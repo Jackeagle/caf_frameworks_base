@@ -20744,6 +20744,7 @@ package android.telephony {
   public abstract class CellLocation {
     ctor public CellLocation();
     method public static android.telephony.CellLocation getEmpty();
+    method public static android.telephony.CellLocation newFromBundle(android.os.Bundle, int);
     method public static void requestLocationUpdate();
   }
 
@@ -22546,6 +22547,12 @@ package android.text.method {
     method protected char[] getAcceptedChars();
     method public int getInputType();
     method public static android.text.method.DialerKeyListener getInstance();
+    field public static final char[] CHARACTERS;
+  }
+
+  public class DialerKeyListenerNoCTS extends android.text.method.DialerKeyListener {
+    ctor public DialerKeyListenerNoCTS();
+    method public static android.text.method.DialerKeyListenerNoCTS getInstance();
     field public static final char[] CHARACTERS;
   }
 

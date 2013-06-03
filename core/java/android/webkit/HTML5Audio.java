@@ -249,6 +249,7 @@ class HTML5Audio extends Handler
                 resetMediaPlayer();
             } else if (mState != ERROR && !mMediaPlayer.isPlaying()) {
                 mMediaPlayer.start();
+				nativeOnRequestPlay(mNativePointer);//yinhui add
                 mState = STARTED;
             }
             break;
@@ -256,8 +257,10 @@ class HTML5Audio extends Handler
         case AudioManager.AUDIOFOCUS_LOSS:
             // Lost focus for an unbounded amount of time: stop playback.
             if (mState != ERROR && mMediaPlayer.isPlaying()) {
-                mMediaPlayer.stop();
-                mState = STOPPED;
+                /*mMediaPlayer.stop();
+                mState = STOPPED;*/
+                pause();
+                nativeOnPaused(mNativePointer);//yinhui add
             }
             break;
 
@@ -334,6 +337,7 @@ class HTML5Audio extends Handler
             return 0;
         }
     }
+	private native void nativeOnPaused(int nativePointer);//yinhui add
 
     private native void nativeOnBuffering(int percent, int nativePointer);
     private native void nativeOnEnded(int nativePointer);

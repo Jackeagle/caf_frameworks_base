@@ -30,6 +30,8 @@ import com.android.systemui.statusbar.policy.BluetoothController;
 import com.android.systemui.statusbar.policy.BrightnessController;
 import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.statusbar.policy.NetworkController;
+import com.android.systemui.statusbar.policy.MSimNetworkController;
+
 import com.android.systemui.statusbar.policy.ToggleSlider;
 
 import android.app.ActivityManagerNative;
@@ -191,6 +193,22 @@ class QuickSettings {
         updateResources();
 
         networkController.addNetworkSignalChangedCallback(mModel);
+        bluetoothController.addStateChangedCallback(mModel);
+        batteryController.addStateChangedCallback(mModel);
+        locationController.addStateChangedCallback(mModel);
+        RotationPolicy.registerRotationPolicyListener(mContext, mRotationPolicyListener,
+                UserHandle.USER_ALL);
+    }
+
+    void setupmsim(MSimNetworkController mSimnetworkController, BluetoothController bluetoothController,
+            BatteryController batteryController, LocationController locationController) {
+        mBluetoothController = bluetoothController;
+
+        setupQuickSettings();
+        updateWifiDisplayStatus();
+        updateResources();
+
+        mSimnetworkController.addSimNetworkSignalChangedCallback(mModel);
         bluetoothController.addStateChangedCallback(mModel);
         batteryController.addStateChangedCallback(mModel);
         locationController.addStateChangedCallback(mModel);
@@ -559,6 +577,7 @@ class QuickSettings {
             public void refreshView(QuickSettingsTileView view, State state) {
                 TextView tv = (TextView) view.findViewById(R.id.airplane_mode_textview);
                 tv.setCompoundDrawablesWithIntrinsicBounds(0, state.iconId, 0, 0);
+	         Log.e(TAG, "airplaneTilestate"+state);
 
                 String airplaneState = mContext.getString(
                         (state.enabled) ? R.string.accessibility_desc_on

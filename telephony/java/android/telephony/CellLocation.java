@@ -72,6 +72,16 @@ public abstract class CellLocation {
             return null;
         }
     }
+    public static CellLocation newFromBundle(Bundle bundle, int subId) {
+        switch(MSimTelephonyManager.getDefault().getCurrentPhoneType(subId)) {
+        case PhoneConstants.PHONE_TYPE_CDMA:
+            return new CdmaCellLocation(bundle);
+        case PhoneConstants.PHONE_TYPE_GSM:
+            return new GsmCellLocation(bundle);
+        default:
+            return null;
+        }
+    }
 
     /**
      * @hide

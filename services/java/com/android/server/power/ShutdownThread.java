@@ -113,6 +113,7 @@ public final class ShutdownThread extends Thread {
     private static final String MUSIC_QRD_SHUTDOWN_FILE = "/data/qrd_theme/boot/shutdown.wav";
  	private boolean isShutdownMusicPlaying = false;   
 	private static AlertDialog sConfirmDialog;
+	private static MediaPlayer mediaPlayer;
     
     private ShutdownThread() {
     }
@@ -373,7 +374,7 @@ public final class ShutdownThread extends Thread {
         
 		showShutdownAnimation();
         String shutDownFile = null;
-        if (!isSilentMode()
+        if (!isSilentMode() && !isBootSoundOff()
                 && (shutDownFile = getShutdownMusicFilePath()) != null) {
             isShutdownMusicPlaying = true;
         Log.i(TAG, "obtainMessage for shutdown music");
@@ -639,6 +640,11 @@ public final class ShutdownThread extends Thread {
         String mode = SystemProperties.get("persist.sys.silent");
         return mode != null && mode.equals("1");
     }
+    private static boolean isBootSoundOff() {
+        String mode = SystemProperties.get("persist.sys.bootsong","1");
+        return !mode.equals("1");
+    }
+
     private static void showShutdownAnimation() {
         SystemProperties.set("ctl.start", "bootanim");
     }
@@ -646,7 +652,8 @@ public final class ShutdownThread extends Thread {
         @Override
         public void handleMessage(Message msg) {
             String path = (String) msg.obj;
-            MediaPlayer mediaPlayer = new MediaPlayer();
+            //mediaPlayer = new MediaPlayer();
+            mediaPlayer = new MediaPlayer();
             try
             {
                 mediaPlayer.reset();

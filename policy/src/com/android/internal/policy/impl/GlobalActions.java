@@ -258,6 +258,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 }
             });
 				// add: fastpoweron
+        if (SystemProperties.getInt("ro.cu.test", 0) == 0) {
 		if (mEnableFastPowerOn) {
 			 mItems.add(
 				 new SinglePressHasSumraryAction(
@@ -277,7 +278,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
 					 }
 				 });
 		 }
-
+         }
         // next: airplane mode
         mItems.add(mAirplaneModeOn);
 

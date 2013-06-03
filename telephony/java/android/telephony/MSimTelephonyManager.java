@@ -176,7 +176,7 @@ public class MSimTelephonyManager {
             iTelephony = ITelephonyMSim.Stub.asInterface(ServiceManager
                     .getService(Context.MSIM_TELEPHONY_SERVICE));
             Bundle bundle = iTelephony.getCellLocation(subscription);
-            CellLocation cl = CellLocation.newFromBundle(bundle);
+            CellLocation cl = CellLocation.newFromBundle(bundle,subscription);
             if (cl.isEmpty())
                 return null;
             return cl;
@@ -359,6 +359,20 @@ public class MSimTelephonyManager {
             return null;
         } catch (NullPointerException ex) {
             return null;
+        }
+    }
+
+    /*
+     * Get subscription is activated or not
+     * @return true if subscription is activated
+     */
+    public boolean isSubActive(int subscription) {
+        try {
+            return getITelephonyMSim().isSubActive(subscription);
+        } catch (RemoteException ex) {
+            return false;
+        } catch (NullPointerException ex) {
+            return false;
         }
     }
 

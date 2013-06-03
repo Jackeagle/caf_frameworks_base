@@ -479,6 +479,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
         mSilentMode = isSilentMode();
         mUnlockWidget = findViewById(R.id.unlock_widget);
         mUnlockWidgetMethods = createUnlockMethods(mUnlockWidget);
+	 mUnlockWidgetMethods.reset(false);
 
         if (DBG) Log.v(TAG, "*** LockScreen accel is "
                 + (mUnlockWidget.isHardwareAccelerated() ? "on":"off"));

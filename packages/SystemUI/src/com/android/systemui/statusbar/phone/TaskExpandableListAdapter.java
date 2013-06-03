@@ -881,7 +881,8 @@ public class TaskExpandableListAdapter extends BaseExpandableListAdapter {
 		public boolean appNeedHide(String psPackageName) {//app filter
 			if ("com.android.stk".equals(psPackageName)||
 				"com.android.settings".equals(psPackageName)||
-				"com.android.bluetooth".equals(psPackageName)
+				"com.android.bluetooth".equals(psPackageName)||
+				"com.android.systemui".equals(psPackageName)
 			){
 				return true;
 			}else{

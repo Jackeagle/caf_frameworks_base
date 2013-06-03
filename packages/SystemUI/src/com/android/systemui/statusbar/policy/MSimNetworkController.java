@@ -111,8 +111,21 @@ public class MSimNetworkController extends NetworkController {
     String[] mSpn;
     String[] mPlmn;
   //  private final LocaleNamesParser localeNamesParser;
-
+  
+  ArrayList<ImageView> mSimPhoneSignalIconViews = new ArrayList<ImageView>();
+  ArrayList<ImageView> mSimDataDirectionIconViews = new ArrayList<ImageView>();
+  ArrayList<ImageView> mSimDataDirectionOverlayIconViews = new ArrayList<ImageView>();
+  ArrayList<ImageView> mSimWifiIconViews = new ArrayList<ImageView>();
+  ArrayList<ImageView> mSimWimaxIconViews = new ArrayList<ImageView>();
+  ArrayList<ImageView> mSimCombinedSignalIconViews = new ArrayList<ImageView>();
+  ArrayList<ImageView> mSimDataTypeIconViews = new ArrayList<ImageView>();
+  ArrayList<TextView> mSimCombinedLabelViews = new ArrayList<TextView>();
+  ArrayList<TextView> mSimMobileLabelViews = new ArrayList<TextView>();
+  ArrayList<TextView> mSimWifiLabelViews = new ArrayList<TextView>();
+  ArrayList<TextView> mSimEmergencyLabelViews = new ArrayList<TextView>();
     ArrayList<MSimSignalCluster> mSimSignalClusters = new ArrayList<MSimSignalCluster>();
+    ArrayList<MSimNetworkSignalChangedCallback> mSimSignalsChangedCallbacks =
+            new ArrayList<MSimNetworkSignalChangedCallback>();
 
     public interface MSimSignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
@@ -140,6 +153,16 @@ public class MSimNetworkController extends NetworkController {
                 int noSimIcon,  int subscription, ServiceState simServiceState,boolean isRoam,boolean dataConnected);
         void setIsAirplaneMode(boolean is, int airplaneIcon);;
     }
+
+    public interface MSimNetworkSignalChangedCallback {
+        void onWifiSignalChanged(boolean enabled, int wifiSignalIconId,
+                String wifitSignalContentDescriptionId, String description);
+        void onMobileDataSignalChanged(boolean enabled, int mobileSignalIconId,
+                String mobileSignalContentDescriptionId, int dataTypeIconId,
+                String dataTypeContentDescriptionId, String description);
+        void onAirplaneModeChanged(boolean enabled);
+    }
+
 
     /**
      * Construct this controller object and register for updates.
@@ -277,6 +300,11 @@ public class MSimNetworkController extends NetworkController {
         refreshSignalCluster(cluster, subscription);
     }
 
+    public void addSimNetworkSignalChangedCallback(MSimNetworkSignalChangedCallback cb) {
+        mSimSignalsChangedCallbacks.add(cb);
+        notifySimSignalsChangedCallbacks(cb);
+    }
+
     public void refreshSignalCluster(MSimSignalCluster cluster, int subscription) {
         cluster.setWifiIndicators(
                 // only show wifi in the cluster if connected or if wifi-only
@@ -325,6 +353,34 @@ public class MSimNetworkController extends NetworkController {
         }
         cluster.setIsAirplaneMode(mAirplaneMode, mAirplaneIconId);
     }
+
+    void notifySimSignalsChangedCallbacks(MSimNetworkSignalChangedCallback cb) {
+        // only show wifi in the cluster if connected or if wifi-only
+        boolean wifiEnabled = mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature);
+        String wifiDesc = wifiEnabled ?
+                mWifiSsid : null;
+        cb.onWifiSignalChanged(wifiEnabled, mQSWifiIconId, mContentDescriptionWifi, wifiDesc);
+
+        if (isEmergencyOnly()) {
+            cb.onMobileDataSignalChanged(false, mQSPhoneSignalIconId,
+                    mContentDescriptionPhoneSignal, mQSDataTypeIconId, mContentDescriptionDataType,
+                    null);
+        } else {
+            if (mIsWimaxEnabled && mWimaxConnected) {
+                // Wimax is special
+                cb.onMobileDataSignalChanged(true, mQSPhoneSignalIconId,
+                        mContentDescriptionPhoneSignal, mQSDataTypeIconId,
+                        mContentDescriptionDataType, mNetworkName);
+            } else {
+                // Normal mobile data
+                cb.onMobileDataSignalChanged(mHasMobileDataFeature, mQSPhoneSignalIconId,
+                        mContentDescriptionPhoneSignal, mQSDataTypeIconId,
+                        mContentDescriptionDataType, mNetworkName);
+            }
+        }
+        cb.onAirplaneModeChanged(mAirplaneMode);
+    }
+
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -520,6 +576,11 @@ public class MSimNetworkController extends NetworkController {
         }
     }
 
+    protected void updateAirplaneMode() {
+        mAirplaneMode = (Settings.Global.getInt(mContext.getContentResolver(),
+            Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
+    }
+
     private final void updateTelephonySignalStrength(int subscription) {
         Slog.d(TAG, "updateTelephonySignalStrength: subscription =" + subscription);
         if (!hasService(subscription) &&
@@ -703,9 +764,9 @@ public class MSimNetworkController extends NetworkController {
             if (isCdmaEri(subscription)) {
                 mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
             }
-        } else if (mPhone.isNetworkRoaming(subscription)) {
+        } /*else if (mPhone.isNetworkRoaming(subscription)) {
             mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
-        }
+        }*/
     }
 
     boolean isCdmaEri(int subscription) {
@@ -1067,13 +1128,13 @@ public class MSimNetworkController extends NetworkController {
                     ? mMSimContentDescriptionDataType[subscription] : mContentDescriptionWifi;
 
             mMSimDataTypeIconId[subscription] = 0;
-            if (isCdma(subscription)) {
+           /* if (isCdma(subscription)) {
                 if (isCdmaEri(subscription)) {
                     mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
                 }
             } else if (mPhone.isNetworkRoaming(subscription)) {
                 mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_roam;
-            }
+            }*/
         }
         if (DEBUG) {
             Slog.d(TAG, "refreshViews connected={"
@@ -1117,6 +1178,9 @@ public class MSimNetworkController extends NetworkController {
             // NB: the mLast*s will be updated later
             for (MSimSignalCluster cluster : mSimSignalClusters) {
                 refreshSignalCluster(cluster, subscription);
+            }
+		for (MSimNetworkSignalChangedCallback cb : mSimSignalsChangedCallbacks) {
+               notifySimSignalsChangedCallbacks(cb);
             }
         }
 
@@ -1262,9 +1326,9 @@ public class MSimNetworkController extends NetworkController {
         int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
         String bannerString = "";
 
-        if(!mConnected){            
+        /*if(!mConnected){            
             bannerString = context.getString(R.string.status_bar_settings_signal_meter_disconnected);
-        }else{
+        }else*/{
             for(int sub=0;sub<numPhones;sub++){
                 if(!mMSimNetworkName[sub].equals(""))
                     bannerString = bannerString + mMSimNetworkName[sub] + "   " ;

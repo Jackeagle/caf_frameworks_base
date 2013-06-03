@@ -205,6 +205,9 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     // Maximum volume adjust steps allowed in a single batch call.
     private static final int MAX_BATCH_VOLUME_ADJUST_STEPS = 4;
 
+    private static final String PROPERTY_BOOTSONG = "persist.sys.bootsong";  
+    private static final String PROPERTY_BOOTSONG_ON_OFF = "persist.sys.bootsong.power"; 
+
     /* Sound effect file names  */
     private static final String SOUND_EFFECTS_PATH = "/media/audio/ui/";
     private static final String[] SOUND_EFFECT_FILES = new String[] {
@@ -1372,6 +1375,14 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         if (persist) {
             sendMsg(mAudioHandler, MSG_PERSIST_RINGER_MODE,
                     SENDMSG_REPLACE, 0, 0, null, PERSIST_DELAY);
+        }
+
+        if(mRingerMode != AudioManager.RINGER_MODE_NORMAL) {
+            //forbid boot sound
+            SystemProperties.set(PROPERTY_BOOTSONG, "0");
+        }else{
+            //allow boot sound
+            SystemProperties.set(PROPERTY_BOOTSONG, "1");
         }
     }
 

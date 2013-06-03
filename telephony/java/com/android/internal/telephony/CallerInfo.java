@@ -408,7 +408,7 @@ public class CallerInfo {
         try {
             String voiceMailLabel = TelephonyManager.getDefault().getVoiceMailAlphaTag();
 
-            phoneNumber = voiceMailLabel;
+            name = voiceMailLabel;
         } catch (SecurityException se) {
             // Should never happen: if this process does not have
             // permission to retrieve VM tag, it should not have
@@ -521,9 +521,9 @@ public class CallerInfo {
      *        this specifies a fallback number to use instead.
      */
     public void updateGeoDescription(Context context, String fallbackNumber) {
-        String number = TextUtils.isEmpty(phoneNumber) ? fallbackNumber : phoneNumber;
-        //geoDescription = getGeoDescription(context, number);
-        geoDescription = getGeoDescriptionExt(context, number);
+        // String number = TextUtils.isEmpty(phoneNumber) ? fallbackNumber : phoneNumber;
+        // geoDescription = getGeoDescription(context, number);
+        geoDescription = getGeoDescriptionExt(context, fallbackNumber);
     }
     
     /**

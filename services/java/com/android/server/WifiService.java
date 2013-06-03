@@ -946,8 +946,9 @@ public class WifiService extends IWifiManager.Stub {
 
     public boolean isDualBandSupported() {
         //TODO: Should move towards adding a driver API that checks at runtime
-        return mContext.getResources().getBoolean(
-                com.android.internal.R.bool.config_wifi_dual_band_support);
+        //return mContext.getResources().getBoolean(
+        //        com.android.internal.R.bool.config_wifi_dual_band_support);
+        return false;
     }
 
     /**

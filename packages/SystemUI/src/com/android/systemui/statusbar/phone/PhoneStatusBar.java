@@ -820,7 +820,7 @@ public class PhoneStatusBar extends BaseStatusBar {
                 mQS.setService(this);
                 mQS.setBar(mStatusBarView);
                 if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                    mQS.setup(mMSimNetworkController, mBluetoothController, mBatteryController,
+                    mQS.setupmsim(mMSimNetworkController, mBluetoothController, mBatteryController,
                             mLocationController);
                 } else {
                     mQS.setup(mNetworkController, mBluetoothController, mBatteryController,

@@ -200,7 +200,14 @@
     <string name="use_ptp_button_title">Mount as a camera (PTP)</string>
     <!-- Label for the installer CD image option in UsbPreferenceActivity. [CHAR LIMIT=50] -->
     <string name="installer_cd_button_title">Install Android File Transfer app for Mac</string>
-
+    <string name="battery_pull_out">Battery is pulled out</string>
+    <!-- Content description of the battery when it is full for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
+    <string name="battery_full_title">Charging Finished!</string>
+    <!-- Content description of the battery when it is overheat for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
+    <string name="battery_overheat_text">Battery temperature too high or too low.</string>
+    <string name="battery_charging_overheat_text">Charging paused. Battery temperature too high or too low.</string>
+    <string name="battery_overheat_title">Battery notification</string>
+    <string name="battery_charging_overheat_title">Charging notification</string>
     <!-- Content description of the back button for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_back">Back</string>
     <!-- Content description of the home button for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->

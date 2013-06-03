@@ -1953,8 +1953,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int ringerModeAffectedStreams = (1 << AudioManager.STREAM_RING) |
                                             (1 << AudioManager.STREAM_NOTIFICATION) |
                                             (1 << AudioManager.STREAM_SYSTEM) |
-                                            (1 << AudioManager.STREAM_SYSTEM_ENFORCED)|
-                                            (1 << AudioManager.STREAM_ALARM);
+                                            (1 << AudioManager.STREAM_SYSTEM_ENFORCED);
             if (!mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_voice_capable)) {
                 ringerModeAffectedStreams |= (1 << AudioManager.STREAM_MUSIC);
@@ -2075,14 +2074,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.System.SHOW_DURATION,
                     FeatureQuery.FEATURE_SHOW_DURATION_AFTER_CALL ? 1 : 0);
 
-            if (SystemProperties.getInt("ro.cmcc.test", 0) == 1) {
-                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                        R.integer.def_key_backlight_values_cmcc);
-            }
-            else{
-                loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
-                        R.integer.def_key_backlight_values);
-            }
+            loadIntegerSetting(stmt, Settings.System.KEY_BACKLIGHT,
+                    R.integer.def_key_backlight_values);
 
             loadBooleanSetting(stmt, Settings.System.PROXIMITY_SENSOR,
                     R.bool.def_proximity_sensor);
@@ -2344,6 +2337,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     R.integer.def_power_sounds_enabled);
             loadStringSetting(stmt, Settings.Global.LOW_BATTERY_SOUND,
                     R.string.def_low_battery_sound);
+            loadStringSetting(stmt, Settings.Global.FULL_BATTERY_SOUND,
+                    R.string.def_full_battery_sound);
             loadIntegerSetting(stmt, Settings.Global.DOCK_SOUNDS_ENABLED,
                     R.integer.def_dock_sounds_enabled);
             loadStringSetting(stmt, Settings.Global.DESK_DOCK_SOUND,
@@ -2392,6 +2387,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // --- New global settings start here
             loadSetting(stmt, Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION,
                     MSimConstants.DEFAULT_SUBSCRIPTION);
+            loadSetting(stmt, Settings.Global.MULTI_SIM_VOICE_CALL_SUBSCRIPTION, 2);
+            loadSetting(stmt, Settings.Global.MULTI_SIM_SMS_SUBSCRIPTION, 2);
         } finally {
             if (stmt != null) stmt.close();
         }

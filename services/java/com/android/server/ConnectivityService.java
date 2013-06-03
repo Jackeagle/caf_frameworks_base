@@ -1789,10 +1789,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private void tryFailover(int prevNetType) {
 //QUALCOMM_CMCC_START
 		if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
-		    //boolean mAutoConnect = Settings.System.getInt(mContext.getContentResolver(), 
-            //            Settings.System.WIFI_AUTO_CONNECT_TYPE, Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO) == Settings.System.WIFI_AUTO_CONNECT_TYPE_AUTO;
-            //show confirm dialog when wifi disconnected
-	        if (prevNetType == ConnectivityManager.TYPE_WIFI/* && !mAutoConnect*/) {
+		    boolean mAutoWifiGsmConnect = Settings.System.getInt(mContext.getContentResolver(), 
+                        Settings.System.WIFI_GSM_CONNECT_TYPE, Settings.System.WIFI_GSM_CONNECT_TYPE_ASK) == Settings.System.WIFI_GSM_CONNECT_TYPE_ASK;
+            //show confirm dialog when wifi disconnected and when switch Gsm->wlan need pop up dialog
+	        if (prevNetType == ConnectivityManager.TYPE_WIFI && mAutoWifiGsmConnect) {
 			    log("---------tryFailover-----------------");
 	            //modify two card nodify for wlan->TD/GSM
 //	            int num_simcard = TelephonyManager.getDefaultDataPhoneId(mContext);

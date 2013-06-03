@@ -33,6 +33,7 @@ import android.provider.ContactsContract.CommonDataKinds.SipAddress;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.PhoneLookup;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.MSimTelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -106,6 +107,7 @@ public class CallerInfoAsyncQuery {
         private Context mQueryContext;
         private Uri mQueryUri;
         private CallerInfo mCallerInfo;
+        private String mNumberToQuery;
 
         /**
          * Our own query worker thread.
@@ -238,6 +240,7 @@ public class CallerInfoAsyncQuery {
                     mCallerInfo = new CallerInfo().markAsEmergency(mQueryContext);
                 } else if (cw.event == EVENT_VOICEMAIL_NUMBER) {
                     mCallerInfo = new CallerInfo().markAsVoiceMail();
+                    mCallerInfo.phoneNumber = mNumberToQuery;
                 } else {
                     mCallerInfo = CallerInfo.getCallerInfo(mQueryContext, mQueryUri, cursor);
                     if (DBG) Log.d(LOG_TAG, "==> Got mCallerInfo: " + mCallerInfo);
@@ -269,7 +272,7 @@ public class CallerInfoAsyncQuery {
                             // the CallerInfo object is totally blank here (i.e. no name
                             // *or* phoneNumber).  So we need to pass in cw.number as
                             // a fallback number.
-                            mCallerInfo.updateGeoDescription(mQueryContext, cw.number);
+                            mCallerInfo.updateGeoDescription(mQueryContext, mNumberToQuery);
                         //}
                     }
 
@@ -335,11 +338,17 @@ public class CallerInfoAsyncQuery {
         cw.cookie = cookie;
         cw.event = EVENT_NEW_QUERY;
 
+        c.mHandler.mNumberToQuery = cw.number;
         c.mHandler.startQuery(token, cw, contactRef, null, null, null, null);
 
         return c;
     }
 
+    public static CallerInfoAsyncQuery startQuery(int token, Context context, String number,
+            OnQueryCompleteListener listener, Object cookie) {
+        return startQuery(token, context, number, listener, MSimTelephonyManager.getDefault().getPreferredVoiceSubscription());
+    } 
+    
     /**
      * Factory method to start the query based on a number.
      *
@@ -352,7 +361,7 @@ public class CallerInfoAsyncQuery {
      * the phone type of the incoming connection.
      */
     public static CallerInfoAsyncQuery startQuery(int token, Context context, String number,
-            OnQueryCompleteListener listener, Object cookie) {
+            OnQueryCompleteListener listener, Object cookie, int Subscription) {
         if (DBG) {
             Log.d(LOG_TAG, "##### CallerInfoAsyncQuery startQuery()... #####");
             Log.d(LOG_TAG, "- number: " + /*number*/ "xxxxxxx");
@@ -420,12 +429,15 @@ public class CallerInfoAsyncQuery {
         // check to see if these are recognized numbers, and use shortcuts if we can.
         if (PhoneNumberUtils.isLocalEmergencyNumber(number, context)) {
             cw.event = EVENT_EMERGENCY_NUMBER;
-        } else if (PhoneNumberUtils.isVoiceMailNumber(number)) {
+        } else if ((MSimTelephonyManager.getDefault().isMultiSimEnabled() 
+                && PhoneNumberUtils.isVoiceMailNumber(number, Subscription))/*Subscription is only used for voice mail checking*/
+                || PhoneNumberUtils.isVoiceMailNumber(number)) {
             cw.event = EVENT_VOICEMAIL_NUMBER;
         } else {
             cw.event = EVENT_NEW_QUERY;
         }
 
+        c.mHandler.mNumberToQuery = cw.number;
         c.mHandler.startQuery(token,
                               cw,  // cookie
                               contactRef,  // uri

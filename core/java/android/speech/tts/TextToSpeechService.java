@@ -641,6 +641,14 @@ public abstract class TextToSpeechService extends Service {
         }
 
         @Override
+        public boolean isValid() {
+            if (!super.isValid()) {
+                return false;
+            }
+            return checkFile(mFile);
+        }
+
+        @Override
         protected AbstractSynthesisCallback createSynthesisCallback() {
             return new FileSynthesisCallback(mFile);
         }
@@ -655,6 +663,33 @@ public abstract class TextToSpeechService extends Service {
                 dispatchOnError();
             }
             return status;
+        }
+
+        /**
+         * Checks that the given file can be used for synthesis output.
+         */
+        private boolean checkFile(File file) {
+            try {
+                if (file.exists()) {
+                    Log.v(TAG, "File " + file + " exists, deleting.");
+                    if (!file.delete()) {
+                        Log.e(TAG, "Failed to delete " + file);
+                        return false;
+                    }
+                }
+                if (!file.createNewFile()) {
+                    Log.e(TAG, "Can't create file " + file);
+                    return false;
+                }
+                if (!file.delete()) {
+                    Log.e(TAG, "Failed to delete " + file);
+                    return false;
+                }
+                return true;
+            } catch (IOException e) {
+                Log.e(TAG, "Can't use " + file + " due to exception " + e);
+                return false;
+            }
         }
     }
 

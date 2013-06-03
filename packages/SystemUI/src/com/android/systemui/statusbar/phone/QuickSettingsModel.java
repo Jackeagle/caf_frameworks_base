@@ -47,11 +47,15 @@ import com.android.systemui.statusbar.policy.BrightnessController.BrightnessStat
 import com.android.systemui.statusbar.policy.CurrentUserTracker;
 import com.android.systemui.statusbar.policy.LocationController.LocationGpsStateChangeCallback;
 import com.android.systemui.statusbar.policy.NetworkController.NetworkSignalChangedCallback;
+import com.android.systemui.statusbar.policy.MSimNetworkController.MSimNetworkSignalChangedCallback;
+
+import android.util.Log;
 
 import java.util.List;
 import android.net.wifi.WifiManager;
 
 class QuickSettingsModel implements BluetoothStateChangeCallback,
+	 MSimNetworkSignalChangedCallback,
         NetworkSignalChangedCallback,
         BatteryStateChangeCallback,
         LocationGpsStateChangeCallback,
@@ -330,6 +334,7 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         mAirplaneModeTile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+            Log.e("zhouwei", "addAirplaneModeTile" +mAirplaneModeState.enabled);
                 if (mAirplaneModeState.enabled) {
                     setAirplaneModeState(false);
                 } else {
@@ -340,6 +345,7 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         mAirplaneModeCallback = cb;
         int airplaneMode = Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.AIRPLANE_MODE_ON, 0);
+	Log.e("zhouwei", "addAirplaneModeTileairplaneMode" +airplaneMode);
         onAirplaneModeChanged(airplaneMode != 0);
     }
     private void setAirplaneModeState(boolean enabled) {

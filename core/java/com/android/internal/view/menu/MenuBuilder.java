@@ -1077,7 +1077,13 @@ public class MenuBuilder implements Menu {
         return mActionItems;
     }
     
-    ArrayList<MenuItemImpl> getNonActionItems() {
+    /**
+     * Get the count of Non Action items. set this function as public,
+     * for it will be used by PhoneWindow to check if there is visible
+     * non-action items to show in OptionMenu
+     * @hide
+     */
+    public ArrayList<MenuItemImpl> getNonActionItems() {
         flagActionItems();
         return mNonActionItems;
     }

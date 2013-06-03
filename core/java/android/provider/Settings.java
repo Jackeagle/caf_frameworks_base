@@ -1597,6 +1597,25 @@ public final class Settings {
          */
         public static final int WIFI_PRIORITY_TYPE_MANUAL = 1;
 
+        /**
+             * Whether connect to data network automatically
+             * @hide
+             */
+        public static final String WIFI_GSM_CONNECT_TYPE = "wifi_gsm_connect_type";
+
+        /**
+             * data network will connect automatically
+             * @hide
+             */
+        public static final int WIFI_GSM_CONNECT_TYPE_AUTO = 0;
+
+        /**
+              * user will be notified when wifi is unavailable
+              * @hide
+              */
+        public static final int WIFI_GSM_CONNECT_TYPE_ASK = 1;
+
+
 		/**
 		 * Whether wpa_supplicant will connect to access point automatically
 		 * @hide
@@ -4509,6 +4528,12 @@ public final class Settings {
          * @hide
          */
         public static final String LOW_BATTERY_SOUND = "low_battery_sound";
+
+        /**
+         * URI for the full battery sound file.
+         * @hide
+         */
+        public static final String FULL_BATTERY_SOUND = "full_battery_sound";
 
         /**
          * Whether to play a sound for low-battery alerts.
