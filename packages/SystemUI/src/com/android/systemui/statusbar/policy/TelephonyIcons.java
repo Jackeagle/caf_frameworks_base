@@ -521,15 +521,77 @@ public class TelephonyIcons {
           R.drawable.stat_sys_r_signal_4_fully_sim2_h  }*/
     };
 
+   private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM1_HA_CU = {
+	{ R.drawable.stat_sys_signal_0_sim1_ha,
+	   R.drawable.stat_sys_signal_1_sim1_ha,
+	   R.drawable.stat_sys_signal_2_sim1_ha,
+	   R.drawable.stat_sys_signal_3_sim1_ha,
+	   R.drawable.stat_sys_signal_4_sim1_ha,
+	   R.drawable.stat_sys_signal_5_sim1_ha  },
+	{ R.drawable.stat_sys_signal_0_sim1_ha,
+	   R.drawable.stat_sys_signal_1_sim1_ha,
+	   R.drawable.stat_sys_signal_2_sim1_ha,
+	   R.drawable.stat_sys_signal_3_sim1_ha,
+	   R.drawable.stat_sys_signal_4_sim1_ha,
+	   R.drawable.stat_sys_signal_5_sim1_ha  }
+	  };
+   
+     private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM2_HA_CU = {
+	{ R.drawable.stat_sys_signal_0_sim2_ha,
+	   R.drawable.stat_sys_signal_1_sim2_ha,
+	   R.drawable.stat_sys_signal_2_sim2_ha,
+	   R.drawable.stat_sys_signal_3_sim2_ha,
+	   R.drawable.stat_sys_signal_4_sim2_ha,
+	   R.drawable.stat_sys_signal_5_sim2_ha  },
+	{ R.drawable.stat_sys_signal_0_sim2_ha,
+	   R.drawable.stat_sys_signal_1_sim2_ha,
+	   R.drawable.stat_sys_signal_2_sim2_ha,
+	   R.drawable.stat_sys_signal_3_sim2_ha,
+	   R.drawable.stat_sys_signal_4_sim2_ha,
+	   R.drawable.stat_sys_signal_5_sim2_ha  }
+	  };
+	 
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_HA_CU = {
+	{ R.drawable.stat_sys_r_signal_0_sim1_ha,
+	   R.drawable.stat_sys_r_signal_1_sim1_ha,
+	   R.drawable.stat_sys_r_signal_2_sim1_ha,
+	   R.drawable.stat_sys_r_signal_3_sim1_ha,
+	   R.drawable.stat_sys_r_signal_4_sim1_ha,
+	   R.drawable.stat_sys_r_signal_5_sim1_ha },
+	{ R.drawable.stat_sys_r_signal_0_sim1_ha,
+	   R.drawable.stat_sys_r_signal_1_sim1_ha,
+          R.drawable.stat_sys_r_signal_2_sim1_ha,
+	   R.drawable.stat_sys_r_signal_3_sim1_ha,
+	   R.drawable.stat_sys_r_signal_4_sim1_ha,
+	   R.drawable.stat_sys_r_signal_5_sim1_ha }
+
+	};
+	
+   private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_HA_CU = {
+	{ R.drawable.stat_sys_r_signal_0_sim2_ha,
+	   R.drawable.stat_sys_r_signal_1_sim2_ha,
+	   R.drawable.stat_sys_r_signal_2_sim2_ha,
+	   R.drawable.stat_sys_r_signal_3_sim2_ha,
+	   R.drawable.stat_sys_r_signal_4_sim2_ha ,
+	   R.drawable.stat_sys_r_signal_5_sim2_ha},
+       { R.drawable.stat_sys_r_signal_0_sim2_ha,
+	   R.drawable.stat_sys_r_signal_1_sim2_ha,
+	   R.drawable.stat_sys_r_signal_2_sim2_ha,
+	   R.drawable.stat_sys_r_signal_3_sim2_ha,
+	   R.drawable.stat_sys_r_signal_4_sim2_ha ,
+	   R.drawable.stat_sys_r_signal_5_sim2_ha}
+        };
+
     static final int[][] DATA_SIGNAL_STRENGTH = TELEPHONY_SIGNAL_STRENGTH;
 
-  
     public static final int[][][] MULTI_SIGNAL_IMAGES_G = {TELEPHONY_SIGNAL_STRENGTH_SIM1_G_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_G_CU};
     public static final int[][][] MULTI_SIGNAL_IMAGES_R_G = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_G_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_G_CU};
     public static final int[][][] MULTI_SIGNAL_IMAGES_3G = {TELEPHONY_SIGNAL_STRENGTH_SIM1_3G_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_3G_CU};
     public static final int[][][] MULTI_SIGNAL_IMAGES_R_3G = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_3G_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_3G_CU};
     public static final int[][][] MULTI_SIGNAL_IMAGES_H = {TELEPHONY_SIGNAL_STRENGTH_SIM1_H_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_H_CU};
     public static final int[][][] MULTI_SIGNAL_IMAGES_R_H = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_H_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_H_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_HA = {TELEPHONY_SIGNAL_STRENGTH_SIM1_HA_CU,TELEPHONY_SIGNAL_STRENGTH_SIM2_HA_CU};
+    public static final int[][][] MULTI_SIGNAL_IMAGES_R_HA = {TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_HA_CU,TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_HA_CU};
 
     // CT status bar icons
     public static final int[][] TELEPHONY_SIGNAL_STRENGTH_3G_CT = {

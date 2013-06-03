@@ -498,6 +498,7 @@ public class StorageNotification extends StorageEventListener {
                 mUsbStorageNotification = new Notification();
                 mUsbStorageNotification.icon = icon;
                 mUsbStorageNotification.when = 0;
+		  mUsbStorageNotification.priority = Notification.PRIORITY_MIN;
             }
 
             if (sound) {
