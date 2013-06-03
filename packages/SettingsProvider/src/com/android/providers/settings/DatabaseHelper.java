@@ -49,6 +49,7 @@ import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 
 import com.android.internal.content.PackageHelper;
+import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.RILConstants;
@@ -1926,10 +1927,41 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     private void loadSettings(SQLiteDatabase db) {
         loadSystemSettings(db);
+        loadEnhanceSystemSettings(db);
         loadSecureSettings(db);
         // The global table only exists for the 'owner' user
         if (mUserHandle == UserHandle.USER_OWNER) {
             loadGlobalSettings(db);
+            loadEnhanceGlobalSettings(db);
+        }
+    }
+
+    private void loadEnhanceSystemSettings(SQLiteDatabase db) {
+        SQLiteStatement stmt = null;
+        try {
+            stmt = db.compileStatement("INSERT OR IGNORE INTO system(name,value)"
+                    + " VALUES(?,?);");
+
+            loadSetting(stmt, Settings.System.CABL_ENABLED, 0);
+
+            loadSetting(stmt, Settings.System.PROXIMITY_SENSOR, 1);
+
+            loadSetting(stmt, Settings.System.DISPLAY_HOME_LOCATION, 1);
+
+            if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                loadSetting(stmt, Settings.System.MULTI_SIM_NAME[MSimConstants.SUB1],
+                        mContext.getString(R.string.name_sim1));
+                loadSetting(stmt, Settings.System.MULTI_SIM_NAME[MSimConstants.SUB2],
+                        mContext.getString(R.string.name_sim2));
+            }
+
+            loadSetting(stmt, Settings.System.PREFERRED_SIM_ICON_INDEX, MSimTelephonyManager
+                    .getDefault().isMultiSimEnabled() ? "0,1" : "0");
+
+            loadSetting(stmt, Settings.System.SHOW_CALL_DURATION, 1);
+        } finally {
+            if (stmt != null)
+                stmt.close();
         }
     }
 
@@ -2097,6 +2129,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         loadStringSetting(stmt, Settings.Secure.BACKUP_TRANSPORT,
                 R.string.def_backup_transport);
+    }
+
+    private void loadEnhanceGlobalSettings(SQLiteDatabase db) {
+        SQLiteStatement stmt = null;
+        try {
+            stmt = db.compileStatement("INSERT OR IGNORE INTO global(name,value)"
+                    + " VALUES(?,?);");
+
+            loadSetting(stmt,
+                    Settings.Global.MULTI_SIM_SMS_SUBSCRIPTION, MSimConstants.SUB1);
+
+            loadSetting(stmt,
+                    Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION, MSimConstants.SUB1);
+
+            loadSetting(stmt,
+                    Settings.Global.MULTI_SIM_VOICE_CALL_SUBSCRIPTION,MSimConstants.SUB1);
+
+            loadSetting(stmt, Settings.Global.ENABLE_FAST_POWERON, 0);
+        } finally {
+            if (stmt != null)
+                stmt.close();
+        }
     }
 
     private void loadGlobalSettings(SQLiteDatabase db) {

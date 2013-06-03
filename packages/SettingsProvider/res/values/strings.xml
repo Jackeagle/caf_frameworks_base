@@ -19,4 +19,6 @@
 <resources>
     <!-- Name of the activity for Settings storage. -->
     <string name="app_label">Settings Storage</string>
+    <string name="name_sim1">SIM1</string>
+    <string name="name_sim2">SIM2</string>
 </resources>
