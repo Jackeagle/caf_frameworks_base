@@ -273,6 +273,47 @@ public class BluetoothGattService {
 
         return value;
     }
+    public String getCharacteristicReportRef(String path)
+    {
+        if (!mHelper.discoveryDone())
+            return null;
+
+    if (characteristicPaths == null)
+        return null;
+    String value = getCharacteristicProperty(path, "ReportReference");
+        if ((value == null) || (Integer.parseInt(value) == 0))  //we try again
+         {
+             String[] properties = null;
+
+             Log.d(TAG, "try again to get Reprot Ref for path: " + path);
+             try {
+                 properties = mService.getCharacteristicProperties(path);
+             } catch (Exception e) {Log.e(TAG, "", e);}
+
+             if (properties != null)
+             {
+                 Log.d(TAG, "we find report reference");
+                 addCharacteristicProperties(path, properties);
+                 value = getCharacteristicProperty(path, "ReportReference");
+             }
+             else
+             {
+                 Log.d(TAG, "still get empty property");
+             }
+         }
+         else
+         {
+             Log.d(TAG, "OMG, we got ReportRef: " + value);
+         }
+
+     if (value != null)
+         {
+             value = String.valueOf((Integer.parseInt(value)));
+         }
+
+         return value;
+    }
+
 
     public boolean writeCharacteristicRaw(String path, byte[] value,
                                           boolean reliable) throws Exception {

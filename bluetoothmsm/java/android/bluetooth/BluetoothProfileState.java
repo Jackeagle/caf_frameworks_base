@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- *
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -46,6 +47,7 @@ public class BluetoothProfileState extends StateMachine {
     public static final int HFP = 0;
     public static final int A2DP = 1;
     public static final int HID = 2;
+    public static final int HOGP = 3;
 
     static final int TRANSITION_TO_STABLE = 100;
 
@@ -80,6 +82,12 @@ public class BluetoothProfileState extends StateMachine {
                     newState == BluetoothProfile.STATE_DISCONNECTED)) {
                     sendMessage(TRANSITION_TO_STABLE);
                 }
+            } else if (action.equals(BluetoothHogpDevice.ACTION_CONNECTION_STATE_CHANGED)) {
+                int newState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                if (mProfile == HOGP && (newState == BluetoothProfile.STATE_CONNECTED ||
+                    newState == BluetoothProfile.STATE_DISCONNECTED)) {
+                    sendMessage(TRANSITION_TO_STABLE);
+                }
             } else if (action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED)) {
                 if (device.equals(mPendingDevice)) {
                     sendMessage(TRANSITION_TO_STABLE);
@@ -99,6 +107,7 @@ public class BluetoothProfileState extends StateMachine {
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothInputDevice.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothHogpDevice.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         context.registerReceiver(mBroadcastReceiver, filter);
     }

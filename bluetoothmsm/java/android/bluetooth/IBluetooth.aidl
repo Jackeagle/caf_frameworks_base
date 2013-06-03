@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008, The Android Open Source Project
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -119,6 +120,15 @@ interface IBluetooth
     int getInputDeviceConnectionState(in BluetoothDevice device);
     boolean setInputDevicePriority(in BluetoothDevice device, int priority);
     int getInputDevicePriority(in BluetoothDevice device);
+
+    // HOGP profile APIs
+    boolean connectHogpDevice(in BluetoothDevice device);
+    boolean disconnectHogpDevice(in BluetoothDevice device);
+    List<BluetoothDevice> getConnectedHogpDevices();
+    List<BluetoothDevice> getHogpDevicesMatchingConnectionStates(in int[] states);
+    int getHogpDeviceConnectionState(in BluetoothDevice device);
+    boolean setHogpDevicePriority(in BluetoothDevice device, int priority);
+    int getHogpDevicePriority(in BluetoothDevice device);
 
     boolean isTetheringOn();
     void setBluetoothTethering(boolean value);

@@ -1382,6 +1382,9 @@ public final class BluetoothAdapter {
         } else if (profile == BluetoothProfile.INPUT_DEVICE) {
             BluetoothInputDevice iDev = new BluetoothInputDevice(context, listener);
             return true;
+        } else if (profile == BluetoothProfile.HOGP_DEVICE) {
+            BluetoothHogpDevice hogpDev = new BluetoothHogpDevice(context, listener);
+            return true;
         } else if (profile == BluetoothProfile.PAN) {
             BluetoothPan pan = new BluetoothPan(context, listener);
             return true;
@@ -1422,6 +1425,10 @@ public final class BluetoothAdapter {
             case BluetoothProfile.INPUT_DEVICE:
                 BluetoothInputDevice iDev = (BluetoothInputDevice)proxy;
                 iDev.close();
+                break;
+            case BluetoothProfile.HOGP_DEVICE:
+                BluetoothHogpDevice hogpDev = (BluetoothHogpDevice)proxy;
+                hogpDev.close();
                 break;
             case BluetoothProfile.PAN:
                 BluetoothPan pan = (BluetoothPan)proxy;

@@ -73,6 +73,8 @@ public final class BluetoothDeviceProfileState extends StateMachine {
     public static final int CONNECT_A2DP_INCOMING = 4;
     public static final int CONNECT_HID_OUTGOING = 5;
     public static final int CONNECT_HID_INCOMING = 6;
+    public static final int CONNECT_HOGP_OUTGOING = 7;
+    public static final int CONNECT_HOGP_INCOMING = 8;
 
     public static final int DISCONNECT_HFP_OUTGOING = 50;
     private static final int DISCONNECT_HFP_INCOMING = 51;
@@ -81,6 +83,8 @@ public final class BluetoothDeviceProfileState extends StateMachine {
     public static final int DISCONNECT_HID_OUTGOING = 54;
     public static final int DISCONNECT_HID_INCOMING = 55;
     public static final int DISCONNECT_PBAP_OUTGOING = 56;
+    public static final int DISCONNECT_HOGP_OUTGOING = 58;
+    public static final int DISCONNECT_HOGP_INCOMING = 59;
 
     public static final int UNPAIR = 100;
     public static final int AUTO_CONNECT_PROFILES = 101;
@@ -109,6 +113,8 @@ public final class BluetoothDeviceProfileState extends StateMachine {
     private OutgoingA2dp mOutgoingA2dp = new OutgoingA2dp();
     private OutgoingHid mOutgoingHid = new OutgoingHid();
     private IncomingHid mIncomingHid = new IncomingHid();
+    private OutgoingHogp mOutgoingHogp = new OutgoingHogp();
+    private IncomingHogp mIncomingHogp = new IncomingHogp();
 
     private Context mContext;
     private BluetoothService mService;
@@ -189,6 +195,22 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                     newState == BluetoothProfile.STATE_DISCONNECTED) {
                     sendMessage(TRANSITION_TO_STABLE);
                 }
+            } else if (action.equals(BluetoothHogpDevice.ACTION_CONNECTION_STATE_CHANGED)) {
+                int newState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                int oldState =
+                    intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, 0);
+                // We trust this device now
+                if (newState == BluetoothHeadset.STATE_CONNECTED) {
+                    setTrust(BluetoothDevice.CONNECTION_ACCESS_YES);
+                }
+                if (oldState == BluetoothProfile.STATE_CONNECTED &&
+                    newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    sendMessage(DISCONNECT_HOGP_INCOMING);
+                }
+                if (newState == BluetoothProfile.STATE_CONNECTED ||
+                    newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    sendMessage(TRANSITION_TO_STABLE);
+                }
             } else if (action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED)) {
                 // This is technically not needed, but we can get stuck sometimes.
                 // For example, if incoming A2DP fails, we are not informed by Bluez
@@ -249,6 +271,8 @@ public final class BluetoothDeviceProfileState extends StateMachine {
         addState(mOutgoingA2dp);
         addState(mOutgoingHid);
         addState(mIncomingHid);
+        addState(mOutgoingHogp);
+        addState(mIncomingHogp);
         setInitialState(mBondedDevice);
 
         IntentFilter filter = new IntentFilter();
@@ -257,6 +281,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
         filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothInputDevice.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothHogpDevice.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
         filter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
@@ -401,6 +426,24 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                         transitionTo(mIncomingHid);
                     }
                     break;
+                /* HOGP cases */
+                case CONNECT_HOGP_OUTGOING:
+                case DISCONNECT_HOGP_OUTGOING:
+                    if (mUnpairStarted == true) {
+                        log("Discarding message " + message.what);
+                    } else {
+                        transitionTo(mOutgoingHogp);
+                    }
+                    break;
+                case CONNECT_HOGP_INCOMING:
+                case DISCONNECT_HOGP_INCOMING:
+                    if (mUnpairStarted == true) {
+                        log("Discarding message " + message.what);
+                    } else {
+                        transitionTo(mIncomingHogp);
+                    }
+                    break;
+                /** HOGP cases end here */
                 case DISCONNECT_PBAP_OUTGOING:
                     processCommand(DISCONNECT_PBAP_OUTGOING);
                     break;
@@ -451,6 +494,10 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                         if (mService.getInputDevicePriority(mDevice) ==
                               BluetoothInputDevice.PRIORITY_AUTO_CONNECT) {
                             mService.connectInputDevice(mDevice);
+                        }
+                        if (mService.getHogpDevicePriority(mDevice) ==
+                              BluetoothHogpDevice.PRIORITY_AUTO_CONNECT) {
+                            mService.connectHogpDevice(mDevice);
                         }
                     }
                     break;
@@ -509,12 +556,14 @@ public final class BluetoothDeviceProfileState extends StateMachine {
         mPbapService = null;
         mIncomingHid = null;
         mOutgoingHid = null;
+        mIncomingHogp = null;
+        mOutgoingHogp = null;
         mIncomingHandsfree = null;
         mOutgoingHandsfree = null;
         mIncomingA2dp = null;
         mOutgoingA2dp = null;
         mBondedDevice = null;
-	//<MR1 change>
+    //<MR1 change>
         super.onQuitting();
     }
 
@@ -1087,7 +1136,161 @@ public final class BluetoothDeviceProfileState extends StateMachine {
       }
   }
 
+        /** HOGP related States */
+        private class OutgoingHogp extends State {
+        private boolean mStatus = false;
+        private int mCommand;
 
+        @Override
+        public void enter() {
+            log("Entering OutgoingHogp state with: " + getCurrentMessage().what);
+            mCommand = getCurrentMessage().what;
+            if (mCommand != CONNECT_HOGP_OUTGOING &&
+                mCommand != DISCONNECT_HOGP_OUTGOING) {
+                Log.e(TAG, "Error: OutgoingHid state with command:" + mCommand);
+            }
+            mStatus = processCommand(mCommand);
+            if (!mStatus) sendMessage(TRANSITION_TO_STABLE);
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            log("OutgoingHid State->Processing Message: " + message.what);
+            Message deferMsg = new Message();
+            switch(message.what) {
+                // defer all outgoing messages
+                case CONNECT_HFP_OUTGOING:
+                case CONNECT_A2DP_OUTGOING:
+                case CONNECT_HID_OUTGOING:
+                case DISCONNECT_HFP_OUTGOING:
+                case DISCONNECT_A2DP_OUTGOING:
+                case DISCONNECT_HID_OUTGOING:
+                    deferMessage(message);
+                    break;
+
+                case CONNECT_HFP_INCOMING:
+                    transitionTo(mIncomingHandsfree);
+                    break;
+                case CONNECT_A2DP_INCOMING:
+                    transitionTo(mIncomingA2dp);
+
+                    // Don't cancel HID outgoing as there is no guarantee it
+                    // will get canceled.
+                    // It might already be connected but we might not have got the
+                    // INPUT_DEVICE_STATE_CHANGE. Hence, no point disconnecting here.
+                    // The worst case, the connection will fail, retry.
+                    if (mStatus) {
+                        deferMsg.what = mCommand;
+                        deferMessage(deferMsg);
+                    }
+                    break;
+                case CONNECT_HOGP_INCOMING:
+                  // Bluez will take care of the conflicts
+                    transitionTo(mIncomingHogp);
+                    break;
+
+                case DISCONNECT_HFP_INCOMING:
+                case DISCONNECT_A2DP_INCOMING:
+                    // At this point, we are already disconnected
+                    // with HFP. Sometimes HID connection can
+                    // fail due to the disconnection of HFP. So add a retry
+                    // for the HID.
+                    if (mStatus) {
+                        deferMsg.what = mCommand;
+                        deferMessage(deferMsg);
+                    }
+                    break;
+                case DISCONNECT_HOGP_INCOMING:
+                    // Ignore, will be handled by Bluez
+                    break;
+                case DISCONNECT_PBAP_OUTGOING:
+                case UNPAIR:
+                case AUTO_CONNECT_PROFILES:
+                    deferMessage(message);
+                    break;
+                case TRANSITION_TO_STABLE:
+                    transitionTo(mBondedDevice);
+                    break;
+                default:
+                    return NOT_HANDLED;
+            }
+            return HANDLED;
+        }
+    }
+
+  // do we really need this?
+  private class IncomingHogp extends State {
+      private boolean mStatus = false;
+      private int mCommand;
+
+      @Override
+    public void enter() {
+          log("Entering IncomingHogp state with: " + getCurrentMessage().what);
+          mCommand = getCurrentMessage().what;
+          if (mCommand != CONNECT_HOGP_INCOMING &&
+              mCommand != DISCONNECT_HOGP_INCOMING) {
+              Log.e(TAG, "Error: IncomingHid state with command:" + mCommand);
+          }
+          mStatus = processCommand(mCommand);
+          if (!mStatus) sendMessage(TRANSITION_TO_STABLE);
+      }
+
+      @Override
+    public boolean processMessage(Message message) {
+          log("IncomingHid State->Processing Message: " + message.what);
+          Message deferMsg = new Message();
+          switch(message.what) {
+              case CONNECT_HFP_OUTGOING:
+              case CONNECT_HFP_INCOMING:
+              case DISCONNECT_HFP_OUTGOING:
+              case CONNECT_A2DP_INCOMING:
+              case CONNECT_A2DP_OUTGOING:
+              case DISCONNECT_A2DP_OUTGOING:
+              case CONNECT_HID_OUTGOING:
+              case CONNECT_HID_INCOMING:
+              case DISCONNECT_HID_OUTGOING:
+                  deferMessage(message);
+                  break;
+              case CONNECTION_ACCESS_REQUEST_REPLY:
+                  mConnectionAccessReplyReceived = true;
+                  int val = message.arg1;
+                  setTrust(val);
+                  handleIncomingConnection(CONNECT_HID_INCOMING,
+                      val == BluetoothDevice.CONNECTION_ACCESS_YES);
+                  break;
+              case CONNECTION_ACCESS_REQUEST_EXPIRY:
+                  if (!mConnectionAccessReplyReceived) {
+                      handleIncomingConnection(CONNECT_HID_INCOMING, false);
+                      sendConnectionAccessRemovalIntent();
+                      sendMessage(TRANSITION_TO_STABLE);
+                  }
+                  break;
+              case DISCONNECT_HFP_INCOMING:
+                  // Shouldn't happen but if does, we can handle it.
+                  // Depends if the headset can handle it.
+                  // Incoming HID will be handled by Bluez, Disconnect HFP
+                  // the socket would have already been closed.
+                  // ignore
+                  break;
+              case DISCONNECT_HOGP_INCOMING:
+              case DISCONNECT_A2DP_INCOMING:
+                  // Ignore, will be handled by Bluez
+                  break;
+              case DISCONNECT_PBAP_OUTGOING:
+              case UNPAIR:
+              case AUTO_CONNECT_PROFILES:
+                  deferMessage(message);
+                  break;
+              case TRANSITION_TO_STABLE:
+                  transitionTo(mBondedDevice);
+                  break;
+              default:
+                  return NOT_HANDLED;
+          }
+          return HANDLED;
+      }
+  }
+  /** HOGP related States end here */
     synchronized void cancelCommand(int command) {
         if (command == CONNECT_HFP_OUTGOING ) {
             // Cancel the outgoing thread.
@@ -1300,6 +1503,15 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                 }
                 processIncomingConnectCommand(command);
                 return true;
+            case CONNECT_HOGP_OUTGOING:
+                return mService.connectHogpDeviceInternal(mDevice);
+            case CONNECT_HOGP_INCOMING:
+                uuids = mDevice.getUuids();
+                if (!BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.Hogp)) {
+                    mDevice.fetchUuidsWithSdp();
+                }
+                processIncomingConnectCommand(command);
+                return true;
             case DISCONNECT_HFP_OUTGOING:
                 if (mHeadsetService == null) {
                     deferProfileServiceMessage(command);
@@ -1342,6 +1554,15 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                     mService.setInputDevicePriority(mDevice, BluetoothInputDevice.PRIORITY_ON);
                 }
                 return mService.disconnectInputDeviceInternal(mDevice);
+            case DISCONNECT_HOGP_INCOMING:
+                // ignore
+                return true;
+            case DISCONNECT_HOGP_OUTGOING:
+                if (mService.getInputDevicePriority(mDevice) ==
+                    BluetoothHogpDevice.PRIORITY_AUTO_CONNECT) {
+                    mService.setHogpDevicePriority(mDevice, BluetoothHogpDevice.PRIORITY_ON);
+                }
+                return mService.disconnectHogpDeviceInternal(mDevice);
             case DISCONNECT_PBAP_OUTGOING:
                 if (!mPbapServiceConnected) {
                     deferProfileServiceMessage(command);

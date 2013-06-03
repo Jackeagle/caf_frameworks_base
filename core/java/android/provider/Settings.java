@@ -3805,7 +3805,7 @@ public final class Settings {
                 "search_global_search_activity";
 
         /**
-	 * Ethernet related configurations
+     * Ethernet related configurations
          */
         public static final String ETHERNET_ON      = "ethernet_on";
         public static final String ETHERNET_MODE    = "ethernet_mode";
@@ -5236,6 +5236,9 @@ public final class Settings {
         /** {@hide} */
         public static final String
                 BLUETOOTH_INPUT_DEVICE_PRIORITY_PREFIX = "bluetooth_input_device_priority_";
+        /** {@hide} */
+        public static final String
+                BLUETOOTH_HOGP_DEVICE_PRIORITY_PREFIX = "bluetooth_hogp_device_priority_";
 
         /**
          * Get the key that retrieves a bluetooth headset's priority.
@@ -5259,6 +5262,14 @@ public final class Settings {
          */
         public static final String getBluetoothInputDevicePriorityKey(String address) {
             return BLUETOOTH_INPUT_DEVICE_PRIORITY_PREFIX + address.toUpperCase();
+        }
+
+        /**
+         * Get the key that retrieves a bluetooth Hogp Device's priority.
+         * @hide
+         */
+        public static final String getBluetoothHogpDevicePriorityKey(String address) {
+            return BLUETOOTH_HOGP_DEVICE_PRIORITY_PREFIX + address.toUpperCase();
         }
 
         /**

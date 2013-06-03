@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
  * Copyright (c) 2011-2013, Linux Foundation. All rights reserved
+ * Not a Contribution.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -32,6 +33,7 @@ import android.bluetooth.BluetoothDeviceProfileState;
 import android.bluetooth.BluetoothHeadset;
 import android.bluetooth.BluetoothHealthAppConfiguration;
 import android.bluetooth.BluetoothInputDevice;
+import android.bluetooth.BluetoothHogpDevice;
 import android.bluetooth.BluetoothPan;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfileState;
@@ -109,6 +111,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private BluetoothEventLoop mEventLoop;
     private BluetoothHeadset mHeadsetProxy;
     private BluetoothInputDevice mInputDevice;
+    private BluetoothHogpDevice mHogpDevice;
     private BluetoothPan mPan;
     private boolean mIsAirplaneSensitive;
     private boolean mIsAirplaneToggleable;
@@ -227,6 +230,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private int mAdapterConnectionState = BluetoothAdapter.STATE_DISCONNECTED;
     private BluetoothPanProfileHandler mBluetoothPanProfileHandler;
     private BluetoothInputProfileHandler mBluetoothInputProfileHandler;
+    private BluetoothHogpProfileHandler mBluetoothHogpProfileHandler;
     private BluetoothHealthProfileHandler mBluetoothHealthProfileHandler;
     private BluetoothGattProfileHandler mBluetoothGattProfileHandler;
     private static final String INCOMING_CONNECTION_FILE =
@@ -457,6 +461,7 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED);
         filter.addAction(BluetoothInputDevice.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothHogpDevice.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothPan.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(Intent.ACTION_DOCK_EVENT);
         filter.addAction(BluetoothDevice.ACTION_CONNECTION_ACCESS_REPLY);
@@ -465,6 +470,7 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
         mContext.registerReceiver(mReceiver, filter);
         mBluetoothInputProfileHandler = BluetoothInputProfileHandler.getInstance(mContext, this);
+        mBluetoothHogpProfileHandler = BluetoothHogpProfileHandler.getInstance(mContext, this);
         mBluetoothPanProfileHandler = BluetoothPanProfileHandler.getInstance(mContext, this);
         mBluetoothHealthProfileHandler = BluetoothHealthProfileHandler.getInstance(mContext, this);
         mBluetoothGattProfileHandler = BluetoothGattProfileHandler.getInstance(mContext, this);
@@ -2935,7 +2941,18 @@ public class BluetoothService extends IBluetooth.Stub {
 
                 sendConnectionStateChange(inputDevice, BluetoothProfile.INPUT_DEVICE, state,
                                                     prevState);
-            } else if (BluetoothPan.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+            } else if (BluetoothHogpDevice.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                Log.i(TAG, "HOGP connection state change" + action);
+                int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                int prevState =
+                    intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, 0);
+                BluetoothDevice inputDevice =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                sendConnectionStateChange(inputDevice, BluetoothProfile.HOGP_DEVICE, state,
+                                                    prevState);
+            }
+            else if (BluetoothPan.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
                 Log.i(TAG, "Pan connection state change" + action);
                 int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
                 int prevState =
@@ -3109,6 +3126,7 @@ public class BluetoothService extends IBluetooth.Stub {
         dumpAclConnectedDevices(pw);
         dumpHeadsetService(pw);
         dumpInputDeviceProfile(pw);
+        dumpHogpDeviceProfile(pw);
         dumpPanProfile(pw);
         dumpApplicationServiceRecords(pw);
         dumpProfileState(pw);
@@ -3116,6 +3134,7 @@ public class BluetoothService extends IBluetooth.Stub {
         //GC for service listener references
         mAdapter.closeProfileProxy(BluetoothProfile.HEADSET, mHeadsetProxy);
         mAdapter.closeProfileProxy(BluetoothProfile.INPUT_DEVICE, mInputDevice);
+        mAdapter.closeProfileProxy(BluetoothProfile.HOGP_DEVICE, mHogpDevice);
         mAdapter.closeProfileProxy(BluetoothProfile.PAN, mPan);
     }
 
@@ -3184,6 +3203,40 @@ public class BluetoothService extends IBluetooth.Stub {
             }
             deviceList.clear();
             deviceList = mInputDevice.getDevicesMatchingConnectionStates(new int[] {
+                     BluetoothProfile.STATE_CONNECTED, BluetoothProfile.STATE_DISCONNECTED});
+            pw.println("--Connected and Disconnected input devices");
+            for (BluetoothDevice device: deviceList) {
+                pw.println(device);
+            }
+        }
+    }
+
+    private void dumpHogpDeviceProfile(PrintWriter pw) {
+        pw.println("\n--Bluetooth Service- HOGP Device Profile");
+        if (mHogpDevice != null) {
+            List<BluetoothDevice> deviceList = mHogpDevice.getConnectedDevices();
+            if (deviceList.size() == 0) {
+                pw.println("No input devices connected");
+            } else {
+                pw.println("Number of connected devices:" + deviceList.size());
+                BluetoothDevice device = deviceList.get(0);
+                pw.println("getConnectedDevices[0] = " + device);
+                pw.println("Priority of Connected device = " + mInputDevice.getPriority(device));
+
+                switch (mHogpDevice.getConnectionState(device)) {
+                    case BluetoothInputDevice.STATE_CONNECTING:
+                        pw.println("getConnectionState() = STATE_CONNECTING");
+                        break;
+                    case BluetoothInputDevice.STATE_CONNECTED:
+                        pw.println("getConnectionState() = STATE_CONNECTED");
+                        break;
+                    case BluetoothInputDevice.STATE_DISCONNECTING:
+                        pw.println("getConnectionState() = STATE_DISCONNECTING");
+                        break;
+                }
+            }
+            deviceList.clear();
+            deviceList = mHogpDevice.getDevicesMatchingConnectionStates(new int[] {
                      BluetoothProfile.STATE_CONNECTED, BluetoothProfile.STATE_DISCONNECTED});
             pw.println("--Connected and Disconnected input devices");
             for (BluetoothDevice device: deviceList) {
@@ -3318,6 +3371,8 @@ public class BluetoothService extends IBluetooth.Stub {
                 mHeadsetProxy = (BluetoothHeadset) proxy;
             } else if (profile == BluetoothProfile.INPUT_DEVICE) {
                 mInputDevice = (BluetoothInputDevice) proxy;
+            } else if (profile == BluetoothProfile.HOGP_DEVICE) {
+                mHogpDevice = (BluetoothHogpDevice) proxy;
             } else if (profile == BluetoothProfile.PAN) {
                 mPan = (BluetoothPan) proxy;
             }
@@ -3327,6 +3382,8 @@ public class BluetoothService extends IBluetooth.Stub {
                 mHeadsetProxy = null;
             } else if (profile == BluetoothProfile.INPUT_DEVICE) {
                 mInputDevice = null;
+            } else if (profile == BluetoothProfile.HOGP_DEVICE) {
+                mHogpDevice = null;
             } else if (profile == BluetoothProfile.PAN) {
                 mPan = null;
             }
@@ -3538,6 +3595,76 @@ public class BluetoothService extends IBluetooth.Stub {
             return mBluetoothInputProfileHandler.setInputDevicePriority(device, priority);
         }
     }
+
+   /********************** HOGP related **************************/
+   public boolean connectHogpDevice(BluetoothDevice device) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
+                                                "Need BLUETOOTH_ADMIN permission");
+        BluetoothDeviceProfileState state = mDeviceProfileState.get(device.getAddress());
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.connectInputDevice(device, state);
+        }
+    }
+
+    public boolean connectHogpDeviceInternal(BluetoothDevice device) {
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.connectInputDeviceInternal(device);
+        }
+    }
+
+    public boolean disconnectHogpDevice(BluetoothDevice device) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
+                                                "Need BLUETOOTH_ADMIN permission");
+        BluetoothDeviceProfileState state = mDeviceProfileState.get(device.getAddress());
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.disconnectInputDevice(device, state);
+        }
+    }
+
+    public boolean disconnectHogpDeviceInternal(BluetoothDevice device) {
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.disconnectInputDeviceInternal(device);
+        }
+    }
+
+    public int getHogpDeviceConnectionState(BluetoothDevice device) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.getInputDeviceConnectionState(device);
+        }
+    }
+
+    public List<BluetoothDevice> getConnectedHogpDevices() {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.getConnectedInputDevices();
+        }
+    }
+
+    public List<BluetoothDevice> getHogpDevicesMatchingConnectionStates(
+            int[] states) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.getInputDevicesMatchingConnectionStates(states);
+        }
+    }
+
+
+    public int getHogpDevicePriority(BluetoothDevice device) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.getInputDevicePriority(device);
+        }
+    }
+
+    public boolean setHogpDevicePriority(BluetoothDevice device, int priority) {
+        mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
+                                                "Need BLUETOOTH_ADMIN permission");
+        synchronized (mBluetoothHogpProfileHandler) {
+            return mBluetoothHogpProfileHandler.setInputDevicePriority(device, priority);
+        }
+    }
+    /**************** HOGP related APIs end here */
 
     /**
      * Handle incoming profile acceptance for profiles handled by Bluetooth Service,

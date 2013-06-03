@@ -277,7 +277,8 @@ LOCAL_SRC_FILES += \
 	bluetoothmsm/java/android/bluetooth/IBluetoothPreferredDeviceListCallback.aidl \
 	bluetoothmsm/java/android/bluetooth/IBluetoothStateChangeCallback.aidl \
 	bluetoothmsm/java/android/bluetooth/IBluetoothThermometerCallBack.aidl \
-	bluetoothmsm/java/android/bluetooth/IBluetoothThermometerServices.aidl
+	bluetoothmsm/java/android/bluetooth/IBluetoothThermometerServices.aidl \
+	bluetoothmsm/java/android/server/IHogpDevice.aidl
 else
 LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/IBluetooth.aidl \

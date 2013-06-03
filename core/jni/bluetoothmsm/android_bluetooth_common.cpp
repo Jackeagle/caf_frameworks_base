@@ -2,7 +2,6 @@
 ** Copyright 2006, The Android Open Source Project
 ** Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
 ** Not a Contribution.
-**
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
 ** You may obtain a copy of the License at
@@ -113,6 +112,7 @@ static Properties gatt_characteristic_properties[] = {
     {"Value", DBUS_TYPE_ARRAY},
     {"Representation", DBUS_TYPE_STRING},
     {"ClientConfiguration", DBUS_TYPE_UINT16},
+    {"ReportReference", DBUS_TYPE_UINT16},
     {"Properties", DBUS_TYPE_BYTE},
 };
 
