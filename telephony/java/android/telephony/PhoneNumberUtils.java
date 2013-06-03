@@ -1867,8 +1867,8 @@ public class PhoneNumberUtils
         // don't return true when both are null.
         return !TextUtils.isEmpty(number) && compare(number, vmNumber);
     }
-	
-	/**
+
+    /**
      * isVoiceMailNumber: checks a given number against the voicemail number
      * provided by the RIL and SIM card. The caller must have the
      * READ_PHONE_STATE credential.
