@@ -1788,7 +1788,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
     private void tryFailover(int prevNetType) {
 //QUALCOMM_CMCC_START
-		if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) {
+		if (FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT && !FeatureQuery.FEATURE_CTS_TEST_SUPPORT) {
 		    boolean mAutoWifiGsmConnect = Settings.System.getInt(mContext.getContentResolver(), 
                         Settings.System.WIFI_GSM_CONNECT_TYPE, Settings.System.WIFI_GSM_CONNECT_TYPE_ASK) == Settings.System.WIFI_GSM_CONNECT_TYPE_ASK;
             //show confirm dialog when wifi disconnected and when switch Gsm->wlan need pop up dialog
@@ -2146,7 +2146,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         &&(ConnectivityManager.TYPE_MOBILE == mActiveDefaultNetwork)){
                         log("not tear down mobile for cts test");
                     }
-                    else if (!((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_WIFI))) {
+                    else if (FeatureQuery.FEATURE_CTS_TEST_SUPPORT || !((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_WIFI))) {
                         if (!teardown(otherNet)) {
                             loge("Network declined teardown request");
                             teardown(thisNet);
