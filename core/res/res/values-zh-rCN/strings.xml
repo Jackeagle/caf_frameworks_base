@@ -1461,4 +1461,6 @@
     <string name="China_Mobile">中国移动</string>
     <string name="China_Unicom">中国联通</string>
     <string name="China_Telecom">中国电信</string>
+    <string name="lockscreen_sim_deactivate">SIM卡已禁用</string>
+    <string name="lockscreen_airplane_mode_on">飞行模式</string>
 </resources>

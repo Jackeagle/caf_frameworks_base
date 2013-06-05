@@ -1456,4 +1456,6 @@
     <string name="enable_accessibility_canceled" msgid="3833923257966635673">"協助工具已取消。"</string>
     <string name="user_switched" msgid="3768006783166984410">"目前的使用者是 <xliff:g id="NAME">%1$s</xliff:g>。"</string>
     <string name="owner_name" msgid="2716755460376028154">"擁有者"</string>
+    <string name="lockscreen_sim_deactivate">"SIM卡已禁用"</string>
+    <string name="lockscreen_airplane_mode_on">"飞行模式"</string>
 </resources>

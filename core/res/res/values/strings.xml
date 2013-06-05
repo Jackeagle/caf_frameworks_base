@@ -4054,4 +4054,9 @@
     <string name="China_Mobile">China Mobile</string>
     <string name="China_Unicom">China Unicom</string>
     <string name="China_Telecom">China Telecom</string>
+
+    <!-- Show in the lock screen when the SIM is deactivated. -->
+    <string name="lockscreen_sim_deactivate">SIM deactivated</string>
+    <!-- Shown in the lock screen to tell the user that phone is in airplane mode-->
+    <string name="lockscreen_airplane_mode_on">Airplane Mode</string>
 </resources>
