@@ -37,6 +37,7 @@ import com.android.internal.telephony.ITelephonyRegistry;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.RILConstants;
 import com.android.internal.telephony.TelephonyProperties;
+import com.android.internal.telephony.MSimConstants;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -410,6 +411,14 @@ public class TelephonyManager {
     /**
      * The contents of the /proc/cmdline file
      */
+
+    public int getPhoneCount() {
+        int phoneCount = 1;
+        if (isMultiSimEnabled()) {
+            phoneCount = MSimConstants.MAX_PHONE_COUNT_DS;
+        }
+        return phoneCount;
+    }
     private static String getProcCmdLine()
     {
         String cmdline = "";
