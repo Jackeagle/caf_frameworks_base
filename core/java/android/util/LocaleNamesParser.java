@@ -72,7 +72,8 @@ public final class LocaleNamesParser {
         Integer localeId = null;
         mNames.clear();
         for (int i = 0; i < origNames.length; i++) {
-            localeId = new Integer(res.getIdentifier(localeNames[i], "string", "android"));
+            localeId = new Integer(res.getIdentifier(localeNames[i], "string",
+                    mContext.getPackageName()));
             mNames.put(origNames[i], localeId);
         }
     }

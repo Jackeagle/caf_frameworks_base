@@ -22,6 +22,8 @@ import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.android.internal.telephony.MSimConstants;
+
 import android.app.ActivityManager;
 import android.app.backup.BackupManager;
 import android.content.BroadcastReceiver;
@@ -50,7 +52,9 @@ import android.os.UserManager;
 import android.provider.DrmStore;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.telephony.MSimTelephonyManager;
 import android.text.TextUtils;
+import android.util.LocaleNamesParser;
 import android.util.Log;
 import android.util.LruCache;
 import android.util.Slog;
@@ -327,6 +331,7 @@ public class SettingsProvider extends ContentProvider {
 
         IntentFilter userFilter = new IntentFilter();
         userFilter.addAction(Intent.ACTION_USER_REMOVED);
+        userFilter.addAction(Intent.ACTION_LOCALE_CHANGED);
         getContext().registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -336,6 +341,8 @@ public class SettingsProvider extends ContentProvider {
                     if (userHandle != UserHandle.USER_OWNER) {
                         onUserRemoved(userHandle);
                     }
+                } else if (intent.getAction().equals(Intent.ACTION_LOCALE_CHANGED)) {
+                    updateSimNames();
                 }
             }
         }, userFilter);
@@ -356,6 +363,28 @@ public class SettingsProvider extends ContentProvider {
             sSystemCaches.delete(userHandle);
             sSecureCaches.delete(userHandle);
             sKnownMutationsInFlight.delete(userHandle);
+        }
+    }
+
+    private void updateSimNames() {
+        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+            String simName = Settings.System.getString(getContext().getContentResolver(),
+                    Settings.System.MULTI_SIM_NAME[i]);
+            String localeSimName;
+            if (simName != null && !simName.equals(localeSimName = getLocaleSimName(simName))) {
+                Settings.System.putString(getContext().getContentResolver(),
+                        Settings.System.MULTI_SIM_NAME[i], localeSimName);
+            }
+        }
+    }
+
+    private String getLocaleSimName(String simName) {
+        LocaleNamesParser parser = new LocaleNamesParser(getContext(), TAG,
+                R.array.origin_sim_names, R.array.sim_name_keys);
+        if (simName == null) {
+            return null;
+        } else {
+            return (String) parser.getLocaleName(simName);
         }
     }
 
@@ -593,6 +622,13 @@ public class SettingsProvider extends ContentProvider {
         values.put(Settings.NameValueTable.VALUE, newValue);
         if (Settings.CALL_METHOD_PUT_SYSTEM.equals(method)) {
             if (LOCAL_LOGV) Slog.v(TAG, "call_put(system:" + request + "=" + newValue + ") for " + callingUser);
+            for (String setting : Settings.System.MULTI_SIM_NAME) {
+                String localeSimName;
+                if (setting.equals(request)) {
+                    values.put(Settings.NameValueTable.VALUE, getLocaleSimName(newValue));
+                    break;
+                }
+            }
             insertForUser(Settings.System.CONTENT_URI, values, callingUser);
         } else if (Settings.CALL_METHOD_PUT_SECURE.equals(method)) {
             if (LOCAL_LOGV) Slog.v(TAG, "call_put(secure:" + request + "=" + newValue + ") for " + callingUser);
