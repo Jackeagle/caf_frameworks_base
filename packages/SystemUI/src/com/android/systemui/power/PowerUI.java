@@ -229,7 +229,6 @@ public class PowerUI extends SystemUI {
                 ((mBatteryLevelTextView == null) ? "showing" : "updating")
                 + " low battery warning: level=" + mBatteryLevel
                 + " [" + findBatteryLevelBucket(mBatteryLevel) + "]");
-        closeLastBatteryView();
         CharSequence levelText = mContext.getString(
                 R.string.battery_low_percent_format, mBatteryLevel);
 
