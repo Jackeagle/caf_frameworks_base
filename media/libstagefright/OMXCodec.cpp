@@ -3591,7 +3591,12 @@ void OMXCodec::onCmdComplete(OMX_COMMANDTYPE cmd, OMX_U32 data) {
                 } else {
                     err = allocateBuffersOnPort(portIndex);
                     if (err != OK) {
-                        CODEC_LOGE("allocateBuffersOnPort failed (err = %d)", err);
+                        CODEC_LOGE("allocateBuffersOnPort (%s) failed "
+                                   "(err = %d)",
+                                   portIndex == kPortIndexInput
+                                        ? "input" : "output",
+                                   err);
+
                         setState(ERROR);
                     }
                 }
@@ -5080,6 +5085,23 @@ status_t OMXCodec::stop() {
         {
             CODEC_LOGE("in error state, check omx il state and decide whether to free or skip");
 
+            if (mPortStatus[kPortIndexOutput] == ENABLING) {
+                // Codec is in a wedged state (technical term)
+                // We've seen an output port settings change from the codec,
+                // We've disabled the output port, then freed the output
+                // buffers, initiated re-enabling the output port but
+                // failed to reallocate the output buffers.
+                // There doesn't seem to be a way to orderly transition
+                // from executing->idle and idle->loaded now that the
+                // output port hasn't been reenabled yet...
+                // Simply free as many resources as we can and pretend
+                // that we're in LOADED state so that the destructor
+                // will free the component instance without asserting.
+                freeBuffersOnPort(kPortIndexInput, true /* onlyThoseWeOwn */);
+                freeBuffersOnPort(kPortIndexOutput, true /* onlyThoseWeOwn */);
+                setState(LOADED);
+                break;
+            } else {
             OMX_STATETYPE state = OMX_StateInvalid;
             status_t err = mOMX->getState(mNode, &state);
             CHECK_EQ(err, (status_t)OK);
@@ -5149,6 +5171,7 @@ status_t OMXCodec::stop() {
             }
             // else fall through to the idling code
             isError = true;
+            }
         }
 
         case PAUSED:
