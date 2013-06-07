@@ -35,6 +35,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncResult;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.telephony.MSimTelephonyManager;
 
@@ -153,8 +154,9 @@ public class MSimIccCardProxy extends IccCardProxy {
     private void onSubscriptionActivated() {
         SubscriptionManager subMgr = SubscriptionManager.getInstance();
         mSubscriptionData = subMgr.getCurrentSubscription(mCardIndex);
-
-        resetProperties();
+        if (0 == SystemProperties.getInt("persist.radio.apm_sim_not_pwdn", 0)) {
+            resetProperties();
+        }
         updateIccAvailability();
         updateStateProperty();
     }
