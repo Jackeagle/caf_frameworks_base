@@ -39,6 +39,8 @@ import android.os.HandlerThread;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
+// WAPI
+import android.net.wifi.WifiConfiguration.KeyMgmt;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -1076,6 +1078,32 @@ class WifiConfigStore {
                         allowedGroupCiphersString);
                 break setVariables;
             }
+			// Atheros WAPI
+			if (config.wapiASCert != null && !config.wapiASCert.equals("*") &&
+				!mWifiNative.setNetworkVariable(netId, WifiConfiguration.wapiAsCertFileVarName, config.wapiASCert)) {
+				Log.e(TAG, "failed to set as cert: "+config.wapiASCert);
+				Log.d(TAG, "- config.wapiASCert = " + config.wapiASCert);
+				break setVariables;
+				}
+
+			if (config.wapiUserCert!= null && !config.wapiUserCert.equals("*") &&
+				!mWifiNative.setNetworkVariable(netId, WifiConfiguration.wapiUserCertFileVarName, config.wapiUserCert)) {
+				Log.e(TAG, "failed to set user cert: "+config.wapiUserCert);
+				Log.d(TAG, "- config.wapiUserCert =  " + config.wapiUserCert);
+				break setVariables;
+				}
+			if (config.allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
+				if (config.wapiPsk != null && !config.wapiPsk.equals("*") &&
+					!mWifiNative.setNetworkVariable(netId, WifiConfiguration.wapiPskVarName, config.wapiPsk)) {
+					Log.e(TAG, "failed to set wapi psk: " + config.wapiPsk);
+					break setVariables;
+					}
+				if (!mWifiNative.setNetworkVariable(netId, WifiConfiguration.wapiPskTypeVarName, Integer.toString(config.wapiPskType))) {
+					Log.e(TAG, "failed to set wapi key type: "+ config.wapiPskType);
+					break setVariables;
+					}
+				}
+			// WAPI++++
 
             // Prevent client screw-up by passing in a WifiConfiguration we gave it
             // by preventing "*" as a key.
@@ -1384,6 +1412,34 @@ class WifiConfigStore {
                 config.wepKeys[i] = null;
             }
         }
+        // WAPI+++   WifiConfiguration  --class definede
+        value = mWifiNative.getNetworkVariable(netId, WifiConfiguration.wapiAsCertFileVarName);
+        if (!TextUtils.isEmpty(value)) {
+            config.wapiASCert = value;
+        } else {
+            config.wapiASCert = null;
+        }
+
+        value = mWifiNative.getNetworkVariable(netId, WifiConfiguration.wapiUserCertFileVarName);
+        if (!TextUtils.isEmpty(value)) {
+            config.wapiUserCert = value;
+        } else {
+            config.wapiUserCert = null;
+        }
+                                                                                                                                            value = mWifiNative.getNetworkVariable(netId, WifiConfiguration.wapiPskTypeVarName);
+        if (!TextUtils.isEmpty(value)) {
+            try {
+                config.wapiPskType = Integer.parseInt(value);
+            } catch (NumberFormatException ignore) {
+            }
+        }
+        value = mWifiNative.getNetworkVariable(netId, WifiConfiguration.wapiPskVarName);
+        if (!TextUtils.isEmpty(value)) {
+            config.wapiPsk = value;
+        } else {
+            config.wapiPsk = null;
+        }
+        //  WAPI---
 
         value = mWifiNative.getNetworkVariable(netId, WifiConfiguration.pskVarName);
         if (!TextUtils.isEmpty(value)) {
