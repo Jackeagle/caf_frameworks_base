@@ -216,15 +216,15 @@ public abstract class WallpaperService extends Service {
                     // Regular apps can't do this.  It can only work for
                     // certain designs of window animations, so you can't
                     // rely on it.
-                    throw new UnsupportedOperationException(
-                            "Wallpapers currently only support sizing from layout");
+                    //throw new UnsupportedOperationException(
+                     //       "Wallpapers currently only support sizing from layout");
                 }
                 super.setFixedSize(width, height);
             }
             
             public void setKeepScreenOn(boolean screenOn) {
-                throw new UnsupportedOperationException(
-                        "Wallpapers do not support keep screen on");
+                //throw new UnsupportedOperationException(
+                //        "Wallpapers do not support keep screen on");
             }
             
         };
