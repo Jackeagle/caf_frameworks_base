@@ -118,6 +118,8 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
+import android.telephony.MSimTelephonyManager;
+import com.android.internal.telephony.MSimConstants;
 import android.text.format.Formatter;
 import android.text.format.Time;
 import android.util.AtomicFile;
@@ -686,18 +688,29 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
      * data connection status.
      */
     private boolean isTemplateRelevant(NetworkTemplate template) {
-        final TelephonyManager tele = TelephonyManager.from(mContext);
-
         switch (template.getMatchRule()) {
             case MATCH_MOBILE_3G_LOWER:
             case MATCH_MOBILE_4G:
             case MATCH_MOBILE_ALL:
                 // mobile templates are relevant when SIM is ready and
                 // subscriberId matches.
-                if (tele.getSimState() == SIM_STATE_READY) {
-                    return Objects.equal(tele.getSubscriberId(), template.getSubscriberId());
-                } else {
-                    return false;
+                if(TelephonyManager.isMultiSimEnabled())
+                {
+                    MSimTelephonyManager tele = MSimTelephonyManager.from(mContext);
+                    int sub=tele.getPreferredDataSubscription();
+                    if (tele.getSimState(sub) == SIM_STATE_READY){
+                        return Objects.equal(tele.getSubscriberId(sub), template.getSubscriberId());
+                    } else {
+                        return false;
+                    }
+                }
+                else{
+                    TelephonyManager tele = TelephonyManager.from(mContext);
+                    if (tele.getSimState() == SIM_STATE_READY) {
+                        return Objects.equal(tele.getSubscriberId(), template.getSubscriberId());
+                    } else {
+                        return false;
+                    }
                 }
         }
         return true;
@@ -944,18 +957,30 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
      * for the given {@link NetworkTemplate}.
      */
     private void setNetworkTemplateEnabled(NetworkTemplate template, boolean enabled) {
-        final TelephonyManager tele = TelephonyManager.from(mContext);
-
         switch (template.getMatchRule()) {
             case MATCH_MOBILE_3G_LOWER:
             case MATCH_MOBILE_4G:
             case MATCH_MOBILE_ALL:
                 // TODO: offer more granular control over radio states once
                 // 4965893 is available.
-                if (tele.getSimState() == SIM_STATE_READY
-                        && Objects.equal(tele.getSubscriberId(), template.getSubscriberId())) {
-                    setPolicyDataEnable(TYPE_MOBILE, enabled);
-                    setPolicyDataEnable(TYPE_WIMAX, enabled);
+                if(TelephonyManager.isMultiSimEnabled())
+                {
+                    MSimTelephonyManager tele = MSimTelephonyManager.from(mContext);
+                    int sub=tele.getPreferredDataSubscription();
+                    if (tele.getSimState(sub) == SIM_STATE_READY
+                        && Objects.equal(tele.getSubscriberId(sub), template.getSubscriberId())) {
+                        setPolicyDataEnable(TYPE_MOBILE, enabled);
+                        setPolicyDataEnable(TYPE_WIMAX, enabled);
+                    }
+                }
+                else
+                {
+                    TelephonyManager tele = TelephonyManager.from(mContext);
+                    if (tele.getSimState() == SIM_STATE_READY
+                            && Objects.equal(tele.getSubscriberId(), template.getSubscriberId())) {
+                        setPolicyDataEnable(TYPE_MOBILE, enabled);
+                        setPolicyDataEnable(TYPE_WIMAX, enabled);
+                    }
                 }
                 break;
             case MATCH_WIFI:
@@ -1104,7 +1129,52 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         if (LOGV) Slog.v(TAG, "ensureActiveMobilePolicyLocked()");
         if (mSuppressDefaultPolicy) return;
 
-        final TelephonyManager tele = TelephonyManager.from(mContext);
+        if(TelephonyManager.isMultiSimEnabled())
+        {
+            MSimTelephonyManager tele = MSimTelephonyManager.from(mContext);
+            int i=0;
+            int count=MSimConstants.MAX_PHONE_COUNT_DS;
+            for (; i<count; i++) {
+                // avoid creating policy when SIM isn't ready
+                if (tele.getSimState(i) != SIM_STATE_READY) break;
+
+                final String subscriberId = tele.getSubscriberId(i);
+                final NetworkIdentity probeIdent = new NetworkIdentity(
+                        TYPE_MOBILE, TelephonyManager.NETWORK_TYPE_UNKNOWN, subscriberId, null, false);
+
+                // examine to see if any policy is defined for active mobile
+                boolean mobileDefined = false;
+                for (NetworkPolicy policy : mNetworkPolicy.values()) {
+                    if (policy.template.matches(probeIdent)) {
+                        mobileDefined = true;
+                    }
+                }
+                Slog.v(TAG, "  subscriberId="+subscriberId+"  mobileDefined="+mobileDefined+"  probeIdent="+probeIdent);
+
+                if (!mobileDefined) {
+                    Slog.i(TAG, "no policy for active mobile network; generating default policy");
+
+                    // build default mobile policy, and assume usage cycle starts today
+                    final long warningBytes = mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_networkPolicyDefaultWarning)
+                            * MB_IN_BYTES;
+
+                    final Time time = new Time();
+                    time.setToNow();
+
+                    final int cycleDay = time.monthDay;
+                    final String cycleTimezone = time.timezone;
+
+                    final NetworkTemplate template = buildTemplateMobileAll(subscriberId);
+                    final NetworkPolicy policy = new NetworkPolicy(template, cycleDay, cycleTimezone,
+                            warningBytes, LIMIT_DISABLED, SNOOZE_NEVER, SNOOZE_NEVER, true, true);
+                    addNetworkPolicyLocked(policy);
+                }
+             }
+        }
+        else
+        {
+            TelephonyManager tele = TelephonyManager.from(mContext);
 
         // avoid creating policy when SIM isn't ready
         if (tele.getSimState() != SIM_STATE_READY) return;
@@ -1139,6 +1209,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             final NetworkPolicy policy = new NetworkPolicy(template, cycleDay, cycleTimezone,
                     warningBytes, LIMIT_DISABLED, SNOOZE_NEVER, SNOOZE_NEVER, true, true);
             addNetworkPolicyLocked(policy);
+            }
         }
     }
 

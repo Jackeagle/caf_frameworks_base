@@ -345,5 +345,12 @@ interface ITelephonyMSim {
      */
     boolean setPreferredDataSubscription(int subscription);
     String getNetworkName(int subscription);
+     /**
+     * Gets the number of attempts remaining for PIN1/PUK1 unlock
+     * for a subscription.
+     * @param subscription user preferred subscription.
+     * Gets the number of attempts remaining for PIN1/PUK1 unlock.
+     */
+    int getIccPin1RetryCount(int subscription);
 }
 

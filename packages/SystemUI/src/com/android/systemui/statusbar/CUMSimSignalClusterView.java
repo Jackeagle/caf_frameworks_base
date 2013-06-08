@@ -387,8 +387,11 @@ public class CUMSimSignalClusterView
         if (mServiceState[subscription] == null) {
             return 0;
         }
-        int radioTechnology = mServiceState[subscription].getVoiceRadioTechnology();
-        Log.i(TAG,subscription+":VoiceRadio technology is:"+mServiceState[subscription].getVoiceRadioTechnology());
+
+        int radioTechnology = mServiceState[subscription].getRadioTechnology();
+        Log.i(TAG,subscription+":radio technology is:"+mServiceState[subscription].getRadioTechnology());
+        if(radioTechnology == 0)
+            radioTechnology = mServiceState[subscription].getVoiceRadioTechnology();
         
         switch (radioTechnology) {
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95A:
@@ -412,12 +415,16 @@ public class CUMSimSignalClusterView
                 return TelephonyIcons.MULTI_SIGNAL_IMAGES_3G[subscription][inetCondition][level];
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSUPA:
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:		
+        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:		
             if(isSimRoam[subscription])
                 return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_H[subscription][inetCondition][level];
             else
                 return TelephonyIcons.MULTI_SIGNAL_IMAGES_H[subscription][inetCondition][level];
+	case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:	
+	    if(isSimRoam[subscription])
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_HA[subscription][inetCondition][level];
+            else
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_HA[subscription][inetCondition][level];
         default:		
             if(isSimRoam[subscription])
                 return TelephonyIcons.MULTI_SIGNAL_IMAGES_R_G[subscription][inetCondition][level];

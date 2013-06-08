@@ -1077,7 +1077,7 @@ public class NotificationManagerService extends INotificationManager.Stub
             }
 
             // If we're not supposed to beep, vibrate, etc. then don't.
-            if (((mDisabledNotifications & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) == 0)
+            if (((mDisabledNotifications & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) == 0 || mInCall)
                     && (!(old != null
                         && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0 ))
                     && (r.userId == UserHandle.USER_ALL ||

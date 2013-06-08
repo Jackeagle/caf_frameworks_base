@@ -19,6 +19,7 @@ package android.net;
 import static android.net.ConnectivityManager.TYPE_WIFI;
 import static android.net.ConnectivityManager.getNetworkTypeName;
 import static android.net.ConnectivityManager.isNetworkTypeMobile;
+import android.telephony.MSimTelephonyManager;
 
 import android.content.Context;
 import android.net.wifi.WifiInfo;
@@ -154,9 +155,12 @@ public class NetworkIdentity {
             if (state.subscriberId != null) {
                 subscriberId = state.subscriberId;
             } else {
-                subscriberId = telephony.getSubscriberId();
+                if((TelephonyManager.getDefault().getPhoneCount() == 2)) {
+                    subscriberId = getActiveSubscriberId(MSimTelephonyManager.getDefault().getPreferredDataSubscription());
+                } else {
+                    subscriberId = telephony.getSubscriberId();
+                }
             }
-
         } else if (type == TYPE_WIFI) {
             if (state.networkId != null) {
                 networkId = state.networkId;
@@ -169,5 +173,8 @@ public class NetworkIdentity {
         }
 
         return new NetworkIdentity(type, subType, subscriberId, networkId, roaming);
+    }
+    private static String getActiveSubscriberId(int sub) {
+        return MSimTelephonyManager.getDefault().getSubscriberId(sub);
     }
 }

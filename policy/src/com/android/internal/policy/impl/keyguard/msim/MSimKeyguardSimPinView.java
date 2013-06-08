@@ -20,6 +20,7 @@
 package com.android.internal.policy.impl.keyguard;
 
 import com.android.internal.telephony.msim.ITelephonyMSim;
+import com.android.internal.telephony.ITelephony;
 
 import android.content.Context;
 import android.os.RemoteException;
@@ -45,10 +46,25 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
         super(context, attrs);
     }
 
-    public void resetState() {
-        mSecurityMessageDisplay.setMessage(
-                getSecurityMessageDisplay(R.string.kg_sim_pin_instructions), true);
+    public void resetState() {	
+        String  displayMessage = "";
+		if (DEBUG) Log.d(TAG, "resetState()");
+        try {
+              int attemptsRemaining = ITelephonyMSim.Stub.asInterface(ServiceManager
+                    .checkService("phone_msim")).getIccPin1RetryCount(KeyguardUpdateMonitor.getInstance(mContext).getPinLockedSubscription());
+			  if (DEBUG) Log.d(TAG, "resetState()attemptsRemaining" +attemptsRemaining);
+            if (attemptsRemaining >= 0) {
+                displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
+                        + getContext().getString(R.string.pinpuk_attempts) + attemptsRemaining;
+            }
+        } catch (RemoteException ex) {
+            displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
+        }
+	
+        displayMessage = displayMessage + getSecurityMessageDisplay(R.string.kg_sim_pin_instructions);
+        mSecurityMessageDisplay.setMessage(displayMessage, true);
         mPasswordEntry.setEnabled(true);
+
     }
 
     /**
