@@ -164,12 +164,14 @@ public class MediaController extends FrameLayout {
     // Update the dynamic parts of mDecorLayoutParams
     // Must be called with mAnchor != NULL.
     private void updateFloatingWindowLayout() {
-        //int [] anchorPos = new int[2];
-        //mAnchor.getLocationOnScreen(anchorPos);
+        int [] anchorPos = new int[2];
+        mAnchor.getLocationOnScreen(anchorPos);
 
-        //WindowManager.LayoutParams p = mDecorLayoutParams;
-        //p.width = mAnchor.getWidth();
-        //p.y = anchorPos[1] + mAnchor.getHeight();
+        WindowManager.LayoutParams p = mDecorLayoutParams;
+		if(p != null){
+        	p.width = mAnchor.getWidth();
+        	p.y = anchorPos[1] + mAnchor.getHeight();
+		}
     }
 
     // This is called whenever mAnchor's layout bound changes
