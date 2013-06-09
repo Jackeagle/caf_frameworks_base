@@ -2156,8 +2156,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                             log("Not broadcasting CONNECT_ACTION " +
                                 "to torn down network " + info.getTypeName());
                         }
-                       teardown(thisNet);
-                       return;
+                        if (FeatureQuery.FEATURE_CTS_TEST_SUPPORT || !((FeatureQuery.FEATURE_WLAN_CMCC_SUPPORT) && (newNetType == ConnectivityManager.TYPE_MOBILE))) {
+                           teardown(thisNet);
+                           return;
+                        }
                 }
             }
             synchronized (ConnectivityService.this) {
