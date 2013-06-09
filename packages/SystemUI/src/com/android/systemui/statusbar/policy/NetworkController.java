@@ -151,6 +151,10 @@ public class NetworkController extends BroadcastReceiver {
     protected boolean mAirplaneMode = false;
     protected boolean mLastAirplaneMode = true;
 
+    private static final int EVENT_UPDATE_SIGNAL_SUB = 7;
+    private final Handler mHandler = new StatusBarHandler();
+
+
     // our ui
     protected Context mContext;
     ArrayList<ImageView> mPhoneSignalIconViews = new ArrayList<ImageView>();
@@ -480,8 +484,8 @@ public class NetworkController extends BroadcastReceiver {
                     ((signalStrength == null) ? "" : (" level=" + signalStrength.getLevel())));
             }
             mSignalStrength = signalStrength;
-            updateTelephonySignalStrength();
-            refreshViews();
+            updateTelephonySignalStrength_post();
+            
         }
 
         @Override
@@ -614,6 +618,16 @@ public class NetworkController extends BroadcastReceiver {
         mAirplaneMode = (Settings.Global.getInt(mContext.getContentResolver(),
             Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
     }
+
+
+	private final void updateTelephonySignalStrength_post() {
+		if (DEBUG) Log.i(TAG, " updateTelephonySignalStrength_post");
+              Message m;
+	       mHandler.removeMessages(EVENT_UPDATE_SIGNAL_SUB);
+		m = mHandler.obtainMessage(EVENT_UPDATE_SIGNAL_SUB);
+		mHandler.sendMessageDelayed(m, 2000);      
+	}
+
 
     private final void updateTelephonySignalStrength() {	
         if (!hasService() &&
@@ -1650,5 +1664,19 @@ public class NetworkController extends BroadcastReceiver {
             return "(null)";
         }
     }
+
+private class StatusBarHandler extends Handler {
+	@Override
+	public void handleMessage(Message msg) {
+		switch (msg.what) {
+	case EVENT_UPDATE_SIGNAL_SUB:
+		if (DEBUG) Log.i(TAG, " EVENT_UPDATE_SIGNAL_SUB");
+		updateTelephonySignalStrength();
+		refreshViews();
+		break;
+		}
+	}
+}
+
 
 }
