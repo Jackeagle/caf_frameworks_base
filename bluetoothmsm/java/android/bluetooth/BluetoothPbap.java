@@ -24,6 +24,7 @@ import android.content.ServiceConnection;
 import android.os.RemoteException;
 import android.os.IBinder;
 import android.os.ServiceManager;
+import android.os.UserHandle;
 import android.util.Log;
 
 /**
@@ -115,7 +116,8 @@ public class BluetoothPbap {
     public BluetoothPbap(Context context, ServiceListener l) {
         mContext = context;
         mServiceListener = l;
-        if (!context.bindService(new Intent(IBluetoothPbap.class.getName()), mConnection, 0)) {
+        if (!context.bindService(new Intent(IBluetoothPbap.class.getName()), mConnection,
+            Context.BIND_AUTO_CREATE, UserHandle.USER_CURRENT)) {
             Log.e(TAG, "Could not bind to Bluetooth Pbap Service");
         }
     }

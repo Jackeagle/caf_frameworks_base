@@ -25,6 +25,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.UserHandle;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -232,7 +233,8 @@ public final class BluetoothHeadset implements BluetoothProfile {
 		Log.d(TAG, "BluetoothHeadset is created");
 		if(mServiceListener == null)
 			Log.e(TAG, "ERROR in headset");
-        if (!context.bindService(new Intent(IBluetoothHeadset.class.getName()), mConnection, 0)) {
+        if (!context.bindService(new Intent(IBluetoothHeadset.class.getName()), mConnection,
+            Context.BIND_AUTO_CREATE, UserHandle.USER_CURRENT)) {
             Log.e(TAG, "Could not bind to Bluetooth Headset Service");
         }
     }
