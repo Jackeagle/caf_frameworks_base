@@ -416,9 +416,6 @@ fwbase_dirs_to_document := \
 # include definition of libcore_to_document
 include libcore/Docs.mk
 
-# include definition of junit_to_document
-include external/junit/Common.mk
-
 non_base_dirs := \
 	../../external/apache-http/src/org/apache/http \
 	../opt/telephony/src/java/android/telephony \
