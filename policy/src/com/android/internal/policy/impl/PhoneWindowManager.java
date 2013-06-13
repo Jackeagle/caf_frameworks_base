@@ -496,6 +496,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private long mVolumeDownKeyTime;
     private boolean mVolumeDownKeyConsumedByScreenshotChord;
     private boolean mVolumeUpKeyTriggered;
+    private long mVolumeUpKeyTime;
+    private boolean mVolumeUpKeyConsumedByScreenshotChord;
     private boolean mPowerKeyTriggered;
     private long mPowerKeyTime;
 
@@ -716,6 +718,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mHandler.postDelayed(mScreenshotChordLongPress, getScreenshotChordLongPressDelay());
             }
         }
+        if (mVolumeUpKeyTriggered && mPowerKeyTriggered && !mVolumeDownKeyTriggered) {
+            final long now = SystemClock.uptimeMillis();
+            if (now <= mVolumeUpKeyTime + SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS
+                    && now <= mPowerKeyTime + SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS) {
+                mVolumeUpKeyConsumedByScreenshotChord = true;
+                cancelPendingPowerKeyAction();
+                mHandler.postDelayed(mScreenshotForLog,
+                        ViewConfiguration.getGlobalActionKeyTimeout());
+            }
+        }
     }
 
     private long getScreenshotChordLongPressDelay() {
@@ -730,6 +742,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void cancelPendingScreenshotChordAction() {
         mHandler.removeCallbacks(mScreenshotChordLongPress);
+    }
+    private void cancelPendingScreenshotForLog() {
+        mHandler.removeCallbacks(mScreenshotForLog);
     }
 
     private final Runnable mPowerLongPress = new Runnable() {
@@ -770,6 +785,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private final Runnable mScreenshotChordLongPress = new Runnable() {
         public void run() {
             takeScreenshot();
+        }
+    };
+    private final Runnable mScreenshotForLog = new Runnable() {
+        public void run() {
+            Intent intent = new Intent();
+            intent.setAction("android.system.agent");
+            String extra = "takeScreeshot";
+            intent.putExtra("para", extra);
+            try {
+                 mContext.startService(intent);
+            } catch (Exception e) {
+                 Slog.e(TAG, "Exception when start SystemAgent service", e);
+            }
         }
     };
 
@@ -1850,6 +1878,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     && mVolumeDownKeyConsumedByScreenshotChord) {
                 if (!down) {
                     mVolumeDownKeyConsumedByScreenshotChord = false;
+                }
+                return -1;
+            }
+            if (mVolumeUpKeyTriggered && !mPowerKeyTriggered) {
+                final long now = SystemClock.uptimeMillis();
+                final long timeoutTime = mVolumeUpKeyTime + SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS;
+                if (now < timeoutTime) {
+                    return timeoutTime - now;
+                }
+            }
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                    && mVolumeUpKeyConsumedByScreenshotChord) {
+                if (!down) {
+                    mVolumeUpKeyConsumedByScreenshotChord = false;
                 }
                 return -1;
             }
@@ -3626,8 +3668,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         if (isScreenOn && !mVolumeUpKeyTriggered
                                 && (event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0) {
                             mVolumeUpKeyTriggered = true;
+                            mVolumeUpKeyTime = event.getDownTime();
+                            mVolumeUpKeyConsumedByScreenshotChord = false;
                             cancelPendingPowerKeyAction();
-                            cancelPendingScreenshotChordAction();
+                            interceptScreenshotChord();
                         }
                     } else {
                         mVolumeUpKeyTriggered = false;

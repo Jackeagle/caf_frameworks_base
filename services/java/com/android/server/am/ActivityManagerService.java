@@ -8228,7 +8228,10 @@ public final class ActivityManagerService extends ActivityManagerNative
                 crashInfo.throwLineNumber);
 
         addErrorToDropBox("crash", r, processName, null, null, null, null, null, crashInfo);
-
+        Slog.i(TAG, "Notify an ApplicationCrash");
+        Intent intent = new Intent("intent.action.logkit.autotrigger");
+        intent.putExtra("reason", "ApplicationCrash");
+        mContext.sendBroadcast(intent);
         crashApplication(r, crashInfo);
     }
 

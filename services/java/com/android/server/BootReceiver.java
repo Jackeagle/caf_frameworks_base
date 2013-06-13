@@ -93,7 +93,7 @@ public class BootReceiver extends BroadcastReceiver {
         Downloads.removeAllDownloadsByPackage(context, OLD_UPDATER_PACKAGE, OLD_UPDATER_CLASS);
     }
 
-    private void logBootEvents(Context ctx) throws IOException {
+    private void logBootEvents(final Context ctx) throws IOException {
         final DropBoxManager db = (DropBoxManager) ctx.getSystemService(Context.DROPBOX_SERVICE);
         final SharedPreferences prefs = ctx.getSharedPreferences("log_files", Context.MODE_PRIVATE);
         final String headers = new StringBuilder(512)
@@ -128,6 +128,10 @@ public class BootReceiver extends BroadcastReceiver {
                     -LOG_SIZE, "APANIC_THREADS");
         } else {
             if (db != null) db.addText("SYSTEM_RESTART", headers);
+            Slog.i(TAG, "Notify a SYSTEM_RESTART");
+            Intent intent = new Intent("intent.action.logkit.autotrigger");
+            intent.putExtra("reason", "SystemRestart");
+            ctx.sendBroadcast(intent);
         }
 
         // Scan existing tombstones (in case any new ones appeared)
@@ -145,6 +149,10 @@ public class BootReceiver extends BroadcastReceiver {
                 try {
                     String filename = new File(TOMBSTONE_DIR, path).getPath();
                     addFileToDropBox(db, prefs, headers, filename, LOG_SIZE, "SYSTEM_TOMBSTONE");
+                    Slog.i(TAG, "Notify a SYSTEM_TOMBSTONE FilePath:" + path);
+                    Intent intent = new Intent("intent.action.logkit.autotrigger");
+                    intent.putExtra("reason", "SystemTombstone");
+                    ctx.sendBroadcast(intent);
                 } catch (IOException e) {
                     Slog.e(TAG, "Can't log tombstone", e);
                 }
