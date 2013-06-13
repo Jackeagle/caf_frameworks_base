@@ -13370,6 +13370,10 @@ package android.net.wifi {
     field public java.lang.String preSharedKey;
     field public int priority;
     field public int status;
+    field public java.lang.String wapiASCert;
+    field public java.lang.String wapiPsk;
+    field public int wapiPskType;
+    field public java.lang.String wapiUserCert;
     field public java.lang.String[] wepKeys;
     field public int wepTxKeyIndex;
   }
