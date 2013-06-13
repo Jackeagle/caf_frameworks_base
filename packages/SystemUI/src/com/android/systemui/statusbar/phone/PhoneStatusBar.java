@@ -50,6 +50,7 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.dreams.DreamService;
@@ -132,7 +133,8 @@ public class PhoneStatusBar extends BaseStatusBar {
     public static final int STATUSBAR_STYLE_CT = 2;
 
     // To save the status bar style.
-    public static final int STATUSBAR_STYLE = STATUSBAR_STYLE_DEFAULT;
+    public static final int STATUSBAR_STYLE = SystemProperties
+            .getInt("persist.env.c.sb.style", STATUSBAR_STYLE_DEFAULT);
 
     private static final int MSG_OPEN_NOTIFICATION_PANEL = 1000;
     private static final int MSG_CLOSE_PANELS = 1001;
