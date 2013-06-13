@@ -44,6 +44,7 @@ import com.android.internal.telephony.ServiceStateTracker;
 import com.android.internal.telephony.TelephonyProperties;
 
 import com.android.internal.telephony.uicc.IccRecords;
+import com.android.internal.telephony.uicc.UiccCard;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UiccCardApplication;
 
@@ -317,5 +318,14 @@ public class MSimGSMPhone extends GSMPhone {
 
     public void unregisterForAllDataDisconnected(Handler h) {
         ((MSimGsmDataConnectionTracker)mDataConnectionTracker).unregisterForAllDataDisconnected(h);
+    }
+    @Override
+    protected void setCardInPhoneBook() {
+        if (mUiccController == null ) {
+            return;
+        }
+
+        UiccCard card = mUiccController.getUiccCard(mSubscriptionData.slotId);
+        mSimPhoneBookIntManager.setIccCard(card);
     }
 }

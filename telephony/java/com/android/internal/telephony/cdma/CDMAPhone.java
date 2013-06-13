@@ -1087,12 +1087,21 @@ public class CDMAPhone extends PhoneBase {
         return  mUiccController.getUiccCardApplication(UiccController.APP_FAM_3GPP2);
     }
 
+    // Set the Card into the Phone Book.
+    protected void setCardInPhoneBook() {
+        if (mUiccController == null ) {
+            return;
+        }
+
+        mRuimPhoneBookInterfaceManager.setIccCard(mUiccController.getUiccCard());
+    }
     @Override
     protected void onUpdateIccAvailability() {
         if (mUiccController == null ) {
             return;
         }
 
+        setCardInPhoneBook();
         UiccCardApplication newUiccApplication = getUiccCardApplication();
 
         UiccCardApplication app = mUiccApplication.get();
@@ -1101,7 +1110,6 @@ public class CDMAPhone extends PhoneBase {
                 log("Removing stale icc objects.");
                 if (mIccRecords.get() != null) {
                     unregisterForRuimRecordEvents();
-                    mRuimPhoneBookInterfaceManager.updateIccRecords(null);
                 }
                 mIccRecords.set(null);
                 mUiccApplication.set(null);
@@ -1113,7 +1121,6 @@ public class CDMAPhone extends PhoneBase {
                 mRuimCard = mUiccApplication.get().getCard();
                 mIccRecords.set(newUiccApplication.getIccRecords());
                 registerForRuimRecordEvents();
-                mRuimPhoneBookInterfaceManager.updateIccRecords(mIccRecords.get());
             }
         }
     }
