@@ -321,4 +321,15 @@ public class TelephonyIntents {
      */
     public static final String ACTION_MANAGED_ROAMING_IND
             = "qualcomm.intent.action.ACTION_MANAGED_ROAMING_IND";
+     
+     /**
+      * Broadcast Action: Indicate sim card refresh icc file update.
+     
+     
+      * <p class="note">This is a protected intent that can only be sent
+      * by the system.
+      * @hide
+      */
+     public static final String ACTION_SIM_REFRESH_UPDATE
+             = "android.intent.action.ACTION_SIM_REFRESH_UPDATE";
 }
