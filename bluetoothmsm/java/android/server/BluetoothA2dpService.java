@@ -41,6 +41,7 @@ import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 import android.net.Uri;
@@ -652,7 +653,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         Intent intent = new Intent(PLAYERSETTINGS_REQUEST);
         intent.putExtra(COMMAND, CMDGET);
         intent.putExtra(EXTRA_GET_COMMAND, GET_ATTRIBUTE_IDS);
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
 
         Message msg = mHandler.obtainMessage();
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
@@ -672,7 +673,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         intent.putExtra(COMMAND, CMDGET);
         intent.putExtra(EXTRA_GET_COMMAND, GET_VALUE_IDS);
         intent.putExtra(EXTRA_ATTRIBUTE_ID, attr);
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
 
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
         msg.arg1 = GET_VALUE_IDS;
@@ -693,7 +694,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         intent.putExtra(EXTRA_ATTIBUTE_ID_ARRAY, attrIds);
         for (int i = 0; i < attrIds.length; i++)
             mPlayerSettings.attrIds[i] = attrIds[i];
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
 
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
         msg.arg1 = GET_ATTRIBUTE_VALUES;
@@ -710,7 +711,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         intent.putExtra(EXTRA_ATTRIB_VALUE_PAIRS, attrValues);
         mPlayerSettings.path = path;
 
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
     }
 
     private void onListPlayerAttributesText(String path, byte[] attrIds ) {
@@ -726,7 +727,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         for (int i = 0; i < attrIds.length; i++)
             mPlayerSettings.attrIds[i] = attrIds[i];
 
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
         msg.arg1 = GET_ATTRIBUTE_TEXT;
         mPendingCmds.add(new Integer(msg.arg1));
@@ -747,7 +748,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         for (int i = 0; i < valIds.length; i++)
             mPlayerSettings.attrIds[i] = valIds[i];
 
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
         msg.what = MESSAGE_PLAYERSETTINGS_TIMEOUT;
         msg.arg1 = GET_VALUE_TEXT;
         mPendingCmds.add(new Integer(msg.arg1));
@@ -1248,7 +1249,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, prevState);
         intent.putExtra(BluetoothProfile.EXTRA_STATE, state);
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
 
         if (DBG) log("A2DP Playing state : device: " + device + " State:" + prevState + "->" + state);
     }
@@ -1309,7 +1310,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, prevState);
             intent.putExtra(BluetoothProfile.EXTRA_STATE, state);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
 
             if (DBG) log("A2DP state : device: " + device + " State:" + prevState + "->" + state);
 
@@ -1415,7 +1416,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
        Intent updateIntent = new Intent(PLAYERSETTINGS_RESPONSE);
        updateIntent.putExtra(EXTRA_GET_RESPONSE, NOTIFY_ATTRIBUTE_VALUES);
        updateIntent.putExtra(EXTRA_ATTRIB_VALUE_PAIRS, retValarray);
-       mContext.sendBroadcast(updateIntent);
+       mContext.sendBroadcastAsUser(updateIntent, UserHandle.CURRENT);
     }
 
 

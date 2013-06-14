@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -205,7 +206,7 @@ class BluetoothBondState {
             mState.put(address, state);
         }
 
-        mContext.sendBroadcast(intent, BluetoothService.BLUETOOTH_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BluetoothService.BLUETOOTH_PERM);
     }
 
     public boolean isAutoPairingBlacklisted(String address) {

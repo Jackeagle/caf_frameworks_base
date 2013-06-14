@@ -29,6 +29,7 @@ import android.server.BluetoothService;
 import android.util.Log;
 import android.util.Pair;
 import android.os.ParcelUuid;
+import android.os.UserHandle;
 
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
@@ -311,7 +312,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                     intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, prevState);
                     intent.putExtra(BluetoothProfile.EXTRA_STATE, mHeadsetState);
                     intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mDevice);
-                    mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+                    mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
                 }
             }
         }
@@ -1182,14 +1183,14 @@ public final class BluetoothDeviceProfileState extends StateMachine {
         intent.putExtra(BluetoothDevice.EXTRA_ACCESS_REQUEST_TYPE,
                         BluetoothDevice.REQUEST_TYPE_PROFILE_CONNECTION);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mDevice);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_PERM);
     }
 
     private void sendConnectionAccessRemovalIntent() {
         mWakeLock.release();
         Intent intent = new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mDevice);
-        mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
+        mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT, BLUETOOTH_ADMIN_PERM);
     }
 
     private int getTrust() {
