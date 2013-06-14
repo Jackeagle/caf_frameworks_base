@@ -39,7 +39,8 @@
 #include <cutils/properties.h>
 #include <utils/Log.h>
 
-#define LIBRARY_PATH_PREFIX	"/system/lib/"
+#define LIBRARY_PATH_PREFIX	        "/vendor/lib/"
+#define LIBRARY_PATH_PREFIX_OLD	    "/system/lib/"
 
 namespace android
 {
@@ -67,7 +68,9 @@ org_codeaurora_performance_native_init()
 
     /* Sanity check - ensure */
     buf[PROPERTY_VALUE_MAX-1] = '\0';
-    if ((strncmp(buf, LIBRARY_PATH_PREFIX, sizeof(LIBRARY_PATH_PREFIX) - 1) != 0)
+    if (((strncmp(buf, LIBRARY_PATH_PREFIX, sizeof(LIBRARY_PATH_PREFIX) - 1) != 0)
+        &&
+        (strncmp(buf, LIBRARY_PATH_PREFIX_OLD, sizeof(LIBRARY_PATH_PREFIX_OLD) - 1) != 0))
         ||
         (strstr(buf, "..") != NULL)) {
         return;
