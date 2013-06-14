@@ -798,7 +798,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         mIntentFilter.addAction(PLAYSTATE_CHANGED);
         mIntentFilter.addAction(ACTION_METADATA_CHANGED);
         mIntentFilter.addAction(PLAYERSETTINGS_RESPONSE);
-        mContext.registerReceiver(mReceiver, mIntentFilter);
+        mContext.registerReceiverAsUser(mReceiver, UserHandle.ALL, mIntentFilter, null, null);
 
         mAudioDevices = new HashMap<BluetoothDevice, Integer>();
         mPendingCmds = new ArrayList<Integer>();

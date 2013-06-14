@@ -464,7 +464,7 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
-        mContext.registerReceiver(mReceiver, filter);
+        mContext.registerReceiverAsUser(mReceiver, UserHandle.ALL, filter, null, null);
         mBluetoothInputProfileHandler = BluetoothInputProfileHandler.getInstance(mContext, this);
         mBluetoothPanProfileHandler = BluetoothPanProfileHandler.getInstance(mContext, this);
         mBluetoothHealthProfileHandler = BluetoothHealthProfileHandler.getInstance(mContext, this);

@@ -264,7 +264,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
         filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_UUID);
 
-        mContext.registerReceiver(mBroadcastReceiver, filter);
+        mContext.registerReceiverAsUser(mBroadcastReceiver, UserHandle.CURRENT, filter, null, null);
 
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mAdapter.getProfileProxy(mContext, mBluetoothProfileServiceListener,
