@@ -28,6 +28,7 @@ import android.view.Surface;
 import android.view.Surface.PhysicalDisplayInfo;
 
 import java.io.PrintWriter;
+import android.util.Slog;
 
 /**
  * A display adapter for the local displays managed by Surface Flinger.
@@ -75,7 +76,15 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_ADDED);
                 } else if (device.updatePhysicalDisplayInfoLocked(mTempPhys)) {
                     // Display properties changed.
-                    sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_CHANGED);
+                    Slog.d(TAG, "device changed: remove then add");
+                    //sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_CHANGED);
+                    // Display was removed.
+                    mDevices.remove(builtInDisplayId);
+                    sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_REMOVED);
+
+                    device = new LocalDisplayDevice(displayToken, builtInDisplayId, mTempPhys);
+                    mDevices.put(builtInDisplayId, device);
+                    sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_ADDED);
                 }
             } else {
                 LocalDisplayDevice device = mDevices.get(builtInDisplayId);
