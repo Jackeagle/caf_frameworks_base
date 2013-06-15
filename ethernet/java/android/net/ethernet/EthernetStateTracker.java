@@ -20,6 +20,8 @@ package android.net.ethernet;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 
 import android.R;
 import android.app.Notification;
@@ -127,6 +129,26 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         mNwService = INetworkManagementService.Stub.asInterface(b);
     }
 
+    public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+        if (mNetworkInfo != null) {
+            pw.println("Network Info : " + mNetworkInfo.toString());
+        }
+
+        pw.println("mServiceStarted : " + mServiceStarted);
+        pw.println("mStackConnected : " + mStackConnected);
+        pw.println("mHWConnected : " + mHWConnected);
+        pw.println("mInterfaceStopped : " + mInterfaceStopped);
+        pw.println("mInterfaceName : " + mInterfaceName);
+        pw.println("mStartingDhcp : " + mStartingDhcp);
+
+        if (mLinkProperties != null) pw.println(mLinkProperties.toString());
+
+        if (mEthInfo != null) pw.println(mEthInfo.toString());
+
+        if (mDhcpInfo != null) pw.println(mDhcpInfo.toString());
+
+    }
+
     /**
      * Stop etherent interface
      * @param suspend {@code false} disable the interface {@code true} only reset the connection without disable the interface
@@ -172,10 +194,14 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
     }
 
     private boolean configureInterface(EthernetDevInfo info) throws UnknownHostException {
-        mStackConnected = false;
-        mHWConnected = false;
-        mInterfaceStopped = false;
-        mStartingDhcp = true;
+
+        synchronized (this) {
+            mStackConnected = false;
+            mHWConnected = false;
+            mInterfaceStopped = false;
+            mStartingDhcp = true;
+        }
+
         if (info.getConnectMode().equals(EthernetDevInfo.ETHERNET_CONN_MODE_DHCP)) {
             if (localLOGV) Slog.i(TAG, "trigger dhcp for device " + info.getIfName());
             sDnsPropNames = new String[] {
@@ -408,27 +434,46 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         synchronized (this) {
             switch (msg.what) {
             case EVENT_INTERFACE_CONFIGURATION_SUCCEEDED:
-                if (localLOGV) Slog.i(TAG, "received configured succeeded, stack=" + mStackConnected + " HW=" + mHWConnected);
                 mStackConnected = true;
-                if (mHWConnected)
-                    setState(true, msg.what);
+                if (localLOGV) {
+                    Slog.i(TAG, "received configured succeeded, stack="
+                                + mStackConnected + " HW=" + mHWConnected);
+                }
+
+                if (mHWConnected) setState(true, msg.what);
+
                 break;
+
             case EVENT_INTERFACE_CONFIGURATION_FAILED:
                 mStackConnected = false;
                 //start to retry ?
                 break;
+
             case EVENT_HW_CONNECTED:
-                if (localLOGV) Slog.i(TAG, "received HW connected, stack=" + mStackConnected + " HW=" + mHWConnected);
                 mHWConnected = true;
-                if (mStackConnected)
-                    setState(true, msg.what);
+                if (localLOGV) {
+                    Slog.i(TAG, "received HW connected, stack=" + mStackConnected
+                                + " HW=" + mHWConnected);
+                }
+
+                if (mStackConnected) setState(true, msg.what);
+
                 break;
             case EVENT_HW_DISCONNECTED:
-                if (localLOGV) Slog.i(TAG, "received disconnected events, stack=" + mStackConnected + " HW=" + mHWConnected);
+                if (localLOGV) {
+                    Slog.i(TAG, "received disconnected events, stack="
+                                + mStackConnected + " HW=" + mHWConnected);
+                }
+
                 setState(mHWConnected = false, msg.what);
+
                 break;
+
             case EVENT_HW_PHYCONNECTED:
-                if (localLOGV) Slog.i(TAG, "interface up event, kick off connection request");
+                if (localLOGV) {
+                    Slog.i(TAG, "interface up event, kick off connection request");
+                }
+
                 if (!mStartingDhcp) {
                     int state = mEM.getState();
                     if (state != mEM.ETHERNET_STATE_DISABLED) {

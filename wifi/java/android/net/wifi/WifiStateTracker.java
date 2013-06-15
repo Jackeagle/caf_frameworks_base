@@ -16,6 +16,9 @@
 
 package android.net.wifi;
 
+import android.net.ConnectivityManager;
+import android.net.wifi.p2p.WifiP2pManager;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -85,10 +88,23 @@ public class WifiStateTracker implements NetworkStateTracker {
 
         mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
         IntentFilter filter = new IntentFilter();
-        filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-        filter.addAction(WifiManager.LINK_CONFIGURATION_CHANGED_ACTION);
 
-        mWifiStateReceiver = new WifiStateReceiver();
+        // listen to wifi related events for a WifiStateTracker instance
+        // monitoring 'wifi' network type
+        if (mNetworkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
+            filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+            filter.addAction(WifiManager.LINK_CONFIGURATION_CHANGED_ACTION);
+
+            mWifiStateReceiver = new WifiStateReceiver();
+
+        } else if (mNetworkInfo.getType() == ConnectivityManager.TYPE_WIFI_P2P) {
+            // listen to P2P related event for a WifiStateTracker instance
+            // monitoring 'wifi_p2p' network type
+            filter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
+
+            mWifiStateReceiver = new WifiP2PStateReceiver();
+        }
+
         mContext.registerReceiver(mWifiStateReceiver, filter);
     }
 
@@ -97,8 +113,15 @@ public class WifiStateTracker implements NetworkStateTracker {
      * TODO: do away with return value after making MobileDataStateTracker async
      */
     public boolean teardown() {
+        /*
+        We don't want to completely 'teardown' wifi, as it would even teardown
+        wifi_p2p.
+
         mTeardownRequested.set(true);
         mWifiManager.stopWifi();
+        */
+        mWifiManager.disconnect();
+
         return true;
     }
 
@@ -106,8 +129,14 @@ public class WifiStateTracker implements NetworkStateTracker {
      * Re-enable connectivity to a network after a {@link #teardown()}.
      */
     public boolean reconnect() {
+        /*
+        Since we didn't teardown completely, we only need to 'reconnect'
+
         mTeardownRequested.set(false);
         mWifiManager.startWifi();
+        */
+        mWifiManager.reconnect();
+
         return true;
     }
 
@@ -130,7 +159,7 @@ public class WifiStateTracker implements NetworkStateTracker {
 
     /**
      * Wi-Fi is considered available as long as we have a connection to the
-     * supplicant daemon and there is at least one enabled network. If a teardown
+     * supplicant daemon and there is at least one enabled/configured network. If a teardown
      * was explicitly requested, then Wi-Fi can be restarted with a reconnect
      * request, so it is considered available. If the driver has been stopped
      * for any reason other than a teardown request, Wi-Fi is considered
@@ -138,7 +167,10 @@ public class WifiStateTracker implements NetworkStateTracker {
      * @return {@code true} if Wi-Fi connections are possible
      */
     public boolean isAvailable() {
-        return mNetworkInfo.isAvailable();
+        // if mNetworkInfo.isAvailable() is true, but still no WIFI AP is configured, then it
+        // still is not 'available', for when switching 'preferred network' from etherent to wifi,
+        // if no Access Point is configures, then it is better off not to teardown ethernet
+        return (mNetworkInfo.isAvailable() && (mWifiManager.getConfiguredNetworks().size() != 0));
     }
 
     @Override
@@ -246,6 +278,23 @@ public class WifiStateTracker implements NetworkStateTracker {
                 Message msg = mCsHandler.obtainMessage(EVENT_CONFIGURATION_CHANGED, mNetworkInfo);
                 msg.sendToTarget();
             }
+        }
+    }
+
+    private class WifiP2PStateReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Slog.d(TAG, "WifiP2PStateReceiver. intent : " + intent.getAction());
+
+            if (intent.getAction().equals(
+                                WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)) {
+                // store the latest NetworkInfo obj for P2P
+                mNetworkInfo = (NetworkInfo) intent
+                                .getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
+
+                Slog.d(TAG, "Received NetworkInfo : " + mNetworkInfo.toString());
+            }
+
         }
     }
 

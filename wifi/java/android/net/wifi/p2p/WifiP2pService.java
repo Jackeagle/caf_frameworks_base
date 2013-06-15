@@ -399,6 +399,23 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     + ", uid=" + Binder.getCallingUid());
             return;
         }
+
+        pw.println("Interface name : " + mInterface);
+        pw.println("Is P2p Supported : " + mP2pSupported);
+        pw.println("is P2p Enabled : " + mIsWifiP2pEnabled);
+        pw.println("Is Discovery Started : " + mDiscoveryStarted);
+        pw.println("Temporarily disconnected wifi : " + mTempoarilyDisconnectedWifi);
+        pw.println("Service discovery req id : "+ mServiceDiscReqId);
+
+        if (mNetworkInfo != null) pw.println("P2p Network Info : " + mNetworkInfo.toString());
+
+        if (mThisDevice != null) pw.println("P2P Device : " + mThisDevice.toString());
+
+        if (mP2pStateMachine != null) {
+            // dump relevant information from internal state machine
+            mP2pStateMachine.dump(fd, pw, args);
+        }
+
     }
 
     /**
@@ -486,6 +503,29 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
         // Saved WifiP2pDevice from provisioning request
         private WifiP2pDevice mSavedProvDiscDevice;
+
+        public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+
+            pw.println("Current state : " + getCurrentState().getName());
+
+            if (mWifiP2pInfo != null) pw.println(mWifiP2pInfo.toString());
+
+            if (mGroup != null) pw.println(mGroup.toString());
+
+            if (mSavedPeerConfig != null) pw.println(mSavedPeerConfig.toString());
+
+            if (mPeers != null) pw.println("Peers : " + mPeers.toString());
+
+            if (mPeersLostDuringConnection != null) {
+                pw.println("peers lost during connection : "
+                            + mPeersLostDuringConnection.toString());
+            }
+
+            if (mSavedP2pGroup != null) pw.println(mSavedP2pGroup.toString());
+
+            if (mSavedProvDiscDevice != null) pw.println(mSavedProvDiscDevice.toString());
+
+        }
 
         P2pStateMachine(String name, boolean p2pSupported) {
             super(name);

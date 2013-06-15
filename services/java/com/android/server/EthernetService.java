@@ -18,6 +18,9 @@
 
 package com.android.server;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
+
 import java.net.UnknownHostException;
 import android.net.ethernet.EthernetNative;
 import android.net.ethernet.IEthernetManager;
@@ -216,6 +219,20 @@ public class EthernetService<syncronized> extends IEthernetManager.Stub {
      */
     public int getState( ) {
         return mEthState;
+    }
+
+    @Override
+    protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+        // just report current state of info stored, on dumpsys
+        synchronized(this) {
+            pw.println("isEnabled : " + isEnabled);
+            pw.println("mEthState: " + mEthState);
+
+            if (DevName != null) pw.println("DevName : " + DevName.toString());
+
+            if (mTracker != null) mTracker.dump(fd, pw, args);
+        }
+
     }
 
 }

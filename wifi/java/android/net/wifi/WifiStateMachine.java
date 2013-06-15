@@ -3768,10 +3768,21 @@ public class WifiStateMachine extends StateMachine {
                     }
                 case CMD_RECONNECT:
                 case CMD_REASSOCIATE:
+                {
+                    log("CMD_RECONNECT / CMD_REASSOCIATE received in DisconnectedState");
+                    log("Total configured wifi networks : "
+                            + mWifiConfigStore.getConfiguredNetworks().size());
+
+                    if (mWifiNative.reconnect()) {
+                        // initiate connectivity through supplicant
+                        mSupplicantStateTracker.sendMessage(WifiManager.CONNECT_NETWORK);
+                    }
+
                     // Drop a third party reconnect/reassociate if we are
                     // tempoarily disconnected for p2p
                     if (mTemporarilyDisconnectWifi) ret = NOT_HANDLED;
                     break;
+                }
                 default:
                     ret = NOT_HANDLED;
             }
