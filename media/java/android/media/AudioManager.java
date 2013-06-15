@@ -1522,6 +1522,53 @@ public class AudioManager {
      */
     public static final int CS_HOLD_SESSION2      = AudioSystem.CS_HOLD_SESSION2;
 
+
+    /* Calls states for Voice calls */
+    /**
+     * @hide Call state for inactive call state.
+     */
+    public static final int CALL_INACTIVE         = AudioSystem.CALL_INACTIVE;
+    /**
+     * @hide Call state for active call state.
+     */
+    public static final int CALL_ACTIVE           = AudioSystem.CALL_ACTIVE;
+    /**
+     * @hide Call state for hold call state.
+     */
+    public static final int CALL_HOLD             = AudioSystem.CALL_HOLD;
+    /**
+     * @hide Call state for local call hold state.
+     */
+    public static final int CALL_LOCAL_HOLD       = AudioSystem.CALL_LOCAL_HOLD;
+
+
+    /* VSIDS for IMS, Multimode CS call and GSM CS call */
+    /**
+     * @hide VSID for CS call, Multimode.
+     */
+    public static final long VOICE_VSID           = AudioSystem.VOICE_VSID;
+    /**
+     * @hide VSID for CS call, GSM-only.
+     */
+    public static final long VOICE2_VSID          = AudioSystem.VOICE2_VSID;
+    /**
+     * @hide VSID for IMS call, Multimode.
+     */
+    public static final long IMS_VSID             = AudioSystem.IMS_VSID;
+
+
+    /* Key used in setParameters for VSID and Call_state */
+    /**
+     * @hide Key for vsid used in setParameters.
+     */
+    public static final String VSID_KEY           = AudioSystem.VSID_KEY;
+
+    /**
+     * @hide Key for call_state used in setParameters.
+     */
+    public static final String CALL_STATE_KEY     = AudioSystem.CALL_STATE_KEY;
+
+
     /* Routing bits for setRouting/getRouting API */
     /**
      * Routing audio output to earpiece
