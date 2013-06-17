@@ -1578,8 +1578,8 @@ public class PhoneStatusBar extends BaseStatusBar {
             return;
         }
 
-        // Settings are not available in setup
-        if (!mUserSetup) return;
+        // MultiUser support has not been available till now.
+        // if (!mUserSetup) return;
 
         if (mHasFlipSettings) {
             mNotificationPanel.expand();
@@ -1594,8 +1594,8 @@ public class PhoneStatusBar extends BaseStatusBar {
     }
 
     public void switchToSettings() {
-        // Settings are not available in setup
-        if (!mUserSetup) return;
+        // MultiUser support has not been available till now.
+        // if (!mUserSetup) return;
 
         mFlipSettingsView.setScaleX(1f);
         mFlipSettingsView.setVisibility(View.VISIBLE);
@@ -1608,8 +1608,8 @@ public class PhoneStatusBar extends BaseStatusBar {
     }
 
     public void flipToSettings() {
-        // Settings are not available in setup
-        if (!mUserSetup) return;
+        // MultiUser support has not been available till now.
+        // if (!UserSetup) return;
 
         if (mFlipSettingsViewAnim != null) mFlipSettingsViewAnim.cancel();
         if (mScrollViewAnim != null) mScrollViewAnim.cancel();
