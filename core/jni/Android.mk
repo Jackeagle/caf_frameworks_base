@@ -221,7 +221,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libcamera_client \
 	libskia \
 	libsqlite \
-	libdvm \
 	libEGL \
 	libGLESv1_CM \
 	libGLESv2 \

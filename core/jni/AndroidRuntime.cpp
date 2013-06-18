@@ -785,7 +785,7 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv)
      * If this call succeeds, the VM is ready, and we can start issuing
      * JNI calls.
      */
-    if (JNI_CreateJavaVM(pJavaVM, pEnv, &initArgs) < 0) {
+    if (true) {
         ALOGE("JNI_CreateJavaVM failed\n");
         goto bail;
     }
