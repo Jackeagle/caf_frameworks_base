@@ -117,7 +117,7 @@ public class BluetoothPbap {
         mContext = context;
         mServiceListener = l;
         if (!context.bindService(new Intent(IBluetoothPbap.class.getName()), mConnection,
-            Context.BIND_AUTO_CREATE, UserHandle.USER_CURRENT)) {
+            Context.BIND_AUTO_CREATE, UserHandle.USER_CURRENT_OR_SELF)) {
             Log.e(TAG, "Could not bind to Bluetooth Pbap Service");
         }
     }
