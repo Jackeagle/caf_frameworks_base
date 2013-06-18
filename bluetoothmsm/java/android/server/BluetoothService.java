@@ -4047,7 +4047,12 @@ public class BluetoothService extends IBluetooth.Stub {
             intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_CONNECTION_STATE,
                     convertToAdapterState(prevState));
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-            mContext.sendBroadcastAsUser(intent, UserHandle.ALL, BLUETOOTH_PERM);
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                mContext.sendBroadcastAsUser(intent, UserHandle.ALL, BLUETOOTH_PERM);
+            } finally {
+                Binder.restoreCallingIdentity(identity);
+            }
             Log.d(TAG, "CONNECTION_STATE_CHANGE: " + device + ": "
                     + prevState + " -> " + state);
         }
