@@ -31,6 +31,8 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.ContentObserver;
 import android.net.wifi.IWifiManager;
+import android.net.wifi.PPPOEConfig;
+import android.net.wifi.PPPOEInfo;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
@@ -224,6 +226,9 @@ public class WifiService extends IWifiManager.Stub {
      */
     private AsyncChannel mWifiStateMachineChannel;
 
+    private AsyncChannel mPPPOEServiceChannel;
+
+    private PPPOEService mPPPOEService;
     /**
      * Clients receiving asynchronous messages
      */
@@ -357,8 +362,42 @@ public class WifiService extends IWifiManager.Stub {
             }
         }
     }
+
+    /**
+     * Handles interaction with PPPOEService
+     */
+    private class PPPOEHandler extends Handler {
+
+        PPPOEHandler(android.os.Looper looper) {
+            super(looper);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case AsyncChannel.CMD_CHANNEL_HALF_CONNECTED: {
+                    if (msg.arg1 == AsyncChannel.STATUS_SUCCESSFUL) {
+                        Slog.e(TAG, "PPPOEService connection success");
+                    } else {
+                        Slog.e(TAG, "PPPOEService connection failure, error=" + msg.arg1);
+                    }
+                    break;
+                }
+                case AsyncChannel.CMD_CHANNEL_DISCONNECTED: {
+                    Slog.e(TAG, "PPPOEHandler channel lost, msg.arg1 =" + msg.arg1);
+                    break;
+                }
+                default: {
+                    Slog.d(TAG, "PPPOEHandler.handleMessage ignoring msg=" + msg);
+                    break;
+                }
+            }
+        }
+    }
     WifiStateMachineHandler mWifiStateMachineHandler;
 
+
+    PPPOEHandler mPPPOEHandler;
     /**
      * Temporary for computing UIDS that are responsible for starting WIFI.
      * Protected by mWifiStateTracker lock.
@@ -432,6 +471,7 @@ public class WifiService extends IWifiManager.Stub {
         wifiThread.start();
         mAsyncServiceHandler = new AsyncServiceHandler(wifiThread.getLooper());
         mWifiStateMachineHandler = new WifiStateMachineHandler(wifiThread.getLooper());
+        mPPPOEHandler = new PPPOEHandler(wifiThread.getLooper());
 
         // Setting is in seconds
         NOTIFICATION_REPEAT_DELAY_MS = Settings.Global.getInt(context.getContentResolver(),
@@ -498,6 +538,9 @@ public class WifiService extends IWifiManager.Stub {
 
         mWifiWatchdogStateMachine = WifiWatchdogStateMachine.
                makeWifiWatchdogStateMachine(mContext);
+        mPPPOEService = new PPPOEService(mContext);
+        mPPPOEServiceChannel = new AsyncChannel();
+        mPPPOEServiceChannel.connect(mContext, mPPPOEHandler, mPPPOEService.getMessenger());
 
     }
 
@@ -1006,6 +1049,21 @@ public class WifiService extends IWifiManager.Stub {
         enforceAccessPermission();
         return mWifiStateMachine.getConfigFile();
     }
+
+   public void startPPPOE(PPPOEConfig config) {
+       mPPPOEServiceChannel.sendMessage(
+               mAsyncServiceHandler.obtainMessage(PPPOEService.CMD_START_PPPOE, config));
+   }
+
+   public void stopPPPOE() {
+       mPPPOEServiceChannel.sendMessage(PPPOEService.CMD_STOP_PPPOE);
+   }
+
+   /**
+    */
+   public PPPOEInfo getPPPOEInfo() {
+       return mPPPOEService.getPPPOEInfo();
+   }
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
