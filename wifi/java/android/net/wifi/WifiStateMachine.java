@@ -1806,16 +1806,7 @@ public class WifiStateMachine extends StateMachine {
             mWifiInfo.setNetworkId(WifiConfiguration.INVALID_NETWORK_ID);
         }
 		
-		 // WAPI++
-		 if ((state == SupplicantState.ASSOCIATING)
-			 || (state == SupplicantState.ASSOCIATED)
-			 || (state == SupplicantState.FOUR_WAY_HANDSHAKE)) {
-			  /* BSSID is valid only in ASSOCIATING state */
-			  mWifiInfo.setBSSID(stateChangeResult.BSSID);
-			NetworkUtils.enableInterface(mInterfaceName);
-		  }
-		 //WAPI--
-
+		mWifiInfo.setBSSID(stateChangeResult.BSSID);
         mWifiInfo.setSSID(stateChangeResult.wifiSsid);
 
         mSupplicantStateTracker.sendMessage(Message.obtain(message));
@@ -4491,12 +4482,12 @@ public class WifiStateMachine extends StateMachine {
             return SECURITY_EAP;
         }
 // WAPI+++
-        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_PSK)) {
-            return SECURITY_WAPI_PSK;
-        }
-        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_CERT)) {
-            return SECURITY_WAPI_CERT;
-        }
+//        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_PSK)) {
+//            return SECURITY_WAPI_PSK;
+//        }
+//        if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_CERT)) {
+//            return SECURITY_WAPI_CERT;
+//        }
 // WAPI--
         return (config.wepKeys[0] != null) ? SECURITY_WEP : SECURITY_NONE;
     }
