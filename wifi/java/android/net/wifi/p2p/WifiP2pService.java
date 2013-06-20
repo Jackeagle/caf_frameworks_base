@@ -1266,6 +1266,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             if (DBG) logd(getName() + message.toString());
             boolean ret = HANDLED;
             switch (message.what) {
+                case WifiMonitor.P2P_GO_NEGOTIATION_REQUEST_EVENT:
+                case WifiMonitor.P2P_INVITATION_RECEIVED_EVENT:
+                     //Ignore additional connection requests
+                     break;
                 case PEER_CONNECTION_USER_ACCEPT:
                     if (connect(mSavedPeerConfig, TRY_REINVOCATION) == CONNECT_FAILURE) {
                         handleGroupCreationFailure();
