@@ -64,6 +64,7 @@ class HTML5Audio extends Handler
     private static int ERROR       = -1;
 
     private int mState = IDLE;
+	private int mState_pre_loss_focuse = IDLE;//yinhui add
 
     private String mUrl;
     private boolean mAskToPlay = false;
@@ -247,11 +248,13 @@ class HTML5Audio extends Handler
             // resume playback
             if (mMediaPlayer == null) {
                 resetMediaPlayer();
-            } else if (mState != ERROR && !mMediaPlayer.isPlaying()) {
+            //} else if (mState != ERROR && !mMediaPlayer.isPlaying()) {
+            } else if (mState != ERROR && !mMediaPlayer.isPlaying()&&mState_pre_loss_focuse!=PAUSED) {
                 mMediaPlayer.start();
 				nativeOnRequestPlay(mNativePointer);//yinhui add
                 mState = STARTED;
             }
+			mState_pre_loss_focuse = IDLE;//yinhui add
             break;
 
         case AudioManager.AUDIOFOCUS_LOSS:
@@ -266,6 +269,7 @@ class HTML5Audio extends Handler
 
         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+			mState_pre_loss_focuse=mState;//yinhui add
             // Lost focus for a short time, but we have to stop
             // playback.
             if (mState != ERROR && mMediaPlayer.isPlaying()) pause();
