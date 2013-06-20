@@ -34,6 +34,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.provider.Telephony;
 import android.telephony.MSimTelephonyManager;
@@ -41,6 +42,7 @@ import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Slog;
 import android.view.View;
 import android.widget.ImageView;
@@ -70,6 +72,7 @@ public class MSimNetworkController extends NetworkController {
     ServiceState[] mMSimServiceState;
     SignalStrength[] mMSimSignalStrength;
     private PhoneStateListener[] mMSimPhoneStateListener;
+    private CharSequence[] mCarrierTextSub;
 
     String[] mMSimNetworkName;
     int[] mMSimPhoneSignalIconId;
@@ -92,8 +95,13 @@ public class MSimNetworkController extends NetworkController {
     int[] mMSimcombinedActivityIconId;
     int[] mMSimLastSimIconId;
     private int mDefaultSubscription;
+    boolean[] mShowSpn;
+    boolean[] mShowPlmn;
+    String[] mSpn;
+    String[] mPlmn;
 
     ArrayList<MSimSignalCluster> mSimSignalClusters = new ArrayList<MSimSignalCluster>();
+    ArrayList<TextView> mSubsLabelViews = new ArrayList<TextView>();
 
     public interface MSimSignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
@@ -135,6 +143,11 @@ public class MSimNetworkController extends NetworkController {
         mMSimContentDescriptionCombinedSignal = new String[numPhones];
         mMSimContentDescriptionDataType = new String[numPhones];
         mMSimLastSimIconId = new int[numPhones];
+        mCarrierTextSub = new CharSequence[numPhones];
+        mShowSpn = new boolean[numPhones];
+        mShowPlmn = new boolean[numPhones];
+        mSpn = new String[numPhones];
+        mPlmn = new String[numPhones];
 
         for (int i=0; i < numPhones; i++) {
             mMSimSignalStrength[i] = new SignalStrength();
@@ -277,10 +290,15 @@ public class MSimNetworkController extends NetworkController {
         } else if (action.equals(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION)) {
             final int subscription = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY, 0);
             Slog.d(TAG, "Received SPN update on sub :" + subscription);
-            updateNetworkName(intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_SPN, false),
-                        intent.getStringExtra(TelephonyIntents.EXTRA_SPN),
-                        intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_PLMN, false),
-                        intent.getStringExtra(TelephonyIntents.EXTRA_PLMN), subscription);
+            mShowSpn[subscription] = intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_SPN, false);
+            mSpn[subscription] = intent.getStringExtra(TelephonyIntents.EXTRA_SPN);
+            mShowPlmn[subscription] = intent.getBooleanExtra(
+                    TelephonyIntents.EXTRA_SHOW_PLMN, false);
+            mPlmn[subscription] = intent.getStringExtra(TelephonyIntents.EXTRA_PLMN);
+
+            updateNetworkName(mShowSpn[subscription], mSpn[subscription], mShowPlmn[subscription],
+                    mPlmn[subscription], subscription);
+            updateCarrierText(subscription);
             refreshViews(subscription);
         } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION) ||
                  action.equals(ConnectivityManager.INET_CONDITION_ACTION)) {
@@ -292,6 +310,7 @@ public class MSimNetworkController extends NetworkController {
             updateAirplaneMode();
             for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
                 updateSimIcon(i);
+                updateCarrierText(i);
             }
             refreshViews(mDefaultSubscription);
         } else if (action.equals(WimaxManagerConstants.NET_4G_STATE_CHANGED_ACTION) ||
@@ -301,6 +320,63 @@ public class MSimNetworkController extends NetworkController {
             refreshViews(mDefaultSubscription);
         }
     }
+
+    public void addSubsLabelView(TextView v) {
+        mSubsLabelViews.add(v);
+    }
+
+    private void updateCarrierText(int sub) {
+        int textResId = 0;
+        if (mAirplaneMode) {
+            textResId = com.android.internal.R.string.lockscreen_airplane_mode_on;
+        } else {
+            if (DEBUG) {
+                Slog.d(TAG, "updateCarrierText for sub:" + sub + " simState =" + mMSimState[sub]);
+            }
+
+            switch (mMSimState[sub]) {
+                case ABSENT:
+                case UNKNOWN:
+                case NOT_READY:
+                    textResId = com.android.internal.R.string.lockscreen_missing_sim_message_short;
+                    break;
+                case PIN_REQUIRED:
+                    textResId = com.android.internal.R.string.lockscreen_sim_locked_message;
+                    break;
+                case PUK_REQUIRED:
+                    textResId = com.android.internal.R.string.lockscreen_sim_puk_locked_message;
+                    break;
+                case READY:
+                    // If the state is ready, set the text as network name.
+                    mCarrierTextSub[sub] = mMSimNetworkName[sub];
+                    break;
+                case PERM_DISABLED:
+                    textResId = com.android.internal.
+                            R.string.lockscreen_permanent_disabled_sim_message_short;
+                    break;
+                case CARD_IO_ERROR:
+                    textResId = com.android.internal.R.string.lockscreen_sim_error_message_short;
+                    break;
+                default:
+                    textResId = com.android.internal.R.string.lockscreen_missing_sim_message_short;
+                    break;
+            }
+        }
+
+        if (textResId != 0) {
+            mCarrierTextSub[sub] = mContext.getString(textResId);
+        }
+    }
+
+    private void setCarrierText() {
+        String carrierName = mCarrierTextSub[MSimConstants.SUB1]
+                  + "    " + mCarrierTextSub[MSimConstants.SUB2];
+        for (int i = 0; i < mSubsLabelViews.size(); i++) {
+            TextView v = mSubsLabelViews.get(i);
+            v.setText(carrierName);
+        }
+    }
+
 
     // ===== Telephony ==============================================================
 
@@ -328,6 +404,10 @@ public class MSimNetworkController extends NetworkController {
                 updateTelephonySignalStrength(mSubscription);
                 updateDataNetType(mSubscription);
                 updateDataIcon(mSubscription);
+                updateNetworkName(mShowSpn[mSubscription], mSpn[mSubscription],
+                                mShowPlmn[mSubscription], mPlmn[mSubscription], mSubscription);
+                updateCarrierText(mSubscription);
+
                 refreshViews(mSubscription);
             }
 
@@ -425,8 +505,12 @@ public class MSimNetworkController extends NetworkController {
         } else {
             simState = IccCardConstants.State.UNKNOWN;
         }
-        mMSimState[sub] = simState;
-        Slog.d(TAG, "updateSimState simState =" + mMSimState[sub]);
+        // Update the sim state and carrier text.
+        if (simState != IccCardConstants.State.UNKNOWN && simState != mMSimState[sub]) {
+            mMSimState[sub] = simState;
+            updateCarrierText(sub);
+            Slog.d(TAG, "updateSimState simState =" + mMSimState[sub]);
+        }
         updateSimIcon(sub);
         updateDataIcon(sub);
     }
@@ -745,8 +829,8 @@ public class MSimNetworkController extends NetworkController {
 
     void updateNetworkName(boolean showSpn, String spn, boolean showPlmn, String plmn,
             int subscription) {
-        if (false) {
-            Slog.d("CarrierLabel", "updateNetworkName showSpn=" + showSpn + " spn=" + spn
+        if (DEBUG) {
+            Slog.d(TAG, "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
         StringBuilder str = new StringBuilder();
@@ -767,6 +851,8 @@ public class MSimNetworkController extends NetworkController {
         } else {
             mMSimNetworkName[subscription] = mNetworkNameDefault;
         }
+        Slog.d(TAG, "mMSimNetworkName[subscription] " + mMSimNetworkName[subscription]
+                                                      + "subscription " + subscription);
     }
 
     // ===== Full or limited Internet connectivity ==================================
@@ -1165,6 +1251,7 @@ public class MSimNetworkController extends NetworkController {
         }
 
         // mobile label
+        setCarrierText();
         N = mMobileLabelViews.size();
         for (int i=0; i<N; i++) {
             TextView v = mMobileLabelViews.get(i);
