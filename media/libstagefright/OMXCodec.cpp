@@ -3053,8 +3053,14 @@ int64_t OMXCodec::retrieveDecodingTimeUs(bool isCodecSpecific) {
 
 void OMXCodec::on_message(const omx_message &msg) {
     if (mState == ERROR && !strncmp(mComponentName, "OMX.google.", 11)) {
-        LOGW("Dropping OMX message - we're in ERROR state.");
-        return;
+        /*
+         * only drop EVENT messages, EBD and FBD are still
+         * processed for bookkeeping purposes
+         */
+        if (msg.type == omx_message::EVENT) {
+            ALOGW("Dropping OMX EVENT message - we're in ERROR state.");
+            return;
+        }
     }
 
     switch (msg.type) {
