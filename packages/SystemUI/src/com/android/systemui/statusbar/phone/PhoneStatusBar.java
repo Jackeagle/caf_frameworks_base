@@ -2403,7 +2403,6 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     private void resetUserSetupObserver() {
         mContext.getContentResolver().unregisterContentObserver(mUserSetupObserver);
-        mUserSetupObserver.onChange(false);
         mContext.getContentResolver().registerContentObserver(
                 Settings.Secure.getUriFor(Settings.Secure.USER_SETUP_COMPLETE), true,
                 mUserSetupObserver,
