@@ -175,10 +175,7 @@ public class MSimSignalClusterView
         mMobileTypeDescription = typeContentDescription;
         mNoSimIconId[subscription] = noSimIcon;
 
-        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_DEFAULT) {
-            mNoSimIconVisiable[subscription] = true;
-            mSignalIconVisiable[subscription] = true;
-        } else if (noSimIcon != 0) {
+        if (noSimIcon != 0) {
             mNoSimIconVisiable[subscription] = true;
             mSignalIconVisiable[subscription] = false;
         } else {
@@ -189,7 +186,6 @@ public class MSimSignalClusterView
             Slog.d(TAG, "setMobileDataIndicators MNoSimIconVisiable "
                     + subscription + " = " + mNoSimIconVisiable[subscription]);
         }
-        apply();
 
         applySubscription(subscription);
     }
@@ -215,20 +211,11 @@ public class MSimSignalClusterView
 
     // Run after each indicator change.
     private void applySubscription(int subscription) {
-        if (mWifiGroup == null) return;
-
-        if (mWifiVisible) {
-            mWifiGroup.setVisibility(View.VISIBLE);
-            mWifi.setImageResource(mWifiStrengthId);
-            mWifiActivity.setImageResource(mWifiActivityId);
-            mWifiGroup.setContentDescription(mWifiDescription);
-        } else {
-            mWifiGroup.setVisibility(View.GONE);
+        if (mWifiGroup == null || mMobileGroup == null || mMobileGroupSub2 == null) {
+            return;
         }
 
-        if (DEBUG) Slog.d(TAG,
-                String.format("wifi: %s sig=%d act=%d",
-                (mWifiVisible ? "VISIBLE" : "GONE"), mWifiStrengthId, mWifiActivityId));
+        apply();
 
         if (mMobileVisible && !mIsAirplaneMode) {
             boolean useDefaultStyle =
@@ -237,7 +224,7 @@ public class MSimSignalClusterView
                 mMobileGroup.setVisibility(View.VISIBLE);
                 mMobile.setImageResource(mMobileStrengthId[subscription]);
                 mMobile.setVisibility(
-                        mSignalIconVisiable[subscription] ? View.VISIBLE : View.GONE);
+                        mSignalIconVisiable[subscription] ? View.VISIBLE : View.INVISIBLE);
                 mMobileGroup.setContentDescription(mMobileTypeDescription + " "
                     + mMobileDescription[subscription]);
                 mMobileActivity.setImageResource(mMobileActivityId[subscription]);
@@ -289,7 +276,7 @@ public class MSimSignalClusterView
     }
 
     // Apply the change after each indicator change.
-    private void apply() {
+    protected void apply() {
         if (mWifiGroup == null) return;
 
         if (mWifiVisible) {

@@ -204,6 +204,10 @@ public class CUMSimSignalClusterView extends MSimSignalClusterView implements
     }
 
     private void applySubscription(int subscription) {
+        if (mWifiGroup == null || mMobileGroup == null || mMobileGroupSub2 == null) {
+            return;
+        }
+
         apply();
 
         if (mMobileVisible && !mIsAirplaneMode) {
@@ -257,27 +261,6 @@ public class CUMSimSignalClusterView extends MSimSignalClusterView implements
             mSpacer.setVisibility(View.INVISIBLE);
         } else {
             mSpacer.setVisibility(View.GONE);
-        }
-    }
-
-    // Run after each indicator change.
-    private void apply() {
-        if (mWifiGroup == null) {
-            return;
-        }
-
-        if (mWifiVisible) {
-            mWifiGroup.setVisibility(View.VISIBLE);
-            mWifi.setImageResource(mWifiStrengthId);
-            mWifiActivity.setImageResource(mWifiActivityId);
-            mWifiGroup.setContentDescription(mWifiDescription);
-        } else {
-            mWifiGroup.setVisibility(View.GONE);
-        }
-
-        if (DEBUG) {
-            Slog.d(TAG, String.format("wifi: %s sig=%d act=%d",
-                    (mWifiVisible ? "VISIBLE" : "GONE"), mWifiStrengthId, mWifiActivityId));
         }
     }
 

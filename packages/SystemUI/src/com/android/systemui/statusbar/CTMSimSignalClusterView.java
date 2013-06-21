@@ -140,6 +140,7 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
         mMobileActivitySub2 = (ImageView) findViewById(R.id.mobile_inout2);
         mSpacer = findViewById(R.id.spacer);
         mAirplane = (ImageView) findViewById(R.id.airplane);
+
         apply();
     }
 
@@ -230,6 +231,10 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
     }
 
     private void applySubscription(int subscription) {
+        if (mWifiGroup == null || mMobileGroup == null || mMobileGroupSub2 == null) {
+            return;
+        }
+
         apply();
 
         if (mMobileVisible && !mIsAirplaneMode) {
@@ -280,26 +285,6 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
         } else {
             mAirplane.setVisibility(View.GONE);
         }
-    }
-
-    // Run after each indicator change.
-    private void apply() {
-        if (mWifiGroup == null) {
-            return;
-        }
-
-        if (mWifiVisible) {
-            mWifiGroup.setVisibility(View.VISIBLE);
-            mWifi.setImageResource(mWifiStrengthId);
-            mWifiActivity.setImageResource(mWifiActivityId);
-            mWifiGroup.setContentDescription(mWifiDescription);
-        } else {
-            mWifiGroup.setVisibility(View.GONE);
-        }
-
-        if (DEBUG)
-            Slog.d(TAG, String.format("wifi: %s sig=%d act=%d",
-                    (mWifiVisible ? "VISIBLE" : "GONE"), mWifiStrengthId, mWifiActivityId));
     }
 
     private int convertNoSimIconIdToCT(int subscription) {
