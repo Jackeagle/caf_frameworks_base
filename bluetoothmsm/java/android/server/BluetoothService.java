@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved
+ * Copyright (c) 2011-2013, Linux Foundation. All rights reserved
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -114,7 +114,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private boolean mIsAirplaneToggleable;
     private BluetoothAdapterStateMachine mBluetoothState;
     private int[] mAdapterSdpHandles;
-    private ParcelUuid[] mAdapterUuids;
+    public ParcelUuid[] mAdapterUuids;
 
     private BluetoothAdapter mAdapter;  // constant after init()
     private final BluetoothBondState mBondState;  // local cache of bondings
@@ -829,7 +829,6 @@ public class BluetoothService extends IBluetooth.Stub {
             return false;
         }
         switchConnectable(false);
-        updateSdpRecords();
         return true;
     }
 
@@ -1067,7 +1066,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
 
-    private synchronized void updateSdpRecords() {
+    public synchronized void updateSdpRecords() {
         ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>();
 
         Resources R = mContext.getResources();
@@ -1772,7 +1771,7 @@ public class BluetoothService extends IBluetooth.Stub {
         return convertStringToParcelUuid(value);
     }
 
-    private ParcelUuid[] convertStringToParcelUuid(String value) {
+    public ParcelUuid[] convertStringToParcelUuid(String value) {
         String[] uuidStrings = null;
         // The UUIDs are stored as a "," separated string.
         uuidStrings = value.split(",");
