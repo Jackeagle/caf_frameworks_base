@@ -1863,6 +1863,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     + " canceled=" + canceled);
         }
 
+        // add key vibrate
+        boolean isEnabled = (Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0);
+        if (down && isEnabled && (repeatCount == 0)) {
+            if (keyCode == KeyEvent.KEYCODE_SEARCH || keyCode == KeyEvent.KEYCODE_HOME
+                    || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_BACK) {
+                performHapticFeedbackLw(null, HapticFeedbackConstants.KEYBOARD_TAP, false);
+            }
+        }
+
         // If we think we might have a volume down & power key chord on the way
         // but we're not sure, then tell the dispatcher to wait a little while and
         // try again later before dispatching.
