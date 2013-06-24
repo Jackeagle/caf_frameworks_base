@@ -168,8 +168,10 @@ public class MediaController extends FrameLayout {
         mAnchor.getLocationOnScreen(anchorPos);
 
         WindowManager.LayoutParams p = mDecorLayoutParams;
-        p.width = mAnchor.getWidth();
-        p.y = anchorPos[1] + mAnchor.getHeight();
+		if(p != null){
+        	p.width = mAnchor.getWidth();
+        	p.y = anchorPos[1] + mAnchor.getHeight();
+		}
     }
 
     // This is called whenever mAnchor's layout bound changes
