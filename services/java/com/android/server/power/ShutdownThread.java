@@ -372,9 +372,19 @@ public final class ShutdownThread extends Thread {
             }
         }
         
-		showShutdownAnimation();
+		    boolean isFastPowerOnOff = "fastpoweroff".equals(SystemProperties.get("sys.shutdown.fast"));
+		  	Log.i(TAG,"flag is "+SystemProperties.get("sys.shutdown.fast"));
+		    Log.i(TAG,"IT IS FAST POWER ON OFF " + isFastPowerOnOff);
+			
+		  	if(isFastPowerOnOff == true){
+                
+		  	}else{
+            showShutdownAnimation();
+				}
+		    
+		    
         String shutDownFile = null;
-        if (!isSilentMode() && !isBootSoundOff()
+        if (isFastPowerOnOff != true && !isSilentMode() && !isBootSoundOff()
                 && (shutDownFile = getShutdownMusicFilePath()) != null) {
             isShutdownMusicPlaying = true;
         Log.i(TAG, "obtainMessage for shutdown music");
