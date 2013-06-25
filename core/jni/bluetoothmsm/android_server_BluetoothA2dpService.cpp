@@ -185,6 +185,24 @@ static jboolean disconnectSinkNative(JNIEnv *env, jobject object,
     return JNI_FALSE;
 }
 
+static jboolean disconnectSourceNative(JNIEnv *env, jobject object,
+                                     jstring path) {
+#ifdef HAVE_BLUETOOTH
+    ALOGV("%s", __FUNCTION__);
+    if (nat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+
+        bool ret = dbus_func_args_async(env, nat->conn, -1, NULL, NULL, nat,
+                                    c_path, "org.bluez.AudioSource", "Disconnect",
+                                    DBUS_TYPE_INVALID);
+
+        env->ReleaseStringUTFChars(path, c_path);
+        return ret ? JNI_TRUE : JNI_FALSE;
+    }
+#endif
+    return JNI_FALSE;
+}
+
 static jboolean suspendSinkNative(JNIEnv *env, jobject object,
                                      jstring path) {
 #ifdef HAVE_BLUETOOTH
@@ -421,7 +439,23 @@ DBusHandlerResult a2dp_event_filter(DBusMessage *msg, JNIEnv *env) {
         env->CallVoidMethod(nat->me,
                             method_onSinkPropertyChanged,
                             path,
-                            str_array);
+                            str_array,
+                            1);
+        env->DeleteLocalRef(path);
+        result = DBUS_HANDLER_RESULT_HANDLED;
+        return result;
+    } else if (dbus_message_is_signal(msg, "org.bluez.AudioSource",
+                                      "PropertyChanged")) {
+        jobjectArray str_array =
+                    parse_property_change(env, msg, (Properties *)&sink_properties,
+                                sizeof(sink_properties) / sizeof(Properties));
+        const char *c_path = dbus_message_get_path(msg);
+        jstring path = env->NewStringUTF(c_path);
+        env->CallVoidMethod(nat->me,
+                            method_onSinkPropertyChanged,
+                            path,
+                            str_array,
+                            0);
         env->DeleteLocalRef(path);
         result = DBUS_HANDLER_RESULT_HANDLED;
         return result;
@@ -620,6 +654,7 @@ static JNINativeMethod sMethods[] = {
     {"resumeSinkNative", "(Ljava/lang/String;)Z", (void*)resumeSinkNative},
     {"getSinkPropertiesNative", "(Ljava/lang/String;)[Ljava/lang/Object;",
                                     (void *)getSinkPropertiesNative},
+    {"disconnectSourceNative", "(Ljava/lang/String;)Z", (void *)disconnectSourceNative},
     {"avrcpVolumeUpNative", "(Ljava/lang/String;)Z", (void*)avrcpVolumeUpNative},
     {"avrcpVolumeDownNative", "(Ljava/lang/String;)Z", (void*)avrcpVolumeDownNative},
     {"sendMetaDataNative", "(Ljava/lang/String;)Z", (void*)sendMetaDataNative},
@@ -638,7 +673,7 @@ int register_android_server_BluetoothA2dpService(JNIEnv *env) {
 
 #ifdef HAVE_BLUETOOTH
     method_onSinkPropertyChanged = env->GetMethodID(clazz, "onSinkPropertyChanged",
-                                          "(Ljava/lang/String;[Ljava/lang/String;)V");
+                                          "(Ljava/lang/String;[Ljava/lang/String;Z)V");
     method_onConnectSinkResult = env->GetMethodID(clazz, "onConnectSinkResult",
                                                          "(Ljava/lang/String;Z)V");
     method_onGetPlayStatusRequest = env->GetMethodID(clazz, "onGetPlayStatusRequest",

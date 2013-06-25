@@ -430,6 +430,14 @@ static jboolean setUpEventLoop(native_data_t *nat) {
         }
 
         dbus_bus_add_match(nat->conn,
+                "type='signal',interface='org.bluez.AudioSource'",
+                &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+            return JNI_FALSE;
+        }
+
+        dbus_bus_add_match(nat->conn,
                 "type='signal',interface='org.bluez.AudioSink'",
                 &err);
         if (dbus_error_is_set(&err)) {
@@ -685,6 +693,13 @@ static void tearDownEventLoop(native_data_t *nat) {
         dbus_bus_remove_match(nat->conn,
              "type='signal',interface='org.qcom.bluetooth.dun'",
              &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR(&err);
+        }
+
+        dbus_bus_remove_match(nat->conn,
+                "type='signal',interface='"BLUEZ_DBUS_BASE_IFC".AudioSource'",
+                &err);
         if (dbus_error_is_set(&err)) {
             LOG_AND_FREE_DBUS_ERROR(&err);
         }

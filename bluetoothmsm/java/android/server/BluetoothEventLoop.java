@@ -1128,8 +1128,8 @@ class BluetoothEventLoop {
         // Bluez sends the UUID of the local service being accessed, _not_ the
         // remote service
         if (mA2dp != null &&
-            (BluetoothUuid.isAudioSource(uuid) || BluetoothUuid.isAvrcpTarget(uuid)
-              || BluetoothUuid.isAdvAudioDist(uuid)) &&
+            (BluetoothUuid.isAudioSink(uuid) || BluetoothUuid.isAudioSource(uuid)
+              || BluetoothUuid.isAvrcpTarget(uuid) || BluetoothUuid.isAdvAudioDist(uuid)) &&
               !isOtherSinkInNonDisconnectedState(address)) {
             authorized = mA2dp.getPriority(device) > BluetoothProfile.PRIORITY_OFF;
             if (authorized && !BluetoothUuid.isAvrcpTarget(uuid)) {

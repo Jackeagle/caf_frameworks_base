@@ -85,6 +85,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private static final int MSG_CONNECTION_STATE_CHANGED = 0;
     private boolean mIsMusicAppPlaying = false;
 
+    private boolean mIsRemoteA2dpSink = true;
+
     /* AVRCP1.3 Metadata variables */
     private String mTrackName = DEFAULT_METADATA_STRING;
     private String mArtistName = DEFAULT_METADATA_STRING;
@@ -880,8 +882,19 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     case BluetoothA2dp.STATE_CONNECTING:
                     case BluetoothA2dp.STATE_CONNECTED:
                     case BluetoothA2dp.STATE_PLAYING:
-                        disconnectSinkNative(mBluetoothService.getObjectPathFromAddress(
-                                device.getAddress()));
+                        if (mIsRemoteA2dpSink) {
+                            disconnectSinkNative(mBluetoothService.getObjectPathFromAddress(
+                                    device.getAddress()));
+                        } else {
+                            // Reset mIsRemoteA2dpSink to True on disconnect
+                            // So that if required Outgoing connection for Source can be tried
+                            // Set Priority of A2dp sink as ON, else incoming connect won't be allowed
+                            setPriority(device, BluetoothA2dp.PRIORITY_ON);
+                            mIsRemoteA2dpSink = true;
+                            log("onBluetoothDisable: mIsRemoteA2dpSink set to 1");
+                            disconnectSourceNative(mBluetoothService.getObjectPathFromAddress(
+                                    device.getAddress()));
+                        }
                         handleSinkStateChange(device, state,
                                               BluetoothA2dp.STATE_DISCONNECTING);
                         break;
@@ -923,6 +936,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                                                 "Need BLUETOOTH_ADMIN permission");
         if (DBG) log("connectSink(" + device + ")");
+
         if (!isConnectSinkFeasible(device)) return false;
 
         int state;
@@ -968,11 +982,14 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             setPriority(device, BluetoothA2dp.PRIORITY_AUTO_CONNECT);
         }
         handleSinkStateChange(device, state, BluetoothA2dp.STATE_CONNECTING);
-
-        if (!connectSinkNative(path)) {
-            // Restore previous state
-            handleSinkStateChange(device, mAudioDevices.get(device), state);
-            return false;
+        if (mIsRemoteA2dpSink) {
+            if (!connectSinkNative(path)) {
+                // Restore previous state
+                handleSinkStateChange(device, mAudioDevices.get(device), state);
+                return false;
+            }
+        } else {
+            // Not handling outgoing connect for a2dpSink feature.
         }
         return true;
     }
@@ -1013,10 +1030,24 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         }
         // State is CONNECTING or CONNECTED or PLAYING
         handleSinkStateChange(device, state, BluetoothA2dp.STATE_DISCONNECTING);
-        if (!disconnectSinkNative(path)) {
-            // Restore previous state
-            handleSinkStateChange(device, mAudioDevices.get(device), state);
-            return false;
+        if (mIsRemoteA2dpSink) {
+            if (!disconnectSinkNative(path)) {
+                // Restore previous state
+                handleSinkStateChange(device, mAudioDevices.get(device), state);
+                return false;
+            }
+        } else {
+            // Reset mIsRemoteA2dpSink to True on disconnect
+            // So that if required Outgoing connection for Source can be tried
+            // Set Priority of A2dp sink as ON, else incoming connect won't be allowed
+            setPriority(device, BluetoothA2dp.PRIORITY_ON);
+            mIsRemoteA2dpSink = true;
+            log("disconnectSinkInternal: mIsRemoteA2dpSink set to 1");
+            if (!disconnectSourceNative(path)) {
+                // Restore previous state
+                handleSinkStateChange(device, mAudioDevices.get(device), state);
+                return false;
+            }
         }
         return true;
     }
@@ -1142,7 +1173,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
      * @param propValues a string array containing the key and one or more
      *  values.
      */
-    private synchronized void onSinkPropertyChanged(String path, String[] propValues) {
+    private synchronized void onSinkPropertyChanged(String path, String[] propValues, boolean isSinkDevice) {
         if (!mBluetoothService.isEnabled()) {
             return;
         }
@@ -1157,6 +1188,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         BluetoothDevice device = mAdapter.getRemoteDevice(address);
 
         if (name.equals(PROPERTY_STATE)) {
+            mIsRemoteA2dpSink = isSinkDevice;
+            log("onSinkPropertyChanged: mIsRemoteA2dpSink set to " + mIsRemoteA2dpSink);
             int state = convertBluezSinkStringToState(propValues[1]);
             log("A2DP: onSinkPropertyChanged newState is: " + state + "mPlayingA2dpDevice: " + mPlayingA2dpDevice);
 
@@ -1176,8 +1209,10 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                        // so audio will not be routed to A2dp. To avoid IOP
                        // issues send a SUSPEND on A2dp if remote device asks
                        // for PLAY during call active state.
-                       suspendSinkNative(mBluetoothService.getObjectPathFromAddress(
-                                device.getAddress()));
+                       if (mIsRemoteA2dpSink) {
+                           suspendSinkNative(mBluetoothService.getObjectPathFromAddress(
+                                    device.getAddress()));
+                       }
                     }
                 } else if (state == BluetoothA2dp.STATE_CONNECTED && mPlayingA2dpDevice != null) {
                     mPlayingA2dpDevice = null;
@@ -1212,7 +1247,11 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                 updateLocalSettingsToBluez();
             }
 
-            int delay = mAudioManager.setBluetoothA2dpDeviceConnectionState(device, state);
+            int delay = 0;
+
+            if (mIsRemoteA2dpSink) {
+                delay = mAudioManager.setBluetoothA2dpDeviceConnectionState(device, state);
+            }
 
             mWakeLock.acquire();
             mIntentBroadcastHandler.sendMessageDelayed(mIntentBroadcastHandler.obtainMessage(
@@ -1428,6 +1467,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private native void cleanupNative();
     private synchronized native boolean connectSinkNative(String path);
     private synchronized native boolean disconnectSinkNative(String path);
+    private synchronized native boolean disconnectSourceNative(String path);
     private synchronized native boolean suspendSinkNative(String path);
     private synchronized native boolean resumeSinkNative(String path);
     private synchronized native Object []getSinkPropertiesNative(String path);
