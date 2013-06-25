@@ -63,6 +63,8 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 
+import static com.android.internal.telephony.MSimConstants.MAX_PHONE_COUNT_TRI_SIM;
+
 /**
  * Database helper class for {@link SettingsProvider}.
  * Mostly just has a bit {@link #onCreate} to initialize the database.
@@ -2193,6 +2195,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     "true".equalsIgnoreCase(
                             SystemProperties.get("ro.com.android.mobiledata",
                                     "true")) ? 1 : 0);
+
+            // SUB specific flags for Multisim devices
+            for (int i = 0; i < MAX_PHONE_COUNT_TRI_SIM; i++) {
+                // Mobile Data default, based on build
+                loadSetting(stmt, Settings.Global.MOBILE_DATA + i,
+                        "true".equalsIgnoreCase(
+                        SystemProperties.get("ro.com.android.mobiledata", "true")) ? 1 : 0);
+
+                // Data roaming default, based on build
+                loadSetting(stmt, Settings.Global.DATA_ROAMING + i,
+                        "true".equalsIgnoreCase(
+                        SystemProperties.get("ro.com.android.dataroaming", "true")) ? 1 : 0);
+            }
 
             loadBooleanSetting(stmt, Settings.Global.NETSTATS_ENABLED,
                     R.bool.def_netstats_enabled);
