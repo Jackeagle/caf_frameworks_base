@@ -548,6 +548,8 @@ public class CallerInfo {
             if (VDBG) Log.v(TAG, "- parsed number: " + pn);
         } catch (NumberParseException e) {
             Log.w(TAG, "getGeoDescription: NumberParseException for incoming number '" + number + "'");
+        } catch (Exception ex) {
+            Log.w(TAG, "Exception Caught" + ex);
         }
 
         if (pn != null) {
@@ -568,7 +570,7 @@ public class CallerInfo {
       CountryDetector detector = (CountryDetector) context.getSystemService(
           Context.COUNTRY_DETECTOR);
       if (detector != null) {
-        countryIso = detector.detectCountry().getCountryIso();
+           countryIso = detector.detectCountry().getCountryIso();
       } else {
         countryIso = locale.getCountry();
         Log.w(TAG, "No CountryDetector; falling back to countryIso based on locale: "
