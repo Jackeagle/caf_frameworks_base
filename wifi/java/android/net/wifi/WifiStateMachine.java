@@ -3487,6 +3487,7 @@ public class WifiStateMachine extends StateMachine {
                   break;
                /* Defer scan request since we should not switch to other channels at DHCP */
               case CMD_START_SCAN:
+              case WifiP2pManager.DISCOVER_PEERS:
                   loge("Received SCAN while in ObtainingIpState");
                   deferMessage(message);
                  break;
