@@ -132,10 +132,7 @@ public class PhoneStatusBarPolicy {
             else if (action.equals(AudioManager.RINGER_MODE_CHANGED_ACTION)) {
                 updateVolume();
             }
-            else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED_SUB0)) {
-                updateSimState(intent);
-            }
-	     else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED_SUB1)) {
+            else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
                 updateSimState(intent);
             }
             else if (action.equals(TtyIntent.TTY_ENABLED_CHANGE_ACTION)) {
@@ -155,8 +152,7 @@ public class PhoneStatusBarPolicy {
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
-        filter.addAction(TelephonyIntents.ACTION_SIM_STATE_CHANGED_SUB0);
-	 filter.addAction(TelephonyIntents.ACTION_SIM_STATE_CHANGED_SUB1);
+        filter.addAction(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
         filter.addAction(TtyIntent.TTY_ENABLED_CHANGE_ACTION);
         mContext.registerReceiver(mIntentReceiver, filter, null, mHandler);
 
