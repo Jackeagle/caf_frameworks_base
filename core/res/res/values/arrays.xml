@@ -415,6 +415,8 @@
     </string-array>
 
     <string-array translateable="false" name="origin_carrier_names">
+        <item>CHINA\u0020\u0020MOBILE</item>
+        <item>CHN-UNICOM</item>
         <item>China Mobile</item>
         <item>China Unicom</item>
         <item>China Telecom</item>
@@ -425,6 +427,8 @@
     </string-array>
 
     <string-array translatable="false" name="locale_carrier_names">
+        <item>China_Mobile</item>
+        <item>China_Unicom</item>
         <item>China_Mobile</item>
         <item>China_Unicom</item>
         <item>China_Telecom</item>
