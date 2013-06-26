@@ -90,6 +90,7 @@ public class PowerUI extends SystemUI {
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         filter.addAction(Intent.ACTION_POWER_CONNECTED);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
         mContext.registerReceiver(mIntentReceiver, filter, null, mHandler);
     }
 
@@ -200,6 +201,11 @@ public class PowerUI extends SystemUI {
                     dismissLowBatteryWarning();
                 } else if (mBatteryLevelTextView != null) {
                     showLowBatteryWarning();
+                }
+            } else if (action.equals(Intent.ACTION_USER_PRESENT)) {
+                if (mLowBatteryDialog != null && !isScreenLocked()) {
+                    // Showing low battery warning dialog if the screen is unlocked.
+                    mLowBatteryDialog.show();
                 }
             } else {
                 Slog.w(TAG, "unknown intent: " + intent);
