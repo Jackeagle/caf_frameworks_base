@@ -3993,6 +3993,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_MEDIA_RECORD:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
             case KeyEvent.KEYCODE_CAMERA:
+            // Same as camera, but pressed before camera key (two level button)
             case KeyEvent.KEYCODE_FOCUS:
                 return false;
         }
