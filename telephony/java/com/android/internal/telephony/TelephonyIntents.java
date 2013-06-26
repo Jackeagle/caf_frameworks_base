@@ -332,4 +332,12 @@ public class TelephonyIntents {
       */
      public static final String ACTION_SIM_REFRESH_UPDATE
              = "android.intent.action.ACTION_SIM_REFRESH_UPDATE";
+
+public static final String ACTION_SIM_STATE_CHANGED_SUB0
+		= "android.intent.action.SIM_STATE_CHANGED0";
+
+public static final String ACTION_SIM_STATE_CHANGED_SUB1
+		= "android.intent.action.SIM_STATE_CHANGED1";
+
+	 
 }

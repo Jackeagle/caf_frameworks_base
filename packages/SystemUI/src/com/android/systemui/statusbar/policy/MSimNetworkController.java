@@ -111,7 +111,7 @@ public class MSimNetworkController extends NetworkController {
     String[] mSpn;
     String[] mPlmn;
   //  private final LocaleNamesParser localeNamesParser;
-  
+
   ArrayList<ImageView> mSimPhoneSignalIconViews = new ArrayList<ImageView>();
   ArrayList<ImageView> mSimDataDirectionIconViews = new ArrayList<ImageView>();
   ArrayList<ImageView> mSimDataDirectionOverlayIconViews = new ArrayList<ImageView>();
@@ -390,13 +390,22 @@ public class MSimNetworkController extends NetworkController {
                 || action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
             updateWifiState(intent);
             refreshViews(mDefaultSubscription);
-        } else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED)) {
+        } else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED_SUB0)) {
             updateSimState(intent);
             for (int sub = 0; sub < MSimTelephonyManager.getDefault().getPhoneCount(); sub++) {
                 updateDataIcon(sub);
                 refreshViews(sub);
             }
-        } else if (action.equals(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION)) {
+        }
+	 else if (action.equals(TelephonyIntents.ACTION_SIM_STATE_CHANGED_SUB1)) {
+            updateSimState(intent);
+            for (int sub = 0; sub < MSimTelephonyManager.getDefault().getPhoneCount(); sub++) {
+                updateDataIcon(sub);
+                refreshViews(sub);
+            }
+        }
+
+		else if (action.equals(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION)) {
             final int subscription = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY, 0);
             Slog.d(TAG, "Received SPN update on sub :" + subscription);
             updateNetworkName(intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_SPN, false),
