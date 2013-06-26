@@ -1428,6 +1428,19 @@ class MountService extends IMountService.Stub
         }
     }
 
+    private ArrayList<String> getShareableVolumes() {
+        // Sharable volumes have android:allowMassStorage="true" in storage_list.xml
+        ArrayList<String> volumesToMount = new ArrayList<String>();
+        synchronized (mVolumes) {
+            for (StorageVolume v : mVolumes) {
+                if (v.allowMassStorage()) {
+                    volumesToMount.add(v.getPath());
+                }
+            }
+        }
+        return volumesToMount;
+    }
+
     public boolean isUsbMassStorageConnected() {
         waitForReady();
 
@@ -1443,51 +1456,47 @@ class MountService extends IMountService.Stub
         waitForReady();
         validatePermission(android.Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS);
 
-        final StorageVolume primary = getPrimaryPhysicalVolume();
-        if (primary == null) return;
-
         // TODO: Add support for multiple share methods
-
-        /*
-         * If the volume is mounted and we're enabling then unmount it
-         */
-        String path = primary.getPath();
-        String vs = getVolumeState(path);
-        String method = "ums";
-        if (enable && vs.equals(Environment.MEDIA_MOUNTED)) {
-            // Override for isUsbMassStorageEnabled()
-            setUmsEnabling(enable);
-            UmsEnableCallBack umscb = new UmsEnableCallBack(path, method, true);
-            mHandler.sendMessage(mHandler.obtainMessage(H_UNMOUNT_PM_UPDATE, umscb));
-            // Clear override
-            setUmsEnabling(false);
-        }
-        /*
-         * If we disabled UMS then mount the volume
-         */
-        if (!enable) {
-            doShareUnshareVolume(path, method, enable);
-            if (doMountVolume(path) != StorageResultCode.OperationSucceeded) {
-                Slog.e(TAG, "Failed to remount " + path +
-                        " after disabling share method " + method);
-                /*
-                 * Even though the mount failed, the unshare didn't so don't indicate an error.
-                 * The mountVolume() call will have set the storage state and sent the necessary
-                 * broadcasts.
-                 */
+        for (String path : getShareableVolumes()) {
+            /*
+             * If the volume is mounted and we're enabling then unmount it
+             */
+            String vs = getVolumeState(path);
+            String method = "ums";
+            if (enable) {
+                // Override for isUsbMassStorageEnabled()
+                setUmsEnabling(enable);
+                UmsEnableCallBack umscb = new UmsEnableCallBack(path, method, true);
+                mHandler.sendMessage(mHandler.obtainMessage(H_UNMOUNT_PM_UPDATE, umscb));
+                // Clear override
+                setUmsEnabling(false);
+            }
+            /*
+             * If we disabled UMS then mount the volume
+             */
+            if (!enable) {
+                doShareUnshareVolume(path, method, enable);
+                if (doMountVolume(path) != StorageResultCode.OperationSucceeded) {
+                    Slog.e(TAG, "Failed to remount " + path +
+                            " after disabling share method " + method);
+                    /*
+                     * Even though the mount failed, the unshare didn't so don't indicate an error.
+                     * The mountVolume() call will have set the storage state and sent the necessary
+                     * broadcasts.
+                     */
+                }
             }
         }
     }
 
     public boolean isUsbMassStorageEnabled() {
         waitForReady();
-
-        final StorageVolume primary = getPrimaryPhysicalVolume();
-        if (primary != null) {
-            return doGetVolumeShared(primary.getPath(), "ums");
-        } else {
-            return false;
+        for (String path : getShareableVolumes()) {
+            if (doGetVolumeShared(path, "ums"))
+                return true;
         }
+        // no volume is shared
+        return false;
     }
 
     /**
