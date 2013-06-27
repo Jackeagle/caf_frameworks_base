@@ -105,6 +105,16 @@ public:
     const Rect& getLocalClip();
 
     /**
+     * Sets the current tile clip.
+     */
+    void setTileClip(float left, float top, float right, float bottom);
+
+    /**
+     * Returns the current tile clip in local coordinates.
+     */
+    const Rect& getTileClip();
+
+    /**
      * Resets the clip to the specified rect.
      */
     void resetClip(float left, float top, float right, float bottom);
@@ -233,6 +243,7 @@ private:
     mat4 mTransformRoot;
     Rect mClipRectRoot;
     Rect mLocalClip;
+    Rect mTileClip;
 
 #if STENCIL_BUFFER_SIZE
     SkRegion mClipRegionRoot;
