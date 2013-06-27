@@ -74,6 +74,8 @@ Snapshot::Snapshot(const sp<Snapshot>& s, int saveFlags):
     } else {
         region = NULL;
     }
+
+    mTileClip.set(s->getTileClip());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -190,6 +192,14 @@ const Rect& Snapshot::getLocalClip() {
     inverse.mapRect(mLocalClip);
 
     return mLocalClip;
+}
+
+void Snapshot::setTileClip(float left, float top, float right, float bottom) {
+    mTileClip.set(left, top, right, bottom);
+}
+
+const Rect& Snapshot::getTileClip() {
+    return mTileClip;
 }
 
 void Snapshot::resetClip(float left, float top, float right, float bottom) {
