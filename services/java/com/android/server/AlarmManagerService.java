@@ -27,6 +27,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
@@ -93,7 +94,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
     private final ArrayList<Alarm> mElapsedRealtimeWakeupAlarms = new ArrayList<Alarm>();
     private final ArrayList<Alarm> mElapsedRealtimeAlarms = new ArrayList<Alarm>();
     private final IncreasingTimeOrder mIncreasingTimeOrder = new IncreasingTimeOrder();
-    
+
+    private final ArrayList<Integer> mTriggeredUids = new ArrayList<Integer>();
+    private final ArrayList<Integer> mBlockedUids = new ArrayList<Integer>();
+
     private int mDescriptor;
     private int mBroadcastRefCount = 0;
     private PowerManager.WakeLock mWakeLock;
@@ -357,6 +361,51 @@ class AlarmManagerService extends IAlarmManager.Stub {
             Alarm alarm = it.next();
             if (alarm.operation.equals(operation)) {
                 it.remove();
+            }
+        }
+    }
+
+    /* updates the blocked uids, so if a wake lock is acquired to only fire
+     * alarm for it, it can be released.
+     */
+    void updateBlockedUids(int uid, boolean isBlocked) {
+        if (localLOGV) Slog.v(TAG, "UpdateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
+        synchronized(mLock) {
+            if(isBlocked) {
+                for( int i=0; i< mTriggeredUids.size(); i++) {
+                    if(mTriggeredUids.contains(new Integer(uid))) {
+                        if (localLOGV) {
+                            Slog.v(TAG,"TriggeredUids has this uid, mBroadcastRefCount="
+                                +mBroadcastRefCount);
+                        }
+                        mTriggeredUids.remove(new Integer(uid));
+                        mBlockedUids.add(new Integer(uid));
+                        if(mBroadcastRefCount > 0){
+                            mBroadcastRefCount--;
+                            if (mBroadcastRefCount == 0) {
+                                /* all the uids for which the alarms are triggered
+                                 * are either blocked or have called onSendFinished.
+                                */
+                                mWakeLock.release();
+                                if (localLOGV) Slog.v(TAG, "AM WakeLock Released Internally");
+                            }
+                        } else {
+                            if (localLOGV) {
+                                Slog.v(TAG, "Trying to decrement mBroadcastRefCount past zero");
+                            }
+                        }
+                    } else {
+                        //no more matching uids break from the for loop
+                        break;
+                    }
+                }
+            } else {
+                for(int i =0; i<mBlockedUids.size(); i++) {
+                    if(!mBlockedUids.remove(new Integer(uid))) {
+                        //no more matching uids break from the for loop
+                        break;
+                     }
+                }
             }
         }
     }
@@ -746,13 +795,17 @@ class AlarmManagerService extends IAlarmManager.Stub {
         public long when;
         public long repeatInterval;
         public PendingIntent operation;
-        
+        public int uid;
+        public int pid;
+
         public Alarm() {
             when = 0;
             repeatInterval = 0;
             operation = null;
+            uid = Binder.getCallingUid();
+            pid = Binder.getCallingPid();
         }
-        
+
         @Override
         public String toString()
         {
@@ -839,7 +892,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                                     alarm.operation);
                             mInFlight.add(inflight);
                             mBroadcastRefCount++;
-
+                            mTriggeredUids.add(new Integer(alarm.uid));
                             final BroadcastStats bs = inflight.mBroadcastStats;
                             bs.count++;
                             if (bs.nesting == 0) {
@@ -886,11 +939,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 mWakeLock.setWorkSource(new WorkSource(uid));
                 return;
             }
-        } catch (Exception e) {
-        }
-
         // Something went wrong; fall back to attributing the lock to the OS
         mWakeLock.setWorkSource(null);
+        } catch (Exception e) {
+        }
     }
 
     private class AlarmHandler extends Handler {
@@ -1078,25 +1130,52 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 } else {
                     mLog.w("No in-flight alarm for " + pi + " " + intent);
                 }
-                mBroadcastRefCount--;
-                if (mBroadcastRefCount == 0) {
-                    mWakeLock.release();
-                    if (mInFlight.size() > 0) {
-                        mLog.w("Finished all broadcasts with " + mInFlight.size()
-                                + " remaining inflights");
-                        for (int i=0; i<mInFlight.size(); i++) {
-                            mLog.w("  Remaining #" + i + ": " + mInFlight.get(i));
-                        }
-                        mInFlight.clear();
-                    }
+                String pkg = null;
+                int uid = 0;
+                try {
+                    pkg = pi.getTargetPackage();
+                    final PackageManager pm = mContext.getPackageManager();
+                    ApplicationInfo appInfo =
+                        pm.getApplicationInfo(pkg, PackageManager.GET_META_DATA);
+                    uid = appInfo.uid;
+                    mTriggeredUids.remove(new Integer(uid));
+                } catch (PackageManager.NameNotFoundException ex) {
+                    Slog.w(TAG, "onSendFinished NameNotFoundException Pkg = " + pkg);
+                }
+                if(mBlockedUids.contains(new Integer(uid))) {
+                    mBlockedUids.remove(new Integer(uid));
                 } else {
+                    if(mBroadcastRefCount > 0){
+                        mBroadcastRefCount--;
+                        if (mBroadcastRefCount == 0) {
+                            mWakeLock.release();
+                            if (mInFlight.size() > 0) {
+                                mLog.w("Finished all broadcasts with " + mInFlight.size()
+                                    + " remaining inflights");
+                                for (int i=0; i<mInFlight.size(); i++) {
+                                    mLog.w("  Remaining #" + i + ": " + mInFlight.get(i));
+                                }
+                                mInFlight.clear();
+                            }
+                        }
+                    } else {
+                        if(localLOGV) {
+                            Slog.e(TAG,"Trying to decrement mBroadcastRefCnt past zero");
+                        }
+                    }
+                }
+                if (mBroadcastRefCount != 0) {
                     // the next of our alarms is now in flight.  reattribute the wakelock.
                     if (mInFlight.size() > 0) {
                         setWakelockWorkSource(mInFlight.get(0).mPendingIntent);
                     } else {
                         // should never happen
+                        try {
                         mLog.w("Alarm wakelock still held but sent queue empty");
                         mWakeLock.setWorkSource(null);
+                        } catch (IllegalArgumentException ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
             }
