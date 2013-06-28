@@ -43,7 +43,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-
+import android.media.AudioManager;
 /**
  * <p>Proxy for HTML5 video views.
  */
@@ -96,6 +96,8 @@ class HTML5VideoViewProxy extends Handler
     private int mSeekPosition;
     // Indicates whether video frame has updated after MediaPlayer initialization
     private boolean mVideoFrameAvailable;
+
+	private AudioManager audioManager;
 
     // A helper class to control the playback. This executes on the UI thread!
     private static final class VideoPlayer {
@@ -446,6 +448,9 @@ class HTML5VideoViewProxy extends Handler
         // This executes on the UI thread.
         switch (msg.what) {
             case PLAY: {
+				if(audioManager != null)
+                        audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC,
+                                                AudioManager.AUDIOFOCUS_GAIN);
                 String url = (String) msg.obj;
                 WebChromeClient client = mWebView.getWebChromeClient();
                 int videoLayerID = msg.arg1;
@@ -470,10 +475,14 @@ class HTML5VideoViewProxy extends Handler
                 break;
             }
             case PAUSE: {
+				if(audioManager != null)
+                        audioManager.abandonAudioFocus(null);
                 VideoPlayer.pause(this);
                 break;
             }
             case ENDED:
+				if(audioManager != null)
+                        audioManager.abandonAudioFocus(null);
                 if (msg.arg1 == 1)
                     VideoPlayer.isVideoSelfEnded = true;
                 VideoPlayer.end();
@@ -694,6 +703,7 @@ class HTML5VideoViewProxy extends Handler
         mNativePointer = nativePtr;
         // create the message handler for this thread
         createWebCoreHandler();
+		audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
     }
 
     private void createWebCoreHandler() {
