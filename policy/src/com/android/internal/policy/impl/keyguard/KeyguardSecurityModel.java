@@ -22,6 +22,7 @@ import android.telephony.TelephonyManager;
 
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.widget.LockPatternUtils;
+import android.util.Log;
 
 public class KeyguardSecurityModel {
     /**
@@ -86,6 +87,9 @@ public class KeyguardSecurityModel {
         int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
         for (int i = 0; i < numPhones; i++) {
             simState = updateMonitor.getSimState(i);
+	     Log.v("KeyguardSecurityModel", "getSecurityMode : simState=" +simState+ "   i" +i);
+	     
+	
             // We are intereseted only in PIN_REQUIRED or PUK_REQUIRED
             // So continue to the next sub if the sim state is other
             // then these two. Refer to the below if condition to find
@@ -128,8 +132,13 @@ public class KeyguardSecurityModel {
                     throw new IllegalStateException("Unknown unlock mode:" + mode);
             }
         }
+	 Log.v("KeyguardSecurityModel", "getSecurityMode : mode=" +mode );
         return mode;
     }
+
+
+
+
 
     /**
      * Some unlock methods can have an alternate, such as biometric unlocks (e.g. face unlock).
