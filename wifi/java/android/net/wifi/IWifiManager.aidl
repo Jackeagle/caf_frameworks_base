@@ -16,6 +16,8 @@
 
 package android.net.wifi;
 
+import android.net.wifi.PPPOEConfig;
+import android.net.wifi.PPPOEInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.ScanResult;
@@ -108,5 +110,11 @@ interface IWifiManager
     String getConfigFile();
 
     void captivePortalCheckComplete();
+
+    void startPPPOE(in PPPOEConfig config);
+
+    void stopPPPOE();
+
+    PPPOEInfo getPPPOEInfo();
 }
 
