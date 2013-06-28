@@ -63,7 +63,7 @@ public abstract class IccRecords extends Handler implements IccConstants {
     protected String newVoiceMailTag = null;
     protected boolean isVoiceMailFixed = false;
     protected int countVoiceMessages = 0;
-    protected String imsi;
+    protected String mImsi;
 
     protected int mncLength = UNINITIALIZED;
     protected int mailboxIndex = 0; // 0 is no mailbox dailing number associated
@@ -169,7 +169,7 @@ public abstract class IccRecords extends Handler implements IccConstants {
         Registrant r = new Registrant(h, what, obj);
         mImsiReadyRegistrants.add(r);
 
-        if (imsi != null) {
+        if (mImsi != null) {
             r.notifyRegistrant(new AsyncResult(null, null, null));
         }
     }
@@ -210,16 +210,7 @@ public abstract class IccRecords extends Handler implements IccConstants {
      * @return null if SIM is not yet ready or unavailable
      */
     public String getIMSI() {
-        return null;
-    }
-
-    /**
-     * Imsi could be set by ServiceStateTrackers in case of cdma
-     * @param imsi
-     */
-    public void setImsi(String imsi) {
-        this.imsi = imsi;
-        mImsiReadyRegistrants.notifyRegistrants();
+        return mImsi;
     }
 
     public String getMsisdnNumber() {
