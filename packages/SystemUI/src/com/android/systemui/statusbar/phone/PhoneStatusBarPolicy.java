@@ -51,6 +51,7 @@ import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.telephony.cdma.TtyIntent;
 import com.android.server.am.BatteryStatsService;
 import com.android.systemui.R;
+import android.os.Environment;
 
 /**
  * This class contains all of the policy about which icons are installed in the status
@@ -107,6 +108,11 @@ public class PhoneStatusBarPolicy {
 
     private int mLastWifiSignalLevel = -1;
     private boolean mIsWifiConnected = false;
+
+    //tfcard icon displayed on status bar 
+    private int mTFcardIconData = R.drawable.stat_notify_sdcard;
+    private int mNoTFcardIconData = R.drawable.stat_notify_sdcard_usb;
+
 
     // state of inet connection - 0 not connected, 100 connected
     private int mInetCondition = 0;
@@ -200,6 +206,20 @@ public class PhoneStatusBarPolicy {
         mService.setIcon("volume", R.drawable.stat_sys_ringer_silent, 0, null);
         mService.setIconVisibility("volume", false);
         updateVolume();
+	//sdcard
+	IntentFilter iFilter2 = new IntentFilter(Intent.ACTION_MEDIA_UNMOUNTED);
+	iFilter2.addAction(Intent.ACTION_MEDIA_MOUNTED);	
+	iFilter2.addAction(Intent.ACTION_MEDIA_BAD_REMOVAL);
+	iFilter2.addDataScheme("file"); 	
+	String status = Environment.getExternalStorageState();
+	if (status.equals(Environment.MEDIA_MOUNTED)) {
+		updateTFCardStatus(true);
+	} else  {
+		updateTFCardStatus(false);
+	}	
+	mContext.registerReceiver(mTFStatusReceiver, iFilter2);
+
+		
     }
 
     private final void updateAlarm(Intent intent) {
@@ -319,4 +339,51 @@ public class PhoneStatusBarPolicy {
             mService.setIconVisibility("tty", false);
         }
     }
+
+ /*
+   * add the wTFcard Icon update method
+   */
+ private final void updateTFCardStatus(boolean tfMounted) {
+	 Slog.d(TAG,"updateTFcardStatus, tf status is " + tfMounted);
+        if (tfMounted) {	
+	 mService.setIconVisibility("tf_card", false);
+	} else {
+	 mService.setIcon("tf_card", mNoTFcardIconData, 0, null);
+	 mService.setIconVisibility("tf_card", true);
+	}
+ }
+	 
+/*
+ * add the sdcard icon broadcast
+ * in hisense project,the storage contain inner storage and tfcard storage,
+ * if we receive Intent.ACTION_MEDIA_MOUNTED,we still can`t judge whether the 
+ * tfcard is inserted,because inner storage exist,we can receive this action too,
+ * we must judge sdcard state using method Environment.getSdcardStorageState().
+ */
+ private BroadcastReceiver mTFStatusReceiver = new BroadcastReceiver(){
+ public void onReceive(Context context, Intent intent){
+	 String action = intent.getAction();
+	 Slog.d(TAG,"recive the action is " + action+" ready to update tfcard icon");
+	 //if inner storage or tfcard storage exist
+	 if (action.equals(Intent.ACTION_MEDIA_MOUNTED)){
+		 //tfcard mounted
+		 if(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+			 updateTFCardStatus(true);
+		 } else {
+			 updateTFCardStatus(false);
+		 }
+	 }
+	 //both of the inner storage and tfcard storage don`t exist
+	 else if (action.equals(Intent.ACTION_MEDIA_UNMOUNTED)){
+		 updateTFCardStatus(false);
+	 } 
+	 //we plug out the tfcard when the mobile phone turned on
+	 else if(action.equals(Intent.ACTION_MEDIA_BAD_REMOVAL)){
+		 updateTFCardStatus(false);
+	 }
+ }
+};
+
+
+	
 }
