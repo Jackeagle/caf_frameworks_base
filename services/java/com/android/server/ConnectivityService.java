@@ -96,12 +96,14 @@ import com.android.internal.net.VpnProfile;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.server.AlarmManagerService;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.connectivity.Nat464Xlat;
 import com.android.server.connectivity.Tethering;
 import com.android.server.connectivity.Vpn;
 import com.android.server.net.BaseNetworkObserver;
 import com.android.server.net.LockdownVpnTracker;
+import com.android.server.power.PowerManagerService;
 import com.google.android.collect.Lists;
 import com.google.android.collect.Sets;
 
@@ -3476,7 +3478,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     }
 
     protected void updateBlockedUids(int uid, boolean isBlocked) {
-        /* TODO: NSRM
         try {
             AlarmManagerService mAlarmMgrSvc =
                 (AlarmManagerService)ServiceManager.getService(Context.ALARM_SERVICE);
@@ -3491,6 +3492,5 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         } catch (NullPointerException e) {
             Slog.w(TAG, "Could Not Update blocked Uids with powerManager" + e);
         }
-        */
     }
 }
