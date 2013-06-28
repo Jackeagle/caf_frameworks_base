@@ -93,7 +93,7 @@
                 android:orientation="horizontal"
                 android:gravity="center"
                 >
-                <include layout="@layout/msim_signal_cluster_view" 
+                <LinearLayout 
                     android:id="@+id/msim_signal_cluster"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
