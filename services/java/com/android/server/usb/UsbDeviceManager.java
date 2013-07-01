@@ -428,7 +428,6 @@ public class UsbDeviceManager {
         }
 
         private void updateUsbMassStorage(boolean connected) {
-            UsbManager usbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
             StorageManager storageManager = (StorageManager) mContext
                     .getSystemService(Context.STORAGE_SERVICE);
             if (storageManager == null) {
@@ -436,7 +435,7 @@ public class UsbDeviceManager {
                 return;
             }
             if (connected && UsbManager.USB_FUNCTION_MASS_STORAGE
-                    .equals(usbManager.getDefaultFunction())
+                    .equals(new UsbManager(null, null).getDefaultFunction())
                 && !storageManager.isUsbMassStorageEnabled()) {
                 storageManager.enableUsbMassStorage();
             } else if (!connected && storageManager.isUsbMassStorageEnabled()) {
