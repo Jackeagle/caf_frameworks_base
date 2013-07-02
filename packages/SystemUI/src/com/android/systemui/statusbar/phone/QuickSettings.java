@@ -158,7 +158,8 @@ class QuickSettings {
         filter.addAction(DisplayManager.ACTION_WIFI_DISPLAY_STATUS_CHANGED);
         filter.addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-        filter.addAction(Intent.ACTION_USER_SWITCHED);
+        filter.addAction(Intent.ACTION_USER_SWITCHED);	
+	 filter.addAction(Intent.ACTION_LOCALE_CHANGED);
         mContext.registerReceiver(mReceiver, filter);
 
         IntentFilter profileFilter = new IntentFilter();
@@ -242,6 +243,7 @@ class QuickSettings {
                 // Fall back to the UserManager nickname if we can't read the name from the local
                 // profile below.
                 String name = userName;
+		  String nameProfile = null;
                 Drawable avatar = null;
                 Bitmap rawAvatar = um.getUserIcon(userId);
                 if (rawAvatar != null) {
@@ -259,14 +261,21 @@ class QuickSettings {
                             null, null, null);
                     if (cursor != null) {
                         try {
-                            if (cursor.moveToFirst()) {
+                            if (cursor.moveToFirst()) {				   
                                 name = cursor.getString(cursor.getColumnIndex(Phone.DISPLAY_NAME));
+				   nameProfile = name;
                             }
                         } finally {
                             cursor.close();
                         }
                     }
                 }
+		 if(nameProfile==null)
+		{
+
+		  name=mContext.getString( com.android.internal.R.string.owner_name);
+
+		 }
                 return new Pair<String, Drawable>(name, avatar);
             }
 
@@ -936,9 +945,10 @@ class QuickSettings {
                         BluetoothAdapter.STATE_DISCONNECTED);
                 mBluetoothState.connected = (status == BluetoothAdapter.STATE_CONNECTED);
                 applyBluetoothStatus();
-            } else if (Intent.ACTION_USER_SWITCHED.equals(action)) {
+            } else if (Intent.ACTION_USER_SWITCHED.equals(action)||Intent.ACTION_LOCALE_CHANGED.equals(action)) {
                 reloadUserInfo();
             }
+		
         }
     };
 
