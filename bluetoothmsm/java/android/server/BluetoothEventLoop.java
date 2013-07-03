@@ -277,6 +277,9 @@ class BluetoothEventLoop {
                 intent.putExtra(BluetoothDevice.EXTRA_VID, vidValue);
                 intent.putExtra(BluetoothDevice.EXTRA_PID, pidValue);
             }
+            if(devType != null) {
+                intent.putExtra(BluetoothDevice.EXTRA_TYPE, devType);
+            }
             if(uuids != null) {
                 intent.putExtra(BluetoothDevice.EXTRA_UUIDS, uuids);
             }
@@ -289,6 +292,7 @@ class BluetoothEventLoop {
                 intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
                 intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssiValue);
                 intent.putExtra(BluetoothDevice.EXTRA_NAME, name);
+                intent.putExtra(BluetoothDevice.EXTRA_TYPE, devType);
                 if(uuids != null) {
                     intent.putExtra(BluetoothDevice.EXTRA_UUIDS, uuids);
                 }

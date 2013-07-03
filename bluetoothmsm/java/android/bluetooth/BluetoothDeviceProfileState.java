@@ -1558,7 +1558,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                 // ignore
                 return true;
             case DISCONNECT_HOGP_OUTGOING:
-                if (mService.getInputDevicePriority(mDevice) ==
+                if (mService.getHogpDevicePriority(mDevice) ==
                     BluetoothHogpDevice.PRIORITY_AUTO_CONNECT) {
                     mService.setHogpDevicePriority(mDevice, BluetoothHogpDevice.PRIORITY_ON);
                 }

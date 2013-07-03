@@ -223,6 +223,13 @@ public final class BluetoothDevice implements Parcelable {
     public static final String EXTRA_NAME = "android.bluetooth.device.extra.NAME";
 
     /**
+     * Used as a String extra field to know device type  is BR/EDR or LE.
+     * It contains the friendly Bluetooth name.
+     * @hide
+     */
+    public static final String EXTRA_TYPE = "android.bluetooth.device.extra.TYPE";
+
+    /**
      * Used as an optional short extra field in {@link #ACTION_FOUND} intents.
      * Contains the RSSI value of the remote device as reported by the
      * Bluetooth hardware.
