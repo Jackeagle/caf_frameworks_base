@@ -360,14 +360,15 @@ public class PhoneStatusBar extends BaseStatusBar {
     private ContentObserver mUserSetupObserver = new ContentObserver(new Handler()) {
         @Override
         public void onChange(boolean selfChange) {
-            final boolean userSetup = 0 != Settings.Secure.getIntForUser(
+            final boolean userSetup =true; /*0 != Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.USER_SETUP_COMPLETE,
-                    0 /*default */,
-                    mCurrentUserId);
+                    0 ,
+                    mCurrentUserId);*/
             if (true) Slog.d(TAG, String.format("User setup changed: " +
                     "selfChange=%s userSetup=%s mUserSetup=%s",
                     selfChange, userSetup, mUserSetup));
+	 
             if (mSettingsButton != null && mHasFlipSettings) {
                 mSettingsButton.setVisibility(userSetup ? View.VISIBLE : View.INVISIBLE);
             }
@@ -1745,7 +1746,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     if (SPEW) Slog.d(TAG, "animateExpand: mUserSetup=" + mUserSetup);
 
         // Settings are not available in setup
-       // if (!mUserSetup) return;
+      // if (!mUserSetup) return;
 
         if (mHasFlipSettings) {
             mNotificationPanel.expand();
@@ -1767,7 +1768,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     public void switchToSettings() {
         // Settings are not available in setup
          if (SPEW) Slog.d(TAG, "switchToSettings: mUserSetup=" + mUserSetup);
-       // if (!mUserSetup) return;
+      //  if (!mUserSetup) return;
 
         mFlipSettingsView.setScaleX(1f);
         mFlipSettingsView.setVisibility(View.VISIBLE);
@@ -1783,7 +1784,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         // Settings are not available in setup
         
 	 if (SPEW) Slog.d(TAG, "flipToSettings: mUserSetup=" + mUserSetup);
-       // if (!mUserSetup) return;
+      // if (!mUserSetup) return;
 	 
         if (mFlipSettingsViewAnim != null) mFlipSettingsViewAnim.cancel();
         if (mScrollViewAnim != null) mScrollViewAnim.cancel();
