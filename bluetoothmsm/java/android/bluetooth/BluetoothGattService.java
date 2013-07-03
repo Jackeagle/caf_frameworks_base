@@ -608,7 +608,7 @@ public class BluetoothGattService {
              return false;
         }
 
-        public synchronized void onSetCharacteristicProperty(String path, String property, boolean result)
+        public void onSetCharacteristicProperty(String path, String property, boolean result)
         {
             Log.d(TAG, "onSetCharacteristicProperty: " + path + " property " + property + " result " + result);
             if (mClosed)
