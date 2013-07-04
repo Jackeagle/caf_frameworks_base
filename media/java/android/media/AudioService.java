@@ -28,6 +28,8 @@ import static android.media.AudioManager.RINGER_MODE_VIBRATE;
 import android.app.Activity;
 import android.app.ActivityManagerNative;
 import android.app.KeyguardManager;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.app.PendingIntent.OnFinished;
@@ -74,6 +76,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.VolumePanel;
 
+import com.android.internal.R;
 import com.android.internal.telephony.ITelephony;
 
 import java.io.FileDescriptor;
@@ -447,6 +450,11 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     private boolean mDockAudioMediaEnabled = true;
 
     private int mDockState = Intent.EXTRA_DOCK_STATE_UNDOCKED;
+
+    // Add for headset insert
+    private final static String NO_ACTION = "android.intent.action.NO_ACTION";
+    private final static int HEADSET_NOTIFICATION_ID =
+            com.android.internal.R.drawable.stat_sys_headset;
 
     ///////////////////////////////////////////////////////////////////////////
     // Construction
@@ -3930,6 +3938,15 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     (device == AudioSystem.DEVICE_OUT_WIRED_HEADPHONE))) {
                 setBluetoothA2dpOnInt(true);
             }
+
+            if (/*FeatureQuery.FEATURE_HEADSET_INSERT*/ true) {
+                if (state == 0) {
+                    cancelNotification();
+                } else {
+                    sendNotification();
+                }
+            }
+
             boolean isUsb = ((device & AudioSystem.DEVICE_OUT_ALL_USB) != 0);
             handleDeviceConnection((state == 1), device, (isUsb ? name : ""));
             if (state != 0) {
@@ -3951,6 +3968,31 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 sendDeviceConnectionIntent(device, state, name);
             }
         }
+    }
+
+    private final void sendNotification() {
+        Intent lowMemIntent = new Intent(NO_ACTION);
+        lowMemIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        NotificationManager mNotificationMgr =
+                (NotificationManager)mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+        CharSequence title =
+                mContext.getText(com.android.internal.R.string.headset_plugin_view_title);
+        CharSequence details =
+                mContext.getText(com.android.internal.R.string.headset_plugin_view_text);
+        PendingIntent intent = PendingIntent.getActivity(mContext, 0, lowMemIntent, 0);
+        Notification notification = new Notification();
+        notification.icon = com.android.internal.R.drawable.stat_sys_headset;
+        notification.tickerText = title;
+        notification.flags |= Notification.FLAG_NO_CLEAR;
+        notification.setLatestEventInfo(mContext, title, details, intent);
+        mNotificationMgr.notify(HEADSET_NOTIFICATION_ID, notification);
+    }
+
+    private final void cancelNotification() {
+        NotificationManager mNotificationMgr =
+                (NotificationManager)mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+        // cancel notification since headset has been plug out
+        mNotificationMgr.cancel(HEADSET_NOTIFICATION_ID);
     }
 
     /* cache of the address of the last dock the device was connected to */
