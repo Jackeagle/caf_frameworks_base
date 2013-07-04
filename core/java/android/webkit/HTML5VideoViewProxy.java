@@ -249,6 +249,12 @@ class HTML5VideoViewProxy extends Handler
             }
         }
 
+        public void release() {
+            if (mHTML5VideoView != null) {
+                mHTML5VideoView.release();
+            }
+        }
+
         public void onPrepared() {
             if (mCachedVolume >= 0.0f) {
                 mHTML5VideoView.setVolume(mCachedVolume);
@@ -961,6 +967,11 @@ class HTML5VideoViewProxy extends Handler
         Message message = obtainMessage(SET_VOLUME);
         message.obj = new Float(volume);
         sendMessage(message);
+    }
+
+    public void pauseAndReleaseMediaPlayer() {
+        mVideoPlayer.pause();
+        mVideoPlayer.release();
     }
 
     /**
