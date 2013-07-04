@@ -152,18 +152,12 @@ public class NetworkIdentity {
         boolean roaming = false;
 
         if (isNetworkTypeMobile(type)) {
-            final TelephonyManager telephony = (TelephonyManager) context.getSystemService(
-                    Context.TELEPHONY_SERVICE);
-            roaming = telephony.isNetworkRoaming();
+            roaming = isDdsRoaming();
             if (state.subscriberId != null) {
                 subscriberId = state.subscriberId;
             } else {
                 //used for dual sim data traffic statistics
-                if(MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                    subscriberId = getActiveSubscriberId(context);
-                } else {
-                    subscriberId = telephony.getSubscriberId();
-                }
+                subscriberId = getDdsSubscriberId();
             }
 
         } else if (type == TYPE_WIFI) {
@@ -180,14 +174,34 @@ public class NetworkIdentity {
         return new NetworkIdentity(type, subType, subscriberId, networkId, roaming);
     }
 
-    private static String getActiveSubscriberId(Context context) {
-        int sub = -1;
-        try {
-            sub = Settings.System.getInt(context.getContentResolver(),
-                    Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION);
-        } catch (SettingNotFoundException snfe) {
-            Log.e(TAG, "Read current data port value exception.", snfe);
+    public static boolean isDdsRoaming() {
+        MSimTelephonyManager mtm = MSimTelephonyManager.getDefault();
+        TelephonyManager tm = TelephonyManager.getDefault();
+        if (mtm.isMultiSimEnabled()) {
+            return mtm.isNetworkRoaming(mtm.getPreferredDataSubscription());
+        } else {
+            return tm.isNetworkRoaming();
         }
-        return MSimTelephonyManager.getDefault().getSubscriberId(sub);
+    }
+
+    public static String getDdsSubscriberId() {
+        MSimTelephonyManager mtm = MSimTelephonyManager.getDefault();
+        TelephonyManager tm = TelephonyManager.getDefault();
+        if (mtm.isMultiSimEnabled()) {
+            return mtm.getSubscriberId(mtm.getPreferredDataSubscription());
+        } else {
+            return tm.getSubscriberId();
+        }
+    }
+
+    public static boolean isDdsReady() {
+        MSimTelephonyManager mtm = MSimTelephonyManager.getDefault();
+        TelephonyManager tm = TelephonyManager.getDefault();
+        if (mtm.isMultiSimEnabled()) {
+            return mtm.getSimState(mtm.getPreferredDataSubscription())
+                    == TelephonyManager.SIM_STATE_READY;
+        } else {
+            return tm.getSimState() == TelephonyManager.SIM_STATE_READY;
+        }
     }
 }
