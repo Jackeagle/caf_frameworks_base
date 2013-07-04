@@ -1860,5 +1860,9 @@
   <java-symbol type="integer" name="config_mobile_mtu_2g_size" />
   <java-symbol type="integer" name="config_mobile_mtu_3g_size" />
   <java-symbol type="integer" name="config_mtu_default_size" />
-
+  
+  <!-- for lowmoemory -->
+  <java-symbol type="string" name="aerr_application_lowmemory" />
+  <java-symbol type="string" name="aerr_process_lowmemory" />
+  <java-symbol type="string" name="force_close_lowmemory" />
 </resources>

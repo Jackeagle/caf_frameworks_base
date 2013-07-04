@@ -4102,5 +4102,9 @@
 
     <string name="auto_power_off_title">Auto power off</string>  
     <string name="auto_power_off_msg">Shut down in <xliff:g id="seconds">%d</xliff:g> seconds.</string>
+    <!--add for low_memory-->
+    <string name="aerr_application_lowmemory">the memory is full，please uninstall the applications!</string>
+    <string name="aerr_process_lowmemory">the memory is full，please uninstall the applications!</string>
+    <string name="force_close_lowmemory">"into settings"</string>
 
 </resources>
