@@ -60,7 +60,6 @@ import static android.net.wifi.WifiManager.EXTRA_CHANGE_REASON;
 import static android.net.wifi.WifiManager.EXTRA_NETWORK_INFO;
 import static android.net.wifi.WifiManager.EXTRA_WIFI_CONFIGURATION;
 import static android.net.wifi.WifiManager.EXTRA_WIFI_INFO;
-import static android.telephony.TelephonyManager.SIM_STATE_READY;
 import static android.text.format.DateUtils.DAY_IN_MILLIS;
 import static com.android.internal.util.ArrayUtils.appendInt;
 import static com.android.internal.util.Preconditions.checkNotNull;
@@ -118,7 +117,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
-import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
 import android.text.format.Formatter;
 import android.text.format.Time;
@@ -687,38 +685,21 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
      * data connection status.
      */
     private boolean isTemplateRelevant(NetworkTemplate template) {
-        final TelephonyManager tele = TelephonyManager.from(mContext);
-
         switch (template.getMatchRule()) {
             case MATCH_MOBILE_3G_LOWER:
             case MATCH_MOBILE_4G:
             case MATCH_MOBILE_ALL:
                 // mobile templates are relevant when SIM is ready and
                 // subscriberId matches.
-                if (tele.getSimState() == SIM_STATE_READY) {
-                    //dual sim data traffic statistics
-                    if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                        String subId = getActiveSubscriberId();
-                        return Objects.equal(subId, template.getSubscriberId());
-                    } else {
-                        return Objects.equal(tele.getSubscriberId(), template.getSubscriberId());
-                    }
+                if (NetworkIdentity.isDdsReady()) {
+                    // dual sim data traffic statistics
+                    return Objects.equal(NetworkIdentity.getDdsSubscriberId(),
+                            template.getSubscriberId());
                 } else {
                     return false;
                 }
         }
         return true;
-    }
-
-    private String getActiveSubscriberId() {
-        int sub = -1;
-        try {
-            sub = Settings.System.getInt(mContext.getContentResolver(),
-                    Settings.Global.MULTI_SIM_DATA_CALL_SUBSCRIPTION);
-        } catch (SettingNotFoundException snfe) {
-            Log.e(TAG, "Read current data port value exception.", snfe);
-        }
-        return MSimTelephonyManager.getDefault().getSubscriberId(sub);
     }
 
     /**
@@ -962,16 +943,15 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
      * for the given {@link NetworkTemplate}.
      */
     private void setNetworkTemplateEnabled(NetworkTemplate template, boolean enabled) {
-        final TelephonyManager tele = TelephonyManager.from(mContext);
-
         switch (template.getMatchRule()) {
             case MATCH_MOBILE_3G_LOWER:
             case MATCH_MOBILE_4G:
             case MATCH_MOBILE_ALL:
                 // TODO: offer more granular control over radio states once
                 // 4965893 is available.
-                if (tele.getSimState() == SIM_STATE_READY
-                        && Objects.equal(tele.getSubscriberId(), template.getSubscriberId())) {
+                if (NetworkIdentity.isDdsReady()
+                        && Objects.equal(NetworkIdentity.getDdsSubscriberId(),
+                                template.getSubscriberId())) {
                     setPolicyDataEnable(TYPE_MOBILE, enabled);
                     setPolicyDataEnable(TYPE_WIMAX, enabled);
                 }
@@ -1122,12 +1102,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         if (LOGV) Slog.v(TAG, "ensureActiveMobilePolicyLocked()");
         if (mSuppressDefaultPolicy) return;
 
-        final TelephonyManager tele = TelephonyManager.from(mContext);
-
         // avoid creating policy when SIM isn't ready
-        if (tele.getSimState() != SIM_STATE_READY) return;
+        if (!NetworkIdentity.isDdsReady()) return;
 
-        final String subscriberId = tele.getSubscriberId();
+        final String subscriberId = NetworkIdentity.getDdsSubscriberId();
         final NetworkIdentity probeIdent = new NetworkIdentity(
                 TYPE_MOBILE, TelephonyManager.NETWORK_TYPE_UNKNOWN, subscriberId, null, false);
 
