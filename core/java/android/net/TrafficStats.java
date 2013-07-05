@@ -268,6 +268,10 @@ public class TrafficStats {
     public static long getMobileTxPackets() {
         long total = 0;
         for (String iface : getMobileIfaces()) {
+			
+			if(iface==null)
+				continue;
+			
             total += getTxPackets(iface);
         }
         return total;
@@ -282,6 +286,11 @@ public class TrafficStats {
     public static long getMobileRxPackets() {
         long total = 0;
         for (String iface : getMobileIfaces()) {
+			
+			if(iface==null)
+				continue;
+		
+
             total += getRxPackets(iface);
         }
         return total;

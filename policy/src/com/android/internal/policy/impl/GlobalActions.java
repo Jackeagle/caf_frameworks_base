@@ -241,6 +241,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
 
                 public void onPress() {
                     // shutdown by making sure radio and power are handled accordingly.
+                    SystemProperties.set("sys.shutdown.fast", "shutdown");
                     mWindowManagerFuncs.shutdown(true);
                 }
 
@@ -986,6 +987,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
      * Start Fast Boot
      */
     private void startFastBoot() {
+	    SystemProperties.set("sys.shutdown.fast", "fastpoweroff");
         synchronized (this) {
             mAudioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
             Intent intent = new Intent(Intent.ACTION_FAST_BOOT_START);

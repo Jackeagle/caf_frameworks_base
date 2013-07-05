@@ -28,7 +28,7 @@ public class Build {
 	/*hardware version*/
     public static final String HARDWARE_VERSION = getString("ro.hardware.version");
     /*software version*/
-    public static final String SOFTWARE_VERSION = getString("ro.software.version");
+    public static final String SOFTWARE_VERSION = getString("ro.software.release");
 
     /** Either a changelist number, or a label like "M4-rc20". */
     public static final String ID = getString("ro.build.id");
