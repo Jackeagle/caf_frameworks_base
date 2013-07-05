@@ -1504,4 +1504,9 @@
     <string name="reconnect_net_for_wifi_disconnected">"WLAN网络已断开，是否切换到移动网络继续上网？"</string>
     <!-- CMCC WLAN customization end-->
     <string name="msim_kg_sim_pin_msg_format">卡:<xliff:g id="number">%d</xliff:g> : <xliff:g id="msg">%s</xliff:g>.</string>
+    <!--- for low_memory-->
+    
+    <string name="aerr_application_lowmemory">"内存已满，请卸载应用程序!"</string>
+    <string name="aerr_process_lowmemory">"内存已满，请卸载应用程序!"</string>
+    <string name="force_close_lowmemory">"进入设置"</string>
 </resources>

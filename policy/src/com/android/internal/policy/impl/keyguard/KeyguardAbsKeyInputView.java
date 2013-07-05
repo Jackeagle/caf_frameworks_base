@@ -256,6 +256,7 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
 
     @Override
     public void hideBouncer(int duration) {
+    //    new Exception().printStackTrace();
         KeyguardSecurityViewHelper.
                 hideBouncer(mSecurityMessageDisplay, mEcaView, mBouncerFrame, duration);
     }

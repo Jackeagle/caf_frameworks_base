@@ -586,6 +586,7 @@ public class KeyguardHostView extends KeyguardViewBase {
      * @param turningOff true if the device is being turned off
      */
     void showPrimarySecurityScreen(boolean turningOff) {
+       // new Exception().printStackTrace();
         SecurityMode securityMode = mSecurityModel.getSecurityMode();
         if (DEBUG) Log.v(TAG, "showPrimarySecurityScreen(turningOff=" + turningOff + ")");
         if (!turningOff &&
@@ -623,6 +624,8 @@ public class KeyguardHostView extends KeyguardViewBase {
     private void showNextSecurityScreenOrFinish(boolean authenticated) {
         if (DEBUG) Log.d(TAG, "showNextSecurityScreenOrFinish(" + authenticated + ")");
         boolean finish = false;
+        boolean mShowBouncer = true;
+	if (DEBUG) Log.d(TAG, "mCurrentSecuritySelection" + mCurrentSecuritySelection );
         if (SecurityMode.None == mCurrentSecuritySelection) {
             SecurityMode securityMode = mSecurityModel.getSecurityMode();
             // Allow an alternate, such as biometric unlock
@@ -648,6 +651,7 @@ public class KeyguardHostView extends KeyguardViewBase {
                     SecurityMode securityMode = mSecurityModel.getSecurityMode();
                     if (securityMode != SecurityMode.None) {
                         showSecurityScreen(securityMode);
+			   mShowBouncer = false;
                     } else {
                         finish = true;
                     }
@@ -681,7 +685,10 @@ public class KeyguardHostView extends KeyguardViewBase {
                 }
             }
         } else {
-            mViewStateManager.showBouncer(true);
+        if(mShowBouncer) {
+	    mViewStateManager.showBouncer(true);
+		   }
+           
         }
     }
 
@@ -825,6 +832,8 @@ public class KeyguardHostView extends KeyguardViewBase {
     private void showSecurityScreen(SecurityMode securityMode) {
         Log.d(TAG, "showSecurityScreen(" + securityMode + ")");
 
+	Log.d(TAG, "showSecurityScreensecurityMode" + securityMode + "mCurrentSecuritySelection" +mCurrentSecuritySelection);
+
         if (securityMode == mCurrentSecuritySelection) return;
 
         KeyguardSecurityView oldView = getSecurityView(mCurrentSecuritySelection);
@@ -875,7 +884,9 @@ public class KeyguardHostView extends KeyguardViewBase {
             // Discard current runnable if we're switching back to the selector view
             setOnDismissAction(null);
         }
+	  if (DEBUG) Log.d(TAG, "mCurrentSecuritySelection " + mCurrentSecuritySelection +"securityMode" +securityMode);
         mCurrentSecuritySelection = securityMode;
+	if (DEBUG) Log.d(TAG, "mCurrentSecuritySelectionqqqq " + mCurrentSecuritySelection +"securityMode" +securityMode);
     }
 
     @Override

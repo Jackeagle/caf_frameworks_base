@@ -154,9 +154,9 @@ public class UsbStorageActivity extends Activity
 
         //avoid the activtity to pause state.
         // getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
-        if (Environment.isExternalStorageRemovable() && !mKeyguardManager.isKeyguardSecure()) {
+       /* if (Environment.isExternalStorageRemovable() && !mKeyguardManager.isKeyguardSecure()) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
-        }
+        }*/
 
         setContentView(com.android.internal.R.layout.usb_storage_activity);
 
