@@ -179,6 +179,7 @@ status_t OpenGLRenderer::prepareDirty(float left, float top, float right, float 
     mSaveCount = 1;
 
     mSnapshot->setClip(left, top, right, bottom);
+    mSnapshot->setTileClip(left, top, right, bottom);
     mDirtyClip = true;
 
     updateLayers();
@@ -228,10 +229,7 @@ void OpenGLRenderer::syncState() {
 
 void OpenGLRenderer::startTiling(const sp<Snapshot>& s, bool opaque) {
     if (!mSuppressTiling) {
-        Rect* clip = mTilingSnapshot->clipRect;
-        if (s->flags & Snapshot::kFlagIsFboLayer) {
-            clip = s->clipRect;
-        }
+        const Rect* clip = &mSnapshot->getTileClip();
 
         mCaches.startTiling(clip->left, s->height - clip->bottom,
                 clip->right - clip->left, clip->bottom - clip->top, opaque);
@@ -782,6 +780,7 @@ bool OpenGLRenderer::createFboLayer(Layer* layer, Rect& bounds, Rect& clip, GLui
     mSnapshot->fbo = layer->getFbo();
     mSnapshot->resetTransform(-bounds.left, -bounds.top, 0.0f);
     mSnapshot->resetClip(clip.left, clip.top, clip.right, clip.bottom);
+    mSnapshot->setTileClip(clip.left, clip.top, clip.right, clip.bottom);
     mSnapshot->viewport.set(0.0f, 0.0f, bounds.getWidth(), bounds.getHeight());
     mSnapshot->height = bounds.getHeight();
     mSnapshot->flags |= Snapshot::kFlagDirtyOrtho;
