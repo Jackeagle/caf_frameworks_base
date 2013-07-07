@@ -1573,7 +1573,10 @@ public class PhoneNumberUtils
     //
     // However, in order to loose match 650-555-1212 and 555-1212, we need to set the min match
     // to 7.
-    static final int MIN_MATCH = 7;
+    // Need to set the match number as 11 in property for CTA test, it can be set dynamically, need
+    // to reboot phone and add new contact to take effect, match number will be saved to DB, old
+    // contacts will use the match number before.
+    static final int MIN_MATCH = SystemProperties.getInt("persist.env.phone.matchnum", 7);
 
     /**
      * Checks a given number against the list of
