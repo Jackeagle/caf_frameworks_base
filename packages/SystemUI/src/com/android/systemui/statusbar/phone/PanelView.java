@@ -481,8 +481,8 @@ public class PanelView extends FrameLayout {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        if (DEBUG) LOG("onMeasure(%d, %d) -> (%d, %d)",
-                widthMeasureSpec, heightMeasureSpec, getMeasuredWidth(), getMeasuredHeight());
+       Slog.v("panelview","onMeasurewidthMeasureSpec="+ widthMeasureSpec +"heightMeasureSpec=" 
+	   	+heightMeasureSpec +"getMeasuredWidth()=" + getMeasuredWidth() +"getMeasuredHeight()" +getMeasuredHeight());
 
         // Did one of our children change size?
         int newHeight = getMeasuredHeight();
@@ -492,6 +492,7 @@ public class PanelView extends FrameLayout {
             if (!mTracking && !mRubberbanding && !mTimeAnimator.isStarted()
                     && mExpandedHeight > 0 && mExpandedHeight != mFullHeight) {
                 mExpandedHeight = mFullHeight;
+		
             }
         }
         heightMeasureSpec = MeasureSpec.makeMeasureSpec(
@@ -507,7 +508,10 @@ public class PanelView extends FrameLayout {
             post(mStopAnimator);
         }
         setExpandedHeightInternal(height);
+	
+        Slog.v("panelview","mExpandedFraction(%.1f)" + mExpandedFraction);
         mBar.panelExpansionChanged(PanelView.this, mExpandedFraction);
+	
     }
 
     @Override
@@ -517,6 +521,7 @@ public class PanelView extends FrameLayout {
     }
 
     public void setExpandedHeightInternal(float h) {
+	//new Exception().printStackTrace();
         float fh = getFullHeight();
         if (fh == 0) {
             // Hmm, full height hasn't been computed yet
@@ -526,7 +531,7 @@ public class PanelView extends FrameLayout {
         if (!(mRubberbandingEnabled && (mTracking || mRubberbanding)) && h > fh) h = fh;
         mExpandedHeight = h;
 
-        if (DEBUG) LOG("setExpansion: height=%.1f fh=%.1f tracking=%s rubber=%s", h, fh, mTracking?"T":"f", mRubberbanding?"T":"f");
+        Slog.v("panelview","setExpansion: height=%.1f  " +h +"fh=%.1f"  +fh);
 
         requestLayout();
 //        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
@@ -534,14 +539,17 @@ public class PanelView extends FrameLayout {
 //        setLayoutParams(lp);
 
         mExpandedFraction = Math.min(1f, (fh == 0) ? 0 : h / fh);
+	if (DEBUG) LOG("setExpandedHeightInternal(%.1f)", mExpandedFraction);
+
     }
 
     private float getFullHeight() {
         if (mFullHeight <= 0) {
-            if (DEBUG) LOG("Forcing measure() since fullHeight=" + mFullHeight);
+             Slog.v("panelview","getFullHeight=" + mFullHeight);
             measure(MeasureSpec.makeMeasureSpec(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, MeasureSpec.EXACTLY),
                     MeasureSpec.makeMeasureSpec(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, MeasureSpec.EXACTLY));
         }
+	Slog.v("panelview","getFullHeight11=" + mFullHeight);
         return mFullHeight;
     }
 
