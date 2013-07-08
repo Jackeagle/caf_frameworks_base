@@ -1467,6 +1467,7 @@
   <java-symbol type="string" name="lockscreen_sim_locked_message" />
   <java-symbol type="string" name="lockscreen_sim_puk_locked_message" />
   <java-symbol type="string" name="lockscreen_sim_unlock_progress_dialog_message" />
+  <java-symbol type="string" name="lockscreen_airplane_mode_on" />
   <java-symbol type="string" name="lockscreen_sound_off_label" />
   <java-symbol type="string" name="lockscreen_sound_on_label" />
   <java-symbol type="string" name="lockscreen_too_many_failed_attempts_countdown" />

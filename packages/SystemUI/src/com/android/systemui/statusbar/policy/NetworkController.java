@@ -158,6 +158,7 @@ public class NetworkController extends BroadcastReceiver {
     ArrayList<ImageView> mDataTypeIconViews = new ArrayList<ImageView>();
     ArrayList<TextView> mCombinedLabelViews = new ArrayList<TextView>();
     ArrayList<TextView> mMobileLabelViews = new ArrayList<TextView>();
+    ArrayList<TextView> mSubsLabelViews = new ArrayList<TextView>();
     ArrayList<TextView> mWifiLabelViews = new ArrayList<TextView>();
     ArrayList<TextView> mEmergencyLabelViews = new ArrayList<TextView>();
     ArrayList<SignalCluster> mSignalClusters = new ArrayList<SignalCluster>();
@@ -330,6 +331,10 @@ public class NetworkController extends BroadcastReceiver {
 
     public void addMobileLabelView(TextView v) {
         mMobileLabelViews.add(v);
+    }
+
+    public void addSubsLabelView(TextView v) {
+        mSubsLabelViews.add(v);
     }
 
     public void addWifiLabelView(TextView v) {
