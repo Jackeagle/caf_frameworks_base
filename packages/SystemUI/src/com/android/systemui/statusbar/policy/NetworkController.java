@@ -523,14 +523,14 @@ public class NetworkController extends BroadcastReceiver {
                 updateTelephonySignalStrength();
                 refreshViews();
             }*/
-            if((mSimState ==  IccCardConstants.State.ABSENT) && (state==2))
+          /*  if((mSimState ==  IccCardConstants.State.ABSENT) && (state==2))
             {
 		mNoSimIconId=0;
             }
 
 	   if ((mSimState ==  IccCardConstants.State.ABSENT) &&(state==0)) {
 		mNoSimIconId = R.drawable.stat_sys_no_sim;
-	   } 		
+	   } 	*/	
              mPhoneState = state;
 	     updateTelephonySignalStrength();
              refreshViews();
