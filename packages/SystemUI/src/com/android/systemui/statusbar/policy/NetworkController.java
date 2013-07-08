@@ -262,7 +262,7 @@ public class NetworkController extends BroadcastReceiver {
         // yuck
         mBatteryStats = BatteryStatsService.getService();
 
-        mLocaleNamesParser = new LocaleNamesParser(mContext, TAG,
+        mLocaleNamesParser = new LocaleNamesParser(mContext, LocaleNamesParser.ANDROID_PKG,
                 com.android.internal.R.array.origin_carrier_names,
                 com.android.internal.R.array.locale_carrier_names);
     }

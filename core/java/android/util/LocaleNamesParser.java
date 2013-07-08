@@ -41,20 +41,26 @@ import android.content.res.Resources.NotFoundException;
 public final class LocaleNamesParser {
     private static final String LOG_TAG = "LocaleNamesParser";
 
+    /**
+     * Package name which used to get the framework resources.
+     */
+    public static final String ANDROID_PKG = "android";
+
     private Context mContext;
     private HashMap<String, Integer> mNames = new HashMap<String, Integer>();
 
     private int mOriginNamesId;
     private int mLocaleNamesId;
 
-    private String mTag;
+    private String mPackageName;
 
     /*
      * Initialize the array of carrier names. synchronize if two instances in
      * one context want to init
      */
-    public LocaleNamesParser(Context context, String tag, int originNamesId, int localeNamesId) {
-        mTag = tag;
+    public LocaleNamesParser(Context context, String packageName, int originNamesId,
+            int localeNamesId) {
+        mPackageName = packageName;
         mContext = context;
         mOriginNamesId = originNamesId;
         mLocaleNamesId = localeNamesId;
@@ -72,8 +78,7 @@ public final class LocaleNamesParser {
         Integer localeId = null;
         mNames.clear();
         for (int i = 0; i < origNames.length; i++) {
-            localeId = new Integer(res.getIdentifier(localeNames[i], "string",
-                    mContext.getPackageName()));
+            localeId = new Integer(res.getIdentifier(localeNames[i], "string", mPackageName));
             mNames.put(origNames[i], localeId);
         }
     }

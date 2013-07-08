@@ -379,8 +379,8 @@ public class SettingsProvider extends ContentProvider {
     }
 
     private String getLocaleSimName(String simName) {
-        LocaleNamesParser parser = new LocaleNamesParser(getContext(), TAG,
-                R.array.origin_sim_names, R.array.sim_name_keys);
+        LocaleNamesParser parser = new LocaleNamesParser(getContext(), getContext()
+                .getPackageName(), R.array.origin_sim_names, R.array.sim_name_keys);
         if (simName == null) {
             return null;
         } else {
