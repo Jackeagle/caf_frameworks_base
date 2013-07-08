@@ -123,6 +123,7 @@ public class DeviceStorageMonitorService extends Binder {
     // flushing takes place.
     private long mMemCacheTrimToThreshold;
     private int mMemFullThreshold;
+    private static final int EXCEPTION_LOW_THRESHOLD_BYTES = 1 * 1024 * 1024; // 0.5MB
 
     /**
      * This string is used for ServiceManager access to this class.
@@ -550,5 +551,14 @@ public class DeviceStorageMonitorService extends Binder {
                 pw.print(Formatter.formatFileSize(mContext, mMemCacheStartTrimThreshold));
                 pw.print(" mMemCacheTrimToThreshold=");
                 pw.println(Formatter.formatFileSize(mContext, mMemCacheTrimToThreshold));
+    }
+    public boolean isMemoryCriticalLow() {
+    Slog.v(TAG,"mFreeMem"+mFreeMem+",EXCEPTION_LOW_THRESHOLD_BYTES"+EXCEPTION_LOW_THRESHOLD_BYTES);
+        if (mFreeMem <= EXCEPTION_LOW_THRESHOLD_BYTES) {
+            Slog.v(TAG, "Return the MemoryCriticalLow flag true");
+            return true;
+        } else {
+            return false;
+        }
     }
 }

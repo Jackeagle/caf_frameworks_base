@@ -17,22 +17,26 @@
 package com.android.server.am;
 
 import static android.view.WindowManager.LayoutParams.FLAG_SYSTEM_ERROR;
-
+import android.os.ServiceManager;
+import android.content.Intent;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.Resources;
 import android.os.Handler;
 import android.os.Message;
 import android.view.WindowManager;
+import com.android.server.DeviceStorageMonitorService;
+import android.util.Log;
 
 class AppErrorDialog extends BaseErrorDialog {
     private final ActivityManagerService mService;
     private final AppErrorResult mResult;
     private final ProcessRecord mProc;
-
+    Context mContext;
     // Event 'what' codes
     static final int FORCE_QUIT = 0;
     static final int FORCE_QUIT_AND_REPORT = 1;
+    static final int FORCE_QUIT_FOR_LOWMEMORY = 2;
 
     // 5-minute timeout, then we automatically dismiss the crash dialog
     static final long DISMISS_TIMEOUT = 1000 * 60 * 5;
@@ -40,34 +44,45 @@ class AppErrorDialog extends BaseErrorDialog {
     public AppErrorDialog(Context context, ActivityManagerService service,
             AppErrorResult result, ProcessRecord app) {
         super(context);
-        
+        mContext = context;
         Resources res = context.getResources();
-        
         mService = service;
         mProc = app;
         mResult = result;
         CharSequence name;
+        CharSequence message;
+        boolean mCriticalLow = isMemoryLow();
+        Log.v("AppErrorDialog","mCriticalLow" + mCriticalLow);
         if ((app.pkgList.size() == 1) &&
-                (name=context.getPackageManager().getApplicationLabel(app.info)) != null) {
-            setMessage(res.getString(
-                    com.android.internal.R.string.aerr_application,
-                    name.toString(), app.info.processName));
+                (name = context.getPackageManager().getApplicationLabel(app.info)) != null) {
+             if (mCriticalLow) {
+                 message = res.getString(
+                     com.android.internal.R.string.aerr_application_lowmemory);
+             } else {
+                 message = res.getString(
+                     com.android.internal.R.string.aerr_application, name.toString(), app.info.processName);
+                }
         } else {
             name = app.processName;
-            setMessage(res.getString(
-                    com.android.internal.R.string.aerr_process,
-                    name.toString()));
+            if (mCriticalLow ) {
+                message = res.getString(
+                    com.android.internal.R.string.aerr_process_lowmemory);
+            } else {
+                message = res.getString(
+                    com.android.internal.R.string.aerr_process, name.toString());
+            }
         }
-
+        setMessage(message);
         setCancelable(false);
-
-        setButton(DialogInterface.BUTTON_POSITIVE,
-                res.getText(com.android.internal.R.string.force_close),
-                mHandler.obtainMessage(FORCE_QUIT));
+        if (mCriticalLow ) { 
+            setButton(DialogInterface.BUTTON_POSITIVE, res.getText(com.android.internal.R.string.force_close_lowmemory), mHandler.obtainMessage(FORCE_QUIT_FOR_LOWMEMORY));
+	} else {
+	    setButton(DialogInterface.BUTTON_POSITIVE, res.getText(com.android.internal.R.string.force_close), mHandler.obtainMessage(FORCE_QUIT));
+        }
 
         if (app.errorReportReceiver != null) {
             setButton(DialogInterface.BUTTON_NEGATIVE,
-                    res.getText(com.android.internal.R.string.report),
+                    res.getText(com.android.internal.R.string.report), 
                     mHandler.obtainMessage(FORCE_QUIT_AND_REPORT));
         }
 
@@ -87,6 +102,12 @@ class AppErrorDialog extends BaseErrorDialog {
                 DISMISS_TIMEOUT);
     }
 
+    private boolean isMemoryLow(){
+        DeviceStorageMonitorService dsm = (DeviceStorageMonitorService) ServiceManager
+            .getService(DeviceStorageMonitorService.SERVICE);
+        return dsm.isMemoryCriticalLow();
+    }
+
     private final Handler mHandler = new Handler() {
         public void handleMessage(Message msg) {
             synchronized (mService) {
@@ -98,7 +119,18 @@ class AppErrorDialog extends BaseErrorDialog {
 
             // If this is a timeout we won't be automatically closed, so go
             // ahead and explicitly dismiss ourselves just in case.
+	   
             dismiss();
+            //add by xiaoqian
+            if (isMemoryLow() && msg.what == FORCE_QUIT_FOR_LOWMEMORY) {//just for out of memory case
+                mHandler.removeMessages(FORCE_QUIT);
+                Log.v("AppErrorDialog","mCriticalLow goto settings");
+                Intent intent = new Intent();
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.setClassName("com.android.settings",
+                    "com.android.settings.Settings$ManageApplicationsActivity");
+                mContext.startActivity(intent);
+            }	
         }
     };
 }
