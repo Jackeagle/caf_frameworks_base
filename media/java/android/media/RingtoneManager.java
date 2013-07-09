@@ -70,7 +70,14 @@ public class RingtoneManager {
      * Type that refers to sounds that are used for the alarm.
      */
     public static final int TYPE_ALARM = 4;
-    
+
+    /**
+     * Type that refers to sounds that are used for the phone ringer
+     *
+     * @hide
+     */
+    public static final int TYPE_RINGTONE_2 = 8;
+
     /**
      * All types of sounds.
      */

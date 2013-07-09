@@ -2105,6 +2105,20 @@ public final class Settings {
         public static final String VIBRATE_WHEN_RINGING = "vibrate_when_ringing";
 
         /**
+         * Whether the phone vibrates when it is ringing due to an incoming call. This will
+         * be used by Phone and Setting apps; it shouldn't affect other apps.
+         * The value is boolean (1 or 0).
+         *
+         * Note: this is not same as "vibrate on ring", which had been available until ICS.
+         * It was about AudioManager's setting and thus affected all the applications which
+         * relied on the setting, while this is purely about the vibration setting for incoming
+         * calls.
+         *
+         * @hide
+         */
+        public static final String VIBRATE_WHEN_RINGING2 = "vibrate_when_ringing2";
+
+        /**
          * Whether the audible DTMF tones are played by the dialer when dialing. The value is
          * boolean (1 or 0).
          */
@@ -2390,7 +2404,8 @@ public final class Settings {
             SIP_RECEIVE_CALLS,
             POINTER_SPEED,
             VIBRATE_WHEN_RINGING,
-            ENABLE_FAST_POWERON
+            ENABLE_FAST_POWERON,
+            VIBRATE_WHEN_RINGING2
         };
 
         // Settings moved to Settings.Secure
@@ -2622,6 +2637,23 @@ public final class Settings {
         @Deprecated
         public static final String WIFI_WATCHDOG_PING_TIMEOUT_MS =
             Secure.WIFI_WATCHDOG_PING_TIMEOUT_MS;
+
+        /**
+         * Int value to specify if the fuction of display home location is enabled.
+         * 0 = Disable  1 = Enable
+         * @hide
+         */
+        public static final String DISPLAY_HOME_LOCATION = "display_home_location";
+
+        /**
+         * Channel name for subcription one and two i.e. channele name 1,
+         * channel name 2
+         *
+         * @hide
+         */
+        public static final String[] MULTI_SIM_NAME = {
+                "perferred_name_sub1", "preferred_name_sub2"
+        };
     }
 
     /**
@@ -4453,6 +4485,13 @@ public final class Settings {
         * Whether or not data roaming is enabled. (0 = false, 1 = true)
         */
        public static final String DATA_ROAMING = "data_roaming";
+
+       /**
+        * Whether or not data roaming is enabled. (0 = false, 1 = true)
+        *
+        * @hide
+        */
+       public static final String DATA_ROAMING_2 = "data_roaming_2";
 
        /**
         * The value passed to a Mobile DataConnection via bringUp which defines the
