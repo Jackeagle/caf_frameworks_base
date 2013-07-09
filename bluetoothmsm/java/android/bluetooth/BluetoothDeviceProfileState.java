@@ -66,6 +66,7 @@ public final class BluetoothDeviceProfileState extends StateMachine {
     private static final String TAG = "BluetoothDeviceProfileState";
     private static final boolean DBG = false;
 
+
     // TODO(): Restructure the state machine to make it scalable with regard to profiles.
     public static final int CONNECT_HFP_OUTGOING = 1;
     public static final int CONNECT_HFP_INCOMING = 2;
@@ -1489,7 +1490,9 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                 break;
             case CONNECT_A2DP_INCOMING:
                 uuids = mDevice.getUuids();
-                if (!BluetoothUuid.isUuidPresent(uuids,  BluetoothUuid.AudioSink)) {
+                // Anding UUIDs not ORing assuming one role at a time
+                if ((!BluetoothUuid.isUuidPresent(uuids,  BluetoothUuid.AudioSource)) &&
+                     (!BluetoothUuid.isUuidPresent(uuids,  BluetoothUuid.AudioSink))) {
                     mDevice.fetchUuidsWithSdp();
                 }
                 processIncomingConnectCommand(command);
