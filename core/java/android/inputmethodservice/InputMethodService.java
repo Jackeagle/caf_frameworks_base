@@ -745,6 +745,13 @@ public class InputMethodService extends AbstractInputMethodService {
         int showFlags = mShowInputFlags;
         boolean showingInput = mShowInputRequested;
         CompletionInfo[] completions = mCurCompletions;
+        // fix the issue that the ime popup window which showed in land-screen is left on the screen
+
+        if (null != mExtractView) {
+            mExtractView.onWindowFocusChanged(false);
+            mExtractView.setVisibility(View.GONE);
+        }
+        // end
         initViews();
         mInputViewStarted = false;
         mCandidatesViewStarted = false;
