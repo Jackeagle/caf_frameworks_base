@@ -1052,6 +1052,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (DBG) logd(getName() + " sending connect");
                     WifiP2pConfig config = (WifiP2pConfig) message.obj;
                     mAutonomousGroup = false;
+                    mIsInvite = false;
 
                     /* Update group capability before connect */
                     int gc = mWifiNative.getGroupCapability(config.deviceAddress);
@@ -1087,6 +1088,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     mSavedPeerConfig = (WifiP2pConfig) message.obj;
                     mAutonomousGroup = false;
                     mJoinExistingGroup = false;
+                    mIsInvite = false;
                     if (!sendConnectNoticeToApp(mPeers.get(mSavedPeerConfig.deviceAddress),
                             mSavedPeerConfig)) {
                         transitionTo(mUserAuthorizingInvitationState);
@@ -1311,6 +1313,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 case WifiMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
                     provDisc = (WifiP2pProvDiscEvent) message.obj;
                     device = provDisc.device;
+                    mIsInvite = false;
                     if (!device.deviceAddress.equals(mSavedPeerConfig.deviceAddress)) break;
 
                     if (mSavedPeerConfig.wps.setup == WpsInfo.KEYPAD) {
@@ -1331,6 +1334,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
                     provDisc = (WifiP2pProvDiscEvent) message.obj;
                     device = provDisc.device;
+                    mIsInvite = false;
                     if (!device.deviceAddress.equals(mSavedPeerConfig.deviceAddress)) break;
 
                     if (mSavedPeerConfig.wps.setup == WpsInfo.DISPLAY) {
@@ -2337,7 +2341,6 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             // do nothing if p2pConnect did not return a pin
         }
         mIsInvite = false;
-        join = false;
     }
 
     private String getPersistedDeviceName() {
