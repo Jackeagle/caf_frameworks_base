@@ -142,7 +142,7 @@ public class BluetoothService extends IBluetooth.Stub {
     private static final int MESSAGE_GATT_INTENT = 7;
     private static final int RFCOMM_RECORD_REAPER = 10;
     private static final int STATE_CHANGE_REAPER = 11;
-
+    private static final byte DISCONNECTION_REASON_CONNECTION_TIMEOUT = 8;
     // The time (in millisecs) to delay the pairing attempt after the first
     // auto pairing attempt fails. We use an exponential delay with
     // INIT_AUTO_PAIRING_FAILURE_ATTEMPT_DELAY as the initial value and
@@ -3001,6 +3001,8 @@ public class BluetoothService extends IBluetooth.Stub {
                 mConnectionManager.setA2dpAudioActive(playingState == BluetoothA2dp.STATE_PLAYING);
             } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                byte reason = intent.getByteExtra(BluetoothDevice.EXTRA_REASON, (byte)0);
+                Log.d(TAG, "disconnnect reason" + reason);
                 if (device == null) {
                     return;
                 }
@@ -3023,7 +3025,7 @@ public class BluetoothService extends IBluetooth.Stub {
                     mBluetoothState.sendMessage(
                         BluetoothAdapterStateMachine.ALL_DEVICES_DISCONNECTED);
                 }
-                gattAclDisconnected("ACTION_ACL_DISCONNECTED", device);
+                gattAclDisconnected("ACTION_ACL_DISCONNECTED", device,reason);
             } else if (ACTION_BT_DISCOVERABLE_TIMEOUT.equals(action)) {
                 Log.i(TAG, "ACTION_BT_DISCOVERABLE_TIMEOUT");
                 setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE, 0);
@@ -5558,12 +5560,21 @@ public class BluetoothService extends IBluetooth.Stub {
     }
     public boolean addToPreferredDeviceList(String address, IBluetoothPreferredDeviceListCallback pListCallBack) {
         Log.d(TAG, "addToPreferredDeviceList");
+        boolean status = false;
         sPListCallBack = pListCallBack;
+        String path = null;
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        String path = getObjectPathFromAddress(address);
+        if (isRemoteDeviceInCache(address) && findDeviceNative(address) != null) {
+             Log.d(TAG, "path from getObjectPathFromAddress");
+             path = getObjectPathFromAddress(address);
+        }
+        else {
+             Log.d(TAG, "path is null");
+             path = createLeDeviceNative(address);
+        }
 
         synchronized (mBluetoothGattProfileHandler) {
-            return mBluetoothGattProfileHandler.addToPreferredDeviceList(path);
+             return mBluetoothGattProfileHandler.addToPreferredDeviceList(path);
         }
     }
 
@@ -5637,7 +5648,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
         return true;
     }
-    public void gattAclDisconnected(String caller, BluetoothDevice btDevice) {
+    public void gattAclDisconnected(String caller, BluetoothDevice btDevice, byte reason) {
         Log.d(TAG, "gattAclDisconnected");
         try {
             callerIntent = caller;
@@ -5662,6 +5673,7 @@ public class BluetoothService extends IBluetooth.Stub {
             //If the ACL_DISCONNECTED intent is received after a preferred devices list device disconnects,
             //add device to preferred devices list again for auto connection
             else if(isDevInPreferredDevList == true){
+            	   Log.d(TAG, "gattAclDisconnected  reason ::" +reason);
                 addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
             }
             else {

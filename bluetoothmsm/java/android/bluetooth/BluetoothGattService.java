@@ -695,7 +695,7 @@ public class BluetoothGattService {
             }
         }
 
-        public synchronized boolean fetchCharValue(String path) {
+        public boolean fetchCharValue(String path) {
             try {
                 return mService.updateCharacteristicValue(path, mServiceId);
             } catch (RemoteException e) {Log.e(TAG, "", e);}
