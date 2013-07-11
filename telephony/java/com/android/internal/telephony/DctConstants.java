@@ -98,6 +98,7 @@ public class DctConstants {
     public static final int EVENT_MODEM_DATA_PROFILE_READY = BASE + 37;
     public static final int EVENT_SET_PREFERRED_NETWORK_TYPE = BASE + 38;
     public static final int EVENT_GET_PREFERRED_NETWORK_TYPE = BASE + 39;
+    public static final int EVENT_SET_INTERNAL_DATA_ENABLE_FEEDBACK = BASE + 40;
     /***** Constants *****/
 
     public static final int APN_INVALID_ID = -1;
