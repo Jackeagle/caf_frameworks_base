@@ -1515,6 +1515,7 @@ public class BluetoothService extends IBluetooth.Stub {
         }
     }
     synchronized void onGattCancelConnectToPreferredDeviceListResult(int result) {
+        boolean isDevInPreferredDevList = false;
         try {
             Log.d(TAG, "onGattCancelConnectToPreferredDeviceListResult");
             if((callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")) ||
@@ -1526,8 +1527,27 @@ public class BluetoothService extends IBluetooth.Stub {
                                     callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")){
                                 Log.d(TAG,"AutoConnectCancel....");
                                 //call remove device from preffered devices list
-                                removeFromPreferredDeviceList(btDeviceInPreferredDevList.getAddress(),
-                                        sPListCallBack);
+                                Log.d(TAG, "calling removeFromPreferredDeviceList in onGattCancelConnectToPreferredDeviceListResult");
+                                Log.d(TAG, "preferredDevicesList in onGattCancelConnectToPreferredDeviceListResult");
+                                if(preferredDevicesList != null) {
+                                    for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                                        Log.d(TAG, "Key()::"+entry.getKey()+"Value::"+entry.getValue());
+                                    }
+                                }
+                                if(preferredDevicesList != null) {
+                                    for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                                        if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
+                                            if(entry.getValue() == DEVICE_IN_PREFERRED_DEVICES_LIST) {
+                                                isDevInPreferredDevList = true;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                                if(isDevInPreferredDevList == true) {
+                                    removeFromPreferredDeviceList(btDeviceInPreferredDevList.getAddress(),
+                                            sPListCallBack);
+                                }
                             }
                             else if(callerIntent != null &&
                                     callerIntent.equalsIgnoreCase("ACTION_ACL_DISCONNECTED")) {
@@ -5635,8 +5655,22 @@ public class BluetoothService extends IBluetooth.Stub {
         else {
             if(preferredDevicesList != null) {
                 for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                    Log.d(TAG, "Key()::"+entry.getKey()+"Value::"+entry.getValue());
+                }
+            }
+            if(preferredDevicesList != null) {
+                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
                     if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
-                        isDevInPreferredDevList = true;
+                        preferredDevicesList.remove(entry.getKey());
+                    }
+                }
+            }
+            if(preferredDevicesList != null) {
+                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
+                    if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
+                        if(entry.getValue() == DEVICE_IN_PREFERRED_DEVICES_LIST) {
+                            isDevInPreferredDevList = true;
+                        }
                         break;
                     }
                 }
