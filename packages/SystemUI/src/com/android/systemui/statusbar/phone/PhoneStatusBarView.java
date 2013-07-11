@@ -183,8 +183,16 @@ public class PhoneStatusBarView extends PanelBar {
 
     @Override
     public void panelExpansionChanged(PanelView panel, float frac) {
+        //new Exception().printStackTrace();
+	
         super.panelExpansionChanged(panel, frac);
+	if(frac==Float.NaN){
+		
+		android.os.Process.sendSignal(android.os.Process.myPid(), 9);
+		Slog.v(TAG,"tick: sendSignal");
 
+	}
+	
         if (DEBUG) {
             Slog.v(TAG, "panelExpansionChanged: f=" + frac);
         }

@@ -239,13 +239,17 @@ public class KeyguardViewManager {
         }
         // TODO: Remove once b/7094175 is fixed
         if (false) Slog.d(TAG, "inflateKeyguardView: b/7094175 mContext.config="
-                + mContext.getResources().getConfiguration());
-        final LayoutInflater inflater = LayoutInflater.from(mContext);
+                + mContext.getResources().getConfiguration());  
+        try{
+        final LayoutInflater inflater = LayoutInflater.from(mContext);	
         View view = inflater.inflate(R.layout.keyguard_host_view, mKeyguardHost, true);
         mKeyguardView = (KeyguardHostView) view.findViewById(R.id.keyguard_host_view);
         mKeyguardView.setLockPatternUtils(mLockPatternUtils);
         mKeyguardView.setViewMediatorCallback(mViewMediatorCallback);
-
+        }
+	catch (Exception e){
+             Slog.d(TAG, "inflateKeyguardView: Exception=" + e);  
+	}
         // HACK
         // The keyguard view will have set up window flags in onFinishInflate before we set
         // the view mediator callback. Make sure it knows the correct IME state.

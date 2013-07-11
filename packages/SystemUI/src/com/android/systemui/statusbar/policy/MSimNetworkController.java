@@ -431,6 +431,16 @@ public class MSimNetworkController extends NetworkController {
             updateWimaxState(intent);
             refreshViews(mDefaultSubscription);
         }
+        else if(action.equals(Intent.ACTION_LOCALE_CHANGED)){  //tianhaiyan add 20130624 for lauguage switch
+            if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
+                for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+		      Slog.d(TAG,"ACTION_LOCALE_CHANGED=" +  i);
+                    updateNetworkName(false, null, false, null, i);
+                    refreshViews(i);
+                }
+            }
+        	}
+		
     }
 
     // ===== Telephony ==============================================================
@@ -898,10 +908,14 @@ public class MSimNetworkController extends NetworkController {
             Slog.d("CarrierLabel", "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
+
+	 mNetworkNameDefault = mContext.getString(com.android.internal.R.string.lockscreen_carrier_default);
 	 if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
             String networkName = mPhone.getNetworkName(subscription);
+
             mMSimNetworkName[subscription] = networkName == null ? mNetworkNameDefault : networkName;
-            Slog.d("CarrierLabel", "updateNetworkName networkName["+subscription+"] =" + networkName);
+            Slog.d("CarrierLabel", "updateNetworkName networkName["+subscription+"] =" + networkName
+				+"mMSimNetworkName" +mMSimNetworkName[subscription]);
         }
 	else{
         StringBuilder str = new StringBuilder();
@@ -1335,12 +1349,13 @@ public class MSimNetworkController extends NetworkController {
         int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
         String bannerString = "";
 
-        /*if(!mConnected){            
+       /* if(!mConnected){            
             bannerString = context.getString(R.string.status_bar_settings_signal_meter_disconnected);
         }else*/{
             for(int sub=0;sub<numPhones;sub++){
                 if(!mMSimNetworkName[sub].equals(""))
                     bannerString = bannerString + mMSimNetworkName[sub] + "   " ;
+		    Slog.d(TAG, "bannerString " +bannerString);
             }
         }
         if (!FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
@@ -1357,6 +1372,8 @@ public class MSimNetworkController extends NetworkController {
                 v.setVisibility(View.VISIBLE);
             }
         }
+
+		
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args, int subscription) {

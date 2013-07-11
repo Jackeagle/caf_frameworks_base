@@ -41,6 +41,9 @@ public class ExtractEditLayout extends LinearLayout {
     Button mExtractActionButton;
     Button mEditButton;
 
+    /** The variable of the menu popup helper. **/
+    private MenuPopupHelper mMenuP;
+
     public ExtractEditLayout(Context context) {
         super(context);
     }
@@ -80,6 +83,24 @@ public class ExtractEditLayout extends LinearLayout {
     }
 
     @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+
+        if (visibility != View.VISIBLE) {
+            dismissMenuPopupHelper();
+        }
+    }
+
+    /**
+     * Dismiss the menu popup.
+     */
+    private void dismissMenuPopupHelper() {
+        if (mMenuP != null && mMenuP.isShowing()) {
+            mMenuP.dismiss();
+        }
+    }
+
+    @Override
     public void onFinishInflate() {
         super.onFinishInflate();
         mExtractActionButton = (Button) findViewById(com.android.internal.R.id.inputExtractAction);
@@ -87,7 +108,10 @@ public class ExtractEditLayout extends LinearLayout {
         mEditButton.setOnClickListener(new OnClickListener() {
             public void onClick(View clicked) {
                 if (mActionMode != null) {
-                    new MenuPopupHelper(getContext(), mActionMode.mMenu, clicked).show();
+
+                    mMenuP = new MenuPopupHelper(getContext(), mActionMode.mMenu, clicked);
+                    mMenuP.show();
+ 
                 }
             }
         });
@@ -169,6 +193,10 @@ public class ExtractEditLayout extends LinearLayout {
             sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
 
             mActionMode = null;
+
+            /**finished, dismiss the MenuPopup **/
+            dismissMenuPopupHelper();
+			
         }
 
         @Override
