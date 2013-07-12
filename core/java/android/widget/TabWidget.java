@@ -309,9 +309,11 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
 
     @Override
     public void childDrawableStateChanged(View child) {
-        if (getTabCount() > 0 && child == getChildTabViewAt(mSelectedTab)) {
-            // To make sure that the bottom strip is redrawn
-            invalidate();
+        if (mSelectedTab != -1) {
+            if (getTabCount() > 0 && child == getChildTabViewAt(mSelectedTab)) {
+                // To make sure that the bottom strip is redrawn
+                invalidate();
+            }
         }
         super.childDrawableStateChanged(child);
     }
@@ -330,28 +332,30 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
             return;
         }
 
-        final View selectedChild = getChildTabViewAt(mSelectedTab);
+        if(mSelectedTab != -1) {
+           final View selectedChild = getChildTabViewAt(mSelectedTab);
 
-        final Drawable leftStrip = mLeftStrip;
-        final Drawable rightStrip = mRightStrip;
+           final Drawable leftStrip = mLeftStrip;
+           final Drawable rightStrip = mRightStrip;
 
-        leftStrip.setState(selectedChild.getDrawableState());
-        rightStrip.setState(selectedChild.getDrawableState());
+           leftStrip.setState(selectedChild.getDrawableState());
+           rightStrip.setState(selectedChild.getDrawableState());
 
-        if (mStripMoved) {
-            final Rect bounds = mBounds;
-            bounds.left = selectedChild.getLeft();
-            bounds.right = selectedChild.getRight();
-            final int myHeight = getHeight();
-            leftStrip.setBounds(Math.min(0, bounds.left - leftStrip.getIntrinsicWidth()),
-                    myHeight - leftStrip.getIntrinsicHeight(), bounds.left, myHeight);
-            rightStrip.setBounds(bounds.right, myHeight - rightStrip.getIntrinsicHeight(),
-                    Math.max(getWidth(), bounds.right + rightStrip.getIntrinsicWidth()), myHeight);
-            mStripMoved = false;
+           if (mStripMoved) {
+              final Rect bounds = mBounds;
+              bounds.left = selectedChild.getLeft();
+              bounds.right = selectedChild.getRight();
+              final int myHeight = getHeight();
+              leftStrip.setBounds(Math.min(0, bounds.left - leftStrip.getIntrinsicWidth()),
+                      myHeight - leftStrip.getIntrinsicHeight(), bounds.left, myHeight);
+              rightStrip.setBounds(bounds.right, myHeight - rightStrip.getIntrinsicHeight(),
+                      Math.max(getWidth(), bounds.right + rightStrip.getIntrinsicWidth()), myHeight);
+              mStripMoved = false;
+           }
+
+           leftStrip.draw(canvas);
+           rightStrip.draw(canvas);
         }
-
-        leftStrip.draw(canvas);
-        rightStrip.draw(canvas);
     }
 
     /**
@@ -385,7 +389,6 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
         if (index < 0 || index >= getTabCount() || index == mSelectedTab) {
             return;
         }
-
         if (mSelectedTab != -1) {
             getChildTabViewAt(mSelectedTab).setSelected(false);
         }
@@ -510,7 +513,7 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
 
     /** {@inheritDoc} */
     public void onFocusChange(View v, boolean hasFocus) {
-        if (v == this && hasFocus && getTabCount() > 0) {
+        if (v == this && hasFocus && getTabCount() > 0 && ( mSelectedTab!= -1) ) {
             getChildTabViewAt(mSelectedTab).requestFocus();
             return;
         }
