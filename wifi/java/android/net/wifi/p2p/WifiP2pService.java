@@ -1610,6 +1610,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         @Override
         public boolean processMessage(Message message) {
             if (DBG) logd(getName() + message.toString());
+            // Update name of dynamic interface
+            SystemProperties.set("wlan.interface.p2p.group", mGroup.getInterface());
+            if (DBG) logd(getName() + "setprop wlan.interface.p2p.group: " + mGroup.getInterface());
+
             switch (message.what) {
                 case WifiMonitor.AP_STA_CONNECTED_EVENT:
                     WifiP2pDevice device = (WifiP2pDevice) message.obj;
