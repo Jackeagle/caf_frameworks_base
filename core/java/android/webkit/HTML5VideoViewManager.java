@@ -85,6 +85,15 @@ class HTML5VideoViewManager
         }
     }
 
+    public void pauseAndReleaseMediaPlayer() {
+        assert (mUiThread == Thread.currentThread());
+        Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
+        while (iter.hasNext()) {
+            HTML5VideoViewProxy proxy = iter.next();
+            proxy.pauseAndReleaseMediaPlayer();
+        }
+    }
+
     public void enterFullscreenVideo(int layerId, String url) {
         assert (mUiThread == Thread.currentThread());
         Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();

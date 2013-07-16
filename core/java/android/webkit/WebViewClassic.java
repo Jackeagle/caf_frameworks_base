@@ -2161,6 +2161,11 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             mListBoxDialog.dismiss();
             mListBoxDialog = null;
         }
+
+        if (mHTML5VideoViewManager != null ) {
+            mHTML5VideoViewManager.pauseAndReleaseMediaPlayer();
+        }
+
         if (mWebViewCore != null) {
             // Tell WebViewCore to destroy itself
             synchronized (this) {
