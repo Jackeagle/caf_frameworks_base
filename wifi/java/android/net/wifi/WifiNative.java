@@ -210,8 +210,8 @@ public class WifiNative {
      * RANGE=ALL gets all scan results
      * MASK=<N> see wpa_supplicant/src/common/wpa_ctrl.h for details
      */
-    public String scanResults() {
-        return doStringCommand("BSS RANGE=ALL MASK=0x21987");
+    public String scanResults (int sid) {
+        return doStringCommand("BSS RANGE=" + sid + "- MASK=0x21987");
     }
 
     public boolean startDriver() {
