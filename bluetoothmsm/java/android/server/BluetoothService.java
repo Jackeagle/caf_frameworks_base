@@ -1518,6 +1518,9 @@ public class BluetoothService extends IBluetooth.Stub {
         boolean isDevInPreferredDevList = false;
         try {
             Log.d(TAG, "onGattCancelConnectToPreferredDeviceListResult");
+            if(result == 0) {
+                isScanInProgress = false;
+            }
             if((callerPreferredDevApi != null && callerPreferredDevApi.equalsIgnoreCase("AutoConnectCancel")) ||
                     (callerIntent != null && callerIntent.equalsIgnoreCase("ACTION_ACL_DISCONNECTED"))) {
                 try {
@@ -5600,13 +5603,21 @@ public class BluetoothService extends IBluetooth.Stub {
 
     public boolean removeFromPreferredDeviceList(String address, IBluetoothPreferredDeviceListCallback pListCallBack) {
         Log.d(TAG, "removeFromPreferredDeviceList");
+        boolean status = false;
         sPListCallBack = pListCallBack;
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        String path = getObjectPathFromAddress(address);
-
-        synchronized (mBluetoothGattProfileHandler) {
-            return mBluetoothGattProfileHandler.removeFromPreferredDeviceList(path);
+        //Stop the scan if it is running
+        if(isScanInProgress == true) {
+            gattCancelConnectToPreferredDeviceList(sPListCallBack);
         }
+        else {
+            String path = getObjectPathFromAddress(address);
+
+            synchronized (mBluetoothGattProfileHandler) {
+                return mBluetoothGattProfileHandler.removeFromPreferredDeviceList(path);
+            }
+        }
+        return status;
     }
 
     public boolean clearPreferredDeviceList(IBluetoothPreferredDeviceListCallback pListCallBack) {
@@ -5707,7 +5718,7 @@ public class BluetoothService extends IBluetooth.Stub {
             //If the ACL_DISCONNECTED intent is received after a preferred devices list device disconnects,
             //add device to preferred devices list again for auto connection
             else if(isDevInPreferredDevList == true){
-            	   Log.d(TAG, "gattAclDisconnected  reason ::" +reason);
+                  Log.d(TAG, "gattAclDisconnected  reason ::" +reason);
                 addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
             }
             else {
