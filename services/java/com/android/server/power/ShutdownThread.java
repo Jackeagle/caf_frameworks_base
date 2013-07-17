@@ -34,7 +34,10 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.MediaPlayer;
+import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Handler;
+import android.os.Message;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -49,9 +52,20 @@ import android.telephony.MSimTelephonyManager;
 
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.msim.ITelephonyMSim;
+import com.android.server.power.PowerManagerService;
 
 import android.util.Log;
+import android.view.IWindowManager;
 import android.view.WindowManager;
+import java.lang.reflect.Method;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
+
 import java.lang.reflect.Method;
 
 public final class ShutdownThread extends Thread {
@@ -76,9 +90,14 @@ public final class ShutdownThread extends Thread {
 
     // Provides shutdown assurance in case the system_server is killed
     public static final String SHUTDOWN_ACTION_PROPERTY = "sys.shutdown.requested";
+    public static final String SHUTDOWN_RUNNING_PROPERTY = "sys.shutdown.running";
 
     // Indicates whether we are rebooting into safe mode
     public static final String REBOOT_SAFEMODE_PROPERTY = "persist.sys.safemode";
+
+    public static final String BOOT_ANIMATION_PROPERTY = "persist.env.sys.bootanim";
+    private static final boolean mBootAnimEnabled =
+        SystemProperties.getBoolean(BOOT_ANIMATION_PROPERTY, true);
 
     // static instance of this thread
     private static final ShutdownThread sInstance = new ShutdownThread();
@@ -90,6 +109,15 @@ public final class ShutdownThread extends Thread {
     private PowerManager.WakeLock mCpuWakeLock;
     private PowerManager.WakeLock mScreenWakeLock;
     private Handler mHandler;
+    private static MediaPlayer mMediaPlayer;
+    private static final String USER_BOOTANIMATION_FILE = "/data/local/shutdownanimation.zip";
+    private static final String SYSTEM_BOOTANIMATION_FILE = "/system/media/shutdownanimation.zip";
+    private static final String SYSTEM_ENCRYPTED_BOOTANIMATION_FILE = "/system/media/shutdownanimation-encrypted.zip";
+
+    private static final String MUSIC_SHUTDOWN_FILE = "/system/media/shutdown.wav";
+    private static final String MUSIC_QRD_SHUTDOWN_FILE = "/data/qrd_theme/boot/shutdown.wav";
+
+    private boolean isShutdownMusicPlaying = false;
 
     private static AlertDialog sConfirmDialog;
     
@@ -193,6 +221,31 @@ public final class ShutdownThread extends Thread {
         shutdownInner(context, confirm);
     }
 
+    private static String getShutdownMusicFilePath() {
+        final String[] fileName = {MUSIC_QRD_SHUTDOWN_FILE,
+                MUSIC_SHUTDOWN_FILE};
+        File checkFile = null;
+        int i = 0;
+        for( ; i < fileName.length; i ++) {
+            checkFile = new File(fileName[i]);
+            if (checkFile.exists())
+                break;
+        }
+        if (i >= fileName.length)
+            return null;
+        return fileName[i];
+    }
+
+    private static void lockDevice() {
+        SystemProperties.set(SHUTDOWN_RUNNING_PROPERTY, "true");
+        IWindowManager wm = IWindowManager.Stub.asInterface(ServiceManager
+                .getService(Context.WINDOW_SERVICE));
+        try {
+            wm.updateRotation(false, false);
+        } catch (RemoteException e) {
+            Log.w(TAG, "boot animation can not lock device!");
+        }
+    }
     /**
      * Request a reboot into safe mode.  Must be called from a Looper thread in which its UI
      * is shown.
@@ -216,16 +269,22 @@ public final class ShutdownThread extends Thread {
             sIsStarted = true;
         }
 
-        // throw up an indeterminate system dialog to indicate radio is
-        // shutting down.
-        ProgressDialog pd = new ProgressDialog(context);
-        pd.setTitle(context.getText(com.android.internal.R.string.power_off));
-        pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
-        pd.setIndeterminate(true);
-        pd.setCancelable(false);
-        pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+        if ( checkAnimationFileExist()) {
+            lockDevice();
+            showShutdownAnimation();
+            // playShutdownMusic(MUSIC_SHUTDOWN_FILE);
+        } else {
+            // throw up an indeterminate system dialog to indicate radio is
+            // shutting down.
+            ProgressDialog pd = new ProgressDialog(context);
+            pd.setTitle(context.getText(com.android.internal.R.string.power_off));
+            pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
+            pd.setIndeterminate(true);
+            pd.setCancelable(false);
+            pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 
-        pd.show();
+            pd.show();
+        }
 
         sInstance.mContext = context;
         sInstance.mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
@@ -321,6 +380,33 @@ public final class ShutdownThread extends Thread {
             }
         }
         
+        String shutDownFile = null;
+        if (mBootAnimEnabled && !isSilentMode()
+                && (shutDownFile = getShutdownMusicFilePath()) != null) {
+            isShutdownMusicPlaying = true;
+            shutdownMusicHandler.obtainMessage(0, shutDownFile).sendToTarget();
+        }
+
+        Log.i(TAG, "wait for shutdown music");
+        final long endTimeForMusic = SystemClock.elapsedRealtime() + MAX_BROADCAST_TIME;
+        synchronized (mActionDoneSync) {
+            while (isShutdownMusicPlaying) {
+                long delay = endTimeForMusic - SystemClock.elapsedRealtime();
+                if (delay <= 0) {
+                    Log.w(TAG, "play shutdown music timeout!");
+                    break;
+                }
+                try {
+                    mActionDoneSync.wait(delay);
+                } catch (InterruptedException e) {
+                }
+            }
+            if (!isShutdownMusicPlaying) {
+                Log.i(TAG, "play shutdown music complete.");
+            }
+        }
+        // Shutdown radios.
+        shutdownRadios(MAX_RADIO_WAIT_TIME);
         Log.i(TAG, "Shutting down activity manager...");
         
         final IActivityManager am =
@@ -332,8 +418,6 @@ public final class ShutdownThread extends Thread {
             }
         }
 
-        // Shutdown radios.
-        shutdownRadios(MAX_RADIO_WAIT_TIME);
 
         // Shutdown MountService to ensure media is in a safe state
         IMountShutdownObserver observer = new IMountShutdownObserver.Stub() {
@@ -463,15 +547,13 @@ public final class ShutdownThread extends Thread {
                     }
                     if (!radioOff) {
                         try {
-                            boolean subRadioOff = true;
                             if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
                                 final ITelephonyMSim mphone = ITelephonyMSim.Stub.asInterface(
                                         ServiceManager.checkService("phone_msim"));
                                 for (int i = 0; i < MSimTelephonyManager.getDefault().
                                         getPhoneCount(); i++) {
-                                    subRadioOff = subRadioOff && !mphone.isRadioOn(i);
+                                    radioOff = radioOff && !mphone.isRadioOn(i);
                                 }
-                                radioOff = subRadioOff;
                             } else {
                                 radioOff = !phone.isRadioOn();
                             }
@@ -578,4 +660,48 @@ public final class ShutdownThread extends Thread {
         //Unknown exception
         }
      }
+
+    private static boolean checkAnimationFileExist() {
+        if (new File(USER_BOOTANIMATION_FILE).exists()
+                || new File(SYSTEM_BOOTANIMATION_FILE).exists()
+                || new File(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE).exists())
+            return true;
+        else
+            return false;
+    }
+
+    private static boolean isSilentMode() {
+        String mode = SystemProperties.get("persist.sys.silent");
+        return mode != null && mode.equals("1");
+    }
+
+    private static void showShutdownAnimation() {
+        SystemProperties.set("ctl.start", "bootanim");
+    }
+
+    private Handler shutdownMusicHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            String path = (String) msg.obj;
+            mMediaPlayer = new MediaPlayer();
+            try
+            {
+                mMediaPlayer.reset();
+                mMediaPlayer.setDataSource(path);
+                mMediaPlayer.prepare();
+                mMediaPlayer.start();
+                mMediaPlayer.setOnCompletionListener(new OnCompletionListener() {
+                    @Override
+                    public void onCompletion(MediaPlayer mp) {
+                        synchronized (mActionDoneSync) {
+                            isShutdownMusicPlaying = false;
+                            mActionDoneSync.notifyAll();
+                        }
+                    }
+                });
+            } catch (IOException e) {
+                Log.d(TAG, "play shutdown music error:" + e);
+            }
+        }
+    };
 }

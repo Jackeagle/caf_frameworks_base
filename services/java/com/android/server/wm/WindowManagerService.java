@@ -5631,6 +5631,11 @@ public class WindowManagerService extends IWindowManager.Stub
         Binder.restoreCallingIdentity(origId);
     }
 
+    private boolean isShutdownRunning() {
+        return SystemProperties.get(ShutdownThread.SHUTDOWN_RUNNING_PROPERTY, "").length() > 0;
+    }
+
+
     // TODO(multidisplay): Rotate any display?
     /**
      * Updates the current rotation.
@@ -5667,7 +5672,8 @@ public class WindowManagerService extends IWindowManager.Stub
         //       an orientation that has different metrics than it expected.
         //       eg. Portrait instead of Landscape.
 
-        int rotation = mPolicy.rotationForOrientationLw(mForcedAppOrientation, mRotation);
+        int rotation = (isKeyguardLocked() || isShutdownRunning()) ? Surface.ROTATION_0 : mPolicy
+                .rotationForOrientationLw(mForcedAppOrientation, mRotation);
         boolean altOrientation = !mPolicy.rotationHasCompatibleMetricsLw(
                 mForcedAppOrientation, rotation);
 

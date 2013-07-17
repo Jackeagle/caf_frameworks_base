@@ -43,8 +43,12 @@ int main(int argc, char** argv)
 #endif
 
     char value[PROPERTY_VALUE_MAX];
-    property_get("debug.sf.nobootanimation", value, "0");
-    int noBootAnimation = atoi(value);
+    property_get("persist.env.sys.bootanim", value, "true");
+    int noBootAnimation = 0;
+    if (strcmp(value, "false") == 0)
+    {
+        noBootAnimation = 1;
+    }
     ALOGI_IF(noBootAnimation,  "boot animation disabled");
     if (!noBootAnimation) {
 
