@@ -1912,6 +1912,18 @@ public final class Settings {
         public static final String RINGTONE = "ringtone";
 
         /**
+         * Persistent store for the system-wide default ringtone URI.
+         * <p>
+         * If you need to play the default ringtone at any given time, it is recommended
+         * you give {@link #DEFAULT_RINGTONE_URI_2} to the media player.  It will resolve
+         * to the set default ringtone at the time of playing.
+         *
+         * @see #DEFAULT_RINGTONE_URI_2
+         * @hide
+         */
+        public static final String RINGTONE_2 = "ringtone_2";
+
+        /**
          * A {@link Uri} that will point to the current default ringtone at any
          * given time.
          * <p>
@@ -1920,6 +1932,18 @@ public final class Settings {
          * FileNotFoundException.
          */
         public static final Uri DEFAULT_RINGTONE_URI = getUriFor(RINGTONE);
+
+        /**
+         * A {@link Uri} that will point to the current default ringtone at any
+         * given time.
+         * <p>
+         * If the current default ringtone is in the DRM provider and the caller
+         * does not have permission, the exception will be a
+         * FileNotFoundException.
+         *
+         * @hide
+         */
+        public static final Uri DEFAULT_RINGTONE_URI_2 = getUriFor(RINGTONE_2);
 
         /**
          * Persistent store for the system-wide default notification sound.
@@ -2639,11 +2663,41 @@ public final class Settings {
             Secure.WIFI_WATCHDOG_PING_TIMEOUT_MS;
 
         /**
+         * Int value to specify if CABL is enabled.
+         * 0 = Disable  1 = Enable
+         * @hide
+         */
+        public static final String CABL_ENABLED = "cabl_enabled";
+
+        /**
+         * Int value to specify CABL levels.
+         * @hide
+         */
+        public static final String CABL_LEVELS = "cabl_levels";
+
+        /**
+         * Set the proximity sensor on or off
+         * 0 == OFF 1 == ON
+         * @hide
+         */
+        public static final String PROXIMITY_SENSOR = "proximity_sensor";
+
+        /**
          * Int value to specify if the fuction of display home location is enabled.
          * 0 = Disable  1 = Enable
          * @hide
          */
         public static final String DISPLAY_HOME_LOCATION = "display_home_location";
+
+        /**
+         * Subscription to be used for multi Sim IP Call Prefix Setting. The
+         * supported values are 0 = SUB1, 1 = SUB2.
+         *
+         * @hide
+         */
+        public static final String[] IPCALL_PREFIX = {
+                "ipcall_prefix_sub1", "ipcall_prefix_sub2"
+        };
 
         /**
          * Channel name for subcription one and two i.e. channele name 1,
@@ -2654,6 +2708,25 @@ public final class Settings {
         public static final String[] MULTI_SIM_NAME = {
                 "perferred_name_sub1", "preferred_name_sub2"
         };
+
+        /**
+         * Preferred subscription icon index. 0 = @drawable/ic_sim_icon_1
+         *                                    1 = @drawable/ic_sim_icon_2
+         *                                    2 = @drawable/ic_sim_icon_c
+         *                                    3 = @drawable/ic_sim_icon_g
+         *                                    4 = @drawable/ic_sim_icon_w
+         * The default value is "0,1". And 0 for SUB1, 1 for SUB2.
+         *
+         * @hide
+         */
+        public static final String PREFERRED_SIM_ICON_INDEX = "preferred_sim_icon_index";
+
+        /**
+         * display duration info after end call. 0 = Off 1 = On
+         *
+         * @hide
+         */
+        public static final String SHOW_CALL_DURATION = "show_call_duration";
     }
 
     /**
@@ -4485,13 +4558,6 @@ public final class Settings {
         * Whether or not data roaming is enabled. (0 = false, 1 = true)
         */
        public static final String DATA_ROAMING = "data_roaming";
-
-       /**
-        * Whether or not data roaming is enabled. (0 = false, 1 = true)
-        *
-        * @hide
-        */
-       public static final String DATA_ROAMING_2 = "data_roaming_2";
 
        /**
         * The value passed to a Mobile DataConnection via bringUp which defines the
