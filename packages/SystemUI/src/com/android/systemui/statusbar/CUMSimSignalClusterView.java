@@ -79,6 +79,10 @@ public class CUMSimSignalClusterView
     private ServiceState[] mServiceState;
     private boolean[] isSimRoam;
 
+    private boolean[] dataEnabledsub;
+    private boolean[] dataConnected;
+
+
     ViewGroup mWifiGroup, mMobileGroup, mMobileGroupSub2;
     ImageView mWifi, mWifiActivity, mMobile, mMobileActivity, mMobileType, mAirplane;
     ImageView mNoSimSlot, mNoSimSlotSub2;
@@ -109,6 +113,8 @@ public class CUMSimSignalClusterView
         isSimRoam = new boolean[numPhones];
         mMNoSimIconVisiable = new boolean[numPhones];
         mSignalIconVisiable = new boolean[numPhones];
+	dataEnabledsub = new boolean[numPhones];
+	dataConnected = new boolean[numPhones];		
         for(int i=0; i < numPhones; i++) {
             mMobileStrengthId[i] = 0;
             mMobileTypeId[i] = 0;
@@ -187,6 +193,7 @@ public class CUMSimSignalClusterView
 	        mServiceState[subscription] = simServiceState;
         mMobileVisible = visible;		
         isSimRoam[subscription] = isRoam;
+	dataConnected[subscription] = dataConnect;
         mMobileStrengthId[subscription] = convertStrengthIconIdToCU(strengthIcon[0], subscription);
         mMobileTypeId[subscription] = convertMobileTypeIconIdToCU(typeIcon);
         mMobileActivityId[subscription] = convertMobileActivityIconIdToCU(typeIcon,activityIcon,subscription);
@@ -233,6 +240,11 @@ public class CUMSimSignalClusterView
                     mWifiStrengthId, mWifiActivityId));
 
         if (mMobileVisible && !mIsAirplaneMode) {
+	// add start 2013.7.1
+		dataEnabledsub[subscription] = dataConnected[subscription];
+		mMobileActivity.setVisibility(dataEnabledsub[0] ? View.VISIBLE : View.GONE);
+		mMobileActivitySub2.setVisibility(dataEnabledsub[1] ? View.VISIBLE : View.GONE);			
+	// add end		
             if (subscription == MSimConstants.SUB1) {
                 mMobileGroup.setVisibility(View.VISIBLE);
                 mMobile.setImageResource(mMobileStrengthId[subscription]);
