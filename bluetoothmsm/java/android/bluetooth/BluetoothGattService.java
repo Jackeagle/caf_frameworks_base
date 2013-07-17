@@ -657,7 +657,7 @@ public class BluetoothGattService {
             } catch (Exception e) {Log.e(TAG, "", e);}
         }
 
-        public synchronized boolean setCharacteristicProperty(String path, String key,
+        public boolean setCharacteristicProperty(String path, String key,
                 byte[] value, boolean reliable) {
             Log.d(TAG, "setCharacteristicProperty");
             try {
