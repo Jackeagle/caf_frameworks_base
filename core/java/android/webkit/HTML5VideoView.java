@@ -423,9 +423,10 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
             mCanSeekForward = !data.has(Metadata.SEEK_FORWARD_AVAILABLE)
                 || data.getBoolean(Metadata.SEEK_FORWARD_AVAILABLE);
         } else {
-            mCanPause = mCanSeekBack = mCanSeekForward = true;
+            mCanPause = true;
+            mCanSeekBack = mCanSeekForward = false;
         }
-        HTML5VideoFullscreen.instance().attachMediaController(mProxy, this);
+        HTML5VideoFullscreen.instance().attachMediaController(mProxy, this, mCanSeekBack || mCanSeekForward);
     }
 
     // Helper function to determine if this particular video is fullscreen
