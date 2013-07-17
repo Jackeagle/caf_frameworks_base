@@ -357,7 +357,7 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
     }
 
     // If MediaPlayer is prepared, enable the buttons
-    public void attachMediaController(HTML5VideoViewProxy proxy, MediaController.MediaPlayerControl player) {
+    public void attachMediaController(HTML5VideoViewProxy proxy, MediaController.MediaPlayerControl player, boolean useFastForward) {
         if (mFullscreenProxy != proxy)
             return;
 
@@ -366,7 +366,7 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
         // This should only be called when MediaPlayer is in prepared state
         // Otherwise data will return invalid values
         if (mMediaController == null) {
-            MediaController mc = new FullScreenMediaController(proxy.getContext(), mLayout);
+            MediaController mc = new FullScreenMediaController(proxy.getContext(), mLayout, useFastForward);
             mc.setSystemUiVisibility(mLayout.getSystemUiVisibility());
             mMediaController = mc;
         }
@@ -469,8 +469,8 @@ public class HTML5VideoFullscreen implements View.OnTouchListener,
 
         View mVideoView;
 
-        public FullScreenMediaController(Context context, View video) {
-            super(context);
+        public FullScreenMediaController(Context context, View video, boolean useFastForward) {
+            super(context,useFastForward);
             mVideoView = video;
         }
 
