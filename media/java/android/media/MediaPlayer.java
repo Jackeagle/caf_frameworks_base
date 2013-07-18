@@ -2449,4 +2449,23 @@ public class MediaPlayer
         return (mode == VIDEO_SCALING_MODE_SCALE_TO_FIT ||
                 mode == VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
     }
+
+    /** @hide
+    */
+    public boolean suspend() {
+        stayAwake(false);
+        return _suspend();
+    }
+
+    private native boolean _suspend();
+
+    /** @hide
+    */
+    public boolean resume() {
+        // This following function will be called in start()
+        // stayAwake(true);
+        return _resume();
+    }
+
+    private native boolean _resume();
 }

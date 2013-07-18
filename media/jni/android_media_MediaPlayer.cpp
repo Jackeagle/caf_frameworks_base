@@ -823,6 +823,36 @@ android_media_MediaPlayer_setNextMediaPlayer(JNIEnv *env, jobject thiz, jobject 
     ;
 }
 
+static jboolean
+android_media_MediaPlayer_suspend(JNIEnv *env, jobject thiz)
+{
+    sp<MediaPlayer> mp = getMediaPlayer(env, thiz);
+    if (mp == NULL) {
+        jniThrowException(env, "java/lang/IllegalStateException", NULL);
+        return false;
+    }
+
+    if (mp->suspend() != OK) {
+        return false;
+    }
+    return true;
+}
+
+static jboolean
+android_media_MediaPlayer_resume(JNIEnv *env, jobject thiz)
+{
+    sp<MediaPlayer> mp = getMediaPlayer(env, thiz);
+    if (mp == NULL) {
+        jniThrowException(env, "java/lang/IllegalStateException", NULL);
+        return false;
+    }
+
+    if (mp->resume() != OK) {
+        return false;
+    }
+    return true;
+}
+
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
@@ -867,6 +897,8 @@ static JNINativeMethod gMethods[] = {
     {"getParameter",        "(ILandroid/os/Parcel;)V",          (void *)android_media_MediaPlayer_getParameter},
     {"native_setRetransmitEndpoint", "(Ljava/lang/String;I)I",  (void *)android_media_MediaPlayer_setRetransmitEndpoint},
     {"setNextMediaPlayer",  "(Landroid/media/MediaPlayer;)V",   (void *)android_media_MediaPlayer_setNextMediaPlayer},
+    {"_suspend",             "()Z",                             (void *)android_media_MediaPlayer_suspend},
+    {"_resume",              "()Z",                             (void *)android_media_MediaPlayer_resume},
 };
 
 static const char* const kClassPathName = "android/media/MediaPlayer";
