@@ -101,6 +101,8 @@ public class KeyguardUpdateMonitor {
     private static final int MSG_POWER_OFF_AT_ONCE = 320;
     private static final int MSG_POWER_OFF = 321;
     private static final int MSG_POWER_OFF_DELAY = 322;
+    private static final int MSG_LOCALE_CHANGED = 323;  
+
     private static final int DELAY_TIME = 15; // 8 seconds
     private AlertDialog mPowerOffDialog = null;
     PowerManager.WakeLock sWakeLock = null;
@@ -154,6 +156,13 @@ public class KeyguardUpdateMonitor {
                 case MSG_CARRIER_INFO_UPDATE:
                     handleCarrierInfoUpdate(msg.arg1);
                     break;
+                case MSG_LOCALE_CHANGED://tianhaiyan add 20130624
+                    if(FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC){
+                        for (int i = 0; i < TelephonyManager.getDefault().getPhoneCount(); i++) {
+                            handleCarrierInfoUpdate(i);
+                        }
+                    }
+                   break;
                 case MSG_SIM_STATE_CHANGE:
                     handleSimStateChange((SimArgs) msg.obj);
                     break;
@@ -254,6 +263,8 @@ public class KeyguardUpdateMonitor {
                 mHandler.sendMessage(mHandler.obtainMessage(MSG_POWER_OFF_AT_ONCE));
             }else if ("android.intent.action.POWER_OFF".equals(action)) {
                 mHandler.sendMessage(mHandler.obtainMessage(MSG_POWER_OFF));
+            }else if(Intent.ACTION_LOCALE_CHANGED.equals(action)){  //tianhaiyan add 20130624
+                mHandler.sendMessage(mHandler.obtainMessage(MSG_LOCALE_CHANGED));
             }
         }
     };
@@ -411,6 +422,7 @@ public class KeyguardUpdateMonitor {
         filter.addAction(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION);
         if (FeatureQuery.FEATURE_SHOW_CARRIER_BY_MCCMNC) {
             filter.addAction(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED);
+            filter.addAction(Intent.ACTION_LOCALE_CHANGED);  //tianhaiyan add 20130624 for display operator when switch language
         }
 
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);

@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.phone;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -37,6 +39,9 @@ import com.android.systemui.R;
 public class PanelView extends FrameLayout {
     public static final boolean DEBUG = PanelBar.DEBUG;
     public static final String TAG = PanelView.class.getSimpleName();
+
+    public static final boolean DEBUG_NAN = true; // http://b/7686690
+
     public final void LOG(String fmt, Object... args) {
         if (!DEBUG) return;
         Slog.v(TAG, (mViewName != null ? (mViewName + ": ") : "") + String.format(fmt, args));
@@ -139,8 +144,17 @@ public class PanelView extends FrameLayout {
                 last = event;
                 i++;
             }
-            mVX /= totalweight;
-            mVY /= totalweight;
+            if (totalweight > 0) {
+                mVX /= totalweight;
+                mVY /= totalweight;
+            } else {
+                if (DEBUG_NAN) {
+                    Slog.v("FlingTracker", "computeCurrentVelocity warning: totalweight=0",
+                            new Throwable());
+                }
+                // so as not to contaminate the velocities with NaN
+                mVX = mVY = 0;
+            }
 
             if (FlingTracker.DEBUG) {
                 Slog.v("FlingTracker", "computed: vx=" + mVX + " vy=" + mVY);
@@ -150,6 +164,12 @@ public class PanelView extends FrameLayout {
             return mVX;
         }
         public float getYVelocity() {
+            if (Float.isNaN(mVY)) {
+                if (DEBUG_NAN) {
+                    Slog.v("FlingTracker", "warning: vx=NaN");
+                }
+                mVY = 0;
+            }
             return mVY;
         }
         public void recycle() {
@@ -282,6 +302,9 @@ public class PanelView extends FrameLayout {
                     || ((mRubberbanding || !mClosing) && mExpandedHeight == fh)) {
                 post(mStopAnimator);
             }
+        } else {
+            Slog.v(TAG, "animationTick called with dtms=" + dtms + "; nothing to do (h="
+                    + mExpandedHeight + " v=" + mVel + ")");
         }
     }
 
@@ -372,7 +395,7 @@ public class PanelView extends FrameLayout {
                         case MotionEvent.ACTION_MOVE:
                             final float h = rawY - mAbsPos[1] - mTouchOffset;
                             if (h > mPeekHeight) {
-                                if (mPeekAnimator != null && mPeekAnimator.isRunning()) {
+                                if (mPeekAnimator != null && mPeekAnimator.isStarted()) {
                                     mPeekAnimator.cancel();
                                 }
                                 mJustPeeked = false;
@@ -481,8 +504,8 @@ public class PanelView extends FrameLayout {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        if (DEBUG) LOG("onMeasure(%d, %d) -> (%d, %d)",
-                widthMeasureSpec, heightMeasureSpec, getMeasuredWidth(), getMeasuredHeight());
+       Slog.v("panelview","onMeasurewidthMeasureSpec="+ widthMeasureSpec +"heightMeasureSpec=" 
+	   	+heightMeasureSpec +"getMeasuredWidth()=" + getMeasuredWidth() +"getMeasuredHeight()" +getMeasuredHeight());
 
         // Did one of our children change size?
         int newHeight = getMeasuredHeight();
@@ -492,6 +515,7 @@ public class PanelView extends FrameLayout {
             if (!mTracking && !mRubberbanding && !mTimeAnimator.isStarted()
                     && mExpandedHeight > 0 && mExpandedHeight != mFullHeight) {
                 mExpandedHeight = mFullHeight;
+		
             }
         }
         heightMeasureSpec = MeasureSpec.makeMeasureSpec(
@@ -503,11 +527,14 @@ public class PanelView extends FrameLayout {
     public void setExpandedHeight(float height) {
         if (DEBUG) LOG("setExpandedHeight(%.1f)", height);
         mRubberbanding = false;
-        if (mTimeAnimator.isRunning()) {
+        if (mTimeAnimator.isStarted()) {
             post(mStopAnimator);
         }
         setExpandedHeightInternal(height);
+	
+        Slog.v("panelview","mExpandedFraction(%.1f)" + mExpandedFraction);
         mBar.panelExpansionChanged(PanelView.this, mExpandedFraction);
+	
     }
 
     @Override
@@ -517,6 +544,15 @@ public class PanelView extends FrameLayout {
     }
 
     public void setExpandedHeightInternal(float h) {
+        if (Float.isNaN(h)) {
+            // If a NaN gets in here, it will freeze the Animators.
+            if (DEBUG_NAN) {
+                Slog.v(TAG, "setExpandedHeightInternal: warning: h=NaN, using 0 instead",
+                        new Throwable());
+            }
+            h = 0;
+        }
+
         float fh = getFullHeight();
         if (fh == 0) {
             // Hmm, full height hasn't been computed yet
@@ -526,7 +562,7 @@ public class PanelView extends FrameLayout {
         if (!(mRubberbandingEnabled && (mTracking || mRubberbanding)) && h > fh) h = fh;
         mExpandedHeight = h;
 
-        if (DEBUG) LOG("setExpansion: height=%.1f fh=%.1f tracking=%s rubber=%s", h, fh, mTracking?"T":"f", mRubberbanding?"T":"f");
+        Slog.v("panelview","setExpansion: height=%.1f  " +h +"fh=%.1f"  +fh);
 
         requestLayout();
 //        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
@@ -534,18 +570,29 @@ public class PanelView extends FrameLayout {
 //        setLayoutParams(lp);
 
         mExpandedFraction = Math.min(1f, (fh == 0) ? 0 : h / fh);
+	if (DEBUG) LOG("setExpandedHeightInternal(%.1f)", mExpandedFraction);
+
     }
 
     private float getFullHeight() {
         if (mFullHeight <= 0) {
-            if (DEBUG) LOG("Forcing measure() since fullHeight=" + mFullHeight);
+             Slog.v("panelview","getFullHeight=" + mFullHeight);
             measure(MeasureSpec.makeMeasureSpec(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, MeasureSpec.EXACTLY),
                     MeasureSpec.makeMeasureSpec(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, MeasureSpec.EXACTLY));
         }
+	Slog.v("panelview","getFullHeight11=" + mFullHeight);
         return mFullHeight;
     }
 
     public void setExpandedFraction(float frac) {
+        if (Float.isNaN(frac)) {
+            // If a NaN gets in here, it will freeze the Animators.
+            if (DEBUG_NAN) {
+                Slog.v(TAG, "setExpandedFraction: frac=NaN, using 0 instead",
+                        new Throwable());
+            }
+            frac = 0;
+        }
         setExpandedHeight(getFullHeight() * frac);
     }
 
@@ -593,5 +640,21 @@ public class PanelView extends FrameLayout {
         } else if (DEBUG) {
             if (DEBUG) LOG("skipping expansion: is expanded");
         }
+    }
+
+    public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
+        pw.println(String.format("[PanelView(%s): expandedHeight=%f fullHeight=%f closing=%s"
+                + " tracking=%s rubberbanding=%s justPeeked=%s peekAnim=%s%s timeAnim=%s%s"
+                + "]",
+                this.getClass().getSimpleName(),
+                getExpandedHeight(),
+                getFullHeight(),
+                mClosing?"T":"f",
+                mTracking?"T":"f",
+                mRubberbanding?"T":"f",
+                mJustPeeked?"T":"f",
+                mPeekAnimator, ((mPeekAnimator!=null && mPeekAnimator.isStarted())?" (started)":""),
+                mTimeAnimator, ((mTimeAnimator!=null && mTimeAnimator.isStarted())?" (started)":"")
+        ));
     }
 }

@@ -463,6 +463,7 @@ public final class ShutdownThread extends Thread {
                 boolean bluetoothOff;
                 boolean radioOff;
 
+                //Log.w(TAG, "task run");
                 final INfcAdapter nfc =
                         INfcAdapter.Stub.asInterface(ServiceManager.checkService("nfc"));
                 final ITelephony phone =
@@ -470,6 +471,7 @@ public final class ShutdownThread extends Thread {
                 final IBluetoothManager bluetooth =
                         IBluetoothManager.Stub.asInterface(ServiceManager.checkService(
                                 BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE));
+                //Log.w(TAG, "Turning off NFC");
 
                 try {
                     nfcOff = nfc == null ||
@@ -483,6 +485,7 @@ public final class ShutdownThread extends Thread {
                     nfcOff = true;
                 }
 
+                //Log.w(TAG, "Turning off BT");
                 try {
                     bluetoothOff = bluetooth == null || !bluetooth.isEnabled();
                     if (!bluetoothOff) {
@@ -523,8 +526,8 @@ public final class ShutdownThread extends Thread {
                     radioOff = true;
                 }
 
-                Log.i(TAG, "Waiting for NFC, Bluetooth and Radio...");
-
+                //Log.i(TAG, "Waiting for NFC, Bluetooth and Radio...");
+                //Log.i(TAG, "bluetoothOff : " + bluetoothOff + " radioOff: " + radioOff + " nfcOff: " + nfcOff);
                 while (SystemClock.elapsedRealtime() < endTime) {
                     if (!bluetoothOff) {
                         try {
@@ -539,12 +542,15 @@ public final class ShutdownThread extends Thread {
                     }
                     if (!radioOff) {
                         try {
+                            radioOff = true;
                             if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
                                 final ITelephonyMSim mphone = ITelephonyMSim.Stub.asInterface(
                                         ServiceManager.checkService("phone_msim"));
                                 for (int i = 0; i < MSimTelephonyManager.getDefault().
                                         getPhoneCount(); i++) {
-                                    radioOff = radioOff && !mphone.isRadioOn(i);
+                                     radioOff = radioOff && !mphone.isRadioOn(i);
+				 
+				      Log.i(TAG,"!mphone.isRadioOn(i)="+!mphone.isRadioOn(i)+";i="+i);
                                 }
                             } else {
                                 radioOff = !phone.isRadioOn();
