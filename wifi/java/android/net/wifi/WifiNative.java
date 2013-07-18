@@ -229,6 +229,8 @@ public class WifiNative {
 
         first_result = doStringCommand(suppl_com);
 
+        if(first_result == null)
+            return result;
         if (first_result.length() == 0)
             return result;
 
