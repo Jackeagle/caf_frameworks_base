@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
- * Copyright (c) 2011-12 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-13 The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -362,7 +362,15 @@ public class MSimCDMALTEPhone extends CDMALTEPhone {
 
     @Override
     public String getSubscriberId() {
-        return mSST.getImsi();
+        IccRecords r = mIccRecords.get();
+        if (mCdmaSubscriptionSource == CDMA_SUBSCRIPTION_NV) {
+            return mSST.getNVImsi();
+        } else {
+            if (r != null) {
+                return r.getIMSI();
+            }
+        }
+        return null;
     }
 
     @Override
