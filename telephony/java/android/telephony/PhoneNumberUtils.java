@@ -1702,6 +1702,16 @@ public class PhoneNumberUtils
             numbers = SystemProperties.get("ro.ril.ecclist");
         }
 
+        // Read user added ecc list
+        String addNumbers = SystemProperties.get("persist.radio.user.add.eccList");
+        if (!TextUtils.isEmpty(addNumbers)) {
+            if (!TextUtils.isEmpty(numbers)) {
+                numbers = numbers + "," + addNumbers;
+            } else {
+                numbers = addNumbers;
+            }
+        }
+
         if (!TextUtils.isEmpty(numbers)) {
             // searches through the comma-separated list for a match,
             // return true if one is found.
