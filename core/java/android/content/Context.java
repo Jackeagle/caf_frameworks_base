@@ -338,6 +338,58 @@ public abstract class Context {
     }
 
     /**
+     * parse the string to current language.
+     *
+     * @param originalString original string
+     * @param defPackage the target package where the local language strings defined
+     * @param originNamesId the id of the original string array.
+     * @param localNamesId the id of the local string keys.
+     * @return local language string
+     *
+     * @hide
+     */
+    private final String getLocalString(String originalString, String defPackage,
+            int originNamesId, int localNamesId) {
+        String[] origNames = getResources().getStringArray(originNamesId);
+        String[] localNames = getResources().getStringArray(localNamesId);
+        for (int i = 0; i < origNames.length; i++) {
+            if (origNames[i].equals(originalString)) {
+                return getString(getResources().getIdentifier(localNames[i], "string", defPackage));
+            }
+        }
+        return originalString;
+    }
+
+    /**
+     * parse the string to current language string in public resources.
+     *
+     * @param originalString original string
+     * @param originNamesId the id of the original string array.
+     * @param localNamesId the id of the local string keys.
+     * @return local language string
+     *
+     * @hide
+     */
+    public final String getLocalString(String originalString, int originNamesId, int localNamesId) {
+        return getLocalString(originalString, "android", originNamesId, localNamesId);
+    }
+
+    /**
+     * parse the string to current language string in current resources.
+     *
+     * @param originalString original string
+     * @param originNamesId the id of the original string array.
+     * @param localNamesId the id of the local string keys.
+     * @return local language string
+     *
+     * @hide
+     */
+    public final String getInternalLocalString(String originalString, int originNamesId,
+            int localNamesId) {
+        return getLocalString(originalString, getPackageName(), originNamesId, localNamesId);
+    }
+
+    /**
      * Return a localized formatted string from the application's package's
      * default string table, substituting the format arguments as defined in
      * {@link java.util.Formatter} and {@link java.lang.String#format}.
