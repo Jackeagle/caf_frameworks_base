@@ -97,6 +97,13 @@ public class KeyguardViewManager {
         if (DEBUG) Log.d(TAG, "show(); mKeyguardView==" + mKeyguardView);
 
         boolean enableScreenRotation = shouldEnableScreenRotation();
+        int panelOrientation =
+                SystemProperties.getInt("persist.panel.orientation", 0) / 90;
+        if(panelOrientation != 0) {
+            // override the enableScreen Rotation value, if the panel
+            // orientation is not portrait.
+            enableScreenRotation = false;
+        }
 
         maybeCreateKeyguardLocked(enableScreenRotation, false, options);
         maybeEnableScreenRotation(enableScreenRotation);
