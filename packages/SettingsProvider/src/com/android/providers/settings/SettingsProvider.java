@@ -52,6 +52,7 @@ import android.os.UserManager;
 import android.provider.DrmStore;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.telephony.MSimTelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.LruCache;
@@ -333,6 +334,7 @@ public class SettingsProvider extends ContentProvider {
 
         IntentFilter userFilter = new IntentFilter();
         userFilter.addAction(Intent.ACTION_USER_REMOVED);
+        userFilter.addAction(Intent.ACTION_LOCALE_CHANGED);
         getContext().registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -342,6 +344,8 @@ public class SettingsProvider extends ContentProvider {
                     if (userHandle != UserHandle.USER_OWNER) {
                         onUserRemoved(userHandle);
                     }
+                } else if (intent.getAction().equals(Intent.ACTION_LOCALE_CHANGED)) {
+                    updateSimNames();
                 }
             }
         }, userFilter);
@@ -363,6 +367,27 @@ public class SettingsProvider extends ContentProvider {
             sSecureCaches.delete(userHandle);
             sKnownMutationsInFlight.delete(userHandle);
         }
+    }
+
+    private void updateSimNames() {
+        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+            String simName = Settings.System.getString(getContext().getContentResolver(),
+                    Settings.System.MULTI_SIM_NAME[i]);
+            String localeSimName = getLocaleSimName(simName);
+            if (simName != null && !simName.equals(localeSimName)) {
+                Settings.System.putString(getContext().getContentResolver(),
+                        Settings.System.MULTI_SIM_NAME[i], localeSimName);
+            }
+        }
+    }
+
+    private String getLocaleSimName(String simName) {
+        String localeSimName = null;
+        if (simName != null) {
+            localeSimName = getContext().getInternalLocalString(
+                    simName, R.array.origin_sim_names, R.array.sim_name_keys);
+        }
+        return localeSimName;
     }
 
     private void establishDbTracking(int userHandle) {
