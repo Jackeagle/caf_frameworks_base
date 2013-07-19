@@ -940,6 +940,7 @@
   <java-symbol type="array" name="config_disabledUntilUsedPreinstalledImes" />
 
   <java-symbol type="drawable" name="default_wallpaper" />
+  <java-symbol type="drawable" name="default_wallpaper_ux" />
   <java-symbol type="drawable" name="indicator_input_error" />
   <java-symbol type="drawable" name="overscroll_edge" />
   <java-symbol type="drawable" name="overscroll_glow" />
