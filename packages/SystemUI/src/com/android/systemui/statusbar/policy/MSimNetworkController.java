@@ -25,6 +25,7 @@ import java.util.ArrayList;
 
 import android.content.Context;
 import android.content.Intent;
+import android.database.ContentObserver;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
@@ -70,6 +71,9 @@ public class MSimNetworkController extends NetworkController {
     private static final int FIRST_SIGNAL_ICON = 0;
     private static final int SECOND_SIGNAL_ICON = 1;
 
+    private static final int ORIGIN_CARRIER_NAME_ID = com.android.internal.R.array.origin_carrier_names;
+    private static final int LOCALE_CARRIER_NAME_ID = com.android.internal.R.array.locale_carrier_names;
+
     // telephony
     private MSimTelephonyManager mPhone;
     boolean[] mMSimDataConnected;
@@ -113,6 +117,13 @@ public class MSimNetworkController extends NetworkController {
 
     ArrayList<MSimSignalCluster> mSimSignalClusters = new ArrayList<MSimSignalCluster>();
     ArrayList<TextView> mSubsLabelViews = new ArrayList<TextView>();
+
+    private ContentObserver mSimCardNameObserver = new ContentObserver(new Handler()) {
+        @Override
+        public void onChange(boolean selfChange) {
+            setCarrierText();
+        }
+    };
 
     public interface MSimSignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
@@ -221,6 +232,12 @@ public class MSimNetworkController extends NetworkController {
         mLastCombinedSignalIconId = mMSimLastCombinedSignalIconId[mDefaultSubscription];
         mLastDataTypeIconId = mMSimLastDataTypeIconId[mDefaultSubscription];
         mLastSimIconId = mMSimLastSimIconId[mDefaultSubscription];
+
+        for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.System.getUriFor(Settings.System.MULTI_SIM_NAME[i]),
+                    true, mSimCardNameObserver);
+        }
     }
 
     @Override
@@ -343,6 +360,12 @@ public class MSimNetworkController extends NetworkController {
                     mPlmn[subscription], subscription);
             updateCarrierText(subscription);
             refreshViews(subscription);
+        } else if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
+            for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
+                updateNetworkName(mShowSpn[i], mSpn[i], mShowPlmn[i], mPlmn[i], i);
+                updateCarrierText(i);
+            }
+            refreshViews(mDefaultSubscription);
         } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION) ||
                  action.equals(ConnectivityManager.INET_CONDITION_ACTION)) {
             updateConnectivity(intent);
@@ -383,6 +406,9 @@ public class MSimNetworkController extends NetworkController {
                 case NOT_READY:
                     textResId = com.android.internal.R.string.lockscreen_missing_sim_message_short;
                     break;
+                case PERSO_LOCKED:
+                    textResId = com.android.internal.R.string.lockscreen_network_locked_message;
+                    break;
                 case PIN_REQUIRED:
                     textResId = com.android.internal.R.string.lockscreen_sim_locked_message;
                     break;
@@ -412,14 +438,21 @@ public class MSimNetworkController extends NetworkController {
     }
 
     private void setCarrierText() {
-        String carrierName = mCarrierTextSub[MSimConstants.SUB1]
-                  + "    " + mCarrierTextSub[MSimConstants.SUB2];
-        for (int i = 0; i < mSubsLabelViews.size(); i++) {
-            TextView v = mSubsLabelViews.get(i);
+        String carrierName = getMultiSimName(MSimConstants.SUB1) + ":"
+                + mCarrierTextSub[MSimConstants.SUB1]
+                + "    "
+                + getMultiSimName(MSimConstants.SUB2) + ":"
+                + mCarrierTextSub[MSimConstants.SUB2];
+        for (int i = 0; i < mMobileLabelViews.size(); i++) {
+            TextView v = mMobileLabelViews.get(i);
             v.setText(carrierName);
         }
     }
 
+    private String getMultiSimName(int subscription) {
+        return Settings.System.getString(mContext.getContentResolver(),
+                Settings.System.MULTI_SIM_NAME[subscription]);
+    }
 
     // ===== Telephony ==============================================================
 
@@ -447,9 +480,12 @@ public class MSimNetworkController extends NetworkController {
                 updateTelephonySignalStrength(mSubscription);
                 updateDataNetType(mSubscription);
                 updateDataIcon(mSubscription);
-                updateNetworkName(mShowSpn[mSubscription], mSpn[mSubscription],
-                                mShowPlmn[mSubscription], mPlmn[mSubscription], mSubscription);
-                updateCarrierText(mSubscription);
+
+                // Update the network name if need show the carrier.
+                if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+                    updateNetworkName(false, null, false, null, mSubscription);
+                    updateCarrierText(mSubscription);
+                }
 
                 refreshViews(mSubscription);
             }
@@ -529,7 +565,12 @@ public class MSimNetworkController extends NetworkController {
                 MSimConstants.DEFAULT_SUBSCRIPTION);
         Slog.d(TAG, "updateSimState for subscription :" + sub);
         if (IccCardConstants.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
-            simState = IccCardConstants.State.ABSENT;
+            String absentReason = intent.getStringExtra(IccCardConstants.INTENT_KEY_LOCKED_REASON);
+            if (IccCardConstants.INTENT_VALUE_ABSENT_ON_PERM_DISABLED.equals(absentReason)) {
+                simState = IccCardConstants.State.PERM_DISABLED;
+            } else {
+                simState = IccCardConstants.State.ABSENT;
+            }
         } else if (IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR.equals(stateExtra)) {
             simState = IccCardConstants.State.CARD_IO_ERROR;
         } else if (IccCardConstants.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
@@ -901,17 +942,35 @@ public class MSimNetworkController extends NetworkController {
             Slog.d(TAG, "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
+
+        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+            String networkName = mContext.getLocalString(
+                mPhone.getNetworkOperatorName(subscription),
+                ORIGIN_CARRIER_NAME_ID,
+                LOCALE_CARRIER_NAME_ID);
+            mMSimNetworkName[subscription] =
+                    TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            return;
+        }
+
+        // Needn't to show carrier, as default.
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
-            str.append(plmn);
+            String plmnName = mContext.getLocalString(plmn,
+                ORIGIN_CARRIER_NAME_ID,
+                LOCALE_CARRIER_NAME_ID);
+            str.append(plmnName);
             something = true;
         }
         if (showSpn && spn != null) {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
-            str.append(spn);
+            String spnName = mContext.getLocalString(plmn,
+                ORIGIN_CARRIER_NAME_ID,
+                LOCALE_CARRIER_NAME_ID);
+            str.append(spnName);
             something = true;
         }
         if (something) {
@@ -1377,16 +1436,6 @@ public class MSimNetworkController extends NetworkController {
 
         // mobile label
         setCarrierText();
-        N = mMobileLabelViews.size();
-        for (int i=0; i<N; i++) {
-            TextView v = mMobileLabelViews.get(i);
-            v.setText(mobileLabel);
-            if ("".equals(mobileLabel)) {
-                v.setVisibility(View.GONE);
-            } else {
-                v.setVisibility(View.VISIBLE);
-            }
-        }
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args, int subscription) {
