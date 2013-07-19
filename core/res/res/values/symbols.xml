@@ -923,6 +923,8 @@
   <java-symbol type="plurals" name="num_minutes_ago" />
   <java-symbol type="plurals" name="num_seconds_ago" />
 
+  <java-symbol type="array" name="origin_carrier_names" />
+  <java-symbol type="array" name="locale_carrier_names" />
   <java-symbol type="array" name="carrier_properties" />
   <java-symbol type="array" name="config_data_usage_network_types" />
   <java-symbol type="array" name="config_sms_enabled_locking_shift_tables" />

@@ -4159,4 +4159,9 @@
 
     <!-- Carrier text used in Multi SIM enabled view -->
     <string name="msim_carrier_text_format"><xliff:g id="text_1">%s</xliff:g>, <xliff:g id="text_2">%s</xliff:g></string>
+
+    <!-- Carrier Name -->
+    <string name="China_Mobile">China Mobile</string>
+    <string name="China_Unicom">China Unicom</string>
+    <string name="China_Telecom">China Telecom</string>
 </resources>

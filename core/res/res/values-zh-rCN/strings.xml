@@ -1495,4 +1495,9 @@
     <string name="app_no_restricted_accounts" msgid="4011285085817350390">"此应用不支持受限个人资料的帐户"</string>
     <string name="app_not_found" msgid="3429141853498927379">"找不到可处理此操作的应用"</string>
     <string name="revoke" msgid="5404479185228271586">"撤消"</string>
+
+    <!-- Carrier Name -->
+    <string name="China_Mobile">中国移动</string>
+    <string name="China_Unicom">中国联通</string>
+    <string name="China_Telecom">中国电信</string>
 </resources>
