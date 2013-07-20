@@ -3500,7 +3500,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
 
             cancelDialogs();
             if ((mIsMultitabManagementOn) && !(mInPageLoadWindow)) {
-                WebViewCore.pauseUpdatePicture(mWebViewCore);
+                WebViewCore.pausePaintTab(mWebViewCore);
             }
             WebCoreThreadWatchdog.pause();
         }
@@ -3535,7 +3535,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             }
         }
         if (mIsMultitabManagementOn) {
-            WebViewCore.resumeUpdatePicture(mWebViewCore);
+            WebViewCore.resumePaintTab(mWebViewCore);
         }
 
         // We get a call to onResume for new WebViews (i.e. mIsPaused will be false). We need

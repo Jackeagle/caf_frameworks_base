@@ -149,6 +149,7 @@ public final class WebViewCore {
 
     private boolean mIsMultitabManagementOn = true;
     private boolean mIsLastDrawSkipped = false;
+    private boolean mTabPaintIsPaused = false;
 
     private int mChromeCanFocusDirection;
     private int mTextSelectionChangeReason = TextSelectionData.REASON_UNKNOWN;
@@ -2338,6 +2339,11 @@ public final class WebViewCore {
 
     }
 
+    static void pausePaintTab(WebViewCore core) {
+        core.mTabPaintIsPaused = true;
+        pauseUpdatePicture(core);
+    }
+
     static void resumeUpdatePicture(WebViewCore core) {
         if (core != null) {
             // if mDrawIsPaused is true, ignore the setting, continue to resume
@@ -2354,6 +2360,11 @@ public final class WebViewCore {
                 core.mDrawIsScheduled = false;
             }
         }
+    }
+
+    static void resumePaintTab(WebViewCore core) {
+        core.mTabPaintIsPaused = false;
+        resumeUpdatePicture(core);
     }
 
     static boolean isUpdatePicturePaused(WebViewCore core) {
@@ -2392,7 +2403,7 @@ public final class WebViewCore {
             // only fire an event if this is our first request
             if (mDrawIsScheduled) return;
             if (mIsMultitabManagementOn) {
-                if (mDrawIsPaused) {
+                if ((mDrawIsPaused) && (mTabPaintIsPaused)) {
                     mIsLastDrawSkipped = true;
                     return;
                 }
