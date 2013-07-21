@@ -226,8 +226,12 @@ public class NetworkController extends BroadcastReceiver {
 
         // telephony
         registerPhoneStateListener(context);
-        mHspaDataDistinguishable = mContext.getResources().getBoolean(
-                R.bool.config_hspa_data_distinguishable);
+        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CU) {
+            mHspaDataDistinguishable = true;
+        } else {
+            mHspaDataDistinguishable = mContext.getResources().getBoolean(
+                    R.bool.config_hspa_data_distinguishable);
+        }
         mNetworkNameSeparator = mContext.getString(R.string.status_bar_network_name_separator);
         mNetworkNameDefault = mContext.getString(
                 com.android.internal.R.string.lockscreen_carrier_default);
@@ -681,11 +685,25 @@ public class NetworkController extends BroadcastReceiver {
                 case TelephonyManager.NETWORK_TYPE_HSDPA:
                 case TelephonyManager.NETWORK_TYPE_HSUPA:
                 case TelephonyManager.NETWORK_TYPE_HSPA:
-                case TelephonyManager.NETWORK_TYPE_HSPAP:
                     if (mHspaDataDistinguishable) {
                         mDataIconList = TelephonyIcons.DATA_H[mInetCondition];
                         mDataTypeIconId = R.drawable.stat_sys_data_connected_h;
                         mQSDataTypeIconId = R.drawable.ic_qs_signal_h;
+                        mContentDescriptionDataType = mContext.getString(
+                                R.string.accessibility_data_connection_3_5g);
+                    } else {
+                        mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
+                        mDataTypeIconId = R.drawable.stat_sys_data_connected_3g;
+                        mQSDataTypeIconId = R.drawable.ic_qs_signal_3g;
+                        mContentDescriptionDataType = mContext.getString(
+                                R.string.accessibility_data_connection_3g);
+                    }
+                    break;
+                case TelephonyManager.NETWORK_TYPE_HSPAP:
+                    if (mHspaDataDistinguishable) {
+                        mDataIconList = TelephonyIcons.DATA_HP[mInetCondition];
+                        mDataTypeIconId = R.drawable.stat_sys_data_connected_hp;
+                        mQSDataTypeIconId = R.drawable.ic_qs_signal_hp;
                         mContentDescriptionDataType = mContext.getString(
                                 R.string.accessibility_data_connection_3_5g);
                     } else {

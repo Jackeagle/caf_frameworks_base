@@ -231,7 +231,69 @@ public class TelephonyIcons {
           R.drawable.stat_sys_r_signal_4_fully_sim2_h }
     };
 
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM1_HP_CU = {
+        { R.drawable.stat_sys_signal_0_sim1_hp,
+          R.drawable.stat_sys_signal_1_sim1_hp,
+          R.drawable.stat_sys_signal_2_sim1_hp,
+          R.drawable.stat_sys_signal_3_sim1_hp,
+          R.drawable.stat_sys_signal_4_sim1_hp },
+        { R.drawable.stat_sys_signal_0_fully_sim1_hp,
+          R.drawable.stat_sys_signal_1_fully_sim1_hp,
+          R.drawable.stat_sys_signal_2_fully_sim1_hp,
+          R.drawable.stat_sys_signal_3_fully_sim1_hp,
+          R.drawable.stat_sys_signal_4_fully_sim1_hp }
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_SIM2_HP_CU = {
+        { R.drawable.stat_sys_signal_0_sim2_hp,
+          R.drawable.stat_sys_signal_1_sim2_hp,
+          R.drawable.stat_sys_signal_2_sim2_hp,
+          R.drawable.stat_sys_signal_3_sim2_hp,
+          R.drawable.stat_sys_signal_4_sim2_hp },
+        { R.drawable.stat_sys_signal_0_fully_sim2_hp,
+          R.drawable.stat_sys_signal_1_fully_sim2_hp,
+          R.drawable.stat_sys_signal_2_fully_sim2_hp,
+          R.drawable.stat_sys_signal_3_fully_sim2_hp,
+          R.drawable.stat_sys_signal_4_fully_sim2_hp }
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_HP_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim1_hp,
+          R.drawable.stat_sys_r_signal_1_sim1_hp,
+          R.drawable.stat_sys_r_signal_2_sim1_hp,
+          R.drawable.stat_sys_r_signal_3_sim1_hp,
+          R.drawable.stat_sys_r_signal_4_sim1_hp },
+        { R.drawable.stat_sys_r_signal_0_fully_sim1_hp,
+          R.drawable.stat_sys_r_signal_1_fully_sim1_hp,
+          R.drawable.stat_sys_r_signal_2_fully_sim1_hp,
+          R.drawable.stat_sys_r_signal_3_fully_sim1_hp,
+          R.drawable.stat_sys_r_signal_4_fully_sim1_hp }
+    };
+
+    private static final int[][] TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_HP_CU = {
+        { R.drawable.stat_sys_r_signal_0_sim2_hp,
+          R.drawable.stat_sys_r_signal_1_sim2_hp,
+          R.drawable.stat_sys_r_signal_2_sim2_hp,
+          R.drawable.stat_sys_r_signal_3_sim2_hp,
+          R.drawable.stat_sys_r_signal_4_sim2_hp },
+        { R.drawable.stat_sys_r_signal_0_fully_sim2_hp,
+          R.drawable.stat_sys_r_signal_1_fully_sim2_hp,
+          R.drawable.stat_sys_r_signal_2_fully_sim2_hp,
+          R.drawable.stat_sys_r_signal_3_fully_sim2_hp,
+          R.drawable.stat_sys_r_signal_4_fully_sim2_hp }
+    };
+
     // The status bar icons for CT style.
+    public static final int[] MULTI_NO_SIM_CT = {
+        R.drawable.stat_sys_no_sim_ct,
+        R.drawable.stat_sys_no_sim_ct
+    };
+
+    public static final int[] MULTI_SIGNAL_NULL_CT = {
+        R.drawable.stat_sys_signal_null_ct,
+        R.drawable.stat_sys_signal_null_ct
+    };
+
     public static final int[][] TELEPHONY_SIGNAL_STRENGTH_3G_CT = {
         { R.drawable.stat_sys_signal_0_3g,
           R.drawable.stat_sys_signal_1_3g,
@@ -363,6 +425,15 @@ public class TelephonyIcons {
             TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_H_CU
         };
 
+    public static final int[][][] MULTI_SIGNAL_IMAGES_HP = {
+            TELEPHONY_SIGNAL_STRENGTH_SIM1_HP_CU,
+            TELEPHONY_SIGNAL_STRENGTH_SIM2_HP_CU
+        };
+    public static final int[][][] MULTI_SIGNAL_IMAGES_R_HP = {
+            TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM1_HP_CU,
+            TELEPHONY_SIGNAL_STRENGTH_ROAMING_SIM2_HP_CU
+        };
+
     //***** Data connection icons
 
     //GSM/UMTS
@@ -411,6 +482,18 @@ public class TelephonyIcons {
           R.drawable.stat_sys_data_fully_connected_h }
     };
 
+    // H+
+    static final int[][] DATA_HP = {
+        { R.drawable.stat_sys_data_connected_hp,
+          R.drawable.stat_sys_data_connected_hp,
+          R.drawable.stat_sys_data_connected_hp,
+          R.drawable.stat_sys_data_connected_hp },
+        { R.drawable.stat_sys_data_fully_connected_hp,
+          R.drawable.stat_sys_data_fully_connected_hp,
+          R.drawable.stat_sys_data_fully_connected_hp,
+          R.drawable.stat_sys_data_fully_connected_hp }
+    };
+
     // CDMA
     // Use 3G icons for EVDO data and 1x icons for 1XRTT data
     static final int[][] DATA_1X = {
@@ -450,7 +533,8 @@ public class TelephonyIcons {
     public static final int DATA_TYPE_1X = 2;
     public static final int DATA_TYPE_3G = 3;
     public static final int DATA_TYPE_H = 4;
-    public static final int DATA_TYPE_R = 5;
+    public static final int DATA_TYPE_HP = 5;
+    public static final int DATA_TYPE_2G_R = 6;
 
     public static final int DATA_NONE = 0;
     public static final int DATA_IN = 1;
@@ -477,7 +561,11 @@ public class TelephonyIcons {
         { R.drawable.stat_sys_signal_h_no,
           R.drawable.stat_sys_signal_h_in,
           R.drawable.stat_sys_signal_h_out,
-          R.drawable.stat_sys_signal_h_inout }
+          R.drawable.stat_sys_signal_h_inout },
+        { R.drawable.stat_sys_signal_hp_no,
+          R.drawable.stat_sys_signal_hp_in,
+          R.drawable.stat_sys_signal_hp_out,
+          R.drawable.stat_sys_signal_hp_inout }
     };
 }
 
