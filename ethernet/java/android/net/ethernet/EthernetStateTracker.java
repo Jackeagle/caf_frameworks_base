@@ -197,7 +197,6 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
 
         synchronized (this) {
             mStackConnected = false;
-            mHWConnected = false;
             mInterfaceStopped = false;
             mStartingDhcp = true;
         }
@@ -473,7 +472,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                 if (localLOGV) {
                     Slog.i(TAG, "interface up event, kick off connection request");
                 }
-
+                mHWConnected = true;
                 if (!mStartingDhcp) {
                     int state = mEM.getState();
                     if (state != mEM.ETHERNET_STATE_DISABLED) {
@@ -505,7 +504,7 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
              switch (msg.what) {
                  case EVENT_DHCP_START:
                      synchronized (mDhcpTarget) {
-                         if (!mInterfaceStopped) {
+                         if ((!mInterfaceStopped) && mHWConnected ) {
                              if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request started");
                              if (NetworkUtils.runDhcp(mInterfaceName, mDhcpInfo)) {
                                  event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
