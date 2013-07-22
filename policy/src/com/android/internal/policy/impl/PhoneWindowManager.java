@@ -4189,7 +4189,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     }
                 }
             }
-            if(130 == soc_id || 109 == soc_id) {
+            if(soc_id == 130) {
                 isHdmiPrimary = true;
             }
         }
