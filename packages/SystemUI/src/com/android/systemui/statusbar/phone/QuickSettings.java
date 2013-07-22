@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.phone;
 import com.android.internal.view.RotationPolicy;
 import com.android.systemui.R;
 
+import com.android.systemui.statusbar.phone.QuickSettingsModel.ApnState;
 import com.android.systemui.statusbar.phone.QuickSettingsModel.BluetoothState;
 import com.android.systemui.statusbar.phone.QuickSettingsModel.RSSIState;
 import com.android.systemui.statusbar.phone.QuickSettingsModel.State;
@@ -55,6 +56,7 @@ import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.ContactsContract;
@@ -740,6 +742,40 @@ class QuickSettings {
         });
         parent.addView(imeTile);
         */
+
+        // APN switch
+        if (SystemProperties.getBoolean("persist.env.sb.apnswitch", false)) {
+            final QuickSettingsBasicTile apnTile = new QuickSettingsBasicTile(mContext);
+            apnTile.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startSettingsActivity(android.provider.Settings.ACTION_APN_SETTINGS);
+                }
+            });
+            if (LONG_PRESS_TOGGLES) {
+                apnTile.setOnLongClickListener(new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        if (mModel != null && mModel.getApnState() != null) {
+                            mModel.getApnState().switchToNextApn(null);
+                        }
+                        apnTile.setPressed(false);
+                        return true;
+                    }});
+            }
+            mModel.addApnTile(apnTile, new QuickSettingsModel.RefreshCallback() {
+                @Override
+                public void refreshView(QuickSettingsTileView view, State state) {
+                    ApnState apnState = (ApnState) state;
+                    QuickSettingsBasicTile apnTileView = (QuickSettingsBasicTile)view;
+
+                    apnTileView.setImageResource(apnState.iconId);
+                    apnTileView.setText(apnState.label);
+                    apnTileView.setVisibility(apnState.enabled ? View.VISIBLE : View.GONE);
+                }
+            });
+            parent.addView(apnTile);
+        }
     }
 
     void updateResources() {
