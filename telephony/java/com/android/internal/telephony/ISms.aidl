@@ -316,4 +316,9 @@ interface ISms {
      * @throws IllegalArgumentException if pdu is NULL
      */
      int copyMessageToIccGetEfIndex(int status, in byte[] pdu, in byte[] smsc);
+
+    /**
+     * Process reduce long sms overtime in raw table
+     */
+    void processCachedLongSms();
 }
