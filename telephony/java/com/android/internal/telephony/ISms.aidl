@@ -294,4 +294,26 @@ interface ISms {
      * @see #isImsSmsSupported()
      */
     String getImsSmsFormat();
+
+    /**
+     * Get the capacity count of sms on Icc card.
+     *
+     * @return capacity of ICC
+     */
+    int getSmsCapacityOnIcc();
+
+    /**
+     * Copy a raw SMS PDU to the ICC, and return the index on ICC
+     * ICC (Integrated Circuit Card) is the card of the device.
+     * For example, this can be the SIM or USIM for GSM.
+     *
+     * @param smsc the SMSC for this message, or NULL for the default SMSC
+     * @param pdu the raw PDU to store
+     * @param status message status (STATUS_ON_ICC_READ, STATUS_ON_ICC_UNREAD,
+     *               STATUS_ON_ICC_SENT, STATUS_ON_ICC_UNSENT)
+     * @return index of ICC, -1 means copy failed
+     *
+     * @throws IllegalArgumentException if pdu is NULL
+     */
+     int copyMessageToIccGetEfIndex(int status, in byte[] pdu, in byte[] smsc);
 }
