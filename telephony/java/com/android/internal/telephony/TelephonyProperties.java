@@ -199,6 +199,11 @@ public interface TelephonyProperties
     static final String CALLS_ON_IMS_ENABLED_PROPERTY = "persist.radio.calls.on.ims";
 
     /**
+     * Specify if Android supports CSVT calls.
+     */
+    static final String PROPERTY_CSVT_ENABLED = "persist.radio.csvt.enabled";
+
+    /**
      * Controls audio route for VT calls.
      * 0 - Use the default audio routing strategy.
      * 1 - Disable the speaker. Route the audio to Headset or Bloutooth
