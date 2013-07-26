@@ -281,7 +281,7 @@ public class CallerInfo {
         // or if it is the voicemail number.  If it is either, take a
         // shortcut and skip the query.
         if (PhoneNumberUtils.isLocalEmergencyNumber(number, context)) {
-            return new CallerInfo().markAsEmergency(context);
+            return new CallerInfo().markAsEmergency(context, number);
         } else if (PhoneNumberUtils.isVoiceMailNumber(number)) {
             return new CallerInfo().markAsVoiceMail();
         }
@@ -385,9 +385,10 @@ public class CallerInfo {
     // should set the phone number to the dialed number and name to
     // 'Emergency Number' and let the UI make the decision about what
     // should be displayed.
-    /* package */ CallerInfo markAsEmergency(Context context) {
+    /* package */ CallerInfo markAsEmergency(Context context, String number) {
         phoneNumber = context.getString(
-            com.android.internal.R.string.emergency_call_dialog_number_for_display);
+            com.android.internal.R.string.emergency_call_dialog_number_for_display)
+            + " " + number;
         photoResource = com.android.internal.R.drawable.picture_emergency;
         mIsEmergency = true;
         return this;
