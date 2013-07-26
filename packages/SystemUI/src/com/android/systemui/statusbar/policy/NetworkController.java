@@ -53,6 +53,7 @@ import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.util.AsyncChannel;
 import com.android.server.am.BatteryStatsService;
 import com.android.systemui.R;
+import com.android.systemui.statusbar.phone.PhoneStatusBar;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -207,8 +208,13 @@ public class NetworkController extends BroadcastReceiver {
 
         mShowPhoneRSSIForData = res.getBoolean(R.bool.config_showPhoneRSSIForData);
         mShowAtLeastThreeGees = res.getBoolean(R.bool.config_showMin3G);
-        mAlwaysShowCdmaRssi = res.getBoolean(
-                com.android.internal.R.bool.config_alwaysUseCdmaRssi);
+        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+            // CT need show both cdma and evdo signal strength in one indicator at the same time.
+            mAlwaysShowCdmaRssi = false;
+        } else {
+            mAlwaysShowCdmaRssi = res.getBoolean(
+                    com.android.internal.R.bool.config_alwaysUseCdmaRssi);
+        }
 
         // set up the default wifi icon, used when no radios have ever appeared
         updateWifiIcons();
