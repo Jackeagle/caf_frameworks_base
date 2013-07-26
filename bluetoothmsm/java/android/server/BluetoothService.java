@@ -1428,10 +1428,13 @@ public class BluetoothService extends IBluetooth.Stub {
                             if(result == 0) {
                                 //remove device from device in preferred devices list
                                 if(preferredDevicesList != null) {
-                                    for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
-                                        if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
-                                            preferredDevicesList.remove(entry.getKey());
-                                        }
+                                    Iterator<Map.Entry<BluetoothDevice, Integer>> it = preferredDevicesList.entrySet().iterator();
+                                    while (it.hasNext())
+                                    {
+                                       Map.Entry<BluetoothDevice, Integer> item = it.next();
+                                       if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(item.getKey().getAddress())) {
+                                           it.remove();
+                                       }
                                     }
                                 }
                                 //call create connection to preferred devices list if there are
@@ -5670,10 +5673,13 @@ public class BluetoothService extends IBluetooth.Stub {
                 }
             }
             if(preferredDevicesList != null) {
-                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
-                    if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
-                        preferredDevicesList.remove(entry.getKey());
-                    }
+                Iterator<Map.Entry<BluetoothDevice, Integer>> it = preferredDevicesList.entrySet().iterator();
+                while (it.hasNext())
+                {
+                   Map.Entry<BluetoothDevice, Integer> item = it.next();
+                   if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(item.getKey().getAddress())) {
+                       it.remove();
+                   }
                 }
             }
             if(preferredDevicesList != null) {
