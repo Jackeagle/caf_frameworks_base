@@ -353,7 +353,7 @@ public abstract class Context {
         String[] origNames = getResources().getStringArray(originNamesId);
         String[] localNames = getResources().getStringArray(localNamesId);
         for (int i = 0; i < origNames.length; i++) {
-            if (origNames[i].equals(originalString)) {
+            if (origNames[i].equalsIgnoreCase(originalString)) {
                 return getString(getResources().getIdentifier(localNames[i], "string", defPackage));
             }
         }
