@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -129,6 +132,14 @@ public final class ContactsContract {
      * the delete operation in {@link RawContacts}.
      */
     public static final String CALLER_IS_SYNCADAPTER = "caller_is_syncadapter";
+
+    /**
+     * A query parameter key used to specify the package that is requesting a query.
+     * This is used for restricting data based on package name.
+     *
+     * @hide
+     */
+    public static final String REQUESTING_PACKAGE_PARAM_KEY = "requesting_package";
 
     /**
      * Query parameter that should be used by the client to access a specific
@@ -2122,6 +2133,15 @@ public final class ContactsContract {
         public static final String CONTACT_ID = "contact_id";
 
         /**
+         * Flag indicating that this {@link RawContacts} entry and its children have
+         * been restricted to specific platform apps.
+         * <P>Type: INTEGER (boolean)</P>
+         *
+         * @hide
+         */
+        public static final String IS_RESTRICTED = "is_restricted";
+
+        /**
          * The data set within the account that this row belongs to.  This allows
          * multiple sync adapters for the same account type to distinguish between
          * each others' data.
@@ -2872,6 +2892,7 @@ public final class ContactsContract {
                 DatabaseUtils.cursorLongToContentValuesIfPresent(cursor, cv, DELETED);
                 DatabaseUtils.cursorLongToContentValuesIfPresent(cursor, cv, CONTACT_ID);
                 DatabaseUtils.cursorLongToContentValuesIfPresent(cursor, cv, STARRED);
+                DatabaseUtils.cursorIntToContentValuesIfPresent(cursor, cv, IS_RESTRICTED);
                 DatabaseUtils.cursorIntToContentValuesIfPresent(cursor, cv, NAME_VERIFIED);
                 android.content.Entity contact = new android.content.Entity(cv);
 
@@ -4328,6 +4349,27 @@ public final class ContactsContract {
          * The MIME type of the results from {@link #CONTENT_URI}.
          */
         public static final String CONTENT_TYPE = "vnd.android.cursor.dir/data";
+
+        /**
+         * <p>
+         * If {@link #FOR_EXPORT_ONLY} is explicitly set to "1", returned Cursor toward
+         * Data.CONTENT_URI contains only exportable data.
+         * </p>
+         * <p>
+         * This flag is useful (currently) only for vCard exporter in Contacts app, which
+         * needs to exclude "un-exportable" data from available data to export, while
+         * Contacts app itself has priviledge to access all data including "un-exportable"
+         * ones and providers return all of them regardless of the callers' intention.
+         * </p>
+         * <p>
+         * Type: INTEGER
+         * </p>
+         *
+         * @hide Maybe available only in Eclair and not really ready for public use.
+         * TODO: remove, or implement this feature completely. As of now (Eclair),
+         * we only use this flag in queryEntities(), not query().
+         */
+        public static final String FOR_EXPORT_ONLY = "for_export_only";
 
         /**
          * <p>
