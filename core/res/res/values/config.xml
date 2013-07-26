@@ -1155,4 +1155,9 @@
         <item>com.android.inputmethod.latin</item>
     </string-array>
 
+    <!-- Button back light brightness value, 2 means 10 mA, friendly user light brightness -->
+    <integer name="def_button_light_bright_level">2</integer>
+    <!-- Button back light brightness friendly time break. -->
+    <integer name="def_button_light_timeout">4000</integer>
+
 </resources>
