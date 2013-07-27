@@ -161,6 +161,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int GPS_DELETE_ALMANAC_CORR_GLO = 0x00040000;
     private static final int GPS_DELETE_TIME_GPS = 0x00080000;
     private static final int GPS_DELETE_TIME_GLO = 0x00100000;
+    private static final int GPS_DELETE_SVDIR_BDS =  0X00200000;
+    private static final int GPS_DELETE_SVSTEER_BDS = 0X00400000;
+    private static final int GPS_DELETE_TIME_BDS = 0X00800000;
+    private static final int GPS_DELETE_ALMANAC_CORR_BDS = 0X01000000;
+    private static final int GPS_DELETE_EPHEMERIS_BDS = 0X02000000;
+    private static final int GPS_DELETE_ALMANAC_BDS = 0X04000000;
     private static final int GPS_DELETE_ALL = 0xFFFFFFFF;
 
     // The GPS_CAPABILITY_* flags must match the values in gps.h
@@ -1037,6 +1043,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
             if (extras.getBoolean("almanac-corr-GLO")) flags |= GPS_DELETE_ALMANAC_CORR_GLO;
             if (extras.getBoolean("time-gps")) flags |= GPS_DELETE_TIME_GPS;
             if (extras.getBoolean("time-GLO")) flags |= GPS_DELETE_TIME_GLO;
+            if (extras.getBoolean("ephemeris-BDS")) flags |= GPS_DELETE_EPHEMERIS_BDS;
+            if (extras.getBoolean("almanac-BDS")) flags |= GPS_DELETE_ALMANAC_BDS;
+            if (extras.getBoolean("svdir-BDS")) flags |= GPS_DELETE_SVDIR_BDS;
+            if (extras.getBoolean("svsteer-BDS")) flags |= GPS_DELETE_SVSTEER_BDS;
+            if (extras.getBoolean("almanac-corr-BDS")) flags |= GPS_DELETE_ALMANAC_CORR_BDS;
+            if (extras.getBoolean("time-BDS")) flags |= GPS_DELETE_TIME_BDS;
             if (extras.getBoolean("all")) flags |= GPS_DELETE_ALL;
         }
 
