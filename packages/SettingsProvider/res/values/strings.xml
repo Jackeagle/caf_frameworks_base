@@ -19,4 +19,9 @@
 <resources>
     <!-- Name of the activity for Settings storage. -->
     <string name="app_label">Settings Storage</string>
+    <!-- Name of the SIM cards. -->
+    <string name="name_sim1">SIM1</string>
+    <string name="name_sim2">SIM2</string>
+    <string name="carrier_name_cdma" translatable="false">CDMA</string>
+    <string name="carrier_name_gsm" translatable="false">GSM</string>
 </resources>
