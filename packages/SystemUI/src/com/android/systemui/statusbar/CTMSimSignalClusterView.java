@@ -74,13 +74,25 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
     private boolean[] isSimRoam;
     private boolean[] dataConnected;
 
-    ViewGroup mWifiGroup, mMobileGroup, mMobileGroupSub2;
-    ImageView mWifi, mWifiActivity, mMobileActivity, mSignalCDMA3g,
-        mSignalCDMA1x, mSignalCDMA1xOnly, mAirplane;
-    ImageView mNoSimSlot, mNoSimSlotSub2;
-    ImageView mMobileSub2, mMobileActivitySub2, mMobileTypeSub2;
+    ViewGroup mWifiGroup;
+    ImageView mWifi, mWifiActivity;
+
+    ViewGroup[] mMobileGroup;
+    ImageView[] mNoSimSlot;
+    ImageView[] mMobileActivity;
+    ImageView mSignalCDMA3g, mSignalCDMA1x, mSignalCDMA1xOnly;
+    ImageView mMobileSub2;
+
+    ImageView mAirplane;
+
     View mSpacer;
     LinearLayout mSignalCDMAboth;
+
+    private int[] mMobileGroupResourceId = {R.id.mobile_combo, R.id.mobile_combo_sub2};
+    private int[] mMobileActResourceId = {R.id.mobile_inout, R.id.mobile_inout2};
+    private int[] mNoSimSlotResourceId = {R.id.no_sim, R.id.no_sim_slot2};
+
+    private int mNumPhones = MSimTelephonyManager.getDefault().getPhoneCount();
 
     public CTMSimSignalClusterView(Context context) {
         this(context, null);
@@ -92,18 +104,23 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
 
     public CTMSimSignalClusterView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
-        mMobileStrengthId = new int[numPhones][CT_SIGNAL_ICON_NUM];
-        mMobileDescription = new String[numPhones];
-        mMobileActivityId = new int[numPhones];
-        mServiceState = new ServiceState[numPhones];
-        mMNoSimIconVisible = new boolean[numPhones];
-        mSignalIconVisible = new boolean[numPhones];
-        dataEnabledsub = new boolean[numPhones];
-        mNoSimIconId = new int[numPhones];
-        isSimRoam = new boolean[numPhones];
-        dataConnected = new boolean[numPhones];
-        for (int i = 0; i < numPhones; i++) {
+        mMobileGroup = new ViewGroup[mNumPhones];
+        mMobileStrengthId = new int[mNumPhones][CT_SIGNAL_ICON_NUM];
+        mMobileDescription = new String[mNumPhones];
+        mMobileActivityId = new int[mNumPhones];
+        mNoSimSlot = new ImageView[mNumPhones];
+        mMobileActivity = new ImageView[mNumPhones];
+        mServiceState = new ServiceState[mNumPhones];
+        mMNoSimIconVisible = new boolean[mNumPhones];
+        mSignalIconVisible = new boolean[mNumPhones];
+        dataEnabledsub = new boolean[mNumPhones];
+        mNoSimIconId = new int[mNumPhones];
+        isSimRoam = new boolean[mNumPhones];
+        dataConnected = new boolean[mNumPhones];
+        for (int i = 0; i < mNumPhones; i++) {
+            mMobileActivityId[i] = 0;
+            mNoSimIconId[i] = 0;
+
             mMNoSimIconVisible[i] = false;
             mSignalIconVisible[i] = false;
             mServiceState[i] = new ServiceState();
@@ -124,23 +141,24 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
         super.onAttachedToWindow();
 
         mWifiGroup = (ViewGroup) findViewById(R.id.wifi_combo);
-
         mWifi = (ImageView) findViewById(R.id.wifi_signal);
         mWifiActivity = (ImageView) findViewById(R.id.wifi_inout);
-        mMobileGroup = (ViewGroup) findViewById(R.id.mobile_combo);
-        mMobileActivity = (ImageView) findViewById(R.id.mobile_inout);
-        mNoSimSlot = (ImageView) findViewById(R.id.no_sim);
+
+        for (int i = 0; i < mNumPhones; i++) {
+            mMobileGroup[i]    = (ViewGroup) findViewById(mMobileGroupResourceId[i]);
+            mMobileActivity[i] = (ImageView) findViewById(mMobileActResourceId[i]);
+            mNoSimSlot[i]      = (ImageView) findViewById(mNoSimSlotResourceId[i]);
+        }
+
         mSignalCDMAboth = (LinearLayout) findViewById(R.id.mobile_signal_cdma);
         mSignalCDMA3g = (ImageView) findViewById(R.id.mobile_signal_3g);
         mSignalCDMA1x = (ImageView) findViewById(R.id.mobile_signal_1x);
         mSignalCDMA1xOnly = (ImageView) findViewById(R.id.mobile_signal_1x_only);
-
-        mMobileGroupSub2 = (ViewGroup) findViewById(R.id.mobile_combo_sub2);
         mMobileSub2 = (ImageView) findViewById(R.id.mobile_signal_sub2);
-        mNoSimSlotSub2 = (ImageView) findViewById(R.id.no_sim_slot2);
-        mMobileActivitySub2 = (ImageView) findViewById(R.id.mobile_inout2);
+
         mSpacer = findViewById(R.id.spacer);
         mAirplane = (ImageView) findViewById(R.id.airplane);
+
         apply();
     }
 
@@ -149,17 +167,18 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
         mWifiGroup = null;
         mWifi = null;
         mWifiActivity = null;
-        mMobileGroup = null;
-        mMobileActivity = null;
-        mMobileActivitySub2 = null;
-        mNoSimSlot = null;
+
         mSignalCDMAboth = null;
-        mMobileGroupSub2 = null;
         mSignalCDMA3g = null;
         mSignalCDMA1x = null;
         mSignalCDMA1xOnly = null;
         mMobileSub2 = null;
-        mNoSimSlotSub2 = null;
+
+        for (int i = 0; i < mNumPhones; i++) {
+            mMobileGroup[i]    = null;
+            mMobileActivity[i] = null;
+            mNoSimSlot[i]      = null;
+        }
 
         super.onDetachedFromWindow();
     }
@@ -231,15 +250,25 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
     }
 
     private void applySubscription(int subscription) {
+        if (mWifiGroup == null || mMobileGroup[subscription] == null) {
+            return;
+        }
+
         apply();
 
         if (mMobileVisible && !mIsAirplaneMode) {
             dataEnabledsub[subscription] = dataConnected[subscription];
-            mMobileActivity.setVisibility(dataEnabledsub[0] ? View.VISIBLE : View.GONE);
-            mMobileActivitySub2.setVisibility(dataEnabledsub[1] ? View.VISIBLE : View.GONE);
+            mMobileGroup[subscription].setVisibility(View.VISIBLE);
+            mMobileGroup[subscription].setContentDescription(mMobileTypeDescription + " "
+                        + mMobileDescription[subscription]);
+            mMobileActivity[subscription].setVisibility(
+                        dataEnabledsub[subscription] ? View.VISIBLE : View.GONE);
+            mMobileActivity[subscription].setImageResource(mMobileActivityId[subscription]);
+            mNoSimSlot[subscription].setImageResource(mNoSimIconId[subscription]);
+            mNoSimSlot[subscription].setVisibility(
+                        mMNoSimIconVisible[subscription] ? View.VISIBLE : View.GONE);
+
             if (subscription == MSimConstants.SUB1) {
-                mMobileGroup.setVisibility(View.VISIBLE);
-                mMobileActivity.setImageResource(mMobileActivityId[subscription]);
                 mSignalCDMA3g.setImageResource(mMobileStrengthId[subscription][1]);
                 mSignalCDMA1x.setImageResource(mMobileStrengthId[subscription][0]);
                 mSignalCDMA1xOnly.setImageResource(mMobileStrengthId[subscription][0]);
@@ -251,29 +280,14 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
                         || mMobileStrengthId[subscription][1]
                                 == R.drawable.stat_sys_signal_null_sim1)
                         && mSignalIconVisible[subscription]) ? View.VISIBLE : View.GONE);
-                mNoSimSlot.setImageResource(mNoSimIconId[subscription]);
-                mNoSimSlot.setVisibility(mMNoSimIconVisible[subscription] ? View.VISIBLE
-                        : View.GONE);
             } else {
-                mMobileActivitySub2.setImageResource(mMobileActivityId[subscription]);
-                mMobileGroupSub2.setVisibility(View.VISIBLE);
                 mMobileSub2.setImageResource(mMobileStrengthId[subscription][0]);
                 mMobileSub2.setVisibility(mSignalIconVisible[subscription] ? View.VISIBLE
                         : View.GONE);
-                mMobileGroupSub2.setContentDescription(mMobileTypeDescription + " "
-                        + mMobileDescription[subscription]);
-                mNoSimSlotSub2.setImageResource(mNoSimIconId[subscription]);
-                mNoSimSlotSub2.setVisibility(mMNoSimIconVisible[subscription] ? View.VISIBLE
-                        : View.GONE);
             }
         } else {
-            if (subscription == 0) {
-                mMobileGroup.setVisibility(View.GONE);
-                mMobileActivity.setVisibility(View.GONE);
-            } else {
-                mMobileGroupSub2.setVisibility(View.GONE);
-                mMobileActivitySub2.setVisibility(View.GONE);
-            }
+            mMobileGroup[subscription].setVisibility(View.GONE);
+            mMobileActivity[subscription].setVisibility(View.GONE);
         }
         if (mIsAirplaneMode) {
             mAirplane.setVisibility(View.VISIBLE);
@@ -283,11 +297,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
         }
     }
 
-    // Run after each indicator change.
+    // Apply the change after each indicator change.
     private void apply() {
-        if (mWifiGroup == null) {
-            return;
-        }
+        if (mWifiGroup == null) return;
 
         if (mWifiVisible) {
             mWifiGroup.setVisibility(View.VISIBLE);
@@ -298,9 +310,10 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             mWifiGroup.setVisibility(View.GONE);
         }
 
-        if (DEBUG)
-            Slog.d(TAG, String.format("wifi: %s sig=%d act=%d",
-                    (mWifiVisible ? "VISIBLE" : "GONE"), mWifiStrengthId, mWifiActivityId));
+        if (DEBUG) {
+            Slog.d(TAG, String.format("wifi: %s sig=%d act=%d", (mWifiVisible ? "VISIBLE" : "GONE"),
+                    mWifiStrengthId, mWifiActivityId));
+        }
     }
 
     private int convertNoSimIconIdToCT(int subscription) {
