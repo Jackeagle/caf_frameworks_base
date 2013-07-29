@@ -41,6 +41,7 @@ import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Slog;
 import android.view.View;
 import android.widget.ImageView;
@@ -66,6 +67,9 @@ public class NetworkController extends BroadcastReceiver {
     static final String TAG = "StatusBar.NetworkController";
     static final boolean DEBUG = true;
     static final boolean CHATTY = true; // additional diagnostics, but not logspew
+
+    // For prop key to show carrier.
+    static final String PROP_KEY_SHOW_CARRIER = "persist.env.sys.SHOW_CARRIER";
 
     // telephony
     boolean mHspaDataDistinguishable;
@@ -242,6 +246,7 @@ public class NetworkController extends BroadcastReceiver {
         filter.addAction(ConnectivityManager.INET_CONDITION_ACTION);
         filter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
         filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+        filter.addAction(Intent.ACTION_LOCALE_CHANGED);
         mWimaxSupported = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_wimaxEnabled);
         if(mWimaxSupported) {
@@ -482,6 +487,12 @@ public class NetworkController extends BroadcastReceiver {
             updateTelephonySignalStrength();
             updateDataNetType();
             updateDataIcon();
+
+            // Update the network name if need show the carrier.
+            if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+                updateNetworkName(false, null, false, null);
+            }
+
             refreshViews();
         }
 
@@ -862,17 +873,33 @@ public class NetworkController extends BroadcastReceiver {
             Slog.d("CarrierLabel", "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
+
+        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+            String networkName = mContext.getLocalString(mPhone.getNetworkOperatorName(),
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+            mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            return;
+        }
+
+        // Needn't to show the carrier.
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
-            str.append(plmn);
+            String plmnName = mContext.getLocalString(plmn,
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+            str.append(plmnName);
             something = true;
         }
         if (showSpn && spn != null) {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
-            str.append(spn);
+            String spnName = mContext.getLocalString(plmn,
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+            str.append(spnName);
             something = true;
         }
         if (something) {
