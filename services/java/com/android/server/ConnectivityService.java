@@ -31,6 +31,9 @@ import static android.net.ConnectivityManager.isNetworkTypeValid;
 import static android.net.NetworkPolicyManager.RULE_ALLOW_ALL;
 import static android.net.NetworkPolicyManager.RULE_REJECT_METERED;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothTetheringDataTracker;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -39,6 +42,7 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.net.CaptivePortalTracker;
@@ -52,11 +56,13 @@ import android.net.INetworkPolicyManager;
 import android.net.INetworkStatsService;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
+import android.net.Uri;
 import android.net.LinkProperties.CompareResult;
 import android.net.MobileDataStateTracker;
 import android.net.NetworkConfig;
 import android.net.NetworkInfo;
 import android.net.NetworkInfo.DetailedState;
+import android.net.NetworkInfo.State;
 import android.net.NetworkQuotaInfo;
 import android.net.NetworkState;
 import android.net.NetworkStateTracker;
@@ -66,6 +72,7 @@ import android.net.ProxyProperties;
 import android.net.RouteInfo;
 import android.net.wifi.WifiStateTracker;
 import android.net.wimax.WimaxManagerConstants;
+import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.FileUtils;
 import android.os.Handler;
@@ -79,6 +86,7 @@ import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.SystemProperties;
@@ -86,17 +94,22 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.security.Credentials;
 import android.security.KeyStore;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Slog;
 import android.util.SparseIntArray;
+import android.util.Xml;
 
+import com.android.internal.R;
 import com.android.internal.net.LegacyVpnInfo;
 import com.android.internal.net.VpnConfig;
 import com.android.internal.net.VpnProfile;
+import com.android.internal.telephony.DctConstants;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.server.AlarmManagerService;
+import com.android.internal.util.XmlUtils;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.connectivity.Nat464Xlat;
 import com.android.server.connectivity.Tethering;
@@ -109,13 +122,21 @@ import com.google.android.collect.Sets;
 
 import dalvik.system.DexClassLoader;
 
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+
+import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
+import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -123,6 +144,8 @@ import java.util.Collection;
 import java.util.GregorianCalendar;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @hide
@@ -142,6 +165,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     // system property that can override the above value
     private static final String NETWORK_RESTORE_DELAY_PROP_NAME =
             "android.telephony.apn-restore";
+
+    // Default value if FAIL_FAST_TIME_MS is not set
+    private static final int DEFAULT_FAIL_FAST_TIME_MS = 1 * 60 * 1000;
+    // system property that can override DEFAULT_FAIL_FAST_TIME_MS
+    private static final String FAIL_FAST_TIME_MS =
+            "persist.radio.fail_fast_time_ms";
 
     // used in recursive route setting to add gateways for the host for which
     // a host route was requested.
@@ -294,6 +323,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
     private static final int EVENT_VPN_STATE_CHANGED = 14;
 
+    /**
+     * Used internally to disable fail fast of mobile data
+     */
+    private static final int EVENT_ENABLE_FAIL_FAST_MOBILE_DATA = 15;
+
     /** Handler used for internal events. */
     private InternalHandler mHandler;
     /** Handler used for incoming {@link NetworkStateTracker} events. */
@@ -350,6 +384,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
     protected ConnectivityService() { }
 
+    private AtomicInteger mEnableFailFastMobileDataTag = new AtomicInteger(0);
+
+    TelephonyManager mTelephonyManager;
+
+    // We only want one checkMobileProvisioning after booting.
+    volatile boolean mFirstProvisioningCheckStarted = false;
+
     public ConnectivityService(Context context, INetworkManagementService netd,
             INetworkStatsService statsService, INetworkPolicyManager policyManager) {
         // Currently, omitting a NetworkFactory will create one internally
@@ -398,6 +439,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mNetd = checkNotNull(netManager, "missing INetworkManagementService");
         mPolicyManager = checkNotNull(policyManager, "missing INetworkPolicyManager");
         mKeyStore = KeyStore.getInstance();
+        mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
 
         try {
             mPolicyManager.registerListener(mPolicyListener);
@@ -1412,8 +1454,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 netState != DetailedState.CAPTIVE_PORTAL_CHECK) ||
                 tracker.isTeardownRequested()) {
             if (VDBG) {
-                log("requestRouteToHostAddress on down network " +
-                           "(" + networkType + ") - dropped");
+                log("requestRouteToHostAddress on down network "
+                        + "(" + networkType + ") - dropped"
+                        + " tracker=" + tracker
+                        + " netState=" + netState
+                        + " isTeardownRequested="
+                            + ((tracker != null) ? tracker.isTeardownRequested() : "tracker:null"));
             }
             return false;
         }
@@ -1421,12 +1467,15 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         try {
             InetAddress addr = InetAddress.getByAddress(hostAddress);
             LinkProperties lp = tracker.getLinkProperties();
-            return addRouteToAddress(lp, addr);
+            boolean ok = addRouteToAddress(lp, addr);
+            if (DBG) log("requestRouteToHostAddress ok=" + ok);
+            return ok;
         } catch (UnknownHostException e) {
             if (DBG) log("requestRouteToHostAddress got " + e.toString());
         } finally {
             Binder.restoreCallingIdentity(token);
         }
+        if (DBG) log("requestRouteToHostAddress X bottom return false");
         return false;
     }
 
@@ -2697,6 +2746,17 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                             state + "/" + info.getDetailedState());
                     }
 
+                    // After booting we'll check once for mobile provisioning
+                    // if we've provisioned by and connected.
+                    if (!mFirstProvisioningCheckStarted
+                            && (0 != Settings.Global.getInt(mContext.getContentResolver(),
+                                        Settings.Global.DEVICE_PROVISIONED, 0))
+                            && (state == NetworkInfo.State.CONNECTED)) {
+                        log("check provisioning after booting");
+                        mFirstProvisioningCheckStarted = true;
+                        checkMobileProvisioning(true, CheckMp.MAX_TIMEOUT_MS, null);
+                    }
+
                     EventLogTags.writeConnectivityStateChanged(
                             info.getType(), info.getSubtype(), info.getDetailedState().ordinal());
 
@@ -2827,6 +2887,19 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         mLockdownTracker.onVpnStateChanged((NetworkInfo) msg.obj);
                     }
                     break;
+                }
+                case EVENT_ENABLE_FAIL_FAST_MOBILE_DATA: {
+                    int tag = mEnableFailFastMobileDataTag.get();
+                    if (msg.arg1 == tag) {
+                        MobileDataStateTracker mobileDst =
+                            (MobileDataStateTracker) mNetTrackers[ConnectivityManager.TYPE_MOBILE];
+                        if (mobileDst != null) {
+                            mobileDst.setEnableFailFastMobileData(msg.arg2);
+                        }
+                    } else {
+                        log("EVENT_ENABLE_FAIL_FAST_MOBILE_DATA: stale arg1:" + msg.arg1
+                                + " != tag:" + tag);
+                    }
                 }
             }
         }
@@ -3492,5 +3565,579 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         } catch (NullPointerException e) {
             Slog.w(TAG, "Could Not Update blocked Uids with powerManager" + e);
         }
+    }
+
+    /**
+     * Have mobile data fail fast if enabled.
+     *
+     * @param enabled DctConstants.ENABLED/DISABLED
+     */
+    private void setEnableFailFastMobileData(int enabled) {
+        int tag;
+
+        if (enabled == DctConstants.ENABLED) {
+            tag = mEnableFailFastMobileDataTag.incrementAndGet();
+        } else {
+            tag = mEnableFailFastMobileDataTag.get();
+        }
+        mHandler.sendMessage(mHandler.obtainMessage(EVENT_ENABLE_FAIL_FAST_MOBILE_DATA, tag,
+                         enabled));
+    }
+
+    @Override
+    public int checkMobileProvisioning(boolean sendNotification, int suggestedTimeOutMs,
+            final ResultReceiver resultReceiver) {
+        log("checkMobileProvisioning: E sendNotification=" + sendNotification
+                + " suggestedTimeOutMs=" + suggestedTimeOutMs
+                + " resultReceiver=" + resultReceiver);
+        enforceChangePermission();
+
+        mFirstProvisioningCheckStarted = true;
+
+        int timeOutMs = suggestedTimeOutMs;
+        if (suggestedTimeOutMs > CheckMp.MAX_TIMEOUT_MS) {
+            timeOutMs = CheckMp.MAX_TIMEOUT_MS;
+        }
+
+        // Check that mobile networks are supported
+        if (!isNetworkSupported(ConnectivityManager.TYPE_MOBILE)
+                || !isNetworkSupported(ConnectivityManager.TYPE_MOBILE_HIPRI)) {
+            log("checkMobileProvisioning: X no mobile network");
+            if (resultReceiver != null) {
+                resultReceiver.send(ConnectivityManager.CMP_RESULT_CODE_NO_CONNECTION, null);
+            }
+            return timeOutMs;
+        }
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            CheckMp checkMp = new CheckMp(mContext, this);
+            CheckMp.CallBack cb = new CheckMp.CallBack() {
+                @Override
+                void onComplete(Integer result) {
+                    log("CheckMp.onComplete: result=" + result);
+                    if (resultReceiver != null) {
+                        log("CheckMp.onComplete: send result");
+                        resultReceiver.send(result, null);
+                    }
+                    NetworkInfo ni =
+                            mNetTrackers[ConnectivityManager.TYPE_MOBILE_HIPRI].getNetworkInfo();
+                    switch(result) {
+                        case ConnectivityManager.CMP_RESULT_CODE_CONNECTABLE:
+                        case ConnectivityManager.CMP_RESULT_CODE_NO_CONNECTION: {
+                            log("CheckMp.onComplete: ignore, connected or no connection");
+                            break;
+                        }
+                        case ConnectivityManager.CMP_RESULT_CODE_REDIRECTED: {
+                            log("CheckMp.onComplete: warm sim");
+                            String url = getMobileProvisioningUrl();
+                            if (TextUtils.isEmpty(url)) {
+                                url = getMobileRedirectedProvisioningUrl();
+                            }
+                            if (TextUtils.isEmpty(url) == false) {
+                                log("CheckMp.onComplete: warm sim (redirected), url=" + url);
+                                setNotificationVisible(true, ni, url);
+                            } else {
+                                log("CheckMp.onComplete: warm sim (redirected), no url");
+                            }
+                            break;
+                        }
+                        case ConnectivityManager.CMP_RESULT_CODE_NO_DNS:
+                        case ConnectivityManager.CMP_RESULT_CODE_NO_TCP_CONNECTION: {
+                            String url = getMobileProvisioningUrl();
+                            if (TextUtils.isEmpty(url) == false) {
+                                log("CheckMp.onComplete: warm sim (no dns/tcp), url=" + url);
+                                setNotificationVisible(true, ni, url);
+                            } else {
+                                log("CheckMp.onComplete: warm sim (no dns/tcp), no url");
+                            }
+                            break;
+                        }
+                        default: {
+                            loge("CheckMp.onComplete: ignore unexpected result=" + result);
+                            break;
+                        }
+                    }
+                }
+            };
+            CheckMp.Params params =
+                    new CheckMp.Params(checkMp.getDefaultUrl(), timeOutMs, cb);
+            log("checkMobileProvisioning: params=" + params);
+            setNotificationVisible(false, null, null);
+            checkMp.execute(params);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+            log("checkMobileProvisioning: X");
+        }
+        return timeOutMs;
+    }
+
+    static class CheckMp extends
+            AsyncTask<CheckMp.Params, Void, Integer> {
+        private static final String CHECKMP_TAG = "CheckMp";
+        public static final int MAX_TIMEOUT_MS =  60000;
+        private static final int SOCKET_TIMEOUT_MS = 5000;
+        private Context mContext;
+        private ConnectivityService mCs;
+        private TelephonyManager mTm;
+        private Params mParams;
+
+        /**
+         * Parameters for AsyncTask.execute
+         */
+        static class Params {
+            private String mUrl;
+            private long mTimeOutMs;
+            private CallBack mCb;
+
+            Params(String url, long timeOutMs, CallBack cb) {
+                mUrl = url;
+                mTimeOutMs = timeOutMs;
+                mCb = cb;
+            }
+
+            @Override
+            public String toString() {
+                return "{" + " url=" + mUrl + " mTimeOutMs=" + mTimeOutMs + " mCb=" + mCb + "}";
+            }
+        }
+
+        /**
+         * The call back object passed in Params. onComplete will be called
+         * on the main thread.
+         */
+        abstract static class CallBack {
+            // Called on the main thread.
+            abstract void onComplete(Integer result);
+        }
+
+        public CheckMp(Context context, ConnectivityService cs) {
+            mContext = context;
+            mCs = cs;
+
+            // Setup access to TelephonyService we'll be using.
+            mTm = (TelephonyManager) mContext.getSystemService(
+                    Context.TELEPHONY_SERVICE);
+        }
+
+        /**
+         * Get the default url to use for the test.
+         */
+        public String getDefaultUrl() {
+            // See http://go/clientsdns for usage approval
+            String server = Settings.Global.getString(mContext.getContentResolver(),
+                    Settings.Global.CAPTIVE_PORTAL_SERVER);
+            if (server == null) {
+                server = "clients3.google.com";
+            }
+            return "http://" + server + "/generate_204";
+        }
+
+        /**
+         * Detect if its possible to connect to the http url. DNS based detection techniques
+         * do not work at all hotspots. The best way to check is to perform a request to
+         * a known address that fetches the data we expect.
+         */
+        private synchronized Integer isMobileOk(Params params) {
+            Integer result = ConnectivityManager.CMP_RESULT_CODE_NO_CONNECTION;
+            Uri orgUri = Uri.parse(params.mUrl);
+            Random rand = new Random();
+            mParams = params;
+
+            try {
+                if (mCs.isNetworkSupported(ConnectivityManager.TYPE_MOBILE) == false) {
+                    log("isMobileOk: not mobile capable");
+                    result = ConnectivityManager.CMP_RESULT_CODE_NO_CONNECTION;
+                    return result;
+                }
+
+                // Enable fail fast as we'll do retries here and use a
+                // hipri connection so the default connection stays active.
+                log("isMobileOk: start hipri url=" + params.mUrl);
+                mCs.setEnableFailFastMobileData(DctConstants.ENABLED);
+                mCs.startUsingNetworkFeature(ConnectivityManager.TYPE_MOBILE,
+                        Phone.FEATURE_ENABLE_HIPRI, new Binder());
+
+                // Continue trying to connect until time has run out
+                long endTime = SystemClock.elapsedRealtime() + params.mTimeOutMs;
+                while(SystemClock.elapsedRealtime() < endTime) {
+                    try {
+                        // Wait for hipri to connect.
+                        // TODO: Don't poll and handle situation where hipri fails
+                        // because default is retrying. See b/9569540
+                        NetworkInfo.State state = mCs
+                                .getNetworkInfo(ConnectivityManager.TYPE_MOBILE_HIPRI).getState();
+                        if (state != NetworkInfo.State.CONNECTED) {
+                            log("isMobileOk: not connected ni=" +
+                                    mCs.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_HIPRI));
+                            sleep(1);
+                            result = ConnectivityManager.CMP_RESULT_CODE_NO_CONNECTION;
+                            continue;
+                        }
+
+                        // Get of the addresses associated with the url host. We need to use the
+                        // address otherwise HttpURLConnection object will use the name to get
+                        // the addresses and is will try every address but that will bypass the
+                        // route to host we setup and the connection could succeed as the default
+                        // interface might be connected to the internet via wifi or other interface.
+                        InetAddress[] addresses;
+                        try {
+                            addresses = InetAddress.getAllByName(orgUri.getHost());
+                        } catch (UnknownHostException e) {
+                            log("isMobileOk: UnknownHostException");
+                            result = ConnectivityManager.CMP_RESULT_CODE_NO_DNS;
+                            return result;
+                        }
+                        log("isMobileOk: addresses=" + inetAddressesToString(addresses));
+
+                        // Get the type of addresses supported by this link
+                        LinkProperties lp = mCs.getLinkProperties(
+                                ConnectivityManager.TYPE_MOBILE_HIPRI);
+                        boolean linkHasIpv4 = hasIPv4Address(lp);
+                        boolean linkHasIpv6 = hasIPv6Address(lp);
+                        log("isMobileOk: linkHasIpv4=" + linkHasIpv4
+                                + " linkHasIpv6=" + linkHasIpv6);
+
+                        // Loop through at most 3 valid addresses or all of the address or until
+                        // we run out of time
+                        int loops = Math.min(3, addresses.length);
+                        for(int validAddr=0, addrTried=0;
+                                    (validAddr < loops) && (addrTried < addresses.length)
+                                      && (SystemClock.elapsedRealtime() < endTime);
+                                addrTried ++) {
+
+                            // Choose the address at random but make sure its type is supported
+                            InetAddress hostAddr = addresses[rand.nextInt(addresses.length)];
+                            if (((hostAddr instanceof Inet4Address) && linkHasIpv4)
+                                    || ((hostAddr instanceof Inet6Address) && linkHasIpv6)) {
+                                // Valid address, so use it
+                                validAddr += 1;
+                            } else {
+                                // Invalid address so try next address
+                                continue;
+                            }
+
+                            // Make a route to host so we check the specific interface.
+                            if (mCs.requestRouteToHostAddress(ConnectivityManager.TYPE_MOBILE_HIPRI,
+                                    hostAddr.getAddress())) {
+                                // Wait a short time to be sure the route is established ??
+                                log("isMobileOk:"
+                                        + " wait to establish route to hostAddr=" + hostAddr);
+                                sleep(3);
+                            } else {
+                                log("isMobileOk:"
+                                        + " could not establish route to hostAddr=" + hostAddr);
+                                continue;
+                            }
+
+                            // Rewrite the url to have numeric address to use the specific route.
+                            // I also set the "Connection" to "Close" as by default "Keep-Alive"
+                            // is used which is useless in this case.
+                            URL newUrl = new URL(orgUri.getScheme() + "://"
+                                    + hostAddr.getHostAddress() + orgUri.getPath());
+                            log("isMobileOk: newUrl=" + newUrl);
+
+                            HttpURLConnection urlConn = null;
+                            try {
+                                // Open the connection set the request header and get the response
+                                urlConn = (HttpURLConnection) newUrl.openConnection(
+                                        java.net.Proxy.NO_PROXY);
+                                urlConn.setInstanceFollowRedirects(false);
+                                urlConn.setConnectTimeout(SOCKET_TIMEOUT_MS);
+                                urlConn.setReadTimeout(SOCKET_TIMEOUT_MS);
+                                urlConn.setUseCaches(false);
+                                urlConn.setAllowUserInteraction(false);
+                                urlConn.setRequestProperty("Connection", "close");
+                                int responseCode = urlConn.getResponseCode();
+                                if (responseCode == 204) {
+                                    result = ConnectivityManager.CMP_RESULT_CODE_CONNECTABLE;
+                                } else {
+                                    result = ConnectivityManager.CMP_RESULT_CODE_REDIRECTED;
+                                }
+                                log("isMobileOk: connected responseCode=" + responseCode);
+                                urlConn.disconnect();
+                                urlConn = null;
+                                return result;
+                            } catch (Exception e) {
+                                log("isMobileOk: HttpURLConnection Exception e=" + e);
+                                if (urlConn != null) {
+                                    urlConn.disconnect();
+                                    urlConn = null;
+                                }
+                            }
+                        }
+                        result = ConnectivityManager.CMP_RESULT_CODE_NO_TCP_CONNECTION;
+                        log("isMobileOk: loops|timed out");
+                        return result;
+                    } catch (Exception e) {
+                        log("isMobileOk: Exception e=" + e);
+                        continue;
+                    }
+                }
+                log("isMobileOk: timed out");
+            } finally {
+                log("isMobileOk: F stop hipri");
+                mCs.setEnableFailFastMobileData(DctConstants.DISABLED);
+                mCs.stopUsingNetworkFeature(ConnectivityManager.TYPE_MOBILE,
+                        Phone.FEATURE_ENABLE_HIPRI);
+                log("isMobileOk: X result=" + result);
+            }
+            return result;
+        }
+
+        @Override
+        protected Integer doInBackground(Params... params) {
+            return isMobileOk(params[0]);
+        }
+
+        @Override
+        protected void onPostExecute(Integer result) {
+            log("onPostExecute: result=" + result);
+            if ((mParams != null) && (mParams.mCb != null)) {
+                mParams.mCb.onComplete(result);
+            }
+        }
+
+        private String inetAddressesToString(InetAddress[] addresses) {
+            StringBuffer sb = new StringBuffer();
+            boolean firstTime = true;
+            for(InetAddress addr : addresses) {
+                if (firstTime) {
+                    firstTime = false;
+                } else {
+                    sb.append(",");
+                }
+                sb.append(addr);
+            }
+            return sb.toString();
+        }
+
+        private void printNetworkInfo() {
+            boolean hasIccCard = mTm.hasIccCard();
+            int simState = mTm.getSimState();
+            log("hasIccCard=" + hasIccCard
+                    + " simState=" + simState);
+            NetworkInfo[] ni = mCs.getAllNetworkInfo();
+            if (ni != null) {
+                log("ni.length=" + ni.length);
+                for (NetworkInfo netInfo: ni) {
+                    log("netInfo=" + netInfo.toString());
+                }
+            } else {
+                log("no network info ni=null");
+            }
+        }
+
+        /**
+         * Sleep for a few seconds then return.
+         * @param seconds
+         */
+        private static void sleep(int seconds) {
+            try {
+                Thread.sleep(seconds * 1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public boolean hasIPv4Address(LinkProperties lp) {
+            return lp.hasIPv4Address();
+        }
+
+        // Not implemented in LinkProperties, do it here.
+        public boolean hasIPv6Address(LinkProperties lp) {
+            for (LinkAddress address : lp.getLinkAddresses()) {
+              if (address.getAddress() instanceof Inet6Address) {
+                return true;
+              }
+            }
+            return false;
+        }
+
+        private void log(String s) {
+            Slog.d(ConnectivityService.TAG, "[" + CHECKMP_TAG + "] " + s);
+        }
+    }
+
+    private static final String NOTIFICATION_ID = "CaptivePortal.Notification";
+
+    private void setNotificationVisible(boolean visible, NetworkInfo networkInfo, String url) {
+        log("setNotificationVisible: E visible=" + visible + " ni=" + networkInfo + " url=" + url);
+
+        Resources r = Resources.getSystem();
+        NotificationManager notificationManager = (NotificationManager) mContext
+            .getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (visible) {
+            CharSequence title;
+            CharSequence details;
+            int icon;
+            switch (networkInfo.getType()) {
+                case ConnectivityManager.TYPE_WIFI:
+                    log("setNotificationVisible: TYPE_WIFI");
+                    title = r.getString(R.string.wifi_available_sign_in, 0);
+                    details = r.getString(R.string.network_available_sign_in_detailed,
+                            networkInfo.getExtraInfo());
+                    icon = R.drawable.stat_notify_wifi_in_range;
+                    break;
+                case ConnectivityManager.TYPE_MOBILE:
+                case ConnectivityManager.TYPE_MOBILE_HIPRI:
+                    log("setNotificationVisible: TYPE_MOBILE|HIPRI");
+                    title = r.getString(R.string.network_available_sign_in, 0);
+                    // TODO: Change this to pull from NetworkInfo once a printable
+                    // name has been added to it
+                    details = mTelephonyManager.getNetworkOperatorName();
+                    icon = R.drawable.stat_notify_rssi_in_range;
+                    break;
+                default:
+                    log("setNotificationVisible: other type=" + networkInfo.getType());
+                    title = r.getString(R.string.network_available_sign_in, 0);
+                    details = r.getString(R.string.network_available_sign_in_detailed,
+                            networkInfo.getExtraInfo());
+                    icon = R.drawable.stat_notify_rssi_in_range;
+                    break;
+            }
+
+            Notification notification = new Notification();
+            notification.when = 0;
+            notification.icon = icon;
+            notification.flags = Notification.FLAG_AUTO_CANCEL;
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.setFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT |
+                    Intent.FLAG_ACTIVITY_NEW_TASK);
+            notification.contentIntent = PendingIntent.getActivity(mContext, 0, intent, 0);
+            notification.tickerText = title;
+            notification.setLatestEventInfo(mContext, title, details, notification.contentIntent);
+
+            log("setNotificaitionVisible: notify notificaiton=" + notification);
+            notificationManager.notify(NOTIFICATION_ID, 1, notification);
+        } else {
+            log("setNotificaitionVisible: cancel");
+            notificationManager.cancel(NOTIFICATION_ID, 1);
+        }
+        log("setNotificationVisible: X visible=" + visible + " ni=" + networkInfo + " url=" + url);
+    }
+
+    /** Location to an updatable file listing carrier provisioning urls.
+     *  An example:
+     *
+     * <?xml version="1.0" encoding="utf-8"?>
+     *  <provisioningUrls>
+     *   <provisioningUrl mcc="310" mnc="4">http://myserver.com/foo?mdn=%3$s&amp;iccid=%1$s&amp;imei=%2$s</provisioningUrl>
+     *   <redirectedUrl mcc="310" mnc="4">http://www.google.com</redirectedUrl>
+     *  </provisioningUrls>
+     */
+    private static final String PROVISIONING_URL_PATH =
+            "/data/misc/radio/provisioning_urls.xml";
+    private final File mProvisioningUrlFile = new File(PROVISIONING_URL_PATH);
+
+    /** XML tag for root element. */
+    private static final String TAG_PROVISIONING_URLS = "provisioningUrls";
+    /** XML tag for individual url */
+    private static final String TAG_PROVISIONING_URL = "provisioningUrl";
+    /** XML tag for redirected url */
+    private static final String TAG_REDIRECTED_URL = "redirectedUrl";
+    /** XML attribute for mcc */
+    private static final String ATTR_MCC = "mcc";
+    /** XML attribute for mnc */
+    private static final String ATTR_MNC = "mnc";
+
+    private static final int REDIRECTED_PROVISIONING = 1;
+    private static final int PROVISIONING = 2;
+
+    private String getProvisioningUrlBaseFromFile(int type) {
+        FileReader fileReader = null;
+        XmlPullParser parser = null;
+        Configuration config = mContext.getResources().getConfiguration();
+        String tagType;
+
+        switch (type) {
+            case PROVISIONING:
+                tagType = TAG_PROVISIONING_URL;
+                break;
+            case REDIRECTED_PROVISIONING:
+                tagType = TAG_REDIRECTED_URL;
+                break;
+            default:
+                throw new RuntimeException("getProvisioningUrlBaseFromFile: Unexpected parameter " +
+                        type);
+        }
+
+        try {
+            fileReader = new FileReader(mProvisioningUrlFile);
+            parser = Xml.newPullParser();
+            parser.setInput(fileReader);
+            XmlUtils.beginDocument(parser, TAG_PROVISIONING_URLS);
+
+            while (true) {
+                XmlUtils.nextElement(parser);
+
+                String element = parser.getName();
+                if (element == null) break;
+
+                if (element.equals(tagType)) {
+                    String mcc = parser.getAttributeValue(null, ATTR_MCC);
+                    try {
+                        if (mcc != null && Integer.parseInt(mcc) == config.mcc) {
+                            String mnc = parser.getAttributeValue(null, ATTR_MNC);
+                            if (mnc != null && Integer.parseInt(mnc) == config.mnc) {
+                                parser.next();
+                                if (parser.getEventType() == XmlPullParser.TEXT) {
+                                    return parser.getText();
+                                }
+                            }
+                        }
+                    } catch (NumberFormatException e) {
+                        loge("NumberFormatException in getProvisioningUrlBaseFromFile: " + e);
+                    }
+                }
+            }
+            return null;
+        } catch (FileNotFoundException e) {
+            loge("Carrier Provisioning Urls file not found");
+        } catch (XmlPullParserException e) {
+            loge("Xml parser exception reading Carrier Provisioning Urls file: " + e);
+        } catch (IOException e) {
+            loge("I/O exception reading Carrier Provisioning Urls file: " + e);
+        } finally {
+            if (fileReader != null) {
+                try {
+                    fileReader.close();
+                } catch (IOException e) {}
+            }
+        }
+        return null;
+    }
+
+    private String getMobileRedirectedProvisioningUrl() {
+        String url = getProvisioningUrlBaseFromFile(REDIRECTED_PROVISIONING);
+        if (TextUtils.isEmpty(url)) {
+            url = mContext.getResources().getString(R.string.mobile_redirected_provisioning_url);
+        }
+        return url;
+    }
+
+    public String getMobileProvisioningUrl() {
+        enforceConnectivityInternalPermission();
+        String url = getProvisioningUrlBaseFromFile(PROVISIONING);
+        if (TextUtils.isEmpty(url)) {
+            url = mContext.getResources().getString(R.string.mobile_provisioning_url);
+            log("getProvisioningUrl: mobile_provisioining_url from resource =" + url);
+        } else {
+            log("getProvisioningUrl: mobile_provisioning_url from File =" + url);
+        }
+        // populate the iccid, imei and phone number in the provisioning url.
+        if (!TextUtils.isEmpty(url)) {
+            String phoneNumber = mTelephonyManager.getLine1Number();
+            if (TextUtils.isEmpty(phoneNumber)) {
+                phoneNumber = "0000000000";
+            }
+            url = String.format(url,
+                    mTelephonyManager.getSimSerialNumber() /* ICCID */,
+                    mTelephonyManager.getDeviceId() /* IMEI */,
+                    phoneNumber /* Phone numer */);
+        }
+
+        return url;
     }
 }
