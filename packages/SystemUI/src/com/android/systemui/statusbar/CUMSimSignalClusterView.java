@@ -370,8 +370,9 @@ public class CUMSimSignalClusterView extends MSimSignalClusterView implements
             case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
             case ServiceState.RIL_RADIO_TECHNOLOGY_HSUPA:
             case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
-            case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
                 return TelephonyIcons.MULTI_SIGNAL_IMAGES_H[subscription][inetCondition][level];
+            case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
+                return TelephonyIcons.MULTI_SIGNAL_IMAGES_HP[subscription][inetCondition][level];
             default:
                 return TelephonyIcons.MULTI_SIGNAL_IMAGES_G[subscription][inetCondition][level];
         }
