@@ -61,6 +61,7 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
     static final private int TOKEN_PHONE_LOOKUP_AND_TRIGGER = 3;
 
     static final private String EXTRA_URI_CONTENT = "uri_content";
+    static final private String BROWSER_INFORMATION_URI = "tel:Browser%20Information";
 
     static final String[] EMAIL_LOOKUP_PROJECTION = new String[] {
         RawContacts.CONTACT_ID,
@@ -357,12 +358,15 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
                         QuickContact.MODE_LARGE, mExcludeMimes);
             } else if (createUri != null) {
                 // Prompt user to add this person to contacts
-                final Intent intent = new Intent(Intents.SHOW_OR_CREATE_CONTACT, createUri);
-                if (extras != null) {
-                    extras.remove(EXTRA_URI_CONTENT);
-                    intent.putExtras(extras);
+                // if message is browser information,don't add to contacts.
+                if (!createUri.toString().equals(BROWSER_INFORMATION_URI)) {
+                    final Intent intent = new Intent(Intents.SHOW_OR_CREATE_CONTACT, createUri);
+                    if (extras != null) {
+                        extras.remove(EXTRA_URI_CONTENT);
+                        intent.putExtras(extras);
+                    }
+                    getContext().startActivity(intent);
                 }
-                getContext().startActivity(intent);
             }
         }
     }
