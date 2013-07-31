@@ -447,6 +447,19 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
     }
 
     class MyPackageMonitor extends PackageMonitor {
+        @Override
+        public boolean onPackageChanged(String packageName, int uid, String[] components) {
+             // The history(installed) input methods string include all input methods packageName.
+             String historyInputMethods = Settings.Secure.getString(
+                 mContext.getContentResolver(), Settings.Secure.INPUT_METHODS_SUBTYPE_HISTORY);
+                 // We only care input methods package change which saved in database.
+                 if (historyInputMethods != null && historyInputMethods.contains(packageName)) {
+                     onSomePackagesChanged();
+                 }
+
+             return true;
+        }
+
         private boolean isChangingPackagesOfCurrentUser() {
             final int userId = getChangingUserId();
             final boolean retval = userId == mSettings.getCurrentUserId();
