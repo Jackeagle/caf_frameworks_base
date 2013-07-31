@@ -3427,11 +3427,23 @@ public final class ActivityManagerService extends ActivityManagerNative
                 else
                     newTracesPath = tracesPath + "_" + app.processName;
                 traceRenameFile.renameTo(new File(newTracesPath));
-
-                Process.sendSignal(app.pid, 6);
-                SystemClock.sleep(1000);
-                Process.sendSignal(app.pid, 6);
-                SystemClock.sleep(1000);
+            
+                Slog.e(TAG,"ANR file made in newTracesPath ="+newTracesPath+" Pid = "+app.pid);
+                /*
+                try{
+                    Runtime.getRuntime().exec("debuggerd -b "+app.pid+">"+newTracesPath);
+                }catch(Exception e){
+                    Slog.e(TAG,"debuggerd error");
+                }
+                */
+                //modify to avoid system_server being killed in user mode.
+                if(SystemProperties.get("ro.build.type","").equals("eng")){
+                    Process.sendSignal(app.pid, 6);
+                    SystemClock.sleep(1000);
+                    Process.sendSignal(app.pid, 6);
+                    SystemClock.sleep(1000);
+                    Slog.e(TAG,"ANR in eng mode, ready to kill : Pid = "+app.pid);
+                }
             }
 
             // Bring up the infamous App Not Responding dialog
@@ -4471,7 +4483,9 @@ public final class ActivityManagerService extends ActivityManagerNative
                                 null, null, 0, null, null,
                                 android.Manifest.permission.RECEIVE_BOOT_COMPLETED,
                                 false, false, MY_PID, Process.SYSTEM_UID, userId);
-                    }
+            						Log.d("boot"," factory boot_complete");
+                    }else
+            						Log.d("boot"," factory not boot_complete");
                 }
             }
         }
