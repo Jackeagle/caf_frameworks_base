@@ -708,20 +708,6 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
 
         mSettingsObserver = new SettingsObserver(mHandler);
         updateFromSettingsLocked(true);
-
-        // IMMS wants to receive Intent.ACTION_LOCALE_CHANGED in order to update the current IME
-        // according to the new system locale.
-        final IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_LOCALE_CHANGED);
-        mContext.registerReceiver(
-                new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context context, Intent intent) {
-                        synchronized(mMethodMap) {
-                            resetStateIfCurrentLocaleChangedLocked();
-                        }
-                    }
-                }, filter);
     }
 
     private void resetDefaultImeLocked(Context context) {
