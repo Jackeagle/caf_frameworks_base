@@ -644,7 +644,7 @@ $(full_target): $(framework_built) $(gen)
 
 # Run this for checkbuild
 .PHONY: checkbuild
-checkbuild: doc-comment-check-docs
+#checkbuild: doc-comment-check-docs
 
 # ====  static html in the sdk ==================================
 include $(CLEAR_VARS)
