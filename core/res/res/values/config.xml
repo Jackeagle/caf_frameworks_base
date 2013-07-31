@@ -533,6 +533,9 @@
     <!-- Diable lockscreen rotation by default -->
     <bool name="config_enableLockScreenRotation">false</bool>
 
+    <!-- Is the device capable of hot swapping an UICC Card -->
+    <bool name="config_hotswapCapable">false</bool>
+
     <!-- Enable puk unlockscreen by default.
          If unlock screen is disabled, the puk should be unlocked through Emergency Dialer -->
     <bool name="config_enable_puk_unlock_screen">true</bool>
@@ -777,6 +780,15 @@
 
     <!-- IP address of the dns server to use if nobody else suggests one -->
     <string name="config_default_dns_server" translatable="false">8.8.8.8</string>
+
+    <!-- The default mobile provisioning url. Empty by default, maybe overridden by
+         an mcc/mnc specific config.xml -->
+    <string name="mobile_provisioning_url" translatable="false"></string>
+
+    <!-- This url is used as the default url when redirection is detected. Any
+         should work as all url's get redirected. But maybe overridden by
+         if needed. -->
+    <string name="mobile_redirected_provisioning_url" translatable="false">http://google.com</string>
 
     <!-- The default character set for GsmAlphabet -->
     <!-- Empty string means MBCS is not considered -->

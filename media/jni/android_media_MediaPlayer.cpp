@@ -55,6 +55,10 @@ struct fields_t {
     jfieldID    surface_texture;
 
     jmethodID   post_event;
+
+    jmethodID   proxyConfigGetHost;
+    jmethodID   proxyConfigGetPort;
+    jmethodID   proxyConfigGetExclusionList;
 };
 static fields_t fields;
 
@@ -622,6 +626,20 @@ android_media_MediaPlayer_native_init(JNIEnv *env)
     if (fields.surface_texture == NULL) {
         return;
     }
+
+    clazz = env->FindClass("android/net/ProxyProperties");
+    if (clazz == NULL) {
+        return;
+    }
+
+    fields.proxyConfigGetHost =
+        env->GetMethodID(clazz, "getHost", "()Ljava/lang/String;");
+
+    fields.proxyConfigGetPort =
+        env->GetMethodID(clazz, "getPort", "()I");
+
+    fields.proxyConfigGetExclusionList =
+        env->GetMethodID(clazz, "getExclusionList", "()Ljava/lang/String;");
 }
 
 static void
@@ -853,6 +871,49 @@ android_media_MediaPlayer_resume(JNIEnv *env, jobject thiz)
     return true;
 }
 
+static void
+android_media_MediaPlayer_updateProxyConfig(
+        JNIEnv *env, jobject thiz, jobject proxyProps)
+{
+    ALOGV("updateProxyConfig");
+    sp<MediaPlayer> thisplayer = getMediaPlayer(env, thiz);
+    if (thisplayer == NULL) {
+        return;
+    }
+
+    if (proxyProps == NULL) {
+        thisplayer->updateProxyConfig(
+                NULL /* host */, 0 /* port */, NULL /* exclusionList */);
+    } else {
+        jstring hostObj = (jstring)env->CallObjectMethod(
+                proxyProps, fields.proxyConfigGetHost);
+
+        const char *host = env->GetStringUTFChars(hostObj, NULL);
+
+        int port = env->CallIntMethod(proxyProps, fields.proxyConfigGetPort);
+
+        jstring exclusionListObj = (jstring)env->CallObjectMethod(
+                proxyProps, fields.proxyConfigGetExclusionList);
+
+        const char *exclusionList =
+            env->GetStringUTFChars(exclusionListObj, NULL);
+
+        if (host != NULL && exclusionListObj != NULL) {
+            thisplayer->updateProxyConfig(host, port, exclusionList);
+        }
+
+        if (exclusionList != NULL) {
+            env->ReleaseStringUTFChars(exclusionListObj, exclusionList);
+            exclusionList = NULL;
+        }
+
+        if (host != NULL) {
+            env->ReleaseStringUTFChars(hostObj, host);
+            host = NULL;
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
@@ -862,7 +923,7 @@ static JNINativeMethod gMethods[] = {
         (void *)android_media_MediaPlayer_setDataSourceAndHeaders
     },
 
-    {"setDataSource",       "(Ljava/io/FileDescriptor;JJ)V",    (void *)android_media_MediaPlayer_setDataSourceFD},
+    {"_setDataSource",       "(Ljava/io/FileDescriptor;JJ)V",    (void *)android_media_MediaPlayer_setDataSourceFD},
     {"_setVideoSurface",    "(Landroid/view/Surface;)V",        (void *)android_media_MediaPlayer_setVideoSurface},
     {"prepare",             "()V",                              (void *)android_media_MediaPlayer_prepare},
     {"prepareAsync",        "()V",                              (void *)android_media_MediaPlayer_prepareAsync},
@@ -899,6 +960,7 @@ static JNINativeMethod gMethods[] = {
     {"setNextMediaPlayer",  "(Landroid/media/MediaPlayer;)V",   (void *)android_media_MediaPlayer_setNextMediaPlayer},
     {"_suspend",             "()Z",                             (void *)android_media_MediaPlayer_suspend},
     {"_resume",              "()Z",                             (void *)android_media_MediaPlayer_resume},
+    {"updateProxyConfig", "(Landroid/net/ProxyProperties;)V", (void *)android_media_MediaPlayer_updateProxyConfig},
 };
 
 static const char* const kClassPathName = "android/media/MediaPlayer";

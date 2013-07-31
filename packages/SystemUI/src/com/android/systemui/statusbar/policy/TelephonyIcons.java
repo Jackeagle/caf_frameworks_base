@@ -536,6 +536,18 @@ public class TelephonyIcons {
     public static final int DATA_TYPE_HP = 5;
     public static final int DATA_TYPE_2G_R = 6;
 
+    // LTE branded "LTE"
+    static final int[][] DATA_LTE = {
+            { R.drawable.stat_sys_data_connected_lte,
+                    R.drawable.stat_sys_data_connected_lte,
+                    R.drawable.stat_sys_data_connected_lte,
+                    R.drawable.stat_sys_data_connected_lte },
+            { R.drawable.stat_sys_data_fully_connected_lte,
+                    R.drawable.stat_sys_data_fully_connected_lte,
+                    R.drawable.stat_sys_data_fully_connected_lte,
+                    R.drawable.stat_sys_data_fully_connected_lte }
+    };
+
     public static final int DATA_NONE = 0;
     public static final int DATA_IN = 1;
     public static final int DATA_OUT = 2;
