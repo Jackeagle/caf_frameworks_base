@@ -345,6 +345,7 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     private void listenToRingerMode() {
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
         mContext.registerReceiver(new BroadcastReceiver() {
 
             public void onReceive(Context context, Intent intent) {
@@ -353,6 +354,10 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 if (AudioManager.RINGER_MODE_CHANGED_ACTION.equals(action)) {
                     removeMessages(MSG_RINGER_MODE_CHANGED);
                     sendMessage(obtainMessage(MSG_RINGER_MODE_CHANGED));
+                } else if (Intent.ACTION_SCREEN_ON.equals(action)){
+                    // Dismiss volume dialog immediately when screen on to avoid
+                    // volume dialog showed on the locksceen.
+                    forceTimeout();
                 }
             }
         }, filter);
