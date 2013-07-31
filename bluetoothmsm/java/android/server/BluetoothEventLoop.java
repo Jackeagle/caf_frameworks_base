@@ -682,6 +682,13 @@ class BluetoothEventLoop {
             intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
             intent.putExtra(BluetoothDevice.EXTRA_CONN_INTERVAL, Integer.valueOf(propValues[1]));
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+        } else if (name.equals("BatteryLevel")) {
+            if (DBG)
+                log("Battery Level Changed, new battery level is: " + propValues[1]);
+            Intent intent = new Intent(BluetoothDevice.ACTION_BATTERY_LEVEL);
+            intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+            intent.putExtra(BluetoothDevice.EXTRA_BATTERY_LEVEL, Byte.valueOf(propValues[1]));
+            mContext.sendBroadcast(intent, BLUETOOTH_PERM);
         }
     }
 
