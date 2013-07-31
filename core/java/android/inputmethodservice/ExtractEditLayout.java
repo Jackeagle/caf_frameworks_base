@@ -97,7 +97,8 @@ public class ExtractEditLayout extends LinearLayout {
         mEditButton.setOnClickListener(new OnClickListener() {
             public void onClick(View clicked) {
                 if (mActionMode != null) {
-                    mMenuPopupHelper = new MenuPopupHelper(getContext(), mActionMode.mMenu, clicked);
+                    mMenuPopupHelper = new MenuPopupHelper(getContext(), mActionMode.mMenu,
+                            clicked, ExtractEditLayout.this);
                     mMenuPopupHelper.show();
                 }
             }

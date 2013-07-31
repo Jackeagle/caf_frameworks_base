@@ -17,9 +17,12 @@
 package com.android.internal.view.menu;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.database.DataSetObserver;
+import android.inputmethodservice.ExtractEditLayout;
 import android.os.Parcelable;
+import android.os.UserHandle;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -63,7 +66,7 @@ public class MenuPopupHelper implements AdapterView.OnItemClickListener, View.On
     boolean mForceShowIcon;
 
     private ViewGroup mMeasureParent;
-
+    private ExtractEditLayout mExlayout;
     public MenuPopupHelper(Context context, MenuBuilder menu) {
         this(context, menu, null, false);
     }
@@ -88,6 +91,11 @@ public class MenuPopupHelper implements AdapterView.OnItemClickListener, View.On
         menu.addMenuPresenter(this);
     }
 
+    public MenuPopupHelper(Context context, MenuBuilder menu, View anchorView,
+            ExtractEditLayout mExlayout) {
+        this(context, menu, anchorView, false);
+        this.mExlayout = mExlayout;
+    }
     public void setAnchorView(View anchor) {
         mAnchorView = anchor;
     }
@@ -159,6 +167,16 @@ public class MenuPopupHelper implements AdapterView.OnItemClickListener, View.On
     public boolean onKey(View v, int keyCode, KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_MENU) {
             dismiss();
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_CAMERA &&
+                event.isLongPress()) {
+            this.mExlayout.finishActionMode();
+            dismiss();
+            Intent intent = new Intent(Intent.ACTION_CAMERA_BUTTON, null);
+            intent.putExtra(Intent.EXTRA_KEY_EVENT, event);
+            mContext.sendOrderedBroadcastAsUser(intent, UserHandle.CURRENT_OR_SELF,
+                    null, null, null, 0, null, null);
             return true;
         }
         return false;
