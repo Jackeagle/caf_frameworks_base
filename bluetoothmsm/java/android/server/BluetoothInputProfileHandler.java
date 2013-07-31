@@ -82,6 +82,8 @@ final class BluetoothInputProfileHandler {
 
     boolean connectInputDeviceInternal(BluetoothDevice device) {
         String objectPath = mBluetoothService.getObjectPathFromAddress(device.getAddress());
+        if (objectPath == null)
+            return false;
         handleInputDeviceStateChange(device, BluetoothInputDevice.STATE_CONNECTING);
         if (!mBluetoothService.connectInputDeviceNative(objectPath)) {
             handleInputDeviceStateChange(device, BluetoothInputDevice.STATE_DISCONNECTED);
