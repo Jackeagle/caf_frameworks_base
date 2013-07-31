@@ -138,6 +138,11 @@ final class BluetoothHogpProfileHandler {
         String objectPath = mBluetoothService.getObjectPathFromAddress(device.getAddress());
         if (objectPath == null ||
                 getInputDeviceConnectionState(device) == BluetoothHogpDevice.STATE_DISCONNECTED) {
+            try {
+                mService.disconnect(device);
+            } catch(Exception e) {
+                Log.d(TAG, "Exception"+e);
+            }
             return false;
         }
         if (state != null) {
