@@ -222,7 +222,7 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
         }
 
         mMobileActivityId[subscription] =
-                getAcitivyTypeIconId(typeIcon, activityIcon, subscription);
+                getAcitivyTypeIconId(typeIcon, activityIcon, subscription, isRoaming);
         mMobileDescription[subscription] = contentDescription;
         mMobileTypeDescription = typeContentDescription;
         mNoSimIconId[subscription] = convertNoSimIconIdToCT(subscription);
@@ -272,13 +272,12 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
                 mSignalCDMA3g.setImageResource(mMobileStrengthId[subscription][1]);
                 mSignalCDMA1x.setImageResource(mMobileStrengthId[subscription][0]);
                 mSignalCDMA1xOnly.setImageResource(mMobileStrengthId[subscription][0]);
+                final int signalNullIconId = convertSignalNullIconIdToCT(subscription);
                 mSignalCDMAboth.setVisibility((mMobileStrengthId[subscription][1] != 0
-                        && mMobileStrengthId[subscription][1]
-                                != R.drawable.stat_sys_signal_null_sim1
+                        && mMobileStrengthId[subscription][1] != signalNullIconId
                         && mSignalIconVisible[subscription]) ? View.VISIBLE : View.GONE);
                 mSignalCDMA1xOnly.setVisibility(((mMobileStrengthId[subscription][1] == 0
-                        || mMobileStrengthId[subscription][1]
-                                == R.drawable.stat_sys_signal_null_sim1)
+                        || mMobileStrengthId[subscription][1] == signalNullIconId)
                         && mSignalIconVisible[subscription]) ? View.VISIBLE : View.GONE);
             } else {
                 mMobileSub2.setImageResource(mMobileStrengthId[subscription][0]);
@@ -317,14 +316,15 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
     }
 
     private int convertNoSimIconIdToCT(int subscription) {
-        return TelephonyIcons.MULTI_NO_SIM_CU[subscription];
+        return TelephonyIcons.MULTI_NO_SIM_CT[subscription];
     }
 
     private int convertSignalNullIconIdToCT(int subscription) {
-        return TelephonyIcons.MULTI_SIGNAL_NULL_CU[subscription];
+        return TelephonyIcons.MULTI_SIGNAL_NULL_CT[subscription];
     }
 
-    private int getAcitivyTypeIconId(int dataType, int dataInout, int subscription) {
+    private int getAcitivyTypeIconId(int dataType, int dataInout, int subscription,
+            boolean isRoaming) {
         int type = 0;
         int inout = 0;
         switch (dataType) {
@@ -352,6 +352,22 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
                 }
                 break;
         }
+
+        if (isRoaming) {
+            switch (type) {
+                case TelephonyIcons.DATA_TYPE_G:
+                case TelephonyIcons.DATA_TYPE_E:
+                case TelephonyIcons.DATA_TYPE_1X:
+                    type = TelephonyIcons.DATA_TYPE_2G;
+                    break;
+                case TelephonyIcons.DATA_TYPE_H:
+                    type = TelephonyIcons.DATA_TYPE_3G;
+                    break;
+                default:
+                    break;
+            }
+        }
+
         switch (dataInout) {
             case R.drawable.stat_sys_signal_in:
                 inout = TelephonyIcons.DATA_IN;
@@ -388,14 +404,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_0:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][0]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[0][0];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][0];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][0];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[0][0];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][0];
                     }
                 } else {
                     if (hasEvdo) {
@@ -412,14 +423,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_1:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][1]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[0][1];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][1];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][1];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[0][1];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][1];
                     }
                 } else {
                     if (hasEvdo) {
@@ -436,14 +442,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_2:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][2]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[0][2];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][2];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][2];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[0][2];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][2];
                     }
                 } else {
                     if (hasEvdo) {
@@ -460,14 +461,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_3:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][3]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[0][3];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][3];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][3];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[0][3];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][3];
                     }
                 } else {
                     if (hasEvdo) {
@@ -484,14 +480,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_4:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][4]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[0][4];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[0][4];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][4];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[0][4];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[0][4];
                     }
                 } else {
                     if (hasEvdo) {
@@ -508,14 +499,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_0_fully:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][0]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[1][0];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][0];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][0];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[1][0];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][0];
                     }
                 } else {
                     if (hasEvdo) {
@@ -532,14 +518,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_1_fully:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][1]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[1][1];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][1];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][1];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[1][1];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][1];
                     }
                 } else {
                     if (hasEvdo) {
@@ -556,14 +537,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_2_fully:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][2]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[1][2];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][2];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][2];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[1][2];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][2];
                     }
                 } else {
                     if (hasEvdo) {
@@ -580,14 +556,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_3_fully:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][3]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[1][3];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][3];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][3];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[1][3];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][3];
                     }
                 } else {
                     if (hasEvdo) {
@@ -604,14 +575,9 @@ public class CTMSimSignalClusterView extends MSimSignalClusterView implements
             case R.drawable.stat_sys_signal_4_fully:
                 if (isRoaming) {
                     if (hasEvdo) {
-                        return isEvdo ? TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][4]
-                                : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_R_CT[1][4];
+                        return isEvdo ? 0 : TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_3G_R_CT[1][4];
                     } else {
-                        if (isGSM) {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][4];
-                        } else {
-                            return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_1X_ONLY_R_CT[1][4];
-                        }
+                        return TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_G_R_CT[1][4];
                     }
                 } else {
                     if (hasEvdo) {

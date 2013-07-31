@@ -695,6 +695,16 @@ public class MSimNetworkController extends NetworkController {
                     mIsRoaming[subscription] = false;
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
                 }
+                // As isNetworkRoaming() is for GSM purposes, check CDMA roaming here.
+                if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+                    if (isCdma(subscription) && isCdmaEri(subscription)) {
+                        iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
+                        mIsRoaming[subscription] = true;
+                        if (DEBUG) {
+                            Slog.d(TAG, "The sub" + subscription + " is in CDMA roaming state.");
+                        }
+                    }
+                }
                 if (isCdma(subscription)) {
                     if (mAlwaysShowCdmaRssi) {
                         iconLevel = mMSimSignalStrength[subscription].getCdmaLevel();
@@ -879,6 +889,12 @@ public class MSimNetworkController extends NetworkController {
                         break;
                 }
             }
+        }
+
+        // As CT spec, a common roaming icon is not enough,
+        // we will just return with the detail network type.
+        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+            return;
         }
 
         if (isCdma(subscription)) {
