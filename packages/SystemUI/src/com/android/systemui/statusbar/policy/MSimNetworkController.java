@@ -57,6 +57,7 @@ import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.util.AsyncChannel;
 
 import com.android.systemui.R;
+import com.android.systemui.statusbar.policy.NetworkController.NetworkSignalChangedCallback;
 import com.android.systemui.statusbar.CTMSimSignalClusterView;
 import com.android.systemui.statusbar.phone.PhoneStatusBar;
 
@@ -1149,6 +1150,9 @@ public class MSimNetworkController extends NetworkController {
             } else {
                 wifiLabel = context.getString(
                         R.string.status_bar_settings_signal_meter_disconnected);
+            }
+            for (NetworkSignalChangedCallback cb : mSignalsChangedCallbacks) {
+                notifySignalsChangedCallbacks(cb);
             }
         }
 
