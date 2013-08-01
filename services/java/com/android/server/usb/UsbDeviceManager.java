@@ -427,7 +427,6 @@ public class UsbDeviceManager {
         }
 
         private void updateUsbMassStorage(boolean connected) {
-            UsbManager usbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
             StorageManager storageManager = (StorageManager) mContext
                     .getSystemService(Context.STORAGE_SERVICE);
             if (storageManager == null) {
