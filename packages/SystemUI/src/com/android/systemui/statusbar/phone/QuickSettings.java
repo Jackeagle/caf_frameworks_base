@@ -61,6 +61,7 @@ import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.Profile;
 import android.provider.Settings;
+import android.telephony.MSimTelephonyManager;
 import android.util.Log;
 import android.util.Pair;
 import android.view.LayoutInflater;
@@ -425,19 +426,42 @@ class QuickSettings {
 
         if (mModel.deviceHasMobileData()) {
             // RSSI
-            QuickSettingsTileView rssiTile = (QuickSettingsTileView)
+            final QuickSettingsTileView rssiTile = (QuickSettingsTileView)
                     inflater.inflate(R.layout.quick_settings_tile, parent, false);
             rssiTile.setContent(R.layout.quick_settings_tile_rssi, inflater);
             rssiTile.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     Intent intent = new Intent();
-                    intent.setComponent(new ComponentName(
-                            "com.android.settings",
-                            "com.android.settings.Settings$DataUsageSummaryActivity"));
+                    if (mModel.dataSwitchEnabled()) {
+                        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                            intent.setClassName("com.android.settings",
+                                    "com.android.settings.multisimsettings.MultiSimSettingTab");
+                            intent.putExtra("PACKAGE", "com.android.phone");
+                            intent.putExtra("TARGET_CLASS",
+                                    "com.android.phone.MSimMobileNetworkSubSettings");
+                        } else {
+                            intent.setComponent(new ComponentName(
+                                    "com.android.phone",
+                                    "com.android.phone.MSimMobileNetworkSubSettings"));
+                        }
+                    } else {
+                        intent.setComponent(new ComponentName(
+                                "com.android.settings",
+                                "com.android.settings.Settings$DataUsageSummaryActivity"));
+                    }
                     startSettingsActivity(intent);
                 }
             });
+            if (mModel.dataSwitchEnabled() && LONG_PRESS_TOGGLES) {
+                rssiTile.setOnLongClickListener(new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        mModel.switchMobileData();
+                        rssiTile.setPressed(false);
+                        return true;
+                    }});
+            }
             mModel.addRSSITile(rssiTile, new QuickSettingsModel.RefreshCallback() {
                 @Override
                 public void refreshView(QuickSettingsTileView view, State state) {
@@ -445,6 +469,18 @@ class QuickSettings {
                     ImageView iv = (ImageView) view.findViewById(R.id.rssi_image);
                     ImageView iov = (ImageView) view.findViewById(R.id.rssi_overlay_image);
                     TextView tv = (TextView) view.findViewById(R.id.rssi_textview);
+
+                    if (mModel.dataSwitchEnabled()) {
+                        Resources r = mContext.getResources();
+                        rssiState.signalIconId = rssiState.enabled
+                                ? R.drawable.ic_qs_data_on
+                                : R.drawable.ic_qs_data_off;
+                        rssiState.label = rssiState.enabled
+                                ? r.getString(R.string.quick_settings_data_on)
+                                : r.getString(R.string.quick_settings_data_off);
+                        rssiState.dataTypeIconId = 0;
+                    }
+
                     // Force refresh
                     iv.setImageDrawable(null);
                     iv.setImageResource(rssiState.signalIconId);

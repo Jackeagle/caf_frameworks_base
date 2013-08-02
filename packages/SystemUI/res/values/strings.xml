@@ -489,6 +489,10 @@
     <string name="quick_settings_rssi_label">RSSI</string>
     <!-- QuickSettings: RSSI (No network) [CHAR LIMIT=NONE] -->
     <string name="quick_settings_rssi_emergency_only">Emergency Calls Only</string>
+    <!-- QuickSettings: Mobile Data On [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_data_on">data on</string>
+    <!-- QuickSettings: Mobile Data On [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_data_off">data off</string>
     <!-- QuickSettings: Settings [CHAR LIMIT=NONE] -->
     <string name="quick_settings_settings_label">Settings</string>
     <!-- QuickSettings: Time [CHAR LIMIT=NONE] -->
