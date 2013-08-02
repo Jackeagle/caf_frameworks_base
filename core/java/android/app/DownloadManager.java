@@ -322,6 +322,7 @@ public class DownloadManager {
         Downloads.Impl.COLUMN_TOTAL_BYTES + " AS " + COLUMN_TOTAL_SIZE_BYTES,
         Downloads.Impl.COLUMN_LAST_MODIFICATION + " AS " + COLUMN_LAST_MODIFIED_TIMESTAMP,
         Downloads.Impl.COLUMN_CURRENT_BYTES + " AS " + COLUMN_BYTES_DOWNLOADED_SO_FAR,
+        Downloads.Impl.COLUMN_MEDIA_SCANNED,
         /* add the following 'computed' columns to the cursor.
          * they are not 'returned' by the database, but their inclusion
          * eliminates need to have lot of methods in CursorTranslator
@@ -376,6 +377,7 @@ public class DownloadManager {
         private static final int SCANNABLE_VALUE_YES = 0;
         // value of 1 is stored in the above column by DownloadProvider after it is scanned by
         // MediaScanner
+        private static final int SCANNABLE_VALUE_SCANNED = 1;
         /** if a file is designated as a file that should not be scanned by MediaScanner,
          * the following value is stored in the database column
          * {@link Downloads.Impl#COLUMN_MEDIA_SCANNED}.
@@ -1128,9 +1130,13 @@ public class DownloadManager {
      */
     public void restartDownload(long... ids) {
         Cursor cursor = query(new Query().setFilterById(ids));
+        int isScanned = Request.SCANNABLE_VALUE_NO;
+
         try {
             for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
                 int status = cursor.getInt(cursor.getColumnIndex(COLUMN_STATUS));
+                isScanned = checkScanned(cursor);
+
                 if (status != STATUS_SUCCESSFUL && status != STATUS_FAILED) {
                     throw new IllegalArgumentException("Cannot restart incomplete download: "
                             + cursor.getLong(cursor.getColumnIndex(COLUMN_ID)));
@@ -1145,8 +1151,25 @@ public class DownloadManager {
         values.put(Downloads.Impl.COLUMN_TOTAL_BYTES, -1);
         values.putNull(Downloads.Impl._DATA);
         values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PENDING);
-        values.put(Downloads.Impl.COLUMN_FAILED_CONNECTIONS, 0);
+        values.put(Downloads.Impl.COLUMN_MEDIA_SCANNED,isScanned);
         mResolver.update(mBaseUri, values, getWhereClauseForIds(ids), getWhereArgsForIds(ids));
+    }
+
+    /**
+     * Check whether or not download data has been scanned.
+     */
+    private int checkScanned(Cursor cursor) {
+        int isScanned = Request.SCANNABLE_VALUE_NO;
+
+        if (cursor != null) {
+            isScanned = cursor.getInt(cursor.getColumnIndex(Downloads.Impl.COLUMN_MEDIA_SCANNED));
+        }
+
+        if(isScanned == Request.SCANNABLE_VALUE_SCANNED) {
+            isScanned = Request.SCANNABLE_VALUE_YES;
+        }
+
+        return isScanned;
     }
 
     /**
