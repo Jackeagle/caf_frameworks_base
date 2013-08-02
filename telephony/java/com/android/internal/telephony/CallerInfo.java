@@ -91,6 +91,13 @@ public class CallerInfo {
     public int namePresentation;
     public boolean contactExists;
 
+    /**
+     * phoneLabel is designed as a international string and we shouldn't get it
+     * directly, otherwise the value will not be updated when system language
+     * changes.
+     *
+     * @deprecated use {@link #getPhoneLabel()} instead.
+     */
     public String phoneLabel;
     /* Split up the phoneLabel into number type and label name */
     public int    numberType;
@@ -583,6 +590,24 @@ public class CallerInfo {
            countryIso = "US"; //default value is "US"
       }
       return countryIso;
+    }
+
+    /**
+     * Return localized string for phone label.
+     *
+     * Because phoneLabel is a international string, we should get it from
+     * resources, NOT get it directly. Note that it should be called after
+     * getCallerInfo.
+     */
+    public String getPhoneLabel(Context context) {
+        if (null == phoneLabel || null == context ||
+                null == context.getResources()) {
+            return phoneLabel;
+        }
+
+        // Get phonelabel just the way it's initialized.
+        return Phone.getTypeLabel(context.getResources(), numberType,
+                numberLabel).toString();
     }
 
     /**
