@@ -382,6 +382,8 @@ public final class ShutdownThread extends Thread {
         // just in case.
         final long endTime = SystemClock.elapsedRealtime() + timeout;
         final boolean[] done = new boolean[1];
+        final boolean mHasTelephony = !SystemProperties.getBoolean("ro.radio.noril", false);
+
         Thread t = new Thread() {
             public void run() {
                 boolean nfcOff;
@@ -421,26 +423,28 @@ public final class ShutdownThread extends Thread {
 
                 try {
                     radioOff = true;
-                    if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                        final ITelephonyMSim mphone = ITelephonyMSim.Stub.asInterface(
-                                ServiceManager.checkService("phone_msim"));
-                        if (mphone != null) {
-                            //radio off indication should be sent for both subscriptions
-                            //in case of DSDS.
-                            for (int i = 0; i < MSimTelephonyManager.getDefault().
-                                    getPhoneCount(); i++) {
-                                radioOff = radioOff && !mphone.isRadioOn(i);
-                                if (mphone.isRadioOn(i)) {
-                                    Log.w(TAG, "Turning off radio on Subscription :" + i);
-                                    mphone.setRadio(false, i);
+                    if (mHasTelephony) {
+                        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                            final ITelephonyMSim mphone = ITelephonyMSim.Stub.asInterface(
+                                    ServiceManager.checkService("phone_msim"));
+                            if (mphone != null) {
+                                // radio off indication should be sent for both subscriptions
+                                // in case of DSDS.
+                                for (int i = 0; i < MSimTelephonyManager.getDefault().
+                                        getPhoneCount(); i++) {
+                                    radioOff = radioOff && !mphone.isRadioOn(i);
+                                    if (mphone.isRadioOn(i)) {
+                                        Log.w(TAG, "Turning off radio on Subscription :" + i);
+                                        mphone.setRadio(false, i);
+                                    }
                                 }
                             }
-                        }
-                    } else {
-                        radioOff = phone == null || !phone.isRadioOn();
-                        if (!radioOff) {
-                            Log.w(TAG, "Turning off radio...");
-                            phone.setRadio(false);
+                        } else {
+                            radioOff = phone == null || !phone.isRadioOn();
+                            if (!radioOff) {
+                                Log.w(TAG, "Turning off radio...");
+                                phone.setRadio(false);
+                            }
                         }
                     }
                 } catch (RemoteException ex) {
