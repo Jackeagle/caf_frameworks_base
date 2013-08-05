@@ -49,6 +49,10 @@ public class WifiNative {
     static final int BLUETOOTH_COEXISTENCE_MODE_SENSE = 2;
     static final int NUM_SCAN_RESULTS_PER_ITERATION = 20;
 
+    static final int SCAN_WITHOUT_CONNECTION_SETUP 		 = 1;
+    static final int SCAN_WITH_CONNECTION_SETUP			 = 2;
+	
+
     String mInterface = "";
     private boolean mSuspendOptEnabled = false;
 
@@ -117,15 +121,13 @@ public class WifiNative {
         return (pong != null && pong.equals("PONG"));
     }
 
-    public boolean scan() {
-       return doBooleanCommand("SCAN");
-    }
-
-    public boolean setScanMode(boolean setActive) {
-        if (setActive) {
-            return doBooleanCommand("DRIVER SCAN-ACTIVE");
+    public boolean scan(int type) {
+        if (type == SCAN_WITHOUT_CONNECTION_SETUP) {
+            return doBooleanCommand("SCAN TYPE=ONLY");
+        } else if (type == SCAN_WITH_CONNECTION_SETUP) {
+            return doBooleanCommand("SCAN");
         } else {
-            return doBooleanCommand("DRIVER SCAN-PASSIVE");
+            throw new IllegalArgumentException("Invalid scan type");
         }
     }
 
@@ -399,14 +401,10 @@ public class WifiNative {
 
     public boolean saveConfig() {
         // Make sure we never write out a value for AP_SCAN other than 1
-        return doBooleanCommand("AP_SCAN 1") && doBooleanCommand("SAVE_CONFIG");
+		return doBooleanCommand("SAVE_CONFIG");
     }
 
 	private native boolean setNetworkVariableCommand(String iface, int netId, String name, String value);
-
-    public boolean setScanResultHandling(int mode) {
-        return doBooleanCommand("AP_SCAN " + mode);
-    }
 
     public boolean addToBlacklist(String bssid) {
         if (TextUtils.isEmpty(bssid)) return false;
