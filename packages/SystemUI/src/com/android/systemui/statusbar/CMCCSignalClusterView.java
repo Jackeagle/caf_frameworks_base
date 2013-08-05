@@ -344,7 +344,6 @@ public class CMCCSignalClusterView
         case ServiceState.RIL_RADIO_TECHNOLOGY_IS95B:
         case ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT:
         case ServiceState.RIL_RADIO_TECHNOLOGY_GPRS:
-	 case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
          if(isSimRoam){
             return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_R_G[inetCondition][level];}
          else{
@@ -355,7 +354,8 @@ public class CMCCSignalClusterView
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
         case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
 	 case ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA:
-         if(isSimRoam){
+	 case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
+        if(isSimRoam){
           return  TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_R_3G[inetCondition][level];}
          else{
             return TelephonyIcons.CMCC_DATA_SIGNAL_STRENGTH_3G[inetCondition][level];}
