@@ -3385,7 +3385,6 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
             prop = (set_characteristic_property_t *) calloc(1, sizeof(struct set_characteristic_property_t));
             prop->path = (char *)calloc(strlen(c_path) + strlen(c_data) + 1, sizeof(char));
 
-            prop->path = (char *)calloc(strlen(c_path) + 1, sizeof(char));
             strlcpy(prop->path, c_path, strlen(c_path) + 1);
 
             prop->property = (char *)calloc(strlen(c_key) + 1, sizeof(char));
