@@ -30,6 +30,7 @@ import android.graphics.drawable.Drawable;
 import android.hardware.display.WifiDisplayStatus;
 import android.net.ConnectivityManager;
 import android.os.Handler;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
@@ -190,6 +191,25 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         }
     }
 
+    /** ContentObserver to watch mobile data on/off **/
+    private class DataSwitchObserver extends ContentObserver {
+        public DataSwitchObserver(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            onMobileDataSwitch();
+        }
+
+        public void startObserving() {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Global.getUriFor(Settings.Global.MOBILE_DATA),
+                    false, this, mUserTracker.getCurrentUserId());
+        }
+    }
+
+
     private final Context mContext;
     private final Handler mHandler;
     private final CurrentUserTracker mUserTracker;
@@ -269,6 +289,9 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
                 onBrightnessLevelChanged();
                 onNextAlarmChanged();
                 onBugreportChanged();
+                if (dataSwitchEnabled()) {
+                    onMobileDataSwitch();
+                }
             }
         };
 
@@ -286,6 +309,10 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
         IntentFilter alarmIntentFilter = new IntentFilter();
         alarmIntentFilter.addAction(Intent.ACTION_ALARM_CHANGED);
         context.registerReceiver(mAlarmIntentReceiver, alarmIntentFilter);
+
+        if (dataSwitchEnabled()) {
+            new DataSwitchObserver(mHandler).startObserving();
+        }
     }
 
     void updateResources() {
@@ -452,7 +479,11 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     void addRSSITile(QuickSettingsTileView view, RefreshCallback cb) {
         mRSSITile = view;
         mRSSICallback = cb;
-        mRSSICallback.refreshView(mRSSITile, mRSSIState);
+        if (dataSwitchEnabled()) {
+            onMobileDataSwitch();
+        } else {
+            mRSSICallback.refreshView(mRSSITile, mRSSIState);
+        }
     }
     // NetworkSignalChanged callback
     @Override
@@ -477,6 +508,25 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
             mRSSIState.label = enabled
                     ? removeTrailingPeriod(enabledDesc)
                     : r.getString(R.string.quick_settings_rssi_emergency_only);
+            mRSSICallback.refreshView(mRSSITile, mRSSIState);
+        }
+    }
+
+    boolean dataSwitchEnabled() {
+        return SystemProperties.getBoolean("persist.env.sb.dataswitch", false);
+    }
+
+    void switchMobileData() {
+        ConnectivityManager cm = (ConnectivityManager)mContext.getSystemService(
+                Context.CONNECTIVITY_SERVICE);
+        cm.setMobileDataEnabled(!mRSSIState.enabled);
+    }
+
+    private void onMobileDataSwitch() {
+        ConnectivityManager cm = (ConnectivityManager)mContext.getSystemService(
+                Context.CONNECTIVITY_SERVICE);
+        mRSSIState.enabled = cm.getMobileDataEnabled();
+        if (mRSSICallback != null && mRSSITile != null) {
             mRSSICallback.refreshView(mRSSITile, mRSSIState);
         }
     }
