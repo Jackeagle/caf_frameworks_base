@@ -1155,8 +1155,7 @@ class BluetoothEventLoop {
         Intent intent = new Intent(BluetoothDevice.ACTION_PAIRING_CANCEL);
         mContext.sendBroadcast(intent, BLUETOOTH_ADMIN_PERM);
 
-        mHandler.sendMessageDelayed(mHandler.obtainMessage(EVENT_AGENT_CANCEL),
-                   1500);
+        mHandler.sendMessage(mHandler.obtainMessage(EVENT_AGENT_CANCEL));
 
         return;
     }
