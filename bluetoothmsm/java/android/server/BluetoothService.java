@@ -104,7 +104,8 @@ import java.util.NoSuchElementException;
 public class BluetoothService extends IBluetooth.Stub {
     private static final String TAG = "BluetoothService";
     private static final boolean DBG = true;
-
+    private static boolean mIsBootComplete = false;
+    private static boolean mIsOnBootBTOnPending = false;
     private int mNativeData;
     private BluetoothEventLoop mEventLoop;
     private BluetoothHeadset mHeadsetProxy;
@@ -463,6 +464,7 @@ public class BluetoothService extends IBluetooth.Stub {
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+        filter.addAction(Intent.ACTION_BOOT_COMPLETED);
         mContext.registerReceiver(mReceiver, filter);
         mBluetoothInputProfileHandler = BluetoothInputProfileHandler.getInstance(mContext, this);
         mBluetoothPanProfileHandler = BluetoothPanProfileHandler.getInstance(mContext, this);
@@ -776,6 +778,14 @@ public class BluetoothService extends IBluetooth.Stub {
 
     /** Bring up BT and persist BT on in settings */
     public boolean enable() {
+        /* Additional check for property is used in case if BluetoothService is
+         * restarted by Android system in low memory scenarios.
+         */
+        if(!mIsBootComplete && !("1".equals(SystemProperties.get("dev.bootcomplete")))) {
+            mIsOnBootBTOnPending = true;
+            Log.i(TAG, "Booting in progress. BT enable deferred.");
+            return false;
+        }
         return enable(true, true);
     }
 
@@ -2884,7 +2894,15 @@ public class BluetoothService extends IBluetooth.Stub {
             if (intent == null) return;
 
             String action = intent.getAction();
-            if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
+            if (action.equals(Intent.ACTION_BOOT_COMPLETED)) {
+                mIsBootComplete = true;
+                Log.i(TAG, "Boot complete.");
+                if (mIsOnBootBTOnPending) {
+                    mIsOnBootBTOnPending = false;
+                    Log.i(TAG, "Deferred BT on triggered.");
+                    enable();
+                }
+            } else if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
                 ContentResolver resolver = context.getContentResolver();
                 // Query the airplane mode from Settings.System just to make sure that
                 // some random app is not sending this intent and disabling bluetooth
