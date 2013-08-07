@@ -587,9 +587,9 @@ public class WifiService extends IWifiManager.Stub {
     /**
      * see {@link android.net.wifi.WifiManager#startScan()}
      */
-    public void startScan(boolean forceActive) {
+    public void startScan() {
         enforceChangePermission();
-        mWifiStateMachine.startScan(forceActive);
+        mWifiStateMachine.startScan();
         noteScanStart();
     }
 
