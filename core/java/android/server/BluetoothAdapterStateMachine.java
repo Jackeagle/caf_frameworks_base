@@ -373,7 +373,6 @@ final class BluetoothAdapterStateMachine extends StateMachine {
                 case SERVICE_RECORD_LOADED:
                     removeMessages(PREPARE_BLUETOOTH_TIMEOUT);
                     transitionTo(mHotOff);
-                    deferMessage(obtainMessage(TURN_ON_CONTINUE));
                     break;
                 case POWER_STATE_CHANGED:
                     if (!((Boolean) message.obj)) {
