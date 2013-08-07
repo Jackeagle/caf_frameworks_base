@@ -1345,6 +1345,7 @@
   <java-symbol type="id" name="pinEntry" />
   <java-symbol type="id" name="right_icon" />
   <java-symbol type="id" name="seven" />
+  <java-symbol type="id" name="simPinEntry" />
   <java-symbol type="id" name="six" />
   <java-symbol type="id" name="status" />
   <java-symbol type="id" name="switch_ime_button" />
