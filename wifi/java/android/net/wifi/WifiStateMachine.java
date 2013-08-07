@@ -140,8 +140,6 @@ public class WifiStateMachine extends StateMachine {
     private int mReconnectCount = 0;
     private boolean mIsScanMode = false;
     private boolean mScanResultIsPending = false;
-    /* Tracks if the current scan settings are active */
-    private boolean mSetScanActive = false;
     /* Tracks if state machine has received any screen state change broadcast yet.
      * We can miss one of these at boot.
      */
@@ -313,14 +311,12 @@ public class WifiStateMachine extends StateMachine {
     static final int CMD_START_SCAN                       = BASE + 71;
     /* Set scan mode. CONNECT_MODE or SCAN_ONLY_MODE */
     static final int CMD_SET_SCAN_MODE                    = BASE + 72;
-    /* Set scan type. SCAN_ACTIVE or SCAN_PASSIVE */
-    static final int CMD_SET_SCAN_TYPE                    = BASE + 73;
     /* Disconnect from a network */
-    static final int CMD_DISCONNECT                       = BASE + 74;
+    static final int CMD_DISCONNECT                       = BASE + 73;
     /* Reconnect to a network */
-    static final int CMD_RECONNECT                        = BASE + 75;
+    static final int CMD_RECONNECT                        = BASE + 74;
     /* Reassociate to a network */
-    static final int CMD_REASSOCIATE                      = BASE + 76;
+    static final int CMD_REASSOCIATE                      = BASE + 75;
     /* Controls suspend mode optimizations
      *
      * When high perf mode is enabled, suspend mode optimizations are disabled
@@ -372,9 +368,6 @@ public class WifiStateMachine extends StateMachine {
 
     private static final int CONNECT_MODE   = 1;
     private static final int SCAN_ONLY_MODE = 2;
-
-    private static final int SCAN_ACTIVE = 1;
-    private static final int SCAN_PASSIVE = 2;
 
     private static final int SUCCESS = 1;
     private static final int FAILURE = -1;
@@ -678,7 +671,7 @@ public class WifiStateMachine extends StateMachine {
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        startScan(false);
+                        startScan();
                     }
                 },
                 new IntentFilter(ACTION_START_SCAN));
@@ -788,10 +781,14 @@ public class WifiStateMachine extends StateMachine {
     /**
      * TODO: doc
      */
-    public void startScan(boolean forceActive) {
-        sendMessage(obtainMessage(CMD_START_SCAN, forceActive ?
-                SCAN_ACTIVE : SCAN_PASSIVE, 0));
+    public void startScan() {
+        sendMessage(CMD_START_SCAN);
     }
+
+    private void startScanNative(int type) {
+        mWifiNative.scan(type);
+        mScanResultIsPending = true;
+     }
 
     /**
      * TODO: doc
@@ -964,17 +961,6 @@ public class WifiStateMachine extends StateMachine {
           sendMessage(obtainMessage(CMD_SET_SCAN_MODE, SCAN_ONLY_MODE, 0));
       } else {
           sendMessage(obtainMessage(CMD_SET_SCAN_MODE, CONNECT_MODE, 0));
-      }
-    }
-
-    /**
-     * TODO: doc
-     */
-    public void setScanType(boolean active) {
-      if (active) {
-          sendMessage(obtainMessage(CMD_SET_SCAN_TYPE, SCAN_ACTIVE, 0));
-      } else {
-          sendMessage(obtainMessage(CMD_SET_SCAN_TYPE, SCAN_PASSIVE, 0));
       }
     }
 
@@ -2047,7 +2033,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_BLACKLIST_NETWORK:
                 case CMD_CLEAR_BLACKLIST:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_RSSI_POLL:
@@ -2224,7 +2209,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -2362,7 +2346,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -2493,7 +2476,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -2715,7 +2697,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -2780,7 +2761,6 @@ public class WifiStateMachine extends StateMachine {
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                 case WifiMonitor.AUTHENTICATION_FAILURE_EVENT:
                 case WifiMonitor.WPS_OVERLAP_EVENT:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -2832,11 +2812,9 @@ public class WifiStateMachine extends StateMachine {
             }
 
             if (mIsScanMode) {
-                mWifiNative.setScanResultHandling(SCAN_ONLY_MODE);
                 mWifiNative.disconnect();
                 transitionTo(mScanModeState);
             } else {
-                mWifiNative.setScanResultHandling(CONNECT_MODE);
                 mWifiNative.reconnect();
                 // Status pulls in the current supplicant state and network connection state
                 // events over the monitor connection. This helps framework sync up with
@@ -2863,20 +2841,8 @@ public class WifiStateMachine extends StateMachine {
         public boolean processMessage(Message message) {
             if (DBG) log(getName() + message.toString() + "\n");
             switch(message.what) {
-               case CMD_SET_SCAN_TYPE:
-                    mSetScanActive = (message.arg1 == SCAN_ACTIVE);
-                    mWifiNative.setScanMode(mSetScanActive);
-                    break;
                 case CMD_START_SCAN:
-                    boolean forceActive = (message.arg1 == SCAN_ACTIVE);
-                    if (forceActive && !mSetScanActive) {
-                        mWifiNative.setScanMode(forceActive);
-                    }
-                    mWifiNative.scan();
-                    if (forceActive && !mSetScanActive) {
-                        mWifiNative.setScanMode(mSetScanActive);
-                    }
-                    mScanResultIsPending = true;
+                    startScanNative(WifiNative.SCAN_WITH_CONNECTION_SETUP);
                     break;
                 case CMD_SET_COUNTRY_CODE:
                     String country = (String) message.obj;
@@ -2891,7 +2857,7 @@ public class WifiStateMachine extends StateMachine {
                     if (mWifiNative.setBand(band)) {
                         mFrequencyBand.set(band);
                         //Fetch the latest scan results when frequency band is set
-                        startScan(true);
+                        startScanNative(WifiNative.SCAN_WITH_CONNECTION_SETUP);
                     } else {
                         loge("Failed to set frequency band " + band);
                     }
@@ -3039,7 +3005,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -3076,7 +3041,6 @@ public class WifiStateMachine extends StateMachine {
                     /* Queue driver commands */
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -3141,11 +3105,13 @@ public class WifiStateMachine extends StateMachine {
                         /* Ignore */
                         return HANDLED;
                     } else {
-                        mWifiNative.setScanResultHandling(message.arg1);
                         mWifiNative.reconnect();
                         mIsScanMode = false;
                         transitionTo(mDisconnectedState);
                     }
+                    break;
+                case CMD_START_SCAN:
+                    startScanNative(WifiNative.SCAN_WITHOUT_CONNECTION_SETUP);
                     break;
                     /* Ignore */
                 case CMD_DISCONNECT:
@@ -3276,9 +3242,6 @@ public class WifiStateMachine extends StateMachine {
                         replyToMessage(message, WifiManager.WPS_FAILED, WifiManager.ERROR);
                     }
                     break;
-                case WifiMonitor.SCAN_RESULTS_EVENT:
-                    /* Handle scan results */
-                    return NOT_HANDLED;
                 case WifiMonitor.NETWORK_CONNECTION_EVENT:
                     if (DBG) log("Network connection established");
                     mLastNetworkId = message.arg1;
@@ -3352,8 +3315,9 @@ public class WifiStateMachine extends StateMachine {
                     }
                     break;
                 case CMD_START_SCAN:
-                    /* Have the parent state handle the rest */
-                    return NOT_HANDLED;
+                    /* Do not attempt to connect when we are already connected */
+                    startScanNative(WifiNative.SCAN_WITHOUT_CONNECTION_SETUP);
+                    break;
                     /* Ignore connection to same network */
                 case WifiManager.CONNECT_NETWORK:
                     int netId = message.arg1;
@@ -3419,16 +3383,6 @@ public class WifiStateMachine extends StateMachine {
             }
 
             return HANDLED;
-        }
-
-        @Override
-        public void exit() {
-            /* If a scan result is pending in connected state, the supplicant
-             * is in SCAN_ONLY_MODE. Restore CONNECT_MODE on exit
-             */
-            if (mScanResultIsPending) {
-                mWifiNative.setScanResultHandling(CONNECT_MODE);
-            }
         }
     }
 
@@ -3715,7 +3669,6 @@ public class WifiStateMachine extends StateMachine {
                     break;
                 case CMD_SET_SCAN_MODE:
                     if (message.arg1 == SCAN_ONLY_MODE) {
-                        mWifiNative.setScanResultHandling(message.arg1);
                         //Supplicant disconnect to prevent further connects
                         mWifiNative.disconnect();
                         mIsScanMode = true;
@@ -3923,7 +3876,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -4033,7 +3985,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
@@ -4125,7 +4076,6 @@ public class WifiStateMachine extends StateMachine {
                 case CMD_START_DRIVER:
                 case CMD_STOP_DRIVER:
                 case CMD_SET_SCAN_MODE:
-                case CMD_SET_SCAN_TYPE:
                 case CMD_SET_COUNTRY_CODE:
                 case CMD_SET_FREQUENCY_BAND:
                 case CMD_START_PACKET_FILTERING:
