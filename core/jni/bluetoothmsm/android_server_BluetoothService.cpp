@@ -822,6 +822,47 @@ static jboolean cancelPairingUserInputNative(JNIEnv *env, jobject object,
     return JNI_FALSE;
 }
 
+static jboolean cancelAuthNative(JNIEnv *env, jobject object,
+                                            jstring path) {
+#ifdef HAVE_BLUETOOTH
+    ALOGV("%s, ", __FUNCTION__);
+    DBusMessage *msg;
+    native_data_t *nat = get_native_data(env, object);
+    DBusError err;
+    jboolean ret = JNI_FALSE;
+    DBusMessage *reply = NULL;
+
+    dbus_error_init(&err);
+    if (nat) {
+        const char *c_path = env->GetStringUTFChars(path, NULL);
+
+        msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
+                                          c_path, DBUS_DEVICE_IFACE, "CancelAuth");
+        if (!msg) {
+            ALOGE("%s: Can't allocate new method call for device CancelAgent!", __FUNCTION__);
+            env->ReleaseStringUTFChars(path, c_path);
+            return JNI_FALSE;
+        }
+
+        /* Send the command. */
+        reply = dbus_connection_send_with_reply_and_block(nat->conn, msg, -1, &err);
+        if (dbus_error_is_set(&err)) {
+            LOG_AND_FREE_DBUS_ERROR_WITH_MSG(&err, msg);
+            env->ReleaseStringUTFChars(path, c_path);
+            goto done;
+        }
+
+        ret = JNI_TRUE;
+    }
+done:
+    if (msg) dbus_message_unref(msg);
+    if (reply) dbus_message_unref(reply);
+    return ret;
+#else
+    return JNI_FALSE;
+#endif
+}
+
 static jobjectArray getDevicePropertiesNative(JNIEnv *env, jobject object,
                                                     jstring path)
 {
@@ -3708,6 +3749,8 @@ static JNINativeMethod sMethods[] = {
     {"setPinNative", "(Ljava/lang/String;Ljava/lang/String;I)Z", (void *)setPinNative},
     {"cancelPairingUserInputNative", "(Ljava/lang/String;I)Z",
             (void *)cancelPairingUserInputNative},
+     {"cancelAuthNative", "(Ljava/lang/String;)Z",
+             (void *)cancelAuthNative},
     {"setDevicePropertyBooleanNative", "(Ljava/lang/String;Ljava/lang/String;I)Z",
             (void *)setDevicePropertyBooleanNative},
     {"setDevicePropertyStringNative", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
