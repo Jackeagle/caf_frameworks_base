@@ -78,6 +78,8 @@ public class WifiNative {
 
     private native String doStringCommand(String iface, String command);
 
+    private native boolean setNetworkVariableCommand(String iface, int netId, String name, String value);
+
     public WifiNative(String iface) {
         mInterface = iface;
         mTAG = "WifiNative-" + iface;
@@ -145,7 +147,7 @@ public class WifiNative {
 
     public boolean setNetworkVariable(int netId, String name, String value) {
         if (TextUtils.isEmpty(name) || TextUtils.isEmpty(value)) return false;
-        return doBooleanCommand("SET_NETWORK " + netId + " " + name + " " + value);
+	return setNetworkVariableCommand(mInterface, netId, name, value);
     }
 
     public String getNetworkVariable(int netId, String name) {
