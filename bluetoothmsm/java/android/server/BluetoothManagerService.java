@@ -65,7 +65,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                Settings.System.AIRPLANE_MODE_ON, 0);
         int bluetoothOn = Settings.Secure.getInt(mContentResolver,
             Settings.Secure.BLUETOOTH_ON, 0);
-        if (airplaneModeOn == 0 && bluetoothOn != 0) {
+        if (bluetoothOn != 0) {
             bluetooth.enable();
         }
     }
