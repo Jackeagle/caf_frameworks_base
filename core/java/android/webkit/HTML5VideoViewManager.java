@@ -94,6 +94,15 @@ class HTML5VideoViewManager
         }
     }
 
+    public void prepareToResume() {
+        assert (mUiThread == Thread.currentThread());
+        Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
+        while (iter.hasNext()) {
+            HTML5VideoViewProxy proxy = iter.next();
+            proxy.prepareToResume();
+        }
+    }
+
     public void enterFullscreenVideo(int layerId, String url) {
         assert (mUiThread == Thread.currentThread());
         Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
@@ -112,7 +121,11 @@ class HTML5VideoViewManager
         // Only one video can be in fullscreen mode
         // As soon as the fullscreen video is found we exit the loop
         while (iter.hasNext()) {
-            iter.next().webkitExitFullscreen();
+            HTML5VideoViewProxy proxy = iter.next();
+            if (proxy.isFullscreen() == true)
+                proxy.webkitExitFullscreen();
+            else
+                proxy.prepareToResume();
         }
     }
 }

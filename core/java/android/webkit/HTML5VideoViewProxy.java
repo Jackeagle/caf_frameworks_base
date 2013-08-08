@@ -255,6 +255,20 @@ class HTML5VideoViewProxy extends Handler
             }
         }
 
+        public void reset() {
+            if (mHTML5VideoView != null) {
+                mHTML5VideoView.reset();
+            }
+        }
+
+        public void prepareToResume() {
+            if (mHTML5VideoView != null) {
+                if (mHTML5VideoView.STATE_RESETTED == mHTML5VideoView.getCurrentState()) {
+                    mHTML5VideoView.prepareDataAndDisplayMode();
+                }
+            }
+        }
+
         public void onPrepared() {
             if (mCachedVolume >= 0.0f) {
                 mHTML5VideoView.setVolume(mCachedVolume);
@@ -922,10 +936,15 @@ class HTML5VideoViewProxy extends Handler
     public void pauseAndDispatch() {
         // mVideoPlayer.pause will always dispatch notification
         mVideoPlayer.pause();
+        mVideoPlayer.reset();
     }
 
     public void suspend() {
         mVideoPlayer.suspend();
+    }
+
+    public void prepareToResume() {
+        mVideoPlayer.prepareToResume();
     }
 
     public void webkitEnterFullscreen() {

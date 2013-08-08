@@ -78,6 +78,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     static final int STATE_PLAYING            = 4;
     static final int STATE_BUFFERING          = 5;
     static final int STATE_DETACHED           = 6;
+    static final int STATE_RESETTED           = 7;
 
     private HTML5VideoViewProxy mProxy;
 
@@ -170,6 +171,15 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
             mTimer.purge();
             mTimer.cancel();
             mTimer = null;
+        }
+    }
+
+    public void reset() {
+        if (mCurrentState < STATE_RESETTED) {
+            int position = getCurrentPosition();
+            mPlayer.reset();
+            mCurrentState = STATE_RESETTED;
+            seekTo(position);
         }
     }
 
