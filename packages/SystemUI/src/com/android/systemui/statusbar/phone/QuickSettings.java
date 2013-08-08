@@ -16,9 +16,12 @@
 
 package com.android.systemui.statusbar.phone;
 
+import com.android.internal.telephony.MSimConstants;
+import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.view.RotationPolicy;
 import com.android.systemui.R;
 
+import com.android.systemui.statusbar.phone.ExtQuickSettingsModel;
 import com.android.systemui.statusbar.phone.QuickSettingsModel.ApnState;
 import com.android.systemui.statusbar.phone.QuickSettingsModel.BluetoothState;
 import com.android.systemui.statusbar.phone.QuickSettingsModel.RSSIState;
@@ -89,7 +92,7 @@ class QuickSettings {
 
     private Context mContext;
     private PanelBar mBar;
-    private QuickSettingsModel mModel;
+    private ExtQuickSettingsModel mModel;
     private ViewGroup mContainerView;
 
     private DisplayManager mDisplayManager;
@@ -128,7 +131,7 @@ class QuickSettings {
         mDisplayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
         mContext = context;
         mContainerView = container;
-        mModel = new QuickSettingsModel(context);
+        mModel = new ExtQuickSettingsModel(context);
         mWifiDisplayStatus = new WifiDisplayStatus();
         mBluetoothState = new QuickSettingsModel.BluetoothState();
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -147,6 +150,9 @@ class QuickSettings {
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(Intent.ACTION_USER_SWITCHED);
         filter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
+        if (SystemProperties.getBoolean("persist.env.phone.global", false)) {
+            filter.addAction(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED);
+        }
         mContext.registerReceiver(mReceiver, filter);
 
         IntentFilter profileFilter = new IntentFilter();
@@ -776,6 +782,12 @@ class QuickSettings {
             });
             parent.addView(apnTile);
         }
+
+        if (SystemProperties.getBoolean("persist.env.phone.global", false)) {
+            // Roaming tile
+            QuickSettingsBasicTile roamingTile = mModel.addRoamingTile();
+            parent.addView(roamingTile);
+        }
     }
 
     void updateResources() {
@@ -879,6 +891,12 @@ class QuickSettings {
             } else if (Intent.ACTION_CONFIGURATION_CHANGED.equals(action)) {
                 if (mUseDefaultAvatar) {
                     queryForUserInformation();
+                }
+            } else if (TelephonyIntents.ACTION_SERVICE_STATE_CHANGED.equals(action)) {
+                int sub = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY, MSimConstants.SUB1);
+                if (sub == MSimConstants.SUB1
+                        && SystemProperties.getBoolean("persist.env.phone.global", false)) {
+                    mModel.onRoamingVisibleChanged();
                 }
             }
         }
