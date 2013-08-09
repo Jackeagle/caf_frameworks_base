@@ -5703,7 +5703,6 @@ public class BluetoothService extends IBluetooth.Stub {
         Log.d(TAG, "gattAclDisconnected");
         try {
             callerIntent = caller;
-            btDeviceInPreferredDevList = btDevice;
             String btAddress = btDevice.getAddress();
             boolean isDevInPreferredDevList = false;
             Log.d(TAG, "gattAclDisconnected  isScanInProgress ::"+isScanInProgress);
@@ -5713,18 +5712,19 @@ public class BluetoothService extends IBluetooth.Stub {
                     Log.d(TAG, "value ::"+entry.getValue());
                     if(btAddress.equalsIgnoreCase(entry.getKey().getAddress())) {
                         isDevInPreferredDevList = true;
+                        Log.d(TAG, "ble dev in preferred list:" + isDevInPreferredDevList );
+                        btDeviceInPreferredDevList = btDevice;
                         break;
                     }
                 }
             }
-            //Stop the scan if the scan is in progress
-            if(isScanInProgress == true) {
-                gattCancelConnectToPreferredDeviceList(sPListCallBack);
-            }
-            //If the ACL_DISCONNECTED intent is received after a preferred devices list device disconnects,
+             //If the ACL_DISCONNECTED intent is received after a preferred devices list device disconnects,
             //add device to preferred devices list again for auto connection
-            else if(isDevInPreferredDevList == true){
-                  Log.d(TAG, "gattAclDisconnected  reason ::" +reason);
+            if(isDevInPreferredDevList == true){
+                //Stop the scan if the scan is in progress
+                if(isScanInProgress == true) {
+                    gattCancelConnectToPreferredDeviceList(sPListCallBack);
+                }
                 addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
             }
             else {
@@ -5737,18 +5737,18 @@ public class BluetoothService extends IBluetooth.Stub {
     public void gattAclConnected(BluetoothDevice btDevice) {
         Log.d(TAG, "gattAclConnected");
         try {
-            btDeviceInPreferredDevList = btDevice;
             callerIntent = "ACTION_ACL_CONNECTED";
-            isScanInProgress = false;
             Log.d(TAG, "gattAclConnected isScanInProgress ::"+isScanInProgress);
             //false means device connected is not in preferred devices list
             boolean isDevInPreferredDevList = false;
-            Log.d(TAG, "ACL connected bluetooth device address::"+btDevice.getAddress());
             if(preferredDevicesList != null) {
                 for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
                     if(btDevice.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
                         if(entry.getValue() == DEVICE_IN_PREFERRED_DEVICES_LIST) {
                             isDevInPreferredDevList = true;
+                            isScanInProgress = false;
+                            Log.d(TAG, "ble dev in preferred list:" + isDevInPreferredDevList );
+                            btDeviceInPreferredDevList = btDevice;
                         }
                         break;
                     }
