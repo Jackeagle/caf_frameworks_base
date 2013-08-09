@@ -1533,6 +1533,7 @@
   <java-symbol type="string" name="kg_enter_confirm_pin_hint" />
   <java-symbol type="string" name="kg_invalid_confirm_pin_hint" />
   <java-symbol type="string" name="kg_text_message_separator" />
+  <java-symbol type="string" name="date_format_day_month_week" />
 
   <!-- From services -->
   <java-symbol type="anim" name="screen_rotate_0_enter" />

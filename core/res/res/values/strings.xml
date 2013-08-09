@@ -4194,6 +4194,7 @@
     <string name="China_Telecom">China Telecom</string>
 
     <string name="no_quick_contact">No Quick Contact</string>
+    <string name="date_format_day_month_week">EEE, d MMMM</string>
 
     <!-- Text of the checkbox for the permission confirmation dialog to remember the user's choice. [CHAR LIMIT=40] -->
     <string name="permission_remember_choice">Remember</string>
