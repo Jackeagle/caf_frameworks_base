@@ -20,6 +20,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.Resources;
+import android.provider.Settings;
+import android.text.format.DateFormat;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewParent;
@@ -39,6 +42,11 @@ public class DateView extends TextView {
     private boolean mAttachedToWindow;
     private boolean mWindowVisible;
     private boolean mUpdating;
+    private static String mDateFormat_DayMonthWeek;
+    private static final String KEY_DATE_FORMAT = "date_format";
+    private static final String DAY_MONTH_YEAR_DATE_FORMAT = "dd-MM-yyyy";
+
+    private CharSequence mDateFormatString;
 
     private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -91,11 +99,18 @@ public class DateView extends TextView {
     }
 
     protected void updateClock() {
-        final String dateFormat = getContext().getString(R.string.system_ui_date_pattern);
-        final Locale l = Locale.getDefault();
-        String fmt = ICU.getBestDateTimePattern(dateFormat, l.toString());
-        SimpleDateFormat sdf = new SimpleDateFormat(fmt, l);
-        setText(sdf.format(new Date()));
+        Resources res = getContext().getResources();
+        mDateFormat_DayMonthWeek =
+                res.getString(com.android.internal.R.string.date_format_day_month_week);
+        mDateFormatString =
+                res.getText(com.android.internal.R.string.abbrev_wday_month_day_no_year);
+        String currentDateFormat = Settings.System.getString(getContext().getContentResolver(),
+                KEY_DATE_FORMAT);
+        //Only deal D_M_Y date fromat, the remaining are correct.
+        if (currentDateFormat != null && currentDateFormat.equals(DAY_MONTH_YEAR_DATE_FORMAT)) {
+            mDateFormatString = mDateFormat_DayMonthWeek;
+        }
+        setText(DateFormat.format(mDateFormatString, new Date()));
     }
 
     private boolean isVisible() {
