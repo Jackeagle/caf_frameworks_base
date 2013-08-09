@@ -463,6 +463,18 @@ public final class DisplayManagerService extends IDisplayManager.Stub {
             throw new IllegalArgumentException("address must not be null");
         }
 
+        //Query existing displays, check for OVERLAY display
+        int [] displayIDs = getDisplayIds();
+        for(int dIndex = 0; dIndex < displayIDs.length; dIndex++){
+            DisplayInfo dInfo = getDisplayInfo(dIndex);
+            //Fail connection if OVERLAY display is present
+            if(Display.typeToString(dInfo.type).equals("OVERLAY")){
+                Slog.w(TAG, "OVERLAY detected, failing WiFi display"
+                        + "connection");
+                return;
+            }
+        }
+
         final boolean trusted = canCallerConfigureWifiDisplay();
         final long token = Binder.clearCallingIdentity();
         try {
