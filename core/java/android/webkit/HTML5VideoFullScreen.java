@@ -103,7 +103,14 @@ public class HTML5VideoFullScreen extends HTML5VideoView
                     // ensure the controller will get repositioned later
                     mMediaController.hide();
                 }
-                mMediaController.show();
+                mMediaController.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mMediaController != null) {
+                            mMediaController.show();
+                        }
+                    }
+                });
             }
         }
 
