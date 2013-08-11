@@ -126,7 +126,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         telephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_SERVICE_STATE);
         ConnectivityManager cm = (ConnectivityManager)
                 context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        mHasTelephony = cm.isNetworkSupported(ConnectivityManager.TYPE_MOBILE);
+        mHasTelephony = cm.isNetworkSupported(ConnectivityManager.TYPE_MOBILE)
+                && (!SystemProperties.getBoolean("ro.radio.noril", false));
         mContext.getContentResolver().registerContentObserver(
                 Settings.Global.getUriFor(Settings.Global.AIRPLANE_MODE_ON), true,
                 mAirplaneModeObserver);
