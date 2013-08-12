@@ -148,7 +148,7 @@ final class BluetoothAdapterStateMachine extends StateMachine {
     private int mPublicState;
 
     // timeout value waiting for all the devices to be disconnected
-    private static final int DEVICES_DISCONNECT_TIMEOUT_TIME = 3000;
+    private static final int DEVICES_DISCONNECT_TIMEOUT_TIME = 6000;
 
     private static final int PREPARE_BLUETOOTH_TIMEOUT_TIME = 10000;
 
