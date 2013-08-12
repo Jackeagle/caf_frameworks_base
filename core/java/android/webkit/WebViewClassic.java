@@ -3563,6 +3563,9 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
                 nativeSetPauseDrawing(mNativeClass, false);
             }
         }
+        if (mHTML5VideoViewManager != null) {
+            mHTML5VideoViewManager.prepareToResume();
+        }
         if (mIsMultitabManagementOn) {
             WebViewCore.resumeUpdatePicture(mWebViewCore);
         }
