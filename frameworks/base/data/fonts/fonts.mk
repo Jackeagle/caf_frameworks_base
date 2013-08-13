@@ -16,7 +16,6 @@
 
 PRODUCT_COPY_FILES := \
     frameworks/base/data/fonts/system_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/system_fonts.xml 
-
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_COPY_FILES += \
     vendor/qcom/proprietary/qrdplus/globalization/engine/fallback_fonts-Rev.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
@@ -24,6 +23,7 @@ else
 PRODUCT_COPY_FILES += \
     frameworks/base/data/fonts/fallback_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
 endif
+
 
 PRODUCT_PACKAGES := \
     DroidSansFallback.ttf \
@@ -40,7 +40,7 @@ PRODUCT_PACKAGES := \
     RobotoCondensed-Italic.ttf \
     RobotoCondensed-BoldItalic.ttf \
     DroidNaskh-Regular.ttf \
-    DroidNaskh-Regular-SystemUI.ttf \
+    DroidNaskhUI-Regular.ttf \
     DroidSansHebrew-Regular.ttf \
     DroidSansHebrew-Bold.ttf \
     DroidSansThai.ttf \
@@ -58,7 +58,6 @@ PRODUCT_PACKAGES := \
     AndroidClock_Solid.ttf \
 
 
-
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_PACKAGES += \
     DroidSansHindi.ttf \
@@ -68,11 +67,9 @@ PRODUCT_PACKAGES += \
     DroidSansKannada.ttf \
     DroidSansBengali.ttf \
     DroidSansGujarati.ttf \
-    DroidSansMalayalam.ttf \
-    DroidSansOdia.ttf 
+    DroidSansMalayalam.ttf 
 
 else
 PRODUCT_PACKAGES += \
-    DroidSansDevanagari-Regular.ttf 
+    DroidSansDevanagari-Regular.ttf
 endif
-
