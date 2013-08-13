@@ -5725,7 +5725,8 @@ public class BluetoothService extends IBluetooth.Stub {
                 if(isScanInProgress == true) {
                     gattCancelConnectToPreferredDeviceList(sPListCallBack);
                 }
-                addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
+                else
+                    addToPreferredDeviceList(btDeviceInPreferredDevList.getAddress(), sPListCallBack);
             }
             else {
                 callerIntent = null;
