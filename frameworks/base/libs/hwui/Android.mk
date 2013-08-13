@@ -5,6 +5,8 @@ include $(CLEAR_VARS)
 # defined in the current device/board configuration
 ifeq ($(USE_OPENGL_RENDERER),true)
 
+
+
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
         LOCAL_CFLAGS += -DREVERIE
 endif
