@@ -5678,18 +5678,11 @@ public class BluetoothService extends IBluetooth.Stub {
                 {
                    Map.Entry<BluetoothDevice, Integer> item = it.next();
                    if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(item.getKey().getAddress())) {
-                       it.remove();
-                   }
-                }
-            }
-            if(preferredDevicesList != null) {
-                for(Map.Entry<BluetoothDevice, Integer> entry : preferredDevicesList.entrySet()) {
-                    if(btDeviceInPreferredDevList.getAddress().equalsIgnoreCase(entry.getKey().getAddress())) {
-                        if(entry.getValue() == DEVICE_IN_PREFERRED_DEVICES_LIST) {
+                       if(item.getValue() == DEVICE_IN_PREFERRED_DEVICES_LIST) {
                             isDevInPreferredDevList = true;
                         }
-                        break;
-                    }
+                       it.remove();
+                   }
                 }
             }
             if(isDevInPreferredDevList == true) {
