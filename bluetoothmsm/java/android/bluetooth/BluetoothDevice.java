@@ -210,6 +210,16 @@ public final class BluetoothDevice implements Parcelable {
             "android.bluetooth.device.action.BOND_STATE_CHANGED";
 
     /**
+     * Broadcast Action: Indicates that battery level of remote device has changed.
+     * <p>Always contains the extra fields {@link #EXTRA_BATTERY_LEVEL}
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_BATTERY_LEVEL =
+            "codeaurora.bluetooth.device.action.BATTERY_LEVEL";
+
+    /**
      * Used as a Parcelable {@link BluetoothDevice} extra field in every intent
      * broadcast by this class. It contains the {@link BluetoothDevice} that
      * the intent applies to.
@@ -592,6 +602,14 @@ public final class BluetoothDevice implements Parcelable {
      * @hide
      */
     public static final String DUN_STATE_CHANGED = "com.android.bluetooth.dun.statechanged";
+
+    /**
+     * Used as an extra field in ACTION_BATTERY_LEVEL intent.
+     * Contains the updated battery level of remote device.
+     * @hide
+     */
+    public static final String EXTRA_BATTERY_LEVEL = "codeaurora.bluetooth.device.extra.BATTERY_LEVEL";
+
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
      * getService() called.

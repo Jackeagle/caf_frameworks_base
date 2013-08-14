@@ -59,7 +59,8 @@ static Properties remote_device_properties[] = {
     {"Services", DBUS_TYPE_ARRAY},
     {"LeConnParams", DBUS_TYPE_UINT16},
     {"PID", DBUS_TYPE_UINT16},
-    {"VID", DBUS_TYPE_UINT16}
+    {"VID", DBUS_TYPE_UINT16},
+    {"BatteryLevel", DBUS_TYPE_BYTE},
 };
 
 static Properties adapter_properties[] = {
