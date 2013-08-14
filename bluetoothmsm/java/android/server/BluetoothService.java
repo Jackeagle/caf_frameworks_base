@@ -2613,7 +2613,11 @@ public class BluetoothService extends IBluetooth.Stub {
             Log.w(TAG, "cancelUserInputNative(" + address + ") called but no native data " +
                 "available, ignoring. Maybe the PasskeyAgent Request was already cancelled " +
                 "by the remote or by bluez.\n");
-            return false;
+            String path = getObjectPathFromAddress(address);
+            if (path != null)
+                return cancelAuthNative(path);
+            else
+                return false;
         }
         return cancelPairingUserInputNative(address, data.intValue());
     }
@@ -5797,6 +5801,7 @@ public class BluetoothService extends IBluetooth.Stub {
             int attributeId);
 
     private native boolean cancelPairingUserInputNative(String address, int nativeData);
+    private native boolean cancelAuthNative(String path);
     private native boolean setPinNative(String address, String pin, int nativeData);
     private native boolean sapAuthorizeNative(String address, boolean access, int nativeData);
     private native boolean DUNAuthorizeNative(String address, boolean access, int nativeData);
