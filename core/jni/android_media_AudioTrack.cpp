@@ -57,6 +57,7 @@ struct fields_t {
     int       EVRC;                  //...  format constants
     int       EVRCB;                 //...  format constants
     int       EVRCWB;                //...  format constants
+    int       EVRCNW;                //...  format constants
     int       STREAM_VOICE_CALL;     //...  stream type constants
     int       STREAM_SYSTEM;         //...  stream type constants
     int       STREAM_RING;           //...  stream type constants
@@ -233,6 +234,8 @@ int getformat(int audioformat)
         return AUDIO_FORMAT_EVRCB;
     else if(audioformat==javaAudioTrackFields.EVRCWB)
         return AUDIO_FORMAT_EVRCWB;
+    else if(audioformat==javaAudioTrackFields.EVRCNW)
+        return AUDIO_FORMAT_EVRCNW;
 
     return AUDIO_FORMAT_PCM_8_BIT;
 }
@@ -294,7 +297,8 @@ android_media_AudioTrack_native_setup(JNIEnv *env, jobject thiz, jobject weak_th
         && (audioFormat != javaAudioTrackFields.AMRWB)
         && (audioFormat != javaAudioTrackFields.EVRC)
         && (audioFormat != javaAudioTrackFields.EVRCB)
-        && (audioFormat != javaAudioTrackFields.EVRCWB)) {
+        && (audioFormat != javaAudioTrackFields.EVRCWB)
+        && (audioFormat != javaAudioTrackFields.EVRCNW)) {
         ALOGE("Error creating AudioTrack: unsupported audio format.");
         return AUDIOTRACK_ERROR_SETUP_INVALIDFORMAT;
     }
@@ -572,7 +576,8 @@ jint writeToTrack(const sp<AudioTrack>& track, jint audioFormat, jbyte* data,
         || (audioFormat == javaAudioTrackFields.AMRWB)
         || (audioFormat == javaAudioTrackFields.EVRC)
         || (audioFormat == javaAudioTrackFields.EVRCB)
-        || (audioFormat == javaAudioTrackFields.EVRCWB)) {
+        || (audioFormat == javaAudioTrackFields.EVRCWB)
+        || (audioFormat == javaAudioTrackFields.EVRCNW)) {
             // writing to shared memory, check for capacity
             if ((size_t)sizeInBytes > track->sharedBuffer()->size()) {
                 sizeInBytes = track->sharedBuffer()->size();
@@ -942,6 +947,7 @@ static JNINativeMethod gMethods[] = {
 #define JAVA_CONST_EVRC_NAME                            "ENCODING_EVRC"
 #define JAVA_CONST_EVRCB_NAME                           "ENCODING_EVRCB"
 #define JAVA_CONST_EVRCWB_NAME                          "ENCODING_EVRCWB"
+#define JAVA_CONST_EVRCNW_NAME                          "ENCODING_EVRCNW"
 #define JAVA_CONST_BUFFER_COUNT_NAME                    "BUFFER_COUNT"
 #define JAVA_CONST_STREAM_VOICE_CALL_NAME               "STREAM_VOICE_CALL"
 #define JAVA_CONST_STREAM_SYSTEM_NAME                   "STREAM_SYSTEM"
@@ -1042,6 +1048,9 @@ int register_android_media_AudioTrack(JNIEnv *env)
            || !android_media_getIntConstantFromClass(env, audioFormatClass,
                 JAVA_AUDIOFORMAT_CLASS_NAME,
                 JAVA_CONST_EVRCWB_NAME, &(javaAudioTrackFields.EVRCWB))
+           || !android_media_getIntConstantFromClass(env, audioFormatClass,
+                JAVA_AUDIOFORMAT_CLASS_NAME,
+                JAVA_CONST_EVRCNW_NAME, &(javaAudioTrackFields.EVRCNW))
 ) {
         // error log performed in android_media_getIntConstantFromClass()
         return -1;
