@@ -231,14 +231,14 @@ public class AudioManager {
     public static final int[] DEFAULT_STREAM_VOLUME = new int[] {
         4,  // STREAM_VOICE_CALL
         7,  // STREAM_SYSTEM
-        5,  // STREAM_RING
-        11, // STREAM_MUSIC
-        6,  // STREAM_ALARM
-        5,  // STREAM_NOTIFICATION
+        7,  // STREAM_RING
+        15, // STREAM_MUSIC
+        7,  // STREAM_ALARM
+        7,  // STREAM_NOTIFICATION
         7,  // STREAM_BLUETOOTH_SCO
         7,  // STREAM_SYSTEM_ENFORCED
-        11, // STREAM_DTMF
-        11, // STREAM_TTS
+        15, // STREAM_DTMF
+        15, // STREAM_TTS
         11  // STREAM_FM
     };
 
