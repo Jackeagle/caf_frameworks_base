@@ -2,6 +2,9 @@
 <!--
 /* //device/apps/common/assets/res/any/strings.xml
 **
+** Copyright (c) 2013, The Linux Foundation. All rights reserved.
+** Not a Contribution.
+**
 ** Copyright 2006, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
@@ -4161,4 +4164,6 @@
 
     <!-- Carrier text used in Multi SIM enabled view -->
     <string name="msim_carrier_text_format"><xliff:g id="text_1">%s</xliff:g>, <xliff:g id="text_2">%s</xliff:g></string>
+    <!-- Text of the checkbox for the permission confirmation dialog to remember the user's choice. [CHAR LIMIT=40] -->
+    <string name="permission_remember_choice">Remember</string>
 </resources>
