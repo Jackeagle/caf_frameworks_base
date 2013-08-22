@@ -321,6 +321,7 @@ public class AudioRecord
         case AudioFormat.ENCODING_EVRC:
         case AudioFormat.ENCODING_EVRCB:
         case AudioFormat.ENCODING_EVRCWB:
+        case AudioFormat.ENCODING_EVRCNW:
             mAudioFormat = audioFormat;
             break;
         default:
@@ -505,7 +506,8 @@ public class AudioRecord
             && audioFormat != AudioFormat.ENCODING_AMRWB
             && audioFormat != AudioFormat.ENCODING_EVRC
             && audioFormat != AudioFormat.ENCODING_EVRCB
-            && audioFormat != AudioFormat.ENCODING_EVRCWB) {
+            && audioFormat != AudioFormat.ENCODING_EVRCWB
+            && audioFormat != AudioFormat.ENCODING_EVRCNW) {
             loge("getMinBufferSize(): Invalid audio format.");
             return AudioRecord.ERROR_BAD_VALUE;
         }

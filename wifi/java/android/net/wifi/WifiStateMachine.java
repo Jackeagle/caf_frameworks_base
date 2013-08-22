@@ -67,9 +67,9 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.WorkSource;
 import android.provider.Settings;
+import android.util.Log;
 import android.text.TextUtils;
 import android.util.LruCache;
-
 import com.android.internal.R;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.util.AsyncChannel;
@@ -100,6 +100,7 @@ import java.util.regex.Pattern;
  */
 public class WifiStateMachine extends StateMachine {
 
+    private static final String TAG = "WifiStateMachine";
     private static final String NETWORKTYPE = "WIFI";
     private static final boolean DBG = false;
 
@@ -151,6 +152,9 @@ public class WifiStateMachine extends StateMachine {
     private boolean mBluetoothConnectionActive = false;
 
     private PowerManager.WakeLock mSuspendWakeLock;
+
+    private int startSafeChannel = 0;
+    private int endSafeChannel = 0;
 
     /**
      * Interval in milliseconds between polling for RSSI
@@ -514,6 +518,8 @@ public class WifiStateMachine extends StateMachine {
     private static final int DRIVER_STOP_REQUEST = 0;
     private static final String ACTION_DELAYED_DRIVER_STOP =
         "com.android.server.WifiManager.action.DELAYED_DRIVER_STOP";
+    private static final String ACTION_SAFE_WIFI_CHANNELS_CHANGED =
+           "qualcomm.intent.action.SAFE_WIFI_CHANNELS_CHANGED";
 
     /**
      * Keep track of whether WIFI is running.
@@ -599,7 +605,11 @@ public class WifiStateMachine extends StateMachine {
                 }
             },new IntentFilter(ConnectivityManager.ACTION_TETHER_STATE_CHANGED));
 
-        mContext.registerReceiver(
+       IntentFilter filter = new IntentFilter();
+       filter.addAction(ACTION_SAFE_WIFI_CHANNELS_CHANGED);
+       mContext.registerReceiver(WifiStateReceiver, filter);
+
+       mContext.registerReceiver(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
@@ -703,6 +713,32 @@ public class WifiStateMachine extends StateMachine {
         mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
     }
 
+    private BroadcastReceiver WifiStateReceiver = new BroadcastReceiver() {
+
+         public void onReceive(Context context, Intent intent) {
+             if (intent.getAction().equals(
+                 ACTION_SAFE_WIFI_CHANNELS_CHANGED)) {
+                 startSafeChannel = intent.getIntExtra("start_safe_channel", -1);
+                 endSafeChannel = intent.getIntExtra("end_safe_channel", -1);
+                 Log.d(TAG, "Received WIFI_CHANNELS_CHANGED broadcast");
+                 int state = syncGetWifiApState();
+                 if (state == WIFI_AP_STATE_ENABLED) {
+                     int autochannel = getSapAutoChannelSelection();
+                     Log.d(TAG,"autochannel=" + autochannel);
+                     if (1 == autochannel){
+                         int currentChannel = getSapOperatingChannel();
+                         if (currentChannel >= 0 &&
+                            (currentChannel < startSafeChannel ||
+                             currentChannel > endSafeChannel)) {
+                             Log.e(TAG, "Operating on restricted channel! Restart SAP");
+                             restartSoftApIfOn();
+                         }
+                     }
+                 }
+              }
+           }
+    };
+
     /*********************************************************
      * Methods exposed for public use
      ********************************************************/
@@ -786,6 +822,42 @@ public class WifiStateMachine extends StateMachine {
         WifiConfiguration ret = (WifiConfiguration) resultMsg.obj;
         resultMsg.recycle();
         return ret;
+    }
+
+    /**
+     * Function to set Channel range.
+    */
+    public void setChannelRange(int startchannel, int endchannel, int band) {
+       try {
+              Log.e(TAG, "setChannelRange");
+              mNwService.setChannelRange(startchannel, endchannel, band);
+           } catch(Exception e) {
+             loge("Exception in setChannelRange");
+           }
+    }
+
+    /**
+    *  Function to get SAP operating Channel
+    */
+    public int getSapOperatingChannel() {
+        try {
+            return mNwService.getSapOperatingChannel();
+        } catch(Exception e) {
+              loge("Exception in getSapOperatingChannel");
+              return -1;
+        }
+    }
+
+    /**
+    *  Function to get Auto Channel selection
+    */
+    public int getSapAutoChannelSelection() {
+        try {
+            return mNwService.getSapAutoChannelSelection();
+        } catch (Exception e) {
+             loge("Exception in getSapOperatingChannel");
+             return -1;
+        }
     }
 
     /**
@@ -1367,6 +1439,7 @@ public class WifiStateMachine extends StateMachine {
         mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
     }
 
+    private static final String ID_STR = "id=";
     private static final String BSSID_STR = "bssid=";
     private static final String FREQ_STR = "freq=";
     private static final String LEVEL_STR = "level=";
@@ -1376,8 +1449,10 @@ public class WifiStateMachine extends StateMachine {
     private static final String DELIMITER_STR = "====";
     private static final String END_STR = "####";
 
+
     /**
      * Format:
+     * id=1
      * bssid=68:7f:76:d7:1a:6e
      * freq=2412
      * level=-44
@@ -1385,6 +1460,7 @@ public class WifiStateMachine extends StateMachine {
      * flags=[WPA2-PSK-CCMP][WPS][ESS]
      * ssid=zfdy
      * ====
+     * id=2
      * bssid=68:5f:74:d7:1a:6f
      * freq=5180
      * level=-73
@@ -1393,18 +1469,44 @@ public class WifiStateMachine extends StateMachine {
      * ssid=zuby
      * ====
      */
-    private void setScanResults(String scanResults) {
+    private void setScanResults() {
         String bssid = "";
         int level = 0;
         int freq = 0;
         long tsf = 0;
         String flags = "";
         WifiSsid wifiSsid = null;
+        String scanResults;
+        String tmpResults;
+        StringBuffer scanResultsBuf = new StringBuffer();
+        int sid = 0;
 
-        if (scanResults == null) {
-            return;
+        while (true) {
+            tmpResults = mWifiNative.scanResults(sid);
+            if (TextUtils.isEmpty(tmpResults)) break;
+            scanResultsBuf.append(tmpResults);
+            scanResultsBuf.append("\n");
+            String[] lines = tmpResults.split("\n");
+            sid = -1;
+            for (int i=lines.length - 1; i >= 0; i--) {
+                if (lines[i].startsWith(END_STR)) {
+                    break;
+                } else if (lines[i].startsWith(ID_STR)) {
+                   try {
+                       sid = Integer.parseInt(lines[i].substring(ID_STR.length())) + 1;
+                   } catch (NumberFormatException e) {
+                       // Nothing to do
+                   }
+                   break;
+                }
+            }
+            if (sid == -1) break;
+         }
+
+        scanResults = scanResultsBuf.toString();
+        if (TextUtils.isEmpty(scanResults)) {
+           return;
         }
-
         synchronized(mScanResultCache) {
             mScanResults = new ArrayList<ScanResult>();
             String[] lines = scanResults.split("\n");
@@ -1740,6 +1842,14 @@ public class WifiStateMachine extends StateMachine {
         // TODO: Remove this comment when the driver is fixed.
         setSuspendOptimizationsNative(SUSPEND_DUE_TO_DHCP, false);
         mWifiNative.setPowerSave(false);
+
+        /* P2p discovery breaks dhcp, shut it down in order to get through this */
+        Message msg = new Message();
+        msg.what = WifiP2pService.BLOCK_DISCOVERY;
+        msg.arg1 = WifiP2pService.ENABLED;
+        msg.arg2 = DhcpStateMachine.CMD_PRE_DHCP_ACTION_COMPLETE;
+        msg.obj = mDhcpStateMachine;
+        mWifiP2pChannel.sendMessage(msg);
     }
 
 
@@ -1765,6 +1875,8 @@ public class WifiStateMachine extends StateMachine {
         /* Restore power save and suspend optimizations */
         setSuspendOptimizationsNative(SUSPEND_DUE_TO_DHCP, true);
         mWifiNative.setPowerSave(true);
+
+        mWifiP2pChannel.sendMessage(WifiP2pService.BLOCK_DISCOVERY, WifiP2pService.DISABLED);
 
         // Set the coexistence mode back to its default value
         mWifiNative.setBluetoothCoexistenceMode(
@@ -1844,6 +1956,10 @@ public class WifiStateMachine extends StateMachine {
                     loge("Exception in softap start " + e);
                     try {
                         mNwService.stopAccessPoint(mInterfaceName);
+                        if (startSafeChannel!=0) {
+                           Log.e(TAG, "Calling setChannelRange ---startSoftApWithConfig()");
+                           setChannelRange(startSafeChannel, endSafeChannel, 0);
+                        }
                         mNwService.startAccessPoint(config, mInterfaceName);
                     } catch (Exception e1) {
                         loge("Exception in softap re-start " + e1);
@@ -2230,7 +2346,7 @@ public class WifiStateMachine extends StateMachine {
                     sendMessageDelayed(CMD_START_SUPPLICANT, SUPPLICANT_RESTART_INTERVAL_MSECS);
                     break;
                 case WifiMonitor.SCAN_RESULTS_EVENT:
-                    setScanResults(mWifiNative.scanResults());
+                    setScanResults();
                     sendScanResultsAvailableBroadcast();
                     mScanResultIsPending = false;
                     break;
@@ -2960,7 +3076,6 @@ public class WifiStateMachine extends StateMachine {
             switch (message.what) {
               case DhcpStateMachine.CMD_PRE_DHCP_ACTION:
                   handlePreDhcpSetup();
-                  mDhcpStateMachine.sendMessage(DhcpStateMachine.CMD_PRE_DHCP_ACTION_COMPLETE);
                   break;
               case DhcpStateMachine.CMD_POST_DHCP_ACTION:
                   handlePostDhcpSetup();
@@ -3511,6 +3626,10 @@ public class WifiStateMachine extends StateMachine {
                 final WifiConfiguration config = (WifiConfiguration) message.obj;
 
                 if (config == null) {
+                   if (startSafeChannel!=0) {
+                       Log.e(TAG, "Calling setChannelRange ---CMD_START_AP SoftApStartingState()");
+                       setChannelRange(startSafeChannel, endSafeChannel , 0);
+                   }
                     mWifiApConfigChannel.sendMessage(CMD_REQUEST_AP_CONFIG);
                 } else {
                     mWifiApConfigChannel.sendMessage(CMD_SET_AP_CONFIG, config);
@@ -3748,5 +3867,14 @@ public class WifiStateMachine extends StateMachine {
         Message msg = Message.obtain();
         msg.arg2 = srcMsg.arg2;
         return msg;
+    }
+
+
+    private void restartSoftApIfOn() {
+        Log.e(TAG, "Disabling wifi ap");
+        setHostApRunning(null, false);
+        Log.e(TAG, "Enabling wifi ap");
+        setHostApRunning(null, true);
+        Log.e(TAG, "Restart softap Done");
     }
 }

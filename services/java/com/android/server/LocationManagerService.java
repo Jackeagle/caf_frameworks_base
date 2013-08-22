@@ -519,7 +519,7 @@ public class LocationManagerService extends ILocationManager.Stub {
         @Override
         public String toString() {
             StringBuilder s = new StringBuilder();
-            s.append("Reciever[");
+            s.append("Receiver[");
             s.append(Integer.toHexString(System.identityHashCode(this)));
             if (mListener != null) {
                 s.append(" listener");
@@ -1315,9 +1315,11 @@ public class LocationManagerService extends ILocationManager.Stub {
             checkLocationAccess(uid, packageName, allowedResolutionLevel);
 
             synchronized (mLock) {
-                Receiver recevier = checkListenerOrIntentLocked(listener, intent, pid, uid,
+                Receiver receiver = checkListenerOrIntentLocked(listener, intent, pid, uid,
                         packageName);
-                requestLocationUpdatesLocked(sanitizedRequest, recevier, pid, uid, packageName);
+                if (receiver != null) {
+                    requestLocationUpdatesLocked(sanitizedRequest, receiver, pid, uid, packageName);
+                }
             }
         } finally {
             Binder.restoreCallingIdentity(identity);
@@ -1370,7 +1372,9 @@ public class LocationManagerService extends ILocationManager.Stub {
             // providers may use public location API's, need to clear identity
             long identity = Binder.clearCallingIdentity();
             try {
-                removeUpdatesLocked(receiver);
+                if (receiver != null) {
+                    removeUpdatesLocked(receiver);
+                }
             } finally {
                 Binder.restoreCallingIdentity(identity);
             }
