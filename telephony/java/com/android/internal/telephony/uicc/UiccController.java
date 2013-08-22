@@ -196,6 +196,7 @@ public class UiccController extends Handler {
             mCi[i].registerForOn(this, EVENT_ICC_STATUS_CHANGED, index);
             // This is needed so that we query for sim status in the case when we boot in APM
             mCi[i].registerForAvailable(this, EVENT_ICC_STATUS_CHANGED, index);
+            mCi[i].registerForNotAvailable(this, EVENT_RADIO_UNAVAILABLE, index);
         }
     }
 
