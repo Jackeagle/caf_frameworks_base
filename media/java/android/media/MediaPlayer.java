@@ -918,7 +918,7 @@ public class MediaPlayer
         String scheme = uri.getScheme();
         mContext = context;
         mUri = uri;
-        Log.e(TAG, "Uri is  "+ mUri);
+        Log.e(TAG, "Uri is <URI SUPPRESSED>");
         if(scheme == null || scheme.equals("file")) {
             setDataSource(uri.getPath());
             return;
@@ -2062,7 +2062,7 @@ public class MediaPlayer
                        intent.putExtra("duration", getDuration());
                        intent.putExtra("time", System.currentTimeMillis());
                        intent.putExtra("position", getCurrentPosition());
-                       Log.d(TAG, "start() mUri is " + mUri);
+                       Log.d(TAG, "start() mUri is <URI SUPPRESSED>");
                        intent.putExtra("uripath", mUri);
                        intent.putExtra("playstate", PLAYSTATUS_PLAYING);
                        mContext.sendBroadcast(intent);
@@ -2076,7 +2076,7 @@ public class MediaPlayer
                        intent.putExtra("duration", getDuration());
                        intent.putExtra("time", System.currentTimeMillis());
                        intent.putExtra("position", getCurrentPosition());
-                       Log.d(TAG, "pause() mUri is " + mUri);
+                       Log.d(TAG, "pause() mUri is <URI SUPPRESSED>");
                        intent.putExtra("uripath", mUri);
                        intent.putExtra("playstate", PLAYSTATUS_PAUSED);
                        mContext.sendBroadcast(intent);
@@ -2090,7 +2090,7 @@ public class MediaPlayer
                        intent.putExtra("duration", getDuration());
                        intent.putExtra("time", System.currentTimeMillis());
                        intent.putExtra("position", getCurrentPosition());
-                       Log.d(TAG, "stop() mUri is " + mUri);
+                       Log.d(TAG, "stop() mUri is <URI SUPPRESSED>");
                        intent.putExtra("uripath", mUri);
                        intent.putExtra("playstate", PLAYSTATUS_STOPPED);
                        mContext.sendBroadcast(intent);
@@ -2104,7 +2104,7 @@ public class MediaPlayer
                        intent.putExtra("duration", getDuration());
                        intent.putExtra("time", System.currentTimeMillis());
                        intent.putExtra("position", msg.arg1);
-                       Log.d(TAG, "seekTo() mUri is " + mUri);
+                       Log.d(TAG, "seekTo() mUri is <URI SUPPRESSED>");
                        intent.putExtra("uripath", mUri);
                        if (msg.arg1 > msg.arg2) {
                            intent.putExtra("playstate", PLAYSTATUS_SEEKFWD);
