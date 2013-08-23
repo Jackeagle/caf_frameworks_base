@@ -23,10 +23,12 @@ import android.graphics.drawable.Drawable;
 import android.location.CountryDetector;
 import android.location.Country;
 import android.net.Uri;
+import android.os.SystemProperties;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.PhoneLookup;
 import android.provider.ContactsContract.RawContacts;
+import android.provider.GeocodedLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -539,10 +541,16 @@ public class CallerInfo {
      * @see com.android.i18n.phonenumbers.PhoneNumberOfflineGeocoder
      */
     private static String getGeoDescription(Context context, String number) {
+        GeocodedLocation geocodedLocation = null;
         if (VDBG) Rlog.v(TAG, "getGeoDescription('" + number + "')...");
 
         if (TextUtils.isEmpty(number)) {
             return null;
+        }
+
+        if (SystemProperties.getBoolean("persist.env.phone.location", false)
+                && (geocodedLocation = GeocodedLocation.getLocation(context, number)) != null) {
+            return geocodedLocation.getAreaCode().getAddress();
         }
 
         PhoneNumberUtil util = PhoneNumberUtil.getInstance();
