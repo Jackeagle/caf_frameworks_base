@@ -52,6 +52,8 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
 
+
+ifneq ($(MULTI_LANG_ENGINE),REVERIE)
 include $(CLEAR_VARS)
 LOCAL_MODULE := DroidSansTamil-Regular.ttf
 LOCAL_SRC_FILES := $(LOCAL_MODULE)
@@ -67,6 +69,24 @@ LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
+endif
+
+ifeq ($(MULTI_LANG_ENGINE),REVERIE)
+
+define addfont
+include $(CLEAR_VARS)
+LOCAL_MODULE := $(1)
+LOCAL_SRC_FILES :=  ../../../../$(PRODUCT_RENDERING_ENGINE_PATH)/$(1)
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
+include $(BUILD_PREBUILT)
+endef
+
+$(foreach ttf,$(PRODUCT_RENDERING_ENGINE_TTF_FILES),$(eval $(call addfont,$(ttf))))
+
+endif
+
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := MTLmr3m.ttf
@@ -81,9 +101,14 @@ extra_font_files := \
 	DroidSans.ttf \
 	DroidSans-Bold.ttf \
 	DroidSansEthiopic-Regular.ttf \
-	DroidSansTamil-Regular.ttf \
-	DroidSansTamil-Bold.ttf \
 	MTLmr3m.ttf
+
+ifneq ($(MULTI_LANG_ENGINE),REVERIE)
+extra_font_files += \
+        DroidSansTamil-Regular.ttf \
+        DroidSansTamil-Bold.ttf
+endif
+
 endif  # SMALLER_FONT_FOOTPRINT
 
 ################################
@@ -153,13 +178,17 @@ font_src_files += \
     RobotoCondensed-BoldItalic.ttf \
     DroidNaskh-Regular.ttf \
     DroidNaskhUI-Regular.ttf \
-    DroidSansDevanagari-Regular.ttf \
     DroidSansHebrew-Regular.ttf \
     DroidSansHebrew-Bold.ttf \
     DroidSansThai.ttf \
     DroidSansArmenian.ttf \
     DroidSansGeorgian.ttf \
     AndroidEmoji.ttf
+
+ifneq ($(MULTI_LANG_ENGINE),REVERIE)
+font_src_files += \
+    DroidSansDevanagari-Regular.ttf
+endif
 
 endif # !MINIMAL_FONT
 
