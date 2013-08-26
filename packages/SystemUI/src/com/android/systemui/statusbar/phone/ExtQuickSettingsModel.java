@@ -33,6 +33,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.ContentObserver;
 import android.os.Handler;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
@@ -77,9 +78,11 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
         super(context);
         mContext = context;
 
-        Handler handler = new Handler();
-        RoamingDataObserver roamingDataObserver = new RoamingDataObserver(handler);
-        roamingDataObserver.startObserving();
+        if (SystemProperties.getBoolean("persist.env.phone.global", false)) {
+            Handler handler = new Handler();
+            RoamingDataObserver roamingDataObserver = new RoamingDataObserver(handler);
+            roamingDataObserver.startObserving();
+        }
     }
 
     public QuickSettingsBasicTile addRoamingTile() {
