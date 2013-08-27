@@ -109,17 +109,14 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
         }
     }
 
-    public boolean suspend() {
-        if (mPlayer.suspend()) {
+    public void suspend() {
+           mPlayer.suspend();
             // Delete the Timer to stop it since there is no stop call.
             if (mTimer != null) {
                 mTimer.purge();
                 mTimer.cancel();
                 mTimer = null;
             }
-            return true;
-        }
-        return false;
     }
 
     public boolean resume() {
@@ -362,15 +359,12 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
 
     // Suspend the player and update the play/pause button
     public void suspendAndDispatch(HTML5VideoViewProxy proxy) {
-        if (suspend()) {
+            suspend();
             mCurrentState = STATE_SUSPENDED;
             mSkipPrepare = true;
             if (proxy != null) {
                 proxy.dispatchOnPaused();
             }
-        } else {
-            release();
-        }
     }
 
     // Below are functions that are different implementation on inline and full-
