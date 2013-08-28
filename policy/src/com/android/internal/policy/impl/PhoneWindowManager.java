@@ -49,6 +49,7 @@ import android.os.Bundle;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IHardwareService;
 import android.os.IRemoteCallback;
 import android.os.Looper;
 import android.os.Message;
@@ -204,6 +205,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mPreloadedRecentApps;
     final Object mServiceAquireLock = new Object();
     Vibrator mVibrator; // Vibrator for giving feedback of orientation changes
+    IHardwareService mLight;
     SearchManager mSearchManager;
 
     // Vibrator pattern for haptic feedback of a long press.
@@ -942,6 +944,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         context.registerReceiver(mMultiuserReceiver, filter);
 
         mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
+
+        mLight = IHardwareService.Stub.asInterface(
+                ServiceManager.getService("hardware"));
         mLongPressVibePattern = getLongIntArray(mContext.getResources(),
                 com.android.internal.R.array.config_longPressVibePattern);
         mVirtualKeyVibePattern = getLongIntArray(mContext.getResources(),
@@ -1946,6 +1951,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (keyCode == KeyEvent.KEYCODE_SEARCH || keyCode == KeyEvent.KEYCODE_HOME
                     || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_BACK) {
                 performHapticFeedbackLw(null, HapticFeedbackConstants.KEYBOARD_TAP, false);
+            }
+        }
+
+        if(down && (repeatCount == 0) && (keyCode == KeyEvent.KEYCODE_HOME
+                || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_SEARCH)) {
+            try {
+                mLight.turnOnButtonLightOneShot();
+            } catch(RemoteException e) {
+                Slog.e(TAG, "remote call for turn on button light failed.");
             }
         }
 
@@ -3869,6 +3884,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mPowerKeyTriggered = true;
                         mPowerKeyTime = event.getDownTime();
                         interceptScreenshotChord();
+                        try {
+                            mLight.turnOffButtonLightOneShot();
+                        } catch(RemoteException e) {
+                            Slog.e(TAG, "remote call for turn off button light failed.");
+                        }
                     }
 
                     ITelephony telephonyService = getTelephonyService();
