@@ -4502,6 +4502,41 @@ public final class Settings {
         public static final String ASSISTED_GPS_ENABLED = "assisted_gps_enabled";
 
         /**
+         * CMCC assisted gps SUPL(Secure User Plane Location) server address
+         *
+         * @hide
+         */
+        public static final String ASSISTED_GPS_SUPL_HOST = "assisted_gps_supl_host";
+
+        /**
+         * CMCC agps SUPL port address
+         *
+         * @hide
+         */
+        public static final String ASSISTED_GPS_SUPL_PORT = "assisted_gps_supl_port";
+
+        /**
+         * location agps position mode,MSB or MSA
+         *
+         * @hide
+         */
+        public static final String ASSISTED_GPS_POSITION_MODE = "assisted_gps_position_mode";
+
+        /**
+         * location agps start mode,cold start or hot start.
+         *
+         * @hide
+         */
+        public static final String ASSISTED_GPS_RESET_TYPE = "assisted_gps_reset_type";
+
+        /**
+         * location agps start network,home or all
+         *
+         * @hide
+         */
+        public static final String ASSISTED_GPS_NETWORK = "assisted_gps_network";
+
+        /**
          * Whether bluetooth is enabled/disabled
          * 0=disabled. 1=enabled.
          */
