@@ -1061,6 +1061,12 @@ public class PhoneNumberUtils
     public static byte[]
     networkPortionToCalledPartyBCD(String s) {
         String networkPortion = extractNetworkPortion(s);
+
+        // if networkPortion is null, shouldn't call function numberToCalledPartyBCDHelper().
+        // It will cause a null point exception.
+        if (null == networkPortion) {
+            return null;
+        }
         return numberToCalledPartyBCDHelper(networkPortion, false);
     }
 
@@ -1096,7 +1102,6 @@ public class PhoneNumberUtils
         if (null == number) {
             return null;
         }
-
         int numberLenReal = number.length();
         int numberLenEffective = numberLenReal;
         boolean hasPlus = number.indexOf('+') != -1;
