@@ -3877,7 +3877,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_POWER: {
                 result &= ~ACTION_PASS_TO_USER;
                 if (down) {
-                    if (isFastPowerOnActive())
+                    if (SystemProperties.getBoolean(PowerManager.PROPERTY_MODE_FASTBOOT, false))
                         startFastPowerOn();
                     if (isScreenOn && !mPowerKeyTriggered
                             && (event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0) {
@@ -5217,17 +5217,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         pw.print(prefix); pw.print("mDemoHdmiRotation="); pw.print(mDemoHdmiRotation);
                 pw.print(" mDemoHdmiRotationLock="); pw.println(mDemoHdmiRotationLock);
         pw.print(prefix); pw.print("mUndockedHdmiRotation="); pw.println(mUndockedHdmiRotation);
-    }
-
-    private Boolean isFastPowerOnActive() {
-        ActivityManager activityManager = (ActivityManager) mContext.getSystemService( Context.ACTIVITY_SERVICE );
-        List<RunningAppProcessInfo> procInfos = activityManager.getRunningAppProcesses();
-        for(int i = 0; i < procInfos.size(); i++){
-            if (procInfos.get(i).processName.equals("com.qualcomm.fastboot")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void startFastPowerOn() {
