@@ -37,6 +37,7 @@ import android.os.Bundle;
 import android.os.PatternMatcher;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -138,17 +139,35 @@ public class ResolverActivity extends AlertActivity implements AdapterView.OnIte
             finish();
             return;
         } else if (count > 1) {
-            ap.mView = getLayoutInflater().inflate(R.layout.resolver_grid, null);
-            mGrid = (GridView) ap.mView.findViewById(R.id.resolver_grid);
-            mGrid.setAdapter(mAdapter);
-            mGrid.setOnItemClickListener(this);
-            mGrid.setOnItemLongClickListener(new ItemLongClickListener());
-
-            if (alwaysUseOption) {
-                mGrid.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+            //NOTE: "defLauncherPN" == default launcher packageName
+            String defLauncherPN = getResources().getString(R.string.default_launcher);
+            if(intent.hasCategory(Intent.CATEGORY_HOME) && !TextUtils.isEmpty(defLauncherPN)){
+                final int N = mAdapter.mList.size();
+                int j = 0; //if default launcher is not found, the first is as default launcher.
+                for (int i=0; i<N; i++) {
+                    ResolveInfo r = mAdapter.mList.get(i).ri;
+                    if (r.activityInfo.packageName.equals(defLauncherPN)) {
+                        j = i;
+                        break;
+                    }
+                }
+                startActivity(mAdapter.intentForPosition(j));
+                mPackageMonitor.unregister();
+                mRegistered = false;
+                dismiss();
+                finish();
+                return;
+            } else {
+                ap.mView = getLayoutInflater().inflate(R.layout.resolver_grid,null);
+                mGrid = (GridView) ap.mView.findViewById(R.id.resolver_grid);
+                mGrid.setAdapter(mAdapter);
+                mGrid.setOnItemClickListener(this);
+                mGrid.setOnItemLongClickListener(new ItemLongClickListener());
+                if (alwaysUseOption) {
+                    mGrid.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+                }
+                resizeGrid();
             }
-
-            resizeGrid();
         } else if (count == 1) {
             startActivity(mAdapter.intentForPosition(0));
             mPackageMonitor.unregister();
