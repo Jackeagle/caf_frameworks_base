@@ -355,11 +355,17 @@ public class ConnectivityManager {
      */
     public static final int TYPE_WIFI_P2P    = 13;
 
-    /** {@hide} */
-    public static final int MAX_RADIO_TYPE   = TYPE_WIFI_P2P;
+    /**{@hide}
+     *
+     * DM data connection
+     */
+    public static final int TYPE_MOBILE_DM  = 14;
 
     /** {@hide} */
-    public static final int MAX_NETWORK_TYPE = TYPE_WIFI_P2P;
+    public static final int MAX_RADIO_TYPE   = TYPE_MOBILE_DM;
+
+    /** {@hide} */
+    public static final int MAX_NETWORK_TYPE = TYPE_MOBILE_DM;
 
     /**
      * If you want to set the default network preference,you can directly
@@ -434,6 +440,8 @@ public class ConnectivityManager {
                 return "MOBILE_IMS";
             case TYPE_MOBILE_CBS:
                 return "MOBILE_CBS";
+            case TYPE_MOBILE_DM:
+                return "MOBILE_DM";
             case TYPE_WIFI_P2P:
                 return "WIFI_P2P";
             default:
@@ -458,6 +466,7 @@ public class ConnectivityManager {
             case TYPE_MOBILE_FOTA:
             case TYPE_MOBILE_IMS:
             case TYPE_MOBILE_CBS:
+            case TYPE_MOBILE_DM:
                 return true;
             default:
                 return false;

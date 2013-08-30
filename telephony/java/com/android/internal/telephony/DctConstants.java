@@ -1,8 +1,6 @@
 /*
  * Copyright (C) 2012 The Android Open Source Project
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
- *
- * Not a Contribution.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +109,8 @@ public class DctConstants {
     public static final int APN_IMS_ID = 5;
     public static final int APN_FOTA_ID = 6;
     public static final int APN_CBS_ID = 7;
-    public static final int APN_NUM_TYPES = 8;
+    public static final int APN_DM_ID = 8;
+    public static final int APN_NUM_TYPES = 9;
 
     public static final int DISABLED = 0;
     public static final int ENABLED = 1;
