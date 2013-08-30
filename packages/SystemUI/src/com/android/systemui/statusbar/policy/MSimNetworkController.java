@@ -1047,13 +1047,16 @@ public class MSimNetworkController extends NetworkController {
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
 
-        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, true)) {
             String networkName = mContext.getLocalString(
                 mPhone.getNetworkOperatorName(subscription),
                 ORIGIN_CARRIER_NAME_ID,
                 LOCALE_CARRIER_NAME_ID);
             mMSimNetworkName[subscription] =
                     TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            Slog.d(TAG, "SPN name is not displayed");
+            Slog.d(TAG, "Sub " + subscription
+                    + " networkName: " + mMSimNetworkName[subscription]);
             return;
         }
 
