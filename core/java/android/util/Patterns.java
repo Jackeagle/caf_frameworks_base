@@ -108,6 +108,13 @@ public class Patterns {
         "a-zA-Z0-9\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF";
 
     /**
+     * Match the characters without containing chinese characters
+     * @hide
+     */
+    public static final String GOOD_IRI_HOST_CHAR =
+        "a-zA-Z0-9\u00A0-\u4DFF\u9FA6-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF";
+
+    /**
      *  Regular expression pattern to match most part of RFC 3987
      *  Internationalized URLs, aka IRIs.  Commonly used Unicode characters are
      *  added.
@@ -116,7 +123,7 @@ public class Patterns {
         "((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/(?:(?:[a-zA-Z0-9\\$\\-\\_\\.\\+\\!\\*\\'\\(\\)"
         + "\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,64}(?:\\:(?:[a-zA-Z0-9\\$\\-\\_"
         + "\\.\\+\\!\\*\\'\\(\\)\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,25})?\\@)?)?"
-        + "((?:(?:[" + GOOD_IRI_CHAR + "][" + GOOD_IRI_CHAR + "\\-]{0,64}\\.)+"   // named host
+        + "((?:(?:[" + GOOD_IRI_HOST_CHAR + "][" + GOOD_IRI_CHAR + "\\-]{0,64}\\.)+"   // named host
         + TOP_LEVEL_DOMAIN_STR_FOR_WEB_URL
         + "|(?:(?:25[0-5]|2[0-4]" // or ip address
         + "[0-9]|[0-1][0-9]{2}|[1-9][0-9]|[1-9])\\.(?:25[0-5]|2[0-4][0-9]"
@@ -126,7 +133,7 @@ public class Patterns {
         + "(?:\\:\\d{1,5})?)" // plus option port number
         + "(\\/(?:(?:[" + GOOD_IRI_CHAR + "\\;\\/\\?\\:\\@\\&\\=\\#\\~"  // plus option query params
         + "\\-\\.\\+\\!\\*\\'\\(\\)\\,\\_])|(?:\\%[a-fA-F0-9]{2}))*)?"
-        + "(?:\\b|$)"); // and finally, a word boundary or end of
+        + "(?:\\b|$|[^\u4e00-\u9fa5])"); // and finally, a word boundary or end of
                         // input.  This is to stop foo.sure from
                         // matching as foo.su
 
