@@ -43,4 +43,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <!-- Default for Settings.Global.DATA_ROAMING -->
     <bool name="def_enable_data_roaming">true</bool>
+
+    <!-- Default for Settings.Global.MOBILE_DATA -->
+    <bool name="def_enable_mobile_data">true</bool>
 </resources>
