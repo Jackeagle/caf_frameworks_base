@@ -2244,10 +2244,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     RILConstants.CDMA_CELL_BROADCAST_SMS_DISABLED);
 
             // Data roaming default, based on build
-            loadSetting(stmt, Settings.Global.DATA_ROAMING,
-                    "true".equalsIgnoreCase(
-                            SystemProperties.get("ro.com.android.dataroaming",
-                                    "false")) ? 1 : 0);
+            loadBooleanSetting(stmt, Settings.Global.DATA_ROAMING,
+                    R.bool.def_enable_data_roaming);
 
             loadBooleanSetting(stmt, Settings.Global.DEVICE_PROVISIONED,
                     R.bool.def_device_provisioned);
@@ -2280,9 +2278,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         SystemProperties.get("ro.com.android.mobiledata", "true")) ? 1 : 0);
 
                 // Data roaming default, based on build
-                loadSetting(stmt, Settings.Global.DATA_ROAMING + i,
-                        "true".equalsIgnoreCase(
-                        SystemProperties.get("ro.com.android.dataroaming", "true")) ? 1 : 0);
+                loadBooleanSetting(stmt, Settings.Global.DATA_ROAMING + i,
+                        R.bool.def_enable_data_roaming);
             }
 
             loadBooleanSetting(stmt, Settings.Global.NETSTATS_ENABLED,
