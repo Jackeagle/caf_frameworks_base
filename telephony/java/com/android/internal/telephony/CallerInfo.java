@@ -23,10 +23,12 @@ import android.graphics.drawable.Drawable;
 import android.location.CountryDetector;
 import android.location.Country;
 import android.net.Uri;
+import android.os.SystemProperties;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.Data;
 import android.provider.ContactsContract.PhoneLookup;
 import android.provider.ContactsContract.RawContacts;
+import android.provider.GeocodedLocation;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -91,6 +93,13 @@ public class CallerInfo {
     public int namePresentation;
     public boolean contactExists;
 
+    /**
+     * phoneLabel is designed as a international string and we shouldn't get it
+     * directly, otherwise the value will not be updated when system language
+     * changes.
+     *
+     * @deprecated use {@link #getPhoneLabel()} instead.
+     */
     public String phoneLabel;
     /* Split up the phoneLabel into number type and label name */
     public int    numberType;
@@ -281,7 +290,7 @@ public class CallerInfo {
         // or if it is the voicemail number.  If it is either, take a
         // shortcut and skip the query.
         if (PhoneNumberUtils.isLocalEmergencyNumber(number, context)) {
-            return new CallerInfo().markAsEmergency(context);
+            return new CallerInfo().markAsEmergency(context, number);
         } else if (PhoneNumberUtils.isVoiceMailNumber(number)) {
             return new CallerInfo().markAsVoiceMail();
         }
@@ -385,9 +394,10 @@ public class CallerInfo {
     // should set the phone number to the dialed number and name to
     // 'Emergency Number' and let the UI make the decision about what
     // should be displayed.
-    /* package */ CallerInfo markAsEmergency(Context context) {
+    /* package */ CallerInfo markAsEmergency(Context context, String number) {
         phoneNumber = context.getString(
-            com.android.internal.R.string.emergency_call_dialog_number_for_display);
+            com.android.internal.R.string.emergency_call_dialog_number_for_display)
+            + " " + number;
         photoResource = com.android.internal.R.drawable.picture_emergency;
         mIsEmergency = true;
         return this;
@@ -531,10 +541,16 @@ public class CallerInfo {
      * @see com.android.i18n.phonenumbers.PhoneNumberOfflineGeocoder
      */
     private static String getGeoDescription(Context context, String number) {
+        GeocodedLocation geocodedLocation = null;
         if (VDBG) Rlog.v(TAG, "getGeoDescription('" + number + "')...");
 
         if (TextUtils.isEmpty(number)) {
             return null;
+        }
+
+        if (SystemProperties.getBoolean("persist.env.phone.location", false)
+                && (geocodedLocation = GeocodedLocation.getLocation(context, number)) != null) {
+            return geocodedLocation.getAreaCode().getAddress();
         }
 
         PhoneNumberUtil util = PhoneNumberUtil.getInstance();
@@ -582,6 +598,24 @@ public class CallerInfo {
            countryIso = "US"; //default value is "US"
       }
       return countryIso;
+    }
+
+    /**
+     * Return localized string for phone label.
+     *
+     * Because phoneLabel is a international string, we should get it from
+     * resources, NOT get it directly. Note that it should be called after
+     * getCallerInfo.
+     */
+    public String getPhoneLabel(Context context) {
+        if (null == phoneLabel || null == context ||
+                null == context.getResources()) {
+            return phoneLabel;
+        }
+
+        // Get phonelabel just the way it's initialized.
+        return Phone.getTypeLabel(context.getResources(), numberType,
+                numberLabel).toString();
     }
 
     /**

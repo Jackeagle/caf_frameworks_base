@@ -259,6 +259,13 @@ public class DownloadManager {
      */
     public final static int PAUSED_UNKNOWN = 4;
 
+   /**
+    * Value of {@link #COLUMN_REASON} when the download is paused by manual.
+    *
+    * @hide
+    */
+    public final static int PAUSED_BY_MANUAL = 5;
+
     /**
      * Broadcast intent action sent by the download manager when a download completes.
      */
@@ -315,6 +322,7 @@ public class DownloadManager {
         Downloads.Impl.COLUMN_TOTAL_BYTES + " AS " + COLUMN_TOTAL_SIZE_BYTES,
         Downloads.Impl.COLUMN_LAST_MODIFICATION + " AS " + COLUMN_LAST_MODIFIED_TIMESTAMP,
         Downloads.Impl.COLUMN_CURRENT_BYTES + " AS " + COLUMN_BYTES_DOWNLOADED_SO_FAR,
+        Downloads.Impl.COLUMN_MEDIA_SCANNED,
         /* add the following 'computed' columns to the cursor.
          * they are not 'returned' by the database, but their inclusion
          * eliminates need to have lot of methods in CursorTranslator
@@ -369,6 +377,7 @@ public class DownloadManager {
         private static final int SCANNABLE_VALUE_YES = 0;
         // value of 1 is stored in the above column by DownloadProvider after it is scanned by
         // MediaScanner
+        private static final int SCANNABLE_VALUE_SCANNED = 1;
         /** if a file is designated as a file that should not be scanned by MediaScanner,
          * the following value is stored in the database column
          * {@link Downloads.Impl#COLUMN_MEDIA_SCANNED}.
@@ -854,6 +863,7 @@ public class DownloadManager {
                     parts.add(statusClause("=", Downloads.Impl.STATUS_WAITING_TO_RETRY));
                     parts.add(statusClause("=", Downloads.Impl.STATUS_WAITING_FOR_NETWORK));
                     parts.add(statusClause("=", Downloads.Impl.STATUS_QUEUED_FOR_WIFI));
+                    parts.add(statusClause("=", Downloads.Impl.STATUS_PAUSED_BY_MANUAL));
                 }
                 if ((mStatusFlags & STATUS_SUCCESSFUL) != 0) {
                     parts.add(statusClause("=", Downloads.Impl.STATUS_SUCCESS));
@@ -961,6 +971,34 @@ public class DownloadManager {
         } 
         return mResolver.update(mBaseUri, values, getWhereClauseForIds(ids),
                 getWhereArgsForIds(ids));
+    }
+
+    /**
+     * Set the download status to STATUS_PAUSED_BY_MANUAL when user pause download.
+     *
+     * @param id the ID of the download to be paused
+     * @return the number of downloads actually updated
+     * @hide
+     */
+    public int pauseDownload(long id) {
+        ContentValues values = new ContentValues();
+        values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PAUSED_BY_MANUAL);
+
+        return mResolver.update(ContentUris.withAppendedId(mBaseUri, id), values, null, null);
+    }
+
+    /**
+     * Set the download status to STATUS_RUNNING when user resume a paused download.
+     *
+     * @param id the ID of the download to be resumed
+     * @return the number of downloads actually updated
+     * @hide
+     */
+    public int resumeDownload(long id) {
+       ContentValues values = new ContentValues();
+       values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_RUNNING);
+
+       return mResolver.update(ContentUris.withAppendedId(mBaseUri, id), values, null, null);
     }
 
     /**
@@ -1092,9 +1130,13 @@ public class DownloadManager {
      */
     public void restartDownload(long... ids) {
         Cursor cursor = query(new Query().setFilterById(ids));
+        int isScanned = Request.SCANNABLE_VALUE_NO;
+
         try {
             for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
                 int status = cursor.getInt(cursor.getColumnIndex(COLUMN_STATUS));
+                isScanned = checkScanned(cursor);
+
                 if (status != STATUS_SUCCESSFUL && status != STATUS_FAILED) {
                     throw new IllegalArgumentException("Cannot restart incomplete download: "
                             + cursor.getLong(cursor.getColumnIndex(COLUMN_ID)));
@@ -1109,8 +1151,25 @@ public class DownloadManager {
         values.put(Downloads.Impl.COLUMN_TOTAL_BYTES, -1);
         values.putNull(Downloads.Impl._DATA);
         values.put(Downloads.Impl.COLUMN_STATUS, Downloads.Impl.STATUS_PENDING);
-        values.put(Downloads.Impl.COLUMN_FAILED_CONNECTIONS, 0);
+        values.put(Downloads.Impl.COLUMN_MEDIA_SCANNED,isScanned);
         mResolver.update(mBaseUri, values, getWhereClauseForIds(ids), getWhereArgsForIds(ids));
+    }
+
+    /**
+     * Check whether or not download data has been scanned.
+     */
+    private int checkScanned(Cursor cursor) {
+        int isScanned = Request.SCANNABLE_VALUE_NO;
+
+        if (cursor != null) {
+            isScanned = cursor.getInt(cursor.getColumnIndex(Downloads.Impl.COLUMN_MEDIA_SCANNED));
+        }
+
+        if(isScanned == Request.SCANNABLE_VALUE_SCANNED) {
+            isScanned = Request.SCANNABLE_VALUE_YES;
+        }
+
+        return isScanned;
     }
 
     /**
@@ -1337,6 +1396,9 @@ public class DownloadManager {
                 case Downloads.Impl.STATUS_QUEUED_FOR_WIFI:
                     return PAUSED_QUEUED_FOR_WIFI;
 
+                case Downloads.Impl.STATUS_PAUSED_BY_MANUAL:
+                    return PAUSED_BY_MANUAL;
+
                 default:
                     return PAUSED_UNKNOWN;
             }
@@ -1375,6 +1437,9 @@ public class DownloadManager {
                 case Downloads.Impl.STATUS_FILE_ALREADY_EXISTS_ERROR:
                     return ERROR_FILE_ALREADY_EXISTS;
 
+                case Downloads.Impl.STATUS_BLOCKED:
+                    return ERROR_BLOCKED;
+
                 default:
                     return ERROR_UNKNOWN;
             }
@@ -1392,6 +1457,7 @@ public class DownloadManager {
                 case Downloads.Impl.STATUS_WAITING_TO_RETRY:
                 case Downloads.Impl.STATUS_WAITING_FOR_NETWORK:
                 case Downloads.Impl.STATUS_QUEUED_FOR_WIFI:
+                case Downloads.Impl.STATUS_PAUSED_BY_MANUAL:
                     return STATUS_PAUSED;
 
                 case Downloads.Impl.STATUS_SUCCESS:

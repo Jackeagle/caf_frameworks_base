@@ -558,6 +558,10 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             return mDevStatsCached.getHistory(template, UID_ALL, SET_ALL, TAG_NONE, fields);
         }
 
+        if (mXtStatsCached == null || mDevStatsCached == null) {
+            return null;
+        }
+
         // splice stats between DEV and XT, switching over from DEV to XT at
         // first atomic bucket.
         final long firstAtomicBucket = mXtStatsCached.getFirstAtomicBucketMillis();

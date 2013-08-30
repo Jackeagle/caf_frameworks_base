@@ -140,6 +140,9 @@ public class ContentQueryMap extends Observable {
             // again, don't do anything if the cursor is already closed
             return;
         }
+        if (cursor.isClosed()) {
+            return;
+        }
         readCursorIntoCache(cursor);
         setChanged();
         notifyObservers();

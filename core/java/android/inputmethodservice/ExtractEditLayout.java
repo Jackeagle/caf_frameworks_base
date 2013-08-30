@@ -37,6 +37,7 @@ import android.widget.LinearLayout;
  * @hide
  */
 public class ExtractEditLayout extends LinearLayout {
+    private MenuPopupHelper mMenuPopupHelper;
     ExtractActionMode mActionMode;
     Button mExtractActionButton;
     Button mEditButton;
@@ -79,6 +80,15 @@ public class ExtractEditLayout extends LinearLayout {
         }
     }
 
+    /**
+    * Dismiss the popup menu of {@link ExtractEditText}.
+    */
+    void dismissActionMenu() {
+        if (mMenuPopupHelper != null) {
+            mMenuPopupHelper.dismiss();
+        }
+    }
+
     @Override
     public void onFinishInflate() {
         super.onFinishInflate();
@@ -87,7 +97,9 @@ public class ExtractEditLayout extends LinearLayout {
         mEditButton.setOnClickListener(new OnClickListener() {
             public void onClick(View clicked) {
                 if (mActionMode != null) {
-                    new MenuPopupHelper(getContext(), mActionMode.mMenu, clicked).show();
+                    mMenuPopupHelper = new MenuPopupHelper(getContext(), mActionMode.mMenu,
+                            clicked, ExtractEditLayout.this);
+                    mMenuPopupHelper.show();
                 }
             }
         });
@@ -169,6 +181,13 @@ public class ExtractEditLayout extends LinearLayout {
             sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
 
             mActionMode = null;
+
+            // Dismiss the MenuPopupHelper instance every time the
+            // ExtractActionMode finishes. As it does in portrait mode.
+            if (mMenuPopupHelper != null && mMenuPopupHelper.isShowing()) {
+                mMenuPopupHelper.dismiss();
+                mMenuPopupHelper = null;
+            }
         }
 
         @Override

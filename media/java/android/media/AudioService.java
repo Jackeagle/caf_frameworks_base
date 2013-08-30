@@ -93,6 +93,12 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Stack;
 
+import android.app.NotificationManager;
+import android.app.Notification;
+import android.app.PendingIntent;
+import com.android.internal.R;
+
+
 /**
  * The implementation of the volume manager service.
  * <p>
@@ -448,6 +454,9 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     // case, the new requested volume, stream type and device are stored in mPendingVolumeCommand
     // and used later when/if disableSafeMediaVolume() is called.
     private StreamVolumeCommand mPendingVolumeCommand;
+    
+    private final static String NO_ACTION="android.intent.action.NO_ACTION";
+    private final static int HEADSET_NOTIFICATION_ID=R.drawable.stat_sys_headset;
 
     ///////////////////////////////////////////////////////////////////////////
     // Construction
@@ -3895,6 +3904,16 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                     (device == AudioSystem.DEVICE_OUT_WIRED_HEADPHONE))) {
                 setBluetoothA2dpOnInt(true);
             }
+            boolean isHeadsetEnable = SystemProperties.getBoolean("persist.env.sb.headset", true);
+            if (isHeadsetEnable) {
+                if(state == 0) {
+                    cancelNotification();
+                }
+                else {
+                    sendNotification();
+                }
+            }
+
             boolean isUsb = ((device & AudioSystem.DEVICE_OUT_ALL_USB) != 0);
             handleDeviceConnection((state == 1), device, (isUsb ? name : ""));
             if (state != 0) {
@@ -3916,6 +3935,34 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 sendDeviceConnectionIntent(device, state, name);
             }
         }
+    }
+
+    private final void sendNotification() {
+        Log.i(TAG, "Sending headset pulg in notification");
+        Intent lowMemIntent = new Intent(NO_ACTION);
+        lowMemIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        NotificationManager mNotificationMgr =
+                (NotificationManager)mContext.getSystemService(
+                        Context.NOTIFICATION_SERVICE);
+        CharSequence title = mContext.getText(R.string.headset_plugin_view_title);
+        CharSequence details = mContext.getText(R.string.headset_plugin_view_text);
+        PendingIntent intent = PendingIntent.getActivity(mContext, 0,  lowMemIntent, 0);
+        Notification notification = new Notification();
+        notification.icon = R.drawable.stat_sys_headset;
+        notification.tickerText = title;
+        notification.flags |= Notification.FLAG_NO_CLEAR;
+        notification.setLatestEventInfo(mContext, title, details, intent);
+        mNotificationMgr.notify(HEADSET_NOTIFICATION_ID, notification);
+       // mContext.sendStickyBroadcast(mStorageLowIntent);
+    }
+
+    private final void cancelNotification() {
+        Log.i(TAG, "Canceling headset plug in notification");
+        NotificationManager mNotificationMgr =
+                (NotificationManager)mContext.getSystemService(
+                        Context.NOTIFICATION_SERVICE);
+        //cancel notification since headset has been plug out
+        mNotificationMgr.cancel(HEADSET_NOTIFICATION_ID);
     }
 
     /* cache of the address of the last dock the device was connected to */
@@ -4196,7 +4243,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     private void notifyTopOfAudioFocusStack() {
         // notify the top of the stack it gained focus
         if (!mFocusStack.empty() && (mFocusStack.peek().mFocusDispatcher != null)) {
-            if (canReassignAudioFocus()) {
+            if (canReassignAudioFocus(mFocusStack.peek().mClientId)) {
                 try {
                     mFocusStack.peek().mFocusDispatcher.dispatchAudioFocusChange(
                             AudioManager.AUDIOFOCUS_GAIN, mFocusStack.peek().mClientId);
@@ -4349,20 +4396,87 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
 
     /**
      * Helper function:
-     * Returns true if the system is in a state where the focus can be reevaluated, false otherwise.
+     * Gets the call states from HAL using the AudioSystem.getParameters() function,
+     * parses the return string and updates the local call state variables.
+     * Returns true if the system is in a state where the focus can be granted to
+     * QCHAT call, false otherwise.
      */
-    private boolean canReassignAudioFocus() {
-        // focus requests are rejected during a phone call or when the phone is ringing
-        // this is equivalent to IN_VOICE_COMM_FOCUS_ID having the focus
-        if (!mFocusStack.isEmpty() && IN_VOICE_COMM_FOCUS_ID.equals(mFocusStack.peek().mClientId)) {
+    private boolean isQchatCallAllowed()
+    {
+        int voiceCallState = 0;
+        int voice2CallState = 0;
+        int volteCallState = 0;
+        int qchatCallState = 0;
+
+        try {
+            String keyValuePair, value;
+            String[] fields, tokens;
+            long vsid;
+            int callState;
+
+            // AudioSystem.getParameters() returns a value in the format:
+            // "all_call_states=281022464:1,282857472:1,281026560:1,276836352:1"
+            keyValuePair = AudioSystem.getParameters(AudioManager.ALL_CALL_STATES_KEY);
+            if (!keyValuePair.startsWith(AudioManager.ALL_CALL_STATES_KEY)) {
+                return false;
+            }
+
+            value = keyValuePair.substring(AudioManager.ALL_CALL_STATES_KEY.length()+1);
+            fields = value.split(",");
+            for (String item : fields) {
+                tokens = item.split(":");
+                vsid = Long.decode(tokens[0]).longValue();
+                callState = Integer.decode(tokens[1]).intValue();
+
+                if (vsid == AudioManager.VOICE_VSID)
+                    voiceCallState = callState;
+                else if (vsid == AudioManager.VOICE2_VSID)
+                    voice2CallState = callState;
+                else if (vsid == AudioManager.IMS_VSID)
+                    volteCallState = callState;
+                else if (vsid == AudioManager.QCHAT_VSID)
+                    qchatCallState = callState;
+                else
+                    Log.e(TAG, "Unrecognized VSID value "+vsid);
+            }
+
+            Log.i(TAG, "voiceCallState=" + voiceCallState + " voice2CallState=" + voice2CallState);
+            Log.i(TAG, "volteCallState=" + volteCallState + " qchatCallState=" + qchatCallState);
+        } catch (Exception e) {
+            Log.e(TAG, "Could not get call states from HAL due to "+e);
+        }
+
+        if ((voiceCallState == AudioManager.CALL_ACTIVE ) ||
+            (voice2CallState == AudioManager.CALL_ACTIVE ) ||
+            (volteCallState == AudioManager.CALL_ACTIVE ) ||
+            (qchatCallState == AudioManager.CALL_ACTIVE )) {
             return false;
         }
-        return true;
+        else {
+            return true;
+        }
     }
 
     /* Constant to identify focus stack entry that is used to hold the audio focus for QCHAT client
      */
     private static final String CLIENT_ID_QCHAT = "QCHAT";
+
+    /**
+     * Helper function:
+     * Returns true if the system is in a state where the focus can be reevaluated, false otherwise.
+     */
+    private boolean canReassignAudioFocus(String clientId) {
+        // focus requests are rejected during a phone call or when the phone is ringing
+        // this is equivalent to IN_VOICE_COMM_FOCUS_ID having the focus.
+        // Also focus request is granted to QCHAT client when the CS/IMS calls are on HOLD.
+        if (!mFocusStack.isEmpty() && IN_VOICE_COMM_FOCUS_ID.equals(mFocusStack.peek().mClientId)) {
+            if (clientId.contains(CLIENT_ID_QCHAT) && isQchatCallAllowed())
+                return true;
+            else
+                return false;
+        }
+        return true;
+    }
 
     /**
      * Helper function:
@@ -4417,7 +4531,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         }
 
         synchronized(mAudioFocusLock) {
-            if (!canReassignAudioFocus()) {
+            if (!canReassignAudioFocus(clientId)) {
                 return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
             }
             if (!canReassignAudioFocusFromQchat(mainStreamType, clientId)) {
@@ -4503,6 +4617,82 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         synchronized(mAudioFocusLock) {
             removeFocusStackEntry(clientId, false);
         }
+    }
+
+    /**
+     * Helper function:
+     * Parses the input Key-Value pairs and handles the audio focus to QCHAT if needed.
+     */
+    private void handleFocusForQchat(String keyValuePairs) {
+        long vsid = 0;
+        int callState = 0;
+        // Parse VSID and Call State from the input string
+        try {
+            String[] pairs;
+            String[] fields;
+
+            pairs = keyValuePairs.split(";");
+            for (String item : pairs) {
+                Log.d(TAG, "keyValuePair is "+item);
+                fields = item.split("=");
+                if (item.startsWith(AudioManager.VSID_KEY)) {
+                    vsid = Long.decode(fields[1]).longValue();
+                }
+                else if (item.startsWith(AudioManager.CALL_STATE_KEY)) {
+                    callState = Integer.decode(fields[1]).intValue();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Invalid number format "+e);
+            return;
+        }
+
+        // Check if any of the telephony calls are UN-HOLD so that
+        // QCHAT call should lose focus automatically
+        if (((vsid == AudioManager.VOICE_VSID) ||
+             (vsid == AudioManager.VOICE2_VSID) ||
+             (vsid == AudioManager.IMS_VSID)) &&
+             (callState == AudioManager.CALL_ACTIVE)) {
+
+            Log.d(TAG, "Telephony call is going to ACTIVE state, see if QCHAT needs to be closed ");
+            // Notify the QCHAT client that it is losing focus if it is the
+            // current top of the stack; Also remove the focus stack entry for QCHAT.
+            synchronized(mAudioFocusLock) {
+                if ((!mFocusStack.isEmpty()) &&
+                     (mFocusStack.peek().mClientId.contains(CLIENT_ID_QCHAT)) &&
+                     (mFocusStack.peek().mFocusDispatcher != null)) {
+                    try {
+                        Log.d(TAG, "Dispatch focus loss to QCHAT ");
+                        mFocusStack.peek().mFocusDispatcher.dispatchAudioFocusChange(
+                                -1 * mFocusStack.peek().mFocusChangeType, /* loss and gain codes
+                                                                    are inverse of each other */
+                                mFocusStack.peek().mClientId);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, " Failure to signal loss of focus due to "+ e);
+                        e.printStackTrace();
+                    }
+
+                    FocusStackEntry fse = mFocusStack.pop();
+                    fse.unlinkToDeath();
+                }
+            }
+        }
+    }
+
+    /**
+     * Sets a variable number of parameter values to audio hardware.
+     *
+     * @param keyValuePairs list of parameters key value pairs in the form:
+     *    key1=value1;key2=value2;...
+     *
+     */
+    public void setParameters(String keyValuePairs) {
+
+        if (keyValuePairs.contains(AudioManager.VSID_KEY)) {
+            handleFocusForQchat(keyValuePairs);
+        }
+
+        AudioSystem.setParameters(keyValuePairs);
     }
 
 

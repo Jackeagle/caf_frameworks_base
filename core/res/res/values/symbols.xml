@@ -251,6 +251,7 @@
   <java-symbol type="bool" name="config_duplicate_port_omadm_wappush" />
   <java-symbol type="bool" name="config_enable_emergency_call_while_sim_locked" />
   <java-symbol type="bool" name="config_enable_puk_unlock_screen" />
+  <java-symbol type="bool" name="config_hotswapCapable" />
   <java-symbol type="bool" name="config_mms_content_disposition_support" />
   <java-symbol type="bool" name="config_showMenuShortcutsWhenKeyboardPresent" />
   <java-symbol type="bool" name="config_sip_wifi_only" />
@@ -712,6 +713,9 @@
   <java-symbol type="string" name="preposition_for_time" />
   <java-symbol type="string" name="progress_erasing" />
   <java-symbol type="string" name="progress_unmounting" />
+  <java-symbol type="string" name="mobile_provisioning_url" />
+  <java-symbol type="string" name="mobile_redirected_provisioning_url" />
+  <java-symbol type="string" name="progress_nomediapresent" />
   <java-symbol type="string" name="reboot_safemode_confirm" />
   <java-symbol type="string" name="reboot_safemode_title" />
   <java-symbol type="string" name="relationTypeAssistant" />
@@ -938,8 +942,10 @@
   <java-symbol type="array" name="config_masterVolumeRamp" />
   <java-symbol type="array" name="config_cdma_dun_supported_types" />
   <java-symbol type="array" name="config_disabledUntilUsedPreinstalledImes" />
+  <java-symbol type="array" name="sim_icons" />
 
   <java-symbol type="drawable" name="default_wallpaper" />
+  <java-symbol type="drawable" name="default_wallpaper_ux" />
   <java-symbol type="drawable" name="indicator_input_error" />
   <java-symbol type="drawable" name="overscroll_edge" />
   <java-symbol type="drawable" name="overscroll_glow" />
@@ -1340,6 +1346,7 @@
   <java-symbol type="id" name="pinEntry" />
   <java-symbol type="id" name="right_icon" />
   <java-symbol type="id" name="seven" />
+  <java-symbol type="id" name="simPinEntry" />
   <java-symbol type="id" name="six" />
   <java-symbol type="id" name="status" />
   <java-symbol type="id" name="switch_ime_button" />
@@ -1621,6 +1628,9 @@
   <java-symbol type="integer" name="config_shutdownBatteryTemperature" />
   <java-symbol type="integer" name="config_undockedHdmiRotation" />
   <java-symbol type="integer" name="config_virtualKeyQuietTimeMillis" />
+  <java-symbol type="integer" name="def_button_light_bright_level" />
+  <java-symbol type="integer" name="def_button_light_timeout" />
+  <java-symbol type="bool" name="def_button_light_enabled" />
   <java-symbol type="layout" name="am_compat_mode_dialog" />
   <java-symbol type="layout" name="launch_warning" />
   <java-symbol type="layout" name="safe_mode" />
@@ -1704,6 +1714,7 @@
   <java-symbol type="string" name="usb_notification_message" />
   <java-symbol type="string" name="use_physical_keyboard" />
   <java-symbol type="string" name="usb_ptp_notification_title" />
+  <java-symbol type="string" name="usb_charging_notification_title" />
   <java-symbol type="string" name="vpn_text" />
   <java-symbol type="string" name="vpn_text_long" />
   <java-symbol type="string" name="vpn_title" />

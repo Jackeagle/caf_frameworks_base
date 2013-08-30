@@ -35,6 +35,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.util.FloatMath;
 import android.util.Slog;
@@ -340,6 +341,8 @@ final class DisplayPowerController {
     // Twilight changed.  We might recalculate auto-brightness values.
     private boolean mTwilightChanged;
 
+    private Context mContext;
+
     /**
      * Creates the display power controller.
      */
@@ -348,6 +351,7 @@ final class DisplayPowerController {
             DisplayManagerService displayManager,
             DisplayBlanker displayBlanker,
             Callbacks callbacks, Handler callbackHandler) {
+        mContext = context;
         mHandler = new DisplayControllerHandler(looper);
         mNotifier = notifier;
         mDisplayBlanker = displayBlanker;
@@ -831,6 +835,13 @@ final class DisplayPowerController {
         }
         if (mPendingProximity == PROXIMITY_POSITIVE && positive) {
             return; // no change
+        }
+
+        // Keep the screen on if proximity switch off during call.
+        int proximityFlag = Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.PROXIMITY_SENSOR, 1);
+        if (proximityFlag == 0) {
+            return;
         }
 
         // Only accept a proximity sensor reading if it remains

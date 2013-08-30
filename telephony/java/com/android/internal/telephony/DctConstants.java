@@ -98,6 +98,7 @@ public class DctConstants {
     public static final int EVENT_DATA_SETUP_COMPLETE_ERROR = BASE + 35;
     public static final int EVENT_TETHERED_MODE_STATE_CHANGED = BASE + 36;
     public static final int EVENT_MODEM_DATA_PROFILE_READY= BASE + 37;
+    public static final int CMD_SET_ENABLE_FAIL_FAST_MOBILE_DATA = BASE + 38;
 
     /***** Constants *****/
 

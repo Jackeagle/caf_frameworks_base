@@ -34,6 +34,8 @@ import android.telephony.PhoneNumberUtils;
 import android.text.TextUtils;
 import android.telephony.Rlog;
 
+import java.util.Locale;
+
 /**
  * Helper class to make it easier to run asynchronous caller-id lookup queries.
  * @see CallerInfo
@@ -233,7 +235,7 @@ public class CallerInfoAsyncQuery {
                 if (cw.event == EVENT_EMERGENCY_NUMBER) {
                     // Note we're setting the phone number here (refer to javadoc
                     // comments at the top of CallerInfo class).
-                    mCallerInfo = new CallerInfo().markAsEmergency(mQueryContext);
+                    mCallerInfo = new CallerInfo().markAsEmergency(mQueryContext, cw.number);
                 } else if (cw.event == EVENT_VOICEMAIL_NUMBER) {
                     mCallerInfo = new CallerInfo().markAsVoiceMail();
                 } else {
@@ -272,17 +274,10 @@ public class CallerInfoAsyncQuery {
 
                     // Use the number entered by the user for display.
                     if (!TextUtils.isEmpty(cw.number)) {
-                        Country country;
-                        CountryDetector detector = (CountryDetector) mQueryContext.getSystemService(
-                                Context.COUNTRY_DETECTOR);
-                        if (detector != null) {
-                            country = detector.detectCountry();
-                            if (country != null) {
-                                mCallerInfo.phoneNumber = PhoneNumberUtils.formatNumber(cw.number,
-                                    mCallerInfo.normalizedNumber,
-                                    country.getCountryIso());
-                            }
-                        }
+                        String countryIso = getCountryIso();
+
+                        mCallerInfo.phoneNumber = PhoneNumberUtils.formatNumber(cw.number,
+                                mCallerInfo.normalizedNumber, countryIso);
                     }
                 }
 
@@ -300,6 +295,25 @@ public class CallerInfoAsyncQuery {
                              " for token: " + token + mCallerInfo);
                 cw.listener.onQueryComplete(token, cw.cookie, mCallerInfo);
             }
+        }
+
+        /**
+         * Get country iso.
+         */
+        private String getCountryIso() {
+            String countryIso = null;
+            Country c = null;
+            CountryDetector detector = (CountryDetector) mQueryContext.getSystemService(
+                    Context.COUNTRY_DETECTOR);
+
+            if (detector != null &&  (c = detector.detectCountry()) != null) {
+                countryIso = c.getCountryIso();
+            } else {
+                Locale locale = mQueryContext.getResources().getConfiguration().locale;
+                countryIso = locale.getCountry();
+            }
+
+            return countryIso;
         }
     }
 

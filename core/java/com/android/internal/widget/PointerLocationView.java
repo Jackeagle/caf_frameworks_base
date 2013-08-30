@@ -549,8 +549,11 @@ public class PointerLocationView extends View implements InputDeviceListener {
 
             final PointerState ps = mPointers.get(id);
             ps.mCurDown = true;
-            ps.mHasBoundingBox = (InputDevice.getDevice(event.getDeviceId()).
-                    getMotionRange(MotionEvent.AXIS_GENERIC_1) != null);
+            InputDevice device = InputDevice.getDevice(event.getDeviceId());
+            if (device != null) {
+                ps.mHasBoundingBox = (device.
+                        getMotionRange(MotionEvent.AXIS_GENERIC_1) != null);
+            }
         }
 
         final int NI = event.getPointerCount();

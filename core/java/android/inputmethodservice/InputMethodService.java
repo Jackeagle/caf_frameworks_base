@@ -752,6 +752,19 @@ public class InputMethodService extends AbstractInputMethodService {
         int showFlags = mShowInputFlags;
         boolean showingInput = mShowInputRequested;
         CompletionInfo[] completions = mCurCompletions;
+
+        // If the extract view shown, need finish the action mode and dismiss
+        // the popup menu when configuration changed. Because the edittext's
+        // selection mode will be finished and selection controller will be
+        // hiden when configuration changed.
+        if (isExtractViewShown() && mExtractView instanceof ExtractEditLayout) {
+            ExtractEditLayout extractEditLayout = (ExtractEditLayout) mExtractView;
+            if (extractEditLayout.isActionModeStarted()) {
+                extractEditLayout.finishActionMode();
+                extractEditLayout.dismissActionMenu();
+            }
+        }
+
         initViews();
         mInputViewStarted = false;
         mCandidatesViewStarted = false;

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006-2008 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved
+ * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -8503,8 +8503,12 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 crashInfo.throwFileName,
                 crashInfo.throwLineNumber);
 
-        addErrorToDropBox(eventType, r, processName, null, null, null, null, null, crashInfo);
 
+        addErrorToDropBox(eventType, r, processName, null, null, null, null, null, crashInfo);
+        Slog.i(TAG, "Notify an ApplicationCrash");
+        Intent intent = new Intent("intent.action.logkit.autotrigger");
+        intent.putExtra("reason", "ApplicationCrash");
+        mContext.sendBroadcast(intent);
         crashApplication(r, crashInfo);
     }
 

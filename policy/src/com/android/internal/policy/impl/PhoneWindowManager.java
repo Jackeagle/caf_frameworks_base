@@ -49,6 +49,7 @@ import android.os.Bundle;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IHardwareService;
 import android.os.IRemoteCallback;
 import android.os.Looper;
 import android.os.Message;
@@ -204,6 +205,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mPreloadedRecentApps;
     final Object mServiceAquireLock = new Object();
     Vibrator mVibrator; // Vibrator for giving feedback of orientation changes
+    IHardwareService mLight;
     SearchManager mSearchManager;
 
     // Vibrator pattern for haptic feedback of a long press.
@@ -455,6 +457,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private long mVolumeDownKeyTime;
     private boolean mVolumeDownKeyConsumedByScreenshotChord;
     private boolean mVolumeUpKeyTriggered;
+    private long mVolumeUpKeyTime;
+    private boolean mVolumeUpKeyConsumedByScreenshotChord;
     private boolean mPowerKeyTriggered;
     private long mPowerKeyTime;
 
@@ -678,6 +682,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mHandler.postDelayed(mScreenshotRunnable, getScreenshotChordLongPressDelay());
             }
         }
+        if (mVolumeUpKeyTriggered && mPowerKeyTriggered && !mVolumeDownKeyTriggered) {
+            final long now = SystemClock.uptimeMillis();
+            if (now <= mVolumeUpKeyTime + SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS
+                    && now <= mPowerKeyTime + SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS) {
+                mVolumeUpKeyConsumedByScreenshotChord = true;
+                cancelPendingPowerKeyAction();
+                mHandler.postDelayed(mScreenshotForLog,
+                        ViewConfiguration.getGlobalActionKeyTimeout());
+            }
+        }
     }
 
     private long getScreenshotChordLongPressDelay() {
@@ -691,6 +705,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void cancelPendingScreenshotChordAction() {
         mHandler.removeCallbacks(mScreenshotRunnable);
+    }
+    private void cancelPendingScreenshotForLog() {
+        mHandler.removeCallbacks(mScreenshotForLog);
     }
 
     private final Runnable mPowerLongPress = new Runnable() {
@@ -732,6 +749,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         @Override
         public void run() {
             takeScreenshot();
+        }
+    };
+    private final Runnable mScreenshotForLog = new Runnable() {
+        public void run() {
+            Intent intent = new Intent();
+            intent.setAction("android.system.agent");
+            String extra = "takeScreeshot";
+            intent.putExtra("para", extra);
+            try {
+                 mContext.startService(intent);
+            } catch (Exception e) {
+                 Slog.e(TAG, "Exception when start SystemAgent service", e);
+            }
         }
     };
 
@@ -914,6 +944,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         context.registerReceiver(mMultiuserReceiver, filter);
 
         mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
+
+        mLight = IHardwareService.Stub.asInterface(
+                ServiceManager.getService("hardware"));
         mLongPressVibePattern = getLongIntArray(mContext.getResources(),
                 com.android.internal.R.array.config_longPressVibePattern);
         mVirtualKeyVibePattern = getLongIntArray(mContext.getResources(),
@@ -1035,9 +1068,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (!mHasSystemNavBar) {
             mHasNavigationBar = mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_showNavigationBar);
-            // Allow a system property to override this. Used by the emulator.
+            // Allow a system property to override this. Used by the emulator,
+            // and also devices with no hardware navigation keys (e.g. tablets).
             // See also hasNavigationBar().
             String navBarOverride = SystemProperties.get("qemu.hw.mainkeys");
+            if ("".equals(navBarOverride)) {
+                navBarOverride = SystemProperties.get("ro.hw.nav_keys");
+            }
             if (! "".equals(navBarOverride)) {
                 if      (navBarOverride.equals("1")) mHasNavigationBar = false;
                 else if (navBarOverride.equals("0")) mHasNavigationBar = true;
@@ -1907,6 +1944,26 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     + " canceled=" + canceled);
         }
 
+        // add key vibrate
+        boolean isEnabled = (Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0);
+        if (down && isEnabled && (repeatCount == 0)) {
+            if (keyCode == KeyEvent.KEYCODE_SEARCH || keyCode == KeyEvent.KEYCODE_HOME
+                    || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_BACK) {
+                performHapticFeedbackLw(null, HapticFeedbackConstants.KEYBOARD_TAP, false);
+            }
+        }
+
+        if(down && (repeatCount == 0) && (keyCode == KeyEvent.KEYCODE_HOME
+                || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_SEARCH)) {
+            try {
+                mLight.turnOnButtonLightOneShot();
+            } catch(RemoteException e) {
+                Slog.e(TAG, "remote call for turn on button light failed.");
+            }
+        }
+
         // If we think we might have a volume down & power key chord on the way
         // but we're not sure, then tell the dispatcher to wait a little while and
         // try again later before dispatching.
@@ -1922,6 +1979,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     && mVolumeDownKeyConsumedByScreenshotChord) {
                 if (!down) {
                     mVolumeDownKeyConsumedByScreenshotChord = false;
+                }
+                return -1;
+            }
+            if (mVolumeUpKeyTriggered && !mPowerKeyTriggered) {
+                final long now = SystemClock.uptimeMillis();
+                final long timeoutTime = mVolumeUpKeyTime + SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS;
+                if (now < timeoutTime) {
+                    return timeoutTime - now;
+                }
+            }
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                    && mVolumeUpKeyConsumedByScreenshotChord) {
+                if (!down) {
+                    mVolumeUpKeyConsumedByScreenshotChord = false;
                 }
                 return -1;
             }
@@ -3718,8 +3789,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         if (isScreenOn && !mVolumeUpKeyTriggered
                                 && (event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0) {
                             mVolumeUpKeyTriggered = true;
+                            mVolumeUpKeyTime = event.getDownTime();
+                            mVolumeUpKeyConsumedByScreenshotChord = false;
                             cancelPendingPowerKeyAction();
-                            cancelPendingScreenshotChordAction();
+                            interceptScreenshotChord();
                         }
                     } else {
                         mVolumeUpKeyTriggered = false;
@@ -3811,6 +3884,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mPowerKeyTriggered = true;
                         mPowerKeyTime = event.getDownTime();
                         interceptScreenshotChord();
+                        try {
+                            mLight.turnOffButtonLightOneShot();
+                        } catch(RemoteException e) {
+                            Slog.e(TAG, "remote call for turn off button light failed.");
+                        }
                     }
 
                     ITelephony telephonyService = getTelephonyService();
@@ -3939,6 +4017,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_MEDIA_RECORD:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
             case KeyEvent.KEYCODE_CAMERA:
+            // Same as camera, but pressed before camera key (two level button)
+            case KeyEvent.KEYCODE_FOCUS:
                 return false;
         }
         return true;

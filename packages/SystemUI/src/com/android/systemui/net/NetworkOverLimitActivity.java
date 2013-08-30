@@ -26,6 +26,7 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.net.ConnectivityManager;
 import android.net.INetworkPolicyManager;
 import android.net.NetworkPolicy;
 import android.net.NetworkTemplate;
@@ -45,16 +46,24 @@ import com.android.systemui.R;
 public class NetworkOverLimitActivity extends Activity {
     private static final String TAG = "NetworkOverLimitActivity";
 
+    private ConnectivityManager mConnService;
+
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        mConnService = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 
         final NetworkTemplate template = getIntent().getParcelableExtra(EXTRA_NETWORK_TEMPLATE);
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(getLimitedDialogTitleForTemplate(template));
         builder.setMessage(R.string.data_usage_disabled_dialog);
 
-        builder.setPositiveButton(android.R.string.ok, null);
+        builder.setPositiveButton(
+                android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        mConnService.setMobileDataEnabled(false);
+                    }
+                });
         builder.setNegativeButton(
                 R.string.data_usage_disabled_dialog_enable, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
