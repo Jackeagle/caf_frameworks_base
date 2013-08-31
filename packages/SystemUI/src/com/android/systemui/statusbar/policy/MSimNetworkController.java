@@ -798,7 +798,13 @@ public class MSimNetworkController extends NetworkController {
                         if (!mShowAtLeastThreeGees) {
                             mDataIconList = TelephonyIcons.DATA_E[mInetCondition];
                             mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_e;
-                            mMSimQSDataTypeIconId[subscription] = R.drawable.ic_qs_signal_e;
+                            // In CU style, both GPRS and EDGE should show "G" icon.
+                            if (PhoneStatusBar.STATUSBAR_STYLE ==
+                                    PhoneStatusBar.STATUSBAR_STYLE_CU) {
+                                mMSimQSDataTypeIconId[subscription] = R.drawable.ic_qs_signal_g;
+                            } else {
+                                mMSimQSDataTypeIconId[subscription] = R.drawable.ic_qs_signal_e;
+                            }
                             mMSimContentDescriptionDataType[subscription] = mContext.getString(
                                     R.string.accessibility_data_connection_edge);
                             break;
