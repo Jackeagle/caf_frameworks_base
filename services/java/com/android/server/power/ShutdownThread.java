@@ -269,11 +269,7 @@ public final class ShutdownThread extends Thread {
             sIsStarted = true;
         }
 
-        if ( checkAnimationFileExist()) {
-            lockDevice();
-            showShutdownAnimation();
-            // playShutdownMusic(MUSIC_SHUTDOWN_FILE);
-        } else {
+        if (!checkAnimationFileExist()) {
             // throw up an indeterminate system dialog to indicate radio is
             // shutting down.
             ProgressDialog pd = new ProgressDialog(context);
@@ -384,6 +380,12 @@ public final class ShutdownThread extends Thread {
         if (mBootAnimEnabled && !isSilentMode()
                 && (shutDownFile = getShutdownMusicFilePath()) != null) {
             isShutdownMusicPlaying = true;
+            //showShutdownAnimation() is called from here to sync
+            //music and animation properly
+            if(checkAnimationFileExist()) {
+                lockDevice();
+                showShutdownAnimation();
+            }
             shutdownMusicHandler.obtainMessage(0, shutDownFile).sendToTarget();
         }
 
@@ -676,6 +678,15 @@ public final class ShutdownThread extends Thread {
     }
 
     private static void showShutdownAnimation() {
+        /*
+         * When boot completed, "service.bootanim.exit" property is set to 1.
+         * Bootanimation checks this property to stop showing the boot animation.
+         * Since we use the same code for shutdown animation, we
+         * need to reset this property to 0. If this is not set to 0 then shutdown
+         * will stop and exit after displaying the first frame of the animation
+         */
+        SystemProperties.set("service.bootanim.exit", "0");
+
         SystemProperties.set("ctl.start", "bootanim");
     }
 

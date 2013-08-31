@@ -76,6 +76,8 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
      */
     public static final int VIBRATE_DELAY = 300;
 
+    private static final int MIN_CALL_VOLUME_LEVEL = 1;
+
     private static final int VIBRATE_DURATION = 300;
     private static final int BEEP_DURATION = 150;
     private static final int MAX_VOLUME = 100;
@@ -345,6 +347,7 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
     private void listenToRingerMode() {
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
         mContext.registerReceiver(new BroadcastReceiver() {
 
             public void onReceive(Context context, Intent intent) {
@@ -353,6 +356,10 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
                 if (AudioManager.RINGER_MODE_CHANGED_ACTION.equals(action)) {
                     removeMessages(MSG_RINGER_MODE_CHANGED);
                     sendMessage(obtainMessage(MSG_RINGER_MODE_CHANGED));
+                } else if (Intent.ACTION_SCREEN_ON.equals(action)){
+                    // Dismiss volume dialog immediately when screen on to avoid
+                    // volume dialog showed on the locksceen.
+                    forceTimeout();
                 }
             }
         }, filter);
@@ -1045,6 +1052,12 @@ public class VolumePanel extends Handler implements OnSeekBarChangeListener, Vie
             // "published" remote volume value, so the UI reflects the actual volume.
             if (sc.streamType == AudioService.STREAM_REMOTE_MUSIC) {
                 seekBar.setProgress(getStreamVolume(AudioService.STREAM_REMOTE_MUSIC));
+            }
+
+            //if the streamType is STREAM_VOICE_CALL and user has change it to 0 level.We must set it 1 level.
+            if (sc.streamType == AudioSystem.STREAM_VOICE_CALL
+                    && seekBar.getProgress() <= MIN_CALL_VOLUME_LEVEL) {
+                seekBar.setProgress(MIN_CALL_VOLUME_LEVEL);
             }
         }
     }

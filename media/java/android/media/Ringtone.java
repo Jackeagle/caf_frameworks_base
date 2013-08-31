@@ -227,7 +227,7 @@ public class Ringtone {
                 mLocalPlayer.start();
             }
         } else if (mAllowRemote) {
-            final Uri canonicalUri = mUri.getCanonicalUri();
+            final Uri canonicalUri = (mUri != null) ? mUri.getCanonicalUri() : null ;
             try {
                 mRemotePlayer.play(mRemoteToken, canonicalUri, mStreamType);
             } catch (RemoteException e) {

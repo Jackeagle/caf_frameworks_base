@@ -21,6 +21,7 @@ import android.app.AppOpsManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
@@ -59,6 +60,7 @@ import android.provider.Telephony.Sms.Intents;
 import android.telephony.SmsMessage;
 import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.NtpTrustedTime;
 
@@ -131,19 +133,34 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int LOCATION_HAS_ACCURACY = 16;
 
 // IMPORTANT - the GPS_DELETE_* symbols here must match constants in gps.h
-    private static final int GPS_DELETE_EPHEMERIS = 0x0001;
-    private static final int GPS_DELETE_ALMANAC = 0x0002;
-    private static final int GPS_DELETE_POSITION = 0x0004;
-    private static final int GPS_DELETE_TIME = 0x0008;
-    private static final int GPS_DELETE_IONO = 0x0010;
-    private static final int GPS_DELETE_UTC = 0x0020;
-    private static final int GPS_DELETE_HEALTH = 0x0040;
-    private static final int GPS_DELETE_SVDIR = 0x0080;
-    private static final int GPS_DELETE_SVSTEER = 0x0100;
-    private static final int GPS_DELETE_SADATA = 0x0200;
-    private static final int GPS_DELETE_RTI = 0x0400;
-    private static final int GPS_DELETE_CELLDB_INFO = 0x8000;
-    private static final int GPS_DELETE_ALL = 0xFFFF;
+    private static final int GPS_DELETE_EPHEMERIS = 0x00000001;
+    private static final int GPS_DELETE_ALMANAC = 0x00000002;
+    private static final int GPS_DELETE_POSITION = 0x00000004;
+    private static final int GPS_DELETE_TIME = 0x00000008;
+    private static final int GPS_DELETE_IONO = 0x00000010;
+    private static final int GPS_DELETE_UTC = 0x00000020;
+    private static final int GPS_DELETE_HEALTH = 0x00000040;
+    private static final int GPS_DELETE_SVDIR = 0x00000080;
+    private static final int GPS_DELETE_SVSTEER = 0x00000100;
+    private static final int GPS_DELETE_SADATA = 0x00000200;
+    private static final int GPS_DELETE_RTI = 0x00000400;
+    private static final int GPS_DELETE_CELLDB_INFO = 0x00000800;
+    private static final int GPS_DELETE_ALMANAC_CORR = 0x00001000;
+    private static final int GPS_DELETE_FREQ_BIAS_EST = 0x00002000;
+    private static final int GLO_DELETE_EPHEMERIS = 0x00004000;
+    private static final int GLO_DELETE_ALMANAC = 0x00008000;
+    private static final int GLO_DELETE_SVDIR = 0x00010000;
+    private static final int GLO_DELETE_SVSTEER = 0x00020000;
+    private static final int GLO_DELETE_ALMANAC_CORR = 0x00040000;
+    private static final int GPS_DELETE_TIME_GPS = 0x00080000;
+    private static final int GLO_DELETE_TIME = 0x00100000;
+    private static final int BDS_DELETE_SVDIR =  0X00200000;
+    private static final int BDS_DELETE_SVSTEER = 0X00400000;
+    private static final int BDS_DELETE_TIME = 0X00800000;
+    private static final int BDS_DELETE_ALMANAC_CORR = 0X01000000;
+    private static final int BDS_DELETE_EPHEMERIS = 0X02000000;
+    private static final int BDS_DELETE_ALMANAC = 0X04000000;
+    private static final int GPS_DELETE_ALL = 0xFFFFFFFF;
 
     // The GPS_CAPABILITY_* flags must match the values in gps.h
     private static final int GPS_CAPABILITY_SCHEDULING = 0x0000001;
@@ -173,6 +190,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int REMOVE_LISTENER = 9;
     private static final int INJECT_NTP_TIME_FINISHED = 10;
     private static final int DOWNLOAD_XTRA_DATA_FINISHED = 11;
+    private static final int AGPS_SETTING_CHANGE = 12;
 
     // Request setid
     private static final int AGPS_RIL_REQUEST_SETID_IMSI = 1;
@@ -191,6 +209,25 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int AGPS_SETID_TYPE_NONE = 0;
     private static final int AGPS_SETID_TYPE_IMSI = 1;
     private static final int AGPS_SETID_TYPE_MSISDN = 2;
+
+    // agps mode and value
+    private static final String AGPS_MSB_MODE = "MSB";
+    private static final String AGPS_MSA_MODE = "MSA";
+    private static final int AGPS_LOCATION_MODE_MSB = 0;
+    private static final int AGPS_LOCATION_MODE_MSA = 1;
+    private static final int AGPS_LOCATION_MODE_ERR = 2;
+
+    // agps start mode
+    private static final int AGPS_START_MODE_COLD = 0;
+    private static final int AGPS_START_MODE_WARM = 1;
+    private static final int AGPS_START_MODE_HOT = 2;
+
+    // command key
+    private static final String AGPS_SUPL_HOST = "host";
+    private static final String AGPS_SUPL_PORT = "port";
+    private static final String AGPS_PROVIDER_ID = "providerid";
+    private static final String AGPS_RESET_TYPE = "resettype";
+    private static final String AGPS_ACCESS_NETWORK = "network";
 
     private static final String PROPERTIES_FILE = "/etc/gps.conf";
 
@@ -278,6 +315,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private int mTimeToFirstFix = 0;
     // time we received our last fix
     private long mLastFixTime;
+
+    // preference for agps network type
+    private String mPrefAGpsNetworkType;
+
+    // preference for agps position mode
+    private int mPrefAGpsMode;
 
     private int mPositionMode;
 
@@ -488,6 +531,25 @@ public class GpsLocationProvider implements LocationProviderInterface {
             Log.w(TAG, "Could not open GPS configuration file " + PROPERTIES_FILE);
         }
 
+        ContentResolver objContentResolver = mContext.getContentResolver();
+        String prefAGpsType = Settings.Global.getString(
+            objContentResolver,Settings.Global.ASSISTED_GPS_POSITION_MODE);
+        int prefAGpsTypeInt;
+        if (prefAGpsType == null) {
+            prefAGpsTypeInt = AGPS_LOCATION_MODE_MSB;
+        } else {
+            if (prefAGpsType.equals(AGPS_MSB_MODE)) {
+                prefAGpsTypeInt = AGPS_LOCATION_MODE_MSB;
+            } else if (prefAGpsType.equals(AGPS_MSA_MODE)) {
+                prefAGpsTypeInt = AGPS_LOCATION_MODE_MSA;
+            } else {
+                prefAGpsTypeInt = AGPS_LOCATION_MODE_ERR;
+            }
+        }
+        mPrefAGpsMode = prefAGpsTypeInt;
+        mPrefAGpsNetworkType = Settings.Global.getString(
+            objContentResolver,Settings.Global.ASSISTED_GPS_NETWORK);
+
         // construct handler, listen for events
         mHandler = new ProviderHandler(looper);
         listenForBroadcasts();
@@ -550,6 +612,38 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (DEBUG) {
             Log.d(TAG, "updateNetworkState " + (mNetworkAvailable ? "available" : "unavailable")
                 + " info: " + info);
+        }
+
+        if ( info != null && mNetworkAvailable && info.isAvailable() )
+        {
+            if (mStarted && hasCapability(GPS_CAPABILITY_SCHEDULING)) {
+                int iPositionMode = GPS_POSITION_MODE_STANDALONE;
+                if(!(info.isRoaming() && mPrefAGpsNetworkType != null
+                    && (mPrefAGpsNetworkType.equals("HOME")))) {
+                    // check the db for user selection
+                    if (Settings.Global.getInt(mContext.getContentResolver(),
+                            Settings.Global.ASSISTED_GPS_ENABLED, 1) != 0) {
+                        if (hasCapability(GPS_CAPABILITY_MSA)
+                            && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSA)) {
+                            iPositionMode = GPS_POSITION_MODE_MS_ASSISTED;
+                        } else if (hasCapability(GPS_CAPABILITY_MSB)
+                            && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSB)) {
+                            iPositionMode = GPS_POSITION_MODE_MS_BASED;
+                        }
+                    }
+                }
+                if(iPositionMode!=mPositionMode) {
+                    // change period
+                    if (!native_set_position_mode(mPositionMode,
+                            GPS_POSITION_RECURRENCE_PERIODIC,
+                            mFixInterval, 0, 0)) {
+                        Log.e(TAG,
+                            "set_position_mode failed when update network!");
+                    } else {
+                        mPositionMode = iPositionMode;
+                    }
+                }
+            }
         }
 
         if (info != null) {
@@ -710,6 +804,78 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
     }
 
+    private void handleAgpsUpdate(Bundle extras) {
+        if(extras!=null) {
+            String host = extras.getString(AGPS_SUPL_HOST,null);
+            String port = extras.getString(AGPS_SUPL_PORT,null);
+            String providerid = extras.getString(AGPS_PROVIDER_ID,null);
+            String resettype = extras.getString(AGPS_RESET_TYPE,null);
+            String network = extras.getString(AGPS_ACCESS_NETWORK,null);
+            ContentResolver objContentResolver = mContext.getContentResolver();
+            if ( !TextUtils.isEmpty(host) && !TextUtils.isEmpty(port)) {
+                try {
+                    String strSuplServerHost = host;
+                    int iSuplServerPort = Integer.parseInt(port);
+                    boolean bRet = Settings.Global.putString(mContext.getContentResolver(),
+                        Settings.Global.ASSISTED_GPS_SUPL_HOST,host);
+                    if(bRet) {
+                        Settings.Global.putString(objContentResolver,
+                            Settings.Global.ASSISTED_GPS_SUPL_PORT,port);
+                        native_set_agps_server(AGPS_TYPE_SUPL,
+                            strSuplServerHost, iSuplServerPort);
+                        mSuplServerHost = strSuplServerHost;
+                        mSuplServerPort = iSuplServerPort;
+                    } else {
+                        Log.e(TAG, "fail to set Settings.Global.SUPL_HOST");
+                    }
+                } catch (NumberFormatException e) {
+                    Log.e(TAG, "native_set_agps_server host:"+
+                        mSuplServerHost+" port:"+mSuplServerPort);
+                }
+            }
+            if (null != providerid && providerid.length() > 0) {
+                boolean bRet = Settings.Global.putString(objContentResolver,
+                    Settings.Global.ASSISTED_GPS_POSITION_MODE,providerid);
+                if (bRet) {
+                    String prefAGpsType = Settings.Global.getString(
+                        objContentResolver,Settings.Global.ASSISTED_GPS_POSITION_MODE);
+                    int prefAGpsTypeInt;
+                    if (prefAGpsType.equals(AGPS_MSB_MODE)) {
+                        prefAGpsTypeInt = AGPS_LOCATION_MODE_MSB;
+                    } else if (prefAGpsType.equals(AGPS_MSA_MODE)) {
+                        prefAGpsTypeInt = AGPS_LOCATION_MODE_MSA;
+                    } else {
+                        prefAGpsTypeInt = AGPS_LOCATION_MODE_ERR;
+                    }
+                    mPrefAGpsMode = prefAGpsTypeInt;
+                }
+            }
+            if (null != network && network.length() > 0) {
+                boolean bRet = Settings.Global.putString(objContentResolver,
+                    Settings.Global.ASSISTED_GPS_NETWORK,network);
+                if (bRet)
+                    mPrefAGpsNetworkType = network;
+            }
+            if (null != resettype && resettype.length() > 0) {
+                boolean bRet = Settings.Global.putString(objContentResolver,
+                    Settings.Global.ASSISTED_GPS_RESET_TYPE,resettype);
+                if (bRet) {
+                    int startMode = Settings.Global.getInt(objContentResolver,
+                        Settings.Global.ASSISTED_GPS_RESET_TYPE, 2);
+                    Bundle bundle = new Bundle();
+                    if (startMode == AGPS_START_MODE_COLD) {
+                        bundle.putBoolean("all", true);
+                    } else if (startMode == AGPS_START_MODE_WARM) {
+                        bundle.putBoolean("almanac", true);
+                    } else if (startMode == AGPS_START_MODE_HOT) {
+                        bundle.putBoolean("ephemeris", true);
+                    }
+                    sendExtraCommand("delete_aiding_data", bundle);
+                }
+            }
+        }
+    }
+
     /**
      * Enables this provider.  When enabled, calls to getStatus()
      * must be handled.  Hardware may be started up
@@ -729,6 +895,27 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (DEBUG) Log.d(TAG, "handleEnable");
 
         boolean enabled = native_init();
+
+        ContentResolver objContentResolver = mContext.getContentResolver();
+        // The server host for SUPL_HOST will be set by app,
+        // and the app will also concern the gps.conf as the default setting
+        String strSuplServerHost = Settings.Global.getString(
+            objContentResolver,Settings.Global.ASSISTED_GPS_SUPL_HOST);
+        if(!TextUtils.isEmpty(strSuplServerHost)
+            && strSuplServerHost.trim().length() != 0)
+            mSuplServerHost = strSuplServerHost.trim();
+        // The server port for SUPL_PORT will be set by app,
+        // and the app will also concern the gps.conf as the default setting
+        String strSuplServerPort = Settings.Global.getString(
+            objContentResolver,Settings.Global.ASSISTED_GPS_SUPL_PORT);
+        if ( mSuplServerHost != null
+            && !TextUtils.isEmpty(strSuplServerPort) ) {
+            try {
+                mSuplServerPort = Integer.parseInt(strSuplServerPort);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "handleEnable NumberFormatException for:"+mSuplServerPort);
+            }
+        }
 
         if (enabled) {
             mSupportsXtra = native_supports_xtra();
@@ -935,6 +1122,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
                 xtraDownloadRequest();
                 result = true;
             }
+        } else if ("agps_parms_changed".equals(command)) {
+            sendMessage(AGPS_SETTING_CHANGE, 0, extras);
         } else {
             Log.w(TAG, "sendExtraCommand: unknown command " + command);
         }
@@ -987,6 +1176,21 @@ public class GpsLocationProvider implements LocationProviderInterface {
             if (extras.getBoolean("sadata")) flags |= GPS_DELETE_SADATA;
             if (extras.getBoolean("rti")) flags |= GPS_DELETE_RTI;
             if (extras.getBoolean("celldb-info")) flags |= GPS_DELETE_CELLDB_INFO;
+            if (extras.getBoolean("almanac-corr")) flags |= GPS_DELETE_ALMANAC_CORR;
+            if (extras.getBoolean("freq-bias-est")) flags |= GPS_DELETE_FREQ_BIAS_EST;
+            if (extras.getBoolean("ephemeris-GLO")) flags |= GLO_DELETE_EPHEMERIS;
+            if (extras.getBoolean("almanac-GLO")) flags |= GLO_DELETE_ALMANAC;
+            if (extras.getBoolean("svdir-GLO")) flags |= GLO_DELETE_SVDIR;
+            if (extras.getBoolean("svsteer-GLO")) flags |= GLO_DELETE_SVSTEER;
+            if (extras.getBoolean("almanac-corr-GLO")) flags |= GLO_DELETE_ALMANAC_CORR;
+            if (extras.getBoolean("time-gps")) flags |= GPS_DELETE_TIME_GPS;
+            if (extras.getBoolean("time-GLO")) flags |= GLO_DELETE_TIME;
+            if (extras.getBoolean("ephemeris-BDS")) flags |= BDS_DELETE_EPHEMERIS;
+            if (extras.getBoolean("almanac-BDS")) flags |= BDS_DELETE_ALMANAC;
+            if (extras.getBoolean("svdir-BDS")) flags |= BDS_DELETE_SVDIR;
+            if (extras.getBoolean("svsteer-BDS")) flags |= BDS_DELETE_SVSTEER;
+            if (extras.getBoolean("almanac-corr-BDS")) flags |= BDS_DELETE_ALMANAC_CORR;
+            if (extras.getBoolean("time-BDS")) flags |= BDS_DELETE_TIME;
             if (extras.getBoolean("all")) flags |= GPS_DELETE_ALL;
         }
 
@@ -1009,10 +1213,20 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
              if (Settings.Global.getInt(mContext.getContentResolver(),
                     Settings.Global.ASSISTED_GPS_ENABLED, 1) != 0) {
-                if (singleShot && hasCapability(GPS_CAPABILITY_MSA)) {
+                if (singleShot && hasCapability(GPS_CAPABILITY_MSA)
+                    && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSA)) {
                     mPositionMode = GPS_POSITION_MODE_MS_ASSISTED;
-                } else if (hasCapability(GPS_CAPABILITY_MSB)) {
+                } else if (hasCapability(GPS_CAPABILITY_MSB)
+                    && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSB)) {
                     mPositionMode = GPS_POSITION_MODE_MS_BASED;
+                }
+            }
+
+            if (mPrefAGpsNetworkType != null && (mPrefAGpsNetworkType.equals("HOME"))) {
+                TelephonyManager tm = (TelephonyManager) mContext
+                        .getSystemService(Context.TELEPHONY_SERVICE);
+                if (tm.isNetworkRoaming()) {
+                    mPositionMode = GPS_POSITION_MODE_STANDALONE;
                 }
             }
 
@@ -1678,6 +1892,9 @@ public class GpsLocationProvider implements LocationProviderInterface {
                     break;
                 case UPDATE_LOCATION:
                     handleUpdateLocation((Location)msg.obj);
+                    break;
+                case AGPS_SETTING_CHANGE:
+                    handleAgpsUpdate((Bundle)(msg.obj));
                     break;
             }
             if (msg.arg2 == 1) {

@@ -41,6 +41,7 @@ import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Slog;
 import android.view.View;
 import android.widget.ImageView;
@@ -53,6 +54,7 @@ import com.android.internal.telephony.cdma.EriInfo;
 import com.android.internal.util.AsyncChannel;
 import com.android.server.am.BatteryStatsService;
 import com.android.systemui.R;
+import com.android.systemui.statusbar.phone.PhoneStatusBar;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -65,6 +67,9 @@ public class NetworkController extends BroadcastReceiver {
     static final String TAG = "StatusBar.NetworkController";
     static final boolean DEBUG = true;
     static final boolean CHATTY = true; // additional diagnostics, but not logspew
+
+    // For prop key to show carrier.
+    static final String PROP_KEY_SHOW_CARRIER = "persist.env.sys.SHOW_CARRIER";
 
     // telephony
     boolean mHspaDataDistinguishable;
@@ -207,8 +212,13 @@ public class NetworkController extends BroadcastReceiver {
 
         mShowPhoneRSSIForData = res.getBoolean(R.bool.config_showPhoneRSSIForData);
         mShowAtLeastThreeGees = res.getBoolean(R.bool.config_showMin3G);
-        mAlwaysShowCdmaRssi = res.getBoolean(
-                com.android.internal.R.bool.config_alwaysUseCdmaRssi);
+        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+            // CT need show both cdma and evdo signal strength in one indicator at the same time.
+            mAlwaysShowCdmaRssi = false;
+        } else {
+            mAlwaysShowCdmaRssi = res.getBoolean(
+                    com.android.internal.R.bool.config_alwaysUseCdmaRssi);
+        }
 
         // set up the default wifi icon, used when no radios have ever appeared
         updateWifiIcons();
@@ -216,8 +226,12 @@ public class NetworkController extends BroadcastReceiver {
 
         // telephony
         registerPhoneStateListener(context);
-        mHspaDataDistinguishable = mContext.getResources().getBoolean(
-                R.bool.config_hspa_data_distinguishable);
+        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CU) {
+            mHspaDataDistinguishable = true;
+        } else {
+            mHspaDataDistinguishable = mContext.getResources().getBoolean(
+                    R.bool.config_hspa_data_distinguishable);
+        }
         mNetworkNameSeparator = mContext.getString(R.string.status_bar_network_name_separator);
         mNetworkNameDefault = mContext.getString(
                 com.android.internal.R.string.lockscreen_carrier_default);
@@ -236,6 +250,7 @@ public class NetworkController extends BroadcastReceiver {
         filter.addAction(ConnectivityManager.INET_CONDITION_ACTION);
         filter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
         filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+        filter.addAction(Intent.ACTION_LOCALE_CHANGED);
         mWimaxSupported = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_wimaxEnabled);
         if(mWimaxSupported) {
@@ -476,6 +491,12 @@ public class NetworkController extends BroadcastReceiver {
             updateTelephonySignalStrength();
             updateDataNetType();
             updateDataIcon();
+
+            // Update the network name if need show the carrier.
+            if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+                updateNetworkName(false, null, false, null);
+            }
+
             refreshViews();
         }
 
@@ -664,11 +685,25 @@ public class NetworkController extends BroadcastReceiver {
                 case TelephonyManager.NETWORK_TYPE_HSDPA:
                 case TelephonyManager.NETWORK_TYPE_HSUPA:
                 case TelephonyManager.NETWORK_TYPE_HSPA:
-                case TelephonyManager.NETWORK_TYPE_HSPAP:
                     if (mHspaDataDistinguishable) {
                         mDataIconList = TelephonyIcons.DATA_H[mInetCondition];
                         mDataTypeIconId = R.drawable.stat_sys_data_connected_h;
                         mQSDataTypeIconId = R.drawable.ic_qs_signal_h;
+                        mContentDescriptionDataType = mContext.getString(
+                                R.string.accessibility_data_connection_3_5g);
+                    } else {
+                        mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
+                        mDataTypeIconId = R.drawable.stat_sys_data_connected_3g;
+                        mQSDataTypeIconId = R.drawable.ic_qs_signal_3g;
+                        mContentDescriptionDataType = mContext.getString(
+                                R.string.accessibility_data_connection_3g);
+                    }
+                    break;
+                case TelephonyManager.NETWORK_TYPE_HSPAP:
+                    if (mHspaDataDistinguishable) {
+                        mDataIconList = TelephonyIcons.DATA_HP[mInetCondition];
+                        mDataTypeIconId = R.drawable.stat_sys_data_connected_hp;
+                        mQSDataTypeIconId = R.drawable.ic_qs_signal_hp;
                         mContentDescriptionDataType = mContext.getString(
                                 R.string.accessibility_data_connection_3_5g);
                     } else {
@@ -713,11 +748,20 @@ public class NetworkController extends BroadcastReceiver {
                             R.string.accessibility_data_connection_3g);
                     break;
                 case TelephonyManager.NETWORK_TYPE_LTE:
-                    mDataIconList = TelephonyIcons.DATA_4G[mInetCondition];
-                    mDataTypeIconId = R.drawable.stat_sys_data_connected_4g;
-                    mQSDataTypeIconId = R.drawable.ic_qs_signal_4g;
-                    mContentDescriptionDataType = mContext.getString(
-                            R.string.accessibility_data_connection_4g);
+                    boolean show4GforLTE = mContext.getResources().getBoolean(R.bool.config_show4GForLTE);
+                    if (show4GforLTE) {
+                        mDataIconList = TelephonyIcons.DATA_4G[mInetCondition];
+                        mDataTypeIconId = R.drawable.stat_sys_data_connected_4g;
+                        mQSDataTypeIconId = R.drawable.ic_qs_signal_4g;
+                        mContentDescriptionDataType = mContext.getString(
+                                R.string.accessibility_data_connection_4g);
+                    } else {
+                        mDataIconList = TelephonyIcons.DATA_LTE[mInetCondition];
+                        mDataTypeIconId = R.drawable.stat_sys_data_connected_lte;
+                        mQSDataTypeIconId = R.drawable.ic_qs_signal_lte;
+                        mContentDescriptionDataType = mContext.getString(
+                                R.string.accessibility_data_connection_lte);
+                    }
                     break;
                 case TelephonyManager.NETWORK_TYPE_GPRS:
                     if (!mShowAtLeastThreeGees) {
@@ -856,17 +900,33 @@ public class NetworkController extends BroadcastReceiver {
             Slog.d("CarrierLabel", "updateNetworkName showSpn=" + showSpn + " spn=" + spn
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
+
+        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+            String networkName = mContext.getLocalString(mPhone.getNetworkOperatorName(),
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+            mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            return;
+        }
+
+        // Needn't to show the carrier.
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
-            str.append(plmn);
+            String plmnName = mContext.getLocalString(plmn,
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+            str.append(plmnName);
             something = true;
         }
         if (showSpn && spn != null) {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
-            str.append(spn);
+            String spnName = mContext.getLocalString(plmn,
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+            str.append(spnName);
             something = true;
         }
         if (something) {

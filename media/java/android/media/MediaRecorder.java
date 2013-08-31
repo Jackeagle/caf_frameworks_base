@@ -357,10 +357,10 @@ public class MediaRecorder
         setVideoEncodingBitRate(profile.videoBitRate);
         setVideoEncoder(profile.videoCodec);
         if (profile.quality >= CamcorderProfile.QUALITY_TIME_LAPSE_LOW &&
-             profile.quality <= CamcorderProfile.QUALITY_TIME_LAPSE_QVGA) {
+             profile.quality <= CamcorderProfile.QUALITY_TIME_LAPSE_WQVGA) {
             // Nothing needs to be done. Call to setCaptureRate() enables
             // time lapse video recording.
-        } else {
+        } else if (profile.audioCodec >= 0) {
             setAudioEncodingBitRate(profile.audioBitRate);
             setAudioChannels(profile.audioChannels);
             setAudioSamplingRate(profile.audioSampleRate);

@@ -175,6 +175,33 @@ interface ISms {
             in List<PendingIntent> deliveryIntents);
 
     /**
+     * Send a multi-part text based SMS.
+     *
+     * @param destinationAddress the address to send the message to
+     * @param scAddress is the service center address or null to use
+     *   the current default SMSC
+     * @param parts an <code>ArrayList</code> of strings that, in order,
+     *   comprise the original message
+     * @param sentIntents if not null, an <code>ArrayList</code> of
+     *   <code>PendingIntent</code>s (one for each message part) that is
+     *   broadcast when the corresponding message part has been sent.
+     *   The result code will be <code>Activity.RESULT_OK<code> for success,
+     *   or one of these errors:
+     *   <code>RESULT_ERROR_GENERIC_FAILURE</code>
+     *   <code>RESULT_ERROR_RADIO_OFF</code>
+     *   <code>RESULT_ERROR_NULL_PDU</code>.
+     * @param deliveryIntents if not null, an <code>ArrayList</code> of
+     *   <code>PendingIntent</code>s (one for each message part) that is
+     *   broadcast when the corresponding message part has been delivered
+     *   to the recipient.  The raw pdu of the status report is in the
+     *   extended data ("pdu").
+     * @param priority Priority level of the message
+     */
+    void sendMultipartTextWithPriority(String callingPkg, in String destinationAddress,
+            in String scAddress, in List<String> parts, in List<PendingIntent> sentIntents,
+            in List<PendingIntent> deliveryIntents, in int priority);
+
+    /**
      * Enable reception of cell broadcast (SMS-CB) messages with the given
      * message identifier. Note that if two different clients enable the same
      * message identifier, they must both disable it for the device to stop
@@ -201,31 +228,6 @@ interface ISms {
      * @see #enableCellBroadcast(int)
      */
     boolean disableCellBroadcast(int messageIdentifier);
-
-    /**
-     * Enable reception of cdma broadcast messages with the given
-     * message identifier. Note that if two different clients enable the same
-     * message identifier, they must both disable it for the device to stop
-     * receiving those messages.
-     *
-     * @param messageIdentifier Message identifier as specified in C.R1001-G
-     * @return true if successful, false otherwise
-     * @see #disableCdmaBroadcast(int)
-     */
-       boolean enableCdmaBroadcast(int messageIdentifier);
-
-    /**
-     * Disable reception of cdma broadcast messages with the given
-     * message identifier. Note that if two different clients enable the same
-     * message identifier, they must both disable it for the device to stop
-     * receiving those messages.
-     *
-     * @param messageIdentifier Message identifier as specified in C.R1001-G
-     * @return true if successful, false otherwise
-     *
-     * @see #enableCdmaBroadcast(int)
-     */
-    boolean disableCdmaBroadcast(int messageIdentifier);
 
     /*
      * Enable reception of cell broadcast (SMS-CB) messages with the given
@@ -260,34 +262,6 @@ interface ISms {
     boolean disableCellBroadcastRange(int startMessageId, int endMessageId);
 
     /**
-     * Enable reception of cdma broadcast messages with the given
-     * message identifier range. Note that if two different clients enable
-     * a message identifier range, they must both disable it for the device
-     * to stop receiving those messages.
-     *
-     * @param startMessageId first message identifier as specified in C.R1001-G
-     * @param endMessageId last message identifier as specified in C.R1001-G
-     * @return true if successful, false otherwise
-     *
-     * @see #disableCdmaBroadcastRange(int, int)
-     */
-    boolean enableCdmaBroadcastRange(int startMessageId, int endMessageId);
-
-    /**
-     * Disable reception of cdma broadcast messages with the given
-     * message identifier range. Note that if two different clients enable
-     * a message identifier range, they must both disable it for the device
-     * to stop receiving those messages.
-     *
-     * @param startMessageId first message identifier as specified in C.R1001-G
-     * @param endMessageId last message identifier as specified in C.R1001-G
-     * @return true if successful, false otherwise
-     *
-     * @see #enableCdmaBroadcastRange(int, int)
-     */
-    boolean disableCdmaBroadcastRange(int startMessageId, int endMessageId);
-
-    /**
      * Returns the premium SMS send permission for the specified package.
      * Requires system permission.
      */
@@ -320,4 +294,31 @@ interface ISms {
      * @see #isImsSmsSupported()
      */
     String getImsSmsFormat();
+
+    /**
+     * Get the capacity count of sms on Icc card.
+     *
+     * @return capacity of ICC
+     */
+    int getSmsCapacityOnIcc();
+
+    /**
+     * Copy a raw SMS PDU to the ICC, and return the index on ICC
+     * ICC (Integrated Circuit Card) is the card of the device.
+     * For example, this can be the SIM or USIM for GSM.
+     *
+     * @param smsc the SMSC for this message, or NULL for the default SMSC
+     * @param pdu the raw PDU to store
+     * @param status message status (STATUS_ON_ICC_READ, STATUS_ON_ICC_UNREAD,
+     *               STATUS_ON_ICC_SENT, STATUS_ON_ICC_UNSENT)
+     * @return index of ICC, -1 means copy failed
+     *
+     * @throws IllegalArgumentException if pdu is NULL
+     */
+     int copyMessageToIccGetEfIndex(int status, in byte[] pdu, in byte[] smsc);
+
+    /**
+     * Process reduce long sms overtime in raw table
+     */
+    void processCachedLongSms();
 }

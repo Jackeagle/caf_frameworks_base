@@ -869,7 +869,7 @@ public class Camera {
 
             case CAMERA_MSG_META_DATA:
                 if (mCameraMetaDataCallback != null) {
-                    mCameraMetaDataCallback.onCameraMetaData((int[])msg.obj, mCamera);
+                    mCameraMetaDataCallback.onCameraMetaData((byte[])msg.obj, mCamera);
                 }
                 return;
             /* ### QC ADD-ONS: END */
@@ -1614,25 +1614,24 @@ public class Camera {
         /**
          * Callback for when camera meta data is available.
          *
-         * @param data   a int array of the camera meta data
+         * @param data   a byte array of the camera meta data
          * @param camera the Camera service object
          */
-        void onCameraMetaData(int[] data, Camera camera);
+        void onCameraMetaData(byte[] data, Camera camera);
     };
 
     /** @hide
-     * Set camera face detection mode and registers a callback function to run.
+     * Set camera meta data and registers a callback function to run.
      *  Only valid after startPreview() has been called.
      *
      * @param cb the callback to run
      */
-    //TBD
-    public final void setFaceDetectionCb(CameraMetaDataCallback cb)
+    public final void setMetadataCb(CameraMetaDataCallback cb)
     {
         mCameraMetaDataCallback = cb;
-        native_setFaceDetectionCb(cb!=null);
+        native_setMetadataCb(cb!=null);
     }
-    private native final void native_setFaceDetectionCb(boolean mode);
+    private native final void native_setMetadataCb(boolean mode);
 
     /** @hide
      * Set camera face detection command to send meta data.
@@ -1642,6 +1641,17 @@ public class Camera {
         native_sendMetaData();
     }
     private native final void native_sendMetaData();
+
+    /** @hide
+     * Configure longshot mode. Available only in ZSL.
+     *
+     * @param enable enable/disable this mode
+     */
+    public final void setLongshot(boolean enable)
+    {
+        native_setLongshot(enable);
+    }
+    private native final void native_setLongshot(boolean enable);
 
      /** @hide
      * Handles the Touch Co-ordinate.
@@ -3971,6 +3981,7 @@ public class Camera {
         private static final String KEY_QC_ZSL = "zsl";
         private static final String KEY_QC_CAMERA_MODE = "camera-mode";
         private static final String KEY_QC_VIDEO_HIGH_FRAME_RATE = "video-hfr";
+        private static final String KEY_QC_VIDEO_HDR = "video-hdr";
         private static final String KEY_QC_POWER_MODE = "power-mode";
         private static final String KEY_QC_POWER_MODE_SUPPORTED = "power-mode-supported";
         /** @hide
@@ -4323,6 +4334,17 @@ public class Camera {
          */
          public List<String> getSupportedZSLModes() {
             String str = get(KEY_QC_ZSL + SUPPORTED_VALUES_SUFFIX);
+            return split(str);
+         }
+
+         /** @hide
+         * Gets the supported Video HDR modes.
+         *
+         * @return a List of Video HDR_OFF/OFF string constants. null if
+         * Video HDR mode setting is not supported.
+         */
+         public List<String> getSupportedVideoHDRModes() {
+            String str = get(KEY_QC_VIDEO_HDR + SUPPORTED_VALUES_SUFFIX);
             return split(str);
          }
 
@@ -4849,6 +4871,24 @@ public class Camera {
          */
          public void setVideoHighFrameRate(String hfr) {
             set(KEY_QC_VIDEO_HIGH_FRAME_RATE, hfr);
+         }
+
+         /** @hide
+         * Gets the current Video HDR Mode.
+         *
+         * @return Video HDR mode value
+         */
+         public String getVideoHDRMode() {
+            return get(KEY_QC_VIDEO_HDR);
+         }
+
+         /** @hide
+         * Sets the current Video HDR Mode.
+         *
+         * @return null
+         */
+         public void setVideoHDRMode(String videohdr) {
+            set(KEY_QC_VIDEO_HDR, videohdr);
          }
 
          /** @hide
