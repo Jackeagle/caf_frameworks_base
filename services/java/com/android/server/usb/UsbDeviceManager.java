@@ -437,7 +437,8 @@ public class UsbDeviceManager {
                     .equals(new UsbManager(null, null).getDefaultFunction())
                 && !storageManager.isUsbMassStorageEnabled()) {
                 storageManager.enableUsbMassStorage();
-            } else if (!connected && storageManager.isUsbMassStorageEnabled()) {
+            } else if ((!connected || (connected && isInChargingMode()))
+                && storageManager.isUsbMassStorageEnabled()) {
                 storageManager.disableUsbMassStorage();
             }
         }
