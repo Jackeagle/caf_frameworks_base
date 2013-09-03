@@ -57,6 +57,7 @@ import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.Vibrator;
@@ -1770,8 +1771,12 @@ public class NotificationManagerService extends INotificationManager.Stub
                 Slog.e(TAG, "WARNING: In a future release this will crash the app: " + n.getPackageName());
             }
 
+            //Have ring tone when received SMS when the device is CT mode
+            Boolean smsRingtone = SystemProperties.getBoolean("persist.env.mms.smsringtone", false);
+
             // If we're not supposed to beep, vibrate, etc. then don't.
-            if (((mDisabledNotifications & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) == 0)
+            if (((mDisabledNotifications & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) == 0
+                        || (smsRingtone && mInCall))
                     && (!(old != null
                         && (notification.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0 ))
                     && (r.getUserId() == UserHandle.USER_ALL ||
@@ -1810,6 +1815,8 @@ public class NotificationManagerService extends INotificationManager.Stub
                     int audioStreamType;
                     if (notification.audioStreamType >= 0) {
                         audioStreamType = notification.audioStreamType;
+                    } else if (smsRingtone && mInCall){
+                        audioStreamType = AudioManager.STREAM_SYSTEM;
                     } else {
                         audioStreamType = DEFAULT_STREAM_TYPE;
                     }
