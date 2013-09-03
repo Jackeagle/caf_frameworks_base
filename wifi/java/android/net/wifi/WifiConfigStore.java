@@ -34,7 +34,9 @@ import android.os.Environment;
 import android.os.Message;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.security.KeyStore;
 import android.text.TextUtils;
 import android.util.Log;
@@ -109,6 +111,7 @@ class WifiConfigStore {
     private Context mContext;
     private static final String TAG = "WifiConfigStore";
     private static final boolean DBG = false;
+    private static final String PROP_AUTOCON = "persist.env.sys.wifi.autocon";
 
     /* configured networks with network id as the key */
     private HashMap<Integer, WifiConfiguration> mConfiguredNetworks =
@@ -147,6 +150,9 @@ class WifiConfigStore {
     private WifiNative mWifiNative;
     private final KeyStore mKeyStore = KeyStore.getInstance();
 
+    private static final int WIFI_AUTO_CONNECT_TYPE_AUTO = 0;
+    private static final int DATA_WIFI_CONNECT_TYPE_AUTO = 0;
+
     WifiConfigStore(Context c, WifiNative wn) {
         mContext = c;
         mWifiNative = wn;
@@ -179,6 +185,20 @@ class WifiConfigStore {
      * of configured networks indicates all networks as being enabled
      */
     void enableAllNetworks() {
+
+        int autoConnectPolicy = Settings.System
+                .getInt(mContext.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE,
+                        WIFI_AUTO_CONNECT_TYPE_AUTO);
+        int gsmToWiFiPolicy = Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.DATA_WIFI_CONNECT_TYPE, DATA_WIFI_CONNECT_TYPE_AUTO);
+        Log.d(TAG, "autoConnectPolicy =" + autoConnectPolicy + ", gsmToWiFiPolicy ="
+                + gsmToWiFiPolicy);
+        if (SystemProperties.getBoolean(PROP_AUTOCON, false)
+                && !(autoConnectPolicy == WIFI_AUTO_CONNECT_TYPE_AUTO
+                && gsmToWiFiPolicy == DATA_WIFI_CONNECT_TYPE_AUTO)) {
+            return;
+        }
+
         boolean networkEnabledStateChanged = false;
         for(WifiConfiguration config : mConfiguredNetworks.values()) {
             if(config != null && config.status == Status.DISABLED) {

@@ -100,6 +100,7 @@ import java.util.regex.Pattern;
  */
 public class WifiStateMachine extends StateMachine {
 
+    private static final String PROP_AUTOCON = "persist.env.sys.wifi.autocon";
     private static final String TAG = "WifiStateMachine";
     private static final String NETWORKTYPE = "WIFI";
     private static final boolean DBG = false;
@@ -542,6 +543,9 @@ public class WifiStateMachine extends StateMachine {
     private final WorkSource mLastRunningWifiUids = new WorkSource();
 
     private final IBatteryStats mBatteryStats;
+
+    private static final int WIFI_AUTO_CONNECT_TYPE_AUTO = 0;
+    private static final int DATA_WIFI_CONNECT_TYPE_AUTO = 0;
 
     public WifiStateMachine(Context context, String wlanInterface) {
         super("WifiStateMachine");
@@ -1767,6 +1771,14 @@ public class WifiStateMachine extends StateMachine {
     private void handleNetworkDisconnect() {
         if (DBG) log("Stopping DHCP and clearing IP");
 
+        // set wifi connection type is manually.
+        // if connect a hotspot manually, the status of this ap is enbale.
+        // and then if close the hotspot, should disable it, in case device auto
+        // connect this ap when open this hotspot.
+        if (SystemProperties.getBoolean(PROP_AUTOCON, false) && !shouldAutoConnect()) {
+            disableLastNetwork();
+        }
+
         stopDhcp();
 
         try {
@@ -2270,6 +2282,13 @@ public class WifiStateMachine extends StateMachine {
                     mWifiInfo.setMacAddress(mWifiNative.getMacAddress());
                     mWifiConfigStore.loadAndEnableAllNetworks();
                     initializeWpsDetails();
+
+                    // if don't set auto connect wifi, should disable all
+                    // wifi ap to prevent wifi connect automatically when open
+                    // wifi switch.
+                    if (SystemProperties.getBoolean(PROP_AUTOCON, false) && !shouldAutoConnect()) {
+                        mWifiConfigStore.disableAllNetworks();
+                    }
 
                     sendSupplicantConnectionChangedBroadcast(true);
                     transitionTo(mDriverStartedState);
@@ -3877,4 +3896,45 @@ public class WifiStateMachine extends StateMachine {
         setHostApRunning(null, true);
         Log.e(TAG, "Restart softap Done");
     }
+
+    boolean shouldAutoConnect() {
+        ConnectivityManager cm = (ConnectivityManager) mContext
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (null == info) {
+            Log.d(TAG, "No active network");
+        } else {
+            Log.d(TAG, "Active network type:" + info.getTypeName());
+        }
+
+        int autoConnectPolicy = Settings.System
+                .getInt(mContext.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE,
+                        WIFI_AUTO_CONNECT_TYPE_AUTO);
+        int dataToWiFiPolicy = Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.DATA_WIFI_CONNECT_TYPE, DATA_WIFI_CONNECT_TYPE_AUTO);
+
+        // If no active network(info == null) and wifi connection type is auto
+        // connect, auto connect to wifi;
+        // If the active network type is mobile, wifi connection type is auto
+        // connect and GSM to WLAN connection type is auto connect,
+        // auto connect to wifi.
+        if (autoConnectPolicy == WIFI_AUTO_CONNECT_TYPE_AUTO
+                && (info == null || (info != null && info.getType()
+                            == ConnectivityManager.TYPE_MOBILE && dataToWiFiPolicy
+                    == DATA_WIFI_CONNECT_TYPE_AUTO))) {
+            Log.d(TAG, "Should auto connect");
+            return true;
+        } else {
+            Log.d(TAG, "Shouldn't auto connect");
+            return false;
+        }
+    }
+
+    void disableLastNetwork() {
+        if (getCurrentState() != mSupplicantStoppingState) {
+            mWifiConfigStore.disableNetwork(mLastNetworkId,
+                    WifiConfiguration.DISABLED_UNKNOWN_REASON);
+        }
+    }
+
 }
