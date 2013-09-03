@@ -339,7 +339,9 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
             return;
         }
         mCurrentState = STATE_PREPARED;
-        seekTo(mSaveSeekTime);
+        if (mSaveSeekTime > 0) {
+            seekTo(mSaveSeekTime);
+        }
         if (mProxy != null) {
             mProxy.onPrepared(mp);
         }
