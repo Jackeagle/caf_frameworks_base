@@ -285,6 +285,14 @@ public final class PowerManager {
     public static final int GO_TO_SLEEP_REASON_DEVICE_ADMIN = 1;
 
     /**
+     * property to save is device in fast boot mode
+     *     false: powered on
+     *     true: powered off in fast boot mode
+     * @hide
+     */
+    public static final String PROPERTY_MODE_FASTBOOT = "sys.shutdown.fastboot";
+
+    /**
      * Go to sleep reason code: Going to sleep due to a screen timeout.
      * @hide
      */
