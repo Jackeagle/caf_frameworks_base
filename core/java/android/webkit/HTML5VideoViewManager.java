@@ -94,6 +94,16 @@ class HTML5VideoViewManager
         }
     }
 
+    public void pauseAndResetStaleMediaPlayer(HTML5VideoViewProxy currentProxy) {
+        assert (mUiThread == Thread.currentThread());
+        Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
+        while (iter.hasNext()) {
+            HTML5VideoViewProxy proxy = iter.next();
+            if(proxy != currentProxy)
+                proxy.pauseAndResetMediaPlayer();
+        }
+    }
+
     public void prepareToResume() {
         assert (mUiThread == Thread.currentThread());
         Iterator<HTML5VideoViewProxy> iter = mProxyList.iterator();
@@ -122,10 +132,7 @@ class HTML5VideoViewManager
         // As soon as the fullscreen video is found we exit the loop
         while (iter.hasNext()) {
             HTML5VideoViewProxy proxy = iter.next();
-            if (proxy.isFullscreen() == true)
-                proxy.webkitExitFullscreen();
-            else
-                proxy.prepareToResume();
+            proxy.webkitExitFullscreen();
         }
     }
 }

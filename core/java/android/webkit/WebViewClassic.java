@@ -3520,8 +3520,10 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             mWebViewCore.sendMessage(EventHub.ON_PAUSE);
             // We want to pause the current playing video when switching out
             // from the current WebView/tab.
+            // passing  null to pauseAndResetStaleMediaPlayer will pause & reset
+            // all media player instances.
             if (mHTML5VideoViewManager != null) {
-                mHTML5VideoViewManager.pauseAndDispatch();
+                mHTML5VideoViewManager.pauseAndResetStaleMediaPlayer(null);
             }
             if (mNativeClass != 0) {
                 nativeSetPauseDrawing(mNativeClass, true);
@@ -3562,9 +3564,6 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             if (mNativeClass != 0) {
                 nativeSetPauseDrawing(mNativeClass, false);
             }
-        }
-        if (mHTML5VideoViewManager != null) {
-            mHTML5VideoViewManager.prepareToResume();
         }
         if (mIsMultitabManagementOn) {
             WebViewCore.resumeUpdatePicture(mWebViewCore);
@@ -8575,6 +8574,9 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
     public void debugDump() {
     }
 
+    public HTML5VideoViewManager getHTML5VideoViewManager() {
+        return mHTML5VideoViewManager;
+    }
     /**
      * Enable the communication b/t the webView and VideoViewProxy
      *

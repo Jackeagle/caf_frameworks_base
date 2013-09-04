@@ -210,6 +210,9 @@ class HTML5VideoViewProxy extends Handler
         }
 
         public void play(String url, int time) {
+            if ((mHTML5VideoView != null) && (mHTML5VideoView.getCurrentState() == mHTML5VideoView.STATE_RESETTED)) {
+                prepareToResume();
+            }
             if (ensureHTML5VideoView(url, time, true)
                 // This second condition allows an HTML5VideoView with preload
                 // metadata to continue into playing state
@@ -429,6 +432,9 @@ class HTML5VideoViewProxy extends Handler
         // This executes on the UI thread.
         switch (msg.what) {
             case PLAY: {
+                if (mWebView.getHTML5VideoViewManager() != null) {
+                    mWebView.getHTML5VideoViewManager().pauseAndResetStaleMediaPlayer(this);
+                }
                 String url = (String) msg.obj;
                 int seekPosition = msg.arg1;
                 mIsFullscreen = (msg.arg2 == 0) ? false : true;
@@ -936,7 +942,6 @@ class HTML5VideoViewProxy extends Handler
     public void pauseAndDispatch() {
         // mVideoPlayer.pause will always dispatch notification
         mVideoPlayer.pause();
-        mVideoPlayer.reset();
     }
 
     public void suspend() {
@@ -989,8 +994,21 @@ class HTML5VideoViewProxy extends Handler
     }
 
     public void pauseAndReleaseMediaPlayer() {
-        mVideoPlayer.pause();
+        try {
+            mVideoPlayer.pause();
+        } catch (java.lang.IllegalStateException e) {
+            Log.w(LOGTAG, " Should not reach here !!!!! . pauseAndReleaseMediaPlayer e = "+ e);
+        }
         mVideoPlayer.release();
+    }
+
+    public void pauseAndResetMediaPlayer() {
+        try {
+            mVideoPlayer.pause();
+        } catch (java.lang.IllegalStateException e) {
+            Log.w(LOGTAG, " Should not reach here !!!!! . pauseAndResetMediaPlayer e = "+ e);
+        }
+        mVideoPlayer.reset();
     }
 
     /**
