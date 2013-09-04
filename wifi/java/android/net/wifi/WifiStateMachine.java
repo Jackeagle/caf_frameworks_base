@@ -2212,22 +2212,6 @@ public class WifiStateMachine extends StateMachine {
         public void enter() {
             if (DBG) log(getName() + "\n");
             EventLog.writeEvent(EVENTLOG_WIFI_STATE_CHANGED, getName());
-
-            /* IPv6 is disabled at boot time and is controlled by framework
-             * to be enabled only as long as we are connected to an access point
-             *
-             * This fixes issues, a few being:
-             * - IPv6 addresses and routes stick around after disconnection
-             * - When connected, the kernel is unaware and can fail to start IPv6 negotiation
-             * - The kernel sometimes starts autoconfiguration when 802.1x is not complete
-             */
-            try {
-                mNwService.disableIpv6(mInterfaceName);
-            } catch (RemoteException re) {
-                loge("Failed to disable IPv6: " + re);
-            } catch (IllegalStateException e) {
-                loge("Failed to disable IPv6: " + e);
-            }
         }
         @Override
         public boolean processMessage(Message message) {
@@ -2250,6 +2234,18 @@ public class WifiStateMachine extends StateMachine {
                         mNwService.setInterfaceDown(mInterfaceName);
                         //Set privacy extensions
                         mNwService.setInterfaceIpv6PrivacyExtensions(mInterfaceName, true);
+
+                       /* IPv6 is disabled at boot time and is controlled by framework
+                        * to be enabled only as long as we are connected to an AP
+                        *
+                        * This fixes issues, a few being:
+                        * - IPv6 addresses and routes stick around after disconnection
+                        * - When connected, the kernel is unaware and can fail to start
+                        *   IPv6 negotiation
+                        * - The kernel sometimes starts autoconfiguration when 802.1x
+                        *   is not complete
+                        */
+                        mNwService.disableIpv6(mInterfaceName);
                     } catch (RemoteException re) {
                         loge("Unable to change interface settings: " + re);
                     } catch (IllegalStateException ie) {
