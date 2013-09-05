@@ -675,6 +675,26 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                 WifiP2pManager.NOT_IN_FOREGROUND);
                     }
                     break;
+                case WifiMonitor.P2P_PERSISTENT_PSK_FAIL_EVENT:
+                    int netId;
+                    String interfaceName;
+                    if (DBG) logd("Persistent PSK failure");
+                    netId = ((Integer) message.obj).intValue();
+                    mSavedPeerConfig = new WifiP2pConfig();
+
+                    mSavedPeerConfig.deviceAddress = mGroups.getOwnerAddr(netId);
+
+                    mGroups.remove(netId);
+
+                    if (DBG) loge("Remove group id: " + netId + " from grouplist");
+
+                    mAutonomousGroup = false;
+                    mJoinExistingGroup = true;
+                    if (!sendConnectNoticeToApp(mPeers.get(mSavedPeerConfig.deviceAddress),
+                            mSavedPeerConfig)) {
+                        transitionTo(mUserAuthorizingInvitationState);
+                    }
+                    break;
                     // Ignore
                 case WifiMonitor.P2P_INVITATION_RESULT_EVENT:
                 case WifiMonitor.SCAN_RESULTS_EVENT:
