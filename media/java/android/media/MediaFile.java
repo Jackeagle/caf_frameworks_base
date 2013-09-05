@@ -63,9 +63,9 @@ public class MediaFile {
     private static final int LAST_AUDIO_FILE_TYPE2 = FILE_TYPE_DTS;
 
     // MIDI file types
-    public static final int FILE_TYPE_MID     = 16;
-    public static final int FILE_TYPE_SMF     = 17;
-    public static final int FILE_TYPE_IMY     = 18;
+    public static final int FILE_TYPE_MID     = 17;
+    public static final int FILE_TYPE_SMF     = 18;
+    public static final int FILE_TYPE_IMY     = 19;
     private static final int FIRST_MIDI_FILE_TYPE = FILE_TYPE_MID;
     private static final int LAST_MIDI_FILE_TYPE = FILE_TYPE_IMY;
 
