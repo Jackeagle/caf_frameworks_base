@@ -26,8 +26,6 @@ import com.android.server.am.ActivityManagerService;
 import com.android.server.display.DisplayManagerService;
 import com.android.server.dreams.DreamManagerService;
 
-import android.app.ActivityManager;
-import android.app.ActivityManager.RunningAppProcessInfo;
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -421,6 +419,9 @@ public final class PowerManagerService extends IPowerManager.Stub
         // activity manager is not running when the constructor is called, so we
         // have to defer setting the screen state until this point.
         mDisplayBlanker.unblankAllDisplays();
+
+        // set powered on state when boot up
+        SystemProperties.set(PowerManager.PROPERTY_MODE_FASTBOOT, String.valueOf(false));
     }
 
     public void setPolicy(WindowManagerPolicy policy) {
@@ -1284,7 +1285,7 @@ public final class PowerManagerService extends IPowerManager.Stub
         }
 
         // If we are in FPO mode, we need to sleep.
-        if (isFastPowerOnActive()) {
+        if (SystemProperties.getBoolean(PowerManager.PROPERTY_MODE_FASTBOOT, false)) {
             return false;
         }
 
@@ -2708,16 +2709,5 @@ public final class PowerManagerService extends IPowerManager.Stub
                 return "blanked=" + mBlanked;
             }
         }
-    }
-
-    private Boolean isFastPowerOnActive() {
-        ActivityManager activityManager = (ActivityManager) mContext.getSystemService( Context.ACTIVITY_SERVICE );
-        List<RunningAppProcessInfo> procInfos = activityManager.getRunningAppProcesses();
-        for(int i = 0; i < procInfos.size(); i++){
-            if (procInfos.get(i).processName.equals("com.qualcomm.fastboot")) {
-                return true;
-            }
-        }
-        return false;
     }
 }

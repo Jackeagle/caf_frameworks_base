@@ -1509,4 +1509,6 @@
     <string name="China_Mobile">中国移动</string>
     <string name="China_Unicom">中国联通</string>
     <string name="China_Telecom">中国电信</string>
+
+    <string name="no_quick_contact">无快速联系人</string>
 </resources>

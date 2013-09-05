@@ -18,6 +18,7 @@ package android.widget;
 
 import com.android.internal.R;
 
+import android.content.ActivityNotFoundException;
 import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -39,6 +40,7 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
 
 /**
  * Widget used to show an image with the standard QuickContact badge
@@ -365,7 +367,13 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
                         extras.remove(EXTRA_URI_CONTENT);
                         intent.putExtras(extras);
                     }
-                    getContext().startActivity(intent);
+
+                    try {
+                        getContext().startActivity(intent);
+                    } catch (ActivityNotFoundException e) {
+                        Toast.makeText(getContext(), R.string.no_quick_contact, Toast.LENGTH_SHORT)
+                                .show();
+                    }
                 }
             }
         }

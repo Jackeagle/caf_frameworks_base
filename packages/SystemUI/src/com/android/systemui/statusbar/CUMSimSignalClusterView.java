@@ -174,13 +174,13 @@ public class CUMSimSignalClusterView extends MSimSignalClusterView implements
             int noSimIcon, int subscription, ServiceState simServiceState, boolean isRoaming,
             boolean dataConnect) {
         mMobileVisible = visible;
+        mServiceState[subscription] = simServiceState;
         mMobileStrengthId[subscription] = convertStrengthIconIdToCU(strengthIcon[0], subscription);
         mMobileActivityId[subscription] = activityIcon;
         mMobileTypeId[subscription] = typeIcon;
         mMobileDescription[subscription] = contentDescription;
         mMobileTypeDescription = typeContentDescription;
         mNoSimIconId[subscription] = convertNoSimIconIdToCU(subscription);
-        mServiceState[subscription] = simServiceState;
 
         if (noSimIcon != 0) {
             mMNoSimIconVisible[subscription] = true;

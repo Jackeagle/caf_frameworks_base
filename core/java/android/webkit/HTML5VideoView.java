@@ -110,13 +110,15 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
     }
 
     public void suspend() {
-           mPlayer.suspend();
-            // Delete the Timer to stop it since there is no stop call.
-            if (mTimer != null) {
-                mTimer.purge();
-                mTimer.cancel();
-                mTimer = null;
-            }
+        if (mPlayer != null) {
+            mPlayer.suspend();
+        }
+        // Delete the Timer to stop it since there is no stop call.
+        if (mTimer != null) {
+            mTimer.purge();
+            mTimer.cancel();
+            mTimer = null;
+        }
     }
 
     public boolean resume() {
@@ -339,7 +341,9 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
             return;
         }
         mCurrentState = STATE_PREPARED;
-        seekTo(mSaveSeekTime);
+        if (mSaveSeekTime > 0) {
+            seekTo(mSaveSeekTime);
+        }
         if (mProxy != null) {
             mProxy.onPrepared(mp);
         }
