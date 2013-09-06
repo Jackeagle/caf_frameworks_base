@@ -44,6 +44,7 @@ import android.provider.Settings;
 import android.sax.Element;
 import android.sax.ElementListener;
 import android.sax.RootElement;
+import android.telephony.MSimTelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Xml;
@@ -1004,6 +1005,10 @@ public class MediaScanner
                     mDefaultNotificationSet = true;
                 } else if (ringtones) {
                     setSettingIfNotSet(Settings.System.RINGTONE, tableUri, rowId);
+                    if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                        // Set the setting to the given URI for RINGTONE_2
+                        setSettingIfNotSet(Settings.System.RINGTONE_2, tableUri, rowId);
+                    }
                     mDefaultRingtoneSet = true;
                 } else if (alarms) {
                     setSettingIfNotSet(Settings.System.ALARM_ALERT, tableUri, rowId);
