@@ -772,16 +772,17 @@ void* playMusic(void* arg)
         pthread_mutex_unlock(&mp_lock);
 
         audio_devices_t device = AudioSystem::getDevicesForStream(AUDIO_STREAM_ENFORCED_AUDIBLE);
-        AudioSystem::getStreamVolumeIndex(AUDIO_STREAM_ENFORCED_AUDIBLE, &index, device);
+        AudioSystem::initStreamVolume(AUDIO_STREAM_ENFORCED_AUDIBLE,0,7);
+        AudioSystem::setStreamVolumeIndex(AUDIO_STREAM_ENFORCED_AUDIBLE, 7, device);
 
         //waiting to ensure sound card is ok to play music.
-        if (index == 0) {
+        /*if (index == 0) {
             ALOGD("waiting 3s...");
             struct timeval delay;
             delay.tv_sec = 0;
             delay.tv_usec = 3000 * 1000; // 3s
             select(0, NULL, NULL, NULL, &delay);
-        }
+        }*/
 
         AudioSystem::getStreamVolumeIndex(AUDIO_STREAM_ENFORCED_AUDIBLE, &index, device);
         if (index != 0) {
