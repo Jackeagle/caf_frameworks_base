@@ -106,8 +106,6 @@ public class KeyguardUpdateMonitor {
     private IccCardConstants.State []mSimState;
     private CharSequence []mTelephonyPlmn;
     private CharSequence []mTelephonySpn;
-    private boolean []mShowPlmn;
-    private boolean []mShowSpn;
     private int mRingMode;
     private int mPhoneState;
     private boolean mKeyguardIsVisible;
@@ -263,10 +261,6 @@ public class KeyguardUpdateMonitor {
                 // Update PLMN and SPN for corresponding subscriptions.
                 mTelephonyPlmn[subscription] = getTelephonyPlmnFrom(intent);
                 mTelephonySpn[subscription] = getTelephonySpnFrom(intent);
-                mShowPlmn[subscription] = intent.getBooleanExtra(
-                        TelephonyIntents.EXTRA_SHOW_PLMN, false);
-                mShowSpn[subscription] = intent.getBooleanExtra(
-                        TelephonyIntents.EXTRA_SHOW_SPN, false);
                 final Message msg = mHandler.obtainMessage(MSG_CARRIER_INFO_UPDATE);
                 msg.arg1 = subscription;
                 mHandler.sendMessage(msg);
@@ -488,9 +482,7 @@ public class KeyguardUpdateMonitor {
         // mode and '2' for dual SIM mode.
         int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
         // Initialize PLMN, SPN strings and SIM states for the subscriptions.
-        mShowPlmn = new boolean[numPhones];
         mTelephonyPlmn = new CharSequence[numPhones];
-        mShowSpn = new boolean[numPhones];
         mTelephonySpn = new CharSequence[numPhones];
         mSimState = new IccCardConstants.State[numPhones];
         for (int i = 0; i < numPhones; i++) {
@@ -737,20 +729,18 @@ public class KeyguardUpdateMonitor {
      * Handle {@link #MSG_CARRIER_INFO_UPDATE}
      */
     private void handleCarrierInfoUpdate(int subscription) {
-        if (DEBUG) Log.d(TAG, "handleCarrierInfoUpdate: bShowPlmn = " + mShowPlmn[subscription]
-                    + ", plmn = " + mTelephonyPlmn[subscription] + ", bShowSpn = "
-                    + mShowSpn[subscription] + ", spn = " + mTelephonySpn[subscription]
-                    + ", subscription = " + subscription);
+        if (DEBUG) Log.d(TAG, "handleCarrierInfoUpdate: plmn = " + mTelephonyPlmn[subscription]
+                + ", spn = " + mTelephonySpn[subscription] + ", subscription = " + subscription);
 
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
             if (cb != null) {
                 if (sIsMultiSimEnabled) {
-                    cb.onRefreshCarrierInfo(mShowPlmn[subscription], mTelephonyPlmn[subscription],
-                            mShowSpn[subscription], mTelephonySpn[subscription], subscription);
+                    cb.onRefreshCarrierInfo(mTelephonyPlmn[subscription],
+                            mTelephonySpn[subscription], subscription);
                 } else {
-                    cb.onRefreshCarrierInfo(mShowPlmn[subscription], mTelephonyPlmn[subscription],
-                            mShowSpn[subscription], mTelephonySpn[subscription], i);
+                    cb.onRefreshCarrierInfo(mTelephonyPlmn[subscription],
+                            mTelephonySpn[subscription]);
                 }
             }
         }
@@ -922,13 +912,12 @@ public class KeyguardUpdateMonitor {
         int subscription = MSimTelephonyManager.getDefault().getDefaultSubscription();
         if (sIsMultiSimEnabled) {
             for (int i=0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
-                callback.onRefreshCarrierInfo(mShowPlmn[i], mTelephonyPlmn[i], mShowSpn[i],
-                        mTelephonySpn[i], i);
+                callback.onRefreshCarrierInfo(mTelephonyPlmn[i], mTelephonySpn[i], i);
                 callback.onSimStateChanged(mSimState[i], i);
             }
         } else {
-            callback.onRefreshCarrierInfo(mShowPlmn[subscription], mTelephonyPlmn[subscription],
-                    mShowSpn[subscription], mTelephonySpn[subscription]);
+            callback.onRefreshCarrierInfo(mTelephonyPlmn[subscription],
+                   mTelephonySpn[subscription]);
             callback.onSimStateChanged(mSimState[subscription]);
         }
         callback.onMusicClientIdChanged(
