@@ -20,6 +20,8 @@
 package com.android.internal.policy.impl.keyguard;
 
 import android.content.Context;
+import android.os.SystemProperties;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.widget.TextView;
@@ -30,26 +32,37 @@ import com.android.internal.telephony.IccCardConstants.State;
 import com.android.internal.widget.LockPatternUtils;
 
 public class CarrierText extends TextView {
+
+    private static final int ORIGIN_CARRIER_NAME_ID
+                                 = com.android.internal.R.array.origin_carrier_names;
+    private static final int LOCALE_CARRIER_NAME_ID
+                                 = com.android.internal.R.array.locale_carrier_names;
+
     private static CharSequence mSeparator;
 
     private LockPatternUtils mLockPatternUtils;
 
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
+        private boolean mShowPlmn;
         private CharSequence mPlmn;
+        private boolean mShowSpn;
         private CharSequence mSpn;
         private State mSimState;
 
         @Override
-        public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) {
+        public void onRefreshCarrierInfo(boolean bShowPlmn, CharSequence plmn, boolean bShowSpn,
+                CharSequence spn) {
+            mShowPlmn = bShowPlmn;
             mPlmn = plmn;
+            mShowSpn = bShowSpn;
             mSpn = spn;
-            updateCarrierText(mSimState, mPlmn, mSpn);
+            updateCarrierText(mSimState, mShowPlmn, mPlmn, mShowSpn, mSpn);
         }
 
         @Override
         public void onSimStateChanged(IccCardConstants.State simState) {
             mSimState = simState;
-            updateCarrierText(mSimState, mPlmn, mSpn);
+            updateCarrierText(mSimState, mShowPlmn, mPlmn, mShowSpn, mSpn);
         }
     };
     /**
@@ -76,8 +89,9 @@ public class CarrierText extends TextView {
         mLockPatternUtils = new LockPatternUtils(mContext);
     }
 
-    protected void updateCarrierText(State simState, CharSequence plmn, CharSequence spn) {
-        CharSequence text = getCarrierTextForSimState(simState, plmn, spn);
+    protected void updateCarrierText(State simState, boolean bShowPlmn, CharSequence plmn,
+            boolean bShowSpn, CharSequence spn) {
+        CharSequence text = getCarrierTextForSimState(simState, bShowPlmn, plmn, bShowSpn, spn);
         if (KeyguardViewManager.USE_UPPER_CASE) {
             setText(text != null ? text.toString().toUpperCase() : null);
         } else {
@@ -112,17 +126,19 @@ public class CarrierText extends TextView {
      * and SPN as well as device capabilities, such as being emergency call capable.
      *
      * @param simState
+     * @param bShowPlmn
      * @param plmn
+     * @param bShowSpn
      * @param spn
      * @return
      */
     protected CharSequence getCarrierTextForSimState(IccCardConstants.State simState,
-            CharSequence plmn, CharSequence spn) {
+            boolean bShowPlmn, CharSequence plmn, boolean bShowSpn, CharSequence spn) {
         CharSequence carrierText = null;
         StatusMode status = getStatusForIccState(simState);
         switch (status) {
             case Normal:
-                carrierText = concatenate(plmn, spn);
+                carrierText = makeCarrierString(bShowPlmn, plmn, bShowSpn, spn);
                 break;
 
             case SimNotReady:
@@ -228,18 +244,53 @@ public class CarrierText extends TextView {
         return StatusMode.SimMissing;
     }
 
-    private static CharSequence concatenate(CharSequence plmn, CharSequence spn) {
+    private CharSequence concatenate(CharSequence plmn, CharSequence spn) {
         final boolean plmnValid = !TextUtils.isEmpty(plmn);
         final boolean spnValid = !TextUtils.isEmpty(spn);
         if (plmnValid && spnValid) {
-            return new StringBuilder().append(plmn).append(mSeparator).append(spn).toString();
+            return new StringBuilder().append(getLocalString(plmn)).append(mSeparator)
+                    .append(getLocalString(spn)).toString();
         } else if (plmnValid) {
-            return plmn;
+            return getLocalString(plmn);
         } else if (spnValid) {
-            return spn;
+            return getLocalString(spn);
         } else {
             return "";
         }
+    }
+
+    private CharSequence makeCarrierString(boolean bShowPlmn, CharSequence plmn, boolean bShowSpn,
+            CharSequence spn) {
+        String networkNameDefault = mContext
+                .getString(com.android.internal.R.string.lockscreen_carrier_default);
+
+        StringBuilder str = new StringBuilder();
+        boolean bShowPlmnOrSpn = false;
+        if (bShowPlmn && !TextUtils.isEmpty(plmn)) {
+            String plmnName = getLocalString(plmn);
+            str.append(plmnName);
+            bShowPlmnOrSpn = true;
+        }
+
+        if (bShowSpn && !TextUtils.isEmpty(spn)) {
+            if (bShowPlmnOrSpn) {
+                str.append(mSeparator);
+            }
+            String spnName = getLocalString(plmn);
+            str.append(spnName);
+            bShowPlmnOrSpn = true;
+        }
+
+        if (bShowPlmnOrSpn) {
+            return str.toString();
+        } else {
+            return networkNameDefault;
+        }
+    }
+
+    private String getLocalString(CharSequence c) {
+        return mContext.getLocalString(
+                   c.toString(), ORIGIN_CARRIER_NAME_ID, LOCALE_CARRIER_NAME_ID);
     }
 
     private CharSequence getCarrierHelpTextForSimState(IccCardConstants.State simState,
