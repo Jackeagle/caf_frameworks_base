@@ -1511,4 +1511,5 @@
     <string name="China_Telecom">中国电信</string>
 
     <string name="no_quick_contact">无快速联系人</string>
+    <string name="date_format_day_month_week">d 日 M 月 E</string>
 </resources>
