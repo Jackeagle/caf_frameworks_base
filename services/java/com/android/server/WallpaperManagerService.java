@@ -575,19 +575,6 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
         }
         final long ident = Binder.clearCallingIdentity();
         RuntimeException e = null;
-        try {
-            wallpaper.imageWallpaperPending = false;
-            if (userId != mCurrentUserId) return;
-            if (bindWallpaperComponentLocked(defaultFailed
-                    ? IMAGE_WALLPAPER
-                    : null, true, false, wallpaper, reply)) {
-                return;
-            }
-        } catch (IllegalArgumentException e1) {
-            e = e1;
-        } finally {
-            Binder.restoreCallingIdentity(ident);
-        }
         
         // This can happen if the default wallpaper component doesn't
         // exist.  This should be a system configuration problem, but
@@ -906,6 +893,8 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
                 if (wallpaper.userId == mCurrentUserId) {
                     if (DEBUG)
                         Slog.v(TAG, "Adding window token: " + newConn.mToken);
+                    Slog.w(TAG, "lmark132_55 Wallpaper create window");
+
                     mIWindowManager.addWindowToken(newConn.mToken,
                             WindowManager.LayoutParams.TYPE_WALLPAPER);
                     mLastWallpaper = wallpaper;
@@ -942,6 +931,8 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
             try {
                 if (DEBUG)
                     Slog.v(TAG, "Removing window token: " + wallpaper.connection.mToken);
+                Slog.w(TAG, "lmark132_55 wallpaper drop window");
+
                 mIWindowManager.removeWindowToken(wallpaper.connection.mToken);
             } catch (RemoteException e) {
             }
