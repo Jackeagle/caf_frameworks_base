@@ -110,6 +110,10 @@ JNIMediaPlayerListener::JNIMediaPlayerListener(JNIEnv* env, jobject thiz, jobjec
     }
     mExtMediaPlayer = false;
     jclass extclazz = env->FindClass("com/qualcomm/qcmedia/QCMediaPlayer");
+    if (env->ExceptionCheck()) {
+        extclazz = NULL;
+        env->ExceptionClear();
+    }
     if (extclazz != NULL){
         if(env->IsInstanceOf(thiz,extclazz)){
             mExtMediaPlayer = true;
@@ -146,7 +150,7 @@ void JNIMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel *o
                     ((msg == MEDIA_PREPARED) || (msg == MEDIA_TIMED_TEXT) ||(msg == MEDIA_QOE) )) {
 
                 ALOGD("JNIMediaPlayerListener::notify calling ext_post_event");
-                if (ext2 == 1) { // only in case of codec config frame
+                if (ext2 == 1 && (msg == MEDIA_TIMED_TEXT)) { // only in case of codec config frame
                     if (mParcelCodecConf != NULL) {
                         Parcel* nativeParcelLocal = parcelForJavaObject(env, mParcelCodecConf);
                         nativeParcelLocal->setData(obj->data(), obj->dataSize());
