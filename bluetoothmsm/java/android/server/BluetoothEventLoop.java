@@ -456,7 +456,8 @@ class BluetoothEventLoop {
             if ((value != null)  && name.equals("UUIDs")) {
                 adapterProperties.setProperty(name, value);
                 mBluetoothService.updateBluetoothState(value);
-            } else if ((value != null) && (value.startsWith(adapterObjectPath))) {
+            } else if ((value != null) && (adapterObjectPath != null)
+                && (value.startsWith(adapterObjectPath))) {
                 // Devices Prop expect value starts with obj path
                 adapterProperties.setProperty(name, value);
             }
