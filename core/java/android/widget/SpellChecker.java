@@ -590,6 +590,7 @@ public class SpellChecker implements SpellCheckerSessionListener {
 
             int wordCount = 0;
             boolean scheduleOtherSpellCheck = false;
+            int spellCheckStart = 0;
 
             if (mIsSentenceSpellCheckSupported) {
                 if (wordIteratorWindowEnd < end) {
@@ -614,7 +615,7 @@ public class SpellChecker implements SpellCheckerSessionListener {
                 }
                 do {
                     // TODO: Find the start position of the sentence.
-                    int spellCheckStart = wordStart;
+                    spellCheckStart = wordStart;
                     boolean createSpellCheckSpan = true;
                     // Cancel or merge overlapped spell check spans
                     for (int i = 0; i < mLength; ++i) {
@@ -733,7 +734,11 @@ public class SpellChecker implements SpellCheckerSessionListener {
 
             if (scheduleOtherSpellCheck) {
                 // Update range span: start new spell check from last wordStart
-                setRangeSpan(editable, wordStart, end);
+                if (wordStart > end) {
+                    setRangeSpan(editable, spellCheckStart, end);
+                } else {
+                    setRangeSpan(editable, wordStart, end);
+                }
             } else {
                 removeRangeSpan(editable);
             }
