@@ -384,15 +384,17 @@ public final class ShutdownThread extends Thread {
         }
         
         String shutDownFile = null;
+
+        //showShutdownAnimation() is called from here to sync
+        //music and animation properly
+        if(checkAnimationFileExist()) {
+            lockDevice();
+            showShutdownAnimation();
+        }
+
         if (mBootAnimEnabled && !isSilentMode()
                 && (shutDownFile = getShutdownMusicFilePath()) != null) {
             isShutdownMusicPlaying = true;
-            //showShutdownAnimation() is called from here to sync
-            //music and animation properly
-            if(checkAnimationFileExist()) {
-                lockDevice();
-                showShutdownAnimation();
-            }
             shutdownMusicHandler.obtainMessage(0, shutDownFile).sendToTarget();
         }
 
@@ -680,8 +682,9 @@ public final class ShutdownThread extends Thread {
     }
 
     private static boolean isSilentMode() {
-        String mode = SystemProperties.get("persist.sys.silent");
-        return mode != null && mode.equals("1");
+        boolean isSilent = mAudioManager.isSilentMode();
+        SystemProperties.set("persist.sys.silent", isSilent ? "1" : "0");
+        return isSilent;
     }
 
     private static void showShutdownAnimation() {
