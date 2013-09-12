@@ -20,8 +20,11 @@
 package com.android.internal.policy.impl.keyguard;
 
 import android.content.Context;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.widget.TextView;
 
 import com.android.internal.R;
@@ -30,9 +33,12 @@ import com.android.internal.telephony.IccCardConstants.State;
 import com.android.internal.widget.LockPatternUtils;
 
 public class CarrierText extends TextView {
+    private static final String TAG = "CarrierText";
     private static CharSequence mSeparator;
 
     private LockPatternUtils mLockPatternUtils;
+
+    protected boolean mAirplaneMode;
 
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
         private CharSequence mPlmn;
@@ -49,6 +55,12 @@ public class CarrierText extends TextView {
         @Override
         public void onSimStateChanged(IccCardConstants.State simState) {
             mSimState = simState;
+            updateCarrierText(mSimState, mPlmn, mSpn);
+        }
+
+        @Override
+        void onAirplaneModeChanged(boolean on) {
+            mAirplaneMode = on;
             updateCarrierText(mSimState, mPlmn, mSpn);
         }
     };
@@ -74,10 +86,24 @@ public class CarrierText extends TextView {
     public CarrierText(Context context, AttributeSet attrs) {
         super(context, attrs);
         mLockPatternUtils = new LockPatternUtils(mContext);
+        try {
+            mAirplaneMode = Settings.System.getInt(mContext.getContentResolver(),
+                    Settings.System.AIRPLANE_MODE_ON) == 1;
+        } catch (SettingNotFoundException snfe) {
+            Log.e(TAG, "get airplane mode exception");
+        }
     }
 
     protected void updateCarrierText(State simState, CharSequence plmn, CharSequence spn) {
-        CharSequence text = getCarrierTextForSimState(simState, plmn, spn);
+        CharSequence text = "";
+
+        if (mAirplaneMode) {
+            // if airplane mode is on, show "airplane mode"
+            text = getContext().getText(R.string.lockscreen_airplane_mode_on);
+        } else {
+            text = getCarrierTextForSimState(simState, plmn, spn);
+        }
+
         if (KeyguardViewManager.USE_UPPER_CASE) {
             setText(text != null ? text.toString().toUpperCase() : null);
         } else {

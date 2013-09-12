@@ -96,6 +96,7 @@ public class KeyguardUpdateMonitor {
     private static final int MSG_SET_CURRENT_CLIENT_ID = 315;
     protected static final int MSG_SET_PLAYBACK_STATE = 316;
     protected static final int MSG_USER_INFO_CHANGED = 317;
+    private static final int MSG_AIRPLANE_MODE_CHANGED = 318;
 
 
     private static KeyguardUpdateMonitor sInstance;
@@ -188,6 +189,9 @@ public class KeyguardUpdateMonitor {
                     break;
                 case MSG_USER_INFO_CHANGED:
                     handleUserInfoChanged(msg.arg1);
+                    break;
+                case MSG_AIRPLANE_MODE_CHANGED:
+                    handleAirplaneModeChanged((Boolean) msg.obj);
                     break;
             }
         }
@@ -291,6 +295,9 @@ public class KeyguardUpdateMonitor {
             } else if (Intent.ACTION_USER_REMOVED.equals(action)) {
                 mHandler.sendMessage(mHandler.obtainMessage(MSG_USER_REMOVED,
                        intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0), 0));
+            } else if (Intent.ACTION_AIRPLANE_MODE_CHANGED.equals(action)) {
+                boolean state = intent.getBooleanExtra("state", false);
+                mHandler.sendMessage(mHandler.obtainMessage(MSG_AIRPLANE_MODE_CHANGED, state));
             } else if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
                 mHandler.sendMessage(mHandler.obtainMessage(MSG_BOOT_COMPLETED));
             }
@@ -457,6 +464,15 @@ public class KeyguardUpdateMonitor {
         }
     }
 
+    private void handleAirplaneModeChanged(boolean on) {
+        for (int i = 0; i < mCallbacks.size(); i++) {
+            KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
+            if (cb != null) {
+                cb.onAirplaneModeChanged(on);
+            }
+        }
+    }
+
     private void handleUserInfoChanged(int userId) {
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
@@ -503,6 +519,7 @@ public class KeyguardUpdateMonitor {
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         filter.addAction(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED);
         filter.addAction(Intent.ACTION_USER_REMOVED);
+        filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
         context.registerReceiver(mBroadcastReceiver, filter);
 
         final IntentFilter bootCompleteFilter = new IntentFilter();
