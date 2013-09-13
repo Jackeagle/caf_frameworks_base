@@ -314,11 +314,14 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
             Uri createUri = null;
             boolean trigger = false;
             Bundle extras = (cookie != null) ? (Bundle) cookie : new Bundle();
+            String contactExtra = extras.getString(EXTRA_URI_CONTENT);
             try {
                 switch(token) {
                     case TOKEN_PHONE_LOOKUP_AND_TRIGGER:
                         trigger = true;
-                        createUri = Uri.fromParts("tel", extras.getString(EXTRA_URI_CONTENT), null);
+                        if (contactExtra != null) {
+                            createUri = Uri.fromParts("tel", contactExtra, null);
+                        }
 
                         //$FALL-THROUGH$
                     case TOKEN_PHONE_LOOKUP: {
