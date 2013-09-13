@@ -190,6 +190,7 @@ class ProcessList {
         float scale = scaleMem > scaleDisp ? scaleMem : scaleDisp;
         if (scale < 0) scale = 0;
         else if (scale > 1) scale = 1;
+        scale = 0;
         for (int i=0; i<mOomAdj.length; i++) {
             long low = mOomMinFreeLow[i];
             long high = mOomMinFreeHigh[i];
