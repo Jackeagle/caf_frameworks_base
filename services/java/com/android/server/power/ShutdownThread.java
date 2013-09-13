@@ -36,6 +36,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
+import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -120,6 +121,8 @@ public final class ShutdownThread extends Thread {
     private boolean isShutdownMusicPlaying = false;
 
     private static AlertDialog sConfirmDialog;
+
+    private static AudioManager mAudioManager;
     
     private ShutdownThread() {
     }
@@ -269,6 +272,10 @@ public final class ShutdownThread extends Thread {
             sIsStarted = true;
         }
 
+        //acquire audio focus to make the other apps to stop playing muisc
+        mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        mAudioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+
         if (!checkAnimationFileExist()) {
             // throw up an indeterminate system dialog to indicate radio is
             // shutting down.
@@ -377,15 +384,17 @@ public final class ShutdownThread extends Thread {
         }
         
         String shutDownFile = null;
+
+        //showShutdownAnimation() is called from here to sync
+        //music and animation properly
+        if(checkAnimationFileExist()) {
+            lockDevice();
+            showShutdownAnimation();
+        }
+
         if (mBootAnimEnabled && !isSilentMode()
                 && (shutDownFile = getShutdownMusicFilePath()) != null) {
             isShutdownMusicPlaying = true;
-            //showShutdownAnimation() is called from here to sync
-            //music and animation properly
-            if(checkAnimationFileExist()) {
-                lockDevice();
-                showShutdownAnimation();
-            }
             shutdownMusicHandler.obtainMessage(0, shutDownFile).sendToTarget();
         }
 
@@ -673,8 +682,9 @@ public final class ShutdownThread extends Thread {
     }
 
     private static boolean isSilentMode() {
-        String mode = SystemProperties.get("persist.sys.silent");
-        return mode != null && mode.equals("1");
+        boolean isSilent = mAudioManager.isSilentMode();
+        SystemProperties.set("persist.sys.silent", isSilent ? "1" : "0");
+        return isSilent;
     }
 
     private static void showShutdownAnimation() {
