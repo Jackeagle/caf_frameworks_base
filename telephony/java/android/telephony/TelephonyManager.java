@@ -135,10 +135,10 @@ public class TelephonyManager {
      * call. By default, the MMS app consumes this message and sends a text message to the caller. A
      * third party app can provide this functionality in lieu of MMS app by consuming this Intent
      * and sending the message using their own messaging system.  The intent contains a URI
-     * describing the recipient, and an EXTRA containg the message itself.
-     * <p>
+     * describing the recipient, and an EXTRA containing the message itself.
+     * <p class="note"><strong>Note:</strong>
      * The intent-filter which consumes this Intent needs to be in a service which requires the
-     * permission SEND_RESPOND_VIA_MESSAGE.
+     * permission {@link android.Manifest.permission#SEND_RESPOND_VIA_MESSAGE}.</p>
      *
      * <p>
      * {@link android.content.Intent#getData} is a URI describing the recipient of the message.
@@ -636,6 +636,8 @@ public class TelephonyManager {
     public static final int NETWORK_TYPE_EHRPD = 14;
     /** Current network is HSPA+ */
     public static final int NETWORK_TYPE_HSPAP = 15;
+    /** Current network is GSM {@hide} */
+    public static final int NETWORK_TYPE_GSM = 16;
     /** Current network is TD_SCDMA {@hide} */
     public static final int NETWORK_TYPE_TD_SCDMA = 17;
 
@@ -731,6 +733,7 @@ public class TelephonyManager {
     public static int getNetworkClass(int networkType) {
         switch (networkType) {
             case NETWORK_TYPE_GPRS:
+            case NETWORK_TYPE_GSM:
             case NETWORK_TYPE_EDGE:
             case NETWORK_TYPE_CDMA:
             case NETWORK_TYPE_1xRTT:
@@ -798,6 +801,8 @@ public class TelephonyManager {
                 return "iDEN";
             case NETWORK_TYPE_HSPAP:
                 return "HSPA+";
+            case NETWORK_TYPE_GSM:
+                return "GSM";
             case NETWORK_TYPE_TD_SCDMA:
                 return "TD_SCDMA";
             default:
@@ -1317,7 +1322,7 @@ public class TelephonyManager {
     public void listen(PhoneStateListener listener, int events) {
         String pkgForDebug = mContext != null ? mContext.getPackageName() : "<unknown>";
         try {
-            Boolean notifyNow = (getITelephony() != null);
+            Boolean notifyNow = true;
             sRegistry.listen(pkgForDebug, listener.callback, events, notifyNow);
         } catch (RemoteException ex) {
             // system process dead

@@ -48,6 +48,7 @@ import android.os.Bundle;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IHardwareService;
 import android.os.IRemoteCallback;
 import android.os.Looper;
 import android.os.Message;
@@ -202,6 +203,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mPreloadedRecentApps;
     final Object mServiceAquireLock = new Object();
     Vibrator mVibrator; // Vibrator for giving feedback of orientation changes
+    IHardwareService mLight;
     SearchManager mSearchManager;
 
     // Vibrator pattern for haptic feedback of a long press.
@@ -912,6 +914,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         context.registerReceiver(mMultiuserReceiver, filter);
 
         mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
+
+        mLight = IHardwareService.Stub.asInterface(
+                ServiceManager.getService("hardware"));
         mLongPressVibePattern = getLongIntArray(mContext.getResources(),
                 com.android.internal.R.array.config_longPressVibePattern);
         mVirtualKeyVibePattern = getLongIntArray(mContext.getResources(),
@@ -1033,9 +1038,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (!mHasSystemNavBar) {
             mHasNavigationBar = mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_showNavigationBar);
-            // Allow a system property to override this. Used by the emulator.
+            // Allow a system property to override this. Used by the emulator,
+            // and also devices with no hardware navigation keys (e.g. tablets).
             // See also hasNavigationBar().
             String navBarOverride = SystemProperties.get("qemu.hw.mainkeys");
+            if ("".equals(navBarOverride)) {
+                navBarOverride = SystemProperties.get("ro.hw.nav_keys");
+            }
             if (! "".equals(navBarOverride)) {
                 if      (navBarOverride.equals("1")) mHasNavigationBar = false;
                 else if (navBarOverride.equals("0")) mHasNavigationBar = true;
@@ -1903,6 +1912,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             Log.d(TAG, "interceptKeyTi keyCode=" + keyCode + " down=" + down + " repeatCount="
                     + repeatCount + " keyguardOn=" + keyguardOn + " mHomePressed=" + mHomePressed
                     + " canceled=" + canceled);
+        }
+
+        if(down && (repeatCount == 0) && (keyCode == KeyEvent.KEYCODE_HOME
+                || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_SEARCH)) {
+            try {
+                mLight.turnOnButtonLightOneShot();
+            } catch(RemoteException e) {
+                Slog.e(TAG, "remote call for turn on button light failed.");
+            }
         }
 
         // If we think we might have a volume down & power key chord on the way
@@ -3807,6 +3826,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mPowerKeyTriggered = true;
                         mPowerKeyTime = event.getDownTime();
                         interceptScreenshotChord();
+                        try {
+                            mLight.turnOffButtonLightOneShot();
+                        } catch(RemoteException e) {
+                            Slog.e(TAG, "remote call for turn off button light failed.");
+                        }
                     }
 
                     ITelephony telephonyService = getTelephonyService();

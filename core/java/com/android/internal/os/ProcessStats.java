@@ -562,7 +562,13 @@ public class ProcessStats {
             tempSpeeds = new long[MAX_SPEEDS];
         }
         int speed = 0;
-        String file = readFile("/sys/devices/system/cpu/cpu0/cpufreq/stats/time_in_state", '\0');
+        File f = new File("/sys/bus/cpu/devices/cpu0/cpufreq/stats/time_in_state");
+        String file;
+        if (f.exists()) {
+            file = readFile("/sys/bus/cpu/devices/cpu0/cpufreq/stats/time_in_state", '\0');
+        } else {
+            file = readFile("/sys/devices/system/cpu/cpu0/cpufreq/stats/time_in_state", '\0');
+        }
         // Note: file may be null on kernels without cpufreq (i.e. the emulator's)
         if (file != null) {
             StringTokenizer st = new StringTokenizer(file, "\n ");

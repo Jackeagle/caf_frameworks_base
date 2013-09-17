@@ -129,6 +129,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
     /* Idle time after a peer is gone when the group is torn down */
     private static final int GROUP_IDLE_TIME_S = 10;
+    private static final String ACTION_SAFE_WIFI_CHANNELS_CHANGED =
+           "qualcomm.intent.action.SAFE_WIFI_CHANNELS_CHANGED";
 
     private static final int BASE = Protocol.BASE_WIFI_P2P_SERVICE;
 
@@ -166,6 +168,16 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
     public static final int SET_MIRACAST_MODE               =   BASE + 14;
 
+    // During dhcp (and perhaps other times) we can't afford to drop packets
+    // but Discovery will switch our channel enough we will.
+    //   msg.arg1 = ENABLED for blocking, DISABLED for resumed.
+    //   msg.arg2 = msg to send when blocked
+    //   msg.obj  = StateMachine to send to when blocked
+    public static final int BLOCK_DISCOVERY                 =   BASE + 15;
+
+    public static final int ENABLED                         = 1;
+    public static final int DISABLED                        = 0;
+
     private final boolean mP2pSupported;
 
     private WifiP2pDevice mThisDevice = new WifiP2pDevice();
@@ -175,13 +187,31 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
      * is invoked */
     private boolean mAutonomousGroup;
 
+    /**@hide*/
+    public static boolean mIsWifiP2pEnabled = false;
+
+    private int startSafeChannel = 0;
+
+    private int endSafeChannel = 0;
+
     /* Invitation to join an existing p2p group */
     private boolean mJoinExistingGroup;
+
+    private boolean mIsInvite = false;
 
     /* Track whether we are in p2p discovery. This is used to avoid sending duplicate
      * broadcasts
      */
     private boolean mDiscoveryStarted;
+    /* Track whether servcice/peer discovery is blocked in favor of other wifi actions
+     * (notably dhcp)
+     */
+    private boolean mDiscoveryBlocked;
+
+    /*
+     * remember if we were in a scan when it had to be stopped
+     */
+    private boolean mDiscoveryPostponed = false;
 
     private NetworkInfo mNetworkInfo;
 
@@ -295,6 +325,47 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
         mP2pStateMachine = new P2pStateMachine(TAG, mP2pSupported);
         mP2pStateMachine.start();
+          // broadcasts
+       IntentFilter filter = new IntentFilter();
+       filter.addAction(ACTION_SAFE_WIFI_CHANNELS_CHANGED);
+       mContext.registerReceiver(new WifiStateReceiver(), filter);
+    }
+
+    private class WifiStateReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (intent.getAction().equals(ACTION_SAFE_WIFI_CHANNELS_CHANGED)) {
+                 Slog.d(TAG, "Received WIFI_CHANNELS_CHANGED broadcast");
+                 startSafeChannel = intent.getIntExtra("start_safe_channel", -1);
+                 endSafeChannel = intent.getIntExtra("end_safe_channel", -1);
+                 if (mIsWifiP2pEnabled) {
+                     Slog.d(TAG, "Set Preferred channel list for Non Auto GO");
+                     mP2pStateMachine.mWifiNative.setPreferredChannel(
+                                        startSafeChannel, endSafeChannel);
+                     if (mP2pStateMachine.mWifiP2pInfo.groupFormed) {
+                         int currentChannel = 0;
+                         currentChannel = frequencyToChannel(
+                                       mP2pStateMachine.mGroup.getGoOperatingFrequency());
+                         Slog.d(TAG, "GO operating frequency="
+                                    + mP2pStateMachine.mGroup.getGoOperatingFrequency());
+                         Slog.d(TAG, "current channel of P2P GO=" + currentChannel);
+
+                         if (currentChannel >= 0 &&
+                              (currentChannel < startSafeChannel ||
+                               currentChannel > endSafeChannel)) {
+                               Slog.d(TAG, "P2P GO is operating on unsafe channel! Terminate!");
+                               mP2pStateMachine.mWifiNative.p2pGroupRemove(
+                                             mP2pStateMachine.mGroup.getInterface());
+                               if (mAutonomousGroup)
+                                   mP2pStateMachine.mWifiNative.p2pGroupAddOnSpecifiedFreq(
+                                                       channelToFrequency(startSafeChannel));
+                          }
+
+                     }
+                 }
+            }
+        }
     }
 
     public void connectivityServiceReady() {
@@ -361,6 +432,32 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         pw.println();
     }
 
+    /**
+     * Function to Convert frequency to Channel
+     */
+    private int frequencyToChannel(int freq) {
+        /* see 802.11 17.3.8.3.2 and Annex J */
+        if (freq == 2484)
+                return 14;
+        else if (freq < 2484)
+                return (freq - 2407) / 5;
+        else if (freq >= 4910 && freq <= 4980)
+                return (freq - 4000) / 5;
+        else
+                return (freq - 5000) / 5;
+    }
+
+    /**
+     * Function to Convert Channel to frequency
+    */
+    private int channelToFrequency(int chan) {
+         if (chan == 14)
+             return 2484;
+         else if (chan < 14)
+             return 2407 + chan * 5;
+         else
+             return 0; /* not supported */
+    }
 
     /**
      * Handles interaction with WifiStateMachine
@@ -478,6 +575,20 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 case AsyncChannel.CMD_CHANNEL_FULL_CONNECTION:
                     AsyncChannel ac = new AsyncChannel();
                     ac.connect(mContext, getHandler(), message.replyTo);
+                    break;
+                case BLOCK_DISCOVERY:
+                    mDiscoveryBlocked = (message.arg1 == ENABLED ? true : false);
+                    // always reset this - we went to a state that doesn't support discovery so
+                    // it would have stopped regardless
+                    mDiscoveryPostponed = false;
+                    if (mDiscoveryBlocked) {
+                        try {
+                            StateMachine m = (StateMachine)message.obj;
+                            m.sendMessage(message.arg2);
+                        } catch (Exception e) {
+                            loge("unable to send BLOCK_DISCOVERY response: " + e);
+                        }
+                    }
                     break;
                 case WifiP2pManager.DISCOVER_PEERS:
                     replyToMessage(message, WifiP2pManager.DISCOVER_PEERS_FAILED,
@@ -716,6 +827,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             if (DBG) logd(getName() + message.toString());
             switch (message.what) {
                 case WifiMonitor.SUP_DISCONNECTION_EVENT:
+                    mIsWifiP2pEnabled = false;
                     if (DBG) logd("p2p socket connection lost");
                     transitionTo(mP2pDisabledState);
                     break;
@@ -780,7 +892,11 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             if (DBG) logd(getName() + message.toString());
             switch (message.what) {
                 case WifiMonitor.SUP_CONNECTION_EVENT:
+                   if (startSafeChannel!=0)
+                       mWifiNative.setPreferredChannel(
+                                        startSafeChannel, endSafeChannel);
                     if (DBG) logd("P2p socket connection successful");
+                    mIsWifiP2pEnabled = true;
                     transitionTo(mInactiveState);
                     break;
                 case WifiMonitor.SUP_DISCONNECTION_EVENT:
@@ -851,7 +967,33 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     }
                     break;
                 }
+                case BLOCK_DISCOVERY:
+                    boolean blocked = (message.arg1 == ENABLED ? true : false);
+                    if (mDiscoveryBlocked == blocked) break;
+                    mDiscoveryBlocked = blocked;
+                    if (blocked && mDiscoveryStarted) {
+                        mWifiNative.p2pStopFind();
+                        mDiscoveryPostponed = true;
+                    }
+                    if (!blocked && mDiscoveryPostponed) {
+                        mDiscoveryPostponed = false;
+                        mWifiNative.p2pFind(DISCOVER_TIMEOUT_S);
+                    }
+                    if (blocked) {
+                        try {
+                            StateMachine m = (StateMachine)message.obj;
+                            m.sendMessage(message.arg2);
+                        } catch (Exception e) {
+                            loge("unable to send BLOCK_DISCOVERY response: " + e);
+                        }
+                    }
+                    break;
                 case WifiP2pManager.DISCOVER_PEERS:
+                    if (mDiscoveryBlocked) {
+                        replyToMessage(message, WifiP2pManager.DISCOVER_PEERS_FAILED,
+                                WifiP2pManager.BUSY);
+                        break;
+                    }
                     // do not send service discovery request while normal find operation.
                     clearSupplicantServiceRequest();
                     if (mWifiNative.p2pFind(DISCOVER_TIMEOUT_S)) {
@@ -874,6 +1016,11 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     }
                     break;
                 case WifiP2pManager.DISCOVER_SERVICES:
+                    if (mDiscoveryBlocked) {
+                        replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                                WifiP2pManager.BUSY);
+                        break;
+                    }
                     if (DBG) logd(getName() + " discover services");
                     if (!updateSupplicantServiceRequest()) {
                         replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
@@ -1029,6 +1176,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                 case WifiMonitor.P2P_INVITATION_RECEIVED_EVENT:
                     WifiP2pGroup group = (WifiP2pGroup) message.obj;
                     WifiP2pDevice owner = group.getOwner();
+                    mIsInvite = true;
 
                     if (owner == null) {
                         loge("Ignored invitation from null owner");
@@ -1062,11 +1210,22 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     break;
                 case WifiMonitor.P2P_PROV_DISC_PBC_REQ_EVENT:
                 case WifiMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
-                case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
                     //We let the supplicant handle the provision discovery response
                     //and wait instead for the GO_NEGOTIATION_REQUEST_EVENT.
                     //Handling provision discovery and issuing a p2p_connect before
                     //group negotiation comes through causes issues
+                    break;
+                case WifiMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT:
+                    WifiP2pProvDiscEvent provDisc = (WifiP2pProvDiscEvent) message.obj;
+                    WifiP2pDevice device = provDisc.device;
+                    if (device == null) {
+                        Slog.d(TAG, "Device entry is null");
+                        break;
+                    }
+                    notifyP2pProvDiscShowPinRequest(provDisc.pin, device.deviceAddress);
+                    mPeers.updateStatus(device.deviceAddress, WifiP2pDevice.INVITED);
+                    sendPeersChangedBroadcast();
+                    transitionTo(mGroupNegotiationState);
                     break;
                 case WifiP2pManager.CREATE_GROUP:
                     mAutonomousGroup = true;
@@ -1081,7 +1240,13 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                             ret = mWifiNative.p2pGroupAdd(true);
                         }
                     } else {
-                        ret = mWifiNative.p2pGroupAdd(false);
+                        Slog.d(TAG, "startChannel while creating P2P Group=" + startSafeChannel);
+                        if (startSafeChannel!=0) {
+                            ret = mWifiNative.p2pGroupAddOnSpecifiedFreq(
+                                                  channelToFrequency(startSafeChannel));
+                        } else {
+                            ret = mWifiNative.p2pGroupAdd(false);
+                        }
                     }
 
                     if (ret) {
@@ -1973,6 +2138,36 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         dialog.show();
     }
 
+    private void notifyP2pProvDiscShowPinRequest(String pin, String peerAddress) {
+        Resources r = Resources.getSystem();
+        final String tempDevAddress = peerAddress;
+        final String tempPin = pin;
+
+        final View textEntryView = LayoutInflater.from(mContext)
+                .inflate(R.layout.wifi_p2p_dialog, null);
+
+        ViewGroup group = (ViewGroup) textEntryView.findViewById(R.id.info);
+        addRowToDialog(group, R.string.wifi_p2p_to_message, getDeviceName(peerAddress));
+        addRowToDialog(group, R.string.wifi_p2p_show_pin_message, pin);
+
+        AlertDialog dialog = new AlertDialog.Builder(mContext)
+            .setTitle(r.getString(R.string.wifi_p2p_invitation_sent_title))
+            .setView(textEntryView)
+            .setPositiveButton(r.getString(R.string.accept), new OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            mSavedPeerConfig = new WifiP2pConfig();
+                            mSavedPeerConfig.deviceAddress = tempDevAddress;
+                            mSavedPeerConfig.wps.setup = WpsInfo.DISPLAY;
+                            mSavedPeerConfig.wps.pin = tempPin;
+                            mWifiNative.p2pConnect(mSavedPeerConfig, FORM_GROUP);
+                        }
+                    })
+            .setCancelable(false)
+            .create();
+        dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+        dialog.show();
+    }
+
     private void notifyInvitationReceived() {
         Resources r = Resources.getSystem();
         final WpsInfo wps = mSavedPeerConfig.wps;
@@ -2153,15 +2348,24 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
      * @param config for the peer
      */
     private void p2pConnectWithPinDisplay(WifiP2pConfig config) {
+        boolean join = false;
         WifiP2pDevice dev = fetchCurrentDeviceDetails(config);
 
-        String pin = mWifiNative.p2pConnect(config, dev.isGroupOwner());
+        if (mIsInvite) {
+            join = true;
+        }
+        else {
+            join = dev.isGroupOwner();
+        }
+
+        String pin = mWifiNative.p2pConnect(config, join);
         try {
             Integer.parseInt(pin);
             notifyInvitationSent(pin, config.deviceAddress);
         } catch (NumberFormatException ignore) {
             // do nothing if p2pConnect did not return a pin
         }
+        mIsInvite = false;
     }
 
     /**

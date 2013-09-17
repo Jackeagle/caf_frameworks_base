@@ -401,6 +401,18 @@ public class MSimNetworkController extends NetworkController {
                         + mSubscription + "state=" + state.getState());
                 }
                 mMSimServiceState[mSubscription] = state;
+                if (SystemProperties.getBoolean("ro.config.combined_signal", true)) {
+                    /*
+                     * if combined_signal is set to true only then consider data
+                     * service state for signal display
+                     */
+                    mMSimDataServiceState[mSubscription] =
+                        mMSimServiceState[mSubscription].getDataRegState();
+                    if (DEBUG) {
+                        Slog.d(TAG, "Combining data service state " +
+                                mMSimDataServiceState[mSubscription] + " for signal");
+                    }
+                }
                 updateTelephonySignalStrength(mSubscription);
                 updateDataNetType(mSubscription);
                 updateDataIcon(mSubscription);
@@ -961,6 +973,8 @@ public class MSimNetworkController extends NetworkController {
                 mMSimcombinedSignalIconId[subscription] = mMSimDataSignalIconId[subscription];
                 mMSimContentDescriptionCombinedSignal[subscription] =
                         mMSimContentDescriptionDataType[subscription];
+            } else {
+                mMSimMobileActivityIconId[subscription] = 0;
             }
         }
 
