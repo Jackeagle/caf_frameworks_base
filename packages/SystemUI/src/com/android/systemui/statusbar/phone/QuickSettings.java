@@ -444,7 +444,7 @@ class QuickSettings {
                     if (mModel.dataSwitchEnabled()) {
                         if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
                             intent.setClassName("com.android.settings",
-                                    "com.android.settings.multisimsettings.MultiSimSettingTab");
+                                    "com.android.settings.SelectSubscription");
                             intent.putExtra("PACKAGE", "com.android.phone");
                             intent.putExtra("TARGET_CLASS",
                                     "com.android.phone.MSimMobileNetworkSubSettings");
