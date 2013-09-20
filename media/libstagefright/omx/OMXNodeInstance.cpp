@@ -143,6 +143,9 @@ status_t OMXNodeInstance::freeNode(OMXMaster *master) {
     OMX_STATETYPE state;
     CHECK_EQ(OMX_GetState(mHandle, &state), OMX_ErrorNone);
     switch (state) {
+        case OMX_StatePause:
+            LOGV("forcing Pause->Idle");
+            // fall through
         case OMX_StateExecuting:
         {
             LOGV("forcing Executing->Idle");
