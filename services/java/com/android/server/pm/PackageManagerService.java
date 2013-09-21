@@ -113,6 +113,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.Environment.UserEnvironment;
 import android.os.UserManager;
+import android.provider.Settings.Global;
 import android.provider.Settings.Secure;
 import android.security.KeyStore;
 import android.security.SystemKeyStore;
@@ -6075,6 +6076,17 @@ public class PackageManagerService extends IPackageManager.Stub {
             VerificationParams verificationParams, ContainerEncryptionParams encryptionParams) {
         mContext.enforceCallingOrSelfPermission(android.Manifest.permission.INSTALL_PACKAGES,
                 null);
+
+        // Check if non-MarketApps allowed
+        boolean strictPermissionEnabled = SystemProperties.getBoolean("persist.sys.strict_op_enable", false);
+        if (strictPermissionEnabled &&
+            Global.getInt(mContext.getContentResolver(), Global.INSTALL_NON_MARKET_APPS, 0) <= 0) {
+            try {
+                observer.packageInstalled("", PackageManager.INSTALL_FAILED_UNKNOWN_SOURCES);
+            } catch (RemoteException re) {
+            }
+            return;
+        }
 
         final int uid = Binder.getCallingUid();
         if (isUserRestricted(UserHandle.getUserId(uid), UserManager.DISALLOW_INSTALL_APPS)) {
