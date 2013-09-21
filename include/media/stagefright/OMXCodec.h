@@ -211,10 +211,12 @@ private:
     bool mOutputPortSettingsChangedPending;
     bool mThumbnailMode;
 
+    uint32_t mNumClientBuffers;
     MediaBuffer *mLeftOverBuffer;
 
     Mutex mLock;
     Condition mAsyncCompletion;
+    Condition mBufferCompletion;
 
     bool mPaused;
 
