@@ -51,6 +51,7 @@ static struct {
     { AID_RADIO, "isms_msim" },
     { AID_MEDIA, "common_time.clock" },
     { AID_MEDIA, "common_time.config" },
+    { AID_MEDIA, "com.iwedia.dvb.framework.service.IDVBService" },
 };
 
 void *svcmgr_handle;
