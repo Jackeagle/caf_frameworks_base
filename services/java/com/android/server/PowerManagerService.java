@@ -2303,7 +2303,9 @@ public class PowerManagerService extends IPowerManager.Stub
                         synchronized(this) {
                             currentValue = value;
                         }
-                        animateInternal(mask, false, delay);
+                        synchronized (mLocks) {
+                            animateInternal(mask, false, delay);
+                        }
                     } else if (msg.what == ANIMATE_POWER_OFF) {
                         int mode = msg.arg1;
                         nativeStartSurfaceFlingerAnimation(mode);
