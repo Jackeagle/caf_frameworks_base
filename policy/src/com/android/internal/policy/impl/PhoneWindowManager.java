@@ -48,6 +48,7 @@ import android.os.Bundle;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IHardwareService;
 import android.os.IRemoteCallback;
 import android.os.Looper;
 import android.os.Message;
@@ -202,6 +203,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mPreloadedRecentApps;
     final Object mServiceAquireLock = new Object();
     Vibrator mVibrator; // Vibrator for giving feedback of orientation changes
+    IHardwareService mLight;
     SearchManager mSearchManager;
 
     // Vibrator pattern for haptic feedback of a long press.
@@ -436,6 +438,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mOverscanTop = 0;
     int mOverscanRight = 0;
     int mOverscanBottom = 0;
+
+    // Panel Orientation default portrait
+    int mPanelOrientation = Surface.ROTATION_0;
 
     // What we do when the user long presses on home
     private int mLongPressOnHomeBehavior;
@@ -912,6 +917,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         context.registerReceiver(mMultiuserReceiver, filter);
 
         mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
+
+        mLight = IHardwareService.Stub.asInterface(
+                ServiceManager.getService("hardware"));
         mLongPressVibePattern = getLongIntArray(mContext.getResources(),
                 com.android.internal.R.array.config_longPressVibePattern);
         mVirtualKeyVibePattern = getLongIntArray(mContext.getResources(),
@@ -966,6 +974,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             throw new IllegalArgumentException("Can only set the default display");
         }
         mDisplay = display;
+        mPanelOrientation =
+            SystemProperties.getInt("persist.panel.orientation", 0) / 90;
 
         int shortSize, longSize;
         if (width > height) {
@@ -1907,6 +1917,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             Log.d(TAG, "interceptKeyTi keyCode=" + keyCode + " down=" + down + " repeatCount="
                     + repeatCount + " keyguardOn=" + keyguardOn + " mHomePressed=" + mHomePressed
                     + " canceled=" + canceled);
+        }
+
+        if(down && (repeatCount == 0) && (keyCode == KeyEvent.KEYCODE_HOME
+                || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_SEARCH)) {
+            try {
+                mLight.turnOnButtonLightOneShot();
+            } catch(RemoteException e) {
+                Slog.e(TAG, "remote call for turn on button light failed.");
+            }
         }
 
         // If we think we might have a volume down & power key chord on the way
@@ -3811,6 +3831,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mPowerKeyTriggered = true;
                         mPowerKeyTime = event.getDownTime();
                         interceptScreenshotChord();
+                        try {
+                            mLight.turnOffButtonLightOneShot();
+                        } catch(RemoteException e) {
+                            Slog.e(TAG, "remote call for turn off button light failed.");
+                        }
                     }
 
                     ITelephony telephonyService = getTelephonyService();
@@ -4395,7 +4420,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     if (preferredRotation >= 0) {
                         return preferredRotation;
                     }
-                    return Surface.ROTATION_0;
+                    return mPanelOrientation;
             }
         }
     }

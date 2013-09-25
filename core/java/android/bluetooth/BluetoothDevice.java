@@ -1,4 +1,6 @@
 /*
+ * Copyright (C) 2013 The Linux Foundation. All rights reserved
+ * Not a Contribution.
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -296,6 +298,11 @@ public final class BluetoothDevice implements Parcelable {
     public static final String ACTION_UUID =
             "android.bluetooth.device.action.UUID";
 
+    /** @hide */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_MAS_INSTANCE =
+            "org.codeaurora.bluetooth.device.action.MAS_INSTANCE";
+
     /**
      * Broadcast Action: Indicates a failure to retrieve the name of a remote
      * device.
@@ -494,6 +501,10 @@ public final class BluetoothDevice implements Parcelable {
      * is a parcelable version of {@link UUID}.
      */
     public static final String EXTRA_UUID = "android.bluetooth.device.extra.UUID";
+
+    /** @hide */
+    public static final String EXTRA_MAS_INSTANCE =
+        "org.codeaurora.bluetooth.device.extra.MAS_INSTANCE";
 
     /**
      * Lazy initialization. Guaranteed final after first object constructed, or
@@ -860,16 +871,20 @@ public final class BluetoothDevice implements Parcelable {
     /**
      * Get trust state of a remote device.
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     * @return true/false
      * @hide
      */
     public boolean getTrustState() {
-        //TODO(BT)
-        /*
+        if (sService == null) {
+            Log.e(TAG, "BT not enabled. Cannot get Remote Device Alias");
+            return false;
+        }
+
         try {
-            return sService.getTrustState(this);
+            return sService.getRemoteTrust(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
-        }*/
+        }
         return false;
     }
 
@@ -877,16 +892,19 @@ public final class BluetoothDevice implements Parcelable {
      * Set trust state for a remote device.
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
      * @param value the trust state value (true or false)
+     * @return true/false
      * @hide
      */
-    public boolean setTrust(boolean value) {
-        //TODO(BT)
-        /*
+    public boolean setTrust(boolean trustValue) {
+        if (sService == null) {
+            Log.e(TAG, "BT not enabled. Cannot set Remote Device name");
+            return false;
+        }
         try {
-            return sService.setTrust(this, value);
+            return sService.setRemoteTrust(this, trustValue);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
-        }*/
+        }
         return false;
     }
 
@@ -934,6 +952,18 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {Log.e(TAG, "", e);}
             return false;
     }
+
+     /** @hide */
+     public boolean fetchMasInstances() {
+         if (sService == null) {
+             Log.e(TAG, "BT not enabled. Cannot query remote device for MAS instances");
+             return false;
+         }
+         try {
+             return sService.fetchRemoteMasInstances(this);
+         } catch (RemoteException e) {Log.e(TAG, "", e);}
+         return false;
+     }
 
     /** @hide */
     public int getServiceChannel(ParcelUuid uuid) {
