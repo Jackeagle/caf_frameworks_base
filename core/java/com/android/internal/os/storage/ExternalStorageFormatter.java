@@ -38,6 +38,8 @@ public class ExternalStorageFormatter extends Service
 
     public static final String FORMAT_ONLY = "com.android.internal.os.storage.FORMAT_ONLY";
     public static final String FORMAT_AND_FACTORY_RESET = "com.android.internal.os.storage.FORMAT_AND_FACTORY_RESET";
+    public static final String ERASE_EXTERNAL_EXTRA = "erase_sd";
+    public static final String ERASE_INTERNAL_EXTRA = "erase_internal_sd";
 
     public static final String EXTRA_ALWAYS_RESET = "always_reset";
 
@@ -59,6 +61,7 @@ public class ExternalStorageFormatter extends Service
     private boolean mFactoryReset = false;
     private boolean mAlwaysReset = false;
 
+    private String mIntStoragePath = null;
     StorageEventListener mStorageListener = new StorageEventListener() {
         @Override
         public void onStorageStateChanged(String path, String oldState, String newState) {
@@ -83,16 +86,44 @@ public class ExternalStorageFormatter extends Service
         mWakeLock.acquire();
     }
 
+    private StorageVolume getExtStorageVolume() {
+        StorageVolume[] StorageVolume = mStorageManager.getVolumeList();
+        if(StorageVolume == null){
+            return null;
+        }
+        int count = StorageVolume.length;
+        int descriptionID = -1;
+        String description = null;
+        for (int i = 0; i < count; i++) {
+            descriptionID = StorageVolume[i].getDescriptionId();
+            description = getResources().getResourceName(descriptionID);
+
+            if (description.contains("sd_card"))
+                return StorageVolume[i];
+        }
+        return null;
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (FORMAT_AND_FACTORY_RESET.equals(intent.getAction())) {
             mFactoryReset = true;
+            final boolean EraseSDCard = intent.getBooleanExtra(ERASE_EXTERNAL_EXTRA,false);
+            final boolean EraseIntStorage = intent.getBooleanExtra(ERASE_INTERNAL_EXTRA,false);
+            Log.d(TAG,"EraseSDCard = " + EraseSDCard + " ; EraseIntStorage = " + EraseIntStorage);
+            if (EraseIntStorage) {
+                mIntStoragePath = Environment.getExternalStorageDirectory().toString();
+            }
+            if (EraseSDCard) {
+                mStorageVolume = getExtStorageVolume();
+            }
         }
         if (intent.getBooleanExtra(EXTRA_ALWAYS_RESET, false)) {
             mAlwaysReset = true;
         }
 
-        mStorageVolume = intent.getParcelableExtra(StorageVolume.EXTRA_STORAGE_VOLUME);
+        if (!mFactoryReset)
+            mStorageVolume = intent.getParcelableExtra(StorageVolume.EXTRA_STORAGE_VOLUME);
 
         if (mProgressDialog == null) {
             mProgressDialog = new ProgressDialog(this);
@@ -133,14 +164,16 @@ public class ExternalStorageFormatter extends Service
             final StorageVolume[] volumes = mountService.getVolumeList();
             final ArrayList<StorageVolume> physicalVols = StorageManager.getPhysicalExternalVolume(volumes);
             String extStoragePath = null;
+            if (mIntStoragePath != null)
+                mountService.mountVolume(mIntStoragePath);
             // find external storage path if storage volume not specified
             if (mStorageVolume == null) {
                 if (physicalVols.size() == 0) {
-                        updateProgressDialog(R.string.progress_nomediapresent);
+                    updateProgressDialog(R.string.progress_nomediapresent);
                 } else {
-                        final StorageVolume physicalVol = physicalVols.get(0);
-                        extStoragePath = physicalVol.toString();
-                        mountService.mountVolume(extStoragePath);
+                    final StorageVolume physicalVol = physicalVols.get(0);
+                    extStoragePath = physicalVol.toString();
+                    mountService.mountVolume(extStoragePath);
                 }
             }
             //else use the specified storage volume
@@ -177,15 +210,15 @@ public class ExternalStorageFormatter extends Service
                 if (physicalVols.size() == 0) {
                     updateProgressDialog(R.string.progress_nomediapresent);
                     return;
-                    } else {
-                        physicalVol = physicalVols.get(0);
-                        status = mStorageManager.getVolumeState(physicalVol.getPath()) ;
-                    }
+                } else {
+                     physicalVol = physicalVols.get(0);
+                     status = mStorageManager.getVolumeState(physicalVol.getPath()) ;
                 }
-                //else use the specified storage volume
-                else {
-                        status = mStorageManager.getVolumeState(mStorageVolume.getPath());
-                }
+            }
+            //else use the specified storage volume
+            else {
+                status = mStorageManager.getVolumeState(mStorageVolume.getPath());
+            }
         }
         catch (RemoteException e) {
                 Log.w(TAG, "Failed talking with mount service", e);
@@ -197,6 +230,9 @@ public class ExternalStorageFormatter extends Service
                 final IMountService mountService = getMountService();
                 final StorageVolume[] volumes = mountService.getVolumeList();
                 final ArrayList<StorageVolume> physicalVols = StorageManager.getPhysicalExternalVolume(volumes);
+                if (mIntStoragePath != null) {
+                    mountService.unmountVolume(mIntStoragePath, true, mFactoryReset);
+                }
                 // find external storage path if storage volume not specified
                 if (mStorageVolume == null) {
                     if (physicalVols.size() == 0) {
@@ -235,6 +271,9 @@ public class ExternalStorageFormatter extends Service
                         try {
                             final StorageVolume[] volumes = mountService.getVolumeList();
                             physicalVols = StorageManager.getPhysicalExternalVolume(volumes);
+                            if (mIntStoragePath != null) {
+                                mountService.formatVolume(mIntStoragePath);
+                            }
                             // find external storage path if storage volume not specified
                             if (mStorageVolume == null) {
                                 if (physicalVols.size() == 0) {
@@ -269,6 +308,9 @@ public class ExternalStorageFormatter extends Service
                             sendBroadcast(new Intent("android.intent.action.MASTER_CLEAR"));
                         } else {
                             try {
+                                if (mIntStoragePath != null) {
+                                    mountService.mountVolume(mIntStoragePath);
+                                }
                                 if(physicalVols.size() == 0) {
                                     updateProgressDialog(R.string.progress_nomediapresent);
                                     return;
