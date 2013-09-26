@@ -751,16 +751,6 @@ class MSimTelephonyRegistry extends ITelephonyRegistryMSim.Stub {
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
-
-        Intent intent = new Intent(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
-        intent.putExtra(PhoneConstants.STATE_KEY,
-                DefaultPhoneNotifier.convertCallState(state).toString());
-        if (!TextUtils.isEmpty(incomingNumber)) {
-            intent.putExtra(TelephonyManager.EXTRA_INCOMING_NUMBER, incomingNumber);
-        }
-        intent.putExtra(MSimConstants.SUBSCRIPTION_KEY, subscription);
-        mContext.sendBroadcastAsUser(intent, UserHandle.ALL,
-                android.Manifest.permission.READ_PHONE_STATE);
     }
 
     private void broadcastDataConnectionStateChanged(int state,

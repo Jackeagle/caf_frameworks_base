@@ -53,6 +53,7 @@ import android.view.WindowManager;
 
 import com.android.internal.os.BinderInternal;
 import com.android.internal.os.SamplingProfilerIntegration;
+import com.android.internal.util.MemInfoReader;
 import com.android.server.accessibility.AccessibilityManagerService;
 import com.android.server.accounts.AccountManagerService;
 import com.android.server.am.ActivityManagerService;
@@ -521,8 +522,14 @@ class ServerThread extends Thread {
             }
 
             try {
-                int value = SystemProperties.getInt("persist.cne.feature", 0);
-                if ( value > 0 && value < 7 ) {
+                int enableCne = 1;
+                if (!deviceHasSufficientMemory()) {
+                    enableCne = SystemProperties.getInt("persist.cne.override.memlimit", 0);
+                }
+                int cneFeature = (enableCne == 1) ?
+                             SystemProperties.getInt("persist.cne.feature", 0) : 0;
+
+                if ( cneFeature > 0 && cneFeature < 7 ) {
                     Slog.i(TAG, "QcConnectivity Service");
                     PathClassLoader qcsClassLoader =
                         new PathClassLoader("/system/framework/services-ext.jar",
@@ -1058,6 +1065,16 @@ class ServerThread extends Thread {
                     "com.android.systemui.SystemUIService"));
         //Slog.d(TAG, "Starting service: " + intent);
         context.startServiceAsUser(intent, UserHandle.OWNER);
+    }
+    private static final boolean deviceHasSufficientMemory() {
+        final long MEMORY_SIZE_MIN = 512 * 1024 * 1024;
+
+        MemInfoReader minfo = new MemInfoReader();
+        minfo.readMemInfo();
+        if (minfo.getTotalSize() <= MEMORY_SIZE_MIN) {
+            return false;
+        }
+        return true;
     }
 }
 
