@@ -22,6 +22,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.hardware.usb.UsbManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -31,6 +32,7 @@ import android.os.storage.StorageManager;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Slog;
+
 
 public class StorageNotification extends StorageEventListener {
     private static final String TAG = "StorageNotification";
@@ -132,7 +134,13 @@ public class StorageNotification extends StorageEventListener {
     private void onStorageStateChangedAsync(String path, String oldState, String newState) {
         if (DEBUG) Slog.i(TAG, String.format(
                 "Media {%s} state changed from {%s} -> {%s}", path, oldState, newState));
+
         if (newState.equals(Environment.MEDIA_SHARED)) {
+            String usbMode = new UsbManager(null, null).getDefaultFunction();
+            boolean isMtpPtpMode = UsbManager.USB_FUNCTION_MTP.equals(usbMode)
+                    || UsbManager.USB_FUNCTION_PTP.equals(usbMode);
+            if (isMtpPtpMode)
+                mStorageManager.disableUsbMassStorage();
             /*
              * Storage is now shared. Modify the UMS notification
              * for stopping UMS.
