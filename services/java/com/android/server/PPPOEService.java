@@ -85,8 +85,8 @@ public class PPPOEService {
      * below ACTION and EXTRA definition are the requirement of China Telecom
      * can not be changed
      */
-    public static final String ACTION_PPPOE_COMPLETE = "android.wifi.PPPOE_COMPLETE_ACTION";
-    public static final String ACTION_PPPOE_STATE_CHANGED = "android.wifi.PPPOE_STATE_CHANGED";
+    public static final String ACTION_PPPOE_COMPLETE = "android.net.wifi.PPPOE_COMPLETED_ACTION";
+    public static final String ACTION_PPPOE_STATE_CHANGED = "android.net.wifi.PPPOE_STATE_CHANGED";
 
     public static final String EXTRA_PPPOE_RESULT_STATUS = "pppoe_result_status";
     public static final String EXTRA_PPPOE_RESULT_ERROR_CODE = "pppoe_result_error_code";
