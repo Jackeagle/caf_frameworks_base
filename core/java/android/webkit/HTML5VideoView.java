@@ -150,6 +150,9 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener,
     }
 
     public void pause() {
+        if ((mCurrentState == STATE_RESETTED) || (mCurrentState == STATE_RELEASED) || (mCurrentState == STATE_INITIALIZED)){
+            return;
+        }
         if (isPlaying()) {
             mPlayer.pause();
         } else if (mCurrentState == STATE_PREPARING) {
