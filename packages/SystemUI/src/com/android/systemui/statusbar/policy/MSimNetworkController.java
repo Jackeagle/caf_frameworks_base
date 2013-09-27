@@ -471,6 +471,11 @@ public class MSimNetworkController extends NetworkController {
             }
         }
 
+        if (textResId == com.android.internal.R.string.lockscreen_missing_sim_message_short
+            && PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+                textResId = com.android.internal.R.string.lockscreen_missing_uim_message_short;
+        }
+
         if (textResId != 0) {
             mCarrierTextSub[sub] = mContext.getString(textResId);
         }

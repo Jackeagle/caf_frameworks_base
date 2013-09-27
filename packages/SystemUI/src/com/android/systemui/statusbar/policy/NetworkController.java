@@ -936,6 +936,15 @@ public class NetworkController extends BroadcastReceiver {
             mNetworkName = str.toString();
         } else {
             mNetworkName = mNetworkNameDefault;
+
+            if (mSimState == IccCardConstants.State.ABSENT) {
+                int textResId =
+                    com.android.internal.R.string.lockscreen_missing_sim_message_short;
+                if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+                    textResId = com.android.internal.R.string.lockscreen_missing_uim_message_short;
+                }
+                mNetworkName = mContext.getString(textResId);
+            }
         }
     }
 
