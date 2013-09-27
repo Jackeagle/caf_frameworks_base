@@ -1395,6 +1395,9 @@ public class MSimNetworkController extends NetworkController {
             for (NetworkSignalChangedCallback cb : mSignalsChangedCallbacks) {
                 notifySignalsChangedCallbacks(cb);
             }
+            for (NetworkSignalChangedCallback cb : mSignalsChangedCallbacks) {
+                notifySignalsChangedCallbacks(cb);
+            }
         }
 
         if (mLastAirplaneMode != mAirplaneMode) {
