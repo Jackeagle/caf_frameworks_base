@@ -39,6 +39,7 @@ import android.util.Slog;
 import com.android.internal.telephony.DctConstants;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.msim.ITelephonyMSim;
+import com.android.internal.telephony.MSimConstants;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.util.AsyncChannel;
@@ -187,6 +188,37 @@ public class MobileDataStateTracker implements NetworkStateTracker {
                 }
                 if (!TextUtils.equals(apnType, mApnType)) {
                     return;
+                }
+
+                if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                    int dds = 0;
+                    final int subscription = intent.getIntExtra(MSimConstants.SUBSCRIPTION_KEY,
+                            MSimConstants.DEFAULT_SUBSCRIPTION);
+                    getPhoneService(false);
+
+                   /*
+                    * If the phone process has crashed in the past, we'll get a
+                    * RemoteException and need to re-reference the service.
+                    */
+                    for (int retry = 0; retry < 2; retry++) {
+                        if (mMSimPhoneService == null) {
+                            loge("Ignoring get dds request because "
+                                    + "MSim Phone Service is not available");
+                            break;
+                        }
+
+                        try {
+                            dds = mMSimPhoneService.getPreferredDataSubscription();
+                        } catch (RemoteException e) {
+                            if (retry == 0) getPhoneService(true);
+                        }
+                    }
+                    log(String.format("subscription=%s, dds=%s", subscription, dds));
+                    if (subscription != dds) {
+                        log("ignore data connection state as sub:" + subscription +
+                                " is not current dds: " + dds);
+                        return;
+                    }
                 }
 
                 int oldSubtype = mNetworkInfo.getSubtype();
