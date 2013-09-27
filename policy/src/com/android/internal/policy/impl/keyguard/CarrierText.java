@@ -20,6 +20,7 @@
 package com.android.internal.policy.impl.keyguard;
 
 import android.content.Context;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.text.TextUtils;
@@ -39,6 +40,16 @@ public class CarrierText extends TextView {
     private LockPatternUtils mLockPatternUtils;
 
     protected boolean mAirplaneMode;
+
+    // For prop key to show carrier.
+    static final String PROP_KEY_SHOW_CARRIER = "persist.env.sys.SHOW_CARRIER";
+    static final String PROP_ENV_SPEC = SystemProperties.get("persist.env.spec");
+
+    static final int ORIGIN_CARRIER_NAME_ID = R.array.origin_carrier_names;
+    static final int LOCALE_CARRIER_NAME_ID = R.array.locale_carrier_names;
+    static final int LOCKSCREEN_CARRIER_DEFAULT_ID =
+            R.string.lockscreen_carrier_default;
+
 
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
         private CharSequence mPlmn;
@@ -146,6 +157,11 @@ public class CarrierText extends TextView {
             CharSequence plmn, CharSequence spn) {
         CharSequence carrierText = null;
         StatusMode status = getStatusForIccState(simState);
+
+        int resTextIdOfNoSimCard = R.string.lockscreen_missing_sim_message_short;
+        if (PROP_ENV_SPEC.equalsIgnoreCase("ChinaTelecom")) {
+            resTextIdOfNoSimCard = R.string.lockscreen_missing_uim_message_short;
+        }
         switch (status) {
             case Normal:
                 carrierText = concatenate(plmn, spn);
@@ -167,7 +183,7 @@ public class CarrierText extends TextView {
                 // has some connectivity. Otherwise, it should be null or empty and just show
                 // "No SIM card"
                 carrierText =  makeCarrierStringOnEmergencyCapable(
-                        getContext().getText(R.string.lockscreen_missing_sim_message_short),
+                        getContext().getText(resTextIdOfNoSimCard),
                         plmn);
                 break;
 
@@ -178,7 +194,7 @@ public class CarrierText extends TextView {
 
             case SimMissingLocked:
                 carrierText =  makeCarrierStringOnEmergencyCapable(
-                        getContext().getText(R.string.lockscreen_missing_sim_message_short),
+                        getContext().getText(resTextIdOfNoSimCard),
                         plmn);
                 break;
 
