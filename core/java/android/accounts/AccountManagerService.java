@@ -35,6 +35,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.RegisteredServicesCache;
 import android.content.pm.RegisteredServicesCacheListener;
+import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
@@ -617,6 +618,7 @@ public class AccountManagerService
             mAccount = account;
         }
 
+        @Override
         public void run() throws RemoteException {
             try {
                 mAuthenticator.hasFeatures(this, mAccount, mFeatures);
@@ -625,6 +627,7 @@ public class AccountManagerService
             }
         }
 
+        @Override
         public void onResult(Bundle result) {
             IAccountManagerResponse response = getResponseAndClose();
             if (response != null) {
@@ -650,6 +653,7 @@ public class AccountManagerService
             }
         }
 
+        @Override
         protected String toDebugString(long now) {
             return super.toDebugString(now) + ", hasFeatures"
                     + ", " + mAccount
@@ -698,15 +702,18 @@ public class AccountManagerService
             mAccount = account;
         }
 
+        @Override
         protected String toDebugString(long now) {
             return super.toDebugString(now) + ", removeAccount"
                     + ", account " + mAccount;
         }
 
+        @Override
         public void run() throws RemoteException {
             mAuthenticator.getAccountRemovalAllowed(this, mAccount);
         }
 
+        @Override
         public void onResult(Bundle result) {
             if (result != null && result.containsKey(AccountManager.KEY_BOOLEAN_RESULT)
                     && !result.containsKey(AccountManager.KEY_INTENT)) {
@@ -1031,16 +1038,19 @@ public class AccountManagerService
         try {
             new Session(accounts, response, accountType, false,
                     false /* stripAuthTokenFromResult */) {
+                @Override
                 protected String toDebugString(long now) {
                     return super.toDebugString(now) + ", getAuthTokenLabel"
                             + ", " + accountType
                             + ", authTokenType " + authTokenType;
                 }
 
+                @Override
                 public void run() throws RemoteException {
                     mAuthenticator.getAuthTokenLabel(this, authTokenType);
                 }
 
+                @Override
                 public void onResult(Bundle result) {
                     if (result != null) {
                         String label = result.getString(AccountManager.KEY_AUTH_TOKEN_LABEL);
@@ -1113,6 +1123,7 @@ public class AccountManagerService
 
             new Session(accounts, response, account.type, expectActivityLaunch,
                     false /* stripAuthTokenFromResult */) {
+                @Override
                 protected String toDebugString(long now) {
                     if (loginOptions != null) loginOptions.keySet();
                     return super.toDebugString(now) + ", getAuthToken"
@@ -1122,6 +1133,7 @@ public class AccountManagerService
                             + ", notifyOnAuthFailure " + notifyOnAuthFailure;
                 }
 
+                @Override
                 public void run() throws RemoteException {
                     // If the caller doesn't have permission then create and return the
                     // "grant permission" intent instead of the "getAuthToken" intent.
@@ -1132,6 +1144,7 @@ public class AccountManagerService
                     }
                 }
 
+                @Override
                 public void onResult(Bundle result) {
                     if (result != null) {
                         if (result.containsKey(AccountManager.KEY_AUTH_TOKEN_LABEL)) {
@@ -1278,11 +1291,13 @@ public class AccountManagerService
         try {
             new Session(accounts, response, accountType, expectActivityLaunch,
                     true /* stripAuthTokenFromResult */) {
+                @Override
                 public void run() throws RemoteException {
                     mAuthenticator.addAccount(this, mAccountType, authTokenType, requiredFeatures,
                             options);
                 }
 
+                @Override
                 protected String toDebugString(long now) {
                     return super.toDebugString(now) + ", addAccount"
                             + ", accountType " + accountType
@@ -1323,9 +1338,11 @@ public class AccountManagerService
         try {
             new Session(accounts, response, account.type, expectActivityLaunch,
                     true /* stripAuthTokenFromResult */) {
+                @Override
                 public void run() throws RemoteException {
                     mAuthenticator.confirmCredentials(this, account, options);
                 }
+                @Override
                 protected String toDebugString(long now) {
                     return super.toDebugString(now) + ", confirmCredentials"
                             + ", " + account;
@@ -1356,9 +1373,11 @@ public class AccountManagerService
         try {
             new Session(accounts, response, account.type, expectActivityLaunch,
                     true /* stripAuthTokenFromResult */) {
+                @Override
                 public void run() throws RemoteException {
                     mAuthenticator.updateCredentials(this, account, authTokenType, loginOptions);
                 }
+                @Override
                 protected String toDebugString(long now) {
                     if (loginOptions != null) loginOptions.keySet();
                     return super.toDebugString(now) + ", updateCredentials"
@@ -1389,9 +1408,11 @@ public class AccountManagerService
         try {
             new Session(accounts, response, accountType, expectActivityLaunch,
                     true /* stripAuthTokenFromResult */) {
+                @Override
                 public void run() throws RemoteException {
                     mAuthenticator.editProperties(this, mAccountType);
                 }
+                @Override
                 protected String toDebugString(long now) {
                     return super.toDebugString(now) + ", editProperties"
                             + ", accountType " + accountType;
@@ -1415,6 +1436,7 @@ public class AccountManagerService
             mFeatures = features;
         }
 
+        @Override
         public void run() throws RemoteException {
             synchronized (mAccounts.cacheLock) {
                 mAccountsOfType = getAccountsFromCacheLocked(mAccounts, mAccountType);
@@ -1451,6 +1473,7 @@ public class AccountManagerService
             }
         }
 
+        @Override
         public void onResult(Bundle result) {
             mNumResults++;
             if (result == null) {
@@ -1489,6 +1512,7 @@ public class AccountManagerService
         }
 
 
+        @Override
         protected String toDebugString(long now) {
             return super.toDebugString(now) + ", getAccountsByTypeAndFeatures"
                     + ", " + (mFeatures != null ? TextUtils.join(",", mFeatures) : null);
@@ -1799,9 +1823,31 @@ public class AccountManagerService
             }
         }
 
+        @Override
         public void onResult(Bundle result) {
             mNumResults++;
-            if (result != null && !TextUtils.isEmpty(result.getString(AccountManager.KEY_AUTHTOKEN))) {
+            Intent intent = null;
+            if (result != null
+                    && (intent = result.getParcelable(AccountManager.KEY_INTENT)) != null) {
+                /*
+                 * The Authenticator API allows third party authenticators to
+                 * supply arbitrary intents to other apps that they can run,
+                 * this can be very bad when those apps are in the system like
+                 * the System Settings.
+                 */
+                PackageManager pm = mContext.getPackageManager();
+                ResolveInfo resolveInfo = pm.resolveActivity(intent, 0);
+                int targetUid = resolveInfo.activityInfo.applicationInfo.uid;
+                int authenticatorUid = Binder.getCallingUid();
+                if (PackageManager.SIGNATURE_MATCH !=
+                        pm.checkSignatures(authenticatorUid, targetUid)) {
+                    throw new SecurityException(
+                            "Activity to be started with KEY_INTENT must " +
+                            "share Authenticator's signatures");
+                }
+            }
+            if (result != null
+                    && !TextUtils.isEmpty(result.getString(AccountManager.KEY_AUTHTOKEN))) {
                 String accountName = result.getString(AccountManager.KEY_ACCOUNT_NAME);
                 String accountType = result.getString(AccountManager.KEY_ACCOUNT_TYPE);
                 if (!TextUtils.isEmpty(accountName) && !TextUtils.isEmpty(accountType)) {
@@ -1910,6 +1956,7 @@ public class AccountManagerService
             super(looper);
         }
 
+        @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case MESSAGE_TIMED_OUT:
