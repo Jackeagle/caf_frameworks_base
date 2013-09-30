@@ -36,6 +36,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
+import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
@@ -120,6 +121,8 @@ public final class ShutdownThread extends Thread {
     private boolean isShutdownMusicPlaying = false;
 
     private static AlertDialog sConfirmDialog;
+
+    private static AudioManager mAudioManager;
     
     private ShutdownThread() {
     }
@@ -268,6 +271,10 @@ public final class ShutdownThread extends Thread {
             }
             sIsStarted = true;
         }
+
+        //acquire audio focus to make the other apps to stop playing muisc
+        mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        mAudioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 
         if (!checkAnimationFileExist()) {
             // throw up an indeterminate system dialog to indicate radio is
