@@ -428,8 +428,6 @@
    </array>
 
     <string-array translateable="false" name="z_origin_carrier_names">
-        <item>CHINA\u0020\u0020MOBILE</item>
-        <item>CHN-UNICOM</item>
         <item>China Mobile</item>
         <item>China Unicom</item>
         <item>China Telecom</item>
