@@ -158,6 +158,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static public final String SYSTEM_DIALOG_REASON_HOME_KEY = "homekey";
     static public final String SYSTEM_DIALOG_REASON_ASSIST = "assist";
 
+    private static final int MAX_ROTATION = Surface.ROTATION_180 + Surface.ROTATION_180;
+
     /**
      * These are the system UI flags that, when changing, can cause the layout
      * of the screen to change.
@@ -1005,6 +1007,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mSeascapeRotation = Surface.ROTATION_270;
             }
         }
+
+        //Update All orientations with  panel-sensor deviation
+        mLandscapeRotation = (mLandscapeRotation + mPanelOrientation) % MAX_ROTATION;
+        mSeascapeRotation = (mSeascapeRotation + mPanelOrientation) % MAX_ROTATION;
+        mPortraitRotation = (mPortraitRotation + mPanelOrientation) % MAX_ROTATION;
+        mUpsideDownRotation = (mUpsideDownRotation + mPanelOrientation) % MAX_ROTATION;
 
         mStatusBarHeight = mContext.getResources().getDimensionPixelSize(
                 com.android.internal.R.dimen.status_bar_height);
@@ -4342,7 +4350,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mAllowAllRotations = mContext.getResources().getBoolean(
                             com.android.internal.R.bool.config_allowAllRotations) ? 1 : 0;
                 }
-                if (sensorRotation != Surface.ROTATION_180
+                if (sensorRotation != mUpsideDownRotation
                         || mAllowAllRotations == 1
                         || orientation == ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
                         || orientation == ActivityInfo.SCREEN_ORIENTATION_FULL_USER) {
