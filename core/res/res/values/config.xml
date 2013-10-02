@@ -1160,4 +1160,8 @@
     <!-- Button back light brightness friendly time break. -->
     <integer name="def_button_light_timeout">4000</integer>
     <bool name="def_button_light_enabled">false</bool>
+
+    <!-- bool value to for enabling motion accelerometer -->
+    <bool name="use_motion_accel">false</bool>
+
 </resources>
