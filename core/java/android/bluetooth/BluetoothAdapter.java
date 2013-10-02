@@ -1,4 +1,6 @@
 /*
+ * Copyright (C) 2013 The Linux Foundation. All rights reserved
+ * Not a Contribution.
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -1177,6 +1179,9 @@ public final class BluetoothAdapter {
         } else if (profile == BluetoothProfile.HEALTH) {
             BluetoothHealth health = new BluetoothHealth(context, listener);
             return true;
+        } else if (profile == BluetoothProfile.HANDSFREE_CLIENT) {
+            BluetoothHandsfreeClient hfpclient = new BluetoothHandsfreeClient(context, listener);
+            return true;
         } else {
             return false;
         }
@@ -1228,6 +1233,10 @@ public final class BluetoothAdapter {
             case BluetoothProfile.GATT_SERVER:
                 BluetoothGattServer gattServer = (BluetoothGattServer)proxy;
                 gattServer.close();
+                break;
+            case BluetoothProfile.HANDSFREE_CLIENT:
+                BluetoothHandsfreeClient hfpclient = (BluetoothHandsfreeClient)proxy;
+                hfpclient.close();
                 break;
         }
     }
