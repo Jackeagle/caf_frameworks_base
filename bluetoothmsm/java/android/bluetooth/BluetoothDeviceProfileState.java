@@ -420,6 +420,14 @@ public final class BluetoothDeviceProfileState extends StateMachine {
                     }
                     break;
                 case CONNECT_HID_INCOMING:
+                    if (mUnpairStarted == true) {
+                        log("Rejecting incoming connection, since device is not bonded now");
+                        handleIncomingConnection(CONNECT_HID_INCOMING, false);
+                        sendConnectionAccessRemovalIntent();
+                    } else {
+                        transitionTo(mIncomingHid);
+                    }
+                    break;
                 case DISCONNECT_HID_INCOMING:
                     if (mUnpairStarted == true) {
                         log("Discarding message " + message.what);
