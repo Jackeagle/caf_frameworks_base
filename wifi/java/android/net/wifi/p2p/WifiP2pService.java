@@ -354,12 +354,16 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                          if (currentChannel >= 0 &&
                               (currentChannel < startSafeChannel ||
                                currentChannel > endSafeChannel)) {
-                               Slog.d(TAG, "P2P GO is operating on unsafe channel! Terminate!");
-                               mP2pStateMachine.mWifiNative.p2pGroupRemove(
+                               //currently RIL passes only 2.4G channels so if the current operating
+                               //channel is 5G channel, do not restart P2P GO.
+                               if (currentChannel >= 1 && currentChannel <=14) {
+                                  Slog.d(TAG, "P2P GO is operating on unsafe channel! Terminate!");
+                                  mP2pStateMachine.mWifiNative.p2pGroupRemove(
                                              mP2pStateMachine.mGroup.getInterface());
-                               if (mAutonomousGroup)
-                                   mP2pStateMachine.mWifiNative.p2pGroupAddOnSpecifiedFreq(
+                                  if (mAutonomousGroup)
+                                      mP2pStateMachine.mWifiNative.p2pGroupAddOnSpecifiedFreq(
                                                        channelToFrequency(startSafeChannel));
+                               }
                           }
 
                      }
@@ -971,15 +975,11 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     boolean blocked = (message.arg1 == ENABLED ? true : false);
                     if (mDiscoveryBlocked == blocked) break;
                     mDiscoveryBlocked = blocked;
-                    if (blocked && mDiscoveryStarted) {
-                        mWifiNative.p2pStopFind();
-                        mDiscoveryPostponed = true;
-                    }
-                    if (!blocked && mDiscoveryPostponed) {
-                        mDiscoveryPostponed = false;
-                        mWifiNative.p2pFind(DISCOVER_TIMEOUT_S);
-                    }
                     if (blocked) {
+                        if (mDiscoveryStarted) {
+                            mWifiNative.p2pStopFind();
+                        }
+                        mDiscoveryPostponed = true;
                         try {
                             StateMachine m = (StateMachine)message.obj;
                             m.sendMessage(message.arg2);
@@ -987,12 +987,17 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                             loge("unable to send BLOCK_DISCOVERY response: " + e);
                         }
                     }
+                    if (!blocked && mDiscoveryPostponed) {
+                        mDiscoveryPostponed = false;
+                        mWifiNative.p2pFind(DISCOVER_TIMEOUT_S);
+                    }
                     break;
                 case WifiP2pManager.DISCOVER_PEERS:
                     if (mDiscoveryBlocked) {
-                        replyToMessage(message, WifiP2pManager.DISCOVER_PEERS_FAILED,
-                                WifiP2pManager.BUSY);
-                        break;
+                    /* do not send discovery failure to apps.
+                       since discovery is postponed and not failed */
+                       loge("P2P_FIND is deffered");
+                       break;
                     }
                     // do not send service discovery request while normal find operation.
                     clearSupplicantServiceRequest();
