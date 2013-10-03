@@ -71,7 +71,7 @@ class PermissionDialog extends BasePermissionDialog {
         mOpLabels = res.getTextArray(R.array.app_ops_labels);
 
         setCancelable(false);
-        setTitle("Permission");
+        setTitle(res.getString(R.string.permission));
         getWindow().addFlags(FLAG_SYSTEM_ERROR);
 
         mView = getLayoutInflater().inflate(R.layout.permission_confirmation_dialog, null);
@@ -84,10 +84,10 @@ class PermissionDialog extends BasePermissionDialog {
         setView(mView);
 
         setButton(DialogInterface.BUTTON_POSITIVE,
-                  "Allow", mHandler.obtainMessage(ACTION_ALLOWED));
+                  res.getString(R.string.allow), mHandler.obtainMessage(ACTION_ALLOWED));
 
         setButton(DialogInterface.BUTTON_NEGATIVE,
-                  "Denied", mHandler.obtainMessage(ACTION_IGNORED));
+                    res.getString(R.string.deny), mHandler.obtainMessage(ACTION_IGNORED));
 
         // After the timeout, pretend the user clicked the quit button
         //mHandler.sendMessageDelayed(
