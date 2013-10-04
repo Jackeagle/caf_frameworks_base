@@ -430,7 +430,7 @@
         <item>@null</item>
    </array>
 
-    <string-array translateable="false" name="origin_carrier_names">
+    <string-array translateable="false" name="z_origin_carrier_names">
         <item>CHINA\u0020\u0020MOBILE</item>
         <item>CHN-UNICOM</item>
         <item>China Mobile</item>
@@ -442,7 +442,7 @@
         <item>Searching for Service</item>
     </string-array>
 
-    <string-array translatable="false" name="locale_carrier_names">
+    <string-array translatable="false" name="z_locale_carrier_names">
         <item>China_Mobile</item>
         <item>China_Unicom</item>
         <item>China_Mobile</item>
