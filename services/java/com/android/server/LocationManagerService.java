@@ -908,7 +908,8 @@ public class LocationManagerService extends ILocationManager.Stub {
     boolean checkLocationAccess(int uid, String packageName, int allowedResolutionLevel) {
         int op = resolutionLevelToOp(allowedResolutionLevel);
         if (op >= 0) {
-            if (mAppOps.checkOp(op, uid, packageName) != AppOpsManager.MODE_ALLOWED) {
+            int mode = mAppOps.checkOp(op, uid, packageName);
+            if (mode != AppOpsManager.MODE_ALLOWED && mode != AppOpsManager.MODE_ASK) {
                 return false;
             }
         }
@@ -1310,9 +1311,12 @@ public class LocationManagerService extends ILocationManager.Stub {
         // providers may use public location API's, need to clear identity
         long identity = Binder.clearCallingIdentity();
         try {
-            // We don't check for MODE_IGNORED here; we will do that when we go to deliver
-            // a location.
-            checkLocationAccess(uid, packageName, allowedResolutionLevel);
+            //Check user permission.
+            if (!reportLocationAccessNoThrow(uid, packageName, allowedResolutionLevel)) {
+                if (D) Log.d(TAG, "rejecting location update request for no op app: " +
+                        packageName);
+                return;
+            }
 
             synchronized (mLock) {
                 Receiver receiver = checkListenerOrIntentLocked(listener, intent, pid, uid,
@@ -1856,13 +1860,6 @@ public class LocationManagerService extends ILocationManager.Stub {
 
             if (mBlacklist.isBlacklisted(receiver.mPackageName)) {
                 if (D) Log.d(TAG, "skipping loc update for blacklisted app: " +
-                        receiver.mPackageName);
-                continue;
-            }
-
-            if (!reportLocationAccessNoThrow(receiver.mUid, receiver.mPackageName,
-                    receiver.mAllowedResolutionLevel)) {
-                if (D) Log.d(TAG, "skipping loc update for no op app: " +
                         receiver.mPackageName);
                 continue;
             }
