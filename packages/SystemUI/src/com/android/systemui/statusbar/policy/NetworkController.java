@@ -906,8 +906,8 @@ public class NetworkController extends BroadcastReceiver {
 
         if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
             String networkName = mContext.getLocalString(mPhone.getNetworkOperatorName(),
-                com.android.internal.R.array.z_origin_carrier_names,
-                com.android.internal.R.array.z_locale_carrier_names);
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
             mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
             return;
         }
@@ -917,8 +917,8 @@ public class NetworkController extends BroadcastReceiver {
         boolean something = false;
         if (showPlmn && plmn != null) {
             String plmnName = mContext.getLocalString(plmn,
-                com.android.internal.R.array.z_origin_carrier_names,
-                com.android.internal.R.array.z_locale_carrier_names);
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
             str.append(plmnName);
             something = true;
         }
@@ -927,8 +927,8 @@ public class NetworkController extends BroadcastReceiver {
                 str.append(mNetworkNameSeparator);
             }
             String spnName = mContext.getLocalString(plmn,
-                com.android.internal.R.array.z_origin_carrier_names,
-                com.android.internal.R.array.z_locale_carrier_names);
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
             str.append(spnName);
             something = true;
         }

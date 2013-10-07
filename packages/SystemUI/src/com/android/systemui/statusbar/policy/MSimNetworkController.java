@@ -72,8 +72,8 @@ public class MSimNetworkController extends NetworkController {
     private static final int FIRST_SIGNAL_ICON = 0;
     private static final int SECOND_SIGNAL_ICON = 1;
 
-    private static final int ORIGIN_CARRIER_NAME_ID = com.android.internal.R.array.z_origin_carrier_names;
-    private static final int LOCALE_CARRIER_NAME_ID = com.android.internal.R.array.z_locale_carrier_names;
+    private static final int ORIGIN_CARRIER_NAME_ID = com.android.internal.R.array.origin_carrier_names;
+    private static final int LOCALE_CARRIER_NAME_ID = com.android.internal.R.array.locale_carrier_names;
 
     // telephony
     private MSimTelephonyManager mPhone;
