@@ -640,6 +640,7 @@ public class MSimNetworkController extends NetworkController {
                             // fall through
                         }
                     case TelephonyManager.NETWORK_TYPE_UMTS:
+                    case TelephonyManager.NETWORK_TYPE_TD_SCDMA:
                         mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
                         mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
                         mMSimContentDescriptionDataType[subscription] = mContext.getString(
