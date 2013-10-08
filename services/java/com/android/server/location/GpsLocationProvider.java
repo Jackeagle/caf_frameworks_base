@@ -1077,7 +1077,10 @@ public class GpsLocationProvider implements LocationProviderInterface {
             for (int i=0; i<newWork.size(); i++) {
                 try {
                     int uid = newWork.get(i);
-                    mAppOpsService.startOperation(AppOpsManager.OP_GPS, uid, newWork.getName(i));
+                    // Don't account for this operation here.
+                    // Currently Location service is going to take care of this.
+                    // TODO: Fix if for MODE_ASK
+                    //mAppOpsService.startOperation(AppOpsManager.OP_GPS, uid, newWork.getName(i));
                     if (uid != lastuid) {
                         lastuid = uid;
                         mBatteryStats.noteStartGps(uid);
@@ -1094,7 +1097,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
             for (int i=0; i<goneWork.size(); i++) {
                 try {
                     int uid = goneWork.get(i);
-                    mAppOpsService.finishOperation(AppOpsManager.OP_GPS, uid, goneWork.getName(i));
+                    //mAppOpsService.finishOperation(AppOpsManager.OP_GPS, uid, goneWork.getName(i));
                     if (uid != lastuid) {
                         lastuid = uid;
                         mBatteryStats.noteStopGps(uid);
