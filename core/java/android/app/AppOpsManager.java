@@ -103,7 +103,11 @@ public class AppOpsManager {
     public static final int OP_WIFI_CHANGE = 31;
     public static final int OP_BLUETOOTH_CHANGE = 32;
     public static final int OP_DATA_CONNECT_CHANGE = 33;
-    public static final int _NUM_OP = 34;
+    public static final int OP_SEND_MMS = 34;
+    public static final int OP_READ_MMS = 35;
+    public static final int OP_WRITE_MMS = 36;
+    public static final int _NUM_OP = 37;
+
 
     /**
      * Map to check if each operation is strict or not, to determine default
@@ -146,6 +150,9 @@ public class AppOpsManager {
         true,   //OP_WIFI_CHANGE
         true,   //OP_BLUETOOTH_CHANGE
         true,   //OP_DATA_CONNECT_CHANGE
+        true,   //OP_SEND_MMS
+        true,   //OP_READ_MMS
+        true,   //OP_WRITE_MMS
     };
 
     /**
@@ -191,6 +198,9 @@ public class AppOpsManager {
             OP_WIFI_CHANGE,
             OP_BLUETOOTH_CHANGE,
             OP_DATA_CONNECT_CHANGE,
+            OP_SEND_MMS,
+            OP_READ_MMS,
+            OP_WRITE_MMS,
     };
 
     /**
@@ -232,6 +242,9 @@ public class AppOpsManager {
             "WIFI_CHANGE",
             "BLUETOOTH_CHANGE",
             "DATA_CONNECT_CHANGE",
+            "SEND_MMS",
+            "READ_MMS",
+            "WRITE_MMS",
     };
 
     /**
@@ -273,6 +286,9 @@ public class AppOpsManager {
             android.Manifest.permission.CHANGE_WIFI_STATE,
             android.Manifest.permission.BLUETOOTH,
             android.Manifest.permission.CHANGE_NETWORK_STATE,
+            android.Manifest.permission.SEND_SMS,
+            android.Manifest.permission.READ_SMS,
+            android.Manifest.permission.WRITE_SMS,
     };
 
     /**
