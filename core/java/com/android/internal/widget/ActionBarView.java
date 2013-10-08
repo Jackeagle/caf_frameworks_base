@@ -549,6 +549,8 @@ public class ActionBarView extends AbsActionBarView {
                     (mDisplayOptions & ActionBar.DISPLAY_SHOW_TITLE) != 0 &&
                     (!TextUtils.isEmpty(mTitle) || !TextUtils.isEmpty(mSubtitle));
             mTitleLayout.setVisibility(visible ? VISIBLE : GONE);
+            // After call setTitle ,sometime mTitleView do not appear even call setVisibility.but call requstLayout can achieve it
+            mTitleView.requestLayout();
         }
         if (mLogoNavItem != null) {
             mLogoNavItem.setTitle(title);
