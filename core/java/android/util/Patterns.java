@@ -133,7 +133,7 @@ public class Patterns {
         + "(?:\\:\\d{1,5})?)" // plus option port number
         + "(\\/(?:(?:[" + GOOD_IRI_CHAR + "\\;\\/\\?\\:\\@\\&\\=\\#\\~"  // plus option query params
         + "\\-\\.\\+\\!\\*\\'\\(\\)\\,\\_])|(?:\\%[a-fA-F0-9]{2}))*)?"
-        + "(?:\\b|$|[^\u4e00-\u9fa5])"); // and finally, a word boundary or end of
+        + "(?:\\b|$)"); // and finally, a word boundary or end of
                         // input.  This is to stop foo.sure from
                         // matching as foo.su
 
