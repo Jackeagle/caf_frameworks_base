@@ -194,6 +194,18 @@ public class ChooseTypeAndAccountActivity extends Activity
     @Override
     protected void onResume() {
         super.onResume();
+
+        // When we start a child activity for result from this activity , when the child activity
+        // is show, then we rotate the device and cancel the child activity, then we back to this
+        // activity, and this activity will recreate. Because onActivityResult will be called
+        // immediately before onResume when the activity is re-starting, so in activity recreate,
+        // it will call onActivityResult and execute the finish, and then it will call onResume and
+        // execute the Add Account. This will cause the Add Account show again issue.
+        // So when the activity is finishing, the onResume should not be executed.
+        if (isFinishing()) {
+            return;
+        }
+
         final AccountManager accountManager = AccountManager.get(this);
 
         mAccounts = getAcceptableAccountChoices(accountManager);
