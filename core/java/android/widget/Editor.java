@@ -2710,21 +2710,22 @@ public class Editor {
                 suggestions[suggestionInfo.suggestionIndex] = originalText;
 
                 // Restore previous SuggestionSpans
-                final int realSuggestionLength = mTextView.getText().toString().length();
-                final int lengthDifference = realSuggestionLength - (spanEnd - spanStart);
+                final int lengthDifference = suggestion.length() - (spanEnd - spanStart);
                 for (int i = 0; i < length; i++) {
                     // Only spans that include the modified region make sense after replacement
                     // Spans partially included in the replaced region are removed, there is no
                     // way to assign them a valid range after replacement
                     if (suggestionSpansStarts[i] <= spanStart &&
-                            suggestionSpansEnds[i] >= spanEnd) {
+                            suggestionSpansEnds[i] >= spanEnd &&
+                            mTextView.length() >= suggestionSpansEnds[i] + lengthDifference) {
                         mTextView.setSpan_internal(suggestionSpans[i], suggestionSpansStarts[i],
                                 suggestionSpansEnds[i] + lengthDifference, suggestionSpansFlags[i]);
                     }
                 }
 
                 // Move cursor at the end of the replaced word
-                final int newCursorPosition = spanEnd + lengthDifference;
+                final int newCursorPosition = spanEnd + lengthDifference > mTextView.length()
+                        ? mTextView.length() : spanEnd + lengthDifference;
                 mTextView.setCursorPosition_internal(newCursorPosition, newCursorPosition);
             }
 
