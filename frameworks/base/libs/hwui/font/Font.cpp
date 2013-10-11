@@ -320,34 +320,32 @@ void Font::render(SkPaint* paint, const char *text, uint32_t start, uint32_t len
 
     if(paint->textIsUnicode(text,len,&no)){
         GIDS = paint->getGlyphIDs(text,len,&noOfGids);
-        //ALOGE("No of Glyph Ids = %d\n",noOfGids);
         char * text2 =(char *)sk_malloc_throw(sizeof(char)*noOfGids*2);
         for(int i=0;i<noOfGids*2;i+=2){
-                text2[i]=(char)(GIDS[i/2]&0xff);
-                text2[i+1]=(char)((GIDS[i/2]&0xff00)>>8);
-                //ALOGE("text[i]=%d text[i+1]=%d \n",text2[i],text2[i+1]);
+            text2[i]=(char)(GIDS[i/2]&0xff);
+            text2[i+1]=(char)((GIDS[i/2]&0xff00)>>8);
         }
         const char* text1 = (const char*)text2;
         while (glyphsCount < noOfGids && penX < pathLength) {
-                glyph_t glyph = GET_GLYPH(text1);
-                if (IS_END_OF_STRING(glyph)) {
-                        break;
-                }
-                CachedGlyphInfo* cachedGlyph = getCachedGlyph(paint, glyph);
-                penX += SkFixedToFloat(AUTO_KERN(prevRsbDelta, cachedGlyph->mLsbDelta));
-                prevRsbDelta = cachedGlyph->mRsbDelta;
+            glyph_t glyph = GET_GLYPH(text1);
+            if (IS_END_OF_STRING(glyph)) {
+                break;
+            }
+            CachedGlyphInfo* cachedGlyph = getCachedGlyph(paint, glyph);
+            penX += SkFixedToFloat(AUTO_KERN(prevRsbDelta, cachedGlyph->mLsbDelta));
+            prevRsbDelta = cachedGlyph->mRsbDelta;
 
-                if (cachedGlyph->mIsValid) {
-                        drawCachedGlyph(cachedGlyph, penX, hOffset, vOffset, measure, &position, &tangent);
-                }
-                penX += SkFixedToFloat(cachedGlyph->mAdvanceX);
-                glyphsCount++;
+            if (cachedGlyph->mIsValid) {
+                drawCachedGlyph(cachedGlyph, penX, hOffset, vOffset, measure, &position, &tangent);
+            }
+            penX += SkFixedToFloat(cachedGlyph->mAdvanceX);
+            glyphsCount++;
         }
         sk_free(text2);
         sk_free(GIDS);
-  }
-  else
-  #endif
+    }
+    else
+#endif
 
     while (glyphsCount < numGlyphs && penX < pathLength) {
         glyph_t glyph = GET_GLYPH(text);
@@ -428,34 +426,19 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
     int no;
     uint16_t * GIDS;
 
-   //ALOGE("PRANJAL textencoding = %d\n",paint->getTextEncoding());
    
-  if(paint->textIsUnicode(text,len,&no)){
-   	/*ALOGE("HWUI RENDERING -- encoding = %d\n",paint->getTextEncoding());
-        for(int i=0;i<len;i+=2){
-       		ALOGE("Libhwui Original Text[i]=%x text[i+1]=%x \n",text[i],text[i+1]);
-        }*/
-
-       //ALOGE("text is unicode \n");
-	GIDS = paint->getGlyphIDs(text,len,&noOfGids);
-        //ALOGE("Libhwui - No of Glyph Ids = %d\n",noOfGids);
+    if(paint->textIsUnicode(text,len,&no)){
+        GIDS = paint->getGlyphIDs(text,len,&noOfGids);
 	
         char * text2 =(char *)sk_malloc_throw(sizeof(char)*noOfGids*2);
         for(int i=0;i<noOfGids*2;i+=2){
-        	text2[i]=(char)(GIDS[i/2]&0xff);
-                text2[i+1]=(char)((GIDS[i/2]&0xff00)>>8);
-       	//	ALOGE("text[i]=%d text[i+1]=%d GID = 0x%x \n",text2[i],text2[i+1],GIDS[i/2]);
-       }
-      const char* text1 = (const char*)text2;
-
-      //if (CC_LIKELY(positions == NULL)) {
+            text2[i]=(char)(GIDS[i/2]&0xff);
+            text2[i+1]=(char)((GIDS[i/2]&0xff00)>>8);
+        }
+        const char* text1 = (const char*)text2;
         SkFixed prevRsbDelta = 0;
-
         float penX = x + 0.5f, prevX=0, prevToPrevX=0;
         int penY = y, retVal, x1,y1;
-
-	
-
         while (glyphsCount < noOfGids){
             glyph_t glyph = GET_GLYPH(text1);
             if (IS_END_OF_STRING(glyph)) {
@@ -464,64 +447,58 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
             CachedGlyphInfo* cachedGlyph = getCachedGlyph(paint, glyph);
             penX += SkFixedToFloat(AUTO_KERN(prevRsbDelta, cachedGlyph->mLsbDelta));
             prevRsbDelta = cachedGlyph->mRsbDelta;
-
-	    if(glyphsCount>1){
-		retVal = paint->getXYPos(GIDS[glyphsCount-2],GIDS[glyphsCount-1],GIDS[glyphsCount],3,&x1,&y1);
-	    }
-	    else if(glyphsCount==1){
-		retVal = paint->getXYPos(GIDS[glyphsCount-1],GIDS[glyphsCount],0,2,&x1,&y1);
-	    }
-	    else{
-		x1=0;y1=0;
-	    }
-
-	    if(x1!=0 || y1!=0){
-		float yPos = SkFixedToFloat(y1);
-		if(retVal==1){
-            		if (cachedGlyph->mIsValid && cachedGlyph->mCacheTexture) {
-				prevToPrevX += SkFixedToFloat(x1);
-				if(y1!=0){
-                			(*this.*render)(cachedGlyph, roundf(prevToPrevX), roundf(penY-yPos),
-                        			bitmap, bitmapW, bitmapH, bounds, positions);
-				}
-				else{
-                			(*this.*render)(cachedGlyph, roundf(prevToPrevX), penY,
-                        			bitmap, bitmapW, bitmapH, bounds, positions);
-				}
-            		}
-		}
-		else{
-            		if (cachedGlyph->mIsValid && cachedGlyph->mCacheTexture) {
-				prevToPrevX = prevX + SkFixedToFloat(x1);
-				if(y1!=0){
-                			(*this.*render)(cachedGlyph, roundf(prevToPrevX), roundf(penY-yPos),
-                        			bitmap, bitmapW, bitmapH, bounds, positions);
-				}
-				else{
-                			(*this.*render)(cachedGlyph, roundf(prevToPrevX), penY,
-                        			bitmap, bitmapW, bitmapH, bounds, positions);
-				}
-            		}
-		}
-	    }
-
-	    else
-
-            // If it's still not valid, we couldn't cache it, so we shouldn't draw garbage
-            if (cachedGlyph->mIsValid && cachedGlyph->mCacheTexture) {
-                (*this.*render)(cachedGlyph, roundf(penX), penY,
-                        bitmap, bitmapW, bitmapH, bounds, positions);
+            if(glyphsCount>1){
+                retVal = paint->getXYPos(GIDS[glyphsCount-2],GIDS[glyphsCount-1],GIDS[glyphsCount],3,&x1,&y1);
             }
-
-	    prevToPrevX = prevX;
-	    prevX = penX;
+            else if(glyphsCount==1){
+                retVal = paint->getXYPos(GIDS[glyphsCount-1],GIDS[glyphsCount],0,2,&x1,&y1);
+            }
+            else{
+                x1=0;y1=0;
+            }
+            if(x1!=0 || y1!=0){
+                float yPos = SkFixedToFloat(y1);
+                if(retVal==1){
+                    if (cachedGlyph->mIsValid && cachedGlyph->mCacheTexture) {
+                        prevToPrevX += SkFixedToFloat(x1);
+                        if(y1!=0){
+                            (*this.*render)(cachedGlyph, roundf(prevToPrevX), roundf(penY-yPos),
+                                bitmap, bitmapW, bitmapH, bounds, positions);
+                        }
+                        else{
+                            (*this.*render)(cachedGlyph, roundf(prevToPrevX), penY,
+                                bitmap, bitmapW, bitmapH, bounds, positions);
+                        }
+                    }
+                }
+                else{
+                    if (cachedGlyph->mIsValid && cachedGlyph->mCacheTexture) {
+				                prevToPrevX = prevX + SkFixedToFloat(x1);
+                        if(y1!=0){
+                		        (*this.*render)(cachedGlyph, roundf(prevToPrevX), roundf(penY-yPos),
+                                bitmap, bitmapW, bitmapH, bounds, positions);
+                        }
+                        else{
+                            (*this.*render)(cachedGlyph, roundf(prevToPrevX), penY,
+                                bitmap, bitmapW, bitmapH, bounds, positions);
+                        }
+                    }
+                }
+            }
+            else
+                // If it's still not valid, we couldn't cache it, so we shouldn't draw garbage
+                if (cachedGlyph->mIsValid && cachedGlyph->mCacheTexture) {
+                    (*this.*render)(cachedGlyph, roundf(penX), penY,
+                        bitmap, bitmapW, bitmapH, bounds, positions);
+                }
+            prevToPrevX = prevX;
+            prevX = penX;
             penX += SkFixedToFloat(cachedGlyph->mAdvanceX);
             glyphsCount++;
         }
-     sk_free(text2);
-     sk_free(GIDS);
+        sk_free(text2);
+        sk_free(GIDS);
     }
-
     else
 #endif
 
