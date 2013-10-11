@@ -707,7 +707,7 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
     jfloat totalAdvance = *outTotalAdvance;
 
     #ifdef REVERIE
-     jfloat totalAdvance1 =totalAdvance;
+    jfloat totalAdvance1 =totalAdvance;
     #endif
 
     ScriptRun run;  // relative to chars
@@ -767,41 +767,41 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
     *outTotalAdvance = totalAdvance;
 
 
-    #ifdef REVERIE
-        int ii=0;
-        for(int i=0;i<count;i++){
-                if((chars[i]>0x900 && chars[i]<0xaff) || (chars[i]>0xb80 && chars[i]<0xd7f) ){
-                        ii=1;
-                        break;
-                }
+#ifdef REVERIE
+    int ii=0;
+    for(int i=0;i<count;i++){
+        if((chars[i]>0x900 && chars[i]<0xaff) || (chars[i]>0xb80 && chars[i]<0xd7f) ){
+            ii=1;
+            break;
         }
-        if(ii==1){
-                SkScalar* scalarArray = new SkScalar[count];//(SkScalar*)resultAdvances;
-                size_t widths;
-                char* text = new char[count*2];
-                for(int i=0;i<count*2;i+=2){
-                        int unichar = paint->unicharToGlyph(chars[(i/2)]);
-                        text[i]=(char)(unichar&0xff);
-                        text[i+1]=(char)((unichar&0xff00)>>8);
-                }
-                const char *text2 = text;
-                widths = paint->getTextWidths(text2, count << 1, scalarArray);
-                for (size_t i = 0; i < widths; i++) {
-                        if(scalarArray[i]!=0)
-                                totalAdvance1 += SkScalarToFloat(scalarArray[i]);
-                        //resultAdvances[i] = SkScalarToFloat(scalarArray[i]);
-                }
-                *outTotalAdvance = totalAdvance1;
-                if(text){
-                        delete(text);
-                        text = NULL;
-                }
-                if(scalarArray){
-                        delete(scalarArray);
-                        scalarArray = NULL;
-                }
-	}
-	#endif
+    }
+    if(ii==1){
+        SkScalar* scalarArray = new SkScalar[count];//(SkScalar*)resultAdvances;
+        size_t widths;
+        char* text = new char[count*2];
+        for(int i=0;i<count*2;i+=2){
+            int unichar = paint->unicharToGlyph(chars[(i/2)]);
+            text[i]=(char)(unichar&0xff);
+            text[i+1]=(char)((unichar&0xff00)>>8);
+        }
+        const char *text2 = text;
+        widths = paint->getTextWidths(text2, count << 1, scalarArray);
+        for (size_t i = 0; i < widths; i++) {
+            if(scalarArray[i]!=0)
+                totalAdvance1 += SkScalarToFloat(scalarArray[i]);
+                //resultAdvances[i] = SkScalarToFloat(scalarArray[i]);
+            }
+        *outTotalAdvance = totalAdvance1;
+        if(text){
+            delete(text);
+            text = NULL;
+        }
+        if(scalarArray){
+            delete(scalarArray);
+            scalarArray = NULL;
+        }
+    }
+#endif
 
 
 #if DEBUG_GLYPHS
