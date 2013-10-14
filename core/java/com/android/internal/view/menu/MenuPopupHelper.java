@@ -171,7 +171,9 @@ public class MenuPopupHelper implements AdapterView.OnItemClickListener, View.On
         }
         if (keyCode == KeyEvent.KEYCODE_CAMERA &&
                 event.isLongPress()) {
-            this.mExlayout.finishActionMode();
+            if (this.mExlayout != null) {
+                this.mExlayout.finishActionMode();
+            }
             dismiss();
             Intent intent = new Intent(Intent.ACTION_CAMERA_BUTTON, null);
             intent.putExtra(Intent.EXTRA_KEY_EVENT, event);
