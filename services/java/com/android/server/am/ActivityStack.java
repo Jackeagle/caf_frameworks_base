@@ -2258,6 +2258,12 @@ final class ActivityStack {
                             Slog.i(TAG, "Removing and adding activity " + p + " to stack at "
                                     + lastReparentPos, here);
                         }
+                        if (target.info.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP
+                                && (target.intent.getFlags()
+                                & Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET) != 0) {
+                            target.intent.setFlags(target.intent.getFlags()
+                                    & ~Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+                        }
                         mHistory.remove(srcPos);
                         p.setTask(task, null, false);
                         mHistory.add(lastReparentPos, p);
