@@ -18,13 +18,13 @@
  */
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-        package="com.android.phone">
+        package="com.android.smspush">
 
     <permission android:name="com.android.smspush.WAPPUSH_MANAGER_BIND"
         android:protectionLevel="signatureOrSystem" />
 
-    <original-package android:name="com.android.phone" />
-    <application>
+    <original-package android:name="com.android.smspush" />
+    <application android:process="com.android.phone">
         <service android:name=".WapPushManager"
             android:permission="com.android.smspush.WAPPUSH_MANAGER_BIND"
             android:exported="true">
