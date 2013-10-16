@@ -866,8 +866,6 @@ public class GpsLocationProvider implements LocationProviderInterface {
                     if (startMode == AGPS_START_MODE_COLD) {
                         bundle.putBoolean("all", true);
                     } else if (startMode == AGPS_START_MODE_WARM) {
-                        bundle.putBoolean("almanac", true);
-                    } else if (startMode == AGPS_START_MODE_HOT) {
                         bundle.putBoolean("ephemeris", true);
                     }
                     sendExtraCommand("delete_aiding_data", bundle);
