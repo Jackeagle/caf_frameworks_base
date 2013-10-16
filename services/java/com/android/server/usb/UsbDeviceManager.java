@@ -451,6 +451,7 @@ public class UsbDeviceManager {
 
             // Filter all extra functions
             final String mExtraFunctions = SystemProperties.get("persist.sys.usb.config.extra");
+            final String isUserRelease = SystemProperties.get("ro.debuggable");
 
             if (!mExtraFunctions.equals("")) {
                 functions = removeFunction(functions, mExtraFunctions);
@@ -460,7 +461,10 @@ public class UsbDeviceManager {
             if (mAdbEnabled) {
                 functions = removeFunction(functions, UsbManager.USB_FUNCTION_ADB);
             }
-
+            // For User Release version, sys.usb.config is always "none" as default.
+            if ("0".equals(isUserRelease)) {
+                return ("none".equals(functions) || functions.split(",").length > 1);
+            }
             return (!"none".equals(functions) && functions.split(",").length > 1);
         }
 
