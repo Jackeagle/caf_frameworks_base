@@ -447,6 +447,9 @@ public class NetworkController extends BroadcastReceiver {
         } else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
             refreshLocale();
             refreshViews();
+        } else if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
+            updateNetworkName(false, null, false, null);
+            refreshViews();
         } else if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
             refreshLocale();
             updateAirplaneMode();
