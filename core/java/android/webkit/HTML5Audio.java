@@ -266,6 +266,7 @@ class HTML5Audio extends Handler
             if (mState != ERROR && mMediaPlayer.isPlaying()) {
                 mMediaPlayer.stop();
                 mState = STOPPED;
+                nativeOnEnded(mNativePointer);
             }
             break;
 
