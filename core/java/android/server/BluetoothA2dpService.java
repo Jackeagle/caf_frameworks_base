@@ -83,6 +83,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private final WakeLock mWakeLock;
 
     private static final int MSG_CONNECTION_STATE_CHANGED = 0;
+    private boolean mIsMusicAppPlaying = false;
 
     /* AVRCP1.3 Metadata variables */
     private String mTrackName = DEFAULT_METADATA_STRING;
@@ -398,45 +399,8 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
                     sendEvent(path, EVENT_TRACK_CHANGED, Long.valueOf(mMediaNumber));
                 }
             } else if (action.equals(PLAYSTATE_CHANGED)) {
-                String currentTrackName = intent.getStringExtra("track");
-                if ((currentTrackName != null) && (!currentTrackName.equals(mTrackName))) {
-                    mTrackName = currentTrackName;
-                    mArtistName = intent.getStringExtra("artist");
-                    mAlbumName = intent.getStringExtra("album");
-                    if (mTrackName == null)
-                        mTrackName = DEFAULT_METADATA_STRING;
-                    if (mArtistName == null)
-                        mArtistName = DEFAULT_METADATA_STRING;
-                    if (mAlbumName == null)
-                        mAlbumName = DEFAULT_METADATA_STRING;
-                    long extra = intent.getLongExtra("id", 0);
-                    if (extra < 0)
-                        extra = 0;
-                    mMediaNumber = String.valueOf(extra);
-                    extra = intent.getLongExtra("ListSize", 0);;
-                    if (extra < 0)
-                        extra = 0;
-                    mMediaCount = String.valueOf(extra);
-                    extra = intent.getLongExtra("duration", 0);
-                    if (extra < 0)
-                        extra = 0;
-                    mDuration = String.valueOf(extra);
-                    extra = intent.getLongExtra("position", 0);
-                    if (extra < 0)
-                        extra = 0;
-                    mPosition = extra;
-                    for (String path: getConnectedSinksPaths())
-                        sendMetaData(path);
-                }
-                boolean playStatus = intent.getBooleanExtra("playing", false);
-                mPosition = intent.getLongExtra("position", 0);
-                if (mPosition < 0)
-                    mPosition = 0;
-                mPlayStatus = convertedPlayStatus(playStatus, mPosition);
-                if(DBG) Log.d(TAG, "PlayState changed "+ mPlayStatus);
-                for (String path: getConnectedSinksPaths()) {
-                    sendEvent(path, EVENT_PLAYSTATUS_CHANGED, (long)mPlayStatus);
-                }
+                mIsMusicAppPlaying = intent.getBooleanExtra("playing", false);
+                Log.d(TAG, "PlayState Changed Received - Music App PlayStatus:"+mIsMusicAppPlaying);
             } else if (action.equals(PLAYSTATUS_RESPONSE)) {
                 if(DBG) Log.d(TAG, "Received PLAYSTATUS_RESPONSE");
                 long extra = intent.getLongExtra("duration", 0);
@@ -668,8 +632,12 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
     private void onGetPlayStatusRequest(String path) {
         if(DBG) Log.d(TAG, "onGetPlayStatusRequest"+path);
         mPlayStatusRequestPath = path;
+        int playStatus = mPlayStatus;
         log("onGetPlayStatus Request position is " + mPosition);
-        if (mPlayStatus == STATUS_PLAYING) {
+        if ((mIsMusicAppPlaying == false) && (mPlayStatus == STATUS_PLAYING)) {
+            log("Music Player is not playing update proper status");
+            playStatus = STATUS_PAUSED;
+        } else if (mPlayStatus == STATUS_PLAYING) {
             long curTime = System.currentTimeMillis();
             long timeElapsed = curTime - mReportTime;
             log("TimeElapsed is " + timeElapsed);
@@ -677,7 +645,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
             mReportTime = curTime;
         }
         log("Updated position " + mPosition);
-        sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, mPlayStatus);
+        sendPlayStatusNative(path, (int)Integer.valueOf(mDuration), (int)mPosition, playStatus);
     }
 
     private void onListPlayerAttributeRequest(String path) {
@@ -829,6 +797,7 @@ public class BluetoothA2dpService extends IBluetoothA2dp.Stub {
         mIntentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         mIntentFilter.addAction(AudioManager.VOLUME_CHANGED_ACTION);
         mIntentFilter.addAction(ACTION_METADATA_CHANGED);
+        mIntentFilter.addAction(PLAYSTATE_CHANGED);
         mIntentFilter.addAction(PLAYERSETTINGS_RESPONSE);
         mContext.registerReceiver(mReceiver, mIntentFilter);
 
