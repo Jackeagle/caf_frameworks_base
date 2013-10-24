@@ -31,6 +31,24 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <!-- Ringtone Volume,its value is from 0 to 7,default value is 5 -->
     <integer name="def_ringtone_volume" translatable="false">5</integer>
 
+    <!-- Music Volume,its value is from 0 to 15,default value is 11  -->
+    <integer name="def_music_volume" translatable="false">11</integer>
+
+    <!-- System Volume,its value is from 0 to 7,default value is 7  -->
+    <integer name="def_system_volume" translatable="false">7</integer>
+
+    <!-- Voice Call Volume,its value is from 0 to 5,default value is 4  -->
+    <integer name="def_voice_call_volume" translatable="false">4</integer>
+
+    <!-- Alarm Volume,its value is from 0 to 7,default value is 6  -->
+    <integer name="def_alarm_volume" translatable="false">6</integer>
+
+    <!-- Notification Volume,its value is from 0 to 7,default value is 5  -->
+    <integer name="def_notification_volume" translatable="false">5</integer>
+
+    <!-- Bluetooth sco Volume,its value is from 0 to 15,default value is 7  -->
+    <integer name="def_bluetooth_sco_volume" translatable="false">7</integer>
+
     <!-- Time format,default vlaue is 24 : 24 format,other value is 12 format -->
     <string name="def_time_format" translatable="false">24</string>
 

@@ -1851,25 +1851,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     + " VALUES(?,?);");
 
             loadSetting(stmt, Settings.System.VOLUME_MUSIC,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_MUSIC]);
+                    mContext.getResources().getInteger(R.integer.def_music_volume));
             loadSetting(stmt, Settings.System.VOLUME_RING,
                     mContext.getResources().getInteger(R.integer.def_ringtone_volume));
             loadSetting(stmt, Settings.System.VOLUME_SYSTEM,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_SYSTEM]);
+                    mContext.getResources().getInteger(R.integer.def_system_volume));
             loadSetting(
                     stmt,
                     Settings.System.VOLUME_VOICE,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_VOICE_CALL]);
+                    mContext.getResources().getInteger(R.integer.def_voice_call_volume));
             loadSetting(stmt, Settings.System.VOLUME_ALARM,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_ALARM]);
+                    mContext.getResources().getInteger(R.integer.def_alarm_volume));
             loadSetting(
                     stmt,
                     Settings.System.VOLUME_NOTIFICATION,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_NOTIFICATION]);
+                    mContext.getResources().getInteger(R.integer.def_notification_volume));
             loadSetting(
                     stmt,
                     Settings.System.VOLUME_BLUETOOTH_SCO,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_BLUETOOTH_SCO]);
+                    mContext.getResources().getInteger(R.integer.def_bluetooth_sco_volume));
 
             // By default:
             // - ringtones, notification, system and music streams are affected by ringer mode
