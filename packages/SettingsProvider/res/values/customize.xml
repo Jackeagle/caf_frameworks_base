@@ -36,4 +36,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <!-- Date format,yyyy-MM-dd: 2013/07/30; MM-dd-yyyy:07/30/2013; dd-MM-yyyy:30/07/2013 -->
     <string name="def_date_format" translatable="false">MM-dd-yyyy</string>
+
+    <!-- Default Input Method, its value is from inputmethod's package name and main class name
+              such as "com.android.inputmethod.pinyin/.PinyinIME" -->
+    <string name="def_input_method" translatable="false"></string>
 </resources>
