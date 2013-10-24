@@ -2157,6 +2157,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 loadStringSetting( stmt, Settings.Secure.DEFAULT_INPUT_METHOD,
                         R.string.def_input_method);
             }
+
+            if (!TextUtils.isEmpty(mContext.getResources().getString(R.string.def_enable_input_methods))) {
+                loadStringSetting( stmt, Settings.Secure.ENABLED_INPUT_METHODS,
+                        R.string.def_enable_input_methods);
+            }
+
         } finally {
             if (stmt != null) stmt.close();
         }
