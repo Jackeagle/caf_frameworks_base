@@ -406,8 +406,8 @@ public class MediaScanner
                 SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.RINGTONE));
         mDefaultNotificationFilename = SystemProperties.get("persist.env.sys.notification",
                 SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.NOTIFICATION_SOUND));
-        mDefaultAlarmAlertFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
-                + Settings.System.ALARM_ALERT);
+        mDefaultAlarmAlertFilename = SystemProperties.get("persist.env.sys.alarm",
+                SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.ALARM_ALERT));
     }
 
     private final MyMediaScannerClient mClient = new MyMediaScannerClient();
