@@ -62,6 +62,8 @@ public class PowerUI extends SystemUI {
     AlertDialog mLowBatteryDialog;
     TextView mBatteryLevelTextView;
 
+    long mLowBatteryAutoDismissTime = 0;
+
     public void start() {
 
         mLowBatteryAlertCloseLevel = mContext.getResources().getInteger(
@@ -152,6 +154,13 @@ public class PowerUI extends SystemUI {
                         && (bucket < oldBucket || oldPlugged)
                         && mBatteryStatus != BatteryManager.BATTERY_STATUS_UNKNOWN
                         && bucket < 0) {
+                    if (mBatteryLevelTextView == null) {
+                        long timePast = System.currentTimeMillis() - mLowBatteryAutoDismissTime;
+                        if (timePast > 0 && timePast < 1000) {
+                            Slog.w(TAG, "Ignore the second dialog when it pops up too frequently");
+                            return;
+                        }
+                    }
                     showLowBatteryWarning();
 
                     // only play SFX when the dialog comes up or the bucket changes
@@ -160,6 +169,7 @@ public class PowerUI extends SystemUI {
                     }
                 } else if (plugged || (bucket > oldBucket && bucket > 0)) {
                     dismissLowBatteryWarning();
+                    mLowBatteryAutoDismissTime = System.currentTimeMillis();
                 } else if (mBatteryLevelTextView != null) {
                     showLowBatteryWarning();
                 }

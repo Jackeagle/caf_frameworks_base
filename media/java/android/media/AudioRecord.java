@@ -24,6 +24,10 @@ import java.lang.IllegalArgumentException;
 import java.lang.IllegalStateException;
 import java.nio.ByteBuffer;
 
+import android.app.ActivityThread;
+import android.app.AppOpsManager;
+import android.content.Context;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -532,6 +536,18 @@ public class AudioRecord
     public int getAudioSessionId() {
         return mSessionId;
     }
+    private boolean isOpsAllowed()
+    {
+        AppOpsManager appOps = (AppOpsManager) ActivityThread.currentApplication().
+            getSystemService(Context.APP_OPS_SERVICE);
+        int callingUid = Binder.getCallingUid();
+        String callingPackage= ActivityThread.currentPackageName();
+        if (appOps.noteOp(AppOpsManager.OP_RECORD_AUDIO, callingUid, callingPackage) ==
+            AppOpsManager.MODE_ALLOWED)
+            return true;
+        else
+            return false;
+    }
 
     //---------------------------------------------------------
     // Transport control methods
@@ -547,6 +563,8 @@ public class AudioRecord
                     +"uninitialized AudioRecord."));
         }
 
+        if (!isOpsAllowed())
+            return;
         // start recording
         synchronized(mRecordingStateLock) {
             if (native_start(MediaSyncEvent.SYNC_EVENT_NONE, 0) == SUCCESS) {
@@ -568,6 +586,8 @@ public class AudioRecord
             throw(new IllegalStateException("startRecording() called on an "
                     +"uninitialized AudioRecord."));
         }
+        if (!isOpsAllowed())
+            return;
 
         // start recording
         synchronized(mRecordingStateLock) {

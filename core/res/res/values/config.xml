@@ -1160,4 +1160,78 @@
     <!-- Button back light brightness friendly time break. -->
     <integer name="def_button_light_timeout">4000</integer>
     <bool name="def_button_light_enabled">false</bool>
+
+    <array name="sim_icons">
+        <item>@drawable/ic_sim_icon_1</item>
+        <item>@drawable/ic_sim_icon_2</item>
+        <item>@drawable/ic_sim_icon_c</item>
+        <item>@drawable/ic_sim_icon_g</item>
+        <item>@drawable/ic_sim_icon_w</item>
+        <item>@null</item>
+   </array>
+
+    <string-array translateable="false" name="origin_carrier_names">
+        <item>CHINA\u0020\u0020MOBILE</item>
+        <item>CHN-UNICOM</item>
+        <item>China Mobile</item>
+        <item>China Unicom</item>
+        <item>China Telecom</item>
+        <item>中国移动</item>
+        <item>中国联通</item>
+        <item>中国电信</item>
+        <item>Searching for Service</item>
+    </string-array>
+
+    <string-array translatable="false" name="locale_carrier_names">
+        <item>China_Mobile</item>
+        <item>China_Unicom</item>
+        <item>China_Mobile</item>
+        <item>China_Unicom</item>
+        <item>China_Telecom</item>
+        <item>China_Mobile</item>
+        <item>China_Unicom</item>
+        <item>China_Telecom</item>
+        <item>roamingTextSearching</item>
+    </string-array>
+
+    <!-- User display names for app ops codes -->
+    <string-array name="app_ops_labels">
+        <item>Trying to access location</item>
+        <item>Trying to access location</item>
+        <item>Trying to access location</item>
+        <item>Trying to use vibrate</item>
+        <item>Trying to read contacts</item>
+        <item>Trying to modify contacts</item>
+        <item>Trying to read call log</item>
+        <item>Trying to modify call log</item>
+        <item>Trying to read calendar</item>
+        <item>Trying to modify calendar</item>
+        <item>Trying to access location</item>
+        <item>Trying to post notification</item>
+        <item>Trying to access location</item>
+        <item>Trying to make phone call</item>
+        <item>Trying to read SMS</item>
+        <item>Trying to write/modify SMS</item>
+        <item>Trying to receive SMS</item>
+        <item>Trying to receive SMS</item>
+        <item>Trying to receive MMS</item>
+        <item>Trying to receive SMS</item>
+        <item>Trying to send SMS</item>
+        <item>Trying to read SMS</item>
+        <item>Trying to write/modify SMS</item>
+        <item>Trying to modify settings</item>
+        <item>Trying to draw on top</item>
+        <item>Trying to access notifications</item>
+        <item>Trying to access Camera</item>
+        <item>Trying to record audio</item>
+        <item>Trying to play audio</item>
+        <item>Trying to read clipboard</item>
+        <item>Trying to modify clipboard</item>
+        <item>Trying to turn on/off Wifi</item>
+        <item>Trying to turn on/off bluetooth</item>
+        <item>Trying to turn on/off mobile data</item>
+        <item>Trying to send MMS</item>
+        <item>Trying to read MMS</item>
+        <item>Trying to write MMS</item>
+    </string-array>
 </resources>

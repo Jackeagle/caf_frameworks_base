@@ -100,6 +100,7 @@ import java.util.regex.Pattern;
  */
 public class WifiStateMachine extends StateMachine {
 
+    private static final String PROP_AUTOCON = "persist.env.sys.wifi.autocon";
     private static final String TAG = "WifiStateMachine";
     private static final String NETWORKTYPE = "WIFI";
     private static final boolean DBG = false;
@@ -543,6 +544,9 @@ public class WifiStateMachine extends StateMachine {
 
     private final IBatteryStats mBatteryStats;
 
+    private static final int WIFI_AUTO_CONNECT_TYPE_AUTO = 0;
+    private static final int DATA_WIFI_CONNECT_TYPE_AUTO = 0;
+
     public WifiStateMachine(Context context, String wlanInterface) {
         super("WifiStateMachine");
 
@@ -730,8 +734,12 @@ public class WifiStateMachine extends StateMachine {
                          if (currentChannel >= 0 &&
                             (currentChannel < startSafeChannel ||
                              currentChannel > endSafeChannel)) {
-                             Log.e(TAG, "Operating on restricted channel! Restart SAP");
-                             restartSoftApIfOn();
+                             //currently RIL passes only 2.4G channels so if the current operating
+                             // channel is 5G channel, do not restart SAP.
+                             if (currentChannel >= 1 &&  currentChannel <=14) {
+                                 Log.e(TAG, "Operating on restricted channel! Restart SAP");
+                                 restartSoftApIfOn();
+                             }
                          }
                      }
                  }
@@ -1767,6 +1775,14 @@ public class WifiStateMachine extends StateMachine {
     private void handleNetworkDisconnect() {
         if (DBG) log("Stopping DHCP and clearing IP");
 
+        // set wifi connection type is manually.
+        // if connect a hotspot manually, the status of this ap is enbale.
+        // and then if close the hotspot, should disable it, in case device auto
+        // connect this ap when open this hotspot.
+        if (SystemProperties.getBoolean(PROP_AUTOCON, false) && !shouldAutoConnect()) {
+            disableLastNetwork();
+        }
+
         stopDhcp();
 
         try {
@@ -2270,6 +2286,13 @@ public class WifiStateMachine extends StateMachine {
                     mWifiInfo.setMacAddress(mWifiNative.getMacAddress());
                     mWifiConfigStore.loadAndEnableAllNetworks();
                     initializeWpsDetails();
+
+                    // if don't set auto connect wifi, should disable all
+                    // wifi ap to prevent wifi connect automatically when open
+                    // wifi switch.
+                    if (SystemProperties.getBoolean(PROP_AUTOCON, false) && !shouldAutoConnect()) {
+                        mWifiConfigStore.disableAllNetworks();
+                    }
 
                     sendSupplicantConnectionChangedBroadcast(true);
                     transitionTo(mDriverStartedState);
@@ -3246,6 +3269,7 @@ public class WifiStateMachine extends StateMachine {
     class VerifyingLinkState extends State {
         @Override
         public void enter() {
+            log(getName() + " enter");
             setNetworkDetailedState(DetailedState.VERIFYING_POOR_LINK);
             mWifiConfigStore.updateStatus(mLastNetworkId, DetailedState.VERIFYING_POOR_LINK);
             sendNetworkStateChangeBroadcast(mLastBssid);
@@ -3255,11 +3279,14 @@ public class WifiStateMachine extends StateMachine {
             switch (message.what) {
                 case WifiWatchdogStateMachine.POOR_LINK_DETECTED:
                     //stay here
+                    log(getName() + " POOR_LINK_DETECTED: no transition");
                     break;
                 case WifiWatchdogStateMachine.GOOD_LINK_DETECTED:
+                    log(getName() + " GOOD_LINK_DETECTED: transition to captive portal check");
                     transitionTo(mCaptivePortalCheckState);
                     break;
                 default:
+                    log(getName() + " what=" + message.what + " NOT_HANDLED");
                     return NOT_HANDLED;
             }
             return HANDLED;
@@ -3269,6 +3296,7 @@ public class WifiStateMachine extends StateMachine {
     class CaptivePortalCheckState extends State {
         @Override
         public void enter() {
+            log(getName() + " enter");
             setNetworkDetailedState(DetailedState.CAPTIVE_PORTAL_CHECK);
             mWifiConfigStore.updateStatus(mLastNetworkId, DetailedState.CAPTIVE_PORTAL_CHECK);
             sendNetworkStateChangeBroadcast(mLastBssid);
@@ -3277,6 +3305,7 @@ public class WifiStateMachine extends StateMachine {
         public boolean processMessage(Message message) {
             switch (message.what) {
                 case CMD_CAPTIVE_CHECK_COMPLETE:
+                    log(getName() + " CMD_CAPTIVE_CHECK_COMPLETE");
                     try {
                         mNwService.enableIpv6(mInterfaceName);
                     } catch (RemoteException re) {
@@ -3877,4 +3906,45 @@ public class WifiStateMachine extends StateMachine {
         setHostApRunning(null, true);
         Log.e(TAG, "Restart softap Done");
     }
+
+    boolean shouldAutoConnect() {
+        ConnectivityManager cm = (ConnectivityManager) mContext
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if (null == info) {
+            Log.d(TAG, "No active network");
+        } else {
+            Log.d(TAG, "Active network type:" + info.getTypeName());
+        }
+
+        int autoConnectPolicy = Settings.System
+                .getInt(mContext.getContentResolver(), Settings.System.WIFI_AUTO_CONNECT_TYPE,
+                        WIFI_AUTO_CONNECT_TYPE_AUTO);
+        int dataToWiFiPolicy = Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.DATA_WIFI_CONNECT_TYPE, DATA_WIFI_CONNECT_TYPE_AUTO);
+
+        // If no active network(info == null) and wifi connection type is auto
+        // connect, auto connect to wifi;
+        // If the active network type is mobile, wifi connection type is auto
+        // connect and GSM to WLAN connection type is auto connect,
+        // auto connect to wifi.
+        if (autoConnectPolicy == WIFI_AUTO_CONNECT_TYPE_AUTO
+                && (info == null || (info != null && info.getType()
+                            == ConnectivityManager.TYPE_MOBILE && dataToWiFiPolicy
+                    == DATA_WIFI_CONNECT_TYPE_AUTO))) {
+            Log.d(TAG, "Should auto connect");
+            return true;
+        } else {
+            Log.d(TAG, "Shouldn't auto connect");
+            return false;
+        }
+    }
+
+    void disableLastNetwork() {
+        if (getCurrentState() != mSupplicantStoppingState) {
+            mWifiConfigStore.disableNetwork(mLastNetworkId,
+                    WifiConfiguration.DISABLED_UNKNOWN_REASON);
+        }
+    }
+
 }

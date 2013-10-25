@@ -354,12 +354,16 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                          if (currentChannel >= 0 &&
                               (currentChannel < startSafeChannel ||
                                currentChannel > endSafeChannel)) {
-                               Slog.d(TAG, "P2P GO is operating on unsafe channel! Terminate!");
-                               mP2pStateMachine.mWifiNative.p2pGroupRemove(
+                               //currently RIL passes only 2.4G channels so if the current operating
+                               //channel is 5G channel, do not restart P2P GO.
+                               if (currentChannel >= 1 && currentChannel <=14) {
+                                  Slog.d(TAG, "P2P GO is operating on unsafe channel! Terminate!");
+                                  mP2pStateMachine.mWifiNative.p2pGroupRemove(
                                              mP2pStateMachine.mGroup.getInterface());
-                               if (mAutonomousGroup)
-                                   mP2pStateMachine.mWifiNative.p2pGroupAddOnSpecifiedFreq(
+                                  if (mAutonomousGroup)
+                                      mP2pStateMachine.mWifiNative.p2pGroupAddOnSpecifiedFreq(
                                                        channelToFrequency(startSafeChannel));
+                               }
                           }
 
                      }
@@ -990,8 +994,10 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     break;
                 case WifiP2pManager.DISCOVER_PEERS:
                     if (mDiscoveryBlocked) {
-                        replyToMessage(message, WifiP2pManager.DISCOVER_PEERS_FAILED,
-                                WifiP2pManager.BUSY);
+                        /* do not send discovery failure to apps.
+                         since discovery is postponed and not failed */
+                        mDiscoveryPostponed = true;
+                        logi("P2P_FIND is deffered");
                         break;
                     }
                     // do not send service discovery request while normal find operation.
@@ -1786,6 +1792,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                     if (DBG) logd(getName() + " remove group");
                     if (mWifiNative.p2pGroupRemove(mGroup.getInterface())) {
                         transitionTo(mOngoingGroupRemovalState);
+                        mWifiNative.p2pFlush();
                         replyToMessage(message, WifiP2pManager.REMOVE_GROUP_SUCCEEDED);
                     } else {
                         handleGroupRemoved();
@@ -1888,7 +1895,6 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                                     mSavedPeerConfig.deviceAddress, false)) {
                                 // not found the client on the list
                                 loge("Already removed the client, ignore");
-                                break;
                             }
                             // try invitation.
                             sendMessage(WifiP2pManager.CONNECT, mSavedPeerConfig);

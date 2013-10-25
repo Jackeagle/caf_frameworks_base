@@ -200,7 +200,9 @@ public class UsbDeviceManager {
         final StorageManager storageManager = StorageManager.from(mContext);
         final StorageVolume primary = storageManager.getPrimaryVolume();
         massStorageSupported = primary != null && primary.allowMassStorage();
-        mUseUsbNotification = !massStorageSupported;
+        // force to show UsbSettings screen to select usb mode if property it true
+        mUseUsbNotification = !massStorageSupported
+                || SystemProperties.getBoolean("persist.env.settings.multiusb", true);
 
         // make sure the ADB_ENABLED setting value matches the current state
         Settings.Global.putInt(mContentResolver, Settings.Global.ADB_ENABLED, mAdbEnabled ? 1 : 0);
@@ -437,8 +439,7 @@ public class UsbDeviceManager {
                     .equals(new UsbManager(null, null).getDefaultFunction())
                 && !storageManager.isUsbMassStorageEnabled()) {
                 storageManager.enableUsbMassStorage();
-            } else if ((!connected || (connected && isInChargingMode()))
-                && storageManager.isUsbMassStorageEnabled()) {
+            } else if (storageManager.isUsbMassStorageEnabled()) {
                 storageManager.disableUsbMassStorage();
             }
         }

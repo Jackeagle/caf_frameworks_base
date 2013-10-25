@@ -1287,6 +1287,10 @@ final class ActivityStack {
         ActivityRecord r;
         boolean behindFullscreen = false;
         for (; i>=0; i--) {
+            // To make sure index is valid as there might be the case when size of
+            // the history stack gets decremented within this for loop.
+            if (i >= mHistory.size())
+                continue;
             r = mHistory.get(i);
             if (DEBUG_VISBILITY) Slog.v(
                     TAG, "Make visible? " + r + " finishing=" + r.finishing
@@ -2253,6 +2257,12 @@ final class ActivityStack {
                             here.fillInStackTrace();
                             Slog.i(TAG, "Removing and adding activity " + p + " to stack at "
                                     + lastReparentPos, here);
+                        }
+                        if (target.info.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP
+                                && (target.intent.getFlags()
+                                & Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET) != 0) {
+                            target.intent.setFlags(target.intent.getFlags()
+                                    & ~Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
                         }
                         mHistory.remove(srcPos);
                         p.setTask(task, null, false);

@@ -316,11 +316,17 @@ public class UsbStorageActivity extends Activity
 
     public void onClick(View v) {
         if (v == mMountButton) {
-           // Check for list of storage users and display dialog if needed.
-            checkStorageUsers();
+            // wait for umount operation was done, otherwise drop this click.
+            if (mStorageManager.isUsbMassStorageEnabled() == false) {
+                // Check for list of storage users and display dialog if needed.
+                checkStorageUsers();
+            }
         } else if (v == mUnmountButton) {
-            if (localLOGV) Log.i(TAG, "Disabling UMS");
-            switchUsbMassStorage(false);
+            // wait for mount operation was done, otherwise drop this click.
+            if (mStorageManager.isUsbMassStorageEnabled() == true) {
+                if (localLOGV) Log.i(TAG, "Disabling UMS");
+                switchUsbMassStorage(false);
+            }
         }
     }
 

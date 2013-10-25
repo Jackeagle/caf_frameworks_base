@@ -344,7 +344,7 @@ public class LockSettingsService extends ILockSettings.Stub {
     private void writeFile(String name, byte[] hash) {
         try {
             // Write the hash to file
-            RandomAccessFile raf = new RandomAccessFile(name, "rw");
+            RandomAccessFile raf = new RandomAccessFile(name, "rws");
             // Truncate the file if pattern is null, to clear the lock
             if (hash == null || hash.length == 0) {
                 raf.setLength(0);

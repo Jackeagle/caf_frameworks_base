@@ -70,7 +70,7 @@ interface IConnectivityManager
     boolean requestRouteToHostAddress(int networkType, in byte[] hostAddress);
 
     boolean getMobileDataEnabled();
-    void setMobileDataEnabled(boolean enabled);
+    void setMobileDataEnabled(String callingPackage, boolean enabled);
 
     /** Policy control over specific {@link NetworkStateTracker}. */
     void setPolicyDataEnable(int networkType, boolean enabled);
@@ -129,6 +129,8 @@ interface IConnectivityManager
 
     void captivePortalCheckComplete(in NetworkInfo info);
 
+    void captivePortalCheckCompleted(in NetworkInfo info, boolean isCaptivePortal);
+
     void supplyMessenger(int networkType, in Messenger messenger);
 
     int findConnectionTypeForIface(in String iface);
@@ -136,4 +138,6 @@ interface IConnectivityManager
     int checkMobileProvisioning(boolean sendNotification, int suggestedTimeOutMs, in ResultReceiver resultReceiver);
 
     String getMobileProvisioningUrl();
+
+    String getMobileRedirectedProvisioningUrl();
 }

@@ -15,8 +15,15 @@
 # Warning: this is actually a product definition, to be inherited from
 
 PRODUCT_COPY_FILES := \
-    frameworks/base/data/fonts/system_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/system_fonts.xml \
+    frameworks/base/data/fonts/system_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/system_fonts.xml 
+ifeq ($(MULTI_LANG_ENGINE),REVERIE)
+PRODUCT_COPY_FILES += \
+      $(PRODUCT_RENDERING_ENGINE_PATH)/$(PRODUCT_RENDERING_ENGINE_FONTS_XML):$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
+else
+PRODUCT_COPY_FILES += \
     frameworks/base/data/fonts/fallback_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
+endif
+
 
 PRODUCT_PACKAGES := \
     DroidSansFallback.ttf \
@@ -34,7 +41,6 @@ PRODUCT_PACKAGES := \
     RobotoCondensed-BoldItalic.ttf \
     DroidNaskh-Regular.ttf \
     DroidNaskhUI-Regular.ttf \
-    DroidSansDevanagari-Regular.ttf \
     DroidSansHebrew-Regular.ttf \
     DroidSansHebrew-Bold.ttf \
     DroidSansThai.ttf \
@@ -50,3 +56,13 @@ PRODUCT_PACKAGES := \
     AndroidClock.ttf \
     AndroidClock_Highlight.ttf \
     AndroidClock_Solid.ttf \
+
+
+ifeq ($(MULTI_LANG_ENGINE),REVERIE)
+PRODUCT_PACKAGES += \
+    $(PRODUCT_RENDERING_ENGINE_TTF_FILES)
+
+else
+PRODUCT_PACKAGES += \
+    DroidSansDevanagari-Regular.ttf
+endif
