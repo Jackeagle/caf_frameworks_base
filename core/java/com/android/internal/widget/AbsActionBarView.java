@@ -77,6 +77,13 @@ public abstract class AbsActionBarView extends ViewGroup {
         }
     }
 
+    public void updateContentHeight() {
+        TypedArray a = getContext().obtainStyledAttributes(null, R.styleable.ActionBar,
+                com.android.internal.R.attr.actionBarStyle, 0);
+        setContentHeight(a.getLayoutDimension(R.styleable.ActionBar_height, 0));
+        a.recycle();
+    }
+
     /**
      * Sets whether the bar should be split right now, no questions asked.
      * @param split true if the bar should split

@@ -206,6 +206,8 @@ public class ActionBarImpl extends ActionBar {
     }
 
     public void onConfigurationChanged(Configuration newConfig) {
+        mActionView.updateContentHeight();
+        mContextView.updateContentHeight();
         setHasEmbeddedTabs(ActionBarPolicy.get(mContext).hasEmbeddedTabs());
     }
 
