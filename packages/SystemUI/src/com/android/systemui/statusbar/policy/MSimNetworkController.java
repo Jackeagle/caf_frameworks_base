@@ -282,7 +282,7 @@ public class MSimNetworkController extends NetworkController {
     public void refreshSignalCluster(MSimSignalCluster cluster, int subscription) {
         cluster.setWifiIndicators(
                 // only show wifi in the cluster if connected or if wifi-only
-                mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature),
+                mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature || mAppopsStrictEnabled),
                 mWifiIconId,
                 mWifiActivityIconId,
                 mContentDescriptionWifi);
@@ -812,6 +812,7 @@ public class MSimNetworkController extends NetworkController {
                             // fall through
                         }
                     case TelephonyManager.NETWORK_TYPE_UMTS:
+                    case TelephonyManager.NETWORK_TYPE_TD_SCDMA:
                         mDataIconList = TelephonyIcons.DATA_3G[mInetCondition];
                         mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_connected_3g;
                         mMSimQSDataTypeIconId[subscription] = R.drawable.ic_qs_signal_3g;
@@ -1047,13 +1048,16 @@ public class MSimNetworkController extends NetworkController {
                     + " showPlmn=" + showPlmn + " plmn=" + plmn);
         }
 
-        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
+        if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, true)) {
             String networkName = mContext.getLocalString(
                 mPhone.getNetworkOperatorName(subscription),
                 ORIGIN_CARRIER_NAME_ID,
                 LOCALE_CARRIER_NAME_ID);
             mMSimNetworkName[subscription] =
                     TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            Slog.d(TAG, "SPN name is not displayed");
+            Slog.d(TAG, "Sub " + subscription
+                    + " networkName: " + mMSimNetworkName[subscription]);
             return;
         }
 
@@ -1388,6 +1392,9 @@ public class MSimNetworkController extends NetworkController {
                         mIsRoaming[subscription],
                         mMSimDataConnected[subscription]);
                 cluster.setIsAirplaneMode(mAirplaneMode,mAirplaneIconId);
+            }
+            for (NetworkSignalChangedCallback cb : mSignalsChangedCallbacks) {
+                notifySignalsChangedCallbacks(cb);
             }
             for (NetworkSignalChangedCallback cb : mSignalsChangedCallbacks) {
                 notifySignalsChangedCallbacks(cb);

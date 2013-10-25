@@ -2718,14 +2718,22 @@ public class Editor {
                     // way to assign them a valid range after replacement
                     if (suggestionSpansStarts[i] <= spanStart &&
                             suggestionSpansEnds[i] >= spanEnd) {
+                        // When the SpansEnd beyond the length of mTextView here should avoid it.
+                        int nTextLen = mTextView.getText().length();
+                        int spansEnd = suggestionSpansEnds[i] + lengthDifference;
+                        int realSpansEnd = spansEnd > nTextLen ? nTextLen : spansEnd;
                         mTextView.setSpan_internal(suggestionSpans[i], suggestionSpansStarts[i],
-                                suggestionSpansEnds[i] + lengthDifference, suggestionSpansFlags[i]);
+                                realSpansEnd, suggestionSpansFlags[i]);
                     }
                 }
 
                 // Move cursor at the end of the replaced word
                 final int newCursorPosition = spanEnd + lengthDifference;
-                mTextView.setCursorPosition_internal(newCursorPosition, newCursorPosition);
+                // When the SpansEnd beyond the length of mTextView here should avoid it.
+                int textLen = mTextView.getText().length();
+                int realNewCursorPosition = newCursorPosition > textLen ? textLen
+                        : newCursorPosition;
+                mTextView.setCursorPosition_internal(realNewCursorPosition, realNewCursorPosition);
             }
 
             hide();
@@ -2890,6 +2898,14 @@ public class Editor {
             boolean canSuggest = mTextView.isSuggestionsEnabled() && isCursorInsideSuggestionSpan();
             mPasteTextView.setVisibility(canPaste ? View.VISIBLE : View.GONE);
             mReplaceTextView.setVisibility(canSuggest ? View.VISIBLE : View.GONE);
+
+            // Reset the resource to update strings when changing locale
+            if (canPaste) {
+                mPasteTextView.setText(com.android.internal.R.string.paste);
+            }
+            if (canSuggest) {
+                mReplaceTextView.setText(com.android.internal.R.string.replace);
+            }
 
             if (!canPaste && !canSuggest) return;
 

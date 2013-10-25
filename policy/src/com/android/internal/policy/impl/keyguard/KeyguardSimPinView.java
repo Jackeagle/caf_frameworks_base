@@ -136,6 +136,8 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                 | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
 
         mPasswordEntry.requestFocus();
+
+        mSecurityMessageDisplay.setTimeout(0);
     }
 
     @Override

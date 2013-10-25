@@ -382,7 +382,18 @@ public final class ShutdownThread extends Thread {
                 }
             }
         }
-        
+
+        Log.i(TAG, "Shutting down activity manager...");
+
+        final IActivityManager am =
+            ActivityManagerNative.asInterface(ServiceManager.checkService("activity"));
+        if (am != null){
+            try {
+                am.shutdown(MAX_BROADCAST_TIME);
+            } catch (RemoteException e) {
+            }
+        }
+
         String shutDownFile = null;
 
         //showShutdownAnimation() is called from here to sync
@@ -418,17 +429,6 @@ public final class ShutdownThread extends Thread {
         }
         // Shutdown radios.
         shutdownRadios(MAX_RADIO_WAIT_TIME);
-        Log.i(TAG, "Shutting down activity manager...");
-        
-        final IActivityManager am =
-            ActivityManagerNative.asInterface(ServiceManager.checkService("activity"));
-        if (am != null) {
-            try {
-                am.shutdown(MAX_BROADCAST_TIME);
-            } catch (RemoteException e) {
-            }
-        }
-
 
         // Shutdown MountService to ensure media is in a safe state
         IMountShutdownObserver observer = new IMountShutdownObserver.Stub() {

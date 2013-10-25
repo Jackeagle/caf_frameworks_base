@@ -22,6 +22,7 @@ package com.android.server;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.INetworkManagementService;
 import android.os.Messenger;
 import android.os.Message;
@@ -85,8 +86,8 @@ public class PPPOEService {
      * below ACTION and EXTRA definition are the requirement of China Telecom
      * can not be changed
      */
-    public static final String ACTION_PPPOE_COMPLETE = "android.wifi.PPPOE_COMPLETE_ACTION";
-    public static final String ACTION_PPPOE_STATE_CHANGED = "android.wifi.PPPOE_STATE_CHANGED";
+    public static final String ACTION_PPPOE_COMPLETE = "android.net.wifi.PPPOE_COMPLETED_ACTION";
+    public static final String ACTION_PPPOE_STATE_CHANGED = "android.net.wifi.PPPOE_STATE_CHANGED";
 
     public static final String EXTRA_PPPOE_RESULT_STATUS = "pppoe_result_status";
     public static final String EXTRA_PPPOE_RESULT_ERROR_CODE = "pppoe_result_error_code";
@@ -96,7 +97,8 @@ public class PPPOEService {
     public static final String NETD_TAG = "PPPOEService_Netd";
     public static final int PPPOEEXIT = 666;
     public static final String PPPOE_MODULE = "pppoe";
-    public static final String SYSTEM_DNS ="net.dns1";
+    public static final String SYSTEM_DNS1 ="net.dns1";
+    public static final String SYSTEM_DNS2 ="net.dns2";
 
     /**
      * Binder context for this service
@@ -296,23 +298,45 @@ public class PPPOEService {
 
     private void setRouteAndDNS(String iface) {
         //set ppp0 route as default.
-        Log.i(TAG, "setRouteAndDNS iface is " + iface);
+        String gateway = null;
+        INetworkManagementService mNwService;
+        IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+        mNwService = INetworkManagementService.Stub.asInterface(b);
+        try {
+            RouteInfo[] ris = mNwService.getRoutes(iface);
+            for(RouteInfo ri : ris) {
+                if(ri != null) {
+                    gateway = ri.getDestination().getAddress().getHostAddress();
+                    break;
+                }
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "error: " + e);
+        }
+        Log.i(TAG, "setRouteAndDNS iface is " + iface + " gateway is " + gateway);
         try{
-            mConnector.execute(PPPOE_MODULE, "route", "setdefault", iface);
+            mConnector.execute(PPPOE_MODULE, "route", "setdefault", iface, gateway);
         } catch(NativeDaemonConnectorException e) {
             Log.wtf(TAG, "problem set ppp route", e);
         }
 
         //set ppp0 dns.
         String pppDNS1Property = "net." + iface + ".dns1";
-        String pppDns = null;
-        pppDns = SystemProperties.get(pppDNS1Property);
-        Log.i(TAG, "setRouteAndDNS get prop " + pppDNS1Property + " is " + pppDns);
-        if(pppDns != null && !pppDns.isEmpty()) {
-            SystemProperties.set(SYSTEM_DNS, pppDns);
-        } else {
-            SystemProperties.set(SYSTEM_DNS, "8.8.8.8"); //DNS server provided by Google
-        }
-    }
+        String pppDNS2Property = "net." + iface + ".dns2";
+        String pppDns1 = SystemProperties.get(pppDNS1Property);
+        String pppDns2 = SystemProperties.get(pppDNS2Property);
 
+        Log.i(TAG, "setRouteAndDNS get prop " + pppDNS1Property + " is " + pppDns1);
+        Log.i(TAG, "setRouteAndDNS get prop " + pppDNS2Property + " is " + pppDns2);
+
+        try {
+            mNwService.setDnsServersForInterface(iface, new String[] {pppDns1, pppDns2}, null);
+            mNwService.setDefaultInterfaceForDns(iface);
+        } catch (RemoteException e) {
+            Log.e(TAG, "error: " + e);
+        }
+
+        SystemProperties.set(SYSTEM_DNS1, pppDns1);
+        SystemProperties.set(SYSTEM_DNS2, pppDns2);
+    }
 }
