@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2010 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,6 +36,15 @@ import android.provider.Settings;
 import android.util.Slog;
 import android.hardware.usb.UsbManager;
 
+import android.os.storage.StorageVolume;
+import android.provider.Settings;
+import android.util.Slog;
+import android.util.Log;
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+
 public class StorageNotification extends StorageEventListener {
     private static final String TAG = "StorageNotification";
     private static final boolean DEBUG = false;
@@ -62,8 +74,23 @@ public class StorageNotification extends StorageEventListener {
      * <p>
      * This is lazily created, so use {@link #setMediaStorageNotification()}.
      */
+    /*
+     *Now we have two storages, one is internal dedicated FAT32 partition
+     *the other is external SD card.
+     *mMediaStorageNotification for primary storage
+     *mSecondaryStorageNotification for secondary storage
+     */
     private Notification   mMediaStorageNotification;
+    private Notification   mPhoneStorageNotification;
     private boolean        mUmsAvailable;
+    /*
+     *It's very strange. sometimes, the media state change from {nofs} to {unmount}
+     *this will cause the Notification be clear.
+     *Add two flags to avoid the nofs or damaged notification be covered by
+     *{unmount} state
+     */
+    private boolean        mMediaStorageNeedFormat  = false;
+    private boolean        mSecondaryStorageNeedFormat = false;
     private StorageManager mStorageManager;
 
     private Handler        mAsyncEventHandler;
@@ -75,7 +102,7 @@ public class StorageNotification extends StorageEventListener {
         final boolean connected = mStorageManager.isUsbMassStorageConnected();
         if (DEBUG) Slog.d(TAG, String.format( "Startup with UMS connection %s (media state %s)",
                 mUmsAvailable, Environment.getExternalStorageState()));
-        
+
         HandlerThread thr = new HandlerThread("SystemUI StorageNotification");
         thr.start();
         mAsyncEventHandler = new Handler(thr.getLooper());
@@ -130,9 +157,38 @@ public class StorageNotification extends StorageEventListener {
         });
     }
 
+    private boolean isExternalStorageDeviceExist() {
+        final File externalStorageDevice = new File("/dev/block/mmcblk1");
+        return externalStorageDevice.exists();
+    }
+
+    private StorageVolume getStorageVolumebyPath(String path) {
+        StorageVolume[] StorageVolume = mStorageManager.getVolumeList();
+        if (StorageVolume == null)
+            return null;
+
+        int count = StorageVolume.length;
+        for (int i = 0; i < count; i++) {
+            if (StorageVolume[i].getPath().equals(path)){
+                return StorageVolume[i];
+            }
+        }
+        return null;
+    }
+
+    private void updateFormatFlag(boolean isExternalStorage, boolean state) {
+        if (isExternalStorage)
+            mSecondaryStorageNeedFormat = state;
+        else
+            mMediaStorageNeedFormat = state;
+    }
+
     private void onStorageStateChangedAsync(String path, String oldState, String newState) {
         if (DEBUG) Slog.i(TAG, String.format(
                 "Media {%s} state changed from {%s} -> {%s}", path, oldState, newState));
+        StorageVolume volume = getStorageVolumebyPath(path);
+        final boolean isExternalStorage =
+                         !Environment.getExternalStorageDirectory().toString().equals(path);
 
         if (newState.equals(Environment.MEDIA_SHARED)) {
             String usbMode = new UsbManager(null, null).getDefaultFunction();
@@ -150,24 +206,51 @@ public class StorageNotification extends StorageEventListener {
                     com.android.internal.R.string.usb_storage_stop_notification_title,
                     com.android.internal.R.string.usb_storage_stop_notification_message,
                     com.android.internal.R.drawable.stat_sys_warning, false, true, pi);
+            /* Clear Notification when enable UMS */
+            setMediaStorageNotification(isExternalStorage, 0, 0, 0, false, false, null);
         } else if (newState.equals(Environment.MEDIA_CHECKING)) {
+            /*
+             *if MEDIA_UNMOUNTABLE or MEDIA_NOFS before.skip checking Notification here to
+             *avoid the format notification being covered
+             */
+            if ((mMediaStorageNeedFormat && !isExternalStorage)
+                || (isExternalStorage && mSecondaryStorageNeedFormat
+                && isExternalStorageDeviceExist()))
+                 return;
             /*
              * Storage is now checking. Update media notification and disable
              * UMS notification.
              */
-            setMediaStorageNotification(
-                    com.android.internal.R.string.ext_media_checking_notification_title,
-                    com.android.internal.R.string.ext_media_checking_notification_message,
-                    com.android.internal.R.drawable.stat_notify_sdcard_prepare, true, false, null);
+            if (isExternalStorage)
+                setMediaStorageNotification(isExternalStorage,
+                        com.android.internal.R.string.ext_media_checking_notification_title,
+                        com.android.internal.R.string.ext_media_checking_notification_message,
+                        com.android.internal.R.drawable.stat_notify_sdcard_prepare,
+                        true, false, null);
+            else
+                setMediaStorageNotification(isExternalStorage,
+                        com.android.internal.R.string.phone_media_checking_notification_title,
+                        com.android.internal.R.string.phone_media_checking_notification_message,
+                        com.android.internal.R.drawable.stat_notify_sdcard_prepare,
+                        true, false, null);
             updateUsbMassStorageNotification(false);
         } else if (newState.equals(Environment.MEDIA_MOUNTED)) {
+            /*
+             * Clear format flag when storage is mounted successfully.
+             */
+            updateFormatFlag(isExternalStorage, false);
+
             /*
              * Storage is now mounted. Dismiss any media notifications,
              * and enable UMS notification if connected.
              */
-            setMediaStorageNotification(0, 0, 0, false, false, null);
+            setMediaStorageNotification(isExternalStorage, 0, 0, 0, false, false, null);
             updateUsbMassStorageNotification(mUmsAvailable);
         } else if (newState.equals(Environment.MEDIA_UNMOUNTED)) {
+            if ((mMediaStorageNeedFormat && !isExternalStorage)
+                || (isExternalStorage && mSecondaryStorageNeedFormat
+                && isExternalStorageDeviceExist()))
+                 return;
             /*
              * Storage is now unmounted. We may have been unmounted
              * because the user is enabling/disabling UMS, in which case we don't
@@ -179,22 +262,22 @@ public class StorageNotification extends StorageEventListener {
                      * The unmount was due to UMS being enabled. Dismiss any
                      * media notifications, and enable UMS notification if connected
                      */
-                    setMediaStorageNotification(0, 0, 0, false, false, null);
+                    setMediaStorageNotification(isExternalStorage, 0, 0, 0, false, false, null);
                     updateUsbMassStorageNotification(mUmsAvailable);
                 } else {
                     /*
                      * Show safe to unmount media notification, and enable UMS
                      * notification if connected.
                      */
-                    if (Environment.isExternalStorageRemovable()) {
-                        setMediaStorageNotification(
+                    if (getStorageVolumebyPath(path).isRemovable()) {
+                        setMediaStorageNotification(isExternalStorage,
                                 com.android.internal.R.string.ext_media_safe_unmount_notification_title,
                                 com.android.internal.R.string.ext_media_safe_unmount_notification_message,
                                 com.android.internal.R.drawable.stat_notify_sdcard, true, true, null);
                     } else {
                         // This device does not have removable storage, so
                         // don't tell the user they can remove it.
-                        setMediaStorageNotification(0, 0, 0, false, false, null);
+                        setMediaStorageNotification(isExternalStorage, 0, 0, 0, false, false, null);
                     }
                     updateUsbMassStorageNotification(mUmsAvailable);
                 }
@@ -203,54 +286,84 @@ public class StorageNotification extends StorageEventListener {
                  * The unmount was due to UMS being enabled. Dismiss any
                  * media notifications, and disable the UMS notification
                  */
-                setMediaStorageNotification(0, 0, 0, false, false, null);
+                setMediaStorageNotification(isExternalStorage, 0, 0, 0, false, false, null);
                 updateUsbMassStorageNotification(false);
             }
         } else if (newState.equals(Environment.MEDIA_NOFS)) {
+            updateFormatFlag(isExternalStorage, true);
             /*
              * Storage has no filesystem. Show blank media notification,
              * and enable UMS notification if connected.
              */
             Intent intent = new Intent();
-            intent.setClass(mContext, com.android.internal.app.ExternalMediaFormatActivity.class);
+            if (isExternalStorage)
+                intent.setClass(mContext, com.android.internal.app.ExternalMediaFormatActivity.class);
+            else
+                intent.setClass(mContext, com.android.internal.app.PhoneMediaFormatActivity.class);
+
+            if (volume != null)
+                intent.putExtra(volume.EXTRA_STORAGE_VOLUME, volume);
+
             PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
 
-            setMediaStorageNotification(
-                    com.android.internal.R.string.ext_media_nofs_notification_title,
-                    com.android.internal.R.string.ext_media_nofs_notification_message,
-                    com.android.internal.R.drawable.stat_notify_sdcard_usb, true, false, pi);
+            if (isExternalStorage)
+                setMediaStorageNotification(isExternalStorage,
+                        com.android.internal.R.string.ext_media_nofs_notification_title,
+                        com.android.internal.R.string.ext_media_nofs_notification_message,
+                        com.android.internal.R.drawable.stat_notify_sdcard_usb, true, false, pi);
+            else
+                setMediaStorageNotification(isExternalStorage,
+                        com.android.internal.R.string.phone_media_nofs_notification_title,
+                        com.android.internal.R.string.phone_media_nofs_notification_message,
+                        com.android.internal.R.drawable.stat_notify_sdcard_usb, true, false, pi);
             updateUsbMassStorageNotification(mUmsAvailable);
         } else if (newState.equals(Environment.MEDIA_UNMOUNTABLE)) {
+            updateFormatFlag(isExternalStorage, true);
             /*
              * Storage is corrupt. Show corrupt media notification,
              * and enable UMS notification if connected.
              */
             Intent intent = new Intent();
-            intent.setClass(mContext, com.android.internal.app.ExternalMediaFormatActivity.class);
+            if (isExternalStorage)
+                intent.setClass(mContext, com.android.internal.app.ExternalMediaFormatActivity.class);
+            else
+                intent.setClass(mContext, com.android.internal.app.PhoneMediaFormatActivity.class);
+
+            if (volume != null)
+                intent.putExtra(volume.EXTRA_STORAGE_VOLUME, volume);
+
             PendingIntent pi = PendingIntent.getActivity(mContext, 0, intent, 0);
 
-            setMediaStorageNotification(
-                    com.android.internal.R.string.ext_media_unmountable_notification_title,
-                    com.android.internal.R.string.ext_media_unmountable_notification_message,
-                    com.android.internal.R.drawable.stat_notify_sdcard_usb, true, false, pi); 
+            if (isExternalStorage)
+                setMediaStorageNotification(isExternalStorage,
+                        com.android.internal.R.string.ext_media_unmountable_notification_title,
+                        com.android.internal.R.string.ext_media_unmountable_notification_message,
+                        com.android.internal.R.drawable.stat_notify_sdcard_usb, true, false, pi);
+            else
+                setMediaStorageNotification(isExternalStorage,
+                        com.android.internal.R.string.phone_media_unmountable_notification_title,
+                        com.android.internal.R.string.phone_media_unmountable_notification_message,
+                        com.android.internal.R.drawable.stat_notify_sdcard_usb, true, false, pi);
             updateUsbMassStorageNotification(mUmsAvailable);
         } else if (newState.equals(Environment.MEDIA_REMOVED)) {
+            updateFormatFlag(isExternalStorage, false);
             /*
              * Storage has been removed. Show nomedia media notification,
              * and disable UMS notification regardless of connection state.
              */
-            setMediaStorageNotification(
+            setMediaStorageNotification(isExternalStorage,
                     com.android.internal.R.string.ext_media_nomedia_notification_title,
                     com.android.internal.R.string.ext_media_nomedia_notification_message,
                     com.android.internal.R.drawable.stat_notify_sdcard_usb,
                     true, false, null);
             updateUsbMassStorageNotification(false);
         } else if (newState.equals(Environment.MEDIA_BAD_REMOVAL)) {
+            updateFormatFlag(isExternalStorage, false);
             /*
              * Storage has been removed unsafely. Show bad removal media notification,
              * and disable UMS notification regardless of connection state.
              */
-            setMediaStorageNotification(
+            setMediaStorageNotification(isExternalStorage,
                     com.android.internal.R.string.ext_media_badremoval_notification_title,
                     com.android.internal.R.string.ext_media_badremoval_notification_message,
                     com.android.internal.R.drawable.stat_sys_warning,
@@ -372,15 +485,32 @@ public class StorageNotification extends StorageEventListener {
         return false;
     }
 
+    private Notification getMediaNotification(boolean isExternalStorage) {
+        if (isExternalStorage)
+            return mMediaStorageNotification;
+        else
+            return mPhoneStorageNotification;
+    }
+
+    private  void setMediaNotification(boolean isExternalStorage,Notification notf) {
+        if (isExternalStorage)
+            mMediaStorageNotification = notf;
+        else
+            mPhoneStorageNotification = notf;
+    }
+
     /**
      * Sets the media storage notification.
      */
-    private synchronized void setMediaStorageNotification(int titleId, int messageId, int icon, boolean visible,
-                                                          boolean dismissable, PendingIntent pi) {
+    private synchronized void setMediaStorageNotification(boolean isExternalStorage, int titleId,
+                int messageId,int icon, boolean visible, boolean dismissable, PendingIntent pi) {
+        if (DEBUG)
+            Slog.i(TAG, String.format("isExternalStorage %s, titleId %s, messageId %s,icon %s, visible %s",
+                  isExternalStorage, titleId, messageId, icon, visible));
+        Notification storageNotification = getMediaNotification(isExternalStorage);
 
-        if (!visible && mMediaStorageNotification == null) {
-            return;
-        }
+        if (!visible && storageNotification  == null)
+                return;
 
         NotificationManager notificationManager = (NotificationManager) mContext
                 .getSystemService(Context.NOTIFICATION_SERVICE);
@@ -389,12 +519,20 @@ public class StorageNotification extends StorageEventListener {
             return;
         }
 
-        if (mMediaStorageNotification != null && visible) {
+        if (storageNotification != null && visible) {
             /*
              * Dismiss the previous notification - we're about to
              * re-use it.
              */
-            final int notificationId = mMediaStorageNotification.icon;
+            int notificationId;
+            if (isExternalStorage)
+                notificationId = storageNotification.icon;
+            else
+                notificationId = storageNotification.icon + 1;
+
+            if (DEBUG)
+                Slog.i(TAG, String.format("notificationManager.cancel notificationId = %s",
+                                             notificationId));
             notificationManager.cancel(notificationId);
         }
         
@@ -403,34 +541,44 @@ public class StorageNotification extends StorageEventListener {
             CharSequence title = r.getText(titleId);
             CharSequence message = r.getText(messageId);
 
-            if (mMediaStorageNotification == null) {
-                mMediaStorageNotification = new Notification();
-                mMediaStorageNotification.when = 0;
+            if (storageNotification == null) {
+                storageNotification = new Notification();
+                storageNotification.when = 0;
+                setMediaNotification(isExternalStorage, storageNotification);
             }
 
-            mMediaStorageNotification.defaults &= ~Notification.DEFAULT_SOUND;
+            storageNotification.defaults &= ~Notification.DEFAULT_SOUND;
 
             if (dismissable) {
-                mMediaStorageNotification.flags = Notification.FLAG_AUTO_CANCEL;
+                storageNotification.flags = Notification.FLAG_AUTO_CANCEL;
             } else {
-                mMediaStorageNotification.flags = Notification.FLAG_ONGOING_EVENT;
+                storageNotification.flags = Notification.FLAG_ONGOING_EVENT;
             }
 
-            mMediaStorageNotification.tickerText = title;
+            storageNotification.tickerText = title;
             if (pi == null) {
                 Intent intent = new Intent();
                 pi = PendingIntent.getBroadcastAsUser(mContext, 0, intent, 0,
                         UserHandle.CURRENT);
             }
 
-            mMediaStorageNotification.icon = icon;
-            mMediaStorageNotification.setLatestEventInfo(mContext, title, message, pi);
+            storageNotification.icon = icon;
+            storageNotification.setLatestEventInfo(mContext, title, message, pi);
+            if (DEBUG)
+                Slog.i(TAG, String.format("title =  %s, message = %s", title, message));
         }
-    
-        final int notificationId = mMediaStorageNotification.icon;
+
+        int notificationId;
+        if (isExternalStorage)
+            notificationId =  storageNotification.icon;
+        else
+            notificationId =  storageNotification.icon + 1;
+
         if (visible) {
+            if (DEBUG)
+                Slog.i(TAG, String.format("notificationId = %s", notificationId));
             notificationManager.notifyAsUser(null, notificationId,
-                    mMediaStorageNotification, UserHandle.ALL);
+                    storageNotification, UserHandle.ALL);
         } else {
             notificationManager.cancelAsUser(null, notificationId, UserHandle.ALL);
         }
