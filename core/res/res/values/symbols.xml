@@ -1910,4 +1910,5 @@
 
   <java-symbol type="string" name="default_launcher" />
   <java-symbol type="string" name="def_wifi_direct_name" />
+  <java-symbol type="string" name="locale_codes" />
 </resources>

@@ -30,6 +30,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <!-- Default launcher, its value is from launcher's package name -->
     <string name="default_launcher"></string>
 
+    <!-- Used in LocalePicker, default language must be contained -->
+    <string name="locale_codes" translatable="false"></string>
+
     <!-- Default wi-fi direct name -->
     <string name="def_wifi_direct_name" translatable="false"></string>
 </resources>
