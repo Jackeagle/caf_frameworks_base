@@ -1904,4 +1904,7 @@
   <java-symbol type="layout" name="msim_keyguard_sim_pin_view" />
   <java-symbol type="layout" name="msim_keyguard_sim_puk_view" />
   <java-symbol type="layout" name="msim_keyguard_carrier_area" />
+
+  <!-- cpu boost for overscroller fling -->
+  <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
 </resources>
