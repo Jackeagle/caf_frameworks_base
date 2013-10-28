@@ -2200,6 +2200,8 @@
          in the phone soon. -->
     <string name="lockscreen_low_battery">Connect your charger.</string>
 
+    <!-- Shown in the lock screen when there is no UIM card. -->
+    <string name="lockscreen_missing_uim_message_short">No UIM card</string>
     <!-- Shown in the lock screen when there is no SIM card. -->
     <string name="lockscreen_missing_sim_message_short">No SIM card</string>
     <!-- Shown in the lock screen when there is no SIM card. -->
