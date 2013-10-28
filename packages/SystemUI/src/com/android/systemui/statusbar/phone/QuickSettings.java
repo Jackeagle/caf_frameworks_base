@@ -295,6 +295,20 @@ class QuickSettings {
         collapsePanels();
     }
 
+    private void startSettingsActivityClearTask(String action) {
+        Intent intent = new Intent(action);
+        if ( !getService().isDeviceProvisioned()) return;
+        try {
+            // Dismiss the lock screen when Settings starts.
+            ActivityManagerNative.getDefault().dismissKeyguardOnNextActivity();
+        } catch (RemoteException e) {
+        }
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK |
+                Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        mContext.startActivityAsUser(intent, new UserHandle(UserHandle.USER_CURRENT));
+        collapsePanels();
+    }
+
     private void addUserTiles(ViewGroup parent, LayoutInflater inflater) {
         QuickSettingsTileView userTile = (QuickSettingsTileView)
                 inflater.inflate(R.layout.quick_settings_tile, parent, false);
@@ -391,7 +405,7 @@ class QuickSettings {
         wifiTile.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startSettingsActivity(android.provider.Settings.ACTION_WIFI_SETTINGS);
+                startSettingsActivityClearTask(android.provider.Settings.ACTION_WIFI_SETTINGS);
             }
         });
         if (LONG_PRESS_TOGGLES) {
