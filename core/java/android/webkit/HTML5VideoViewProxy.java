@@ -73,6 +73,14 @@ class HTML5VideoViewProxy extends Handler
     private static final int STOPFULLSCREEN    = 204;
     private static final int RESTORESTATE      = 205;
 
+    // Mark the next status of the player after exit full screen mode & suspend
+    public enum PlayingStatus {
+        STOP_PLAYING,           // Default
+        STILL_PLAYING,
+        STOP_AFTER_SUSPEND,
+    }
+    private PlayingStatus mStillPlaying;
+
     // Timer thread -> UI thread
     private static final int TIMEUPDATE = 300;
 
@@ -265,7 +273,9 @@ class HTML5VideoViewProxy extends Handler
 
                 mHTML5VideoView.setVideoURI(url, mCurrentProxy);
                 mHTML5VideoView.prepareDataAndDisplayMode(proxy);
-                return;
+                if (mHTML5VideoView.isPlaying()) {
+                    return;
+                }
             }
 
             if (mCurrentProxy == proxy) {
@@ -395,6 +405,9 @@ class HTML5VideoViewProxy extends Handler
                 VideoPlayer.EXIT_FULLSCREEN_STATE_PLAYING :
                 VideoPlayer.EXIT_FULLSCREEN_STATE_NONE;
         msg.arg1 = stillPlaying ? 1 : 0;
+        if (stillPlaying) {
+            mStillPlaying = PlayingStatus.STILL_PLAYING;
+        }
         mWebCoreHandler.sendMessage(msg);
     }
 
@@ -661,6 +674,7 @@ class HTML5VideoViewProxy extends Handler
         createWebCoreHandler();
         // This flag is to check whether audio is focused. Set it to be false initially
         isAudioFocused = false;
+        mStillPlaying = PlayingStatus.STOP_PLAYING;
     }
 
     private void createWebCoreHandler() {
@@ -729,6 +743,11 @@ class HTML5VideoViewProxy extends Handler
      * @param url is the URL of the video stream.
      */
     public void play(String url, int position, int videoLayerID) {
+        if (mStillPlaying == PlayingStatus.STOP_AFTER_SUSPEND) {
+            mStillPlaying = PlayingStatus.STOP_PLAYING;
+            return;
+        }
+
         if (url == null) {
             return;
         }
@@ -827,6 +846,10 @@ class HTML5VideoViewProxy extends Handler
     }
 
     public void suspendAndDispatch() {
+        if (mStillPlaying == PlayingStatus.STILL_PLAYING) {
+            mStillPlaying = PlayingStatus.STOP_AFTER_SUSPEND;
+        }
+
         VideoPlayer.suspendAndDispatch();
         if(isAudioFocused){
             ((AudioManager)(mWebView.getContext().getSystemService(Context.AUDIO_SERVICE)))
