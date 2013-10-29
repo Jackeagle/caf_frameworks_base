@@ -137,9 +137,8 @@ public class StorageNotification extends StorageEventListener {
 
         if (newState.equals(Environment.MEDIA_SHARED)) {
             String usbMode = new UsbManager(null, null).getDefaultFunction();
-            boolean isMtpPtpMode = UsbManager.USB_FUNCTION_MTP.equals(usbMode)
-                    || UsbManager.USB_FUNCTION_PTP.equals(usbMode);
-            if (isMtpPtpMode)
+            final boolean isUmsMode = UsbManager.USB_FUNCTION_MASS_STORAGE.equals(usbMode);
+            if (!isUmsMode )
                 mStorageManager.disableUsbMassStorage();
             /*
              * Storage is now shared. Modify the UMS notification
