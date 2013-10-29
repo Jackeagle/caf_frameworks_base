@@ -2615,6 +2615,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
             mItemCount = mAdapter.getCount();
         }
         mIsAttached = true;
+        // Position the fast scroller of list view when rtl.
+        if (isLayoutRtl() && mFastScroller != null) {
+            mFastScroller.setScrollbarPosition(getVerticalScrollbarPosition());
+        }
     }
 
     @Override

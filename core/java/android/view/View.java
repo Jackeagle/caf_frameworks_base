@@ -18,6 +18,7 @@ package android.view;
 
 import android.content.ClipData;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
@@ -6035,7 +6036,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     })
     public int getLayoutDirection() {
         final int targetSdkVersion = getContext().getApplicationInfo().targetSdkVersion;
-        if (targetSdkVersion < JELLY_BEAN_MR1) {
+        if (targetSdkVersion < JELLY_BEAN_MR1 && !isSystemApp()) {
             mPrivateFlags2 |= PFLAG2_LAYOUT_DIRECTION_RESOLVED;
             return LAYOUT_DIRECTION_RESOLVED_DEFAULT;
         }
@@ -11804,7 +11805,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private boolean isRtlCompatibilityMode() {
         final int targetSdkVersion = getContext().getApplicationInfo().targetSdkVersion;
-        return targetSdkVersion < JELLY_BEAN_MR1 || !hasRtlSupport();
+        return targetSdkVersion < JELLY_BEAN_MR1 && !isSystemApp() || !hasRtlSupport();
+    }
+
+    /**
+     * Return true if we are in a system app context.
+     */
+    private boolean isSystemApp() {
+        return ((getContext().getApplicationInfo().flags & ApplicationInfo.FLAG_SYSTEM) != 0);
     }
 
     /**
@@ -16853,8 +16861,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         }
 
         // Clamp values if at the limits and record
-        final int left = -maxOverScrollX;
-        final int right = maxOverScrollX + scrollRangeX;
+        final int left = -maxOverScrollX + (isLayoutRtl() ? -scrollRangeX : 0);
+        final int right = maxOverScrollX + (isLayoutRtl() ? 0 : scrollRangeX);
         final int top = -maxOverScrollY;
         final int bottom = maxOverScrollY + scrollRangeY;
 

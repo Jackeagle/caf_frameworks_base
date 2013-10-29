@@ -224,6 +224,40 @@ public class MSimSignalClusterView
         return super.dispatchPopulateAccessibilityEvent(event);
     }
 
+    @Override
+    public void onRtlPropertiesChanged(int layoutDirection) {
+        super.onRtlPropertiesChanged(layoutDirection);
+
+        int count = MSimTelephonyManager.getDefault().getPhoneCount();
+
+        if (mWifi != null) {
+            mWifi.setImageDrawable(null);
+        }
+        if (mWifiActivity != null) {
+            mWifiActivity.setImageDrawable(null);
+        }
+
+        if(mAirplane != null) {
+            mAirplane.setImageDrawable(null);
+        }
+        for (int i = 0; i < count; i++) {
+            if (mMobile[i] != null) {
+                mMobile[i].setImageDrawable(null);
+            }
+            if (mMobileActivity[i] != null) {
+                mMobileActivity[i].setImageDrawable(null);
+            }
+            if (mMobileType[i] != null) {
+                mMobileType[i].setImageDrawable(null);
+            }
+            if (mNoSimSlot[i] != null) {
+                mNoSimSlot[i].setImageDrawable(null);
+            }
+
+            applySubscription(i);
+        }
+    }
+
     // Run after each indicator change.
     private void applySubscription(int subscription) {
         if (mWifiGroup == null || mMobileGroup[subscription] == null) {
@@ -235,12 +269,12 @@ public class MSimSignalClusterView
         if (mMobileVisible && !mIsAirplaneMode) {
             boolean useDefaultStyle =
                     PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_DEFAULT;
-            mMobileGroup[subscription].setVisibility(View.VISIBLE);
             mMobile[subscription].setImageResource(mMobileStrengthId[subscription]);
             mMobile[subscription].setVisibility(
             mSignalIconVisible[subscription] ? View.VISIBLE : View.GONE);
             mMobileGroup[subscription].setContentDescription(mMobileTypeDescription + " "
                 + mMobileDescription[subscription]);
+            mMobileGroup[subscription].setVisibility(View.VISIBLE);
             mMobileActivity[subscription].setImageResource(mMobileActivityId[subscription]);
             mMobileType[subscription].setImageResource(mMobileTypeId[subscription]);
             mMobileType[subscription].setVisibility(
@@ -253,8 +287,8 @@ public class MSimSignalClusterView
         }
 
         if (mIsAirplaneMode) {
-            mAirplane.setVisibility(View.VISIBLE);
             mAirplane.setImageResource(mAirplaneIconId);
+            mAirplane.setVisibility(View.VISIBLE);
         } else {
             mAirplane.setVisibility(View.GONE);
         }
@@ -275,10 +309,10 @@ public class MSimSignalClusterView
         if (mWifiGroup == null) return;
 
         if (mWifiVisible) {
-            mWifiGroup.setVisibility(View.VISIBLE);
             mWifi.setImageResource(mWifiStrengthId);
             mWifiActivity.setImageResource(mWifiActivityId);
             mWifiGroup.setContentDescription(mWifiDescription);
+            mWifiGroup.setVisibility(View.VISIBLE);
         } else {
             mWifiGroup.setVisibility(View.GONE);
         }

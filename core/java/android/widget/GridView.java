@@ -342,7 +342,7 @@ public class GridView extends AbsListView {
 
             nextLeft += (isLayoutRtl ? -1 : +1) * columnWidth;
             if (pos < last - 1) {
-                nextLeft += horizontalSpacing;
+                nextLeft += (isLayoutRtl ? -1 : +1) * horizontalSpacing;
             }
 
             if (selected && (hasFocus || inClick)) {
@@ -1724,6 +1724,7 @@ public class GridView extends AbsListView {
     boolean arrowScroll(int direction) {
         final int selectedPosition = mSelectedPosition;
         final int numColumns = mNumColumns;
+        final boolean isLayoutRtl = isLayoutRtl();
 
         int startOfRowPos;
         int endOfRowPos;
@@ -1755,16 +1756,24 @@ public class GridView extends AbsListView {
                 }
                 break;
             case FOCUS_LEFT:
-                if (selectedPosition > startOfRowPos) {
+                if (!isLayoutRtl && selectedPosition > startOfRowPos) {
                     mLayoutMode = LAYOUT_MOVE_SELECTION;
                     setSelectionInt(Math.max(0, selectedPosition - 1));
+                    moved = true;
+                } else if (isLayoutRtl && selectedPosition < endOfRowPos) {
+                    mLayoutMode = LAYOUT_MOVE_SELECTION;
+                    setSelectionInt(Math.min(selectedPosition + 1, mItemCount - 1));
                     moved = true;
                 }
                 break;
             case FOCUS_RIGHT:
-                if (selectedPosition < endOfRowPos) {
+                if (!isLayoutRtl && selectedPosition < endOfRowPos) {
                     mLayoutMode = LAYOUT_MOVE_SELECTION;
                     setSelectionInt(Math.min(selectedPosition + 1, mItemCount - 1));
+                    moved = true;
+                } else if (isLayoutRtl && selectedPosition > startOfRowPos) {
+                    mLayoutMode = LAYOUT_MOVE_SELECTION;
+                    setSelectionInt(Math.max(0, selectedPosition - 1));
                     moved = true;
                 }
                 break;
