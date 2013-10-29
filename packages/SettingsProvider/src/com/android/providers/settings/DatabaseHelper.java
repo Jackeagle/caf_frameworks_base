@@ -2324,20 +2324,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Set default cdma call auto retry
             loadSetting(stmt, Settings.Global.CALL_AUTO_RETRY, 0);
 
-            // Set the preferred network mode to 0 = Global, CDMA default
-            int type;
-            if (TelephonyManager.getLteOnCdmaModeStatic() == PhoneConstants.LTE_ON_CDMA_TRUE) {
-                type = Phone.NT_MODE_GLOBAL;
-            } else {
-                type = SystemProperties.getInt("ro.telephony.default_network",
-                        RILConstants.PREFERRED_NETWORK_MODE);
-            }
+            // Set the preferred network mode
+            int defaultNetworkType = (TelephonyManager.getLteOnCdmaModeStatic()
+                    == PhoneConstants.LTE_ON_CDMA_TRUE)
+                            ? Phone.NT_MODE_GLOBAL
+                            : RILConstants.PREFERRED_NETWORK_MODE;
 
-            String val = Integer.toString(type);
-            if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                val = type + "," + type;
+            int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
+            String networkMode = SystemProperties.get("ro.telephony.default_network");
+            if (networkMode != null) {
+                if (numPhones == MSimConstants.MAX_PHONE_COUNT_SINGLE_SIM) {
+                    loadSetting(
+                            stmt,
+                            Settings.Global.PREFERRED_NETWORK_MODE,
+                            MSimTelephonyManager.getTelephonyProperty(
+                                    "ro.telephony.default_network", 0,
+                                    Integer.toString(defaultNetworkType)));
+                } else {
+                    loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, networkMode);
+                }
+            } else {
+                StringBuilder sb = new StringBuilder(defaultNetworkType);
+                for (int i = 0; i < numPhones - 1; i++) {
+                    sb.append(",");
+                    sb.append(RILConstants.NETWORK_MODE_GSM_ONLY);
+                }
+                loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, sb.toString());
             }
-            loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, val);
 
             // --- New global settings start here
         } finally {
