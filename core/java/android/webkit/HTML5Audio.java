@@ -267,6 +267,7 @@ class HTML5Audio extends Handler
                 mMediaPlayer.stop();
                 mState = STOPPED;
                 nativeOnEnded(mNativePointer);
+                abandonAudioFocus();
             }
             break;
 
@@ -322,6 +323,14 @@ class HTML5Audio extends Handler
         }
     }
 
+    // Call this to notify the AudioManager that audio playback is done
+    private void abandonAudioFocus() {
+        AudioManager audioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+        int result = audioManager.abandonAudioFocus(this);
+        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+            Log.w(LOGTAG, "abandonAudioFocus request not granted");
+    }
+
     private void seek(int msec) {
         if (mProcessingOnEnd == true && mState == COMPLETE && msec == 0) {
             mLoopEnabled = true;
@@ -336,6 +345,7 @@ class HTML5Audio extends Handler
      * destroy the media player.
      */
     private void teardown() {
+        abandonAudioFocus();
         mMediaPlayer.release();
         mMediaPlayer = null;
         mState = ERROR;
