@@ -436,8 +436,10 @@ class BluetoothEventLoop {
             if (propValues[1].equals("true")) {
                 intent = new Intent(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
             } else {
-                // Stop the discovery.
-                mBluetoothService.cancelDiscovery();
+                if (mBluetoothService.isDiscovering()) {
+                    // Stop the discovery.
+                    mBluetoothService.cancelDiscovery();
+                }
                 intent = new Intent(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
             }
             mContext.sendBroadcast(intent, BLUETOOTH_PERM);
