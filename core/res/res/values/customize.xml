@@ -29,4 +29,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- Default launcher, its value is from launcher's package name -->
     <string name="default_launcher"></string>
+
+    <!-- Default wi-fi direct name -->
+    <string name="def_wifi_direct_name" translatable="false"></string>
 </resources>
