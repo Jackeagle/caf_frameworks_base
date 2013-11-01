@@ -29,16 +29,16 @@ public class Build {
     public static final String ID = getString("ro.build.id");
 
     /** A build ID string meant for displaying to the user */
-    public static final String DISPLAY = getString("ro.build.display.id");
+    public static final String DISPLAY = getString("persist.sys.build.display.id", getString("ro.build.display.id"));
 
     /** The name of the overall product. */
-    public static final String PRODUCT = getString("ro.product.name");
+    public static final String PRODUCT = getString("persist.sys.product.name", getString("ro.product.name"));
 
     /** The name of the industrial design. */
-    public static final String DEVICE = getString("ro.product.device");
+    public static final String DEVICE = getString("persist.sys.product.device", getString("ro.product.device"));
 
     /** The name of the underlying board, like "goldfish". */
-    public static final String BOARD = getString("ro.product.board");
+    public static final String BOARD = getString("persist.sys.product.board", getString("ro.product.board"));
 
     /** The name of the instruction set (CPU type + ABI convention) of native code. */
     public static final String CPU_ABI = getString("ro.product.cpu.abi");
@@ -47,13 +47,13 @@ public class Build {
     public static final String CPU_ABI2 = getString("ro.product.cpu.abi2");
 
     /** The manufacturer of the product/hardware. */
-    public static final String MANUFACTURER = getString("ro.product.manufacturer");
+    public static final String MANUFACTURER = getString("persist.sys.product.mfr", getString("ro.product.manufacturer"));
 
     /** The brand (e.g., carrier) the software is customized for, if any. */
-    public static final String BRAND = getString("ro.product.brand");
+    public static final String BRAND = getString("persist.sys.product.brand", getString("ro.product.brand"));
 
     /** The end-user-visible name for the end product. */
-    public static final String MODEL = getString("ro.product.model");
+    public static final String MODEL = getString("persist.sys.product.model", getString("ro.product.model"));
 
     /** The system bootloader version number. */
     public static final String BOOTLOADER = getString("ro.bootloader");
@@ -469,6 +469,10 @@ public class Build {
 
     private static String getString(String property) {
         return SystemProperties.get(property, UNKNOWN);
+    }
+
+    private static String getString(String property, String defaultValue) {
+        return SystemProperties.get(property, defaultValue);
     }
 
     private static long getLong(String property) {
