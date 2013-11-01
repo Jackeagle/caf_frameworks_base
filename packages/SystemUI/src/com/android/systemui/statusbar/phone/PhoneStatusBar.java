@@ -567,6 +567,7 @@ public class PhoneStatusBar extends BaseStatusBar {
                     final ViewGroup p = (ViewGroup)signalCluster.getParent();
                     if (p != null) {
                         View v = View.inflate(context, R.layout.signal_cluster_view_ct, null);
+                        v.setId(R.id.signal_cluster);
                         p.removeView((View)signalCluster);
                         p.addView(v, 0);
                         signalCluster = (SignalClusterView)v;
