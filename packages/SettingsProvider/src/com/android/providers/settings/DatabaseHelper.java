@@ -2265,17 +2265,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
 
             // Mobile Data default, based on build
-            loadSetting(stmt, Settings.Global.MOBILE_DATA,
-                    "true".equalsIgnoreCase(
-                            SystemProperties.get("ro.com.android.mobiledata",
-                                    "true")) ? 1 : 0);
+            loadBooleanSetting(stmt, Settings.Global.MOBILE_DATA,
+                    R.bool.def_enable_mobile_data);
 
             // SUB specific flags for Multisim devices
             for (int i = 0; i < MAX_PHONE_COUNT_TRI_SIM; i++) {
                 // Mobile Data default, based on build
-                loadSetting(stmt, Settings.Global.MOBILE_DATA + i,
-                        "true".equalsIgnoreCase(
-                        SystemProperties.get("ro.com.android.mobiledata", "true")) ? 1 : 0);
+                loadBooleanSetting(stmt, Settings.Global.MOBILE_DATA + i,
+                        R.bool.def_enable_mobile_data);
 
                 // Data roaming default, based on build
                 loadBooleanSetting(stmt, Settings.Global.DATA_ROAMING + i,
