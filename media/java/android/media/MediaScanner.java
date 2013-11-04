@@ -402,8 +402,8 @@ public class MediaScanner
     }
 
     private void setDefaultRingtoneFileNames() {
-        mDefaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
-                + Settings.System.RINGTONE);
+        mDefaultRingtoneFilename = SystemProperties.get("persist.env.sys.ringtone",
+                SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.RINGTONE));
         mDefaultNotificationFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
                 + Settings.System.NOTIFICATION_SOUND);
         mDefaultAlarmAlertFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
