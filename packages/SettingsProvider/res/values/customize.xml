@@ -30,4 +30,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <!-- Ringtone Volume,its value is from 0 to 7,default value is 5 -->
     <integer name="def_ringtone_volume" translatable="false">5</integer>
+
+    <!-- Time format,default vlaue is 24 : 24 format,other value is 12 format -->
+    <string name="def_time_format" translatable="false">24</string>
 </resources>
