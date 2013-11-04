@@ -31,6 +31,7 @@ import com.android.internal.telephony.IccCardConstants.State;
 import com.android.internal.widget.LockPatternUtils;
 
 import android.telephony.MSimTelephonyManager;
+import android.telephony.TelephonyManager;
 
 public class MSimCarrierText extends CarrierText {
     private static final String TAG = "MSimCarrierText";
@@ -42,6 +43,13 @@ public class MSimCarrierText extends CarrierText {
 
         @Override
         public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int sub) {
+            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+            MSimTelephonyManager tm =
+                (MSimTelephonyManager)MSimTelephonyManager.getDefault();
+            boolean show3G = !mAirplaneMode && tm != null && plmn != null &&
+                tm.getVoiceNetworkType(sub) == TelephonyManager.NETWORK_TYPE_TD_SCDMA;
+            if (show3G) plmn = plmn + " 3G";
+
             mPlmn[sub] = plmn;
             mSpn[sub] = spn;
             updateCarrierText(mSimState, mPlmn, mSpn);

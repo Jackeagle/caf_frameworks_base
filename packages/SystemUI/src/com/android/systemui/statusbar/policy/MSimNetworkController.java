@@ -1053,8 +1053,15 @@ public class MSimNetworkController extends NetworkController {
                 mPhone.getNetworkOperatorName(subscription),
                 ORIGIN_CARRIER_NAME_ID,
                 LOCALE_CARRIER_NAME_ID);
+
+            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+            final ServiceState[] ss = mMSimServiceState;
+            boolean show3G = ss[subscription] != null &&
+                ss[subscription].getRilVoiceRadioTechnology() ==
+                    ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA;
             mMSimNetworkName[subscription] =
-                    TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+                    TextUtils.isEmpty(networkName) ? mNetworkNameDefault :
+                    networkName + (show3G ? " 3G" : "");
             Slog.d(TAG, "SPN name is not displayed");
             Slog.d(TAG, "Sub " + subscription
                     + " networkName: " + mMSimNetworkName[subscription]);
