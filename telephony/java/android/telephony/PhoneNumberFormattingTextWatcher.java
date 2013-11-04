@@ -19,6 +19,7 @@ package android.telephony;
 import com.android.i18n.phonenumbers.AsYouTypeFormatter;
 import com.android.i18n.phonenumbers.PhoneNumberUtil;
 
+import android.os.SystemProperties;
 import android.telephony.PhoneNumberUtils;
 import android.text.Editable;
 import android.text.Selection;
@@ -115,6 +116,9 @@ public class PhoneNumberFormattingTextWatcher implements TextWatcher {
             // The text could be changed by other TextWatcher after we changed it. If we found the
             // text is not the one we were expecting, just give up calling setSelection().
             if (formatted.equals(s.toString())) {
+                if(rememberedPos > s.length() - 1) {
+                    rememberedPos = s.length();
+                }
                 Selection.setSelection(s, rememberedPos);
             }
             mSelfChange = false;
@@ -154,8 +158,12 @@ public class PhoneNumberFormattingTextWatcher implements TextWatcher {
     }
 
     private String getFormattedNumber(char lastNonSeparator, boolean hasCursor) {
-        return hasCursor ? mFormatter.inputDigitAndRememberPosition(lastNonSeparator)
+        String formattedNum = hasCursor ? mFormatter.inputDigitAndRememberPosition(lastNonSeparator)
                 : mFormatter.inputDigit(lastNonSeparator);
+        if(!SystemProperties.getBoolean("persist.env.sys.hypenenable", true)){
+            return formattedNum.replace("-","");
+        }
+        return formattedNum;
     }
 
     private void stopFormatting() {
