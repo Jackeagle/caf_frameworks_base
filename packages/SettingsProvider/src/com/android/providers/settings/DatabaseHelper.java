@@ -1853,7 +1853,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.System.VOLUME_MUSIC,
                     AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_MUSIC]);
             loadSetting(stmt, Settings.System.VOLUME_RING,
-                    AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_RING]);
+                    mContext.getResources().getInteger(R.integer.def_ringtone_volume));
             loadSetting(stmt, Settings.System.VOLUME_SYSTEM,
                     AudioManager.DEFAULT_STREAM_VOLUME[AudioManager.STREAM_SYSTEM]);
             loadSetting(
