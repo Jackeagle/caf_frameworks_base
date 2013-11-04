@@ -108,8 +108,14 @@ public class LocalePicker extends ListFragment {
             final int layoutId, final int fieldId, final boolean isInDeveloperMode) {
         final Resources resources = context.getResources();
 
-        ArrayList<String> localeList = new ArrayList<String>(Arrays.asList(
-                Resources.getSystem().getAssets().getLocales()));
+         String[] def_locale_codes = Resources.getSystem().getAssets().getLocales();
+         String locale_codes = resources.getString(R.string.locale_codes);
+         String[] localeCodesArray = null;
+         if (locale_codes != null && !"".equals(locale_codes.trim())){
+             localeCodesArray = locale_codes.split(",");
+         }
+         ArrayList<String> localeList = new ArrayList<String>(
+                 Arrays.asList((localeCodesArray == null || localeCodesArray.length == 0) ? def_locale_codes : localeCodesArray));
         if (isInDeveloperMode) {
             if (!localeList.contains("zz_ZZ")) {
                 localeList.add("zz_ZZ");
