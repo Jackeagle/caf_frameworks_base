@@ -2163,6 +2163,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         R.string.def_enable_input_methods);
             }
 
+            // for accessibility enabled
+            loadStringSetting(stmt, Settings.Secure.ACCESSIBILITY_ENABLED,
+                        R.integer.def_enable_accessiblity);
+            loadStringSetting(stmt, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+                        R.string.def_enable_accessiblity_services);
+
         } finally {
             if (stmt != null) stmt.close();
         }
