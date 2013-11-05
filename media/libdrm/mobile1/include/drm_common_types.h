@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +39,10 @@ extern "C" {
 #endif
 
 #define Trace(...)
-
+/* DRM CHANGE -- START */
+#define DRMV1_D(fmt, xxx...) /*LOGE("(%s:%s:%d)"fmt, __FILE__, __FUNCTION__, __LINE__, ##xxx)*/
+#define DRMV1_E(fmt, xxx...) /*LOGE("(%s:%s:%d)"fmt, __FILE__, __FUNCTION__, __LINE__, ##xxx)*/
+/* DRM CHANGE -- END */
 #ifdef __cplusplus
 }
 #endif

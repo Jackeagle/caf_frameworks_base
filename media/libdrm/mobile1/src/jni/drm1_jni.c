@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -339,6 +341,24 @@ static int64_t mkgmtime(
 
     return result;
 }
+/* DRM CHANGE -- START */
+static int64_t mkUTCtime(
+        uint32_t year, uint32_t month, uint32_t day,
+        uint32_t hour, uint32_t minute, uint32_t second)
+{
+    struct tm localTime;
+
+    memset (&localTime, 0x0, sizeof (struct tm));
+    localTime.tm_year = year - 1900;
+    localTime.tm_mon  = month - 1;
+    localTime.tm_mday = day;
+    localTime.tm_hour = hour;
+    localTime.tm_min  = minute;
+    localTime.tm_sec  = second;
+
+    return mktime (&localTime);
+}
+/* DRM CHANGE -- END */
 
 /**
  * Compute the milliseconds by the specified <code>date</code>
@@ -375,7 +395,9 @@ static int64_t computeTime(int32_t date, int32_t time)
     if (second < 0) second = 0;
     if (second > 59) second = 59;
 
-    return mkgmtime(year, month, day, hour, minute, second) * 1000;
+/* DRM CHANGE -- START */
+    return mkUTCtime (year, month, day, hour, minute, second) * 1000;
+/* DRM CHANGE -- END */
 }
 
 /**
@@ -932,7 +954,9 @@ Java_android_drm_mobile1_DrmRightsManager_nativeInstallDrmRights
     drmInData->env = env;
     drmInData->pInData = &data;
     drmInData->len = len;
-
+/* DRM CHANGE -- START */
+    memset(&inData, 0, sizeof(inData));
+/* DRM CHANGE -- END */
     inData.inputHandle = (int32_t)drmInData;
     inData.mimeType = mimeType;
     inData.getInputDataLength = getInputStreamDataLength;
@@ -941,6 +965,10 @@ Java_android_drm_mobile1_DrmRightsManager_nativeInstallDrmRights
     memset(&rightsInfo, 0, sizeof(T_DRM_Rights_Info));
     if (DRM_FAILURE == SVC_drm_installRights(inData, &rightsInfo))
         return JNI_DRM_FAILURE;
+
+/* DRM CHANGE -- START */
+    DRMV1_D("Success in SVC_drm_installRights\n");
+/* DRM CHANGE -- END */
 
     freeItem(drmInData);
 

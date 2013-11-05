@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +29,12 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.UnknownServiceException;
 import java.util.Arrays;
+// Drm changes start
+import java.io.FileNotFoundException;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.File;
+// Drm changes end
 
 import libcore.io.Streams;
 
@@ -62,7 +70,45 @@ public class DrmOutputStream extends OutputStream {
         final DrmConvertedStatus status = mClient.closeConvertSession(mSessionId);
         if (status.statusCode == STATUS_OK) {
             mFile.seek(status.offset);
-            mFile.write(status.convertedData);
+            // Drm changes start
+            //mFile.write(status.convertedData);
+            InputStream ipStream = null;
+            String path = null;
+            try {
+                byte[] filePath = status.convertedData;
+                path = new String(filePath);
+                Log.d(TAG, "filePath = " + path);
+                if (path != null) ipStream = new FileInputStream(path);
+                byte[] buffer = new byte[4096];
+                int size=0;
+                do {
+                    size = ipStream.read(buffer);
+                    mFile.write(buffer);
+                    Log.d(TAG, "bytes = " + Integer.toString(size));
+                } while(size > 0);
+            } catch (FileNotFoundException e) {
+                Log.w(TAG, "File: " + mFile + " could not be found.", e);
+            } catch (IOException e) {
+                Log.w(TAG, "Could not access File: " + mFile + " .", e);
+            } catch (IllegalArgumentException e) {
+                Log.w(TAG, "Could not open file in mode: rw", e);
+            } catch (SecurityException e) {
+                Log.w(TAG, "Access to File: " + mFile +
+                        " was denied denied by SecurityManager.", e);
+            } finally {
+                try {
+                    File file = null;
+                    if (path != null) file = new File(path);
+                    if (file.delete()) {
+                        Log.d(TAG, "deleted file " + path);
+                    } else {
+                        Log.d(TAG, "could not deleted file " + path);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "exeption");
+                }
+            }
+            // Drm changes start
             mSessionId = INVALID_SESSION;
         } else {
             throw new IOException("Unexpected DRM status: " + status.statusCode);

@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +43,9 @@ void DRM_time_getSysTime(T_DB_TIME_SysTime *time_ptr)
     struct tm *tm_t;
 
     time(&t);
-    tm_t = gmtime(&t);
+/* DRM CHANGE -- START */
+    tm_t = localtime(&t);
+/* DRM CHANGE -- END */
 
     time_ptr->year = tm_t->tm_year + 1900;
     time_ptr->month = tm_t->tm_mon + 1;

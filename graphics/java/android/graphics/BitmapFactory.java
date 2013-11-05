@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -295,12 +297,18 @@ public class BitmapFactory {
      *         decoded, or, if opts is non-null, if opts requested only the
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
+// DRM Change -- START
     public static Bitmap decodeFile(String pathName, Options opts) {
+        return decodeFile(pathName, opts, true);
+    }
+
+    public static Bitmap decodeFile(String pathName, Options opts, boolean consumeRights) {
+// DRM Change -- END
         Bitmap bm = null;
         InputStream stream = null;
         try {
             stream = new FileInputStream(pathName);
-            bm = decodeStream(stream, null, opts);
+            bm = decodeStream(stream, null, opts, consumeRights);// DRM Change
         } catch (Exception e) {
             /*  do nothing.
                 If the exception happened on open, bm will be null.
@@ -333,9 +341,15 @@ public class BitmapFactory {
      * Decode a new Bitmap from an InputStream. This InputStream was obtained from
      * resources, which we pass to be able to scale the bitmap accordingly.
      */
+// DRM Change -- START
     public static Bitmap decodeResourceStream(Resources res, TypedValue value,
             InputStream is, Rect pad, Options opts) {
+        return decodeResourceStream(res, value, is, pad, opts, true);
+    }
 
+    public static Bitmap decodeResourceStream(Resources res, TypedValue value,
+            InputStream is, Rect pad, Options opts, boolean consumeRights) {
+// DRM Change -- END
         if (opts == null) {
             opts = new Options();
         }
@@ -353,7 +367,7 @@ public class BitmapFactory {
             opts.inTargetDensity = res.getDisplayMetrics().densityDpi;
         }
         
-        return decodeStream(is, pad, opts);
+        return decodeStream(is, pad, opts,consumeRights);// DRM Change
     }
 
     /**
@@ -368,7 +382,14 @@ public class BitmapFactory {
      *         decoded, or, if opts is non-null, if opts requested only the
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
+// DRM Change -- START
     public static Bitmap decodeResource(Resources res, int id, Options opts) {
+        return decodeResource(res, id, opts, true);
+    }
+
+    public static Bitmap decodeResource(Resources res, int id, Options opts,
+            boolean consumeRights) {
+// DRM Change -- END
         Bitmap bm = null;
         InputStream is = null; 
         
@@ -376,7 +397,7 @@ public class BitmapFactory {
             final TypedValue value = new TypedValue();
             is = res.openRawResource(id, value);
 
-            bm = decodeResourceStream(res, value, is, null, opts);
+            bm = decodeResourceStream(res, value, is, null, opts, consumeRights);
         } catch (Exception e) {
             /*  do nothing.
                 If the exception happened on open, bm will be null.
@@ -405,8 +426,14 @@ public class BitmapFactory {
      * @param id The resource id of the image data
      * @return The decoded bitmap, or null if the image could not be decode.
      */
+// DRM Change -- START
     public static Bitmap decodeResource(Resources res, int id) {
-        return decodeResource(res, id, null);
+        return decodeResource(res, id, null, true);
+    }
+
+    public static Bitmap decodeResource(Resources res, int id, boolean consumeRights) {
+        return decodeResource(res, id, null, consumeRights);
+// DRM Change -- END
     }
 
     /**
@@ -422,11 +449,18 @@ public class BitmapFactory {
      *         decoded, or, if opts is non-null, if opts requested only the
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
+// DRM Change -- START
     public static Bitmap decodeByteArray(byte[] data, int offset, int length, Options opts) {
+        return decodeByteArray(data, offset, length, opts, true);
+    }
+
+    public static Bitmap decodeByteArray(byte[] data, int offset, int length, Options opts,
+            boolean consumeRights) {
+// DRM Change -- END
         if ((offset | length) < 0 || data.length < offset + length) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        Bitmap bm = nativeDecodeByteArray(data, offset, length, opts);
+        Bitmap bm = nativeDecodeByteArray(data, offset, length, opts, consumeRights);
 
         if (bm == null && opts != null && opts.inBitmap != null) {
             throw new IllegalArgumentException("Problem decoding into existing bitmap");
@@ -443,8 +477,15 @@ public class BitmapFactory {
      * @param length the number of bytes, beginning at offset, to parse
      * @return The decoded bitmap, or null if the image could not be decode.
      */
+// DRM Change -- START
     public static Bitmap decodeByteArray(byte[] data, int offset, int length) {
-        return decodeByteArray(data, offset, length, null);
+        return decodeByteArray(data, offset, length, null, true);
+    }
+
+    public static Bitmap decodeByteArray(byte[] data, int offset, int length,
+            boolean consumeRights) {
+        return decodeByteArray(data, offset, length, null, consumeRights);
+// DRM Change -- END
     }
 
     /**
@@ -465,7 +506,14 @@ public class BitmapFactory {
      *         decoded, or, if opts is non-null, if opts requested only the
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
+// DRM Change -- START
     public static Bitmap decodeStream(InputStream is, Rect outPadding, Options opts) {
+        return decodeStream(is, outPadding, opts, true);
+    }
+
+    public static Bitmap decodeStream(InputStream is, Rect outPadding, Options opts,
+            boolean consumeRights) {
+// DRM Change -- END
         // we don't throw in this case, thus allowing the caller to only check
         // the cache, and not force the image to be decoded.
         if (is == null) {
@@ -500,12 +548,16 @@ public class BitmapFactory {
                     }
                 }
 
-                bm = nativeDecodeAsset(asset, outPadding, opts, true, scale);
+// DRM Change -- START
+                bm = nativeDecodeAsset(asset, outPadding, opts, true, scale, true);
+// DRM Change -- END
                 if (bm != null && targetDensity != 0) bm.setDensity(targetDensity);
 
                 finish = false;
             } else {
-                bm = nativeDecodeAsset(asset, outPadding, opts);
+// DRM Change -- START
+                bm = nativeDecodeAsset(asset, outPadding, opts, true);
+// DRM Change -- END
             }
         } else {
             // pass some temp storage down to the native code. 1024 is made up,
@@ -527,12 +579,17 @@ public class BitmapFactory {
                     }
                 }
 
-                bm = nativeDecodeStream(is, tempStorage, outPadding, opts, true, scale);
+// DRM Change -- START
+                bm = nativeDecodeStream(is, tempStorage, outPadding, opts, true, scale,
+                        consumeRights);
+// DRM Change -- END
                 if (bm != null && targetDensity != 0) bm.setDensity(targetDensity);
 
                 finish = false;
             } else {
-                bm = nativeDecodeStream(is, tempStorage, outPadding, opts);
+// DRM Change -- START
+                bm = nativeDecodeStream(is, tempStorage, outPadding, opts, consumeRights);
+// DRM Change -- END
             }
         }
 
@@ -617,9 +674,16 @@ public class BitmapFactory {
      *             image should be completely decoded, or just is size returned.
      * @return the decoded bitmap, or null
      */
+// DRM Change -- START
     public static Bitmap decodeFileDescriptor(FileDescriptor fd, Rect outPadding, Options opts) {
+        return decodeFileDescriptor(fd, outPadding, opts, true);
+    }
+
+    public static Bitmap decodeFileDescriptor(FileDescriptor fd, Rect outPadding, Options opts,
+            boolean consumeRights) {
+// DRM Change -- END
         if (nativeIsSeekable(fd)) {
-            Bitmap bm = nativeDecodeFileDescriptor(fd, outPadding, opts);
+            Bitmap bm = nativeDecodeFileDescriptor(fd, outPadding, opts, consumeRights);
             if (bm == null && opts != null && opts.inBitmap != null) {
                 throw new IllegalArgumentException("Problem decoding into existing bitmap");
             }
@@ -648,17 +712,20 @@ public class BitmapFactory {
         return decodeFileDescriptor(fd, null, null);
     }
 
+// DRM Change -- START
     private static native Bitmap nativeDecodeStream(InputStream is, byte[] storage,
-            Rect padding, Options opts);
+            Rect padding, Options opts, boolean consumeRights);
     private static native Bitmap nativeDecodeStream(InputStream is, byte[] storage,
-            Rect padding, Options opts, boolean applyScale, float scale);
+            Rect padding, Options opts, boolean applyScale, float scale, boolean consumeRights);
     private static native Bitmap nativeDecodeFileDescriptor(FileDescriptor fd,
-            Rect padding, Options opts);
-    private static native Bitmap nativeDecodeAsset(int asset, Rect padding, Options opts);
+            Rect padding, Options opts, boolean consumeRights);
     private static native Bitmap nativeDecodeAsset(int asset, Rect padding, Options opts,
-            boolean applyScale, float scale);
+            boolean consumeRights);
+    private static native Bitmap nativeDecodeAsset(int asset, Rect padding, Options opts,
+            boolean applyScale, float scale, boolean consumeRights);
     private static native Bitmap nativeDecodeByteArray(byte[] data, int offset,
-            int length, Options opts);
+            int length, Options opts, boolean consumeRights);
     private static native byte[] nativeScaleNinePatch(byte[] chunk, float scale, Rect pad);
     private static native boolean nativeIsSeekable(FileDescriptor fd);
+// DRM Change -- END
 }

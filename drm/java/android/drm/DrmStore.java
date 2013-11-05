@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -245,6 +247,31 @@ public class DrmStore {
          */
         public RightsStatus() {}
     }
+
+    // Drm Add -- START
+    /**
+     * Defines the drm delivery methods.
+     * This should be in sync with svc_drm.h
+     */
+    public static class DrmDeliveryType {
+        /**
+         * Forward_lock
+         */
+        public static final int FORWARD_LOCK = 0x01;
+        /**
+         * Combined delivery
+         */
+        public static final int COMBINED_DELIVERY = 0x02;
+        /**
+         * Separate delivery
+         */
+        public static final int SEPARATE_DELIVERY = 0x03;
+        /**
+         * Separate delivery but DCF is forward-lock
+         */
+        public static final int SEPARATE_DELIVERY_FL = 0x04;
+    }
+    // Drm Add -- END
 
     /**
      * @deprecated This class should have been an interface instead.

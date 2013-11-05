@@ -55,7 +55,8 @@ public class MediaFile {
     public static final int FILE_TYPE_QCP     = 13;
     public static final int FILE_TYPE_WEBMA   = 14;
     public static final int FILE_TYPE_PCM     = 15;
-    public static final int FILE_TYPE_EC3     = 16;
+    public static final int FILE_TYPE_3GA     = 16;
+    public static final int FILE_TYPE_EC3     = 17;
     private static final int FIRST_AUDIO_FILE_TYPE = FILE_TYPE_MP3;
     private static final int LAST_AUDIO_FILE_TYPE = FILE_TYPE_EC3;
 
@@ -65,23 +66,23 @@ public class MediaFile {
     private static final int LAST_AUDIO_FILE_TYPE2 = FILE_TYPE_DTS;
 
     // MIDI file types
-    public static final int FILE_TYPE_MID     = 17;
-    public static final int FILE_TYPE_SMF     = 18;
-    public static final int FILE_TYPE_IMY     = 19;
+    public static final int FILE_TYPE_MID     = 19;
+    public static final int FILE_TYPE_SMF     = 20;
+    public static final int FILE_TYPE_IMY     = 21;
     private static final int FIRST_MIDI_FILE_TYPE = FILE_TYPE_MID;
     private static final int LAST_MIDI_FILE_TYPE = FILE_TYPE_IMY;
    
     // Video file types
-    public static final int FILE_TYPE_MP4     = 21;
-    public static final int FILE_TYPE_M4V     = 22;
-    public static final int FILE_TYPE_3GPP    = 23;
-    public static final int FILE_TYPE_3GPP2   = 24;
-    public static final int FILE_TYPE_WMV     = 25;
-    public static final int FILE_TYPE_ASF     = 26;
-    public static final int FILE_TYPE_MKV     = 27;
-    public static final int FILE_TYPE_MP2TS   = 28;
-    public static final int FILE_TYPE_AVI     = 29;
-    public static final int FILE_TYPE_WEBM    = 30;
+    public static final int FILE_TYPE_MP4     = 22;
+    public static final int FILE_TYPE_M4V     = 23;
+    public static final int FILE_TYPE_3GPP    = 24;
+    public static final int FILE_TYPE_3GPP2   = 25;
+    public static final int FILE_TYPE_WMV     = 26;
+    public static final int FILE_TYPE_ASF     = 27;
+    public static final int FILE_TYPE_MKV     = 28;
+    public static final int FILE_TYPE_MP2TS   = 29;
+    public static final int FILE_TYPE_AVI     = 30;
+    public static final int FILE_TYPE_WEBM    = 31;
     private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
     private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_WEBM;
     
@@ -92,12 +93,12 @@ public class MediaFile {
     private static final int LAST_VIDEO_FILE_TYPE2 = FILE_TYPE_DIVX;
 
     // Image file types
-    public static final int FILE_TYPE_JPEG    = 31;
-    public static final int FILE_TYPE_GIF     = 32;
-    public static final int FILE_TYPE_PNG     = 33;
-    public static final int FILE_TYPE_BMP     = 34;
-    public static final int FILE_TYPE_WBMP    = 35;
-    public static final int FILE_TYPE_WEBP    = 36;
+    public static final int FILE_TYPE_JPEG    = 32;
+    public static final int FILE_TYPE_GIF     = 33;
+    public static final int FILE_TYPE_PNG     = 34;
+    public static final int FILE_TYPE_BMP     = 35;
+    public static final int FILE_TYPE_WBMP    = 36;
+    public static final int FILE_TYPE_WEBP    = 37;
     private static final int FIRST_IMAGE_FILE_TYPE = FILE_TYPE_JPEG;
     private static final int LAST_IMAGE_FILE_TYPE = FILE_TYPE_WEBP;
    
@@ -111,9 +112,14 @@ public class MediaFile {
     private static final int LAST_PLAYLIST_FILE_TYPE = FILE_TYPE_HTTPLIVE;
 
     // Drm file types
-    public static final int FILE_TYPE_FL      = 51;
-    private static final int FIRST_DRM_FILE_TYPE = FILE_TYPE_FL;
-    private static final int LAST_DRM_FILE_TYPE = FILE_TYPE_FL;
+    // DRM Change -- START
+    //public static final int FILE_TYPE_FL      = 51;
+    //private static final int FIRST_DRM_FILE_TYPE = FILE_TYPE_FL;
+    //private static final int LAST_DRM_FILE_TYPE = FILE_TYPE_FL;
+    public static final int FILE_TYPE_DRM      = 51;
+    private static final int FIRST_DRM_FILE_TYPE = FILE_TYPE_DRM;
+    private static final int LAST_DRM_FILE_TYPE = FILE_TYPE_DRM;
+    // DRM Change -- END
 
     // Other popular file types
     public static final int FILE_TYPE_TEXT          = 100;
@@ -228,6 +234,31 @@ public class MediaFile {
         addFileType("WEBM", FILE_TYPE_WEBM, "video/webm");
         addFileType("TS", FILE_TYPE_MP2TS, "video/mp2ts");
         addFileType("AVI", FILE_TYPE_AVI, "video/avi");
+        // DRM Change -- START
+        addFileType("OGG", FILE_TYPE_OGG, "audio/ogg", MtpConstants.FORMAT_OGG);
+        addFileType("3GA", FILE_TYPE_3GA, "audio/3gpp");
+        addFileType("3GA", FILE_TYPE_3GA, "audio/3gp");
+        //addFileType("3GPA", FILE_TYPE_3GPA, "audio/3gpa");
+        //addFileType("3GPP", FILE_TYPE_3GPA, "audio/3gpp");
+        //addFileType("3GA", FILE_TYPE_3GPA, "audio/3gp");
+        addFileType("MP3", FILE_TYPE_MP3, "audio/mp3", MtpConstants.FORMAT_MP3);
+        addFileType("MP3", FILE_TYPE_MP3, "audio/x-mp3");
+        addFileType("AAC", FILE_TYPE_AAC, "audio/m4a", MtpConstants.FORMAT_AAC);       
+        addFileType("MID", FILE_TYPE_MID, "audio/mid");
+        addFileType("RTX", FILE_TYPE_MID, "audio/rtx");
+        addFileType("RTTTL", FILE_TYPE_MID, "audio/rttl");
+        addFileType("XMF", FILE_TYPE_MID, "audio/xmf");
+        addFileType("IMY", FILE_TYPE_IMY, "audio/imy");
+        addFileType("M4V", FILE_TYPE_M4V, "video/m4v", MtpConstants.FORMAT_MPEG);
+        addFileType("3G2", FILE_TYPE_3GPP2, "video/3g2", MtpConstants.FORMAT_3GP_CONTAINER);
+        addFileType("3GP2", FILE_TYPE_3GPP2, "video/3gp2", MtpConstants.FORMAT_3GP_CONTAINER);
+        addFileType("3GP", FILE_TYPE_3GPP, "video/3gp",  MtpConstants.FORMAT_3GP_CONTAINER);
+        addFileType("MPEG", FILE_TYPE_MP4, "video/mpeg4", MtpConstants.FORMAT_MPEG);
+        addFileType("BMP", FILE_TYPE_BMP, "image/x-MS-bmp", MtpConstants.FORMAT_BMP);
+        addFileType("BMP", FILE_TYPE_BMP, "image/bmp", MtpConstants.FORMAT_BMP);
+        addFileType("DCF", FILE_TYPE_DRM, "application/x-android-drm");
+        //addFileType("FL", FILE_TYPE_FL, "application/x-android-drm-fl");
+        // DRM Change -- END
 
         if (isWMVEnabled()) {
             addFileType("WMV", FILE_TYPE_WMV, "video/x-ms-wmv", MtpConstants.FORMAT_WMV);
@@ -250,7 +281,7 @@ public class MediaFile {
         addFileType("M3U8", FILE_TYPE_HTTPLIVE, "audio/mpegurl");
         addFileType("M3U8", FILE_TYPE_HTTPLIVE, "audio/x-mpegurl");
 
-        addFileType("FL", FILE_TYPE_FL, "application/x-android-drm-fl");
+        //addFileType("FL", FILE_TYPE_FL, "application/x-android-drm-fl");// DRM Change
 
         addFileType("TXT", FILE_TYPE_TEXT, "text/plain", MtpConstants.FORMAT_TEXT);
         addFileType("HTM", FILE_TYPE_HTML, "text/html", MtpConstants.FORMAT_HTML);
@@ -361,4 +392,18 @@ public class MediaFile {
     public static String getMimeTypeForFormatCode(int formatCode) {
         return sFormatToMimeTypeMap.get(formatCode);
     }
+
+    // DRM Change -- START
+    public static boolean isUriStreamable(String uri) {
+        if (uri != null
+                && (uri.endsWith(".dm")
+                        || uri.endsWith(".midi")
+                        || uri.endsWith(".MIDI")
+                        || uri.endsWith(".mid")
+                        || uri.endsWith(".MID"))) {
+          return false;
+       }
+       return true;
+    }
+    // DRM Change -- END
 }

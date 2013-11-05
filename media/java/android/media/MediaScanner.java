@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -413,8 +415,12 @@ public class MediaScanner
     private final MyMediaScannerClient mClient = new MyMediaScannerClient();
 
     private boolean isDrmEnabled() {
-        String prop = SystemProperties.get("drm.service.enabled");
-        return prop != null && prop.equals("true");
+/* DRM -- Change START */
+/* UnComment next two lines and return true, if drm.service.enabled is set in system properties */
+        //String prop = SystemProperties.get("drm.service.enabled");
+        //return prop != null && prop.equals("true");
+        return true;
+/* DRM -- Change END */
     }
 
     private class MyMediaScannerClient implements MediaScannerClient {
@@ -735,7 +741,7 @@ public class MediaScanner
             try {
                 mBitmapOptions.outWidth = 0;
                 mBitmapOptions.outHeight = 0;
-                BitmapFactory.decodeFile(path, mBitmapOptions);
+               BitmapFactory.decodeFile(path, mBitmapOptions, false);// Drm changed
                 mWidth = mBitmapOptions.outWidth;
                 mHeight = mBitmapOptions.outHeight;
             } catch (Throwable th) {

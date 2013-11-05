@@ -216,6 +216,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libjpeg \
 	libusbhost \
 	libharfbuzz_ng \
+	libdrmframework \
 	libz
 
 ifeq ($(TARGET_ARCH), arm)

@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +37,9 @@ extern "C" {
 /**
  * Define the max malloc length for a DRM.
  */
-#define DRM_MAX_MALLOC_LEN          (50 * 1024) /* 50K */
+/* DRM CHANGE -- START */
+#define DRM_MAX_MALLOC_LEN          (110 * 1024)  /* 50K */
+/* DRM CHANGE -- END */
 
 #define DRM_ONE_AES_BLOCK_LEN       16
 #define DRM_TWO_AES_BLOCK_LEN       32
@@ -68,6 +72,9 @@ typedef struct _T_DRM_Session_Node {
     int32_t (*readInputDataFunc)(int32_t inputHandle, uint8_t* buf, int32_t bufLen);
     int32_t (*seekInputDataFunc)(int32_t inputHandle, int32_t offset);
     int32_t deliveryMethod;
+/* DRM CHANGE -- START */
+    int32_t isEncrypted;
+/* DRM CHANGE -- END */
     int32_t transferEncoding;
     uint8_t contentType[64];
     int32_t contentLength;
@@ -81,6 +88,9 @@ typedef struct _T_DRM_Session_Node {
     int32_t readBufOff;
     void* infoStruct;
     struct _T_DRM_Session_Node* next;
+/* DRM CHANGE -- START */
+    uint8_t key[16];
+/* DRM CHANGE -- END */
 } T_DRM_Session_Node;
 
 #ifdef __cplusplus

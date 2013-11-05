@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +113,9 @@ public class ThumbnailUtils {
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inSampleSize = 1;
                 options.inJustDecodeBounds = true;
-                BitmapFactory.decodeFileDescriptor(fd, null, options);
+                // DRM Change -- START
+                BitmapFactory.decodeFileDescriptor(fd, null, options, false);
+                // DRM Change -- END
                 if (options.mCancel || options.outWidth == -1
                         || options.outHeight == -1) {
                     return null;
@@ -122,7 +126,9 @@ public class ThumbnailUtils {
 
                 options.inDither = false;
                 options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-                bitmap = BitmapFactory.decodeFileDescriptor(fd, null, options);
+                // DRM Change -- START
+                bitmap = BitmapFactory.decodeFileDescriptor(fd, null, options, false);
+                // DRM Change -- END
             } catch (IOException ex) {
                 Log.e(TAG, "", ex);
             } catch (OutOfMemoryError oom) {
@@ -317,7 +323,9 @@ public class ThumbnailUtils {
             FileDescriptor fd = pfd.getFileDescriptor();
             options.inSampleSize = 1;
             options.inJustDecodeBounds = true;
-            BitmapFactory.decodeFileDescriptor(fd, null, options);
+            // DRM Change -- START
+            BitmapFactory.decodeFileDescriptor(fd, null, options, false);
+            // DRM Change -- END
             if (options.mCancel || options.outWidth == -1
                     || options.outHeight == -1) {
                 return null;
@@ -328,7 +336,9 @@ public class ThumbnailUtils {
 
             options.inDither = false;
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-            b = BitmapFactory.decodeFileDescriptor(fd, null, options);
+            // DRM Change -- START
+            b = BitmapFactory.decodeFileDescriptor(fd, null, options, false);
+            // DRM Change -- END
         } catch (OutOfMemoryError ex) {
             Log.e(TAG, "Got oom exception ", ex);
             return null;
@@ -496,14 +506,18 @@ public class ThumbnailUtils {
         // Compute exifThumbWidth.
         if (thumbData != null) {
             exifOptions.inJustDecodeBounds = true;
-            BitmapFactory.decodeByteArray(thumbData, 0, thumbData.length, exifOptions);
+            // DRM Change -- START
+            BitmapFactory.decodeByteArray(thumbData, 0, thumbData.length, exifOptions, false);
+            // DRM Change -- END
             exifOptions.inSampleSize = computeSampleSize(exifOptions, targetSize, maxPixels);
             exifThumbWidth = exifOptions.outWidth / exifOptions.inSampleSize;
         }
 
         // Compute fullThumbWidth.
         fullOptions.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(filePath, fullOptions);
+        // DRM Change -- START
+        BitmapFactory.decodeFile(filePath, fullOptions, false);
+        // DRM Change -- END
         fullOptions.inSampleSize = computeSampleSize(fullOptions, targetSize, maxPixels);
         fullThumbWidth = fullOptions.outWidth / fullOptions.inSampleSize;
 
@@ -512,8 +526,10 @@ public class ThumbnailUtils {
             int width = exifOptions.outWidth;
             int height = exifOptions.outHeight;
             exifOptions.inJustDecodeBounds = false;
+            // DRM Change -- START
             sizedThumbBitmap.mBitmap = BitmapFactory.decodeByteArray(thumbData, 0,
-                    thumbData.length, exifOptions);
+                    thumbData.length, exifOptions, false);
+            // DRM Change -- END
             if (sizedThumbBitmap.mBitmap != null) {
                 sizedThumbBitmap.mThumbnailData = thumbData;
                 sizedThumbBitmap.mThumbnailWidth = width;
@@ -521,7 +537,9 @@ public class ThumbnailUtils {
             }
         } else {
             fullOptions.inJustDecodeBounds = false;
-            sizedThumbBitmap.mBitmap = BitmapFactory.decodeFile(filePath, fullOptions);
+            // DRM Change -- START
+            sizedThumbBitmap.mBitmap = BitmapFactory.decodeFile(filePath, fullOptions, false);
+            // DRM Change -- END
         }
     }
 }
