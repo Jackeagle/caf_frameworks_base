@@ -141,6 +141,16 @@ public interface TelephonyProperties
     static final String PROPERTY_OTASP_NUM_SCHEMA = "ro.cdma.otaspnumschema";
 
     /**
+     * Defines to the property value if set, otherwise initialized to false
+     */
+    static final String PROPERTY_RUIM_OMH_ENABLED = "persist.sys.omh.enabled";
+
+    /**
+     * Defines to determine if is a OMH card
+     */
+    static final String PROPERTY_RUIM_OMH_CARD = "ril.cdma.omhcard";
+
+    /**
      * Disable all calls including Emergency call when it set to true.
      */
     static final String PROPERTY_DISABLE_CALL = "ro.telephony.disable-call";
