@@ -329,14 +329,22 @@ public class MediaScanner
     private boolean mWasEmptyPriorToScan = false;
     /** Whether the scanner has set a default sound for the ringer ringtone. */
     private boolean mDefaultRingtoneSet;
+    /** Whether the scanner has set a default sound for the ringer ringtone 2. */
+    private boolean mDefaultRingtone2Set;
     /** Whether the scanner has set a default sound for the notification ringtone. */
     private boolean mDefaultNotificationSet;
+    /** Whether the scanner has set a default sound for the mms notification ringtone. */
+    private boolean mDefaultMmsNotificationSet;
     /** Whether the scanner has set a default sound for the alarm ringtone. */
     private boolean mDefaultAlarmSet;
     /** The filename for the default sound for the ringer ringtone. */
     private String mDefaultRingtoneFilename;
+    /** The filename for the default sound for the ringer ringtone 2. */
+    private String mDefaultRingtone2Filename;
     /** The filename for the default sound for the notification ringtone. */
     private String mDefaultNotificationFilename;
+    /** The filename for the default sound for the mms notification ringtone. */
+    private String mDefaultMmsNotificationFilename;
     /** The filename for the default sound for the alarm ringtone. */
     private String mDefaultAlarmAlertFilename;
     /**
@@ -345,6 +353,7 @@ public class MediaScanner
      * to get the full system property.
      */
     private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX = "ro.config.";
+    private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX_PERSIST = "persist.env.";
 
     // set to true if file path comparisons should be case insensitive.
     // this should be set when scanning files on a case insensitive file system.
@@ -404,8 +413,18 @@ public class MediaScanner
     private void setDefaultRingtoneFileNames() {
         mDefaultRingtoneFilename = SystemProperties.get("persist.env.sys.ringtone",
                 SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.RINGTONE));
+        mDefaultRingtone2Filename = SystemProperties.get("persist.env.sys.ringtone_2");
+        if (mDefaultRingtone2Filename == null ||
+            TextUtils.isEmpty(mDefaultRingtone2Filename.trim())) {
+            mDefaultRingtone2Filename = mDefaultRingtoneFilename;
+        }
         mDefaultNotificationFilename = SystemProperties.get("persist.env.sys.notification",
                 SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.NOTIFICATION_SOUND));
+        mDefaultMmsNotificationFilename = SystemProperties.get("persist.env.sys.mms");
+        if (mDefaultMmsNotificationFilename == null ||
+            TextUtils.isEmpty(mDefaultMmsNotificationFilename.trim())) {
+            mDefaultMmsNotificationFilename = mDefaultNotificationFilename;
+        }
         mDefaultAlarmAlertFilename = SystemProperties.get("persist.env.sys.alarm",
                 SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX + Settings.System.ALARM_ALERT));
     }
@@ -922,6 +941,10 @@ public class MediaScanner
             }
             Uri result = null;
             boolean needToSetSettings = false;
+            boolean needToSetMmsNotificationSettings = false;
+            boolean needToSetNormalNotificationSettings = false;
+            boolean needToSetRingtoneSettings = false;
+            boolean needToSetRingtone2Settings = false;
             if (rowId == 0) {
                 if (mMtpObjectHandle != 0) {
                     values.put(MediaStore.MediaColumns.MEDIA_SCANNER_NEW_OBJECT_ID, mMtpObjectHandle);
@@ -937,15 +960,27 @@ public class MediaScanner
                 // notifications, ringtones, and alarms, because the rowId of the inserted file is
                 // needed.
                 if (mWasEmptyPriorToScan) {
-                    if (notifications && !mDefaultNotificationSet) {
+                    if (notifications && (!mDefaultNotificationSet || !mDefaultMmsNotificationSet)) {
                         if (TextUtils.isEmpty(mDefaultNotificationFilename) ||
                                 doesPathHaveFilename(entry.mPath, mDefaultNotificationFilename)) {
                             needToSetSettings = true;
+                            needToSetNormalNotificationSettings = true;
                         }
-                    } else if (ringtones && !mDefaultRingtoneSet) {
+                        if (TextUtils.isEmpty(mDefaultMmsNotificationFilename) ||
+                                doesPathHaveFilename(entry.mPath, mDefaultMmsNotificationFilename)) {
+                            needToSetSettings = true;
+                            needToSetMmsNotificationSettings = true;
+                        }
+                    } else if (ringtones && (!mDefaultRingtoneSet | !mDefaultRingtone2Set)) {
                         if (TextUtils.isEmpty(mDefaultRingtoneFilename) ||
                                 doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename)) {
                             needToSetSettings = true;
+                            needToSetRingtoneSettings = true;
+                        }
+                        if (TextUtils.isEmpty(mDefaultRingtone2Filename) ||
+                                doesPathHaveFilename(entry.mPath, mDefaultRingtone2Filename)) {
+                            needToSetSettings = true;
+                            needToSetRingtone2Settings = true;
                         }
                     } else if (alarms && !mDefaultAlarmSet) {
                         if (TextUtils.isEmpty(mDefaultAlarmAlertFilename) ||
@@ -1001,15 +1036,25 @@ public class MediaScanner
 
             if(needToSetSettings) {
                 if (notifications) {
-                    setSettingIfNotSet(Settings.System.NOTIFICATION_SOUND, tableUri, rowId);
-                    mDefaultNotificationSet = true;
-                } else if (ringtones) {
-                    setSettingIfNotSet(Settings.System.RINGTONE, tableUri, rowId);
-                    if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-                        // Set the setting to the given URI for RINGTONE_2
-                        setSettingIfNotSet(Settings.System.RINGTONE_2, tableUri, rowId);
+                    if (needToSetNormalNotificationSettings){
+                        setSettingIfNotSet(Settings.System.NOTIFICATION_SOUND, tableUri, rowId);
+                        mDefaultNotificationSet = true;
                     }
-                    mDefaultRingtoneSet = true;
+                    if (needToSetMmsNotificationSettings){
+                        setSettingIfNotSet(Settings.System.MMS_NOTIFICATION_SOUND, tableUri, rowId);
+                        mDefaultMmsNotificationSet = true;
+                    }
+                } else if (ringtones) {
+                    if (needToSetRingtoneSettings){
+                        setSettingIfNotSet(Settings.System.RINGTONE, tableUri, rowId);
+                        mDefaultRingtoneSet = true;
+                    }
+                    if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                        if (needToSetRingtone2Settings){
+                            setSettingIfNotSet(Settings.System.RINGTONE_2, tableUri, rowId);
+                            mDefaultRingtone2Set = true;
+                        }
+                    }
                 } else if (alarms) {
                     setSettingIfNotSet(Settings.System.ALARM_ALERT, tableUri, rowId);
                     mDefaultAlarmSet = true;

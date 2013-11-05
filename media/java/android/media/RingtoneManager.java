@@ -79,6 +79,13 @@ public class RingtoneManager {
     public static final int TYPE_RINGTONE_2 = 8;
 
     /**
+     * Type that refers to sounds that are used for mms notifications.
+     *
+     * @hide
+     */
+    public static final int TYPE_MMS_NOTIFICATION = 16;
+
+    /**
      * All types of sounds.
      */
     public static final int TYPE_ALL = TYPE_RINGTONE | TYPE_NOTIFICATION | TYPE_ALARM;
@@ -155,7 +162,8 @@ public class RingtoneManager {
     /**
      * Given to the ringtone picker as an int. Specifies which ringtone type(s) should be
      * shown in the picker. One or more of {@link #TYPE_RINGTONE},
-     * {@link #TYPE_NOTIFICATION}, {@link #TYPE_ALARM}, or {@link #TYPE_ALL}
+     * {@link #TYPE_NOTIFICATION}, {@link #TYPE_MMS_NOTIFICATION},
+     * {@link #TYPE_ALARM}, or {@link #TYPE_ALL}
      * (bitwise-ored together).
      */
     public static final String EXTRA_RINGTONE_TYPE = "android.intent.extra.ringtone.TYPE";
@@ -265,8 +273,8 @@ public class RingtoneManager {
      * Sets which type(s) of ringtones will be listed by this.
      * 
      * @param type The type(s), one or more of {@link #TYPE_RINGTONE},
-     *            {@link #TYPE_NOTIFICATION}, {@link #TYPE_ALARM},
-     *            {@link #TYPE_ALL}.
+     *            {@link #TYPE_NOTIFICATION}, {@link #TYPE_NOTIFICATION},
+     *            {@link #TYPE_ALARM}, {@link #TYPE_ALL}.
      * @see #EXTRA_RINGTONE_TYPE           
      */
     public void setType(int type) {
@@ -295,6 +303,9 @@ public class RingtoneManager {
             case TYPE_NOTIFICATION:
                 return AudioManager.STREAM_NOTIFICATION;
                 
+            case TYPE_MMS_NOTIFICATION:
+                return AudioManager.STREAM_NOTIFICATION;
+
             default:
                 return AudioManager.STREAM_RING;
         }
@@ -534,6 +545,10 @@ public class RingtoneManager {
         if ((type & TYPE_NOTIFICATION) != 0) {
             columns.add(MediaStore.Audio.AudioColumns.IS_NOTIFICATION);
         }
+
+        if ((type & TYPE_MMS_NOTIFICATION) != 0) {
+            columns.add(MediaStore.Audio.AudioColumns.IS_NOTIFICATION);
+        }
         
         if ((type & TYPE_ALARM) != 0) {
             columns.add(MediaStore.Audio.AudioColumns.IS_ALARM);
@@ -643,8 +658,8 @@ public class RingtoneManager {
      * 
      * @param context A context used for querying.
      * @param type The type whose default sound should be returned. One of
-     *            {@link #TYPE_RINGTONE}, {@link #TYPE_NOTIFICATION}, or
-     *            {@link #TYPE_ALARM}.
+     *            {@link #TYPE_RINGTONE}, {@link #TYPE_NOTIFICATION},
+     *            {@link #TYPE_NOTIFICATION}, or {@link #TYPE_ALARM}.
      * @return A {@link Uri} pointing to the default sound for the sound type.
      * @see #setActualDefaultRingtoneUri(Context, int, Uri)
      */
@@ -660,8 +675,8 @@ public class RingtoneManager {
      * 
      * @param context A context used for querying.
      * @param type The type whose default sound should be set. One of
-     *            {@link #TYPE_RINGTONE}, {@link #TYPE_NOTIFICATION}, or
-     *            {@link #TYPE_ALARM}.
+     *            {@link #TYPE_RINGTONE}, {@link #TYPE_NOTIFICATION},
+     *            {@link #TYPE_MMS_NOTIFICATION} or {@link #TYPE_ALARM}.
      * @param ringtoneUri A {@link Uri} pointing to the default sound to set.
      * @see #getActualDefaultRingtoneUri(Context, int)
      */
@@ -677,6 +692,8 @@ public class RingtoneManager {
             return Settings.System.RINGTONE;
         } else if ((type & TYPE_NOTIFICATION) != 0) {
             return Settings.System.NOTIFICATION_SOUND;
+        } else if ((type & TYPE_MMS_NOTIFICATION) != 0) {
+            return Settings.System.MMS_NOTIFICATION_SOUND;
         } else if ((type & TYPE_ALARM) != 0) {
             return Settings.System.ALARM_ALERT;
         } else if ((type & TYPE_RINGTONE_2) != 0) {
@@ -701,7 +718,8 @@ public class RingtoneManager {
      * 
      * @param defaultRingtoneUri The default {@link Uri}. For example,
      *            {@link System#DEFAULT_RINGTONE_URI},
-     *            {@link System#DEFAULT_NOTIFICATION_URI}, or
+     *            {@link System#DEFAULT_NOTIFICATION_URI},
+     *            {@link System#DEFAULT_MMS_NOTIFICATION_URI}, or
      *            {@link System#DEFAULT_ALARM_ALERT_URI}.
      * @return The type of the defaultRingtoneUri, or -1.
      */
@@ -712,6 +730,8 @@ public class RingtoneManager {
             return TYPE_RINGTONE;
         } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_NOTIFICATION_URI)) {
             return TYPE_NOTIFICATION;
+        } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_MMS_NOTIFICATION_URI)) {
+            return TYPE_MMS_NOTIFICATION;
         } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_ALARM_ALERT_URI)) {
             return TYPE_ALARM;
         } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_RINGTONE_URI_2)) {
@@ -735,6 +755,8 @@ public class RingtoneManager {
             return Settings.System.DEFAULT_RINGTONE_URI;
         } else if ((type & TYPE_NOTIFICATION) != 0) {
             return Settings.System.DEFAULT_NOTIFICATION_URI;
+        } else if ((type & TYPE_MMS_NOTIFICATION) != 0) {
+            return Settings.System.DEFAULT_MMS_NOTIFICATION_URI;
         } else if ((type & TYPE_ALARM) != 0) {
             return Settings.System.DEFAULT_ALARM_ALERT_URI;
         } else if ((type & TYPE_RINGTONE_2) != 0) {
