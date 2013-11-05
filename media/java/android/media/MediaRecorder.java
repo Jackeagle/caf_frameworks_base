@@ -813,7 +813,6 @@ public class MediaRecorder
      * @see android.media.MediaRecorder.OnInfoListener
      */
     public static final int MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED = 801;
-
     /** informational events for individual tracks, for testing purpose.
      * The track informational event usually contains two parts in the ext1
      * arg of the onInfo() callback: bit 31-28 contains the track id; and
@@ -881,6 +880,10 @@ public class MediaRecorder
      * {@hide}
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_LIST_END          = 2000;
+    /** A maximum waiting-to-write-to-file frame number had been setup and has now been reached.
+     * @hide android.media.MediaRecorder.OnInfoListener
+     */
+    public static final int MEDIA_RECORDER_INFO_FILE_WRITER_SPEED_NOT_CATCHUP = 802;
 
 
     /**
