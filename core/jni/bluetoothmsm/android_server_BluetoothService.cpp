@@ -147,6 +147,8 @@ static bool initializeNativeDataNative(JNIEnv* env, jobject object) {
     if (dbus_error_is_set(&err)) {
         ALOGE("Could not get onto the system bus: %s", err.message);
         dbus_error_free(&err);
+        if(nat) free (nat);
+        env->SetIntField(object, field_mNativeData, 0);
         return false;
     }
     dbus_connection_set_exit_on_disconnect(nat->conn, FALSE);
@@ -379,9 +381,16 @@ static jboolean createPairedDeviceNative(JNIEnv *env, jobject object,
     if (nat && eventLoopNat) {
         const char *c_address = env->GetStringUTFChars(address, NULL);
         ALOGV("... address = %s", c_address);
-        char *context_address = (char *)calloc(BTADDR_SIZE, sizeof(char));
         const char *capabilities = "KeyboardDisplay";
         const char *agent_path = "/android/bluetooth/remote_device_agent";
+
+        char *context_address = (char *)calloc(BTADDR_SIZE, sizeof(char));
+
+        if (context_address == NULL) {
+            ALOGE("Alloc Error: context_address");
+            env->ReleaseStringUTFChars(address, c_address);
+            return JNI_FALSE;
+        }
 
         strlcpy(context_address, c_address, BTADDR_SIZE);  // for callback
         bool ret = dbus_func_args_async(env, nat->conn, (int)timeout_ms,
@@ -396,6 +405,12 @@ static jboolean createPairedDeviceNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_STRING, &capabilities,
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
+
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_address) free(context_address);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
 
     }
@@ -415,9 +430,15 @@ static jboolean createPairedDeviceOutOfBandNative(JNIEnv *env, jobject object,
     if (nat && eventLoopNat) {
         const char *c_address = env->GetStringUTFChars(address, NULL);
         ALOGV("... address = %s", c_address);
-        char *context_address = (char *)calloc(BTADDR_SIZE, sizeof(char));
         const char *capabilities = "KeyboardDisplay";
         const char *agent_path = "/android/bluetooth/remote_device_agent";
+
+        char *context_address = (char *)calloc(BTADDR_SIZE, sizeof(char));
+        if (context_address == NULL) {
+            ALOGE("Alloca Error: context_address");
+            env->ReleaseStringUTFChars(address, c_address);
+            return JNI_FALSE;
+        }
 
         strlcpy(context_address, c_address, BTADDR_SIZE);  // for callback
         bool ret = dbus_func_args_async(env, nat->conn, (int)timeout_ms,
@@ -432,6 +453,12 @@ static jboolean createPairedDeviceOutOfBandNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_STRING, &capabilities,
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
+
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_address) free(context_address);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1108,7 +1135,7 @@ static jboolean setLEConnectionParamNative(JNIEnv *env, jobject object,
         DBusError err;
 
         const char *c_path = env->GetStringUTFChars(path, NULL);
-       ALOGE("the dbus object path: %s", c_path);
+        ALOGE("the dbus object path: %s", c_path);
 
         dbus_error_init(&err);
         msg = dbus_message_new_method_call(BLUEZ_DBUS_BASE_IFC,
@@ -1253,6 +1280,12 @@ static jboolean createDeviceNative(JNIEnv *env, jobject object,
         const char *c_address = env->GetStringUTFChars(address, NULL);
         ALOGV("... address = %s", c_address);
         char *context_address = (char *)calloc(BTADDR_SIZE, sizeof(char));
+        if (context_address == NULL) {
+            ALOGE("Alloca Error: context_address");
+            env->ReleaseStringUTFChars(address, c_address);
+            return JNI_FALSE;
+        }
+
         strlcpy(context_address, c_address, BTADDR_SIZE);  // for callback
 
         bool ret = dbus_func_args_async(env, nat->conn, -1,
@@ -1265,6 +1298,11 @@ static jboolean createDeviceNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_STRING, &c_address,
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(address, c_address);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_address) free(context_address);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1287,6 +1325,7 @@ static jboolean addToPreferredDeviceListNative(JNIEnv *env, jobject object,
         if (context_path != NULL) {
             strlcpy(context_path, c_path, len);  // for callback
         } else {
+            env->ReleaseStringUTFChars(path, c_path);
             return JNI_FALSE;
         }
 
@@ -1299,6 +1338,12 @@ static jboolean addToPreferredDeviceListNative(JNIEnv *env, jobject object,
                                         "AddToWhiteList",
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
+
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1321,6 +1366,7 @@ static jboolean removeFromPreferredDeviceListNative(JNIEnv *env, jobject object,
         if (context_path != NULL) {
             strlcpy(context_path, c_path, len);  // for callback
         } else {
+            env->ReleaseStringUTFChars(path, c_path);
             return JNI_FALSE;
         }
 
@@ -1333,6 +1379,13 @@ static jboolean removeFromPreferredDeviceListNative(JNIEnv *env, jobject object,
                                         "RemoveFromWhiteList",
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
+
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1442,7 +1495,12 @@ static jboolean discoverServicesNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
         env->ReleaseStringUTFChars(pattern, c_pattern);
-        return ret ? JNI_TRUE : JNI_FALSE;
+
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+ return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
     return JNI_FALSE;
@@ -1635,6 +1693,11 @@ static jboolean connectInputDeviceNative(JNIEnv *env, jobject object, jstring pa
                                         DBUS_TYPE_INVALID);
 
         env->ReleaseStringUTFChars(path, c_path);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1658,6 +1721,7 @@ static jboolean disconnectInputDeviceNative(JNIEnv *env, jobject object,
         if (context_path != NULL) {
             strlcpy(context_path, c_path, len);  // for callback
         } else {
+            env->ReleaseStringUTFChars(path, c_path);
             return JNI_FALSE;
         }
 
@@ -1667,6 +1731,11 @@ static jboolean disconnectInputDeviceNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_INVALID);
 
         env->ReleaseStringUTFChars(path, c_path);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1734,6 +1803,12 @@ static jboolean connectPanDeviceNative(JNIEnv *env, jobject object, jstring path
 
         env->ReleaseStringUTFChars(path, c_path);
         env->ReleaseStringUTFChars(dstRole, dst);
+
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1763,6 +1838,11 @@ static jboolean disconnectPanDeviceNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_INVALID);
 
         env->ReleaseStringUTFChars(path, c_path);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -1802,6 +1882,11 @@ static jboolean disconnectPanServerDeviceNative(JNIEnv *env, jobject object,
         env->ReleaseStringUTFChars(address, c_address);
         env->ReleaseStringUTFChars(iface, c_iface);
         env->ReleaseStringUTFChars(path, c_path);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -2105,10 +2190,6 @@ static jboolean indicateNative(JNIEnv *env, jobject object,
 
         const char *c_obj_path = env->GetStringUTFChars(objPath, NULL);
 
-        int len = env->GetStringLength(objPath) + 1;
-        char *context_path = (char *)calloc(len, sizeof(char));
-        strlcpy(context_path, c_obj_path, len);  // for callback
-
         jbyte *payload_ptr = env->GetByteArrayElements(payload, NULL);
         dbus_error_init(&err);
 
@@ -2119,7 +2200,9 @@ static jboolean indicateNative(JNIEnv *env, jobject object,
 
         if (msg == NULL) {
            ALOGE("Could not allocate D-Bus message object!");
-            return NULL;
+           env->ReleaseStringUTFChars(objPath, c_obj_path);
+           env->ReleaseByteArrayElements(payload, payload_ptr, 0);
+           return NULL;
         }
 
         /* append arguments */
@@ -2132,15 +2215,37 @@ static jboolean indicateNative(JNIEnv *env, jobject object,
         // Setup the callback info
         struct set_indicate_info_t *prop;
         prop = (set_indicate_info_t *) calloc(1, sizeof(struct set_indicate_info_t));
+        if (prop ==  NULL) {
+             ALOGE("out of memory: prop");
+             env->ReleaseStringUTFChars(objPath, c_obj_path);
+             env->ReleaseByteArrayElements(payload, payload_ptr, 0);
+
+             return JNI_FALSE;
+        }
 
         prop->path = (char *)calloc(strlen(c_obj_path) + 1, sizeof(char));
+        if (prop->path ==  NULL) {
+             ALOGE("out of memory: prop->path");
+             if (prop != NULL) free(prop);
+             env->ReleaseStringUTFChars(objPath, c_obj_path);
+             env->ReleaseByteArrayElements(payload, payload_ptr, 0);
+
+             return JNI_FALSE;
+        }
+
         strlcpy(prop->path, c_obj_path, strlen(c_obj_path) + 1);
 
         /* Make the call. */
         pending = (dbus_async_call_t *)malloc(sizeof(dbus_async_call_t));
 
         if (!pending) {
-           ALOGE("!pending");
+            ALOGE("!pending");
+
+            if (prop->path != NULL) free(prop->path);
+            if (prop != NULL) free(prop);
+            env->ReleaseStringUTFChars(objPath, c_obj_path);
+            env->ReleaseByteArrayElements(payload, payload_ptr, 0);
+
             return JNI_FALSE;
         }
 
@@ -2165,6 +2270,8 @@ static jboolean indicateNative(JNIEnv *env, jobject object,
            if (dbus_error_is_set(&err)) {
            LOG_AND_FREE_DBUS_ERROR(&err);
            }
+           if (prop->path != NULL) free(prop->path);
+           if (prop != NULL) free(prop);
        }
 
        env->ReleaseStringUTFChars(objPath, c_obj_path);
@@ -3012,8 +3119,8 @@ static jboolean discoverCharacteristicsNative(JNIEnv *env, jobject object,
         strlcat(context_path, c_data, len);
         ALOGE("%s.. %s\n", __FUNCTION__, context_path);
 
-       ALOGV("... Object Path = %s", c_path);
-       ALOGE(" %s .. Object Path = %s\n",  __FUNCTION__, c_path);
+        ALOGV("... Object Path = %s", c_path);
+        ALOGE(" %s .. Object Path = %s\n",  __FUNCTION__, c_path);
 
         bool ret = dbus_func_args_async(env, nat->conn, -1,
                                         onDiscoverCharacteristicsResult,
@@ -3025,6 +3132,11 @@ static jboolean discoverCharacteristicsNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
         env->ReleaseStringUTFChars(path, c_data);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
+
         return ret ? JNI_TRUE : JNI_FALSE;
     }
 #endif
@@ -3383,12 +3495,40 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
             // Setup the callback info
             struct set_characteristic_property_t *prop;
             prop = (set_characteristic_property_t *) calloc(1, sizeof(struct set_characteristic_property_t));
-            prop->path = (char *)calloc(strlen(c_path) + strlen(c_data) + 1, sizeof(char));
+            if (prop == NULL ) {
+                ALOGE("Malloc error for prop");
+                env->ReleaseStringUTFChars(key, c_key);
+                env->ReleaseStringUTFChars(path, c_path);
+                env->ReleaseStringUTFChars(data, c_data);
+                env->ReleaseByteArrayElements(value, v_ptr, 0);
+                return JNI_FALSE;
+            }
 
-            prop->path = (char *)calloc(strlen(c_path) + 1, sizeof(char));
+            prop->path = (char *)calloc(strlen(c_path) + strlen(c_data) + 1, sizeof(char));
+            if (prop->path == NULL ) {
+                ALOGE("Malloc error for prop->path");
+                if (prop != NULL) free(prop);
+                env->ReleaseStringUTFChars(key, c_key);
+                env->ReleaseStringUTFChars(path, c_path);
+                env->ReleaseStringUTFChars(data, c_data);
+                env->ReleaseByteArrayElements(value, v_ptr, 0);
+                return JNI_FALSE;
+            }
+
             strlcpy(prop->path, c_path, strlen(c_path) + 1);
 
             prop->property = (char *)calloc(strlen(c_key) + 1, sizeof(char));
+            if (prop->property == NULL ) {
+                ALOGE("Malloc error for prop->property");
+                if (prop->path != NULL) free(prop->path);
+                if (prop != NULL) free(prop);
+                env->ReleaseStringUTFChars(key, c_key);
+                env->ReleaseStringUTFChars(path, c_path);
+                env->ReleaseStringUTFChars(data, c_data);
+                env->ReleaseByteArrayElements(value, v_ptr, 0);
+                return JNI_FALSE;
+            }
+
             strlcpy(prop->property, c_key, strlen(c_key) + 1);
             strlcat(prop->path, c_data, strlen(c_path)+ strlen(c_data) + 1);
             ALOGE(" %s .. user data = %s\n",  __FUNCTION__, prop->path);
@@ -3396,8 +3536,19 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
             // Make the call.
             pending = (dbus_async_call_t *)malloc(sizeof(dbus_async_call_t));
 
-            if (!pending)
+            if (!pending) {
+                ALOGE("%s: Can't allocate pending", __FUNCTION__);
+
+                if (prop->property != NULL) free(prop->property);
+                if (prop->path != NULL) free(prop->path);
+                if (prop != NULL) free(prop);
+                env->ReleaseStringUTFChars(key, c_key);
+                env->ReleaseStringUTFChars(path, c_path);
+                env->ReleaseStringUTFChars(data, c_data);
+                env->ReleaseByteArrayElements(value, v_ptr, 0);
+
                 return JNI_FALSE;
+            }
 
             DBusPendingCall *call;
 
@@ -3419,6 +3570,9 @@ static jboolean setCharacteristicPropertyNative(JNIEnv *env, jobject object, jst
                 if (dbus_error_is_set(&err)) {
                     LOG_AND_FREE_DBUS_ERROR(&err);
                 }
+                if (prop->property != NULL) free(prop->property);
+                if (prop->path != NULL) free(prop->path);
+                if (prop != NULL) free(prop);
             }
 
         } else {
@@ -3468,6 +3622,13 @@ static jboolean updateCharacteristicValueNative(JNIEnv *env, jobject object,
         int len = env->GetStringLength(path) + env->GetStringLength(data) + 1;
         int pathLen = env->GetStringLength(path) + 1;
         char *context_path = (char *)calloc(len, sizeof(char));
+        if (context_path == NULL) {
+            ALOGE("Alloca Error: context_address");
+            env->ReleaseStringUTFChars(path, c_path);
+            env->ReleaseStringUTFChars(data, c_data);
+            return JNI_FALSE;
+        }
+
         strlcpy(context_path, c_path, pathLen);  // for callback
         strlcat(context_path, c_data, len);
 
@@ -3484,6 +3645,10 @@ static jboolean updateCharacteristicValueNative(JNIEnv *env, jobject object,
                                         DBUS_TYPE_INVALID);
         env->ReleaseStringUTFChars(path, c_path);
         env->ReleaseStringUTFChars(data, c_data);
+        if (ret != true) {
+            ALOGE("D-Bus Error: ");
+            if (context_path) free(context_path);
+        }
 
         return ret ? JNI_TRUE : JNI_FALSE;
     }
