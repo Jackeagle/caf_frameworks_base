@@ -125,6 +125,12 @@ public class EmergencyButton extends Button {
                 enabled = true;
             }
         }
+
+        if (getContext().getResources().getBoolean(com.android.internal.R.bool.icccardexist_hide_emergencybutton)) {
+            if (simState.iccCardExist())
+                enabled = false;
+        }
+
         mLockPatternUtils.updateEmergencyCallButtonState(this, phoneState, enabled,
                 KeyguardViewManager.USE_UPPER_CASE, false);
     }

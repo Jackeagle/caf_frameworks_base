@@ -1292,6 +1292,7 @@
   <java-symbol type="bool" name="target_honeycomb_needs_options_menu" />
   <java-symbol type="bool" name="kg_center_small_widgets_vertically" />
   <java-symbol type="bool" name="kg_show_ime_at_screen_on" />
+  <java-symbol type="bool" name="icccardexist_hide_emergencybutton" />
   <java-symbol type="color" name="kg_multi_user_text_active" />
   <java-symbol type="color" name="kg_multi_user_text_inactive" />
   <java-symbol type="color" name="kg_widget_pager_gradient" />
