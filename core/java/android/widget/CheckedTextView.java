@@ -242,7 +242,11 @@ public class CheckedTextView extends TextView implements Checkable {
                 right = width - mBasePadding;
                 left = right - mCheckMarkWidth;
             }
-            checkMarkDrawable.setBounds( left, top, right, bottom);
+            if (isLayoutRtl()) {
+                checkMarkDrawable.setBounds( mScrollX + left, top, mScrollX + right, bottom);
+            } else {
+                checkMarkDrawable.setBounds( left, top, right, bottom);
+            }
             checkMarkDrawable.draw(canvas);
         }
     }

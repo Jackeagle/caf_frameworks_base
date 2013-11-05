@@ -24,6 +24,7 @@
     android:id="@+id/recents_root"
     android:layout_height="match_parent"
     android:layout_width="match_parent"
+    android:layoutDirection="ltr"
     systemui:recentItemLayout="@layout/status_bar_recent_item"
     >
     <FrameLayout

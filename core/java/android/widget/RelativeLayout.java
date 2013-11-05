@@ -26,6 +26,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
@@ -454,18 +455,33 @@ public class RelativeLayout extends ViewGroup {
         final boolean isWrapContentWidth = widthMode != MeasureSpec.EXACTLY;
         final boolean isWrapContentHeight = heightMode != MeasureSpec.EXACTLY;
 
-        // We need to know our size for doing the correct computation of children positioning in RTL
-        // mode but there is no practical way to get it instead of running the code below.
-        // So, instead of running the code twice, we just set the width to a "default display width"
-        // before the computation and then, as a last pass, we will update their real position with
-        // an offset equals to "DEFAULT_WIDTH - width".
-        final int layoutDirection = getLayoutDirection();
-        if (isLayoutRtl() && myWidth == -1) {
-            myWidth = DEFAULT_WIDTH;
-        }
-
         View[] views = mSortedHorizontalChildren;
         int count = views.length;
+
+        final int layoutDirection = getLayoutDirection();
+
+        // We need to know our size for doing the correct computation of positioning in RTL mode
+        if (isLayoutRtl() && (myWidth == -1 || isWrapContentWidth)) {
+            int w = getPaddingStart() + getPaddingEnd();
+            w += getChildrenWidthForRtl(views, count, myHeight);
+            if (myWidth == -1) {
+                // Easy case: "myWidth" was undefined before so use the width we have just computed
+                myWidth = w;
+            } else {
+                // "myWidth" was defined before, so take the min of it and the computed width if it
+                // is a non null one
+                boolean needMostWidth = getLayoutParams().width == LayoutParams.MATCH_PARENT;
+                if (getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                    LinearLayout.LayoutParams lp =
+                        (LinearLayout.LayoutParams)getLayoutParams();
+                    needMostWidth = needMostWidth ||
+                        lp.width == LayoutParams.WRAP_CONTENT && lp.weight > 0;
+                }
+                if (w > 0 && !(needMostWidth && myWidth > w)) {
+                    myWidth = Math.min(myWidth, w);
+                }
+            }
+        }
 
         for (int i = 0; i < count; i++) {
             View child = views[i];
@@ -497,11 +513,7 @@ public class RelativeLayout extends ViewGroup {
                 }
 
                 if (isWrapContentWidth) {
-                    if (isLayoutRtl()) {
-                        width = Math.max(width, myWidth - params.mLeft);
-                    } else {
-                        width = Math.max(width, params.mRight);
-                    }
+                    width = Math.max(width, params.mRight);
                 }
 
                 if (isWrapContentHeight) {
@@ -627,19 +639,6 @@ public class RelativeLayout extends ViewGroup {
                     }
                 }
             }
-        }
-
-        if (isLayoutRtl()) {
-            final int offsetWidth = myWidth - width;
-            for (int i = 0; i < count; i++) {
-                View child = getChildAt(i);
-                if (child.getVisibility() != GONE) {
-                    LayoutParams params = (LayoutParams) child.getLayoutParams();
-                    params.mLeft -= offsetWidth;
-                    params.mRight -= offsetWidth;
-                }
-            }
-
         }
 
         setMeasuredDimension(width, height);
@@ -1027,6 +1026,93 @@ public class RelativeLayout extends ViewGroup {
         return null;
     }
 
+    private int getChildrenWidthForRtl(View[] views, int count, int myHeight) {
+        int[] childWidths = new int[count];
+        int maxAlignParentWidth = 0;
+        final int childWidthMeasureSpec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+
+        for (int i = 0; i < count; i++) {
+            View child = views[i];
+            if (child.getVisibility() != GONE) {
+                LayoutParams params = (LayoutParams) child.getLayoutParams();
+                // Would be similar to a call to measureChildHorizontal(child, params, -1, myHeight)
+                // but we cannot change for now the behavior of measureChildHorizontal() for
+                // taking care or a "-1" for "mywidth" so use here our own version of that code.
+                int childHeightMeasureSpec;
+                if (params.width == LayoutParams.MATCH_PARENT) {
+                    childHeightMeasureSpec =
+                        MeasureSpec.makeMeasureSpec(myHeight, MeasureSpec.EXACTLY);
+                } else {
+                    childHeightMeasureSpec =
+                        MeasureSpec.makeMeasureSpec(myHeight, MeasureSpec.AT_MOST);
+                }
+                child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
+
+                // Filter widths of align together views.
+                int currChildWidth = Math.max(params.width, child.getMeasuredWidth()) +
+                        params.leftMargin + params.rightMargin;
+                final int[] rules = params.getRules(View.LAYOUT_DIRECTION_RTL);
+                boolean needCalculate = true;
+
+                int anchorIndex = getRelatedViewIndex(rules, ALIGN_LEFT, views);
+                if (anchorIndex >= 0) {
+                    childWidths[anchorIndex] = Math.max(currChildWidth, childWidths[anchorIndex]);
+                    needCalculate = false;
+                } else if (params.alignWithParent && 0 != rules[ALIGN_LEFT]) {
+                    maxAlignParentWidth = Math.max(maxAlignParentWidth, currChildWidth);
+                    needCalculate = false;
+                }
+
+                anchorIndex = getRelatedViewIndex(rules, ALIGN_RIGHT, views);
+                if (anchorIndex >= 0) {
+                    childWidths[anchorIndex] = Math.max(currChildWidth, childWidths[anchorIndex]);
+                    needCalculate = false;
+                } else if (params.alignWithParent && 0 != rules[ALIGN_RIGHT]) {
+                    maxAlignParentWidth = Math.max(maxAlignParentWidth, currChildWidth);
+                    needCalculate = false;
+                }
+
+                if (0 != rules[ALIGN_PARENT_LEFT] || 0 != rules[ALIGN_PARENT_RIGHT]) {
+                    if (0 != rules[ALIGN_PARENT_LEFT] && 0 != rules[LEFT_OF]) {
+                        anchorIndex = getRelatedViewIndex(rules, LEFT_OF, views);
+                        if (anchorIndex >= 0) {
+                            maxAlignParentWidth = Math.max(maxAlignParentWidth,
+                                currChildWidth + childWidths[anchorIndex]);
+                        }
+                    } else if (0 != rules[ALIGN_PARENT_RIGHT] && 0 != rules[RIGHT_OF]) {
+                        anchorIndex = getRelatedViewIndex(rules, RIGHT_OF, views);
+                        if (anchorIndex >= 0) {
+                            maxAlignParentWidth = Math.max(maxAlignParentWidth,
+                                currChildWidth + childWidths[anchorIndex]);
+                        }
+                    } else {
+                        maxAlignParentWidth = Math.max(maxAlignParentWidth, currChildWidth);
+                        needCalculate = false;
+                    }
+                }
+
+                if (needCalculate) childWidths[i] = currChildWidth;
+            }
+        }
+
+        int width = 0;
+        for (int i = 0; i < count; i++) width += childWidths[i];
+
+        return Math.max(width, maxAlignParentWidth);
+    }
+
+    private int getRelatedViewIndex(int[] rules, int relation, View[] views) {
+        int index = -1;
+        View anchorView = getRelatedView(rules, relation);
+        for (int i = 0; anchorView != null && i < views.length; i++) {
+            if (views[i] == anchorView) {
+                index = i;
+                break;
+            }
+        }
+        return index;
+    }
+
     private LayoutParams getRelatedViewParams(int[] rules, int relation) {
         View v = getRelatedView(rules, relation);
         if (v != null) {
@@ -1249,7 +1335,9 @@ public class RelativeLayout extends ViewGroup {
                     com.android.internal.R.styleable.RelativeLayout_Layout);
 
             final int targetSdkVersion = c.getApplicationInfo().targetSdkVersion;
-            mIsRtlCompatibilityMode = (targetSdkVersion < JELLY_BEAN_MR1 ||
+            final boolean isSystemApp = (c.getApplicationInfo().flags &
+                    ApplicationInfo.FLAG_SYSTEM) != 0;
+            mIsRtlCompatibilityMode = (targetSdkVersion < JELLY_BEAN_MR1 && !isSystemApp ||
                     !c.getApplicationInfo().hasRtlSupport());
 
             final int[] rules = mRules;
