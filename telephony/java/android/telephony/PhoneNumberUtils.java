@@ -178,7 +178,7 @@ public class PhoneNumberUtils
 
         if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
             subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
-                MSimTelephonyManager.getDefault().getDefaultSubscription());
+                MSimTelephonyManager.getDefault().getPreferredVoiceSubscription());
         }
 
         if (scheme.equals("tel") || scheme.equals("sip")) {
