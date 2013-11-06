@@ -20,7 +20,11 @@
 #include <netinet/in.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-
+// Drm changes - start
+#include <drm/DrmManagerClient.h>
+#include <utils/Log.h>
+#include <fcntl.h>
+// Drm changes - end
 jfieldID gOptions_justBoundsFieldID;
 jfieldID gOptions_sampleSizeFieldID;
 jfieldID gOptions_configFieldID;
@@ -156,7 +160,9 @@ static SkPixelRef* installPixelRef(SkBitmap* bitmap, SkStream* stream,
 // i.e. dynamically allocated, since its lifetime may exceed the current stack
 // frame.
 static jobject doDecode(JNIEnv* env, SkStream* stream, jobject padding,
-        jobject options, bool allowPurgeable, bool forcePurgeable = false,
+        jobject options, bool allowPurgeable,
+        bool consumeRights,// DRM Change
+        bool forcePurgeable = false,
         bool applyScale = false, float scale = 1.0f) {
 
     int sampleSize = 1;
@@ -198,6 +204,77 @@ static jobject doDecode(JNIEnv* env, SkStream* stream, jobject padding,
     }
 
     SkImageDecoder* decoder = SkImageDecoder::Factory(stream);
+    // Drm changes -  start
+    if (NULL == decoder) {
+        DrmManagerClient* mDrmManagerClient = new DrmManagerClient();
+        sp<DecryptHandle> mDecryptHandle = NULL;
+        if (mDrmManagerClient != NULL) {
+            const int size=4096;
+            int readBytes = 0;
+            int encodedFD = -1;
+            char tempFile[50];
+            char tempDecodedFile[50];
+            int temp1 = rand();
+            int temp2 = rand();
+            sprintf(tempFile, "/data/local/.Drm/%d.temp", temp1);
+            sprintf(tempDecodedFile, "/data/local/.Drm/%d.temp", temp2);
+            ALOGV("dodecode:t1=%s ,t2=%s", tempFile, tempDecodedFile);
+
+            encodedFD = open (tempFile, O_WRONLY | O_CREAT, 0777);
+            char* encodedData = new char[size];
+
+            while ((readBytes = stream->read(encodedData, size)) > 0) {
+                write(encodedFD, encodedData, readBytes);
+            }
+            close(encodedFD);
+            if (encodedData != NULL) {
+                delete [] encodedData;
+            }
+            encodedFD = -1;
+            encodedFD = open (tempFile, O_RDONLY);
+
+            mDecryptHandle = mDrmManagerClient->openDecryptSession(encodedFD, 0, 1);
+            if ((mDecryptHandle !=NULL) && (mDecryptHandle->status == RightsStatus::RIGHTS_VALID)) {
+                char* data = new char[size];
+                int len = 0;
+                int decodedFD = -1;
+
+                decodedFD = open (tempDecodedFile, O_WRONLY | O_CREAT, 0777);
+                int offset = 0;
+                while ((len = mDrmManagerClient->pread(mDecryptHandle, data, size, offset)) > 0) {
+                    write(decodedFD, data, len);
+                    offset += len;
+                }
+
+                //Consume  Rights
+                if (consumeRights) {
+                    ALOGV("bitmap factory:doDecode: calling consumeRights");
+                    mDrmManagerClient->consumeRights(mDecryptHandle, Action::DISPLAY, true);
+                }
+                close(decodedFD);
+                decodedFD = -1;
+                decodedFD = open(tempDecodedFile, O_RDONLY);
+                bool weOwnTheFD=true;
+                stream = new SkFDStream(decodedFD, weOwnTheFD);
+                decoder = SkImageDecoder::Factory(stream);
+                if (data != NULL)
+                    delete [] data;
+            }
+            if (mDecryptHandle != NULL) {
+                mDrmManagerClient->closeDecryptSession(mDecryptHandle);
+                mDecryptHandle = NULL;
+            }
+            if (mDrmManagerClient !=NULL) {
+                delete mDrmManagerClient;
+                mDrmManagerClient = NULL;
+            }
+            if (encodedFD >= 0) close(encodedFD);
+            remove(tempFile);
+            remove(tempDecodedFile);
+        }
+    }
+    // Drm Chg -- END
+
     if (decoder == NULL) {
         return nullObjectReturn("SkImageDecoder::Factory returned null");
     }
@@ -401,24 +478,36 @@ static jobject doDecode(JNIEnv* env, SkStream* stream, jobject padding,
             isMutable, ninePatchChunk, layoutBounds, -1);
 }
 
+// DRM Change -- START
+/*
 static jobject nativeDecodeStreamScaled(JNIEnv* env, jobject clazz, jobject is, jbyteArray storage,
         jobject padding, jobject options, jboolean applyScale, jfloat scale) {
+*/
+static jobject nativeDecodeStreamScaled(JNIEnv* env, jobject clazz, jobject is, jbyteArray storage,
+        jobject padding, jobject options, jboolean applyScale, jfloat scale, jboolean consumeRights=true) {
+// DRM Change -- END
 
     jobject bitmap = NULL;
     SkStream* stream = CreateJavaInputStreamAdaptor(env, is, storage, 0);
 
     if (stream) {
         // for now we don't allow purgeable with java inputstreams
-        bitmap = doDecode(env, stream, padding, options, false, false, applyScale, scale);
+// DRM Change -- START
+        bitmap = doDecode(env, stream, padding, options, false, consumeRights, false, applyScale, scale);
+        //bitmap = doDecode(env, stream, padding, options, false, false, applyScale, scale);
+// DRM Change -- END
         stream->unref();
     }
     return bitmap;
 }
 
+// DRM Change -- START
 static jobject nativeDecodeStream(JNIEnv* env, jobject clazz, jobject is, jbyteArray storage,
-        jobject padding, jobject options) {
+        jobject padding, jobject options, jboolean consumeRights = true) {
 
-    return nativeDecodeStreamScaled(env, clazz, is, storage, padding, options, false, 1.0f);
+    return nativeDecodeStreamScaled(env, clazz, is, storage, padding, options, false, 1.0f, consumeRights);
+    //return nativeDecodeStreamScaled(env, clazz, is, storage, padding, options, false, 1.0f);
+// DRM Change -- END
 }
 
 static ssize_t getFDSize(int fd) {
@@ -432,7 +521,9 @@ static ssize_t getFDSize(int fd) {
 }
 
 static jobject nativeDecodeFileDescriptor(JNIEnv* env, jobject clazz, jobject fileDescriptor,
-        jobject padding, jobject bitmapFactoryOptions) {
+// DRM Change -- START
+        jobject padding, jobject bitmapFactoryOptions, jboolean consumeRights = true) {
+// DRM Change -- END
 
     NPE_CHECK_RETURN_ZERO(env, fileDescriptor);
 
@@ -464,7 +555,34 @@ static jobject nativeDecodeFileDescriptor(JNIEnv* env, jobject clazz, jobject fi
     /* Allow purgeable iff we own the FD, i.e., in the puregeable and
        shareable case.
     */
-    return doDecode(env, stream, padding, bitmapFactoryOptions, weOwnTheFD);
+    // DRM Change -- START
+    //return doDecode(env, stream, padding, bitmapFactoryOptions, weOwnTheFD);
+    jobject obj = doDecode(env, stream, padding, bitmapFactoryOptions, weOwnTheFD, false);
+    if (consumeRights) {
+        ALOGV("nativeDecodeFileDescriptor1 with consumeRights=true");
+        DrmManagerClient* drmManagerClient = new DrmManagerClient();
+        sp<DecryptHandle> decryptHandle = NULL;
+        decryptHandle = drmManagerClient->openDecryptSession(descriptor,0,1);
+        if (decryptHandle !=NULL) {
+            //Consume  Rights
+            if (consumeRights) {
+                ALOGV("bitmap factory: calling consumeRights");
+                drmManagerClient->consumeRights(decryptHandle, Action::DISPLAY, true);
+            }
+        }
+        if (decryptHandle != NULL) {
+            drmManagerClient->closeDecryptSession(decryptHandle);
+            decryptHandle = NULL;
+        }
+        if (drmManagerClient != NULL) {
+            delete drmManagerClient;
+            drmManagerClient = NULL;
+        }
+    } else {
+        ALOGV("nativeDecodeFileDescriptor1 with consumeRights=false");
+    }
+    return obj;
+    // DRM Change -- END
 }
 
 /*  make a deep copy of the asset, and return it as a stream, or NULL if there
@@ -496,7 +614,9 @@ static SkStream* copyAssetToStream(Asset* asset) {
 }
 
 static jobject nativeDecodeAssetScaled(JNIEnv* env, jobject clazz, jint native_asset,
-        jobject padding, jobject options, jboolean applyScale, jfloat scale) {
+// DRM Change -- START
+        jobject padding, jobject options, jboolean applyScale, jfloat scale, jboolean consumeRights = true) {
+// DRM Change -- END
 
     SkStream* stream;
     Asset* asset = reinterpret_cast<Asset*>(native_asset);
@@ -514,18 +634,25 @@ static jobject nativeDecodeAssetScaled(JNIEnv* env, jobject clazz, jint native_a
         stream = new AssetStreamAdaptor(asset);
     }
     SkAutoUnref aur(stream);
-    return doDecode(env, stream, padding, options, true, forcePurgeable, applyScale, scale);
+// Drm changes CHG start
+    return doDecode(env, stream, padding, options, true, consumeRights, forcePurgeable, applyScale, scale);
+// Drm changes CHG End
 }
 
 static jobject nativeDecodeAsset(JNIEnv* env, jobject clazz, jint native_asset,
-        jobject padding, jobject options) {
+// Drm changes CHG start
+        jobject padding, jobject options, jboolean consumeRights = true) {
+// Drm changes CHG End
 
-    return nativeDecodeAssetScaled(env, clazz, native_asset, padding, options, false, 1.0f);
+// Drm changes CHG start
+    return nativeDecodeAssetScaled(env, clazz, native_asset, padding, options, false, 1.0f, consumeRights);
+// Drm changes CHG End
 }
 
 static jobject nativeDecodeByteArray(JNIEnv* env, jobject, jbyteArray byteArray,
-        int offset, int length, jobject options) {
-
+// Drm changes CHG start
+        int offset, int length, jobject options, jboolean consumeRights = true) {
+// Drm changes CHG end
     /*  If optionsShareable() we could decide to just wrap the java array and
         share it, but that means adding a globalref to the java array object
         and managing its lifetime. For now we just always copy the array's data
@@ -535,7 +662,9 @@ static jobject nativeDecodeByteArray(JNIEnv* env, jobject, jbyteArray byteArray,
     AutoJavaByteArray ar(env, byteArray);
     SkStream* stream = new SkMemoryStream(ar.ptr() + offset, length, purgeable);
     SkAutoUnref aur(stream);
-    return doDecode(env, stream, NULL, options, purgeable);
+// DRM Change -- START
+    return doDecode(env, stream, NULL, options, purgeable, consumeRights);
+// DRM Change -- END
 }
 
 static void nativeRequestCancel(JNIEnv*, jobject joptions) {
@@ -551,31 +680,43 @@ static jboolean nativeIsSeekable(JNIEnv* env, jobject, jobject fileDescriptor) {
 
 static JNINativeMethod gMethods[] = {
     {   "nativeDecodeStream",
-        "(Ljava/io/InputStream;[BLandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;",
+// DRM Change -- START
+        "(Ljava/io/InputStream;[BLandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;Z)Landroid/graphics/Bitmap;",
+// DRM Change -- END
         (void*)nativeDecodeStream
     },
     {   "nativeDecodeStream",
-        "(Ljava/io/InputStream;[BLandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;ZF)Landroid/graphics/Bitmap;",
+// DRM Change -- START
+        "(Ljava/io/InputStream;[BLandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;ZFZ)Landroid/graphics/Bitmap;",
+// DRM Change -- END
         (void*)nativeDecodeStreamScaled
     },
 
     {   "nativeDecodeFileDescriptor",
-        "(Ljava/io/FileDescriptor;Landroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;",
+// DRM Change -- START
+        "(Ljava/io/FileDescriptor;Landroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;Z)Landroid/graphics/Bitmap;",
+// DRM Change -- END
         (void*)nativeDecodeFileDescriptor
     },
 
     {   "nativeDecodeAsset",
-        "(ILandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;",
+// DRM Change -- START
+        "(ILandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;Z)Landroid/graphics/Bitmap;",
+// DRM Change -- END
         (void*)nativeDecodeAsset
     },
 
     {   "nativeDecodeAsset",
-        "(ILandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;ZF)Landroid/graphics/Bitmap;",
+// DRM Change -- START
+        "(ILandroid/graphics/Rect;Landroid/graphics/BitmapFactory$Options;ZFZ)Landroid/graphics/Bitmap;",
+// DRM Change -- END
         (void*)nativeDecodeAssetScaled
     },
 
     {   "nativeDecodeByteArray",
-        "([BIILandroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;",
+// DRM Change -- START
+        "([BIILandroid/graphics/BitmapFactory$Options;Z)Landroid/graphics/Bitmap;",
+// DRM Change -- END
         (void*)nativeDecodeByteArray
     },
 

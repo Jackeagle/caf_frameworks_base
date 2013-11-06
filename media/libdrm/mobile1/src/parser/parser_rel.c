@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -308,9 +310,14 @@ static int32_t drm_getRightValue(uint8_t * buffer, int32_t bufferLen,
     }
 
     CHECK_VALIDITY(ret);
-    if (ret == NULL)
+    if (ret == NULL) {
+/* DRM CHANGE -- START */
+        WRITE_RO_FLAG(*bIsAble, 1, pConstraint->Indicator, DRM_NO_CONSTRAINT); /* If exit first assume have utter rights */
+        ro->bIsUnlimited = TRUE;
+        DRMV1_D("Set License to unlimited, as o-ex:constraint tag is absent");
+/* DRM CHANGE -- END */
         return TRUE;
-
+    }
     if(TRUE == drm_checkWhetherHasUnknowConstraint(ret))
         return FALSE;
 
@@ -498,8 +505,13 @@ static int32_t drm_getRightValue(uint8_t * buffer, int32_t bufferLen,
         flag = 3;
     }
 
-    if (2 == flag)
+    if (2 == flag) {
         WRITE_RO_FLAG(*bIsAble, 1, pConstraint->Indicator, DRM_NO_CONSTRAINT); /* If exit first assume have utter rights */
+/* DRM CHANGE -- START */
+        ro->bIsUnlimited = TRUE;
+        DRMV1_D("Set License to unlimited as no constraint item present in o-ex-constraint tag");
+/* DRM CHANGE -- END */
+    }
     return TRUE;
 }
 

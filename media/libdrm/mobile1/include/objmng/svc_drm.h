@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +32,17 @@ extern "C" {
 #define TYPE_DRM_CONTENT            0x49    /**< The mime type is "application/vnd.oma.drm.content" */
 #define TYPE_DRM_RIGHTS_XML         0x4a    /**< The mime type is "application/vnd.oma.drm.rights+xml" */
 #define TYPE_DRM_RIGHTS_WBXML       0x4b    /**< The mime type is "application/vnd.oma.drm.rights+wbxml" */
+/* DRM CHANGE -- START */
+#define TYPE_DRM_FL_CONTENT         0x50    /**< The mime type is fake, indicating forward locking encrypted content */
+#define TYPE_DRM_CD_CONTENT         0x51    /**< The mime type is fake, indicating combined forward encrypted content */
+/* DRM CHANGE -- END */
 #define TYPE_DRM_UNKNOWN            0xff    /**< The mime type is unknown */
+/* DRM CHANGE -- START */
+#define MIMETYPE_DRM_MESSAGE        "application/vnd.oma.drm.message"
+#define MIMETYPE_DRM_CONTENT        "application/vnd.oma.drm.content"
+#define MIMETYPE_DRM_RIGHTS_XML     "application/vnd.oma.drm.rights+xml"
+#define MIMETYPE_DRM_RIGHTS_WBXML   "applicatoin/vnd.oma.drm.rights+wbxml"
+/* DRM CHANGE -- END */
 
 /**
  * Define the delivery methods.
@@ -39,7 +51,9 @@ extern "C" {
 #define COMBINED_DELIVERY           2       /**< Combined delivery */
 #define SEPARATE_DELIVERY           3       /**< Separate delivery */
 #define SEPARATE_DELIVERY_FL        4       /**< Separate delivery but DCF is forward-lock */
-
+/* DRM CHANGE -- START */
+#define JAVA_APK                    5       /**< java apk */
+/* DRM CHANGE -- END */
 /**
  * Define the permissions.
  */
@@ -73,7 +87,10 @@ extern "C" {
 #define DRM_RIGHTS_PENDING          -8
 #define DRM_RIGHTS_EXPIRED          -9
 #define DRM_UNKNOWN_DATA_LEN        -10
-
+/* DRM CHANGE -- START */
+#define DRM_MIMETYPE_INVALID        -11
+#define DRM_ROLLBACK_CLOCK          -12
+/* DRM CHANGE -- END */
 /**
  * The input DRM data structure, include DM, DCF, DR, DRC.
  */
@@ -136,6 +153,9 @@ typedef struct _T_DRM_Input_Data {
  */
 typedef struct _T_DRM_Constraint_Info {
     uint8_t indicator;          /**< Whether there is a right */
+/* DRM CHANGE -- START */
+    uint8_t valid;              /**For rollback clock */
+/* DRM CHANGE -- END */
     uint8_t unUsed[3];
     int32_t count;              /**< The constraint of count */
     int32_t startDate;          /**< The constraint of start date */
@@ -151,6 +171,9 @@ typedef struct _T_DRM_Constraint_Info {
  */
 typedef struct _T_DRM_Rights_Info {
     uint8_t roId[256];                     /**< The unique id for a specially rights object */
+/* DRM CHANGE -- START */
+    int32_t bIsUnlimited;                   /**< Is unlimited */
+/* DRM CHANGE -- END */
     T_DRM_Constraint_Info playRights;       /**< Constraint of play */
     T_DRM_Constraint_Info displayRights;    /**< Constraint of display */
     T_DRM_Constraint_Info executeRights;    /**< Constraint of execute */
@@ -164,6 +187,20 @@ typedef struct _T_DRM_Rights_Info_Node {
     T_DRM_Rights_Info roInfo;
     struct _T_DRM_Rights_Info_Node *next;
 } T_DRM_Rights_Info_Node;
+
+/* DRM CHANGE -- START */
+typedef struct _DRM_ENC_CONTEXT {
+    int32_t handle;
+    void* ctx;
+} DRM_ENC_CONTEXT;
+typedef struct _DRM_DEC_CONTEXT {
+    char* buf;
+    int32_t pos;
+    int32_t id;
+    int32_t len;
+    int32_t type;
+} DRM_DEC_CONTEXT;
+/* DRM CHANGE -- END */
 
 /**
  * Install a rights object to DRM engine, include the rights in Combined Delivery cases.
@@ -216,6 +253,21 @@ int32_t SVC_drm_getDeliveryMethod(int32_t session);
  *      -DRM_FAILURE, when some other error occured.
  */
 int32_t SVC_drm_getContentType(int32_t session, uint8_t* mediaType);
+
+/* DRM CHANGE -- START */
+/**
+ * Get DRM object media object content ID.
+ *
+ * \param session   The handle for this DRM object session.
+ * \param contentID The buffer to save the content ID string, 256 bytes is enough.
+ *
+ * \return
+ *      -DRM_SUCCESS, when get the media object content type successfully.
+ *      -DRM_SESSION_NOT_OPENED, when the session is not opened or has been closed.
+ *      -DRM_FAILURE, when some other error occured.
+ */
+int32_t SVC_drm_getContentType(int32_t session, uint8_t* contentID);
+/* DRM CHANGE -- END */
 
 /**
  * Check whether a specific DRM object has the specific permission rights or not.
@@ -368,6 +420,18 @@ int32_t SVC_drm_freeRightsInfoList(T_DRM_Rights_Info_Node *pRightsHeader);
  *      -DRM_FAILURE, when some other error occured.
  */
 int32_t SVC_drm_deleteRights(uint8_t* roId);
+
+/* DRM CHANGE -- START */
+int32_t SVC_drm_installDRMObject(const uint8_t *filepath, const uint8_t *mime);
+
+int32_t SVC_drm_canBeAutoUsed(int32_t session, int32_t permission);
+
+int32_t SVC_drm_getContentRightsNum(int32_t session, int32_t* roAmount);
+
+int32_t SVC_drm_getContentRightsList(int32_t session, T_DRM_Rights_Info_Node** ppRightsInfo);
+
+int32_t SVC_drm_getContentID(int32_t session, uint8_t* contentID);
+/* DRM CHANGE -- END */
 
 #ifdef __cplusplus
 }

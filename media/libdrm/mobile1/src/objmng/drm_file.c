@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +26,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <string.h>
+/* DRM CHANGE -- START */
+#include <log.h>
+/* DRM CHANGE -- END */
 
 /**
  * Fails on zaurus?
@@ -90,12 +95,15 @@ static int32_t
 getFileStat(const uint16_t *name, int32_t nameLen, struct stat *sbuf)
 {
     Trace("getFileStat: %.*S", nameLen, name);
-
+/* DRM CHANGE -- START */
+#if 0
     if (convertFilename(name, nameLen, tmpPathBuf1) <= 0)
     {
         Trace("getFileStat: bad filename");
     }
-    else if (stat(tmpPathBuf1, sbuf) != 0)
+#endif
+    if (stat(name, sbuf) != 0)
+/* DRM CHANGE -- END */
     {
         Trace("getFileStat %s: stat() errno=%d", tmpPathBuf1, errno);
     }
@@ -226,19 +234,24 @@ DRM_file_listOpen(const uint16_t *prefix,
 {
     Trace("DRM_file_listOpen: %.*S", prefixLen, prefix);
 
+/* DRM CHANGE -- START */
+#if 0
     if (convertFilename(prefix, prefixLen, tmpPathBuf1) <= 0)
     {
         Trace("DRM_file_listOpen: bad filename");
     }
     else
     {
+#endif
+/* DRM CHANGE -- END */
         DIR *dir;
 
         /* find the last /, and store the offset to the leaf prefix in
          * *iteration
          */
-
-        char *sep = strrchr(tmpPathBuf1, '/');
+/* DRM CHANGE -- START */
+        char *sep = strrchr(prefix, '/');
+/* DRM CHANGE -- END */
         /* Root "/" is a leaf */
         if (sep == NULL || ((sep != NULL) && (sep == tmpPathBuf1)))
         {
@@ -253,21 +266,27 @@ DRM_file_listOpen(const uint16_t *prefix,
             *iteration = sep - tmpPathBuf1 + 1;
             *sep = 0;
         }
+/* DRM CHANGE -- START */
+        dir = opendir(prefix);
 
-        dir = opendir(tmpPathBuf1);
-
+/* DRM CHANGE -- END */
         if (dir == NULL)
         {
-            Trace("DRM_file_listOpen: opendir %s: errno=%d", tmpPathBuf1, errno);
+/* DRM CHANGE -- START */
+            Trace("DRM_file_listOpen: opendir %s: errno=%d", prefix, errno);
+/* DRM CHANGE -- END */
         }
         else
         {
-            Trace("DRM_file_listOpen: dir %s, filter %s", tmpPathBuf1, sep+1);
+/* DRM CHANGE -- START */
+            Trace("DRM_file_listOpen: dir %s, filter %s", prefix, sep+1);
+/* DRM CHANGE -- END */
             *session = (int32_t)dir;
             return DRM_FILE_SUCCESS;
         }
-    }
-
+/* DRM CHANGE -- START */
+//  }
+/* DRM CHANGE -- END */
     return DRM_FILE_FAILURE;
 }
 
@@ -389,6 +408,8 @@ DRM_file_delete(const uint16_t *name, int32_t nameLen)
 {
     Trace("DRM_file_delete: %.*S", nameLen, name);
 
+/* DRM CHANGE -- START */
+#if 0
     if (convertFilename(name, nameLen, tmpPathBuf1) <= 0)
     {
         Trace("DRM_file_delete: bad filename");
@@ -396,15 +417,21 @@ DRM_file_delete(const uint16_t *name, int32_t nameLen)
     }
     else
     {
+#endif
+/* DRM CHANGE -- END */
        struct stat sinfo;
-       if (stat(tmpPathBuf1, &sinfo) != 0){
+/* DRM CHANGE -- START */
+       if (stat(name, &sinfo) != 0) {
+/* DRM CHANGE -- END */
            Trace("DRM_file_delete: stat failed, errno=%d", errno);
            return DRM_FILE_FAILURE;
        }
 #ifndef DEVICE_FILESYSTEM
        if (S_ISDIR(sinfo.st_mode)){
             /* it's a dir */
-            if (rmdir(tmpPathBuf1) != 0){
+/* DRM CHANGE -- START */
+            if (rmdir(name) != 0) {
+/* DRM CHANGE -- END */
                 Trace("DRM_file_delete: dir remove failed, errno=%d", errno);
                 return DRM_FILE_FAILURE;
             }
@@ -415,7 +442,9 @@ DRM_file_delete(const uint16_t *name, int32_t nameLen)
         }
 #endif
         /* it's a file */
-        if (unlink(tmpPathBuf1) != 0)
+/* DRM CHANGE -- START */
+        if (unlink(name) != 0)
+/* DRM CHANGE -- END */
         {
             Trace("DRM_file_delete: file remove failed, errno=%d", errno);
             return DRM_FILE_FAILURE;
@@ -427,7 +456,9 @@ DRM_file_delete(const uint16_t *name, int32_t nameLen)
 #endif
             return DRM_FILE_SUCCESS;
         }
-    }
+/* DRM CHANGE -- START */
+//  }
+/* DRM CHANGE -- END */
     return DRM_FILE_FAILURE;
 }
 
@@ -444,12 +475,18 @@ DRM_file_rename(const uint16_t *oldName, int32_t oldNameLen,
         return DRM_FILE_FAILURE;
     }
 
+/* DRM CHANGE -- START */
+#if 0
     if (convertFilename(oldName, oldNameLen, tmpPathBuf1) <= 0 ||
         convertFilename(newName, newNameLen, tmpPathBuf2) <= 0)
     {
         Trace("DRM_file_rename: bad filename");
     }
     else if (rename(tmpPathBuf1, tmpPathBuf2) != 0)
+#else
+    if (rename(oldName, newName) != 0)
+#endif
+/* DRM CHANGE -- END */
     {
          Trace("DRM_file_rename: failed errno=%d", errno);
     }
@@ -509,19 +546,26 @@ DRM_file_open(const uint16_t *name, int32_t nameLen, int32_t mode,
 
     assert((mode & ~(DRM_FILE_MODE_READ|DRM_FILE_MODE_WRITE)) == 0);
 
+/* DRM CHANGE -- START */
+#if 0
     if (convertFilename(name, nameLen, tmpPathBuf1) <= 0)
     {
         Trace("DRM_file_open: bad filename");
         return DRM_FILE_FAILURE;
     }
+#endif
+/* DRM CHANGE -- END */
 
-    if ((res = open(tmpPathBuf1, modes[mode], 0777)) == -1)
+/* DRM CHANGE -- START */
+    if ((res = open(name, modes[mode], 0777)) == -1)
+/* DRM CHANGE -- END */
     {
         Trace("DRM_file_open: open failed errno=%d", errno);
         return DRM_FILE_FAILURE;
     }
-
-    Trace("DRM_file_open: open '%s; returned %d", tmpPathBuf1, res);
+/* DRM CHANGE -- START */
+    Trace("DRM_file_open: open '%s; returned %d", name, res);
+/* DRM CHANGE -- END */
     *handle = res;
 
     return DRM_FILE_SUCCESS;
@@ -677,14 +721,19 @@ int32_t
 DRM_file_mkdir(const uint16_t* name, int32_t nameChars)
 {
     Trace("DRM_file_mkdir started!..");
-
+/* DRM CHANGE -- START */
+#if 0
     if (convertFilename(name, nameChars, tmpPathBuf1) <= 0)
     {
         Trace("DRM_file_mkdir: bad filename");
         return DRM_FILE_FAILURE;
     }
+#endif
+/* DRM CHANGE -- END */
 
-    if (mkdir(tmpPathBuf1,0777) != 0)
+/* DRM CHANGE -- START */
+    if (mkdir(name,0777) != 0)
+/* DRM CHANGE -- END */
     {
         Trace("DRM_file_mkdir failed!errno=%d",errno);
         return DRM_FILE_FAILURE;
@@ -692,3 +741,107 @@ DRM_file_mkdir(const uint16_t* name, int32_t nameChars)
 
     return DRM_FILE_SUCCESS;
 }
+
+/* DRM CHANGE -- START */
+int32_t
+DRM_file_copy (int32_t sourceHandle, int32_t targetHandle)
+{
+#define    DRM_READFILE_BUF_MAXLEN     256
+    uint8_t   buf[DRM_READFILE_BUF_MAXLEN];
+    uint32_t  bufLen = 0;
+//  DRMV1_D ("Source file handle [%d], target file handle [%d]\n", sourceHandle, targetHandle);
+
+    ftruncate (targetHandle, 0);
+
+    lseek (sourceHandle, 0, SEEK_SET);
+    lseek (targetHandle, 0, SEEK_SET);
+
+    do {
+        bufLen = read (sourceHandle, buf, DRM_READFILE_BUF_MAXLEN);
+        if (bufLen == -1) {
+            DRMV1_E ("read buf from file error, errno [%d], errinfo [%s]\n", errno, strerror(errno));
+            return -1;
+        }
+
+        if (bufLen == 0) {
+            DRMV1_D ("close to end-of-file \n");
+            break;
+        }
+
+        if (write (targetHandle, buf, bufLen) != bufLen) {
+            DRMV1_E ("write buf to file error, errno [%d], errinfo [%s]\n", errno, strerror(errno));
+            return -1;
+        }
+    } while (1);
+
+    return 0;
+}
+
+#define    DRM_FILE_POS_END  -2
+#define    DRM_FILE_MAX_BUF  1024
+int32_t
+DRM_file_truncate (uint32_t handle, uint32_t  start, int32_t end)
+{
+    uint32_t  curReadPos; 
+    uint32_t  curWritePos; 
+    uint8_t   fileData[DRM_FILE_MAX_BUF];
+    uint32_t  toReadLen = 0;
+    uint32_t  readedLen = 0;
+    uint32_t  wroteLen = 0;
+    uint32_t  remainDataLen = 0;
+    struct stat   statBuf;
+
+    DRMV1_D ("In DRM_file_truncate, start [%d], end [%d]", start, end);
+
+    if (fstat (handle, &statBuf) != 0) {
+        DRMV1_E ("fstat error, handle [%d], errinfo [%s]", handle, strerror (errno));
+        return -1;
+    }
+
+    if ((statBuf.st_size <= start) || (start >= end)) {
+        DRMV1_D ("No need to truncate file\n");
+        return 0;
+    }
+
+    DRMV1_D ("file size [%d]", statBuf.st_size);
+
+    if ((end == DRM_FILE_POS_END) || (end > statBuf.st_size))
+        remainDataLen = statBuf.st_size - start;
+    else
+        remainDataLen = end - start;
+
+    DRMV1_D ("data length [%d] need to move", remainDataLen);
+
+    curReadPos = start;
+    curWritePos = 0;
+    do {
+        toReadLen = (remainDataLen > DRM_FILE_MAX_BUF) ? DRM_FILE_MAX_BUF : remainDataLen;
+
+        lseek (handle, curReadPos, SEEK_SET);
+        readedLen = read (handle, fileData, toReadLen);
+        if (readedLen != toReadLen) {
+            DRMV1_E ("read file error, readedLen [%d], errinfo [%s]", readedLen, strerror (errno));
+            return -1;
+        }
+        curReadPos += readedLen;
+
+        lseek (handle, curWritePos, SEEK_SET);
+        wroteLen= write (handle, fileData, readedLen);
+        if (wroteLen != readedLen) {
+            DRMV1_E ("write file error, wroteLen [%d], errinfo [%s]", wroteLen, strerror (errno));
+            return -1;
+        }
+        curWritePos += wroteLen;
+
+        remainDataLen -= wroteLen;
+    } while(remainDataLen > 0);
+
+    curWritePos = lseek (handle, 0, SEEK_CUR);
+
+    DRMV1_D ("curWritePos [%d]", curWritePos);
+
+    ftruncate (handle, curWritePos);
+
+    return 0;
+}
+/* DRM CHANGE -- End */

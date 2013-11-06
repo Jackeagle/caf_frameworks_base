@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,17 +33,19 @@ extern "C" {
 #define MAX_ICON_URI_LEN                                     256
 #define MAX_CONTENT_TYPE_LEN                                 64
 #define MAX_CONTENT_URI_LEN                                  256
-
-#define HEADER_ENCRYPTION_METHOD                             "Encryption-Method: "
-#define HEADER_RIGHTS_ISSUER                                 "Rights-Issuer: "
-#define HEADER_CONTENT_NAME                                  "Content-Name: "
+/* DRM CHANGE -- START */
+#define HEADER_ENCRYPTION_METHOD                             "Encryption-Method:"
+#define HEADER_RIGHTS_ISSUER                                 "Rights-Issuer:"
+#define HEADER_CONTENT_NAME                                  "Content-Name:"
+/* DRM CHANGE -- END */
 #define HEADER_CONTENT_DESCRIPTION                           "Content-Description: "
 #define HEADER_CONTENT_VENDOR                                "Content-Vendor: "
 #define HEADER_ICON_URI                                      "Icon-Uri: "
-
-#define HEADER_ENCRYPTION_METHOD_LEN                         19
-#define HEADER_RIGHTS_ISSUER_LEN                             15
-#define HEADER_CONTENT_NAME_LEN                              14
+/* DRM CHANGE -- START */
+#define HEADER_ENCRYPTION_METHOD_LEN                         18
+#define HEADER_RIGHTS_ISSUER_LEN                             14
+#define HEADER_CONTENT_NAME_LEN                              13
+/* DRM CHANGE -- END */
 #define HEADER_CONTENT_DESCRIPTION_LEN                       21
 #define HEADER_CONTENT_VENDOR_LEN                            16
 #define HEADER_ICON_URI_LEN                                  10

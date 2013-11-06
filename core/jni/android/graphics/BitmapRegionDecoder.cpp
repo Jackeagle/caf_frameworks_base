@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +37,11 @@
 #include "android_util_Binder.h"
 #include "android_nio_utils.h"
 #include "CreateJavaOutputStreamAdaptor.h"
+// Drm changes start
+#include <drm/DrmManagerClient.h>
+#include <utils/Log.h>
+#include <fcntl.h>
+// Drm changes end
 
 #include <binder/Parcel.h>
 #include <jni.h>
@@ -73,6 +80,74 @@ static SkMemoryStream* buildSkMemoryStream(SkStream *stream) {
 static jobject doBuildTileIndex(JNIEnv* env, SkStream* stream) {
     SkImageDecoder* decoder = SkImageDecoder::Factory(stream);
     int width, height;
+    // DRM Change START */
+    if (NULL == decoder) {
+        ALOGV("decoder is null and entered drm path");
+        DrmManagerClient* mDrmManagerClient = new DrmManagerClient();
+        sp<DecryptHandle> mDecryptHandle = NULL;
+        if (mDrmManagerClient != NULL) {
+            const int size = 4096;
+            int readBytes = 0;
+            int encodedFD = -1;
+            char tempFile[50];
+            char temp[50];
+            int temp1 = rand();
+            int temp2 = rand();
+            sprintf(tempFile, "/data/local/.Drm/%d.tmp", temp1);
+            sprintf(temp, "/data/local/.Drm/%d.tmp", temp2);
+            ALOGV("dodecode:t1=%s ,t2=%s", tempFile, temp);
+            encodedFD = open(tempFile, O_WRONLY | O_CREAT, 0777);
+            char* encodedData = new char[size];
+
+            while ((readBytes = stream->read(encodedData, size)) > 0)
+                write(encodedFD, encodedData, readBytes);
+
+            close(encodedFD);
+            if (encodedData != NULL)
+                delete [] encodedData;
+
+            encodedFD = -1;
+            encodedFD = open (tempFile, O_RDONLY);
+
+            mDecryptHandle = mDrmManagerClient->openDecryptSession(encodedFD, 0, 1);
+            if ((mDecryptHandle !=NULL) && (mDecryptHandle->status == RightsStatus::RIGHTS_VALID)) {
+                ALOGV("bitmap factory: mDecryptHandle not null");
+                char* data = new char[size];
+                int len = 0;
+                int decodedFD = -1;
+
+                decodedFD = open (temp, O_WRONLY | O_CREAT, 0777);
+                int offset = 0;
+                while ((len = mDrmManagerClient->pread(mDecryptHandle, data, size, offset)) > 0) {
+                    ALOGV("pread returned bytes=%d", len);
+                    write(decodedFD, data, len);
+                    offset += len;
+                }
+                close(decodedFD);
+                decodedFD = -1;
+                decodedFD = open (temp, O_RDONLY);
+                bool weOwnTheFD=true;
+                stream = new SkFDStream(decodedFD, weOwnTheFD);
+                decoder = SkImageDecoder::Factory(stream);
+                if (data != NULL)
+                    delete [] data;
+            }
+
+            if (mDecryptHandle != NULL) {
+                mDrmManagerClient->closeDecryptSession(mDecryptHandle);
+                mDecryptHandle = NULL;
+            }
+            if (mDrmManagerClient != NULL) {
+                delete mDrmManagerClient;
+                mDrmManagerClient = NULL;
+            }
+            if (encodedFD >= 0) close(encodedFD);
+            remove(tempFile);
+            remove(temp);
+        }
+    }
+    // DRM Change END
+
     if (NULL == decoder) {
         doThrowIOE(env, "Image format not supported");
         return nullObjectReturn("SkImageDecoder::Factory returned null");
