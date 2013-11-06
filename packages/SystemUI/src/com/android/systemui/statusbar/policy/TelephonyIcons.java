@@ -30,12 +30,14 @@ public class TelephonyIcons {
           R.drawable.stat_sys_signal_1,
           R.drawable.stat_sys_signal_2,
           R.drawable.stat_sys_signal_3,
-          R.drawable.stat_sys_signal_4 },
+          R.drawable.stat_sys_signal_4,
+          R.drawable.stat_sys_signal_5 },
         { R.drawable.stat_sys_signal_0_fully,
           R.drawable.stat_sys_signal_1_fully,
           R.drawable.stat_sys_signal_2_fully,
           R.drawable.stat_sys_signal_3_fully,
-          R.drawable.stat_sys_signal_4_fully }
+          R.drawable.stat_sys_signal_4_fully,
+          R.drawable.stat_sys_signal_5_fully }
     };
 
     static final int[][] QS_TELEPHONY_SIGNAL_STRENGTH = {
@@ -43,11 +45,13 @@ public class TelephonyIcons {
           R.drawable.ic_qs_signal_1,
           R.drawable.ic_qs_signal_2,
           R.drawable.ic_qs_signal_3,
+          R.drawable.ic_qs_signal_4,
           R.drawable.ic_qs_signal_4 },
         { R.drawable.ic_qs_signal_full_0,
           R.drawable.ic_qs_signal_full_1,
           R.drawable.ic_qs_signal_full_2,
           R.drawable.ic_qs_signal_full_3,
+          R.drawable.ic_qs_signal_full_4,
           R.drawable.ic_qs_signal_full_4 }
     };
 
@@ -56,13 +60,123 @@ public class TelephonyIcons {
           R.drawable.stat_sys_signal_1,
           R.drawable.stat_sys_signal_2,
           R.drawable.stat_sys_signal_3,
-          R.drawable.stat_sys_signal_4 },
+          R.drawable.stat_sys_signal_4,
+          R.drawable.stat_sys_signal_5 },
         { R.drawable.stat_sys_signal_0_fully,
           R.drawable.stat_sys_signal_1_fully,
           R.drawable.stat_sys_signal_2_fully,
           R.drawable.stat_sys_signal_3_fully,
-          R.drawable.stat_sys_signal_4_fully }
+          R.drawable.stat_sys_signal_4_fully,
+          R.drawable.stat_sys_signal_5_fully }
     };
+
+    // The status bar icons for CMCC style.
+    public static final int[] MULTI_SIGNAL_NULL_CMCC = {
+        R.drawable.c_stat_sys_signal_null_cmcc,
+        R.drawable.c_stat_sys_signal_null_cmcc
+       };
+     public static final int[] MULTI_NO_SIM_CMCC = {
+         R.drawable.stat_sys_no_sim,
+         R.drawable.stat_sys_no_sim
+     };
+
+     //GSM/UMTS
+     static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_G = {
+      { R.drawable.stat_sys_signal_0_g_cmcc,
+        R.drawable.stat_sys_signal_1_g_cmcc,
+        R.drawable.stat_sys_signal_2_g_cmcc,
+        R.drawable.stat_sys_signal_3_g_cmcc,
+        R.drawable.stat_sys_signal_4_g_cmcc,
+        R.drawable.stat_sys_signal_5_g_cmcc },
+      { R.drawable.stat_sys_signal_0_g_cmcc,
+        R.drawable.stat_sys_signal_1_g_cmcc,
+        R.drawable.stat_sys_signal_2_g_cmcc,
+        R.drawable.stat_sys_signal_3_g_cmcc,
+        R.drawable.stat_sys_signal_4_g_cmcc,
+        R.drawable.stat_sys_signal_5_g_cmcc }
+     };
+
+     static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_G = {
+     { R.drawable.stat_sys_signal_0_g_roam_cmcc,
+       R.drawable.stat_sys_signal_1_g_roam_cmcc,
+       R.drawable.stat_sys_signal_2_g_roam_cmcc,
+       R.drawable.stat_sys_signal_3_g_roam_cmcc,
+       R.drawable.stat_sys_signal_4_g_roam_cmcc,
+       R.drawable.stat_sys_signal_5_g_roam_cmcc },
+     { R.drawable.stat_sys_signal_0_g_roam_cmcc,
+       R.drawable.stat_sys_signal_1_g_roam_cmcc,
+       R.drawable.stat_sys_signal_2_g_roam_cmcc,
+       R.drawable.stat_sys_signal_3_g_roam_cmcc,
+       R.drawable.stat_sys_signal_4_g_roam_cmcc,
+       R.drawable.stat_sys_signal_5_g_roam_cmcc }
+     };
+
+     static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_3G = {
+     { R.drawable.stat_sys_signal_0_3g_cmcc,
+       R.drawable.stat_sys_signal_1_3g_cmcc,
+       R.drawable.stat_sys_signal_2_3g_cmcc,
+       R.drawable.stat_sys_signal_3_3g_cmcc,
+       R.drawable.stat_sys_signal_4_3g_cmcc,
+       R.drawable.stat_sys_signal_5_3g_cmcc },
+     { R.drawable.stat_sys_signal_0_3g_cmcc,
+       R.drawable.stat_sys_signal_1_3g_cmcc,
+       R.drawable.stat_sys_signal_2_3g_cmcc,
+       R.drawable.stat_sys_signal_3_3g_cmcc,
+       R.drawable.stat_sys_signal_4_3g_cmcc,
+       R.drawable.stat_sys_signal_5_3g_cmcc }
+     };
+
+     static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_3G = {
+     { R.drawable.stat_sys_signal_0_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_1_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_2_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_3_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_4_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_5_3g_roam_cmcc },
+     { R.drawable.stat_sys_signal_0_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_1_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_2_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_3_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_4_3g_roam_cmcc,
+       R.drawable.stat_sys_signal_5_3g_roam_cmcc }
+     };
+
+     static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_4G = {
+     { R.drawable.stat_sys_signal_0_4g_cmcc,
+       R.drawable.stat_sys_signal_1_4g_cmcc,
+       R.drawable.stat_sys_signal_2_4g_cmcc,
+       R.drawable.stat_sys_signal_3_4g_cmcc,
+       R.drawable.stat_sys_signal_4_4g_cmcc,
+       R.drawable.stat_sys_signal_5_4g_cmcc },
+     { R.drawable.stat_sys_signal_0_4g_cmcc,
+       R.drawable.stat_sys_signal_1_4g_cmcc,
+       R.drawable.stat_sys_signal_2_4g_cmcc,
+       R.drawable.stat_sys_signal_3_4g_cmcc,
+       R.drawable.stat_sys_signal_4_4g_cmcc,
+       R.drawable.stat_sys_signal_5_4g_cmcc }
+     };
+
+     static final int[][] TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_4G = {
+     { R.drawable.stat_sys_signal_0_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_1_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_2_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_3_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_4_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_5_4g_roam_cmcc },
+     { R.drawable.stat_sys_signal_0_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_1_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_2_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_3_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_4_4g_roam_cmcc,
+       R.drawable.stat_sys_signal_5_4g_roam_cmcc }
+     };
+
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_G = TELEPHONY_CMCC_SIGNAL_STRENGTH_G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_R_G = TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_3G = TELEPHONY_CMCC_SIGNAL_STRENGTH_3G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_R_3G = TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_3G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_4G = TELEPHONY_CMCC_SIGNAL_STRENGTH_4G;
+    public static final int[][] CMCC_DATA_SIGNAL_STRENGTH_R_4G = TELEPHONY_CMCC_SIGNAL_STRENGTH_ROAMING_4G;
 
     // The status bar icons for CU style.
     public static final int[] MULTI_NO_SIM_CU = {
@@ -524,6 +638,7 @@ public class TelephonyIcons {
     public static final int SIGNAL_LEVEL_2 = 2;
     public static final int SIGNAL_LEVEL_3 = 3;
     public static final int SIGNAL_LEVEL_4 = 4;
+    public static final int SIGNAL_LEVEL_5 = 5;
 
     public static final int DATA_CONNECTIVITY_NOT_CONNECTED = 0;
     public static final int DATA_CONNECTIVITY_CONNECTED     = 1;
@@ -582,6 +697,60 @@ public class TelephonyIcons {
           R.drawable.stat_sys_signal_2g_in,
           R.drawable.stat_sys_signal_2g_out,
           R.drawable.stat_sys_signal_2g_inout }
+    };
+
+    public static int MOBILE_DATA_CONNECT_ACTIVITY_IN = 0;
+    public static int MOBILE_DATA_CONNECT_ACTIVITY_OUT = 1;
+    public static int MOBILE_DATA_CONNECT_ACTIVITY_INOUT = 2;
+    public static int MOBILE_DATA_CONNECT_ACTIVITY_IDLE = 3;
+    public static int MOBILE_DATA_CONNECT_ACTIVITY_MAX = 4;
+
+    public static int MOBILE_DATA_CONNECT_TYPE_1X = 0;
+    public static int MOBILE_DATA_CONNECT_TYPE_G = 1;
+    public static int MOBILE_DATA_CONNECT_TYPE_3G = 2;
+    public static int MOBILE_DATA_CONNECT_TYPE_4G = 3;
+    public static int MOBILE_DATA_CONNECT_TYPE_E = 4;
+    public static int MOBILE_DATA_CONNECT_TYPE_H = 5;
+    public static int MOBILE_DATA_CONNECT_TYPE_R = 6;
+    public static int MOBILE_DATA_CONNECT_TYPE_MAX = 7;
+
+    public static final int[][] MOBILE_DATA_CONNECT_ICON_CMCC = {
+            {
+                    R.drawable.stat_sys_data_in_1x,
+                    R.drawable.stat_sys_data_in_g,
+                    R.drawable.stat_sys_data_in_3g,
+                    R.drawable.stat_sys_data_in_4g,
+                    R.drawable.stat_sys_data_in_e,
+                    R.drawable.stat_sys_data_in_h,
+                    R.drawable.stat_sys_data_in_e
+            },
+            {
+                    R.drawable.stat_sys_data_out_1x,
+                    R.drawable.stat_sys_data_out_g,
+                    R.drawable.stat_sys_data_out_3g,
+                    R.drawable.stat_sys_data_out_4g,
+                    R.drawable.stat_sys_data_out_e,
+                    R.drawable.stat_sys_data_out_h,
+                    R.drawable.stat_sys_data_out_e
+            },
+            {
+                    R.drawable.stat_sys_data_inout_1x,
+                    R.drawable.stat_sys_data_inout_g,
+                    R.drawable.stat_sys_data_inout_3g,
+                    R.drawable.stat_sys_data_inandout_4g,
+                    R.drawable.stat_sys_data_inandout_e,
+                    R.drawable.stat_sys_data_inandout_h,
+                    R.drawable.stat_sys_data_inandout_e
+            },
+            {
+                    R.drawable.stat_sys_data_idle_1x,
+                    R.drawable.stat_sys_data_idle_g,
+                    R.drawable.stat_sys_data_idle_3g,
+                    R.drawable.stat_sys_data_idle_4g,
+                    R.drawable.stat_sys_data_idle_e,
+                    R.drawable.stat_sys_data_idle_h,
+                    R.drawable.stat_sys_data_idle_e
+            },
     };
 }
 
