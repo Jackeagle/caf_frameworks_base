@@ -90,6 +90,7 @@ import android.content.pm.ManifestDigest;
 import android.content.pm.VerificationParams;
 import android.content.pm.VerifierDeviceIdentity;
 import android.content.pm.VerifierInfo;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -113,6 +114,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.Environment.UserEnvironment;
 import android.os.UserManager;
+import android.provider.Downloads;
 import android.provider.Settings.Global;
 import android.provider.Settings.Secure;
 import android.security.KeyStore;
@@ -6104,7 +6106,7 @@ public class PackageManagerService extends IPackageManager.Stub {
             user = new UserHandle(UserHandle.getUserId(uid));
         }
 
-        final int filteredFlags;
+        int filteredFlags;
 
         if (uid == Process.SHELL_UID || uid == 0) {
             if (DEBUG_INSTALL) {
@@ -6114,13 +6116,94 @@ public class PackageManagerService extends IPackageManager.Stub {
         } else {
             filteredFlags = flags & ~PackageManager.INSTALL_FROM_ADB;
         }
+        if (DEBUG_INSTALL)
+            Log.d(TAG, "installPackageWithVerificationAndEncryption, old filteredFlags = " + filteredFlags);
+
+        int[] result = checkPackageStorageSelected(packageURI, installerPackageName, filteredFlags);
+        if (result[0] == 1) {
+            filteredFlags = result[1];
+        }
+        if (DEBUG_INSTALL)
+            Log.d(TAG, "installPackageWithVerificationAndEncryption, new filteredFlags = " + filteredFlags);
 
         verificationParams.setInstallerUid(uid);
 
         final Message msg = mHandler.obtainMessage(INIT_COPY);
-        msg.obj = new InstallParams(packageURI, observer, filteredFlags, installerPackageName,
+        InstallParams installParams = new InstallParams(packageURI, observer, filteredFlags, installerPackageName,
                 verificationParams, encryptionParams, user);
+        if (result[0] == 1) {
+            installParams.userSelectedStorage = true;
+        }
+        msg.obj = installParams;
         mHandler.sendMessage(msg);
+    }
+
+    private int[] checkPackageStorageSelected(Uri packageURI, String installerPackageName, int filteredFlags) {
+        if (DEBUG_INSTALL) {
+            Log.d(TAG, "installerPackageName = " + (installerPackageName == null ? "null" : installerPackageName));
+            Log.d(TAG, "packageURI.getScheme() = " + (packageURI.getScheme() == null ? "null" : packageURI.getScheme()));
+            Log.d(TAG, "packageURI.getPath() = " + (packageURI.getPath() == null ? "null" : packageURI.getPath()));
+        }
+
+        boolean userSelectedStorage = false;
+        if ("Xolo".equals(SystemProperties.get("persist.env.spec"))
+                && "com.android.vending".equals(installerPackageName)) {
+            if ("file".equals(packageURI.getScheme())) {
+                String path = packageURI.getPath();
+                if (path != null) {
+                    Cursor cursor = mContext.getContentResolver().query(
+                            Downloads.Impl.ALL_DOWNLOADS_CONTENT_URI,
+                            null,
+                            Downloads.Impl._DATA + "=?",
+                            new String[] {path},
+                            null);
+
+                    Log.d(TAG, "cursor is " + (cursor == null ? "null" : "not null"));
+                    if (cursor != null) {
+                        Log.d(TAG, "cursor.getCount() = " + cursor.getCount());
+                        if (cursor.moveToFirst()) {
+                            String strClass = cursor.getString(
+                                    cursor.getColumnIndex(Downloads.Impl.COLUMN_NOTIFICATION_CLASS));
+                            String strUri = cursor.getString(
+                                    cursor.getColumnIndex(Downloads.Impl.COLUMN_URI));
+                            int selectedStorage = cursor.getInt(
+                                    cursor.getColumnIndex(Downloads.Impl.COLUMN_STORAGE_SELECTED));
+                            if (DEBUG_INSTALL) {
+                                Log.d(TAG, "strClass = " + (strClass == null ? "null" : strClass));
+                                Log.d(TAG, "strUri = " + (strUri == null ? "null" : strUri));
+                                Log.d(TAG, "selectedStorage = " + selectedStorage);
+                            }
+                            // I think actually only having the selectedStorage judgement is enough.
+                            if (strClass != null
+                                    && "com.google.android.finsky.download.DownloadBroadcastReceiver".equals(strClass)
+                                    && strUri != null
+                                    && !strUri.contains("packageName=com.android.vending")
+                                    /* I think the checkPackageInstalled in DownloadInfo is unneeded here. */
+                                    && (selectedStorage == PackageHelper.APP_INSTALL_INTERNAL ||
+                                            selectedStorage == PackageHelper.APP_INSTALL_EXTERNAL)) {
+
+                                if (selectedStorage == PackageHelper.APP_INSTALL_INTERNAL) {
+                                    filteredFlags |= PackageManager.INSTALL_INTERNAL;
+                                    filteredFlags &= ~PackageManager.INSTALL_EXTERNAL;
+                                    userSelectedStorage = true;
+                                }
+                                else if (selectedStorage == PackageHelper.APP_INSTALL_EXTERNAL) {
+                                    filteredFlags |= PackageManager.INSTALL_EXTERNAL;
+                                    filteredFlags &= ~PackageManager.INSTALL_INTERNAL;
+                                    userSelectedStorage = true;
+                                }
+                            }
+                        }
+                        cursor.close();
+                    }
+                }
+            }
+        }
+        int[] result = new int[] {userSelectedStorage ? 1 : 0, filteredFlags};
+        if (DEBUG_INSTALL)
+            Log.d(TAG, "checkPackageStorageSelected returned, result[0] = " + result[0]
+                + ", result[1] = " + result[1]);
+        return result;
     }
 
     /**
@@ -6705,6 +6788,7 @@ public class PackageManagerService extends IPackageManager.Stub {
     class InstallParams extends HandlerParams {
         final IPackageInstallObserver observer;
         int flags;
+        boolean userSelectedStorage = false;
 
         private final Uri mPackageURI;
         final String installerPackageName;
@@ -6800,6 +6884,31 @@ public class PackageManagerService extends IPackageManager.Stub {
             return pkgLite.recommendedInstallLocation;
         }
 
+        private int checkRecommendedInstallLocation(String packageFilePath, long lowThreshold,
+                int recommendedInstallLocation) {
+            if (DEBUG_INSTALL)
+                Log.d(TAG, "checkRecommendedInstallLocation, userSelectedStorage = " + userSelectedStorage
+                       + " flags = " + flags);
+            try {
+                if (userSelectedStorage) {
+                    if (recommendedInstallLocation != PackageHelper.RECOMMEND_FAILED_INVALID_APK
+                        && recommendedInstallLocation != PackageHelper.RECOMMEND_FAILED_INVALID_URI) {
+                        if ((flags & PackageManager.INSTALL_INTERNAL) != 0) {
+                            return mContainerService.checkInternalStorageAvailable(
+                                    packageFilePath, flags, lowThreshold);
+                        }
+                        else if ((flags & PackageManager.INSTALL_EXTERNAL) != 0) {
+                            return mContainerService.checkExternalStorageAvailable(
+                                    packageFilePath, flags);
+                        }
+                    }
+                }
+            } catch (RemoteException e) {
+                Log.e(TAG, "exception in checkRecommendedInstallLocation: " + e);
+            }
+            return recommendedInstallLocation;
+        }
+
         /*
          * Invoke remote method to get package information and install
          * location values. Override install location based on default
@@ -6866,8 +6975,18 @@ public class PackageManagerService extends IPackageManager.Stub {
                     if (packageFile != null) {
                         // Remote call to find out default install location
                         final String packageFilePath = packageFile.getAbsolutePath();
+                        if (DEBUG_INSTALL)
+                            Log.d(TAG + "::InstallParams", "getMinimalPackageInfo, packageFilePath = " + packageFilePath + ", flags = " + flags + ", lowThreshold = " + lowThreshold);
+
                         pkgLite = mContainerService.getMinimalPackageInfo(packageFilePath, flags,
                                 lowThreshold);
+                        if (DEBUG_INSTALL)
+                            Log.d(TAG + "::InstallParams", "old pkgLite.recommendedInstallLocation = " + pkgLite.recommendedInstallLocation);
+
+                        pkgLite.recommendedInstallLocation =
+                                checkRecommendedInstallLocation(packageFilePath, lowThreshold, pkgLite.recommendedInstallLocation);
+                        if (DEBUG_INSTALL)
+                            Log.d(TAG + "::InstallParams", "new pkgLite.recommendedInstallLocation = " + pkgLite.recommendedInstallLocation);
 
                         /*
                          * If we have too little free space, try to free cache
@@ -6918,6 +7037,8 @@ public class PackageManagerService extends IPackageManager.Stub {
                 } else {
                     // Override with defaults if needed.
                     loc = installLocationPolicy(pkgLite, flags);
+                    if (DEBUG_INSTALL)
+                        Log.d(TAG + "::InstallParams", "after installLocationPolicy, loc = " + loc);
                     if (loc == PackageHelper.RECOMMEND_FAILED_VERSION_DOWNGRADE) {
                         ret = PackageManager.INSTALL_FAILED_VERSION_DOWNGRADE;
                     } else if (!onSd && !onInt) {

@@ -29,6 +29,8 @@ interface IMediaContainerService {
     int copyResource(in Uri packageURI, in ContainerEncryptionParams encryptionParams,
             in ParcelFileDescriptor outStream);
     PackageInfoLite getMinimalPackageInfo(in String packagePath, in int flags, in long threshold);
+    int checkInternalStorageAvailable(in String packagePath, in int flags, in long threshold);
+    int checkExternalStorageAvailable(in String packagePath, in int flags);
     boolean checkInternalFreeStorage(in Uri fileUri, boolean isForwardLocked, in long threshold);
     boolean checkExternalFreeStorage(in Uri fileUri, boolean isForwardLocked);
     ObbInfo getObbInfo(in String filename);
