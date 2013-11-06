@@ -30,6 +30,8 @@ import android.provider.Settings;
 import android.util.Log;
 
 import java.io.IOException;
+import android.content.ContentUris;
+import android.os.SystemProperties;
 
 /**
  * Ringtone provides a quick method for playing a ringtone, notification, or
@@ -43,6 +45,9 @@ import java.io.IOException;
 public class Ringtone {
     private static final String TAG = "Ringtone";
     private static final boolean LOGD = true;
+
+    private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX_RO = "ro.config.";
+    private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX_PERSIST = "persist.env.sys.";
 
     private static final String[] MEDIA_COLUMNS = new String[] {
         MediaStore.Audio.Media._ID,
@@ -181,7 +186,9 @@ public class Ringtone {
             return;
         }
 
-        // TODO: detect READ_EXTERNAL and specific content provider case, instead of relying on throwing
+        // TODO: detect READ_EXTERNAL and specific content provider case, instead of restore to default ringtone.
+        restoreRingtoneIfNotExist(Settings.System.RINGTONE);
+        restoreRingtoneIfNotExist(Settings.System.RINGTONE_2);
 
         // try opening uri locally before delegating to remote player
         mLocalPlayer = new MediaPlayer();
@@ -325,5 +332,60 @@ public class Ringtone {
 
     void setTitle(String title) {
         mTitle = title;
+    }
+
+    /**
+      * When playing ringtone or in Phone ringtone interface, check the corresponding file get from media
+      * with the uri get from setting. If the file is not exist, restore to default ringtone.
+       */
+    private void restoreRingtoneIfNotExist(String settingName) {
+        String ringtoneUri = Settings.System.getString(mContext.getContentResolver(),
+                settingName);
+        Cursor c = null;
+        ContentResolver res = mContext.getContentResolver();
+        try {
+            if (ringtoneUri != null) {
+                c = mContext.getContentResolver().query(
+                        Uri.parse(ringtoneUri),
+                        new String[] { MediaStore.Audio.Media.TITLE },
+                        null, null, null);
+            } else {
+                Log.w(TAG,"It should be silent mode, and needn't to restore it.");
+                return;
+            }
+            // Check whether the corresponding file of Uri is exist.
+            if (!hasData(c)) {
+                String defaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_PERSIST + settingName,
+                    SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+                c = res.acquireProvider("media").query(null, MediaStore.Audio.Media.INTERNAL_CONTENT_URI,
+                        new String[]{"_id"},
+                        MediaStore.Audio.AudioColumns.IS_RINGTONE+"=1 and "+MediaStore.Audio.Media.DISPLAY_NAME + "=?",
+                        new String[]{defaultRingtoneFilename},
+                        null,null);
+
+                // Set the setting to the Uri of default ringtone.
+                if (hasData(c)) {
+                    c.moveToFirst();
+                    int rowId = c.getInt(0);
+                    Log.e(TAG, "update Uri to new Uri " + ContentUris.withAppendedId(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, rowId).toString());
+                    Settings.System.putString(mContext.getContentResolver(), settingName,
+                            ContentUris.withAppendedId(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, rowId).toString());
+                }
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "RemoteException in restoreRingtoneIfNotExist()", e);
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+    }
+
+    private boolean hasData(Cursor c) {
+        if (c != null && c.getCount() > 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
