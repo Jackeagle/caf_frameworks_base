@@ -259,6 +259,56 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                         return true;
                     }
                 });
+        } else if (SystemProperties.getBoolean("persist.env.pw.reboot.enable", false)) {
+            // add: poweroff && Reboot
+            // first: power off
+            mItems.add(
+                new SinglePressAction(
+                        com.android.internal.R.drawable.ic_lock_power_off,
+                        R.string.global_action_power_off) {
+
+                    public void onPress() {
+                        // shutdown by making sure radio and power are handled accordingly.
+                        mWindowManagerFuncs.shutdown(true);
+                    }
+
+                    public boolean onLongPress() {
+                        mWindowManagerFuncs.rebootSafeMode(true);
+                        return true;
+                    }
+
+                    public boolean showDuringKeyguard() {
+                        return true;
+                    }
+
+                    public boolean showBeforeProvisioning() {
+                        return true;
+                    }
+                });
+            mItems.add(
+                new SinglePressAction(
+                    com.android.internal.R.drawable.ic_lock_power_off,
+                    R.string.factorytest_reboot) {
+
+                    public void onPress() {
+                        try {
+                            IPowerManager pm = IPowerManager.Stub.asInterface(
+                                ServiceManager.getService(Context.POWER_SERVICE));
+                            pm.reboot(true, null, false);
+                        } catch (RemoteException e) {
+                            Log.e(TAG, "PowerManager service died!", e);
+                            return;
+                        }
+                    }
+
+                    public boolean showDuringKeyguard() {
+                        return true;
+                    }
+
+                    public boolean showBeforeProvisioning() {
+                        return true;
+                    }
+                });
         } else {
             // first: power off
             mItems.add(
