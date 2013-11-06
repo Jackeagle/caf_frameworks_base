@@ -1399,11 +1399,19 @@ class CallbackProxy extends Handler {
     private synchronized void sendMessageToUiThreadSync(Message msg) {
         sendMessage(msg);
         WebCoreThreadWatchdog.pause();
+        // We need lock the watchdog when webview want ui thread sync.
+        // Example:Webview show save password dialog, then lock and unlock
+        // screen, we need avoid that the watchdog have been wake up(call to
+        // resumeWatchdog).
+        WebCoreThreadWatchdog.setLocked(true);
         try {
             wait();
         } catch (InterruptedException e) {
             Log.e(LOGTAG, "Caught exception waiting for synchronous UI message to be processed");
             Log.e(LOGTAG, Log.getStackTraceString(e));
+        } finally {
+            // We need unlock the watchdog when webview have been synchronized.
+            WebCoreThreadWatchdog.setLocked(false);
         }
         WebCoreThreadWatchdog.resume();
     }
