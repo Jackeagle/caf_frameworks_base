@@ -264,7 +264,7 @@ public class ProcessStats {
     public void init() {
         if (DEBUG) Slog.v(TAG, "Init: " + this);
         mFirst = true;
-        update();
+        //update();//Function is to collect the CPU time measurement.
     }
     
     public void update() {
