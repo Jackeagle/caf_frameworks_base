@@ -351,16 +351,12 @@ public class ZygoteInit {
                         com.android.internal.R.array.preloaded_drawables);
                 int N = preloadDrawables(runtime, ar);
                 ar.recycle();
-                Log.i(TAG, "...preloaded " + N + " resources in "
-                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
 
                 startTime = SystemClock.uptimeMillis();
                 ar = mResources.obtainTypedArray(
                         com.android.internal.R.array.preloaded_color_state_lists);
                 N = preloadColorStateLists(runtime, ar);
                 ar.recycle();
-                Log.i(TAG, "...preloaded " + N + " resources in "
-                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
             }
             mResources.finishPreloading();
         } catch (RuntimeException e) {
@@ -524,11 +520,6 @@ public class ZygoteInit {
             SamplingProfilerIntegration.start();
 
             registerZygoteSocket();
-            EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_START,
-                SystemClock.uptimeMillis());
-            preload();
-            EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_END,
-                SystemClock.uptimeMillis());
 
             // Finish profiling the zygote initialization.
             SamplingProfilerIntegration.writeZygoteSnapshot();
@@ -803,5 +794,199 @@ public class ZygoteInit {
                 throw new RuntimeException(ex);
             }
         }
+    }
+
+    static long doLoading(String cmd) {
+        long para;
+        try {
+            para = Long.decode(
+                    cmd.substring(cmd.indexOf('@') + 1));
+        } catch (IllegalArgumentException e) {
+            return -1;
+        }
+
+        if (cmd.startsWith("load_classes")) {
+            para = loadClasses(para);
+        }
+        else if (cmd.startsWith("load_resources")) {
+            para = loadResources(para);
+        }
+        gc();
+        return para;
+    }
+
+    private static long loadResources(long para) {
+        final VMRuntime runtime = VMRuntime.getRuntime();
+
+        Debug.startAllocCounting();
+        try {
+            System.gc();
+            runtime.runFinalizationSync();
+            mResources = Resources.getSystem();
+            if (0 == para) {
+                mResources.startPreloading();
+            }
+            Log.i(TAG, "Preloading resources...");
+
+            long startTime = SystemClock.uptimeMillis();
+            TypedArray ar = mResources.obtainTypedArray(
+                    com.android.internal.R.array.preloaded_drawables);
+            int N = ar.length();
+            int timeCount = 0, i;
+            //Log.d(TAG, "para="+para+", N="+N);
+            for (i=(int)para; i<N; i++) {
+                if (Debug.getGlobalAllocSize() > PRELOAD_GC_THRESHOLD) {
+                    if (false) {
+                        Log.v(TAG, " GC at " + Debug.getGlobalAllocSize());
+                    }
+                    System.gc();
+                    runtime.runFinalizationSync();
+                    Debug.resetGlobalAllocSize();
+                }
+                int id = ar.getResourceId(i, 0);
+                if (false) {
+                    Log.v(TAG, "Preloading resource #" + Integer.toHexString(id));
+                }
+                if (id != 0) {
+                    if (mResources.getDrawable(id) == null) {
+                        throw new IllegalArgumentException(
+                                "Unable to find preloaded drawable resource #0x"
+                                + Integer.toHexString(id)
+                                + " (" + ar.getString(i) + ")");
+                    }
+                }
+                if ((++timeCount) >= 5) {
+                    timeCount = 0;
+                    if (SystemClock.uptimeMillis() - startTime >= 600) {
+                        para = i + 1;
+                        break;
+                    }
+                }
+            }
+            if (i >= N || para >= N) {
+                para = -1;
+            }
+            ar.recycle();
+            Log.i(TAG, "...loaded drawable resources in "
+                    + (SystemClock.uptimeMillis()-startTime) + "ms.");
+
+            if (para < 0) {
+                startTime = SystemClock.uptimeMillis();
+                ar = mResources.obtainTypedArray(
+                        com.android.internal.R.array.preloaded_color_state_lists);
+                N = preloadColorStateLists(runtime, ar);
+                ar.recycle();
+                Log.i(TAG, "...loaded " + N + " resources in "
+                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
+                mResources.finishPreloading();
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failure preloading resources", e);
+            para = -1;
+        } finally {
+            Debug.stopAllocCounting();
+        }
+        return para;
+    }
+
+    private static long loadClasses(long offset) {
+        final VMRuntime runtime = VMRuntime.getRuntime();
+
+        InputStream is = ClassLoader.getSystemClassLoader().getResourceAsStream(
+                PRELOADED_CLASSES);
+        if (is == null) {
+            Log.e(TAG, "Couldn't find " + PRELOADED_CLASSES + ".");
+            return -1;
+        } else {
+            Log.i(TAG, "Loading classes...");
+            long startTime = SystemClock.uptimeMillis();
+
+            // Drop root perms while running static initializers.
+            setEffectiveGroup(UNPRIVILEGED_GID);
+            setEffectiveUser(UNPRIVILEGED_UID);
+
+            // Alter the target heap utilization.  With explicit GCs this
+            // is not likely to have any effect.
+            float defaultUtilization = runtime.getTargetHeapUtilization();
+            runtime.setTargetHeapUtilization(0.8f);
+
+            // Start with a clean slate.
+            System.gc();
+            runtime.runFinalizationSync();
+            Debug.startAllocCounting();
+
+            try {
+                BufferedReader br
+                    = new BufferedReader(new InputStreamReader(is), 256);
+
+                int count = 0;
+                int timeCount = 0;
+                String line;
+                if (offset > 0) {
+                    long skipped = br.skip(offset);
+                    //Log.d(TAG, "offset="+offset+", skip="+skipped);
+                }
+                while ((line = br.readLine()) != null) {
+                    offset += line.length() + 1;
+                    // Skip comments and blank lines.
+                    line = line.trim();
+                    if (line.startsWith("#") || line.equals("")) {
+                        continue;
+                    }
+
+                    try {
+                        if (false) {
+                            Log.v(TAG, "Loading " + line + "...");
+                        }
+                        Class.forName(line);
+                        if (Debug.getGlobalAllocSize() > PRELOAD_GC_THRESHOLD) {
+                            if (false) {
+                                Log.v(TAG,
+                                    " GC at " + Debug.getGlobalAllocSize());
+                            }
+                            System.gc();
+                            runtime.runFinalizationSync();
+                            Debug.resetGlobalAllocSize();
+                        }
+                        count++;
+                    } catch (ClassNotFoundException e) {
+                        Log.w(TAG, "Class not found for preloading: " + line);
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Error preloading " + line + ".", t);
+                        if (t instanceof Error) {
+                            throw (Error) t;
+                        }
+                        if (t instanceof RuntimeException) {
+                            throw (RuntimeException) t;
+                        }
+                        throw new RuntimeException(t);
+                    }
+                    // Check time consumed after each 5 classes loaded
+                    if ((++timeCount) >= 5) {
+                        timeCount = 0;
+                        if (SystemClock.uptimeMillis() - startTime >= 600) {
+                            break;
+                        }
+                    }
+                }
+                if (null == line) offset = -1;
+
+                Log.i(TAG, "...loaded " + count + " classes in "
+                        + (SystemClock.uptimeMillis()-startTime) + "ms.");
+            } catch (IOException e) {
+                Log.e(TAG, "Error reading " + PRELOADED_CLASSES + ".", e);
+            } finally {
+                IoUtils.closeQuietly(is);
+                // Restore default.
+                runtime.setTargetHeapUtilization(defaultUtilization);
+
+                Debug.stopAllocCounting();
+
+                // Bring back root. We'll need it later.
+                setEffectiveUser(ROOT_UID);
+                setEffectiveGroup(ROOT_GID);
+            }
+        }
+        return offset;
     }
 }

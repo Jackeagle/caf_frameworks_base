@@ -210,6 +210,8 @@ class ZygoteConnection {
         try {
             parsedArgs = new Arguments(args);
 
+            if (applyCommand(parsedArgs)) return false;
+
             applyUidSecurityPolicy(parsedArgs, peer, peerSecurityContext);
             applyRlimitSecurityPolicy(parsedArgs, peer, peerSecurityContext);
             applyCapabilitiesSecurityPolicy(parsedArgs, peer, peerSecurityContext);
@@ -1087,5 +1089,20 @@ class ZygoteConnection {
         if (newStderr != null) {
             newStderr.println(message + (ex == null ? "" : ex));
         }
+    }
+
+    private boolean applyCommand(Arguments args) {
+        if (2 == args.remainingArgs.length
+                && "-1".equals(args.remainingArgs[0])
+                && args.remainingArgs[1].startsWith("load_")) {
+            try {
+                mSocketOutStream.writeLong(
+                        ZygoteInit.doLoading(args.remainingArgs[1]));
+            } catch (IOException ex) {
+                Log.e(TAG, "Error reading from command socket", ex);
+            }
+            return true;
+        }
+        return false;
     }
 }
