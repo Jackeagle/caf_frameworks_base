@@ -411,6 +411,14 @@ public final class Downloads {
         public static final String COLUMN_FAILED_CONNECTIONS = "numfailed";
 
         /**
+         * Indicates the user selected storage to download and install app.
+         * See PackageHelper.APP_INSTALL_AUTO, PackageHelper.APP_INSTALL_INTERNAL and
+         * PackageHelper.APP_INSTALL_EXTERNAL.
+         * <P>Type: INTEGER</P>
+         */
+        public static final String COLUMN_STORAGE_SELECTED = "storage_selected";
+
+        /**
          * default value for {@link #COLUMN_LAST_UPDATESRC}.
          * This value is used when this column's value is not relevant.
          */

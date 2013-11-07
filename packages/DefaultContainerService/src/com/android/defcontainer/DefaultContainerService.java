@@ -277,6 +277,68 @@ public class DefaultContainerService extends IntentService {
                 return packageFile.length() * 2;
             }
         }
+
+        @Override
+        public int checkInternalStorageAvailable(String packagePath, int flags,
+                long threshold) throws RemoteException {
+            if (localLOGV)
+                Log.d(TAG, "checkInternalStorageAvailable");
+            final boolean isForwardLocked = (flags & PackageManager.INSTALL_FORWARD_LOCK) != 0;
+            final File apkFile = new File(packagePath);
+            try {
+                if (isUnderInternalThreshold(apkFile, isForwardLocked, threshold)) {
+                    if (localLOGV)
+                        Log.d(TAG, "checkInternalStorageAvailable, return install internal");
+                    return PackageHelper.RECOMMEND_INSTALL_INTERNAL;
+                }
+                else {
+                    if (localLOGV)
+                        Log.d(TAG, "checkInternalStorageAvailable, return insufficient storage");
+                    return PackageHelper.RECOMMEND_FAILED_INSUFFICIENT_STORAGE;
+                }
+            } catch (IOException e) {
+                if (localLOGV)
+                    Log.d(TAG, "checkInternalStorageAvailable, return invalid uri");
+                return PackageHelper.RECOMMEND_FAILED_INVALID_URI;
+            }
+        }
+
+        @Override
+        public int checkExternalStorageAvailable(String packagePath, int flags)
+                throws RemoteException {
+            if (localLOGV)
+                Log.d(TAG, "checkExternalStorageAvailable");
+            if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+                if (localLOGV)
+                    Log.d(TAG, "checkExternalStorageAvailable, return media unavailable");
+                return PackageHelper.RECOMMEND_MEDIA_UNAVAILABLE;
+            }
+
+            final boolean isForwardLocked = (flags & PackageManager.INSTALL_FORWARD_LOCK) != 0;
+            final File apkFile = new File(packagePath);
+
+            try {
+                final int sizeMb = calculateContainerSize(apkFile, isForwardLocked);
+
+                final int availSdMb;
+                if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+                    final StatFs sdStats = new StatFs(Environment.getExternalStorageDirectory().getPath());
+                    final int blocksToMb = (1 << 20) / sdStats.getBlockSize();
+                    availSdMb = sdStats.getAvailableBlocks() / blocksToMb;
+                } else {
+                    availSdMb = -1;
+                }
+
+                Log.d(TAG, "checkExternalStorageAvailable, availSdMb = " + availSdMb + " sizeMb = " + sizeMb);
+                return availSdMb > sizeMb ? PackageHelper.RECOMMEND_INSTALL_EXTERNAL
+                        : PackageHelper.RECOMMEND_FAILED_INSUFFICIENT_STORAGE;
+
+            } catch (IOException e) {
+                if (localLOGV)
+                    Log.d(TAG, "checkExternalStorageAvailable, return invalid uri");
+                return PackageHelper.RECOMMEND_FAILED_INVALID_URI;
+            }
+        }
     };
 
     public DefaultContainerService() {
@@ -660,6 +722,8 @@ public class DefaultContainerService extends IntentService {
         int prefer;
         boolean checkBoth = false;
 
+        if (localLOGV)
+            Log.d(TAG, "recommendAppInstallLocation, installLocation = " + installLocation + " flags = " + flags);
         final boolean isForwardLocked = (flags & PackageManager.INSTALL_FORWARD_LOCK) != 0;
 
         check_inner : {
@@ -710,6 +774,8 @@ public class DefaultContainerService extends IntentService {
         }
 
         final boolean emulated = Environment.isExternalStorageEmulated();
+        if (localLOGV)
+            Log.d(TAG, "recommendAppInstallLocation, emulated = " + emulated + " prefer = " + prefer + " checkBoth = " + checkBoth);
 
         final File apkFile = new File(archiveFilePath);
 
@@ -730,6 +796,8 @@ public class DefaultContainerService extends IntentService {
                 return PackageHelper.RECOMMEND_FAILED_INVALID_URI;
             }
         }
+        if (localLOGV)
+            Log.d(TAG, "recommendAppInstallLocation, fitsOnInternal = " + fitsOnInternal + " fitsOnSd = " + fitsOnSd);
 
         if (prefer == PREFER_INTERNAL) {
             if (fitsOnInternal) {
