@@ -447,7 +447,7 @@ public class WindowManagerService extends IWindowManager.Stub
     boolean mSystemBooted = false;
     boolean mForceDisplayEnabled = false;
     boolean mShowingBootMessages = false;
-
+    boolean mAutoEnv = SystemProperties.getBoolean("AUTOPLATFORM", true );
     String mLastANRState;
 
     /** All DisplayDontents in the world, kept here */
@@ -4599,7 +4599,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 Slog.w(TAG, "Attempted to set visibility of non-existing app token: " + token);
                 return;
             }
-
+           
             if (DEBUG_APP_TRANSITIONS || DEBUG_ORIENTATION) {
                 RuntimeException e = null;
                 if (!HIDE_STACK_CRAWLS) {
@@ -5563,7 +5563,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
 
-            if (!mForceDisplayEnabled) {
+            if (!mAutoEnv && !mForceDisplayEnabled) {//Not a use case for Auto
                 // Don't enable the screen until all existing windows
                 // have been drawn.
                 boolean haveBootMsg = false;
@@ -11199,4 +11199,5 @@ public class WindowManagerService extends IWindowManager.Stub
             displayContent.updateDisplayInfo();
         }
     }
+
 }
