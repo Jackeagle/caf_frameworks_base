@@ -355,7 +355,6 @@ public class MediaScanner
      * to get the full system property.
      */
     private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX = "ro.config.";
-    private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX_PERSIST = "persist.env.";
 
     // set to true if file path comparisons should be case insensitive.
     // this should be set when scanning files on a case insensitive file system.
@@ -977,7 +976,7 @@ public class MediaScanner
                             needToSetSettings = true;
                             needToSetMmsNotificationSettings = true;
                         }
-                    } else if (ringtones && (!mDefaultRingtoneSet | !mDefaultRingtone2Set)) {
+                    } else if (ringtones && (!mDefaultRingtoneSet || !mDefaultRingtone2Set)) {
                         if (TextUtils.isEmpty(mDefaultRingtoneFilename) ||
                                 doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename)) {
                             needToSetSettings = true;
