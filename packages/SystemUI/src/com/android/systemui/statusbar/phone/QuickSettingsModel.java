@@ -858,6 +858,11 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     }
 
     void switchMobileData() {
+        // Do not make mobile data on/off if airplane mode on.
+        if (Settings.Global.getInt(mContext.getContentResolver(),
+                Settings.Global.AIRPLANE_MODE_ON, 0) != 0) {
+            return;
+        }
         ConnectivityManager cm = (ConnectivityManager)mContext.getSystemService(
                 Context.CONNECTIVITY_SERVICE);
         cm.setMobileDataEnabled(!mRSSIState.enabled);

@@ -1234,4 +1234,7 @@
         <item>Trying to read MMS</item>
         <item>Trying to write MMS</item>
     </string-array>
+
+    <!-- Whether cpu boost is enabled for overscroller fling. -->
+    <bool name="config_enableCpuBoostForOverScrollerFling">false</bool>
 </resources>

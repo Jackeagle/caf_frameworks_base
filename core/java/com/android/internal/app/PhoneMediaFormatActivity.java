@@ -30,14 +30,17 @@ import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
 import android.os.storage.StorageVolume;
+import com.android.internal.R;
 
 /**
  * This activity is shown to the user to confirm formatting of external media.
  * It uses the alert dialog style. It will be launched from a notification, or from settings
  */
-public class ExternalMediaFormatActivity extends AlertActivity implements DialogInterface.OnClickListener {
+public class PhoneMediaFormatActivity extends AlertActivity
+                                implements DialogInterface.OnClickListener {
 
     private static final int POSITIVE_BUTTON = AlertDialog.BUTTON_POSITIVE;
+    private static final String TAG = "PhoneMediaFormatActivity";
     private StorageVolume mStorageVolume = null;
 
     /** Used to detect when the media state changes, in case we need to call finish() */
@@ -45,7 +48,7 @@ public class ExternalMediaFormatActivity extends AlertActivity implements Dialog
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            Log.d("ExternalMediaFormatActivity", "got action " + action);
+            Log.d(TAG, "got action " + action);
 
             if (action == Intent.ACTION_MEDIA_REMOVED ||
                 action == Intent.ACTION_MEDIA_CHECKING ||
@@ -55,21 +58,20 @@ public class ExternalMediaFormatActivity extends AlertActivity implements Dialog
             }
         }
     };
-    
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mStorageVolume = getIntent().getParcelableExtra(StorageVolume.EXTRA_STORAGE_VOLUME);
-        Log.d("ExternalMediaFormatActivity", "onCreate! mStorageVolume:" + mStorageVolume);
+        Log.d(TAG, "onCreate! mStorageVolume:" + mStorageVolume);
         // Set up the "dialog"
         final AlertController.AlertParams p = mAlertParams;
-        p.mIconId = com.android.internal.R.drawable.stat_sys_warning;
-        p.mTitle = getString(com.android.internal.R.string.extmedia_format_title);
-        p.mMessage = getString(com.android.internal.R.string.extmedia_format_message);
-        p.mPositiveButtonText = getString(
-                                  com.android.internal.R.string.extmedia_format_button_format);
+        p.mIconId = R.drawable.stat_sys_warning;
+        p.mTitle = getString(R.string.phonemedia_format_title);
+        p.mMessage = getString(R.string.phonemedia_format_message);
+        p.mPositiveButtonText = getString(R.string.phonemedia_format_button_format);
         p.mPositiveButtonListener = this;
-        p.mNegativeButtonText = getString(com.android.internal.R.string.cancel);
+        p.mNegativeButtonText = getString(R.string.cancel);
         p.mNegativeButtonListener = this;
         setupAlert();
     }
@@ -89,7 +91,6 @@ public class ExternalMediaFormatActivity extends AlertActivity implements Dialog
     @Override
     protected void onPause() {
         super.onPause();
-
         unregisterReceiver(mStorageReceiver);
     }
 
@@ -97,15 +98,14 @@ public class ExternalMediaFormatActivity extends AlertActivity implements Dialog
      * {@inheritDoc}
      */
     public void onClick(DialogInterface dialog, int which) {
-
-        if (which == POSITIVE_BUTTON) {
-            Intent intent = new Intent(ExternalStorageFormatter.FORMAT_ONLY);
-            intent.setComponent(ExternalStorageFormatter.COMPONENT_NAME);
-            if (mStorageVolume != null)
+        if(mStorageVolume != null){
+            if (which == POSITIVE_BUTTON) {
+                Intent intent = new Intent(ExternalStorageFormatter.FORMAT_ONLY);
+                intent.setComponent(ExternalStorageFormatter.COMPONENT_NAME);
                 intent.putExtra(mStorageVolume.EXTRA_STORAGE_VOLUME, mStorageVolume);
-            startService(intent);
+                startService(intent);
+            }
         }
-
         // No matter what, finish the activity
         finish();
     }

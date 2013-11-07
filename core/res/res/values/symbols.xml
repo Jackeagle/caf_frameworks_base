@@ -521,8 +521,11 @@
   <java-symbol type="string" name="eventTypeCustom" />
   <java-symbol type="string" name="eventTypeOther" />
   <java-symbol type="string" name="extmedia_format_button_format" />
+  <java-symbol type="string" name="phonemedia_format_button_format" />
   <java-symbol type="string" name="extmedia_format_message" />
+  <java-symbol type="string" name="phonemedia_format_message" />
   <java-symbol type="string" name="extmedia_format_title" />
+  <java-symbol type="string" name="phonemedia_format_title" />
   <java-symbol type="string" name="fileSizeSuffix" />
   <java-symbol type="string" name="force_close" />
   <java-symbol type="string" name="format_error" />
@@ -1783,15 +1786,21 @@
   <java-symbol type="string" name="ext_media_badremoval_notification_message" />
   <java-symbol type="string" name="ext_media_badremoval_notification_title" />
   <java-symbol type="string" name="ext_media_checking_notification_message" />
+  <java-symbol type="string" name="phone_media_checking_notification_message" />
   <java-symbol type="string" name="ext_media_checking_notification_title" />
+  <java-symbol type="string" name="phone_media_checking_notification_title" />
   <java-symbol type="string" name="ext_media_nofs_notification_message" />
+  <java-symbol type="string" name="phone_media_nofs_notification_message" />
   <java-symbol type="string" name="ext_media_nofs_notification_title" />
+  <java-symbol type="string" name="phone_media_nofs_notification_title" />
   <java-symbol type="string" name="ext_media_nomedia_notification_message" />
   <java-symbol type="string" name="ext_media_nomedia_notification_title" />
   <java-symbol type="string" name="ext_media_safe_unmount_notification_message" />
   <java-symbol type="string" name="ext_media_safe_unmount_notification_title" />
   <java-symbol type="string" name="ext_media_unmountable_notification_message" />
+  <java-symbol type="string" name="phone_media_unmountable_notification_message" />
   <java-symbol type="string" name="ext_media_unmountable_notification_title" />
+  <java-symbol type="string" name="phone_media_unmountable_notification_title" />
   <java-symbol type="string" name="usb_storage_error_message" />
   <java-symbol type="string" name="usb_storage_message" />
   <java-symbol type="string" name="usb_storage_notification_message" />
@@ -1896,4 +1905,7 @@
   <java-symbol type="layout" name="msim_keyguard_sim_pin_view" />
   <java-symbol type="layout" name="msim_keyguard_sim_puk_view" />
   <java-symbol type="layout" name="msim_keyguard_carrier_area" />
+
+  <!-- cpu boost for overscroller fling -->
+  <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
 </resources>

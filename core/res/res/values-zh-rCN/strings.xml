@@ -1221,9 +1221,14 @@
     <string name="usb_charging_notification_title">以充电方式连接</string>
     <string name="extmedia_format_title" product="nosdcard" msgid="9020092196061007262">"格式化 USB 存储设备吗？"</string>
     <string name="extmedia_format_title" product="default" msgid="3648415921526526069">"要格式化 SD 卡吗？"</string>
+    <string name="phonemedia_format_title" product="nosdcard">"格式化内置 SD 卡吗？"</string>
+    <string name="phonemedia_format_title" product="default">"要格式化内置 SD 卡吗？"</string>
     <string name="extmedia_format_message" product="nosdcard" msgid="3934016853425761078">"您的 USB 存储设备中存储的所有文件都将清除。该操作无法撤消！"</string>
     <string name="extmedia_format_message" product="default" msgid="14131895027543830">"您卡上的所有数据都会丢失。"</string>
+    <string name="phonemedia_format_message" product="nosdcard">"您的内置 SD 卡中存储的所有文件都将清除。该操作无法撤消！"</string>
+    <string name="phonemedia_format_message" product="default">"您内置 SD 卡上的所有数据都会丢失。"</string>
     <string name="extmedia_format_button_format" msgid="4131064560127478695">"格式化"</string>
+    <string name="phonemedia_format_button_format">"格式化"</string>
     <string name="adb_active_notification_title" msgid="6729044778949189918">"已连接 USB 调试"</string>
     <string name="adb_active_notification_message" msgid="1016654627626476142">"触摸可停用 USB 调试。"</string>
     <string name="select_input_method" msgid="4653387336791222978">"选择输入法"</string>
@@ -1237,15 +1242,26 @@
     <string name="candidates_style" msgid="4333913089637062257"><u>"候选"</u></string>
     <string name="ext_media_checking_notification_title" product="nosdcard" msgid="3449816005351468560">"正在准备 USB 存储设备"</string>
     <string name="ext_media_checking_notification_title" product="default" msgid="5457603418970994050">"正在准备 SD 卡"</string>
+    <string name="phone_media_checking_notification_title" product="nosdcard">"正在准备内置存储设备"</string>
+    <string name="phone_media_checking_notification_title" product="default">"正在准备内置 SD 卡"</string>
     <string name="ext_media_checking_notification_message" msgid="8287319882926737053">"正在检查是否有错误。"</string>
+    <string name="phone_media_checking_notification_message">"正在检查是否有错误。"</string>
     <string name="ext_media_nofs_notification_title" product="nosdcard" msgid="7788040745686229307">"USB 存储设备中无文件"</string>
     <string name="ext_media_nofs_notification_title" product="default" msgid="780477838241212997">"空 SD 卡"</string>
+    <string name="phone_media_nofs_notification_title" product="nosdcard">"内置存储设备中无文件"</string>
+    <string name="phone_media_nofs_notification_title" product="default">"空内置 SD 卡"</string>
     <string name="ext_media_nofs_notification_message" product="nosdcard" msgid="7840121067427269500">"USB 存储设备中没有任何文件或使用了不支持的文件系统。"</string>
     <string name="ext_media_nofs_notification_message" product="default" msgid="8641065641786923604">"SD 卡中没有任何文件或使用了不支持的文件系统。"</string>
+    <string name="phone_media_nofs_notification_message" product="nosdcard">"内置存储设备中没有任何文件或使用了不支持的文件系统。"</string>
+    <string name="phone_media_nofs_notification_message" product="default">"内置  SD 卡中没有任何文件或使用了不支持的文件系统。"</string>
     <string name="ext_media_unmountable_notification_title" product="nosdcard" msgid="2090046769532713563">"USB 存储设备已损坏"</string>
     <string name="ext_media_unmountable_notification_title" product="default" msgid="6410723906019100189">"SD 卡受损"</string>
+    <string name="phone_media_unmountable_notification_title" product="nosdcard">"内置存储设备已损坏"</string>
+    <string name="phone_media_unmountable_notification_title" product="default">"内置  SD 卡受损"</string>
     <string name="ext_media_unmountable_notification_message" product="nosdcard" msgid="1795917578395333280">"USB 存储设备已损坏，请尝试重新格式化。"</string>
     <string name="ext_media_unmountable_notification_message" product="default" msgid="1753898567525568253">"SD 卡已损坏，请尝试重新格式化。"</string>
+    <string name="phone_media_unmountable_notification_message" product="nosdcard">"内置存储设备已损坏，请尝试重新格式化。"</string>
+    <string name="phone_media_unmountable_notification_message" product="default">"内置  SD 卡已损坏，请尝试重新格式化。"</string>
     <string name="ext_media_badremoval_notification_title" product="nosdcard" msgid="1661683031330951073">"USB 存储设备已意外移除"</string>
     <string name="ext_media_badremoval_notification_title" product="default" msgid="6872152882604407837">"SD 卡未正常移除"</string>
     <string name="ext_media_badremoval_notification_message" product="nosdcard" msgid="4329848819865594241">"请先卸载 USB 存储设备，再将其移除，以防数据丢失。"</string>
@@ -1400,6 +1416,7 @@
     <string name="action_bar_home_description_format" msgid="7965984360903693903">"%1$s：%2$s"</string>
     <string name="action_bar_home_subtitle_description_format" msgid="6985546530471780727">"%1$s - %2$s：%3$s"</string>
     <string name="storage_internal" msgid="4891916833657929263">"内存设备"</string>
+    <string name="storage_internal_sd">"内置 SD 卡"</string>
     <string name="storage_sd_card" msgid="3282948861378286745">"SD 卡"</string>
     <string name="storage_usb" msgid="3017954059538517278">"USB 存储器"</string>
     <string name="extract_edit_menu_button" msgid="8940478730496610137">"修改"</string>
