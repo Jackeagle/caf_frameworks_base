@@ -748,7 +748,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             try {
                 stmt = db.compileStatement("INSERT INTO system(name,value)"
                         + " VALUES(?,?);");
-                loadSetting(stmt, Global.SET_INSTALL_LOCATION, 0);
+                if ("Xolo".equals(SystemProperties.get("persist.env.spec"))) {
+                    Log.d(TAG, "onUpgrade: set SET_INSTALL_LOCATION to 1");
+                    loadSetting(stmt, Global.SET_INSTALL_LOCATION, 1);
+                } else {
+                    loadSetting(stmt, Global.SET_INSTALL_LOCATION, 0);
+                }
                 loadSetting(stmt, Global.DEFAULT_INSTALL_LOCATION,
                         PackageHelper.APP_INSTALL_AUTO);
                 db.setTransactionSuccessful();
@@ -2332,7 +2337,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadIntegerSetting(stmt, Settings.Global.DOCK_AUDIO_MEDIA_ENABLED,
                     R.integer.def_dock_audio_media_enabled);
 
-            loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 0);
+            if ("Xolo".equals(SystemProperties.get("persist.env.spec"))) {
+                Log.d(TAG, "loadGlobalSettings: set SET_INSTALL_LOCATION to 1");
+                loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 1);
+            } else {
+                loadSetting(stmt, Settings.Global.SET_INSTALL_LOCATION, 0);
+            }
             loadSetting(stmt, Settings.Global.DEFAULT_INSTALL_LOCATION,
                     PackageHelper.APP_INSTALL_AUTO);
 
@@ -2349,15 +2359,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                             : RILConstants.PREFERRED_NETWORK_MODE;
 
             int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
-            String networkMode = SystemProperties.get("ro.telephony.default_network");
+            String networkMode = SystemProperties.get("persist.radio.default_network");
+            if (networkMode == null) {
+                networkMode = SystemProperties.get("ro.telephony.default_network");
+            }
+
             if (networkMode != null) {
                 if (numPhones == MSimConstants.MAX_PHONE_COUNT_SINGLE_SIM) {
                     loadSetting(
                             stmt,
                             Settings.Global.PREFERRED_NETWORK_MODE,
                             MSimTelephonyManager.getTelephonyProperty(
-                                    "ro.telephony.default_network", 0,
-                                    Integer.toString(defaultNetworkType)));
+                                    "persist.radio.default_network", 0,
+                                    Integer.toString(SystemProperties.getInt("ro.telephony.default_network",
+                                            defaultNetworkType))));
                 } else {
                     loadSetting(stmt, Settings.Global.PREFERRED_NETWORK_MODE, networkMode);
                 }

@@ -389,7 +389,9 @@ public class TelephonyManager {
         // When the system property CURRENT_ACTIVE_PHONE, has not been set,
         // use the system property for default network type.
         // This is a fail safe, and can only happen at first boot.
-        int mode = SystemProperties.getInt("ro.telephony.default_network", -1);
+        int mode =
+            SystemProperties.getInt("presist.radio.default_network",
+                    SystemProperties.getInt("ro.telephony.default_network", -1));
         if (mode == -1)
             return PHONE_TYPE_NONE;
         return getPhoneType(mode);
