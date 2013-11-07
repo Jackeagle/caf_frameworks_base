@@ -157,6 +157,9 @@ public class KeyguardViewMediator {
 
     private boolean mSystemReady;
 
+    //Added to remove non auto specific functionalities
+    private boolean mAutoEnv = SystemProperties.getBoolean("AUTOPLATFORM", true );
+
     // Whether the next call to playSounds() should be skipped.  Defaults to
     // true because the first lock (on boot) should be silent.
     private boolean mSuppressNextLockSound = true;
@@ -364,6 +367,8 @@ public class KeyguardViewMediator {
         @Override
         public void onSimStateChanged(IccCardConstants.State simState, int subscription) {
             Log.d(TAG, "onSimStateChanged: " + simState);
+            if (mAutoEnv) //No sim for Auto
+                return;
 
             switch (simState) {
                 case NOT_READY:
@@ -571,6 +576,8 @@ public class KeyguardViewMediator {
      *   {@link WindowManagerPolicy#OFF_BECAUSE_OF_PROX_SENSOR}.
      */
     public void onScreenTurnedOff(int why) {
+        if (mAutoEnv) //Screen turn off already disabled for Auto
+             return;
         synchronized (this) {
             mScreenOn = false;
             if (DEBUG) Log.d(TAG, "onScreenTurnedOff(" + why + ")");
@@ -660,6 +667,12 @@ public class KeyguardViewMediator {
      */
     public void onScreenTurnedOn(KeyguardViewManager.ShowListener showListener) {
         synchronized (this) {
+            if (mAutoEnv) {  //screen turn off/on is disabled for Auto
+                if (showListener != null) {
+                    showListener.onShown(null);
+                }
+                return;
+            }
             mScreenOn = true;
             cancelDoKeyguardLaterLocked();
             if (DEBUG) Log.d(TAG, "onScreenTurnedOn, seq = " + mDelayedShowingSequence);
@@ -852,7 +865,7 @@ public class KeyguardViewMediator {
      */
     private void doKeyguardLocked(Bundle options) {
         // if another app is disabling us, don't show
-        if (!mExternallyEnabled) {
+        if (mAutoEnv || !mExternallyEnabled) {
             if (DEBUG) Log.d(TAG, "doKeyguard: not showing because externally disabled");
 
             // note: we *should* set mNeedToReshowWhenReenabled=true here, but that makes
@@ -1242,7 +1255,8 @@ public class KeyguardViewMediator {
     private void handleShow(Bundle options) {
         synchronized (KeyguardViewMediator.this) {
             if (DEBUG) Log.d(TAG, "handleShow");
-            if (!mSystemReady) return;
+            mShowKeyguardWakeLock.release();
+            if (mAutoEnv || !mSystemReady) return;//Not a use case for Auto
 
             mKeyguardViewManager.show(options);
             mShowing = true;
@@ -1269,7 +1283,7 @@ public class KeyguardViewMediator {
     private void handleHide() {
         synchronized (KeyguardViewMediator.this) {
             if (DEBUG) Log.d(TAG, "handleHide");
-            if (mWakeAndHandOff.isHeld()) {
+            if (mAutoEnv || mWakeAndHandOff.isHeld()) {//Not a use case for Auto
                 Log.w(TAG, "attempt to hide the keyguard while waking, ignored");
                 return;
             }
