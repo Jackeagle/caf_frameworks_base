@@ -1031,4 +1031,45 @@ public class Process {
          */
         public boolean usingWrapper;
     }
+
+    /**
+     * Start loading classes and resources.
+     *
+     * {@hide}
+     */
+    public static long doCommand(final String command) {
+        try {
+            Log.d(LOG_TAG, "doCommand="+command);
+            synchronized(Process.class) {
+                openZygoteSocketIfNeeded();
+
+                sZygoteWriter.write("2");
+                sZygoteWriter.newLine();
+                sZygoteWriter.write("-1");
+                sZygoteWriter.newLine();
+                sZygoteWriter.write(command);
+                sZygoteWriter.newLine();
+                sZygoteWriter.flush();
+
+                return sZygoteInputStream.readLong();
+            }
+        } catch (ZygoteStartFailedEx ex) {
+            Log.e(LOG_TAG,
+                    "Starting VM process through Zygote failed");
+            throw new RuntimeException(
+                    "Starting VM process through Zygote failed", ex);
+        } catch (IOException ex) {
+            try {
+                if (sZygoteSocket != null) {
+                    sZygoteSocket.close();
+                }
+            } catch (IOException ex2) {
+                // we're going to fail anyway
+                Log.e(LOG_TAG,"I/O exception on routine close", ex2);
+            }
+
+            sZygoteSocket = null;
+        }
+        return -1;
+    }
 }
