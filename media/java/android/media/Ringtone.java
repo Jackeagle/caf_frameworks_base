@@ -47,7 +47,6 @@ public class Ringtone {
     private static final boolean LOGD = true;
 
     private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX_RO = "ro.config.";
-    private static final String DEFAULT_RINGTONE_PROPERTY_PREFIX_PERSIST = "persist.env.sys.";
 
     private static final String[] MEDIA_COLUMNS = new String[] {
         MediaStore.Audio.Media._ID,
@@ -355,8 +354,24 @@ public class Ringtone {
             }
             // Check whether the corresponding file of Uri is exist.
             if (!hasData(c)) {
-                String defaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_PERSIST + settingName,
-                    SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+                String defaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName);
+
+                if(Settings.System.RINGTONE.equals(settingName))
+                    defaultRingtoneFilename = SystemProperties.get("persist.env.sys.ringtone",
+                        SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+                else if(Settings.System.RINGTONE_2.equals(settingName))
+                    defaultRingtoneFilename = SystemProperties.get("persist.env.sys.ringtone_2",
+                        SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+                else if(Settings.System.NOTIFICATION_SOUND.equals(settingName))
+                    defaultRingtoneFilename = SystemProperties.get("persist.env.sys.notification",
+                        SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+                else if(Settings.System.MMS_NOTIFICATION_SOUND.equals(settingName))
+                    defaultRingtoneFilename = SystemProperties.get("persist.env.sys.mms",
+                        SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+                else if(Settings.System.ALARM_ALERT.equals(settingName))
+                    defaultRingtoneFilename = SystemProperties.get("persist.env.sys.alarm",
+                        SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX_RO + settingName));
+
                 c = res.acquireProvider("media").query(null, MediaStore.Audio.Media.INTERNAL_CONTENT_URI,
                         new String[]{"_id"},
                         MediaStore.Audio.AudioColumns.IS_RINGTONE+"=1 and "+MediaStore.Audio.Media.DISPLAY_NAME + "=?",
