@@ -165,32 +165,39 @@ public class ExternalStorageFormatter extends Service
     @Override
     public void onCancel(DialogInterface dialog) {
 
-        IMountService mountService = getMountService();
-        try {
-            final StorageVolume[] volumes = mountService.getVolumeList();
-            final ArrayList<StorageVolume> physicalVols = StorageManager.getPhysicalExternalVolume(volumes);
-            String extStoragePath = null;
-            if (mIntStoragePath != null)
-                mountService.mountVolume(mIntStoragePath);
-            // find external storage path if storage volume not specified
-            if (mStorageVolume == null) {
-                if (physicalVols.size() == 0) {
-                    updateProgressDialog(R.string.progress_nomediapresent);
-                } else {
-                    final StorageVolume physicalVol = physicalVols.get(0);
-                    extStoragePath = physicalVol.toString();
-                    mountService.mountVolume(extStoragePath);
+        final IMountService mountService = getMountService();
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    final StorageVolume[] volumes = mountService.getVolumeList();
+                    final ArrayList<StorageVolume> physicalVols = StorageManager
+                            .getPhysicalExternalVolume(volumes);
+                    String extStoragePath = null;
+                    if (mIntStoragePath != null)
+                        mountService.mountVolume(mIntStoragePath);
+                    // find external storage path if storage volume not
+                    // specified
+                    if (mStorageVolume == null) {
+                        if (physicalVols.size() == 0) {
+                            updateProgressDialog(R.string.progress_nomediapresent);
+                        } else {
+                            final StorageVolume physicalVol = physicalVols.get(0);
+                            extStoragePath = physicalVol.toString();
+                            mountService.mountVolume(extStoragePath);
+                        }
+                    }
+                    // else use the specified storage volume
+                    else {
+                        extStoragePath = mStorageVolume.getPath();
+                        mountService.mountVolume(extStoragePath);
+                    }
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Failed talking with mount service", e);
                 }
+                stopSelf();
             }
-            //else use the specified storage volume
-            else {
-                extStoragePath = mStorageVolume.getPath();
-                mountService.mountVolume(extStoragePath);
-            }
-        } catch (RemoteException e) {
-            Log.w(TAG, "Failed talking with mount service", e);
-        }
-        stopSelf();
+        }.start();
     }
 
     void fail(int msg) {
