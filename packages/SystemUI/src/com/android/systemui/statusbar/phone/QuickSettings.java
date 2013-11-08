@@ -552,6 +552,10 @@ class QuickSettings {
             public void refreshView(QuickSettingsTileView unused, State state) {
                 QuickSettingsModel.BatteryState batteryState =
                         (QuickSettingsModel.BatteryState) state;
+                // Reset charging drawable level to support charging animation
+                if (!batteryState.pluggedIn && mChargingBatteryLevels.getLevel() != 0) {
+                    mChargingBatteryLevels.setLevel(0);
+                }
                 Drawable d = batteryState.pluggedIn
                         ? mChargingBatteryLevels
                         : mBatteryLevels;
