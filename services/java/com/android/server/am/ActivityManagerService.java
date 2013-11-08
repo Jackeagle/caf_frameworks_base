@@ -133,6 +133,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.WindowManagerPolicy;
 import android.content.BroadcastReceiver;
+import android.os.PowerManager;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -199,7 +200,7 @@ public final class ActivityManagerService extends ActivityManagerNative
     
     // Control over CPU and battery monitoring.
     static final long BATTERY_STATS_TIME = 30*60*1000;      // write battery stats every 30 minutes.
-    static final boolean MONITOR_CPU_USAGE = true;
+    static final boolean MONITOR_CPU_USAGE = false; //No need of Auto
     static final long MONITOR_CPU_MIN_TIME = 5*1000;        // don't sample cpu less than every 5 seconds.
     static final long MONITOR_CPU_MAX_TIME = 0x0fffffff;    // wait possibly forever for next cpu sample.
     static final boolean MONITOR_THREAD_CPU_USAGE = false;
@@ -901,6 +902,7 @@ public final class ActivityManagerService extends ActivityManagerNative
     static final int REPORT_USER_SWITCH_MSG = 34;
     static final int CONTINUE_USER_SWITCH_MSG = 35;
     static final int USER_SWITCH_TIMEOUT_MSG = 36;
+    static final int DO_LOADING = 40;
 
     static final int FIRST_ACTIVITY_STACK_MSG = 100;
     static final int FIRST_BROADCAST_QUEUE_MSG = 200;
@@ -1362,6 +1364,83 @@ public final class ActivityManagerService extends ActivityManagerNative
                 timeoutUserSwitch((UserStartedState)msg.obj, msg.arg1, msg.arg2);
                 break;
             }
+            case DO_LOADING: {
+                Thread thread = new Thread() {
+                    @Override
+                    public void run() {
+                        PowerManager pmc = (PowerManager)mContext.getSystemService(Context.POWER_SERVICE);
+                        PowerManager.WakeLock wakeLock = pmc.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                                "LATER_LOADING");
+                        wakeLock.setReferenceCounted(false);
+                        wakeLock.acquire();
+
+                        long now = SystemClock.uptimeMillis();
+                        int delay = 100;
+                        if (LOADING_PERSIST == mLoadingState) {
+                            synchronized (ActivityManagerService.this) {
+                                enableScreenAfterBoot();
+                                if (mFactoryTest != SystemServer.FACTORY_TEST_LOW_LEVEL) {
+                                    try {
+                                        List apps = AppGlobals.getPackageManager().
+                                            getPersistentApplications(STOCK_PM_FLAGS);
+                                        if (apps != null) {
+                                            int N = apps.size();
+                                            int i;
+                                            for (i=0; i<N; i++) {
+                                                ApplicationInfo info
+                                                    = (ApplicationInfo)apps.get(i);
+                                                if (info != null &&
+                                                        !info.packageName.equals("android")) {
+                                                    addAppLocked(info, false);
+                                                }
+                                            }
+                                        }
+                                    } catch (RemoteException ex) {
+                                        // pm is in same process, this will never happen.
+                                    }
+                                }
+                            }
+                            mLoadingState = LOADING_RESTAPP;
+                            delay = 10;
+                            mLoadPara = 0;
+                        }
+                        else if (LOADING_RESTAPP == mLoadingState) {
+                            try {
+                                AppGlobals.getPackageManager().laterScanApp();
+                            } catch (RemoteException ex) {
+                                // pm is in same process, this will never happen.
+                            }
+                            mLoadingState = LOADING_CLASSES;
+                            delay = 10;
+                            mLoadPara = 0;
+                        }
+                        else if (LOADING_CLASSES == mLoadingState) {
+                            mLoadPara = Process.doCommand("load_classes@"+Long.toString(mLoadPara));
+                            if (mLoadPara < 0) {
+                                mLoadingState = LOADING_RESOURCES;
+                                mLoadPara = 0;
+                            }
+                        }
+                        else if (LOADING_RESOURCES == mLoadingState) {
+                            mLoadPara = Process.doCommand("load_resources@"+Long.toString(mLoadPara));
+                            if (mLoadPara < 0) {
+                                mLoadingState = LOADING_FINISHED;
+                                mLoadPara = 0;
+                            }
+                        }
+                        if (mLoadingState != LOADING_FINISHED) {
+                            handleLoading(delay);
+                        }
+                        Slog.d(ActivityManagerService.TAG,
+                                "mState=" + mLoadingState
+                                + ", mLoadPara=" + mLoadPara
+                                + ", time="+(SystemClock.uptimeMillis() - now));
+                        wakeLock.release();
+                    }
+                };
+                thread.start();
+                break;
+            }
             }
         }
     };
@@ -1645,7 +1724,7 @@ public final class ActivityManagerService extends ActivityManagerNative
                 }
             }
         };
-        mProcessStatsThread.start();
+        //mProcessStatsThread.start(); /* Runtime statistics collection thread disabling */
     }
 
     @Override
@@ -2224,12 +2303,21 @@ public final class ActivityManagerService extends ActivityManagerNative
             // error message and don't try to start anything.
             return false;
         }
-        Intent intent = new Intent(
-            mTopAction,
-            mTopData != null ? Uri.parse(mTopData) : null);
-        intent.setComponent(mTopComponent);
-        if (mFactoryTest != SystemServer.FACTORY_TEST_LOW_LEVEL) {
-            intent.addCategory(Intent.CATEGORY_HOME);
+        Intent intent;
+        if (!mFirstAppLaunched) {
+            mFirstAppLaunched = true;
+            intent = new Intent(
+                    Intent.ACTION_MAIN,
+                    null);
+            intent.setComponent(mFirstAppComponent);
+        } else {
+            intent = new Intent(
+                    mTopAction,
+                    mTopData != null ? Uri.parse(mTopData) : null);
+            intent.setComponent(mTopComponent);
+            if (mFactoryTest != SystemServer.FACTORY_TEST_LOW_LEVEL) {
+                intent.addCategory(Intent.CATEGORY_HOME);
+            }
         }
         ActivityInfo aInfo =
             resolveActivityInfo(intent, STOCK_PM_FLAGS, userId);
@@ -7942,26 +8030,6 @@ public final class ActivityManagerService extends ActivityManagerNative
         if (goingCallback != null) goingCallback.run();
         
         synchronized (this) {
-            if (mFactoryTest != SystemServer.FACTORY_TEST_LOW_LEVEL) {
-                try {
-                    List apps = AppGlobals.getPackageManager().
-                        getPersistentApplications(STOCK_PM_FLAGS);
-                    if (apps != null) {
-                        int N = apps.size();
-                        int i;
-                        for (i=0; i<N; i++) {
-                            ApplicationInfo info
-                                = (ApplicationInfo)apps.get(i);
-                            if (info != null &&
-                                    !info.packageName.equals("android")) {
-                                addAppLocked(info, false);
-                            }
-                        }
-                    }
-                } catch (RemoteException ex) {
-                    // pm is in same process, this will never happen.
-                }
-            }
 
             // Start up initial activity.
             mBooting = true;
@@ -14814,5 +14882,25 @@ public final class ActivityManagerService extends ActivityManagerNative
         ActivityInfo info = new ActivityInfo(aInfo);
         info.applicationInfo = getAppInfoForUser(info.applicationInfo, userId);
         return info;
+    }
+
+    private static final int LOADING_PERSIST   = 0;
+    private static final int LOADING_RESTAPP   = 1;
+    private static final int LOADING_CLASSES   = 2;
+    private static final int LOADING_RESOURCES = 3;
+    private static final int LOADING_FINISHED  = LOADING_RESOURCES+1;
+
+    private int mLoadingState = LOADING_PERSIST;
+    private long mLoadPara = 0;
+    private boolean mFirstAppLaunched = true;
+    private final ComponentName mFirstAppComponent =
+        new ComponentName("com.google.android.apps.maps",
+                "com.google.android.maps.driveabout.app.DestinationActivity");
+    public boolean mFirstAppFirstVisible = false;
+
+    public void handleLoading(long delay) {
+        //Slog.d(TAG, "handleLoading");
+        Message msg = mHandler.obtainMessage(DO_LOADING);
+        mHandler.sendMessageDelayed(msg, delay);
     }
 }

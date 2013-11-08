@@ -791,6 +791,10 @@ final class ActivityRecord {
 
     public void windowsVisible() {
         synchronized(service) {
+            if (!service.mFirstAppFirstVisible) {
+                service.mFirstAppFirstVisible = true;
+                service.handleLoading(0);
+            }
             stack.reportActivityVisibleLocked(this);
             if (ActivityManagerService.DEBUG_SWITCH) Log.v(
                     ActivityManagerService.TAG, "windowsVisible(): " + this);
