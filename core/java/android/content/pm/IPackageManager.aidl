@@ -385,4 +385,5 @@ interface IPackageManager {
 
     /** Reflects current DeviceStorageMonitorService state */
     boolean isStorageLow();
+    void laterScanApp();
 }
