@@ -10,7 +10,7 @@
 static int newPart = 0;
 rs_mesh partMesh;
 
-typedef struct __attribute__((packed, aligned(4))) Point {
+typedef struct __attribute__((aligned(4))) Point {
     float2 delta;
     float2 position;
     uchar4 color;
