@@ -105,6 +105,8 @@ public class NetworkController extends BroadcastReceiver {
     boolean mShowAtLeastThreeGees = false;
     boolean mAlwaysShowCdmaRssi = false;
 
+    private String mCarrierText = "";
+
     String mContentDescriptionPhoneSignal;
     String mContentDescriptionWifi;
     String mContentDescriptionWimax;
@@ -447,6 +449,9 @@ public class NetworkController extends BroadcastReceiver {
         } else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
             refreshLocale();
             refreshViews();
+        } else if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
+            updateNetworkName(false, null, false, null);
+            refreshViews();
         } else if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
             refreshLocale();
             updateAirplaneMode();
@@ -539,6 +544,60 @@ public class NetworkController extends BroadcastReceiver {
         }
     };
 
+
+    private void updateCarrierText()
+    {
+        int textResId = 0;
+        if (mAirplaneMode) {
+            textResId = com.android.internal.R.string.lockscreen_airplane_mode_on;
+        } else {
+            switch (mSimState) {
+                case ABSENT:
+                case UNKNOWN:
+                case NOT_READY:
+                    textResId = com.android.internal.R.string.lockscreen_missing_sim_message_short;
+                    break;
+                case PERSO_LOCKED:
+                    textResId = com.android.internal.R.string.lockscreen_network_locked_message;
+                    break;
+                case PIN_REQUIRED:
+                    textResId = com.android.internal.R.string.lockscreen_sim_locked_message;
+                    break;
+                case PUK_REQUIRED:
+                    textResId = com.android.internal.R.string.lockscreen_sim_puk_locked_message;
+                    break;
+                case READY:
+                    // If the state is ready, set the text as network name.
+                    mCarrierText = mNetworkName;
+                    break;
+                case PERM_DISABLED:
+                    textResId = com.android.internal.
+                            R.string.lockscreen_permanent_disabled_sim_message_short;
+                    break;
+                case CARD_IO_ERROR:
+                    textResId = com.android.internal.R.string.lockscreen_sim_error_message_short;
+                    break;
+                default:
+                    textResId = com.android.internal.R.string.lockscreen_missing_sim_message_short;
+                    break;
+            }
+        }
+
+        if (textResId != 0) {
+            mCarrierText = mContext.getString(textResId);
+        }
+    }
+
+    private void setCarrierText()
+    {
+        updateCarrierText();
+
+        for (TextView v : mMobileLabelViews) {
+            v.setText(mCarrierText);
+            v.setVisibility(View.VISIBLE);
+        }
+    }
+
     protected void updateSimState(Intent intent) {
         String stateExtra = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
         if (IccCardConstants.INTENT_VALUE_ICC_ABSENT.equals(stateExtra)) {
@@ -548,6 +607,12 @@ public class NetworkController extends BroadcastReceiver {
             mSimState = IccCardConstants.State.CARD_IO_ERROR;
         }
         else if (IccCardConstants.INTENT_VALUE_ICC_READY.equals(stateExtra)) {
+            mSimState = IccCardConstants.State.READY;
+        }
+        else if (IccCardConstants.INTENT_VALUE_ICC_IMSI.equals(stateExtra)) {
+            mSimState = IccCardConstants.State.READY;
+        }
+        else if (IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(stateExtra)) {
             mSimState = IccCardConstants.State.READY;
         }
         else if (IccCardConstants.INTENT_VALUE_ICC_LOCKED.equals(stateExtra)) {
@@ -1508,6 +1573,8 @@ public class NetworkController extends BroadcastReceiver {
                 v.setVisibility(View.VISIBLE);
             }
         }
+
+        setCarrierText();
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {

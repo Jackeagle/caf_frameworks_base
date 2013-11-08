@@ -40,6 +40,8 @@ public class ExternalStorageFormatter extends Service
     public static final String FORMAT_AND_FACTORY_RESET = "com.android.internal.os.storage.FORMAT_AND_FACTORY_RESET";
     public static final String ERASE_EXTERNAL_EXTRA = "erase_sd";
     public static final String ERASE_INTERNAL_EXTRA = "erase_internal_sd";
+    private static final String EXTERNAL_SD_DESCRIPTION = "sd_card";
+    private static final String INTERNAL_SD_DESCRIPTION = "internal";
 
     public static final String EXTRA_ALWAYS_RESET = "always_reset";
 
@@ -86,7 +88,7 @@ public class ExternalStorageFormatter extends Service
         mWakeLock.acquire();
     }
 
-    private StorageVolume getExtStorageVolume() {
+    private StorageVolume getStorageVolume(boolean eraseSDCard) {
         StorageVolume[] StorageVolume = mStorageManager.getVolumeList();
         if(StorageVolume == null){
             return null;
@@ -97,9 +99,15 @@ public class ExternalStorageFormatter extends Service
         for (int i = 0; i < count; i++) {
             descriptionID = StorageVolume[i].getDescriptionId();
             description = getResources().getResourceName(descriptionID);
-
-            if (description.contains("sd_card"))
-                return StorageVolume[i];
+            if (description == null)
+                continue;
+            if (eraseSDCard) {
+                if (description.contains(EXTERNAL_SD_DESCRIPTION))
+                    return StorageVolume[i];
+            } else {
+                if (description.contains(INTERNAL_SD_DESCRIPTION))
+                    return StorageVolume[i];
+            }
         }
         return null;
     }
@@ -108,15 +116,13 @@ public class ExternalStorageFormatter extends Service
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (FORMAT_AND_FACTORY_RESET.equals(intent.getAction())) {
             mFactoryReset = true;
-            final boolean EraseSDCard = intent.getBooleanExtra(ERASE_EXTERNAL_EXTRA,false);
-            final boolean EraseIntStorage = intent.getBooleanExtra(ERASE_INTERNAL_EXTRA,false);
-            Log.d(TAG,"EraseSDCard = " + EraseSDCard + " ; EraseIntStorage = " + EraseIntStorage);
-            if (EraseIntStorage) {
+            final boolean eraseSDCard = intent.getBooleanExtra(ERASE_EXTERNAL_EXTRA,false);
+            final boolean eraseIntStorage = intent.getBooleanExtra(ERASE_INTERNAL_EXTRA,false);
+            Log.d(TAG,"EraseSDCard = " + eraseSDCard + " ; EraseIntStorage = " + eraseIntStorage);
+            if (eraseIntStorage && eraseSDCard) {
                 mIntStoragePath = Environment.getExternalStorageDirectory().toString();
             }
-            if (EraseSDCard) {
-                mStorageVolume = getExtStorageVolume();
-            }
+            mStorageVolume = getStorageVolume(eraseSDCard);
         }
         if (intent.getBooleanExtra(EXTRA_ALWAYS_RESET, false)) {
             mAlwaysReset = true;
@@ -247,8 +253,14 @@ public class ExternalStorageFormatter extends Service
                 }
                 //else use the specified storage volume
                 else {
-                        extStoragePath = mStorageVolume.getPath();
-                        mountService.unmountVolume(extStoragePath, true, mFactoryReset);
+                    final int id = mStorageVolume.getDescriptionId();
+                    final String description = getResources().getResourceName(id);
+                    boolean isIntStorage = false;
+                    if (description != null) {
+                        isIntStorage = description.contains(INTERNAL_SD_DESCRIPTION);
+                    }
+                    extStoragePath = mStorageVolume.getPath();
+                    mountService.unmountVolume(extStoragePath, true, mFactoryReset && isIntStorage);
                 }
             }
             catch (RemoteException e) {

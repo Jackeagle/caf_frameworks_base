@@ -1442,6 +1442,10 @@ class WindowStateAnimator {
                         // loop, this will cause it to restart with a new
                         // layout.
                         c.mDisplayContent.layoutNeeded = true;
+                        if (c.mPolicyVisibility && (mService.mCurrentFocus == null
+                                || mService.mCurrentFocus.mLayer < c.mLayer)) {
+                            mService.mFocusMayChange = true;
+                        }
                     }
                 }
             }

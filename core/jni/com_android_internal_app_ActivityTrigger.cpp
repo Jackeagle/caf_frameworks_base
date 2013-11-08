@@ -41,15 +41,31 @@
 
 #define LIBRARY_PATH_PREFIX_OLD	"/system/lib/"
 #define LIBRARY_PATH_PREFIX "/vendor/lib/"
+#define NUM_DL_LIBRARIES 2
 
 namespace android
 {
 
 // ----------------------------------------------------------------------------
+/*
+ * Stuct containing handle to dynamically loaded lib as well as function
+ * pointers to key interfaces.
+ */
+struct stateChangeHandler {
+    void *dlhandle;
+    void (*startActivity)(const char *);
+    void (*resumeActivity)(const char *);
+    void (*init)(void);
+    void (*deinit)(void);
+};
 
-static void (*startActivity)(const char *)  = NULL;
-static void (*resumeActivity)(const char *) = NULL;
-static void *dlhandle                       = NULL;
+/*
+ * Array of stateChangeHandler
+ * library -both handlers for Start and Resume events.
+ */
+static struct stateChangeHandler mStateChangeHandlers[NUM_DL_LIBRARIES];
+static size_t initIndex = 0;
+static size_t gestIndex = 1;
 
 // ----------------------------------------------------------------------------
 
@@ -57,9 +73,9 @@ static void
 com_android_internal_app_ActivityTrigger_native_at_init()
 {
     const char *rc;
-    void (*init)(void);
     char buf[PROPERTY_VALUE_MAX];
     int len;
+    bool symError = false;
 
     /* Retrieve name of vendor extension library */
     if (property_get("ro.vendor.extension_library", buf, NULL) <= 0) {
@@ -68,82 +84,153 @@ com_android_internal_app_ActivityTrigger_native_at_init()
 
     /* Sanity check - ensure */
     buf[PROPERTY_VALUE_MAX-1] = '\0';
-    if (((strncmp(buf, LIBRARY_PATH_PREFIX, sizeof(LIBRARY_PATH_PREFIX) - 1) != 0)
-	&&
-	(strncmp(buf, LIBRARY_PATH_PREFIX_OLD, sizeof(LIBRARY_PATH_PREFIX_OLD) - 1) != 0))
+    if (((strncmp(buf, LIBRARY_PATH_PREFIX,
+            sizeof(LIBRARY_PATH_PREFIX) - 1) != 0)
+    &&
+    (strncmp(buf, LIBRARY_PATH_PREFIX_OLD,
+            sizeof(LIBRARY_PATH_PREFIX_OLD) - 1) != 0))
         ||
         (strstr(buf, "..") != NULL)) {
         return;
     }
 
-    dlhandle = dlopen(buf, RTLD_NOW | RTLD_LOCAL);
-    if (dlhandle == NULL) {
-        return;
-    }
-
+    // ----------------------------------
+    /*
+     * Clear error and load lib.
+     */
     dlerror();
+    mStateChangeHandlers[initIndex].dlhandle =
+            dlopen(buf, RTLD_NOW | RTLD_LOCAL);
+    if(mStateChangeHandlers[initIndex].dlhandle != 0) {
+        *(void **)(&mStateChangeHandlers[initIndex].startActivity) =
+                dlsym(mStateChangeHandlers[initIndex].dlhandle,
+                        "activity_trigger_start");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
 
-    *(void **) (&startActivity) = dlsym(dlhandle, "activity_trigger_start");
-    if ((rc = dlerror()) != NULL) {
-        goto cleanup;
+        *(void **)(&mStateChangeHandlers[initIndex].resumeActivity) =
+                dlsym(mStateChangeHandlers[initIndex].dlhandle,
+                        "activity_trigger_resume");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
+
+        *(void **)(&mStateChangeHandlers[initIndex].init) =
+                dlsym(mStateChangeHandlers[initIndex].dlhandle,
+                        "activity_trigger_init");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
+
+        *(void **)(&mStateChangeHandlers[initIndex].deinit) =
+                dlsym(mStateChangeHandlers[initIndex].dlhandle,
+                        "activity_trigger_deinit");
+        if ((rc = dlerror()) != NULL) {
+            //may not be an error condition, deinit is not always available
+        }
+
+        //check for sym load errors
+        if (symError == true) {
+            if (mStateChangeHandlers[initIndex].dlhandle)
+            {
+                dlclose(mStateChangeHandlers[initIndex].dlhandle);
+                memset(&mStateChangeHandlers[initIndex], 0,
+                        sizeof(struct stateChangeHandler));
+            }
+        } else {
+            (*mStateChangeHandlers[initIndex].init)();
+        }
     }
-    *(void **) (&resumeActivity) = dlsym(dlhandle, "activity_trigger_resume");
-    if ((rc = dlerror()) != NULL) {
-        goto cleanup;
+    // ----------------------------------
+
+    /*
+     * Clear error and load gesture activity trigger
+     */
+    dlerror();
+    symError = false;
+    mStateChangeHandlers[gestIndex].dlhandle =
+            dlopen("/vendor/lib/libmmgesture-activity-trigger.so",
+                    RTLD_NOW | RTLD_LOCAL);
+    if(mStateChangeHandlers[gestIndex].dlhandle != 0) {
+        *(void **)(&mStateChangeHandlers[gestIndex].startActivity) =
+                dlsym(mStateChangeHandlers[gestIndex].dlhandle,
+                        "activity_trigger_start");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
+
+        *(void **)(&mStateChangeHandlers[gestIndex].resumeActivity) =
+                dlsym(mStateChangeHandlers[gestIndex].dlhandle,
+                        "activity_trigger_resume");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
+
+        *(void **)(&mStateChangeHandlers[gestIndex].init) =
+                dlsym(mStateChangeHandlers[gestIndex].dlhandle,
+                        "activity_trigger_init");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
+
+        *(void **)(&mStateChangeHandlers[gestIndex].deinit) =
+                dlsym(mStateChangeHandlers[gestIndex].dlhandle,
+                        "activity_trigger_deinit");
+        if ((rc = dlerror()) != NULL) {
+            symError = true;
+        }
+
+        if (symError == true) {
+            if (mStateChangeHandlers[gestIndex].dlhandle)
+            {
+                dlclose(mStateChangeHandlers[gestIndex].dlhandle);
+                memset(&mStateChangeHandlers[gestIndex], 0,
+                        sizeof(struct stateChangeHandler));
+            }
+        } else {
+            (*mStateChangeHandlers[gestIndex].init)();
+        }
     }
-    *(void **) (&init) = dlsym(dlhandle, "activity_trigger_init");
-    if ((rc = dlerror()) != NULL) {
-        goto cleanup;
-    }
-    (*init)();
+
     return;
-
-cleanup:
-    startActivity  = NULL;
-    resumeActivity = NULL;
-    if (dlhandle) {
-        dlclose(dlhandle);
-        dlhandle = NULL;
-    }
 }
 
 static void
-com_android_internal_app_ActivityTrigger_native_at_deinit(JNIEnv *env, jobject clazz)
+com_android_internal_app_ActivityTrigger_native_at_deinit(JNIEnv *env,
+        jobject clazz)
 {
-    void (*deinit)(void);
-
-    if (dlhandle) {
-        startActivity  = NULL;
-        resumeActivity = NULL;
-
-        *(void **) (&deinit) = dlsym(dlhandle, "activity_trigger_deinit");
-        if (deinit) {
-            (*deinit)();
-        }
-
-        dlclose(dlhandle);
-        dlhandle       = NULL;
-    }
-}
-
-static void
-com_android_internal_app_ActivityTrigger_native_at_startActivity(JNIEnv *env, jobject clazz, jstring activity)
-{
-    if (startActivity && activity) {
-        const char *actStr = env->GetStringUTFChars(activity, NULL);
-        if (actStr) {
-            (*startActivity)(actStr);
+    for(size_t i = 0; i < NUM_DL_LIBRARIES; i++){
+        if(mStateChangeHandlers[i].deinit) {
+            (*mStateChangeHandlers[i].deinit)();
         }
     }
 }
 
 static void
-com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env, jobject clazz, jstring activity)
+com_android_internal_app_ActivityTrigger_native_at_startActivity(JNIEnv *env,
+        jobject clazz, jstring activity)
 {
-    if (resumeActivity && activity) {
-        const char *actStr = env->GetStringUTFChars(activity, NULL);
-        if (actStr) {
-            (*resumeActivity)(actStr);
+    for(size_t i = 0; i < NUM_DL_LIBRARIES; i++){
+        if(mStateChangeHandlers[i].startActivity && activity) {
+            const char *actStr = env->GetStringUTFChars(activity, NULL);
+            if (actStr) {
+                (*mStateChangeHandlers[i].startActivity)(actStr);
+            }
+        }
+    }
+}
+
+static void
+com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env,
+        jobject clazz, jstring activity)
+{
+    for(size_t i = 0; i < NUM_DL_LIBRARIES; i++){
+        if(mStateChangeHandlers[i].resumeActivity && activity) {
+            const char *actStr = env->GetStringUTFChars(activity, NULL);
+            if (actStr) {
+                (*mStateChangeHandlers[i].resumeActivity)(actStr);
+            }
         }
     }
 }
@@ -151,9 +238,12 @@ com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env, j
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod gMethods[] = {
-    {"native_at_startActivity",  "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_startActivity},
-    {"native_at_resumeActivity", "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_resumeActivity},
-    {"native_at_deinit",         "()V",                   (void *)com_android_internal_app_ActivityTrigger_native_at_deinit},
+    {"native_at_startActivity",  "(Ljava/lang/String;)V",
+            (void *)com_android_internal_app_ActivityTrigger_native_at_startActivity},
+    {"native_at_resumeActivity", "(Ljava/lang/String;)V",
+            (void *)com_android_internal_app_ActivityTrigger_native_at_resumeActivity},
+    {"native_at_deinit",         "()V",
+            (void *)com_android_internal_app_ActivityTrigger_native_at_deinit},
 };
 
 

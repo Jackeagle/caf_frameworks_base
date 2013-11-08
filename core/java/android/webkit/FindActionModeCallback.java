@@ -25,13 +25,16 @@ import android.text.Selection;
 import android.text.Spannable;
 import android.text.TextWatcher;
 import android.view.ActionMode;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.TextView.OnEditorActionListener;
 
 /**
  * @hide
@@ -56,11 +59,27 @@ public class FindActionModeCallback implements ActionMode.Callback, TextWatcher,
                 com.android.internal.R.id.edit);
         mEditText.setCustomSelectionActionModeCallback(new NoAction());
         mEditText.setOnClickListener(this);
+
         setText("");
         mMatches = (TextView) mCustomView.findViewById(
                 com.android.internal.R.id.matches);
         mInput = (InputMethodManager)
                 context.getSystemService(Context.INPUT_METHOD_SERVICE);
+
+        mEditText.setOnEditorActionListener(new OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                    // Dismiss soft keyboard but don't modify focus.
+                    if (mInput != null && mInput.isActive()) {
+                        mInput.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
+
         mResources = context.getResources();
     }
 

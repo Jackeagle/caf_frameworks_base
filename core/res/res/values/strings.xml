@@ -3405,12 +3405,17 @@
     <string name="extmedia_format_title" product="nosdcard">Format USB storage?</string>
     <!-- See EXTMEDIA_FORMAT.  EXTMEDIA_FORMAT_DIALOG:  After the user selects the notification, a dialog is shown asking if he wants to format the SD card.  This is the title. -->
     <string name="extmedia_format_title" product="default">Format SD card?</string>
+    <string name="phonemedia_format_title" product="nosdcard">Format Internal SD Card?</string>
+    <string name="phonemedia_format_title" product="default">Format Internal SD Card?</string>
     <!-- See EXTMEDIA_FORMAT.   This is the message. [CHAR LIMIT=NONE] -->
     <string name="extmedia_format_message" product="nosdcard">All files stored in your USB storage will be erased. This action can\'t be reversed!</string>
+    <string name="phonemedia_format_message" product="nosdcard">All files stored in your Internal SD Card will be erased. This action can\'t be reversed!</string>
     <!-- See EXTMEDIA_FORMAT.   This is the message. -->
     <string name="extmedia_format_message" product="default">All data on your card will be lost.</string>
+    <string name="phonemedia_format_message" product="default">All data on your Internal SD Card will be lost.</string>
     <!-- See EXTMEDIA_FORMAT.    This is the button text to format the sd card. -->
     <string name="extmedia_format_button_format">Format</string>
+    <string name="phonemedia_format_button_format">Format</string>
 
     <!-- Title of notification shown when ADB is actively connected to the phone. -->
     <string name="adb_active_notification_title">USB debugging connected</string>
@@ -3446,17 +3451,24 @@
     <!-- External media notification strings -->
     <!-- Shown when external media is being checked [CHAR LIMIT=30] -->
     <string name="ext_media_checking_notification_title" product="nosdcard">Preparing USB storage</string>
+    <string name="phone_media_checking_notification_title" product="nosdcard">Preparing Internal SD Card</string>
     <!-- Shown when external media is being checked -->
     <string name="ext_media_checking_notification_title" product="default">Preparing SD card</string>
+    <string name="phone_media_checking_notification_title" product="default">Preparing Internal SD Card</string>
     <string name="ext_media_checking_notification_message">Checking for errors.</string>
+    <string name="phone_media_checking_notification_message">Checking for errors.</string>
 
     <!-- Shown when external media is blank (or unsupported filesystem) [CHAR LIMIT=30] -->
     <string name="ext_media_nofs_notification_title" product="nosdcard">Blank USB storage</string>
     <!-- Shown when external media is blank (or unsupported filesystem) -->
     <string name="ext_media_nofs_notification_title" product="default">Blank SD card</string>
+    <string name="phone_media_nofs_notification_title" product="nosdcard">Blank Internal SD Card</string>
+    <string name="phone_media_nofs_notification_title" product="default">Blank Internal SD Card</string>
     <!-- Shown when USB storage cannot be read.  [CHAR LIMIT=NONE] -->
     <string name="ext_media_nofs_notification_message" product="nosdcard">USB storage is blank or has unsupported filesystem.</string>
     <string name="ext_media_nofs_notification_message" product="default">SD card is blank or has unsupported filesystem.</string>
+    <string name="phone_media_nofs_notification_message" product="nosdcard">Internal SD card is blank or has unsupported filesystem.</string>
+    <string name="phone_media_nofs_notification_message" product="default">Internal SD Card is blank or has unsupported filesystem.</string>
 
     <!-- Shown when external media is unmountable (corrupt)) [CHAR LIMIT=30] -->
     <string name="ext_media_unmountable_notification_title" product="nosdcard">Damaged USB storage</string>
@@ -3465,6 +3477,8 @@
     <!-- Shown when USB storage cannot be read.  [CHAR LIMIT=NONE] -->
     <string name="ext_media_unmountable_notification_message" product="nosdcard">USB storage is damaged. Try reformatting it.</string>
     <string name="ext_media_unmountable_notification_message" product="default">SD card is damaged. Try reformatting it.</string>
+    <string name="phone_media_unmountable_notification_title" product="nosdcard">Damaged Internal SD Card</string>
+    <string name="phone_media_unmountable_notification_title" product="default">Damaged Internal SD Card</string>
 
     <!-- Shown when external media is unsafely removed [CHAR LIMIT=30] -->
     <string name="ext_media_badremoval_notification_title" product="nosdcard">USB storage unexpectedly removed</string>
@@ -3473,7 +3487,8 @@
     <!-- Shown when external media is unsafely removed.  [CHAR LIMIT=NONE] -->
     <string name="ext_media_badremoval_notification_message" product="nosdcard">Unmount USB storage before removing to avoid data loss.</string>
     <string name="ext_media_badremoval_notification_message" product="default">Unmount SD card before removing to avoid data loss.</string>
-
+    <string name="phone_media_unmountable_notification_message" product="nosdcard">Internal SD card is damaged. Try reformatting it.</string>
+    <string name="phone_media_unmountable_notification_message" product="default">Internal SD Card is damaged. Try reformatting it.</string>
     <!-- Shown when external media has been safely removed [CHAR LIMIT=30] -->
     <string name="ext_media_safe_unmount_notification_title" product="nosdcard">USB storage safe to remove</string>
     <!-- Shown when external media has been safely removed -->
@@ -3848,6 +3863,9 @@
 
     <!-- Storage description for internal storage. [CHAR LIMIT=NONE] -->
     <string name="storage_internal">Internal storage</string>
+
+    <!-- Storage description for internal SD card. [CHAR LIMIT=NONE] -->
+    <string name="storage_internal_sd">Internal SD card</string>
 
     <!-- Storage description for the SD card. [CHAR LIMIT=NONE] -->
     <string name="storage_sd_card">SD card</string>
