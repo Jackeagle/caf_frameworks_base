@@ -2353,11 +2353,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             loadSetting(stmt, Settings.Global.CALL_AUTO_RETRY, 0);
 
             // Set the preferred network mode
-            int defaultNetworkType = (TelephonyManager.getLteOnCdmaModeStatic()
-                    == PhoneConstants.LTE_ON_CDMA_TRUE)
-                            ? Phone.NT_MODE_GLOBAL
-                            : RILConstants.PREFERRED_NETWORK_MODE;
-
+            int defaultNetworkType = RILConstants.PREFERRED_NETWORK_MODE;
             int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
             String networkMode = SystemProperties.get("persist.radio.default_network");
             if (networkMode == null) {

@@ -94,8 +94,7 @@ public class ClockView extends RelativeLayout {
         private String mAmString, mPmString;
 
         AmPm(View parent, Typeface tf) {
-            // No longer used, uncomment if we decide to use AM/PM indicator again
-            // mAmPmTextView = (TextView) parent.findViewById(R.id.am_pm);
+            mAmPmTextView = (TextView) parent.findViewById(R.id.am_pm);
             if (mAmPmTextView != null && tf != null) {
                 mAmPmTextView.setTypeface(tf);
             }
