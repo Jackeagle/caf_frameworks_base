@@ -151,6 +151,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.io.BufferedReader;
 
 import libcore.io.ErrnoException;
 import libcore.io.IoUtils;
@@ -485,7 +486,7 @@ public class PackageManagerService extends IPackageManager.Stub {
     final SparseArray<PostInstallData> mRunningInstalls = new SparseArray<PostInstallData>();
     int mNextInstallToken = 1;  // nonzero; will be wrapped back to 1 when ++ overflows
 
-    private final String mRequiredVerifierPackage;
+    private String mRequiredVerifierPackage;
 
     class PackageHandler extends Handler {
         private boolean mBound = false;
@@ -1057,6 +1058,7 @@ public class PackageManagerService extends IPackageManager.Stub {
 
             mRestoredSettings = mSettings.readLPw(sUserManager.getUsers(false),
                     mSdkVersion, mOnlyCore);
+            loadAppScanList();//Update list to be scanned
             long startTime = SystemClock.uptimeMillis();
 
             EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_SYSTEM_SCAN_START,
@@ -1191,17 +1193,28 @@ public class PackageManagerService extends IPackageManager.Stub {
             mSystemInstallObserver = new AppDirObserver(
                 mSystemAppDir.getPath(), OBSERVER_EVENTS, true);
             mSystemInstallObserver.startWatching();
+            //follow regular flow if list is empty
+            if (!mUseAppScanList) {
             scanDirLI(mSystemAppDir, PackageParser.PARSE_IS_SYSTEM
                     | PackageParser.PARSE_IS_SYSTEM_DIR, scanMode, 0);
+            } else {
+                preScanApp(mSystemAppDir, mSystemAppList, PackageParser.PARSE_IS_SYSTEM
+                        | PackageParser.PARSE_IS_SYSTEM_DIR, scanMode);
+            }
 
             // Collect all vendor packages.
             mVendorAppDir = new File("/vendor/app");
             mVendorInstallObserver = new AppDirObserver(
                 mVendorAppDir.getPath(), OBSERVER_EVENTS, true);
             mVendorInstallObserver.startWatching();
+            //follow regular flow if list is empty
+            if (!mUseAppScanList) {
             scanDirLI(mVendorAppDir, PackageParser.PARSE_IS_SYSTEM
                     | PackageParser.PARSE_IS_SYSTEM_DIR, scanMode, 0);
-
+            } else {
+                preScanApp(mVendorAppDir, mVendorAppList, PackageParser.PARSE_IS_SYSTEM
+                        | PackageParser.PARSE_IS_SYSTEM_DIR, scanMode);
+            }
             if (DEBUG_UPGRADE) Log.v(TAG, "Running installd update commands");
             mInstaller.moveFiles();
 
@@ -1241,6 +1254,8 @@ public class PackageManagerService extends IPackageManager.Stub {
                         continue;
                     }
 
+                    //follow regular flow if list is empty
+                    if (!mUseAppScanList) {
                     if (!mSettings.isDisabledSystemPackageLPr(ps.name)) {
                         psit.remove();
                         String msg = "System package " + ps.name
@@ -1252,6 +1267,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                         if (disabledPs.codePath == null || !disabledPs.codePath.exists()) {
                             possiblyDeletedUpdatedSystemApps.add(ps.name);
                         }
+                    }
                     }
                 }
             }
@@ -1272,13 +1288,20 @@ public class PackageManagerService extends IPackageManager.Stub {
                 mAppInstallObserver = new AppDirObserver(
                     mAppInstallDir.getPath(), OBSERVER_EVENTS, false);
                 mAppInstallObserver.startWatching();
+                //follow regular flow if list is empty
+                if (!mUseAppScanList) {
                 scanDirLI(mAppInstallDir, 0, scanMode, 0);
+                } else {
+                    preScanApp(mAppInstallDir, mDataAppList, 0, scanMode);
+                }
     
                 mDrmAppInstallObserver = new AppDirObserver(
                     mDrmAppPrivateInstallDir.getPath(), OBSERVER_EVENTS, false);
                 mDrmAppInstallObserver.startWatching();
+                if (!mUseAppScanList) {
                 scanDirLI(mDrmAppPrivateInstallDir, PackageParser.PARSE_FORWARD_LOCK,
                         scanMode, 0);
+                }
 
                 /**
                  * Remove disable package settings for any updated system
@@ -1286,6 +1309,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                  * previously-updated app, remove them completely.
                  * Otherwise, just revoke their system-level permissions.
                  */
+                if (!mUseAppScanList) {
                 for (String deletedAppName : possiblyDeletedUpdatedSystemApps) {
                     PackageParser.Package deletedPkg = mPackages.get(deletedAppName);
                     mSettings.removeDisabledSystemPackageLPw(deletedAppName);
@@ -1306,6 +1330,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                         deletedPs.pkgFlags &= ~ApplicationInfo.FLAG_SYSTEM;
                     }
                     reportSettingsProblem(Log.WARN, msg);
+                }
                 }
             } else {
                 mAppInstallObserver = null;
@@ -9116,6 +9141,7 @@ public class PackageManagerService extends IPackageManager.Stub {
             Log.d(TAG, "compatibility mode:" + compatibilityModeEnabled);
         }
 
+        if (!mUseAppScanList) {
         synchronized (mPackages) {
             // Verify that all of the preferred activity components actually
             // exist.  It is possible for applications to be updated and at
@@ -9145,6 +9171,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                             mSettings.mPreferredActivities.keyAt(i));
                 }
             }
+        }
         }
     }
 
@@ -10254,5 +10281,304 @@ public class PackageManagerService extends IPackageManager.Stub {
         } finally {
             Binder.restoreCallingIdentity(token);
         }
+    }
+
+    final File mScanListFile = new File(Environment.getRootDirectory(), "etc/package_scan_list.conf");
+    private HashSet<String> mSystemAppList;
+    private HashSet<String> mVendorAppList;
+    private HashSet<String> mDataAppList;
+    private boolean mUseAppScanList = false;
+
+    private void preScanApp(File dir, HashSet<String> list, int flags, int scanMode) {
+        if (!list.isEmpty()) {
+            Iterator<String> it = list.iterator();
+            while (it.hasNext()) {
+                String s = it.next();
+                File file = new File(dir, s);
+                if (!file.exists() || !isPackageFilename(s)) {
+                    // Ignore entries which are not apk's
+                    continue;
+                }
+
+                Slog.d(TAG, "prescan apk=" + file.getPath());
+                PackageParser.Package pkg = scanPackageLI(file,
+                        flags|PackageParser.PARSE_MUST_BE_APK, scanMode, 0, null);
+
+                if (pkg == null && (flags & PackageParser.PARSE_IS_SYSTEM) == 0 &&
+                        mLastScanError == PackageManager.INSTALL_FAILED_INVALID_APK) {
+                    // Delete the apk
+                    Slog.w(TAG, "Cleaning up failed install of " + file);
+                    file.delete();
+                }
+            }
+        }
+    }
+
+    private void loadAppScanList() {
+        mUseAppScanList = false;
+        if (mScanListFile.exists()) {
+            mSystemAppList = new HashSet<String>();
+            mDataAppList = new HashSet<String>();
+            mVendorAppList = new HashSet<String>();
+            BufferedReader br = null;
+
+            try {
+                br = new BufferedReader(new FileReader(mScanListFile), 256);
+
+                String line;
+                HashSet<String> fillList = null;
+                while ((line = br.readLine()) != null) {
+                    // Skip comments and blank lines.
+                    line = line.trim();
+                    if (line.startsWith("#")
+                            || line.equals("")) {
+                        continue;
+                    }
+                    if (line.startsWith("/system/app")) {
+                        fillList = mSystemAppList;
+                    }
+                    else if (line.startsWith("/vendor/app")) {
+                        fillList = mVendorAppList;
+                    }
+                    else if (line.startsWith("/data/app")) {
+                        fillList = mDataAppList;
+                    }
+                    else if (fillList != null
+                        && isPackageFilename(line)) {
+                        fillList.add(line);
+                    }
+                }
+                if (!mSystemAppList.isEmpty()
+                    || !mVendorAppList.isEmpty()) {
+                    mUseAppScanList = true;
+                }
+            } catch (IOException e) {
+                mSystemAppList.clear();
+                mVendorAppList.clear();
+                mDataAppList.clear();
+                mSystemAppList = null;
+                mVendorAppList = null;
+                mDataAppList = null;
+                Log.e(TAG, "Error reading " + mScanListFile.getPath() + ".", e);
+            } finally {
+                if (br != null) {
+                    try {
+                        br.close();
+                    } catch (IOException e) {
+                    }
+                }
+            }
+        }
+        Slog.d(TAG, "mUseAppScanList=" + mUseAppScanList);
+    }
+
+    private void laterScanDir(File dir, HashSet<String> appList, int flags, int scanMode) {
+        String[] files = dir.list();
+        if (files == null) {
+            Log.d(TAG, "No files in app dir " + dir);
+            return;
+        }
+
+        int i;
+        for (i=0; i<files.length; i++) {
+            File file = new File(dir, files[i]);
+            if (appList.contains(files[i])
+                    || !isPackageFilename(files[i])) {
+                continue;
+            }
+            Slog.d(TAG, "later scan apk=" + file.getPath());
+            PackageParser.Package pkg = scanPackageLI(file,
+                    flags|PackageParser.PARSE_MUST_BE_APK, scanMode, 0, null);
+            // Don't mess around with apps in system partition.
+            if (pkg == null && (flags & PackageParser.PARSE_IS_SYSTEM) == 0 &&
+                    mLastScanError == PackageManager.INSTALL_FAILED_INVALID_APK) {
+                // Delete the apk
+                Slog.w(TAG, "Cleaning up failed install of " + file);
+                file.delete();
+            }
+        }
+    }
+
+    public void laterScanApp() {
+        if (!mUseAppScanList) return;
+
+        new Thread() {
+            @Override
+            public void run() {
+                synchronized (mInstallLock) {
+                    // writer
+                    int scanMode = SCAN_MONITOR | SCAN_NO_PATHS | SCAN_BOOTING;
+                    if (mNoDexOpt) {
+                        scanMode |= SCAN_NO_DEX;
+                    }
+
+                    laterScanDir(mSystemAppDir, mSystemAppList, PackageParser.PARSE_IS_SYSTEM
+                            | PackageParser.PARSE_IS_SYSTEM_DIR, scanMode);
+                    laterScanDir(mVendorAppDir, mVendorAppList, PackageParser.PARSE_IS_SYSTEM
+                            | PackageParser.PARSE_IS_SYSTEM_DIR, scanMode);
+
+                    if (DEBUG_UPGRADE) Log.v(TAG, "Running installd update commands");
+                    mInstaller.moveFiles();
+
+                    // Prune any system packages that no longer exist.
+                    final List<String> possiblyDeletedUpdatedSystemApps = new ArrayList<String>();
+                    synchronized (mPackages) {
+                        if (!mOnlyCore) {
+                            Iterator<PackageSetting> psit = mSettings.mPackages.values().iterator();
+                            while (psit.hasNext()) {
+                                PackageSetting ps = psit.next();
+
+                                /*
+                                 * If this is not a system app, it can't be a
+                                 * disable system app.
+                                 */
+                                if ((ps.pkgFlags & ApplicationInfo.FLAG_SYSTEM) == 0) {
+                                    continue;
+                                }
+
+                                /*
+                                 * If the package is scanned, it's not erased.
+                                 */
+                                final PackageParser.Package scannedPkg = mPackages.get(ps.name);
+                                if (scannedPkg != null) {
+                                    /*
+                                     * If the system app is both scanned and in the
+                                     * disabled packages list, then it must have been
+                                     * added via OTA. Remove it from the currently
+                                     * scanned package so the previously user-installed
+                                     * application can be scanned.
+                                     */
+                                    if (mSettings.isDisabledSystemPackageLPr(ps.name)) {
+                                        Slog.i(TAG, "Expecting better updatd system app for " + ps.name
+                                                + "; removing system app");
+                                        removePackageLI(ps, true);
+                                    }
+
+                                    continue;
+                                }
+
+                                if (!mSettings.isDisabledSystemPackageLPr(ps.name)) {
+                                    psit.remove();
+                                    String msg = "System package " + ps.name
+                                        + " no longer exists; wiping its data";
+                                    reportSettingsProblem(Log.WARN, msg);
+                                    removeDataDirsLI(ps.name);
+                                } else {
+                                    final PackageSetting disabledPs = mSettings.getDisabledSystemPkgLPr(ps.name);
+                                    if (disabledPs.codePath == null || !disabledPs.codePath.exists()) {
+                                        possiblyDeletedUpdatedSystemApps.add(ps.name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!mOnlyCore) {
+                        laterScanDir(mAppInstallDir, mDataAppList, 0, scanMode);
+                        scanDirLI(mDrmAppPrivateInstallDir, PackageParser.PARSE_FORWARD_LOCK,
+                                scanMode, 0);
+
+                        /**
+                         * Remove disable package settings for any updated system
+                         * apps that were removed via an OTA. If they're not a
+                         * previously-updated app, remove them completely.
+                         * Otherwise, just revoke their system-level permissions.
+                         */
+                        synchronized (mPackages) {
+                            for (String deletedAppName : possiblyDeletedUpdatedSystemApps) {
+                                PackageParser.Package deletedPkg = mPackages.get(deletedAppName);
+                                mSettings.removeDisabledSystemPackageLPw(deletedAppName);
+
+                                String msg;
+                                if (deletedPkg == null) {
+                                    msg = "Updated system package " + deletedAppName
+                                        + " no longer exists; wiping its data";
+                                    removeDataDirsLI(deletedAppName);
+                                } else {
+                                    msg = "Updated system app + " + deletedAppName
+                                        + " no longer present; removing system privileges for "
+                                        + deletedAppName;
+
+                                    deletedPkg.applicationInfo.flags &= ~ApplicationInfo.FLAG_SYSTEM;
+
+                                    PackageSetting deletedPs = mSettings.mPackages.get(deletedAppName);
+                                    deletedPs.pkgFlags &= ~ApplicationInfo.FLAG_SYSTEM;
+                                }
+                                reportSettingsProblem(Log.WARN, msg);
+                            }
+                        }
+                    }
+
+                    synchronized (mPackages) {
+                        final boolean regrantPermissions = mSettings.mInternalSdkPlatform
+                            != mSdkVersion;
+                        if (regrantPermissions) Slog.i(TAG, "Platform changed from "
+                                + mSettings.mInternalSdkPlatform + " to " + mSdkVersion
+                                + "; regranting permissions for internal storage");
+                        mSettings.mInternalSdkPlatform = mSdkVersion;
+
+                        updatePermissionsLPw(null, null, UPDATE_PERMISSIONS_ALL
+                                | (regrantPermissions
+                                    ? (UPDATE_PERMISSIONS_REPLACE_PKG|UPDATE_PERMISSIONS_REPLACE_ALL)
+                                    : 0));
+
+                        // Verify that all of the preferred activity components actually
+                        // exist.  It is possible for applications to be updated and at
+                        // that point remove a previously declared activity component that
+                        // had been set as a preferred activity.  We try to clean this up
+                        // the next time we encounter that preferred activity, but it is
+                        // possible for the user flow to never be able to return to that
+                        // situation so here we do a sanity check to make sure we haven't
+                        // left any junk around.
+                        ArrayList<PreferredActivity> removed = new ArrayList<PreferredActivity>();
+                        for (int i=0; i<mSettings.mPreferredActivities.size(); i++) {
+                            PreferredIntentResolver pir = mSettings.mPreferredActivities.valueAt(i);
+                            removed.clear();
+                            for (PreferredActivity pa : pir.filterSet()) {
+                                if (mActivities.mActivities.get(pa.mPref.mComponent) == null) {
+                                    removed.add(pa);
+                                }
+                            }
+                            if (removed.size() > 0) {
+                                for (int j=0; j<removed.size(); j++) {
+                                    PreferredActivity pa = removed.get(i);
+                                    Slog.w(TAG, "Removing dangling preferred activity: "
+                                            + pa.mPref.mComponent);
+                                    pir.removeFilter(pa);
+                                }
+                            }
+                        }
+
+                        // can downgrade to reader
+                        mSettings.writeLPr();
+                    }
+
+                    // Now after opening every single application zip, make sure they
+                    // are all flushed.  Not really needed, but keeps things nice and
+                    // tidy.
+                    Runtime.getRuntime().gc();
+
+                    if (null == mRequiredVerifierPackage) {
+                        mRequiredVerifierPackage = getRequiredVerifierLPr();
+                    }
+
+                }
+
+                // Notify launcher to update app list
+                Intent intent = new Intent("intent.action.PACKAGE_LATER_SCANNED");
+                // Now just let launcher receive this intent
+                // If want other app receive, please do not do this.
+                intent.setPackage("com.android.launcher");
+                intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+                mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
+                // release resource
+                mSystemAppList.clear();
+                mDataAppList.clear();
+                mVendorAppList.clear();
+                mSystemAppList = null;
+                mVendorAppList = null;
+                mDataAppList = null;
+            };
+        }.start();
     }
 }
