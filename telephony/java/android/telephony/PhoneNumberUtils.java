@@ -168,7 +168,7 @@ public class PhoneNumberUtils
         if (scheme.equals("voicemail")) {
             if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
                 int subscription = intent.getIntExtra(SUBSCRIPTION_KEY,
-                        MSimTelephonyManager.getDefault().getDefaultSubscription());
+                        MSimTelephonyManager.getDefault().getPreferredVoiceSubscription());
                 return MSimTelephonyManager.getDefault()
                         .getCompleteVoiceMailNumber(subscription);
             }
