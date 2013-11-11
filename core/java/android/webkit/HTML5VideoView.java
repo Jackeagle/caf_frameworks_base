@@ -162,7 +162,7 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
     }
 
     public boolean isPlaying() {
-        if (mCurrentState == STATE_PREPARED || mCurrentState == STATE_SUSPENDED) {
+        if ((mCurrentState == STATE_PREPARED || mCurrentState == STATE_SUSPENDED) && mPlayer != null) {
             return mPlayer.isPlaying();
         } else {
             return false;
