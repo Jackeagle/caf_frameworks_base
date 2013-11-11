@@ -793,6 +793,8 @@ public class AppOpsService extends IAppOpsService.Stub {
             packageName = "root";
         } else if (uid == Process.SHELL_UID) {
             packageName = "com.android.shell";
+        } else if (uid == Process.SYSTEM_UID && packageName == null) {
+            packageName = "android";
         }
         Ops ops = pkgOps.get(packageName);
         if (ops == null) {
