@@ -57,6 +57,18 @@
                           android:textColor="#ffffffff"
                           android:drawablePadding="2dip"
                           />
+               <TextView android:id="@+id/am_pm"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_toRightOf="@id/clock_text"
+                          android:layout_alignBaseline="@id/clock_text"
+                          android:singleLine="true"
+                          android:ellipsize="none"
+                          android:textSize="@dimen/kg_status_clock_ampm_font_size"
+                          android:textAppearance="?android:attr/textAppearanceMedium"
+                          android:textColor="#ffffffff"
+                          android:drawablePadding="2dip"
+                          />
 
             </com.android.internal.policy.impl.keyguard.ClockView>
 
