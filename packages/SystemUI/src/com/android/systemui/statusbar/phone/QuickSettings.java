@@ -239,6 +239,9 @@ class QuickSettings {
                         try {
                             if (cursor.moveToFirst()) {
                                 name = cursor.getString(cursor.getColumnIndex(Phone.DISPLAY_NAME));
+                            } else {
+                                name = mContext.getResources().
+                                        getString(R.string.quick_settings_user_label);
                             }
                         } finally {
                             cursor.close();
