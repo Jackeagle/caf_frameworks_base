@@ -17,6 +17,8 @@
 package com.android.internal.widget;
 
 import android.app.ActivityManagerNative;
+import com.qualcomm.util.MpqUtils;
+
 import android.app.admin.DevicePolicyManager;
 import android.appwidget.AppWidgetManager;
 import android.content.ContentResolver;
@@ -459,6 +461,11 @@ public class LockPatternUtils {
      * @return true if lock screen is can be disabled
      */
     public boolean isLockScreenDisabled() {
+        // If its an MPQ specific target, don't show Lock screen,
+        // as it is not relevant for TV / Set top box
+        if (MpqUtils.isTargetMpq() == true)
+            return true;
+
         return !isSecure() && getLong(DISABLE_LOCKSCREEN_KEY, 0) != 0;
     }
 
