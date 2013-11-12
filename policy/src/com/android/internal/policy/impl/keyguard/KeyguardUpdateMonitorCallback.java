@@ -51,6 +51,19 @@ class KeyguardUpdateMonitorCallback {
     void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) { }
 
     /**
+     * Called when the carrier PLMN or SPN changes.
+     *
+     * @param bShowPlmn Indicates if the plmn should show.
+     * @param plmn The operator name of the registered network.  May be null if it shouldn't
+     *   be displayed.
+     * @param bShowSpn Indicates if the spn should show.
+     * @param spn The service provider name.  May be null if it shouldn't be displayed.
+     */
+    void onRefreshCarrierInfo(boolean bShowPlmn, CharSequence plmn, boolean bShowSpn,
+            CharSequence spn) {
+    }
+
+    /**
      * Called when the ringer mode changes.
      * @param state the current ringer state, as defined in
      * {@link AudioManager#RINGER_MODE_CHANGED_ACTION}
@@ -150,6 +163,20 @@ class KeyguardUpdateMonitorCallback {
      * @param subscription The subscription for which onRefreshCarrierInfo is meant
      */
     void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int subscription) { }
+
+    /**
+     * Called when the carrier PLMN or SPN changes.
+     *
+     * @param bShowPlmn Indicates if the plmn should show.
+     * @param plmn The operator name of the registered network.  May be null if it shouldn't
+     *   be displayed.
+     * @param bShowSpn Indicates if the spn should show.
+     * @param spn The service provider name.  May be null if it shouldn't be displayed.
+     * @param subscription The subscription for which onRefreshCarrierInfo is meant
+     */
+    void onRefreshCarrierInfo(boolean bShowPlmn, CharSequence plmn, boolean bShowSpn,
+            CharSequence spn, int subscription) {
+    }
 
     /**
      * Called when the airplane mode changes.
