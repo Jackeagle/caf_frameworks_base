@@ -19,7 +19,9 @@ package com.android.internal.policy.impl.keyguard;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Typeface;
+import android.provider.Settings;
 import android.text.TextUtils;
+import android.text.format.DateFormat;
 import android.util.AttributeSet;
 import android.util.Slog;
 import android.view.View;
@@ -38,13 +40,16 @@ import libcore.icu.ICU;
 public class KeyguardStatusView extends GridLayout {
     private static final boolean DEBUG = KeyguardViewMediator.DEBUG;
     private static final String TAG = "KeyguardStatusView";
+    private static String mDateFormat_DayMonthWeek;
+    private static final String KEY_DATE_FORMAT = "date_format";
+    private static final String DAY_MONTH_YEAR_DATE_FORMAT = "dd-MM-yyyy";
 
     public static final int LOCK_ICON = 0; // R.drawable.ic_lock_idle_lock;
     public static final int ALARM_ICON = com.android.internal.R.drawable.ic_lock_idle_alarm;
     public static final int CHARGING_ICON = 0; //R.drawable.ic_lock_idle_charging;
     public static final int BATTERY_LOW_ICON = 0; //R.drawable.ic_lock_idle_low_battery;
 
-    private SimpleDateFormat mDateFormat;
+    private CharSequence mDateFormatString;
     private LockPatternUtils mLockPatternUtils;
 
     private TextView mDateView;
@@ -83,11 +88,16 @@ public class KeyguardStatusView extends GridLayout {
     protected void onFinishInflate() {
         super.onFinishInflate();
         Resources res = getContext().getResources();
-        final Locale locale = Locale.getDefault();
-        final String datePattern =
-                res.getString(com.android.internal.R.string.system_ui_date_pattern);
-        final String bestFormat = ICU.getBestDateTimePattern(datePattern, locale.toString());
-        mDateFormat = new SimpleDateFormat(bestFormat, locale);
+        mDateFormat_DayMonthWeek =
+                mContext.getString(com.android.internal.R.string.date_format_day_month_week);
+        mDateFormatString =
+                res.getText(com.android.internal.R.string.abbrev_wday_month_day_no_year);
+        String currentDateFormat = Settings.System.getString(getContext().getContentResolver(),
+                KEY_DATE_FORMAT);
+        //Only deal D_M_Y date fromat, the remaining are correct.
+        if (currentDateFormat != null && currentDateFormat.equals(DAY_MONTH_YEAR_DATE_FORMAT)) {
+            mDateFormatString = mDateFormat_DayMonthWeek;
+        }
         mDateView = (TextView) findViewById(R.id.date);
         mAlarmStatusView = (TextView) findViewById(R.id.alarm_status);
         mClockView = (ClockView) findViewById(R.id.clock_view);
@@ -127,7 +137,7 @@ public class KeyguardStatusView extends GridLayout {
     }
 
     void refreshDate() {
-        maybeSetUpperCaseText(mDateView, mDateFormat.format(new Date()));
+        maybeSetUpperCaseText(mDateView, DateFormat.format(mDateFormatString, new Date()));
     }
 
     @Override

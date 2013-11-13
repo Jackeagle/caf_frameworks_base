@@ -1534,6 +1534,8 @@
     <string name="China_Telecom">中国电信</string>
 
     <string name="no_quick_contact">无快速联系人</string>
+    <string name="date_format_day_month_week">d 日 M 月 E</string>
+
     <!-- App Ops -->
     <string name="permission_remember_choice">记住</string>
     <string name="permission">权限</string>
