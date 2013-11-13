@@ -59,13 +59,6 @@ public class CarrierText extends TextView {
 
         @Override
         public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) {
-            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
-            TelephonyManager tm =  (TelephonyManager)getContext()
-                .getSystemService(Context.TELEPHONY_SERVICE);
-            boolean show3G = !mAirplaneMode && tm != null && plmn != null &&
-                tm.getVoiceNetworkType() == TelephonyManager.NETWORK_TYPE_TD_SCDMA;
-            if (show3G) plmn = plmn + " 3G";
-
             mPlmn = plmn;
             mSpn = spn;
             updateCarrierText(mSimState, mPlmn, mSpn);
@@ -162,13 +155,40 @@ public class CarrierText extends TextView {
         CharSequence carrierText = null;
         StatusMode status = getStatusForIccState(simState);
 
+        Log.d(TAG, "getCarrierTextForSimState, plmn: " + plmn + ", spn: " + spn);
+        String localPlmn = null;
+        if (plmn != null) {
+            localPlmn= mContext.getLocalString(plmn.toString(),
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+        }
+        String localSpn = null;
+        if (spn != null) {
+            localSpn= mContext.getLocalString(spn.toString(),
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+        }
+        Log.d(TAG, "getCarrierTextForSimState, localPlmn: "
+            + localPlmn + ", localSpn: " + localSpn);
+
+
         int resTextIdOfNoSimCard = R.string.lockscreen_missing_sim_message_short;
         if (PROP_ENV_SPEC.equalsIgnoreCase("ChinaTelecom")) {
             resTextIdOfNoSimCard = R.string.lockscreen_missing_uim_message_short;
         }
+
+        // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+        TelephonyManager tm =  (TelephonyManager)getContext()
+                .getSystemService(Context.TELEPHONY_SERVICE);
+        boolean show3G = !mAirplaneMode && tm != null && plmn != null &&
+                tm.getVoiceNetworkType() == TelephonyManager.NETWORK_TYPE_TD_SCDMA;
+        if (show3G && localPlmn != null) {
+            localPlmn = localPlmn + " 3G";
+        }
+
         switch (status) {
             case Normal:
-                carrierText = concatenate(plmn, spn);
+                carrierText = concatenate(localPlmn, localSpn);
                 break;
 
             case SimNotReady:
