@@ -78,6 +78,7 @@ public class NetworkController extends BroadcastReceiver {
     boolean mHspaDataDistinguishable;
     private TelephonyManager mPhone;
     boolean mDataConnected;
+    boolean isRoam = false;
     IccCardConstants.State mSimState = IccCardConstants.State.READY;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
     int mDataNetType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
@@ -191,7 +192,7 @@ public class NetworkController extends BroadcastReceiver {
                 String contentDescription);
         void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
                 int typeIcon, String contentDescription, String typeContentDescription,
-                int noSimIcon);
+                int noSimIcon, ServiceState simServiceState, boolean isRoam, boolean dataConnect);
         void setIsAirplaneMode(boolean is, int airplaneIcon);
     }
 
@@ -378,7 +379,10 @@ public class NetworkController extends BroadcastReceiver {
                     mDataTypeIconId,
                     mContentDescriptionWimax,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mServiceState,
+                    isRoam,
+                    mDataConnected);
         } else {
             // normal mobile data
             cluster.setMobileDataIndicators(
@@ -388,7 +392,10 @@ public class NetworkController extends BroadcastReceiver {
                     mDataTypeIconId,
                     mContentDescriptionPhoneSignal,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mServiceState,
+                    isRoam,
+                    mDataConnected);
         }
         cluster.setIsAirplaneMode(mAirplaneMode, mAirplaneIconId);
     }
@@ -693,15 +700,23 @@ public class NetworkController extends BroadcastReceiver {
                 // Though mPhone is a Manager, this call is not an IPC
                 if ((isCdma() && isCdmaEri()) || mPhone.isNetworkRoaming()) {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
+                    isRoam=true;
                 } else {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
+                    isRoam=false;
                 }
 
                 mPhoneSignalIconId = iconList[iconLevel];
                 mQSPhoneSignalIconId =
                         TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH[mInetCondition][iconLevel];
-                mContentDescriptionPhoneSignal = mContext.getString(
-                        AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[iconLevel]);
+                if (SystemProperties
+                        .getInt("persist.env.c.sb.style", 0) == 3) {
+                    mContentDescriptionPhoneSignal = mContext.getString(
+                            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH_CMCC[iconLevel]);
+                } else {
+                    mContentDescriptionPhoneSignal = mContext.getString(
+                            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[iconLevel]);
+                }
                 mDataSignalIconId = TelephonyIcons.DATA_SIGNAL_STRENGTH[mInetCondition][iconLevel];
             }
         }
