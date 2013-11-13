@@ -265,8 +265,9 @@ public class CaptivePortalTracker extends StateMachine {
             switch (message.what) {
                 case CMD_DELAYED_CAPTIVE_CHECK:
                     if (message.arg1 == mDelayedCheckToken) {
-                        InetAddress server = lookupHost(mServer);
-                        boolean captive = server != null && isCaptivePortal(server);
+                        // InetAddress server = lookupHost(mServer);
+                        // boolean captive = server != null && isCaptivePortal(server);
+                        boolean captive = false;
                         if (captive) {
                             if (DBG) log("Captive network " + mNetworkInfo);
                         } else {
@@ -339,32 +340,31 @@ public class CaptivePortalTracker extends StateMachine {
      * Do a URL fetch on a known server to see if we get the data we expect
      */
     private boolean isCaptivePortal(InetAddress server) {
-        HttpURLConnection urlConnection = null;
-        if (!mIsCaptivePortalCheckEnabled) return false;
-
-        mUrl = "http://" + server.getHostAddress() + "/generate_204";
-        if (DBG) log("Checking " + mUrl);
-        try {
-            URL url = new URL(mUrl);
-            urlConnection = (HttpURLConnection) url.openConnection();
-            urlConnection.setInstanceFollowRedirects(false);
-            urlConnection.setConnectTimeout(SOCKET_TIMEOUT_MS);
-            urlConnection.setReadTimeout(SOCKET_TIMEOUT_MS);
-            urlConnection.setUseCaches(false);
-            urlConnection.getInputStream();
-            // we got a valid response, but not from the real google
-            return urlConnection.getResponseCode() != 204;
-        } catch (SocketTimeoutException e) {
-            if (DBG) log("Probably a portal: exception " + e);
-            return true;
-        } catch (IOException e) {
-            if (DBG) log("Probably not a portal: exception " + e);
-            return false;
-        } finally {
-            if (urlConnection != null) {
-                urlConnection.disconnect();
-            }
-        }
+        return false;
+        /* HttpURLConnection urlConnection = null;
+         * if (!mIsCaptivePortalCheckEnabled) return false;
+         *
+         *     mUrl = "http://" + server.getHostAddress() + "/generate_204";
+         *     if (DBG) log("Checking " + mUrl);
+         *     try {
+         *     URL url = new URL(mUrl);
+         *     urlConnection = (HttpURLConnection) url.openConnection();
+         *     urlConnection.setInstanceFollowRedirects(false);
+         *     urlConnection.setConnectTimeout(SOCKET_TIMEOUT_MS);
+         *     urlConnection.setReadTimeout(SOCKET_TIMEOUT_MS);
+         *     urlConnection.setUseCaches(false);
+         *     urlConnection.getInputStream();
+         *     // we got a valid response, but not from the real google
+         *     return urlConnection.getResponseCode() != 204;
+         *     } catch (IOException e) {
+         *         if (DBG) log("Probably not a portal: exception " + e);
+         *         return false;
+         *     } finally {
+         *         if (urlConnection != null) {
+         *         urlConnection.disconnect();
+         *     }
+         * }
+         */
     }
 
     private InetAddress lookupHost(String hostname) {
