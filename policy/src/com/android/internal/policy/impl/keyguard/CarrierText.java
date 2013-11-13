@@ -168,13 +168,30 @@ public class CarrierText extends TextView {
         CharSequence carrierText = null;
         StatusMode status = getStatusForIccState(simState);
 
+        Log.d(TAG, "getCarrierTextForSimState, plmn: " + plmn + ", spn: " + spn);
+        String localPlmn = null;
+        if (plmn != null) {
+            localPlmn= mContext.getLocalString(plmn.toString(),
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+        }
+        String localSpn = null;
+        if (spn != null) {
+            localSpn= mContext.getLocalString(spn.toString(),
+                com.android.internal.R.array.origin_carrier_names,
+                com.android.internal.R.array.locale_carrier_names);
+        }
+        Log.d(TAG, "getCarrierTextForSimState, localPlmn: " + localPlmn + ", localSpn: " + localSpn);
+
+
         int resTextIdOfNoSimCard = R.string.lockscreen_missing_sim_message_short;
         if (PROP_ENV_SPEC.equalsIgnoreCase("ChinaTelecom")) {
             resTextIdOfNoSimCard = R.string.lockscreen_missing_uim_message_short;
         }
+
         switch (status) {
             case Normal:
-                carrierText = concatenate(plmn, spn);
+                carrierText = concatenate(localPlmn, localSpn);
                 break;
 
             case SimNotReady:
