@@ -589,10 +589,12 @@ bool BootAnimation::movie()
             for (int j=0 ; j<fcount && (!exitPending() || part.playUntilComplete) ; j++) {
                 const Animation::Frame& frame(part.frames[j]);
                 nsecs_t lastFrame = systemTime();
-
+/*
                 if (r > 0) {
                     glBindTexture(GL_TEXTURE_2D, frame.tid);
                 } else {
+*/
+                {
                     if (part.count != 1) {
                         glGenTextures(1, &frame.tid);
                         glBindTexture(GL_TEXTURE_2D, frame.tid);
@@ -633,7 +635,9 @@ bool BootAnimation::movie()
                         err = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &spec, NULL);
                     } while (err<0 && errno == EINTR);
                 }
-
+                if (part.count != 1) {
+                    glDeleteTextures(1, &frame.tid);
+                }
                 checkExit();
             }
 
@@ -644,6 +648,7 @@ bool BootAnimation::movie()
                 break;
         }
 
+/*
         // free the textures for this part
         if (part.count != 1) {
             for (int j=0 ; j<fcount ; j++) {
@@ -651,6 +656,7 @@ bool BootAnimation::movie()
                 glDeleteTextures(1, &frame.tid);
             }
         }
+*/
     }
 
     ALOGD("waiting for media player to complete.");
