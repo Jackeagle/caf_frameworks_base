@@ -850,6 +850,11 @@ class HTML5VideoViewProxy extends Handler
             mStillPlaying = PlayingStatus.STOP_AFTER_SUSPEND;
         }
 
+        if (hasMessages(PLAY)) {
+            removeMessages(PLAY);
+            mStillPlaying = PlayingStatus.STOP_PLAYING;
+        }
+
         VideoPlayer.suspendAndDispatch();
         if(isAudioFocused){
             ((AudioManager)(mWebView.getContext().getSystemService(Context.AUDIO_SERVICE)))
