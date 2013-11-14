@@ -2130,6 +2130,8 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         clearActionModes();
         dismissFullScreenMode();
         cancelDialogs();
+        // clear adapter and dismiss popup about form data.
+        clearFormData();
     }
 
     private void cancelDialogs() {
