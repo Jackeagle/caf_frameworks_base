@@ -559,8 +559,25 @@ public class PhoneStatusBar extends BaseStatusBar {
             networkController = mMSimNetworkController;
         } else {
             mNetworkController = new NetworkController(mContext);
-            final SignalClusterView signalCluster =
+            SignalClusterView signalCluster =
                 (SignalClusterView)mStatusBarView.findViewById(R.id.signal_cluster);
+
+            switch (STATUSBAR_STYLE) {
+                case STATUSBAR_STYLE_CT:
+                    final ViewGroup p = (ViewGroup)signalCluster.getParent();
+                    if (p != null) {
+                        View v = View.inflate(context, R.layout.signal_cluster_view_ct, null);
+                        p.removeView((View)signalCluster);
+                        p.addView(v, 0);
+                        signalCluster = (SignalClusterView)v;
+                    }
+                    break;
+                case STATUSBAR_STYLE_CU:
+                case STATUSBAR_STYLE_DEFAULT:
+                default:
+                    Log.i(TAG, "The status bar's style is: " + STATUSBAR_STYLE);
+                    break;
+            }
 
             mNetworkController.addSignalCluster(signalCluster);
             signalCluster.setNetworkController(mNetworkController);
