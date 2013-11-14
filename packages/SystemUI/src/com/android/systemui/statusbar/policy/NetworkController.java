@@ -973,7 +973,12 @@ public class NetworkController extends BroadcastReceiver {
             String networkName = mContext.getLocalString(mPhone.getNetworkOperatorName(),
                 com.android.internal.R.array.origin_carrier_names,
                 com.android.internal.R.array.locale_carrier_names);
-            mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+            final ServiceState ss = mServiceState;
+            boolean show3G = ss != null &&
+                ss.getRilVoiceRadioTechnology() == ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA;
+            mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault :
+                networkName + (show3G ? " 3G" : "");
             return;
         }
 

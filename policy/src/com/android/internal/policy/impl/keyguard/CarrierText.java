@@ -22,6 +22,7 @@ package com.android.internal.policy.impl.keyguard;
 import android.content.Context;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -47,6 +48,13 @@ public class CarrierText extends TextView {
 
         @Override
         public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn) {
+            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+            TelephonyManager tm =  (TelephonyManager)getContext()
+                .getSystemService(Context.TELEPHONY_SERVICE);
+            boolean show3G = !mAirplaneMode && tm != null && plmn != null &&
+                tm.getVoiceNetworkType() == TelephonyManager.NETWORK_TYPE_TD_SCDMA;
+            if (show3G) plmn = plmn + " 3G";
+
             mPlmn = plmn;
             mSpn = spn;
             updateCarrierText(mSimState, mPlmn, mSpn);
