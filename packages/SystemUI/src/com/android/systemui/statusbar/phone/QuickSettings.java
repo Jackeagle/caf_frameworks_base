@@ -424,7 +424,9 @@ class QuickSettings {
                                 mWifiManager.setWifiApEnabled(null, false);
                             }
 
-                            mWifiManager.setWifiEnabled(enable);
+                            if (!mModel.isRadioProhibited()) {
+                                mWifiManager.setWifiEnabled(enable);
+                            }
                             return null;
                         }
                     }.execute();
@@ -613,7 +615,7 @@ class QuickSettings {
                     public boolean onLongClick(View v) {
                         if (mBluetoothAdapter.isEnabled()) {
                             mBluetoothAdapter.disable();
-                        } else {
+                        } else if (!mModel.isRadioProhibited()) {
                             mBluetoothAdapter.enable();
                         }
                         bluetoothTile.setPressed(false);
