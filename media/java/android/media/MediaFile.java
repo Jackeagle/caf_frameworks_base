@@ -302,6 +302,8 @@ public class MediaFile {
         addFileType("EC3", FILE_TYPE_EC3, "audio/eac3");
         if(isMPQTarget()) {
             addFileType("DTS", FILE_TYPE_DTS, "audio/dts");
+            addFileType("DTSHD", FILE_TYPE_DTS, "audio/dts");
+            addFileType("CPT", FILE_TYPE_DTS, "audio/dts");
         }
     }
 
