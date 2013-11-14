@@ -27,7 +27,7 @@
 ** IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-package com.qualcomm.util;
+package org.codeaurora.util;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;

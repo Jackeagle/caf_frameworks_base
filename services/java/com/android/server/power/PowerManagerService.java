@@ -25,7 +25,8 @@ import com.android.server.Watchdog;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.display.DisplayManagerService;
 import com.android.server.dreams.DreamManagerService;
-import com.qualcomm.util.MpqUtils;
+
+import org.codeaurora.util.MpqUtils;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
