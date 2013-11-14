@@ -20,6 +20,7 @@ import android.net.NetworkInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pGroup;
+import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pService;
 import android.net.wifi.p2p.WifiP2pService.P2pStatus;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
@@ -226,6 +227,8 @@ public class WifiMonitor {
     private static final String P2P_PROV_DISC_SHOW_PIN_STR = "P2P-PROV-DISC-SHOW-PIN";
     /* P2P-PROV-DISC-FAILURE p2p_dev_addr=42:fc:89:e1:e2:27 */
     private static final String P2P_PROV_DISC_FAILURE_STR = "P2P-PROV-DISC-FAILURE";
+    /* P2P-PERSISTENT-PSK-FAIL id=0 */
+    private static final String P2P_PERSISTENT_PSK_FAIL_STR = "P2P-PERSISTENT-PSK-FAIL";
 
     /*
      * Protocol format is as follows.<br>
@@ -329,6 +332,7 @@ public class WifiMonitor {
     public static final int P2P_FIND_STOPPED_EVENT               = BASE + 37;
     public static final int P2P_SERV_DISC_RESP_EVENT             = BASE + 38;
     public static final int P2P_PROV_DISC_FAILURE_EVENT          = BASE + 39;
+    public static final int P2P_PERSISTENT_PSK_FAIL_EVENT        = BASE + 40;
 
     /* hostap events */
     public static final int AP_STA_DISCONNECTED_EVENT            = BASE + 41;
@@ -650,6 +654,9 @@ public class WifiMonitor {
                 } else {
                     Log.e(TAG, "Null service resp " + dataString);
                 }
+            } else if (dataString.startsWith(P2P_PERSISTENT_PSK_FAIL_STR)) {
+                mStateMachine.sendMessage(P2P_PERSISTENT_PSK_FAIL_EVENT,
+                        new Integer(WifiP2pGroupList.getNetworkByEventString(dataString)));
             }
         }
 

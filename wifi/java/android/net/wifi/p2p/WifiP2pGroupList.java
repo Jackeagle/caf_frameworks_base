@@ -66,6 +66,30 @@ public class WifiP2pGroupList implements Parcelable {
     }
 
     /**
+     * Return network id
+     *
+     * @hide
+     */
+    public static int getNetworkByEventString(String eventString) {
+        String[] tokens = eventString.split(" ");
+
+        if (tokens.length < 2) {
+            throw new IllegalArgumentException("Malformed supplicant event");
+        }
+
+        if (eventString.startsWith("P2P-PERSISTENT-PSK-FAIL")) {
+            for (String token : tokens) {
+                String[] nameValue = token.split("=");
+                if (nameValue[0].equals("id")) {
+                    return Integer.parseInt(nameValue[1]);
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    /**
      * Return the list of p2p group.
      *
      * @return the list of p2p group.
