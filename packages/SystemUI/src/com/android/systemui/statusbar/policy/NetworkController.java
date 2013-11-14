@@ -614,6 +614,11 @@ public class NetworkController extends BroadcastReceiver {
             }
         }
 
+        if (textResId == com.android.internal.R.string.lockscreen_missing_sim_message_short
+            && PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+                textResId = com.android.internal.R.string.lockscreen_missing_uim_message_short;
+        }
+
         if (textResId != 0) {
             mCarrierText = mContext.getString(textResId);
         }
