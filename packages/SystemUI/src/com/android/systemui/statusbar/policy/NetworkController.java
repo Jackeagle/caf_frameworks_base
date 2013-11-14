@@ -68,6 +68,11 @@ public class NetworkController extends BroadcastReceiver {
     static final boolean DEBUG = true;
     static final boolean CHATTY = true; // additional diagnostics, but not logspew
 
+    // For CT style, it will be display two signal icon which defined in the CT view.
+    private static final int SIGNAL_ICON_NUM = 2;
+    private static final int FIRST_SIGNAL_ICON = 0;
+    private static final int SECOND_SIGNAL_ICON = 1;
+
     // For prop key to show carrier.
     static final String PROP_KEY_SHOW_CARRIER = "persist.env.sys.SHOW_CARRIER";
 
@@ -90,6 +95,12 @@ public class NetworkController extends BroadcastReceiver {
     String mNetworkNameDefault;
     String mNetworkNameSeparator;
     int mPhoneSignalIconId;
+    // For CT need show two signal strength icons.
+    int[] mCtPhoneSignalIconId =
+            {R.drawable.stat_sys_signal_null, R.drawable.stat_sys_signal_null};
+    int[] mCtLastPhoneSignalIconId =
+            {R.drawable.stat_sys_signal_null, R.drawable.stat_sys_signal_null};
+
     int mQSPhoneSignalIconId;
     int mDataDirectionIconId; // data + data direction on phones
     int mDataSignalIconId;
@@ -193,6 +204,14 @@ public class NetworkController extends BroadcastReceiver {
                 int typeIcon, String contentDescription, String typeContentDescription,
                 int noSimIcon);
         void setIsAirplaneMode(boolean is, int airplaneIcon);
+    }
+
+    // For CT need show both 1x and Evdo signal strengths.
+    public interface CtSignalCluster extends SignalCluster {
+        void setMobileDataIndicators(boolean visible, int[] strengthIcon, int activityIcon,
+                int typeIcon, String contentDescription, String typeContentDescription,
+                int noSimIcon, boolean isRoaming, ServiceState simServiceState,
+                boolean dataConnected);
     }
 
     public interface NetworkSignalChangedCallback {
@@ -379,6 +398,18 @@ public class NetworkController extends BroadcastReceiver {
                     mContentDescriptionWimax,
                     mContentDescriptionDataType,
                     mNoSimIconId);
+        } else if (cluster instanceof CtSignalCluster) {
+            ((CtSignalCluster)cluster).setMobileDataIndicators(
+                    mHasMobileDataFeature,
+                    mCtPhoneSignalIconId,
+                    mMobileActivityIconId,
+                    mDataTypeIconId,
+                    mContentDescriptionPhoneSignal,
+                    mContentDescriptionDataType,
+                    mNoSimIconId,
+                    isInternationalRoaming(),
+                    mServiceState,
+                    mDataConnected);
         } else {
             // normal mobile data
             cluster.setMobileDataIndicators(
@@ -583,6 +614,11 @@ public class NetworkController extends BroadcastReceiver {
             }
         }
 
+        if (textResId == com.android.internal.R.string.lockscreen_missing_sim_message_short
+            && PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+                textResId = com.android.internal.R.string.lockscreen_missing_uim_message_short;
+        }
+
         if (textResId != 0) {
             mCarrierText = mContext.getString(textResId);
         }
@@ -665,6 +701,9 @@ public class NetworkController extends BroadcastReceiver {
                 (mDataServiceState != ServiceState.STATE_IN_SERVICE)) {
             if (DEBUG) Slog.d(TAG, " No service");
             mPhoneSignalIconId = R.drawable.stat_sys_signal_null;
+            for (int i = 0; i < SIGNAL_ICON_NUM; i++) {
+                mCtPhoneSignalIconId[i] = R.drawable.stat_sys_signal_null;
+            }
             mQSPhoneSignalIconId = R.drawable.ic_qs_signal_no_signal;
             mDataSignalIconId = R.drawable.stat_sys_signal_null;
         } else {
@@ -674,6 +713,9 @@ public class NetworkController extends BroadcastReceiver {
                             + " mServiceState " + mServiceState);
                 }
                 mPhoneSignalIconId = R.drawable.stat_sys_signal_null;
+                for (int i = 0; i < SIGNAL_ICON_NUM; i++) {
+                    mCtPhoneSignalIconId[i] = R.drawable.stat_sys_signal_null;
+                }
                 mQSPhoneSignalIconId = R.drawable.ic_qs_signal_no_signal;
                 mDataSignalIconId = R.drawable.stat_sys_signal_null;
                 mContentDescriptionPhoneSignal = mContext.getString(
@@ -695,6 +737,26 @@ public class NetworkController extends BroadcastReceiver {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
                 } else {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
+                }
+
+                if (isCdma()) {
+                    int cdmaLevel = mSignalStrength.getCdmaLevel();
+                    int evdoLevel = mSignalStrength.getEvdoLevel();
+                    Slog.i(TAG, "updateTelephonySignalStrength cdmaLevel="
+                            + cdmaLevel + " evdoLevel=" + evdoLevel);
+                    mCtPhoneSignalIconId[FIRST_SIGNAL_ICON] = iconList[cdmaLevel];
+                    mCtPhoneSignalIconId[SECOND_SIGNAL_ICON] = iconList[evdoLevel];
+                    iconLevel = (evdoLevel != 0) ? evdoLevel : cdmaLevel;
+                    if (DEBUG) {
+                        Slog.d(TAG, " set to cdmaLevel= "
+                                + mSignalStrength.getCdmaLevel()
+                                + " instead of level= "
+                                + mSignalStrength.getLevel());
+                    }
+                } else {
+                    iconLevel = mSignalStrength.getLevel();
+                    mCtPhoneSignalIconId[FIRST_SIGNAL_ICON] = iconList[iconLevel];
+                    mCtPhoneSignalIconId[SECOND_SIGNAL_ICON] = 0;
                 }
 
                 mPhoneSignalIconId = iconList[iconLevel];
@@ -856,6 +918,12 @@ public class NetworkController extends BroadcastReceiver {
             }
         }
 
+        // As CT spec, a common roaming icon is not enough,
+        // we will just return with the detail network type.
+        if (PhoneStatusBar.STATUSBAR_STYLE == PhoneStatusBar.STATUSBAR_STYLE_CT) {
+            return;
+        }
+
         if (isCdma()) {
             if (isCdmaEri()) {
                 mDataTypeIconId = R.drawable.stat_sys_data_connected_roam;
@@ -973,7 +1041,12 @@ public class NetworkController extends BroadcastReceiver {
             String networkName = mContext.getLocalString(mPhone.getNetworkOperatorName(),
                 com.android.internal.R.array.origin_carrier_names,
                 com.android.internal.R.array.locale_carrier_names);
-            mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault : networkName;
+            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+            final ServiceState ss = mServiceState;
+            boolean show3G = ss != null &&
+                ss.getRilVoiceRadioTechnology() == ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA;
+            mNetworkName = TextUtils.isEmpty(networkName) ? mNetworkNameDefault :
+                networkName + (show3G ? " 3G" : "");
             return;
         }
 
@@ -1315,6 +1388,9 @@ public class NetworkController extends BroadcastReceiver {
                     R.string.accessibility_airplane_mode);
             mAirplaneIconId = R.drawable.stat_sys_signal_flightmode;
             mPhoneSignalIconId = mDataSignalIconId = mDataTypeIconId = mQSDataTypeIconId = 0;
+            for (int i = 0; i < SIGNAL_ICON_NUM; i++) {
+                mCtPhoneSignalIconId[i] = 0;
+            }
             mQSPhoneSignalIconId = 0;
             mNoSimIconId = 0;
 
@@ -1389,6 +1465,10 @@ public class NetworkController extends BroadcastReceiver {
         }
 
         if (mLastPhoneSignalIconId          != mPhoneSignalIconId
+         || mCtLastPhoneSignalIconId[FIRST_SIGNAL_ICON]
+                != mCtPhoneSignalIconId[FIRST_SIGNAL_ICON]
+         || mCtLastPhoneSignalIconId[SECOND_SIGNAL_ICON]
+                != mCtPhoneSignalIconId[SECOND_SIGNAL_ICON]
          || mLastDataDirectionOverlayIconId != combinedActivityIconId
          || mLastWifiIconId                 != mWifiIconId
          || mLastWimaxIconId                != mWimaxIconId
@@ -1412,6 +1492,15 @@ public class NetworkController extends BroadcastReceiver {
 
         if (mLastLocale != mLocale) {
             mLastLocale = mLocale;
+        }
+
+        if (mCtLastPhoneSignalIconId[FIRST_SIGNAL_ICON] != mCtPhoneSignalIconId[FIRST_SIGNAL_ICON]
+                || mCtLastPhoneSignalIconId[SECOND_SIGNAL_ICON]
+                       != mCtPhoneSignalIconId[SECOND_SIGNAL_ICON]) {
+            mCtLastPhoneSignalIconId[FIRST_SIGNAL_ICON] =
+                    mCtPhoneSignalIconId[FIRST_SIGNAL_ICON];
+            mCtLastPhoneSignalIconId[SECOND_SIGNAL_ICON] =
+                    mCtPhoneSignalIconId[SECOND_SIGNAL_ICON];
         }
 
         // the phone icon on phones
@@ -1712,6 +1801,29 @@ public class NetworkController extends BroadcastReceiver {
         } else {
             return "(null)";
         }
+    }
+
+    // Get international roaming state for CT spec.
+    protected boolean isInternationalRoaming() {
+        final String CHINA_MCC = "460";
+        final String MACAO_MCC = "455";
+        final String numeric = TelephonyManager.getDefault().getNetworkOperator();
+
+        if (!isValidNumeric(numeric)) {
+            return false;
+        }
+
+        return (!numeric.startsWith(CHINA_MCC) && !numeric.startsWith(MACAO_MCC));
+
+    }
+
+    protected boolean isValidNumeric(String numeric) {
+        if (TextUtils.isEmpty(numeric)
+                || numeric.equals("null") || numeric.equals("00000")) {
+            return false;
+        }
+
+        return true;
     }
 
 }
