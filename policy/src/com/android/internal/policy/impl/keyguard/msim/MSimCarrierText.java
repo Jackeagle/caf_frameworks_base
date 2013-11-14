@@ -34,35 +34,42 @@ import android.telephony.MSimTelephonyManager;
 
 public class MSimCarrierText extends CarrierText {
     private static final String TAG = "MSimCarrierText";
+    private boolean []mShowPlmn;
     private CharSequence []mPlmn;
+    private boolean []mShowSpn;
     private CharSequence []mSpn;
     private State []mSimState;
 
     private KeyguardUpdateMonitorCallback mMSimCallback = new KeyguardUpdateMonitorCallback() {
 
         @Override
-        public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int sub) {
+        public void onRefreshCarrierInfo(boolean bShowPlmn, CharSequence plmn, boolean bShowSpn,
+                CharSequence spn, int sub) {
+            mShowPlmn[sub] = bShowPlmn;
             mPlmn[sub] = plmn;
+            mShowSpn[sub] = bShowSpn;
             mSpn[sub] = spn;
-            updateCarrierText(mSimState, mPlmn, mSpn);
+            updateCarrierText(mSimState, mShowPlmn, mPlmn, mShowSpn, mSpn);
         }
 
         @Override
         public void onSimStateChanged(IccCardConstants.State simState, int sub) {
             mSimState[sub] = simState;
-            updateCarrierText(mSimState, mPlmn, mSpn);
+            updateCarrierText(mSimState, mShowPlmn, mPlmn, mShowSpn, mSpn);
         }
 
         @Override
         void onAirplaneModeChanged(boolean on) {
             mAirplaneMode = on;
-            updateCarrierText(mSimState, mPlmn, mSpn);
+            updateCarrierText(mSimState, mShowPlmn, mPlmn, mShowSpn, mSpn);
         }
     };
 
     private void initialize() {
         int numPhones = MSimTelephonyManager.getDefault().getPhoneCount();
+        mShowPlmn = new boolean[numPhones];
         mPlmn = new CharSequence[numPhones];
+        mShowSpn = new boolean[numPhones];
         mSpn = new CharSequence[numPhones];
         mSimState = new State[numPhones];
     }
@@ -76,7 +83,8 @@ public class MSimCarrierText extends CarrierText {
         initialize();
     }
 
-    protected void updateCarrierText(State []simState, CharSequence []plmn, CharSequence []spn) {
+    protected void updateCarrierText(State[] simState, boolean[] bShowPlmn, CharSequence[] plmn,
+            boolean[] bshowSpn, CharSequence[] spn) {
         CharSequence text = "";
 
         if (mAirplaneMode) {
@@ -86,7 +94,8 @@ public class MSimCarrierText extends CarrierText {
             }
         } else {
             for (int i = 0; i < simState.length; i++) {
-                CharSequence displayText = getCarrierTextForSimState(simState[i], plmn[i], spn[i]);
+                 CharSequence displayText = getCarrierTextForSimState(simState[i], bShowPlmn[i],
+                    plmn[i], bshowSpn[i], spn[i]);
                 if (KeyguardViewManager.USE_UPPER_CASE) {
                     displayText = (displayText != null ? displayText.toString().toUpperCase() : "");
                 }
