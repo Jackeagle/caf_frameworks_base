@@ -3808,100 +3808,105 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                             continue;
                         }
 
-                        // Get of the addresses associated with the url host. We need to use the
-                        // address otherwise HttpURLConnection object will use the name to get
-                        // the addresses and is will try every address but that will bypass the
-                        // route to host we setup and the connection could succeed as the default
-                        // interface might be connected to the internet via wifi or other interface.
-                        InetAddress[] addresses;
-                        try {
-                            addresses = InetAddress.getAllByName(orgUri.getHost());
-                        } catch (UnknownHostException e) {
-                            log("isMobileOk: UnknownHostException");
-                            result = ConnectivityManager.CMP_RESULT_CODE_NO_DNS;
-                            return result;
-                        }
-                        log("isMobileOk: addresses=" + inetAddressesToString(addresses));
-
-                        // Get the type of addresses supported by this link
-                        LinkProperties lp = mCs.getLinkProperties(
-                                ConnectivityManager.TYPE_MOBILE_HIPRI);
-                        boolean linkHasIpv4 = hasIPv4Address(lp);
-                        boolean linkHasIpv6 = hasIPv6Address(lp);
-                        log("isMobileOk: linkHasIpv4=" + linkHasIpv4
-                                + " linkHasIpv6=" + linkHasIpv6);
-
-                        // Loop through at most 3 valid addresses or all of the address or until
-                        // we run out of time
-                        int loops = Math.min(3, addresses.length);
-                        for(int validAddr=0, addrTried=0;
-                                    (validAddr < loops) && (addrTried < addresses.length)
-                                      && (SystemClock.elapsedRealtime() < endTime);
-                                addrTried ++) {
-
-                            // Choose the address at random but make sure its type is supported
-                            InetAddress hostAddr = addresses[rand.nextInt(addresses.length)];
-                            if (((hostAddr instanceof Inet4Address) && linkHasIpv4)
-                                    || ((hostAddr instanceof Inet6Address) && linkHasIpv6)) {
-                                // Valid address, so use it
-                                validAddr += 1;
-                            } else {
-                                // Invalid address so try next address
-                                continue;
-                            }
-
-                            // Make a route to host so we check the specific interface.
-                            if (mCs.requestRouteToHostAddress(ConnectivityManager.TYPE_MOBILE_HIPRI,
-                                    hostAddr.getAddress())) {
-                                // Wait a short time to be sure the route is established ??
-                                log("isMobileOk:"
-                                        + " wait to establish route to hostAddr=" + hostAddr);
-                                sleep(3);
-                            } else {
-                                log("isMobileOk:"
-                                        + " could not establish route to hostAddr=" + hostAddr);
-                                continue;
-                            }
-
-                            // Rewrite the url to have numeric address to use the specific route.
-                            // I also set the "Connection" to "Close" as by default "Keep-Alive"
-                            // is used which is useless in this case.
-                            URL newUrl = new URL(orgUri.getScheme() + "://"
-                                    + hostAddr.getHostAddress() + orgUri.getPath());
-                            log("isMobileOk: newUrl=" + newUrl);
-
-                            HttpURLConnection urlConn = null;
-                            try {
-                                // Open the connection set the request header and get the response
-                                urlConn = (HttpURLConnection) newUrl.openConnection(
-                                        java.net.Proxy.NO_PROXY);
-                                urlConn.setInstanceFollowRedirects(false);
-                                urlConn.setConnectTimeout(SOCKET_TIMEOUT_MS);
-                                urlConn.setReadTimeout(SOCKET_TIMEOUT_MS);
-                                urlConn.setUseCaches(false);
-                                urlConn.setAllowUserInteraction(false);
-                                urlConn.setRequestProperty("Connection", "close");
-                                int responseCode = urlConn.getResponseCode();
-                                if (responseCode == 204) {
-                                    result = ConnectivityManager.CMP_RESULT_CODE_CONNECTABLE;
-                                } else {
-                                    result = ConnectivityManager.CMP_RESULT_CODE_REDIRECTED;
-                                }
-                                log("isMobileOk: connected responseCode=" + responseCode);
-                                urlConn.disconnect();
-                                urlConn = null;
-                                return result;
-                            } catch (Exception e) {
-                                log("isMobileOk: HttpURLConnection Exception e=" + e);
-                                if (urlConn != null) {
-                                    urlConn.disconnect();
-                                    urlConn = null;
-                                }
-                            }
-                        }
-                        result = ConnectivityManager.CMP_RESULT_CODE_NO_TCP_CONNECTION;
-                        log("isMobileOk: loops|timed out");
+                        result = ConnectivityManager.CMP_RESULT_CODE_CONNECTABLE;
                         return result;
+
+                        /*
+                         * // Get of the addresses associated with the url host. We need to use the
+                         * // address otherwise HttpURLConnection object will use the name to get
+                         * // the addresses and is will try every address but that will bypass the
+                         * // route to host we setup and the connection could succeed as the default
+                         * // interface might be connected to the internet via wifi or other interface.
+                         * InetAddress[] addresses;
+                         * try {
+                         *     addresses = InetAddress.getAllByName(orgUri.getHost());
+                         * } catch (UnknownHostException e) {
+                         *     log("isMobileOk: UnknownHostException");
+                         *     result = ConnectivityManager.CMP_RESULT_CODE_NO_DNS;
+                         *     return result;
+                         * }
+                         * log("isMobileOk: addresses=" + inetAddressesToString(addresses));
+                         *
+                         * // Get the type of addresses supported by this link
+                         * LinkProperties lp = mCs.getLinkProperties(
+                         *         ConnectivityManager.TYPE_MOBILE_HIPRI);
+                         * boolean linkHasIpv4 = hasIPv4Address(lp);
+                         * boolean linkHasIpv6 = hasIPv6Address(lp);
+                         * log("isMobileOk: linkHasIpv4=" + linkHasIpv4
+                         *         + " linkHasIpv6=" + linkHasIpv6);
+                         *
+                         * // Loop through at most 3 valid addresses or all of the address or until
+                         * // we run out of time
+                         * int loops = Math.min(3, addresses.length);
+                         * for(int validAddr=0, addrTried=0;
+                         *         (validAddr < loops) && (addrTried < addresses.length)
+                         *          && (SystemClock.elapsedRealtime() < endTime);
+                         *          addrTried ++) {
+                         *
+                         *     // Choose the address at random but make sure its type is supported
+                         *     InetAddress hostAddr = addresses[rand.nextInt(addresses.length)];
+                         *     if (((hostAddr instanceof Inet4Address) && linkHasIpv4)
+                         *             || ((hostAddr instanceof Inet6Address) && linkHasIpv6)) {
+                         *         // Valid address, so use it
+                         *         validAddr += 1;
+                         *     } else {
+                         *         // Invalid address so try next address
+                         *         continue;
+                         *     }
+                         *
+                         *     // Make a route to host so we check the specific interface.
+                         *     if (mCs.requestRouteToHostAddress(ConnectivityManager.TYPE_MOBILE_HIPRI,
+                         *             hostAddr.getAddress())) {
+                         *         // Wait a short time to be sure the route is established ??
+                         *         log("isMobileOk:"
+                         *                 + " wait to establish route to hostAddr=" + hostAddr);
+                         *         sleep(3);
+                         *     } else {
+                         *         log("isMobileOk:"
+                         *                 + " could not establish route to hostAddr=" + hostAddr);
+                         *         continue;
+                         *     }
+                         *
+                         *     // Rewrite the url to have numeric address to use the specific route.
+                         *     // I also set the "Connection" to "Close" as by default "Keep-Alive"
+                         *     // is used which is useless in this case.
+                         *     URL newUrl = new URL(orgUri.getScheme() + "://"
+                         *             + hostAddr.getHostAddress() + orgUri.getPath());
+                         *     log("isMobileOk: newUrl=" + newUrl);
+                         *
+                         *     HttpURLConnection urlConn = null;
+                         *     try {
+                         *         // Open the connection set the request header and get the response
+                         *         urlConn = (HttpURLConnection) newUrl.openConnection(
+                         *                 java.net.Proxy.NO_PROXY);
+                         *         urlConn.setInstanceFollowRedirects(false);
+                         *         urlConn.setConnectTimeout(SOCKET_TIMEOUT_MS);
+                         *         urlConn.setReadTimeout(SOCKET_TIMEOUT_MS);
+                         *         urlConn.setUseCaches(false);
+                         *         urlConn.setAllowUserInteraction(false);
+                         *         urlConn.setRequestProperty("Connection", "close");
+                         *         int responseCode = urlConn.getResponseCode();
+                         *         if (responseCode == 204) {
+                         *             result = ConnectivityManager.CMP_RESULT_CODE_CONNECTABLE;
+                         *         } else {
+                         *             result = ConnectivityManager.CMP_RESULT_CODE_REDIRECTED;
+                         *         }
+                         *         log("isMobileOk: connected responseCode=" + responseCode);
+                         *         urlConn.disconnect();
+                         *         urlConn = null;
+                         *         return result;
+                         *     } catch (Exception e) {
+                         *         log("isMobileOk: HttpURLConnection Exception e=" + e);
+                         *         if (urlConn != null) {
+                         *             urlConn.disconnect();
+                         *             urlConn = null;
+                         *         }
+                         *     }
+                         * }
+                         * result = ConnectivityManager.CMP_RESULT_CODE_NO_TCP_CONNECTION;
+                         * log("isMobileOk: loops|timed out");
+                         * return result;
+                         */
                     } catch (Exception e) {
                         log("isMobileOk: Exception e=" + e);
                         continue;
