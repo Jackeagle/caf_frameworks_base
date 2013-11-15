@@ -104,6 +104,12 @@ public interface BluetoothProfile {
     public static final int SAP = 20;
 
     /**
+     * DUN
+     * @hide
+     */
+    public static final int DUN = 21;
+
+    /**
      * Default priority for devices that we try to auto-connect to and
      * and allow incoming connections for the profile
      * @hide
