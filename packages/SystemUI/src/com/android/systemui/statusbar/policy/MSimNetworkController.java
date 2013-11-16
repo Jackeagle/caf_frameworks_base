@@ -1388,7 +1388,7 @@ public class MSimNetworkController extends NetworkController {
             // NB: the mLast*s will be updated later
             for (MSimSignalCluster cluster : mSimSignalClusters) {
                 cluster.setWifiIndicators(
-                        mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature),
+                        mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature  || mAppopsStrictEnabled),
                         mWifiIconId,
                         mWifiActivityIconId,
                         mContentDescriptionWifi);

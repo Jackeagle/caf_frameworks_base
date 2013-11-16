@@ -42,8 +42,6 @@ public class CarrierText extends TextView {
 
     protected boolean mAirplaneMode;
 
-
-
     // For prop key to show carrier.
     static final String PROP_KEY_SHOW_CARRIER = "persist.env.sys.SHOW_CARRIER";
     static final String PROP_ENV_SPEC = SystemProperties.get("persist.env.spec");

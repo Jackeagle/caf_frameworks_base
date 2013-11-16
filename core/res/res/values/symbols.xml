@@ -1908,4 +1908,9 @@
 
   <!-- cpu boost for overscroller fling -->
   <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
+
+  <java-symbol type="bool" name="use_motion_accel" />
+
+  <!-- for am_pm on the losckscreen  -->
+  <java-symbol type="id" name="am_pm" />
 </resources>
