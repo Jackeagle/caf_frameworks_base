@@ -17,7 +17,8 @@
 package com.android.internal.widget;
 
 import android.app.ActivityManagerNative;
-import com.qualcomm.util.MpqUtils;
+
+import org.codeaurora.util.MpqUtils;
 
 import android.app.admin.DevicePolicyManager;
 import android.appwidget.AppWidgetManager;
