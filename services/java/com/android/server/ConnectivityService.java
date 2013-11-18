@@ -2361,7 +2361,13 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 }
             }
             if (mNetConfigs[netType].isDefault()) {
-                handleApplyDefaultProxy(newLp.getHttpProxy());
+                if(netType == ConnectivityManager.TYPE_ETHERNET) {
+					log("net Type is ConnectivityManager.TYPE_ETHERNET "+ netType + " Setting mGlobalProxy" );
+                    handleApplyDefaultProxy(mGlobalProxy);
+                }
+                else {
+                    handleApplyDefaultProxy(newLp.getHttpProxy());
+                }
             }
         } else {
             if (VDBG) {
@@ -3226,6 +3232,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         if (mGlobalProxy == null) {
             proxyProperties = mDefaultProxy;
+         }
+        if(mActiveDefaultNetwork == ConnectivityManager.TYPE_ETHERNET) {
+					    log("net Type is ConnectivityManager.TYPE_ETHERNET "+ mActiveDefaultNetwork + "Setting mGlobalProxy" );
+                        handleApplyDefaultProxy(mGlobalProxy);
         }
         sendProxyBroadcast(proxyProperties);
     }
