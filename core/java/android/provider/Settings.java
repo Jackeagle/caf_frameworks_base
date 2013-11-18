@@ -3828,6 +3828,18 @@ public final class Settings {
                 "search_global_search_activity";
 
         /**
+	 * Ethernet related configurations
+         */
+        public static final String ETHERNET_ON      = "ethernet_on";
+        public static final String ETHERNET_MODE    = "ethernet_mode";
+        public static final String ETHERNET_IP      = "ethernet_ip";
+        public static final String ETHERNET_MASK    = "ethernet_netmask";
+        public static final String ETHERNET_DNS     = "ethernet_dns";
+        public static final String ETHERNET_ROUTE   = "ethernet_iproute";
+        public static final String ETHERNET_CONF    = "ethernet_conf";
+        public static final String ETHERNET_IFNAME  = "ethernet_ifname";
+
+        /**
          * The number of promoted sources in GlobalSearch.
          * @hide
          */
