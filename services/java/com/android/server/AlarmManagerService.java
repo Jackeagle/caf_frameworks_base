@@ -365,6 +365,14 @@ class AlarmManagerService extends IAlarmManager.Stub {
             Alarm alarm = it.next();
             if (alarm.operation.equals(operation)) {
                 it.remove();
+                if (alarm.type == AlarmManager.RTC_POWEROFF_WAKEUP) {
+                    long alarmSeconds, alarmNanoseconds;
+                    alarmSeconds = alarm.when / 1000;
+                    alarmNanoseconds = (alarm.when % 1000) * 1000 * 1000;
+                    Slog.w(TAG,"Clear alarm type=" + alarm.type + ",alarmSeconds=" +
+                        alarmSeconds);
+                    clear(mDescriptor, alarm.type, alarmSeconds, alarmNanoseconds);
+                }
             }
         }
     }
@@ -720,6 +728,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
     private native int init();
     private native void close(int fd);
     private native void set(int fd, int type, long seconds, long nanoseconds);
+    private native void clear(int fd, int type, long seconds, long nanoseconds);
     private native int waitForAlarm(int fd);
     private native int setKernelTimezone(int fd, int minuteswest);
 
