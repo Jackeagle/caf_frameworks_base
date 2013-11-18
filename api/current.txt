@@ -20054,7 +20054,6 @@ package android.provider {
     field public static final deprecated java.lang.String DEVICE_PROVISIONED = "device_provisioned";
     field public static final java.lang.String ENABLED_ACCESSIBILITY_SERVICES = "enabled_accessibility_services";
     field public static final java.lang.String ENABLED_INPUT_METHODS = "enabled_input_methods";
-    field public static final deprecated java.lang.String HTTP_PROXY = "http_proxy";
     field public static final java.lang.String ETHERNET_CONF = "ethernet_conf";
     field public static final java.lang.String ETHERNET_DNS = "ethernet_dns";
     field public static final java.lang.String ETHERNET_IFNAME = "ethernet_ifname";
@@ -20063,7 +20062,7 @@ package android.provider {
     field public static final java.lang.String ETHERNET_MODE = "ethernet_mode";
     field public static final java.lang.String ETHERNET_ON = "ethernet_on";
     field public static final java.lang.String ETHERNET_ROUTE = "ethernet_iproute";
-    field public static final java.lang.String HTTP_PROXY = "http_proxy";
+    field public static final deprecated java.lang.String HTTP_PROXY = "http_proxy";
     field public static final java.lang.String INPUT_METHOD_SELECTOR_VISIBILITY = "input_method_selector_visibility";
     field public static final deprecated java.lang.String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
     field public static final java.lang.String LOCATION_PROVIDERS_ALLOWED = "location_providers_allowed";
