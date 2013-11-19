@@ -89,15 +89,9 @@ public class MSimCarrierText extends CarrierText {
 
         if (mAirplaneMode) {
             text = getContext().getText(R.string.lockscreen_airplane_mode_on);
-            if (KeyguardViewManager.USE_UPPER_CASE) {
-                text = text.toString().toUpperCase();
-            }
         } else {
             for (int i = 0; i < simState.length; i++) {
                 CharSequence displayText = getCarrierTextForSimState(simState[i], plmn[i], spn[i]);
-                if (KeyguardViewManager.USE_UPPER_CASE) {
-                    displayText = (displayText != null ? displayText.toString().toUpperCase() : "");
-                }
                 text = (TextUtils.isEmpty(text)
                         ? displayText : getContext().getString(R.string.msim_carrier_text_format,
                                 text, displayText));
