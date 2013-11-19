@@ -14197,114 +14197,40 @@ public final class ActivityManagerService  extends ActivityManagerNative
         // are managing to keep around is less than half the maximum we desire;
         // if we are keeping a good number around, we'll let them use whatever
         // memory they want.
-        if (numHidden <= ProcessList.TRIM_HIDDEN_APPS
-                && numEmpty <= ProcessList.TRIM_EMPTY_APPS) {
-            final int numHiddenAndEmpty = numHidden + numEmpty;
-            final int N = mLruProcesses.size();
-            int factor = numTrimming/3;
-            int minFactor = 2;
-            if (mHomeProcess != null) minFactor++;
-            if (mPreviousProcess != null) minFactor++;
-            if (factor < minFactor) factor = minFactor;
-            int step = 0;
-            int fgTrimLevel;
-            if (numHiddenAndEmpty <= ProcessList.TRIM_CRITICAL_THRESHOLD) {
-                fgTrimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL;
-            } else if (numHiddenAndEmpty <= ProcessList.TRIM_LOW_THRESHOLD) {
-                fgTrimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW;
-            } else {
-                fgTrimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE;
-            }
-            int curLevel = ComponentCallbacks2.TRIM_MEMORY_COMPLETE;
+
+        final int N = mLruProcesses.size();
+        i = 0;
+
+        try {
             for (i=0; i<N; i++) {
                 ProcessRecord app = mLruProcesses.get(i);
-                if (app.nonStoppingAdj >= ProcessList.HOME_APP_ADJ
-                        && app.nonStoppingAdj != ProcessList.SERVICE_B_ADJ
-                        && !app.killedBackground) {
-                    if (app.trimMemoryLevel < curLevel && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(curLevel);
-                        } catch (RemoteException e) {
-                        }
-                        if (false) {
-                            // For now we won't do this; our memory trimming seems
-                            // to be good enough at this point that destroying
-                            // activities causes more harm than good.
-                            if (curLevel >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE
-                                    && app != mHomeProcess && app != mPreviousProcess) {
-                                // Need to do this on its own message because the stack may not
-                                // be in a consistent state at this point.
-                                // For these apps we will also finish their activities
-                                // to help them free memory.
-                                mMainStack.scheduleDestroyActivities(app, false, "trim");
-                            }
-                        }
-                    }
-                    app.trimMemoryLevel = curLevel;
-                    step++;
-                    if (step >= factor) {
-                        step = 0;
-                        switch (curLevel) {
-                            case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
-                                curLevel = ComponentCallbacks2.TRIM_MEMORY_MODERATE;
-                                break;
-                            case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
-                                curLevel = ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
-                                break;
-                        }
-                    }
-                } else if (app.nonStoppingAdj == ProcessList.HEAVY_WEIGHT_APP_ADJ) {
-                    if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
-                            && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(
-                                    ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
-                        } catch (RemoteException e) {
-                        }
-                    }
-                    app.trimMemoryLevel = ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
-                } else {
-                    if ((app.nonStoppingAdj > ProcessList.VISIBLE_APP_ADJ || app.systemNoUi)
-                            && app.pendingUiClean) {
-                        // If this application is now in the background and it
-                        // had done UI, then give it the special trim level to
-                        // have it free UI resources.
-                        final int level = ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN;
-                        if (app.trimMemoryLevel < level && app.thread != null) {
-                            try {
-                                app.thread.scheduleTrimMemory(level);
-                            } catch (RemoteException e) {
-                            }
-                        }
-                        app.pendingUiClean = false;
-                    }
-                    if (app.trimMemoryLevel < fgTrimLevel && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(fgTrimLevel);
-                        } catch (RemoteException e) {
-                        }
-                    }
-                    app.trimMemoryLevel = fgTrimLevel;
+                boolean doTrim = false;
+                int trimLevel = ComponentCallbacks2.TRIM_MEMORY_COMPLETE;
+                if (app.curAdj ==0  && (app.trimMemoryLevel != ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) && app.thread != null) {
+                    doTrim = true;
+                    trimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW;
+                } else if ((app.curAdj > 0) && (app.curAdj < 6) && (app.trimMemoryLevel != ComponentCallbacks2.TRIM_MEMORY_MODERATE) && app.thread != null) {
+                    doTrim = true;
+                    trimLevel = ComponentCallbacks2.TRIM_MEMORY_MODERATE;
                 }
-            }
-        } else {
-            final int N = mLruProcesses.size();
-            for (i=0; i<N; i++) {
-                ProcessRecord app = mLruProcesses.get(i);
-                if ((app.nonStoppingAdj > ProcessList.VISIBLE_APP_ADJ || app.systemNoUi)
-                        && app.pendingUiClean) {
-                    if (app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
-                            && app.thread != null) {
-                        try {
-                            app.thread.scheduleTrimMemory(
-                                    ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
-                        } catch (RemoteException e) {
-                        }
+                else if ((app.curAdj >= 6) && app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_COMPLETE && app.thread != null) {
+                    doTrim = true;
+                    trimLevel = ComponentCallbacks2.TRIM_MEMORY_COMPLETE;
+                }
+
+                if (doTrim) {
+                    try {
+		                //Slog.e(TAG, "lmark132_92 trim level:"+ trimLevel + " app: "+ app + " adj:" + app.curAdj);
+                        app.thread.scheduleTrimMemory(trimLevel);
+                        app.trimMemoryLevel = trimLevel;
+                    } catch (RemoteException e) {
+                        Slog.w(TAG, "lmark132_93 Exception during scheduleTrimMemory, ex:"+e);
                     }
                     app.pendingUiClean = false;
                 }
-                app.trimMemoryLevel = 0;
             }
+        } catch (Exception e) {
+            Slog.w(TAG, "lmark132_93 Exception during app trim memory, ex:"+e);
         }
 
         if (mAlwaysFinishActivities) {
