@@ -278,7 +278,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
     static final int PENDING_ACTIVITY_RESULT_TIMEOUT = 2*2000;
 
     static final int MY_PID = Process.myPid();
-    
+    //Treat the app as heavy app if the app memory(PSS) is more than thresholdSize.
+    long thresholdSize = SystemProperties.getLong( "ro.am.heavy_apps.pss",40*1024 );
     static final String[] EMPTY_STRING_ARRAY = new String[0];
 
     public ActivityStack mMainStack;
@@ -13128,10 +13129,21 @@ public final class ActivityManagerService  extends ActivityManagerNative
             for (int j = 0; j < activitiesSize; j++) {
                 final ActivityRecord r = app.activities.get(j);
                 if (r.visible) {
+                    long p_pss = Debug.getPss(r.app.pid);
                     // App has a visible activity; only upgrade adjustment.
                     if (adj > ProcessList.VISIBLE_APP_ADJ) {
-                        adj = ProcessList.VISIBLE_APP_ADJ;
-                        app.adjType = "visible";
+                    //If the app PSS is more than threshold, directly move to adj-9
+                        if(p_pss < thresholdSize)
+                        {
+                            adj = ProcessList.PREVIOUS_APP_ADJ;
+                            app.adjType = "visible";
+                        
+                        }
+                        else
+                        {
+                            adj = hiddenAdj;
+                            app.adjType = "bg-act";
+                        }
                     }
                     schedGroup = Process.THREAD_GROUP_DEFAULT;
                     app.hidden = false;
@@ -13139,9 +13151,19 @@ public final class ActivityManagerService  extends ActivityManagerNative
                     foregroundActivities = true;
                     break;
                 } else if (r.state == ActivityState.PAUSING || r.state == ActivityState.PAUSED) {
+                    long p_pss = Debug.getPss(r.app.pid);
                     if (adj > ProcessList.PERCEPTIBLE_APP_ADJ) {
-                        adj = ProcessList.PERCEPTIBLE_APP_ADJ;
-                        app.adjType = "pausing";
+                        if(p_pss < thresholdSize)
+                        {
+                            adj = ProcessList.PREVIOUS_APP_ADJ;
+                            app.adjType = "pausing";
+                        
+                        }
+                        else
+                        {
+                            adj = hiddenAdj;
+                            app.adjType = "bg-act";
+                         }
                     }
                     app.hidden = false;
                     foregroundActivities = true;
