@@ -31,6 +31,7 @@ import com.android.internal.telephony.IccCardConstants.State;
 import com.android.internal.widget.LockPatternUtils;
 
 import android.telephony.MSimTelephonyManager;
+import android.telephony.TelephonyManager;
 
 public class MSimCarrierText extends CarrierText {
     private static final String TAG = "MSimCarrierText";
@@ -42,6 +43,13 @@ public class MSimCarrierText extends CarrierText {
 
         @Override
         public void onRefreshCarrierInfo(CharSequence plmn, CharSequence spn, int sub) {
+            // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
+            MSimTelephonyManager tm =
+                (MSimTelephonyManager)MSimTelephonyManager.getDefault();
+            boolean show3G = !mAirplaneMode && tm != null && plmn != null &&
+                tm.getVoiceNetworkType(sub) == TelephonyManager.NETWORK_TYPE_TD_SCDMA;
+            if (show3G) plmn = plmn + " 3G";
+
             mPlmn[sub] = plmn;
             mSpn[sub] = spn;
             updateCarrierText(mSimState, mPlmn, mSpn);
@@ -81,15 +89,9 @@ public class MSimCarrierText extends CarrierText {
 
         if (mAirplaneMode) {
             text = getContext().getText(R.string.lockscreen_airplane_mode_on);
-            if (KeyguardViewManager.USE_UPPER_CASE) {
-                text = text.toString().toUpperCase();
-            }
         } else {
             for (int i = 0; i < simState.length; i++) {
                 CharSequence displayText = getCarrierTextForSimState(simState[i], plmn[i], spn[i]);
-                if (KeyguardViewManager.USE_UPPER_CASE) {
-                    displayText = (displayText != null ? displayText.toString().toUpperCase() : "");
-                }
                 text = (TextUtils.isEmpty(text)
                         ? displayText : getContext().getString(R.string.msim_carrier_text_format,
                                 text, displayText));
