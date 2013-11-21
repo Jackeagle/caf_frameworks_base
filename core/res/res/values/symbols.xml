@@ -1913,4 +1913,6 @@
 
   <!-- for am_pm on the losckscreen  -->
   <java-symbol type="id" name="am_pm" />
+
+  <java-symbol type="string" name="transport_destination" />
 </resources>
