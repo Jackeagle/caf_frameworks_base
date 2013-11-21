@@ -459,8 +459,10 @@ class QuickSettings {
             rssiTile.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Intent intent = new Intent();
                     if (mModel.dataSwitchEnabled()) {
+                        mModel.switchMobileData();
+                    } else {
+                        Intent intent = new Intent();
                         if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
                             intent.setClassName("com.android.settings",
                                     "com.android.settings.SelectSubscription");
@@ -472,23 +474,10 @@ class QuickSettings {
                                     "com.android.phone",
                                     "com.android.phone.MSimMobileNetworkSubSettings"));
                         }
-                    } else {
-                        intent.setComponent(new ComponentName(
-                                "com.android.settings",
-                                "com.android.settings.Settings$DataUsageSummaryActivity"));
+                        startSettingsActivity(intent);
                     }
-                    startSettingsActivity(intent);
                 }
             });
-            if (mModel.dataSwitchEnabled() && LONG_PRESS_TOGGLES) {
-                rssiTile.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        mModel.switchMobileData();
-                        rssiTile.setPressed(false);
-                        return true;
-                    }});
-            }
             mModel.addRSSITile(rssiTile, new QuickSettingsModel.RefreshCallback() {
                 @Override
                 public void refreshView(QuickSettingsTileView view, State state) {
@@ -778,20 +767,11 @@ class QuickSettings {
             apnTile.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    startSettingsActivity(android.provider.Settings.ACTION_APN_SETTINGS);
+                    if (mModel != null && mModel.getApnState() != null) {
+                        mModel.getApnState().switchToNextApn(null);
+                    }
                 }
             });
-            if (LONG_PRESS_TOGGLES) {
-                apnTile.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        if (mModel != null && mModel.getApnState() != null) {
-                            mModel.getApnState().switchToNextApn(null);
-                        }
-                        apnTile.setPressed(false);
-                        return true;
-                    }});
-            }
             mModel.addApnTile(apnTile, new QuickSettingsModel.RefreshCallback() {
                 @Override
                 public void refreshView(QuickSettingsTileView view, State state) {
