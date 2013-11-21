@@ -22,8 +22,6 @@ import android.telephony.PhoneNumberUtils;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.android.internal.telephony.GsmAlphabet;
-
 import java.util.Arrays;
 
 
@@ -239,7 +237,7 @@ public class AdnRecord implements Parcelable {
                     = (byte) 0xFF; // Extension Record Id
 
             if (!TextUtils.isEmpty(alphaTag)) {
-                byteTag = GsmAlphabet.stringToGsm8BitPacked(alphaTag);
+                byteTag = IccUtils.stringToAdnStringField(alphaTag);
                 System.arraycopy(byteTag, 0, adnString, 0, byteTag.length);
             }
 
