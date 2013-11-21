@@ -1576,4 +1576,6 @@
         <item>试图读取彩信</item>
         <item>试图修改彩信</item>
     </string-array>
+
+    <string name="transport_destination">备份调试状态下的用户私有缓存</string>
 </resources>
