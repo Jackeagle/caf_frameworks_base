@@ -721,10 +721,11 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                      (1 << AudioSystem.STREAM_SYSTEM)|(1 << AudioSystem.STREAM_SYSTEM_ENFORCED)),
                      UserHandle.USER_CURRENT);
 
-            // ringtone, notification and system streams are always affected by ringer mode
+            // ringtone, notification, system and dtmf streams are always affected by ringer mode
             mRingerModeAffectedStreams |= (1 << AudioSystem.STREAM_RING)|
                                             (1 << AudioSystem.STREAM_NOTIFICATION)|
-                                            (1 << AudioSystem.STREAM_SYSTEM);
+                                            (1 << AudioSystem.STREAM_SYSTEM)|
+                                            (1 << AudioSystem.STREAM_DTMF);
 
             if (mVoiceCapable) {
                 mRingerModeAffectedStreams &= ~(1 << AudioSystem.STREAM_MUSIC);
