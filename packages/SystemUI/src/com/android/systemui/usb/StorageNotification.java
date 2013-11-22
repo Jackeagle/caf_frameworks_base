@@ -167,7 +167,7 @@ public class StorageNotification extends StorageEventListener {
              * want to display the 'safe to unmount' notification.
              */
             if (!mStorageManager.isUsbMassStorageEnabled()) {
-                if (oldState.equals(Environment.MEDIA_SHARED)) {
+                if (oldState != null && oldState.equals(Environment.MEDIA_SHARED)) {
                     /*
                      * The unmount was due to UMS being enabled. Dismiss any
                      * media notifications, and enable UMS notification if connected

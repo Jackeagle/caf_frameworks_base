@@ -72,6 +72,7 @@ import android.net.Proxy;
 import android.net.ProxyProperties;
 import android.net.RouteInfo;
 import android.net.wifi.WifiStateTracker;
+import android.net.ethernet.EthernetStateTracker;
 import android.net.wimax.WimaxManagerConstants;
 import android.os.AsyncTask;
 import android.os.Binder;
@@ -501,7 +502,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                             n.type);
                     continue;
                 }
-                if (mRadioAttributes[n.radio] == null) {
+                if ((n.type != ConnectivityManager.TYPE_ETHERNET) && (mRadioAttributes[n.radio] == null)) {
                     loge("Error in networkAttributes - ignoring attempt to use undefined " +
                             "radio " + n.radio + " in network type " + n.type);
                     continue;
@@ -585,7 +586,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                         + " tracker: " + e);
                 continue;
             }
-
             tracker.startMonitoring(context, mTrackerHandler);
             if (config.isDefault()) {
                 tracker.reconnect();
@@ -2313,7 +2313,15 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 }
             }
             if (mNetConfigs[netType].isDefault()) {
-                handleApplyDefaultProxy(newLp.getHttpProxy());
+                if(netType == ConnectivityManager.TYPE_ETHERNET) {
+                   if(DBG) {
+                      log("net Type is ConnectivityManager.TYPE_ETHERNET "+ netType + " Setting mGlobalProxy" );
+                   }
+                   handleApplyDefaultProxy(mGlobalProxy);
+                }
+                else {
+                   handleApplyDefaultProxy(newLp.getHttpProxy());
+                }
             }
         } else {
             if (VDBG) {
@@ -3178,6 +3186,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         if (mGlobalProxy == null) {
             proxyProperties = mDefaultProxy;
+         }
+        if(mActiveDefaultNetwork == ConnectivityManager.TYPE_ETHERNET) {
+           if(DBG) {
+              log("net Type is ConnectivityManager.TYPE_ETHERNET "+ mActiveDefaultNetwork + "Setting mGlobalProxy" );
+           }
+           handleApplyDefaultProxy(mGlobalProxy);
         }
         sendProxyBroadcast(proxyProperties);
     }
