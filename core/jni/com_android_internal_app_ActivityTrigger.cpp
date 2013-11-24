@@ -216,6 +216,7 @@ com_android_internal_app_ActivityTrigger_native_at_startActivity(JNIEnv *env,
             const char *actStr = env->GetStringUTFChars(activity, NULL);
             if (actStr) {
                 (*mStateChangeHandlers[i].startActivity)(actStr);
+                env->ReleaseStringUTFChars(activity, actStr);
             }
         }
     }
@@ -230,6 +231,7 @@ com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env,
             const char *actStr = env->GetStringUTFChars(activity, NULL);
             if (actStr) {
                 (*mStateChangeHandlers[i].resumeActivity)(actStr);
+                env->ReleaseStringUTFChars(activity, actStr);
             }
         }
     }
