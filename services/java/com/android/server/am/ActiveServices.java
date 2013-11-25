@@ -93,6 +93,8 @@ public class ActiveServices {
 
     final ServiceMap mServiceMap = new ServiceMap();
 
+    final ProcessList mProcessList = new ProcessList();
+
     /**
      * All currently bound service connections.  Keys are the IBinder of
      * the client's IServiceConnection.
@@ -949,10 +951,28 @@ public class ActiveServices {
     }
 
     final void performServiceRestartLocked(ServiceRecord r) {
+
         if (!mRestartingServices.contains(r)) {
             return;
         }
-        bringUpServiceLocked(r, r.intent.getIntent().getFlags(), true);
+
+        long available_mem = Process.getFreeMemory();
+        long ServiceThreshold = mProcessList.getMemLevel(ProcessList.BACKUP_APP_ADJ);;
+
+        //ServiceThreshold = 4 * ServiceThreshold;
+
+        Slog.i(TAG, "available_mem : " + available_mem + ", ServiceThreshold : " + ServiceThreshold);
+
+        if(available_mem < ServiceThreshold)
+	{
+            Slog.i(TAG, "Reschedule the service as available memory is very less " + r.packageName);
+            r.restartDelay=0;
+            scheduleServiceRestartLocked(r, true);
+        }
+        else
+        {
+            bringUpServiceLocked(r, r.intent.getIntent().getFlags(), true);
+        }
     }
 
     private final boolean unscheduleServiceRestartLocked(ServiceRecord r) {
