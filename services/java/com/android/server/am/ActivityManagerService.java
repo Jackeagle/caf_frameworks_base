@@ -391,6 +391,11 @@ public final class ActivityManagerService  extends ActivityManagerNative
      * The currently running heavy-weight process, if any.
      */
     ProcessRecord mHeavyWeightProcess = null;
+
+    /**
+     * The previous process in an app switch, if any.
+     */
+    ProcessRecord mPrevAppSwithcProcess = null;
     
     /**
      * The last time that various processes have crashed.
@@ -2131,7 +2136,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
     boolean isAllowedWhileBooting(ApplicationInfo ai) {
         return (ai.flags&ApplicationInfo.FLAG_PERSISTENT) != 0;
     }
-    
+
     private final void startProcessLocked(ProcessRecord app,
             String hostingType, String hostingNameStr) {
         if (app.pid > 0 && app.pid != MY_PID) {
@@ -2242,7 +2247,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
             if (app.persistent) {
                 Watchdog.getInstance().processStarted(app.processName, startResult.pid);
             }
-            
             StringBuilder buf = mStringBuilder;
             buf.setLength(0);
             buf.append("Start proc ");
@@ -4157,6 +4161,11 @@ public final class ActivityManagerService  extends ActivityManagerNative
                     mHeavyWeightProcess.userId, 0));
             mHeavyWeightProcess = null;
         }
+
+        if (mPrevAppSwithcProcess == app) {
+            mPrevAppSwithcProcess = null;
+        }
+
         boolean needRestart = false;
         if (app.pid > 0 && app.pid != MY_PID) {
             int pid = app.pid;
@@ -4205,6 +4214,11 @@ public final class ActivityManagerService  extends ActivityManagerNative
                         mHeavyWeightProcess.userId, 0));
                 mHeavyWeightProcess = null;
             }
+
+            if (mPrevAppSwithcProcess == app) {
+                mPrevAppSwithcProcess = null;
+            }
+
             // Take care of any launching providers waiting for this process.
             checkAppInLaunchingProvidersLocked(app, true);
             // Take care of any services that are waiting for the process.
@@ -6165,6 +6179,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 ActivityOptions.abort(options);
                 return;
             }
+            final ActivityRecord TOP_ACT = resumedAppLocked();
+            final ProcessRecord TOP_APP = TOP_ACT != null ? TOP_ACT.app : null;
             final long origId = Binder.clearCallingIdentity();
             try {
                 TaskRecord tr = taskForIdLocked(task);
@@ -6177,6 +6193,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                         // we'll just move the home task to the top first.
                         mMainStack.moveHomeToFrontLocked();
                     }
+                    mPrevAppSwithcProcess = TOP_APP;
                     mMainStack.moveTaskToFrontLocked(tr, null, options);
                     return;
                 }
@@ -6191,6 +6208,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                             // we'll just move the home task to the top first.
                             mMainStack.moveHomeToFrontLocked();
                         }
+                        mPrevAppSwithcProcess = TOP_APP;
                         mMainStack.moveTaskToFrontLocked(hr.task, null, options);
                         return;
                     }
@@ -11197,6 +11215,9 @@ public final class ActivityManagerService  extends ActivityManagerNative
                         mHeavyWeightProcess.userId, 0));
                 mHeavyWeightProcess = null;
             }
+            if (mPrevAppSwithcProcess == app) {
+                mPrevAppSwithcProcess = null;
+            }
         } else if (!app.removed) {
             // This app is persistent, so we need to keep its record around.
             // If it is not already on the pending app list, add it there
@@ -13075,6 +13096,11 @@ public final class ActivityManagerService  extends ActivityManagerNative
             interesting = true;
             app.hasActivities = true;
 
+            if (mPrevAppSwithcProcess != null &&
+                app == mHomeProcess) {
+                mPrevAppSwithcProcess = null;
+            }
+
             try {
                 if (mDroppedWallpaper && app == mHomeProcess) {
                     mDroppedWallpaper = false;
@@ -13217,6 +13243,14 @@ public final class ActivityManagerService  extends ActivityManagerNative
 
         if (adj > ProcessList.HEAVY_WEIGHT_APP_ADJ && app == mHeavyWeightProcess) {
             // We don't want to kill the current heavy-weight process.
+            adj = ProcessList.HEAVY_WEIGHT_APP_ADJ;
+            schedGroup = Process.THREAD_GROUP_BG_NONINTERACTIVE;
+            app.hidden = false;
+            app.adjType = "heavy";
+        }
+
+        if (adj > ProcessList.HEAVY_WEIGHT_APP_ADJ && app == mPrevAppSwithcProcess) {
+            // We don't want to kill the previous app switch process.
             adj = ProcessList.HEAVY_WEIGHT_APP_ADJ;
             schedGroup = Process.THREAD_GROUP_BG_NONINTERACTIVE;
             app.hidden = false;
