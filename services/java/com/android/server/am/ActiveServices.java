@@ -56,6 +56,7 @@ import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.TimeUtils;
+import android.os.SystemProperties;
 
 public class ActiveServices {
     static final boolean DEBUG_SERVICE = ActivityManagerService.DEBUG_SERVICE;
@@ -88,6 +89,10 @@ public class ActiveServices {
     // we consider it non-essential and allow its process to go on the
     // LRU background list.
     static final int MAX_SERVICE_INACTIVITY = 30*60*1000;
+
+    // Enable this flag to reschedule the services under memory prasure.
+    private static final boolean SERVICE_RESCHEDULE
+            = SystemProperties.getBoolean("ro.am.reschedule_service", true);
 
     final ActivityManagerService mAm;
 
@@ -955,24 +960,29 @@ public class ActiveServices {
         if (!mRestartingServices.contains(r)) {
             return;
         }
-
-        long available_mem = Process.getFreeMemory();
-        long ServiceThreshold = mProcessList.getMemLevel(ProcessList.BACKUP_APP_ADJ);;
-
-        //ServiceThreshold = 4 * ServiceThreshold;
-
-        Slog.i(TAG, "available_mem : " + available_mem + ", ServiceThreshold : " + ServiceThreshold);
-
-        if(available_mem < ServiceThreshold)
-	{
-            Slog.i(TAG, "Reschedule the service as available memory is very less " + r.packageName);
-            r.restartDelay=0;
-            scheduleServiceRestartLocked(r, true);
-        }
-        else
+        if(SERVICE_RESCHEDULE == true)
         {
-            bringUpServiceLocked(r, r.intent.getIntent().getFlags(), true);
-        }
+            long available_mem = Process.getFreeMemory();
+            long ServiceThreshold = mProcessList.getMemLevel(ProcessList.BACKUP_APP_ADJ);;
+            ActivityRecord top_rc = mAm.mMainStack.topRunningActivityLocked(null);
+            Slog.i(TAG, "available_mem : " + available_mem + ", ServiceThreshold : " + ServiceThreshold
+                         + "top_rc.nowVisible : " + top_rc.nowVisible);
+            // Start the service if there is enough memory and app is visible.
+            if(available_mem > ServiceThreshold && top_rc.nowVisible)
+	        {
+                bringUpServiceLocked(r, r.intent.getIntent().getFlags(), true);
+            }
+            else
+            {
+                Slog.i(TAG, "Reschedule the service as available memory is very less or another process is starting up" + r.packageName);
+                r.restartDelay=0;
+                scheduleServiceRestartLocked(r, true);
+            }
+         }
+         else
+         {
+             bringUpServiceLocked(r, r.intent.getIntent().getFlags(), true);
+         }
     }
 
     private final boolean unscheduleServiceRestartLocked(ServiceRecord r) {
