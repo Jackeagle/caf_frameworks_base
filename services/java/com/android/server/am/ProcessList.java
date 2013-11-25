@@ -149,7 +149,10 @@ class ProcessList {
             86016, 98304, 122880
     };
     // The actual OOM killer memory levels we are using.
-    private final long[] mOomMinFree = new long[mOomAdj.length];
+    private final long[] mOomMinFree = new long[] {
+            4096, 12288, 16384,
+            24576, 47104, 56620
+    };
 
     private final long mTotalMemMb;
 
@@ -192,10 +195,11 @@ class ProcessList {
         else if (scale > 1) scale = 1;
         scale = 0;
         for (int i=0; i<mOomAdj.length; i++) {
+/*
             long low = mOomMinFreeLow[i];
             long high = mOomMinFreeHigh[i];
             mOomMinFree[i] = (long)(low + ((high-low)*scale));
-
+*/
             if (i > 0) {
                 adjString.append(',');
                 memString.append(',');
@@ -204,7 +208,7 @@ class ProcessList {
             memString.append((mOomMinFree[i]*1024)/PAGE_SIZE);
         }
 
-        //Slog.i("XXXXXXX", "******************************* MINFREE: " + memString);
+        Slog.i("XXXXXXX", "******************************* MINFREE: " + memString);
         if (write) {
             writeFile("/sys/module/lowmemorykiller/parameters/adj", adjString.toString());
             writeFile("/sys/module/lowmemorykiller/parameters/minfree", memString.toString());
