@@ -1148,4 +1148,13 @@ class QuickSettingsModel implements BluetoothStateChangeCallback,
     public ApnState getApnState() {
         return mApnState;
     }
+
+    public boolean isRadioProhibited() {
+        boolean airModeOn = (android.provider.Settings.System.getInt(
+                mContext.getContentResolver(),
+                android.provider.Settings.System.AIRPLANE_MODE_ON, 0) != 0);
+        boolean isRadioProhibited =
+                SystemProperties.getBoolean("persist.env.settings.apprompt", false);
+        return airModeOn && isRadioProhibited;
+    }
 }

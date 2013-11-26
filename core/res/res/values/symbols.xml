@@ -1472,6 +1472,7 @@
   <java-symbol type="string" name="lockscreen_low_battery" />
   <java-symbol type="string" name="lockscreen_missing_sim_instructions" />
   <java-symbol type="string" name="lockscreen_missing_sim_instructions_long" />
+  <java-symbol type="string" name="lockscreen_missing_uim_message_short" />
   <java-symbol type="string" name="lockscreen_missing_sim_message_short" />
   <java-symbol type="string" name="lockscreen_network_locked_message" />
   <java-symbol type="string" name="lockscreen_perso_locked_message" />
@@ -1909,4 +1910,7 @@
   <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
 
   <java-symbol type="bool" name="use_motion_accel" />
+
+  <!-- for am_pm on the losckscreen  -->
+  <java-symbol type="id" name="am_pm" />
 </resources>

@@ -50,6 +50,7 @@ class AutoCompletePopup implements OnItemClickListener, Filter.FilterListener,
     private View mAnchor;
     private WebViewClassic.WebViewInputConnection mInputConnection;
     private WebViewClassic mWebView;
+    private boolean mIsPopupClicked;
 
     public AutoCompletePopup(WebViewClassic webView,
             WebViewClassic.WebViewInputConnection inputConnection) {
@@ -98,6 +99,8 @@ class AutoCompletePopup implements OnItemClickListener, Filter.FilterListener,
     }
 
     public void setText(CharSequence text) {
+        mIsPopupClicked = false;
+
         mText = text;
         if (mFilter != null) {
             mFilter.filter(text, this);
@@ -200,6 +203,8 @@ class AutoCompletePopup implements OnItemClickListener, Filter.FilterListener,
             }
         }
         mPopup.dismiss();
+
+        mIsPopupClicked = true;
     }
 
     public void setIsAutoFillProfileSet(boolean isAutoFillProfileSet) {
@@ -218,7 +223,8 @@ class AutoCompletePopup implements OnItemClickListener, Filter.FilterListener,
         ensurePopup();
         boolean showDropDown = (count > 0) &&
                 (mInputConnection.getIsAutoFillable() || mText.length() > 0);
-        if (showDropDown) {
+        // if popup is clicked to fill the text, then we will not show it.
+        if (showDropDown && !mIsPopupClicked) {
             if (!mPopup.isShowing()) {
                 // Make sure the list does not obscure the IME when shown for the first time.
                 mPopup.setInputMethodMode(ListPopupWindow.INPUT_METHOD_NEEDED);
