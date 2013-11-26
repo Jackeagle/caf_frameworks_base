@@ -1815,6 +1815,8 @@ public class BluetoothService extends IBluetooth.Stub {
                                                 "Need BLUETOOTH_ADMIN permission");
         if (!isEnabledInternal()) return false;
 
+        log("**** cancelDiscovery");
+
         return stopDiscoveryNative();
     }
 
