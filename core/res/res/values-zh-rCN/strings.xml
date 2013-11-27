@@ -1338,7 +1338,7 @@
     <string name="find_on_page" msgid="1946799233822820384">"在网页上查找"</string>
   <plurals name="matches_found">
     <item quantity="one" msgid="8167147081136579439">"1 个匹配项"</item>
-    <item quantity="other" msgid="4641872797067609177">"第 <xliff:g id="INDEX">%d</xliff:g> 项，共 <xliff:g id="TOTAL">%d</xliff:g> 项"</item>
+    <item quantity="other" msgid="4641872797067609177">"第<xliff:g id="INDEX">%d</xliff:g>项，共<xliff:g id="TOTAL">%d</xliff:g>项"</item>
   </plurals>
     <string name="action_mode_done" msgid="7217581640461922289">"完成"</string>
     <string name="progress_unmounting" product="nosdcard" msgid="3923810448507612746">"正在卸载 USB 存储设备..."</string>
