@@ -106,7 +106,7 @@ public class CaptivePortalTracker extends StateMachine {
         if (mServer == null) mServer = DEFAULT_SERVER;
 
         mIsCaptivePortalCheckEnabled = Settings.Global.getInt(mContext.getContentResolver(),
-                Settings.Global.CAPTIVE_PORTAL_DETECTION_ENABLED, 1) == 1;
+                Settings.Global.CAPTIVE_PORTAL_DETECTION_ENABLED, 0) == 1;
 
         addState(mDefaultState);
             addState(mNoActiveNetworkState, mDefaultState);
@@ -264,6 +264,7 @@ public class CaptivePortalTracker extends StateMachine {
             if (DBG) log(getName() + message.toString() + "\n");
             switch (message.what) {
                 case CMD_DELAYED_CAPTIVE_CHECK:
+                    /*
                     if (message.arg1 == mDelayedCheckToken) {
                         InetAddress server = lookupHost(mServer);
                         boolean captive = server != null && isCaptivePortal(server);
@@ -289,6 +290,7 @@ public class CaptivePortalTracker extends StateMachine {
 
                         transitionTo(mActiveNetworkState);
                     }
+                    */
                     break;
                 default:
                     return NOT_HANDLED;
