@@ -13158,18 +13158,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
                     long p_pss = Debug.getPss(r.app.pid);
                     // App has a visible activity; only upgrade adjustment.
                     if (adj > ProcessList.VISIBLE_APP_ADJ) {
-                    //If the app PSS is more than threshold, directly move to adj-9
-                        if(p_pss < thresholdSize)
-                        {
-                            adj = ProcessList.PREVIOUS_APP_ADJ;
-                            app.adjType = "visible";
-                        
-                        }
-                        else
-                        {
-                            adj = hiddenAdj;
-                            app.adjType = "bg-act";
-                        }
+                        adj = ProcessList.PREVIOUS_APP_ADJ;
+                        app.adjType = "visible";
                     }
                     schedGroup = Process.THREAD_GROUP_DEFAULT;
                     app.hidden = false;
@@ -13179,17 +13169,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 } else if (r.state == ActivityState.PAUSING || r.state == ActivityState.PAUSED) {
                     long p_pss = Debug.getPss(r.app.pid);
                     if (adj > ProcessList.PERCEPTIBLE_APP_ADJ) {
-                        if(p_pss < thresholdSize)
-                        {
-                            adj = ProcessList.PREVIOUS_APP_ADJ;
-                            app.adjType = "pausing";
-                        
-                        }
-                        else
-                        {
-                            adj = hiddenAdj;
-                            app.adjType = "bg-act";
-                         }
+                        adj = ProcessList.PREVIOUS_APP_ADJ;
+                        app.adjType = "pausing";
                     }
                     app.hidden = false;
                     foregroundActivities = true;
