@@ -136,7 +136,6 @@ public class ListMenuPresenter implements MenuPresenter, AdapterView.OnItemClick
         if (!subMenu.hasVisibleItems()) return false;
 
         // The window manager will give us a token.
-        new MenuDialogHelper(subMenu).show(null);
         if (mCallback != null) {
             mCallback.onOpenSubMenu(subMenu);
         }
