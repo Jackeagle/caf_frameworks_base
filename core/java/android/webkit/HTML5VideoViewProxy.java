@@ -33,7 +33,6 @@ import android.os.Message;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
-import android.media.AudioManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -97,8 +96,6 @@ class HTML5VideoViewProxy extends Handler
     private PosterDownloader mPosterDownloader;
     // The seek position.
     private int mSeekPosition;
-    // The flag for checking whether the audio is focused.
-    private boolean isAudioFocused;
     // A helper class to control the playback. This executes on the UI thread!
     private static final class VideoPlayer {
         // The proxy that is currently playing (if any).
@@ -364,12 +361,6 @@ class HTML5VideoViewProxy extends Handler
         map.put("height", new Integer(mp.getVideoHeight()));
         msg.obj = map;
         mWebCoreHandler.sendMessage(msg);
-        if(!isAudioFocused){
-            ((AudioManager)(mWebView.getContext().getSystemService(Context.AUDIO_SERVICE)))
-                .requestAudioFocus(null, AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
-            isAudioFocused = true;
-        }
     }
 
     // MediaPlayer.OnCompletionListener;
@@ -672,8 +663,7 @@ class HTML5VideoViewProxy extends Handler
         mNativePointer = nativePtr;
         // create the message handler for this thread
         createWebCoreHandler();
-        // This flag is to check whether audio is focused. Set it to be false initially
-        isAudioFocused = false;
+
         mStillPlaying = PlayingStatus.STOP_PLAYING;
     }
 
@@ -759,12 +749,6 @@ class HTML5VideoViewProxy extends Handler
         message.arg1 = videoLayerID;
         message.obj = url;
         sendMessage(message);
-        if(!isAudioFocused){
-            ((AudioManager)(mWebView.getContext().getSystemService(Context.AUDIO_SERVICE)))
-                .requestAudioFocus(null, AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
-            isAudioFocused = true;
-        }
     }
 
     /**
@@ -810,11 +794,6 @@ class HTML5VideoViewProxy extends Handler
             mPosterDownloader.cancelAndReleaseQueue();
         }
         mNativePointer = 0;
-        if(isAudioFocused){
-            ((AudioManager)(mWebView.getContext().getSystemService(Context.AUDIO_SERVICE)))
-                .abandonAudioFocus(null);
-            isAudioFocused = false;
-        }
     }
 
     /**
@@ -856,11 +835,6 @@ class HTML5VideoViewProxy extends Handler
         }
 
         VideoPlayer.suspendAndDispatch();
-        if(isAudioFocused){
-            ((AudioManager)(mWebView.getContext().getSystemService(Context.AUDIO_SERVICE)))
-                .abandonAudioFocus(null);
-            isAudioFocused = false;
-        }
     }
 
     public void enterFullScreenVideo(int layerId, String url) {
