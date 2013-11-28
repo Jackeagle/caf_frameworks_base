@@ -202,7 +202,8 @@ class WifiApConfigStore extends StateMachine {
        will keep the device secure after the update */
     private void setDefaultApConfiguration() {
         WifiConfiguration config = new WifiConfiguration();
-        config.SSID = mContext.getString(R.string.wifi_tether_configure_ssid_default);
+        //config.SSID = mContext.getString(R.string.wifi_tether_configure_ssid_default);
+        config.SSID = "lephone T700";
         config.allowedKeyManagement.set(KeyMgmt.WPA2_PSK);
         String randomUUID = UUID.randomUUID().toString();
         //first 12 chars from xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
