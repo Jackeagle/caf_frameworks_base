@@ -1876,6 +1876,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     Settings.System.VOLUME_BLUETOOTH_SCO,
                     mContext.getResources().getInteger(R.integer.def_bluetooth_sco_volume));
 
+            //set headset default volume
+            loadSetting(stmt, Settings.System.VOLUME_MUSIC + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_music_headset_volume));
+            loadSetting(stmt, Settings.System.VOLUME_RING + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_ringtone_headset_volume));
+            loadSetting(stmt, Settings.System.VOLUME_SYSTEM + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_system_headset_volume));
+            loadSetting(
+                    stmt,
+                    Settings.System.VOLUME_VOICE + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_voice_call_headset_volume));
+            loadSetting(stmt, Settings.System.VOLUME_ALARM + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_alarm_headset_volume));
+            loadSetting(
+                    stmt,
+                    Settings.System.VOLUME_NOTIFICATION + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_notification_headset_volume));
+            loadSetting(
+                    stmt,
+                    Settings.System.VOLUME_BLUETOOTH_SCO + "_headset",
+                    mContext.getResources().getInteger(R.integer.def_bluetooth_sco_headset_volume));
+
             // By default:
             // - ringtones, notification, system and music streams are affected by ringer mode
             // on non voice capable devices (tablets)
