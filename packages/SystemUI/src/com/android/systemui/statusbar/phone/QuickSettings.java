@@ -239,6 +239,9 @@ class QuickSettings {
                         try {
                             if (cursor.moveToFirst()) {
                                 name = cursor.getString(cursor.getColumnIndex(Phone.DISPLAY_NAME));
+                            } else {
+                                name = mContext.getResources().
+                                        getString(R.string.quick_settings_user_label);
                             }
                         } finally {
                             cursor.close();
@@ -424,7 +427,9 @@ class QuickSettings {
                                 mWifiManager.setWifiApEnabled(null, false);
                             }
 
-                            mWifiManager.setWifiEnabled(enable);
+                            if (!mModel.isRadioProhibited()) {
+                                mWifiManager.setWifiEnabled(enable);
+                            }
                             return null;
                         }
                     }.execute();
@@ -552,6 +557,10 @@ class QuickSettings {
             public void refreshView(QuickSettingsTileView unused, State state) {
                 QuickSettingsModel.BatteryState batteryState =
                         (QuickSettingsModel.BatteryState) state;
+                // Reset charging drawable level to support charging animation
+                if (!batteryState.pluggedIn && mChargingBatteryLevels.getLevel() != 0) {
+                    mChargingBatteryLevels.setLevel(0);
+                }
                 Drawable d = batteryState.pluggedIn
                         ? mChargingBatteryLevels
                         : mBatteryLevels;
@@ -609,7 +618,7 @@ class QuickSettings {
                     public boolean onLongClick(View v) {
                         if (mBluetoothAdapter.isEnabled()) {
                             mBluetoothAdapter.disable();
-                        } else {
+                        } else if (!mModel.isRadioProhibited()) {
                             mBluetoothAdapter.enable();
                         }
                         bluetoothTile.setPressed(false);
