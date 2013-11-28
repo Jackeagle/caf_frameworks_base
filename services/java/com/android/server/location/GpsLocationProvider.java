@@ -213,6 +213,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     // agps mode and value
     private static final String AGPS_MSB_MODE = "MSB";
     private static final String AGPS_MSA_MODE = "MSA";
+    private static final int AGPS_LOCATION_MODE_NOTSET = -1;
     private static final int AGPS_LOCATION_MODE_MSB = 0;
     private static final int AGPS_LOCATION_MODE_MSA = 1;
     private static final int AGPS_LOCATION_MODE_ERR = 2;
@@ -536,7 +537,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
             objContentResolver,Settings.Global.ASSISTED_GPS_POSITION_MODE);
         int prefAGpsTypeInt;
         if (prefAGpsType == null) {
-            prefAGpsTypeInt = AGPS_LOCATION_MODE_MSB;
+            prefAGpsTypeInt = AGPS_LOCATION_MODE_NOTSET;
         } else {
             if (prefAGpsType.equals(AGPS_MSB_MODE)) {
                 prefAGpsTypeInt = AGPS_LOCATION_MODE_MSB;
@@ -617,23 +618,15 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if ( info != null && mNetworkAvailable && info.isAvailable() )
         {
             if (mStarted && hasCapability(GPS_CAPABILITY_SCHEDULING)) {
-                int iPositionMode = GPS_POSITION_MODE_STANDALONE;
-                if(!(info.isRoaming() && mPrefAGpsNetworkType != null
-                    && (mPrefAGpsNetworkType.equals("HOME")))) {
-                    // check the db for user selection
-                    if (Settings.Global.getInt(mContext.getContentResolver(),
-                            Settings.Global.ASSISTED_GPS_ENABLED, 1) != 0) {
-                        if (hasCapability(GPS_CAPABILITY_MSA)
-                            && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSA)) {
-                            iPositionMode = GPS_POSITION_MODE_MS_ASSISTED;
-                        } else if (hasCapability(GPS_CAPABILITY_MSB)
-                            && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSB)) {
-                            iPositionMode = GPS_POSITION_MODE_MS_BASED;
-                        }
-                    }
+                int iPositionMode = mPositionMode;
+                // here is to check the roaming status
+                if(info.isRoaming() && mPrefAGpsNetworkType != null
+                    && (mPrefAGpsNetworkType.equals("HOME"))) {
+                    iPositionMode = GPS_POSITION_MODE_STANDALONE;
                 }
                 if(iPositionMode!=mPositionMode) {
                     // change period
+                    Log.d(TAG,"FW: set_position_mode:"+mPositionMode);
                     if (!native_set_position_mode(mPositionMode,
                             GPS_POSITION_RECURRENCE_PERIODIC,
                             mFixInterval, 0, 0)) {
@@ -1023,6 +1016,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
             // apply request to GPS engine
             if (mStarted && hasCapability(GPS_CAPABILITY_SCHEDULING)) {
                 // change period
+                Log.d(TAG,"FW: set_position_mode:"+mPositionMode);
                 if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
                         mFixInterval, 0, 0)) {
                     Log.e(TAG, "set_position_mode failed in setMinTime()");
@@ -1215,10 +1209,12 @@ public class GpsLocationProvider implements LocationProviderInterface {
              if (Settings.Global.getInt(mContext.getContentResolver(),
                     Settings.Global.ASSISTED_GPS_ENABLED, 1) != 0) {
                 if (singleShot && hasCapability(GPS_CAPABILITY_MSA)
-                    && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSA)) {
+                    && ( mPrefAGpsMode==AGPS_LOCATION_MODE_NOTSET
+                       || mPrefAGpsMode== AGPS_LOCATION_MODE_MSA)) {
                     mPositionMode = GPS_POSITION_MODE_MS_ASSISTED;
                 } else if (hasCapability(GPS_CAPABILITY_MSB)
-                    && (mPrefAGpsMode== AGPS_LOCATION_MODE_MSB)) {
+                    && ( mPrefAGpsMode==AGPS_LOCATION_MODE_NOTSET
+                       || mPrefAGpsMode== AGPS_LOCATION_MODE_MSB)) {
                     mPositionMode = GPS_POSITION_MODE_MS_BASED;
                 }
             }
@@ -1252,6 +1248,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
             }
 
             int interval = (hasCapability(GPS_CAPABILITY_SCHEDULING) ? mFixInterval : 1000);
+            Log.d(TAG,"FW: set_position_mode:"+mPositionMode);
             if (!native_set_position_mode(mPositionMode, GPS_POSITION_RECURRENCE_PERIODIC,
                     interval, 0, 0)) {
                 mStarted = false;
