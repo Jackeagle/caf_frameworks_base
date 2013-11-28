@@ -61,6 +61,16 @@ struct fields_t {
     jfieldID cryptoInfoModeID;
 };
 
+typedef long PR_DRM_RESULT;
+enum {
+    //playready error range
+    ERROR_DRM_PR_VENDOR_SET1_MIN                 = (PR_DRM_RESULT)0x80004001,
+    ERROR_DRM_PR_VENDOR_SET1_MAX                 = (PR_DRM_RESULT)0x8004DFFF,
+
+    ERROR_DRM_PR_VENDOR_SET2_MIN                 = (PR_DRM_RESULT)0x80070000,
+    ERROR_DRM_PR_VENDOR_SET2_MAX                 = (PR_DRM_RESULT)0x8007FFFF,
+};
+
 static fields_t gFields;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -320,6 +330,12 @@ static jint throwExceptionAsNecessary(
         // We'll throw our custom MediaCodec.CryptoException
 
         throwCryptoException(env, err, msg);
+        return 0;
+    }
+
+    if ((err >= ERROR_DRM_PR_VENDOR_SET1_MIN && err <= ERROR_DRM_PR_VENDOR_SET1_MAX) ||
+        (err >= ERROR_DRM_PR_VENDOR_SET2_MIN && err <= ERROR_DRM_PR_VENDOR_SET2_MAX)) {
+        throwCryptoException(env,err, msg);
         return 0;
     }
 
