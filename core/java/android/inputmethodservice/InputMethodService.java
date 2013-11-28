@@ -1509,6 +1509,7 @@ public class InputMethodService extends AbstractInputMethodService {
             mWindowVisible = false;
             onWindowHidden();
             mWindowWasVisible = false;
+            updateFullscreenMode();
         }
     }
 
