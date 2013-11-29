@@ -151,7 +151,7 @@ class ProcessList {
     // The actual OOM killer memory levels we are using.
     private final long[] mOomMinFree = new long[] {
             4096, 12288, 16384,
-            24576, 47104, 56620
+            43008, 73728, 98304
     };
 
     private final long mTotalMemMb;
