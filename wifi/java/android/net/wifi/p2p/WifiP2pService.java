@@ -2550,7 +2550,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
              * default that has low likelihood of collision with a peer */
             String id = Settings.Secure.getString(mContext.getContentResolver(),
                     Settings.Secure.ANDROID_ID);
-            return "Android_" + id.substring(0,4);
+            return "lephone T700_" + id.substring(0,4);
         }
         return deviceName;
     }
