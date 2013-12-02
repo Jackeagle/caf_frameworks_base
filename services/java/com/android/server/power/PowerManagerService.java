@@ -26,8 +26,6 @@ import com.android.server.am.ActivityManagerService;
 import com.android.server.display.DisplayManagerService;
 import com.android.server.dreams.DreamManagerService;
 
-import org.codeaurora.util.MpqUtils;
-
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -1293,19 +1291,11 @@ public final class PowerManagerService extends IPowerManager.Stub
     private void updateStayOnLocked(int dirty) {
         if ((dirty & (DIRTY_BATTERY_STATE | DIRTY_SETTINGS)) != 0) {
             final boolean wasStayOn = mStayOn;
-
-            // If its an MPQ specific target, stay always ON
-            // as that is very relevant for TV / Set top box
-            if (MpqUtils.isTargetMpq() == true) {
-                mStayOn = true;
-            }
-            else {
-                if (mStayOnWhilePluggedInSetting != 0
-                        && !isMaximumScreenOffTimeoutFromDeviceAdminEnforcedLocked()) {
-                    mStayOn = mBatteryService.isPowered(mStayOnWhilePluggedInSetting);
-                } else {
-                    mStayOn = false;
-                }
+            if (mStayOnWhilePluggedInSetting != 0
+                    && !isMaximumScreenOffTimeoutFromDeviceAdminEnforcedLocked()) {
+                mStayOn = mBatteryService.isPowered(mStayOnWhilePluggedInSetting);
+            } else {
+                mStayOn = false;
             }
 
             if (mStayOn != wasStayOn) {
