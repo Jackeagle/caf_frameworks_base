@@ -212,7 +212,7 @@ public interface TelephonyProperties
      * Property to set multi sim feature.
      * Type:  String(dsds, dsda)
      */
-    static final String PROPERTY_MULTI_SIM_CONFIG = "persist.multisim.config";
+    static final String PROPERTY_MULTI_SIM_CONFIG = "persist.radio.multisim.config";
 
     /**
      * Property to store default subscription.

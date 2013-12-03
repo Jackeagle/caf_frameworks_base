@@ -132,10 +132,7 @@ public class Patterns {
         + "|[1-9][0-9]|[0-9])))"
         + "(?:\\:\\d{1,5})?)" // plus option port number
         + "(\\/(?:(?:[" + GOOD_IRI_CHAR + "\\;\\/\\?\\:\\@\\&\\=\\#\\~"  // plus option query params
-        + "\\-\\.\\+\\!\\*\\'\\(\\)\\,\\_])|(?:\\%[a-fA-F0-9]{2}))*)?"
-        + "(?:\\b|$)"); // and finally, a word boundary or end of
-                        // input.  This is to stop foo.sure from
-                        // matching as foo.su
+        + "\\-\\.\\+\\!\\*\\'\\(\\)\\,\\_])|(?:\\%[a-fA-F0-9]{2}))*)?");
 
     public static final Pattern IP_ADDRESS
         = Pattern.compile(
