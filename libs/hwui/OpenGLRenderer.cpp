@@ -1003,7 +1003,13 @@ void OpenGLRenderer::composeLayer(sp<Snapshot> current, sp<Snapshot> previous) {
         }
     } else if (!rect.isEmpty()) {
         dirtyLayer(rect.left, rect.top, rect.right, rect.bottom);
+
+        save(0);
+        // the layer contains screen buffer content that shouldn't be alpha modulated
+        // (and any necessary alpha modulation was handled drawing into the layer)
+        mSnapshot->alpha = 1.0f;
         composeLayerRect(layer, rect, true);
+        restore();
     }
 
     dirtyClip();
@@ -1647,6 +1653,10 @@ void OpenGLRenderer::setupDraw(bool clear) {
             setScissorFromClip();
         }
         setStencilFromClip();
+    } else {
+        // Disable stencil test in case setStencilFromClip()
+        // enabled the stencil test but didn't disable it
+        glDisable(GL_STENCIL_TEST);
     }
 
     mDescription.reset();
