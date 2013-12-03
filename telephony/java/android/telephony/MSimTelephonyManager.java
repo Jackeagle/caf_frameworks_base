@@ -122,6 +122,8 @@ public class MSimTelephonyManager {
      * Returns UNKNOWN for others
      */
     public MultiSimVariants getMultiSimConfiguration() {
+        multiSimConfig =
+            SystemProperties.get(TelephonyProperties.PROPERTY_MULTI_SIM_CONFIG);
         if (multiSimConfig.equals("dsds")) {
             return MultiSimVariants.DSDS;
         } else if (multiSimConfig.equals("dsda")) {

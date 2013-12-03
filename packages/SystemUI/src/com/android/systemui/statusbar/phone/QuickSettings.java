@@ -239,6 +239,9 @@ class QuickSettings {
                         try {
                             if (cursor.moveToFirst()) {
                                 name = cursor.getString(cursor.getColumnIndex(Phone.DISPLAY_NAME));
+                            } else {
+                                name = mContext.getResources().
+                                        getString(R.string.quick_settings_user_label);
                             }
                         } finally {
                             cursor.close();
@@ -424,7 +427,7 @@ class QuickSettings {
                                 mWifiManager.setWifiApEnabled(null, false);
                             }
 
-                            if (!(enable && mModel.isRadioProhibited())) {
+                            if (!mModel.isRadioProhibited()) {
                                 mWifiManager.setWifiEnabled(enable);
                             }
                             return null;
