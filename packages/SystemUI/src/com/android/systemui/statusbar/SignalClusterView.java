@@ -28,6 +28,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
+import com.android.systemui.statusbar.phone.PhoneStatusBar;
 import com.android.systemui.statusbar.policy.NetworkController;
 
 import com.android.systemui.R;
@@ -75,6 +76,11 @@ public class SignalClusterView
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+
+        // If the defined status bar style is not the default style, do nothing.
+        if (PhoneStatusBar.STATUSBAR_STYLE != PhoneStatusBar.STATUSBAR_STYLE_DEFAULT) {
+            return;
+        }
 
         mWifiGroup      = (ViewGroup) findViewById(R.id.wifi_combo);
         mWifi           = (ImageView) findViewById(R.id.wifi_signal);
