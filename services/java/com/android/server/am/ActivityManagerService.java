@@ -4536,7 +4536,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                         broadcastIntentLocked(null, null, intent,
                                 null, null, 0, null, null,
                                 android.Manifest.permission.RECEIVE_BOOT_COMPLETED,
-                                AppOpsManager.OP_NONE, false, false, MY_PID, Process.SYSTEM_UID,
+                                AppOpsManager.OP_BOOT_COMPLETED, false, false, MY_PID, Process.SYSTEM_UID,
                                 userId);
                     }
                 }
@@ -14792,7 +14792,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 intent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
                 broadcastIntentLocked(null, null, intent,
                         null, null, 0, null, null,
-                        android.Manifest.permission.RECEIVE_BOOT_COMPLETED, AppOpsManager.OP_NONE,
+                        android.Manifest.permission.RECEIVE_BOOT_COMPLETED, AppOpsManager.OP_BOOT_COMPLETED,
                         false, false, MY_PID, Process.SYSTEM_UID, userId);
             }
             int num = mUserLru.size();
