@@ -2145,6 +2145,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             loadBooleanSetting(stmt, Settings.Secure.USER_SETUP_COMPLETE,
                     R.bool.def_user_setup_complete);
+
+            loadIntegerSetting(stmt, Settings.Secure.BACKGROUND_DATA,
+                    R.integer.def_background_data);
+
         } finally {
             if (stmt != null) stmt.close();
         }
