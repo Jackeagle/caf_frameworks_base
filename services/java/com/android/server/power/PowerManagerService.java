@@ -1347,12 +1347,22 @@ public final class PowerManagerService extends IPowerManager.Stub
      * This function must have no other side-effects.
      */
     private void updateUserActivitySummaryLocked(long now, int dirty) {
-        // Update the status of the user activity timeout timer.
-        if ((dirty & (DIRTY_USER_ACTIVITY | DIRTY_WAKEFULNESS | DIRTY_SETTINGS)) != 0) {
-            mHandler.removeMessages(MSG_USER_ACTIVITY_TIMEOUT);
 
-            long nextTimeout = 0;
-            if (mWakefulness != WAKEFULNESS_ASLEEP) {
+
+        /*Added to avoid functions not required for Auto project */
+        boolean mAutoEnv = SystemProperties.getBoolean("AUTOPLATFORM", true );
+
+        // Disable screen timeout for Automotive platform
+        if (mAutoEnv) {
+           mUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
+        } else {
+
+        // Update the status of the user activity timeout timer.
+          if ((dirty & (DIRTY_USER_ACTIVITY | DIRTY_WAKEFULNESS | DIRTY_SETTINGS)) != 0) {
+              mHandler.removeMessages(MSG_USER_ACTIVITY_TIMEOUT);
+
+              long nextTimeout = 0;
+              if (mWakefulness != WAKEFULNESS_ASLEEP) {
                 final int screenOffTimeout = getScreenOffTimeoutLocked();
                 final int screenDimDuration = getScreenDimDurationLocked(screenOffTimeout);
 
@@ -1385,18 +1395,19 @@ public final class PowerManagerService extends IPowerManager.Stub
                     msg.setAsynchronous(true);
                     mHandler.sendMessageAtTime(msg, nextTimeout);
                 }
-            } else {
+             } else {
                 mUserActivitySummary = 0;
-            }
+             }
 
-            if (DEBUG_SPEW) {
+             if (DEBUG_SPEW) {
                 Slog.d(TAG, "updateUserActivitySummaryLocked: mWakefulness="
                         + wakefulnessToString(mWakefulness)
                         + ", mUserActivitySummary=0x" + Integer.toHexString(mUserActivitySummary)
                         + ", nextTimeout=" + TimeUtils.formatUptime(nextTimeout));
             }
-        }
-    }
+          }
+        } // mAutoEnv
+    } // updateUserActivitySummaryLocked
 
     /**
      * Called when a user activity timeout has occurred.
