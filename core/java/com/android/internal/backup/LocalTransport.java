@@ -77,7 +77,7 @@ public class LocalTransport extends IBackupTransport.Stub {
     }
 
     public String currentDestinationString() {
-        return TRANSPORT_DESTINATION_STRING;
+        return mContext.getString(com.android.internal.R.string.transport_destination);
     }
 
     public String transportDirName() {
