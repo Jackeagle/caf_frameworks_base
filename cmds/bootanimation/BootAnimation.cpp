@@ -572,9 +572,9 @@ bool BootAnimation::movie()
     pthread_cond_init(&mp_cond, NULL);
 
     property_get("persist.sys.silent", value, "null");
-    if (strcmp(value, "1") != 0) {
+//    if (strcmp(value, "1") != 0) {
         playBackgroundMusic();
-    }
+//    }
 
     for (int i=0 ; i<pcount && !exitPending() ; i++) {
         const Animation::Part& part(animation.parts[i]);
