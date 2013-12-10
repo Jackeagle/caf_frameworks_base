@@ -435,6 +435,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mOverscanRight = 0;
     int mOverscanBottom = 0;
 
+    // Panel Orientation default portrait
+    int mPanelOrientation = Surface.ROTATION_0;
+
     // What we do when the user long presses on home
     private int mLongPressOnHomeBehavior;
 
@@ -1024,6 +1027,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return;
         }
         mDisplay = display;
+        mPanelOrientation =
+            SystemProperties.getInt("persist.panel.orientation", 0) / 90;
 
         final Resources res = mContext.getResources();
         int shortSize, longSize;
@@ -3474,6 +3479,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (mStatusBarController.setBarShowingLw(true)) {
                     changes |= FINISH_LAYOUT_REDO_LAYOUT;
                 }
+                // Maintain fullscreen layout until incoming animation is complete.
+                topIsFullscreen = mTopIsFullscreen && mStatusBar.isAnimatingLw();
+                // Transient status bar on the lockscreen is not allowed
+                if (mForceStatusBarFromKeyguard && mStatusBarController.isTransientShowing()) {
+                    mStatusBarController.updateVisibilityLw(false /*transientAllowed*/,
+                            mLastSystemUiFlags, mLastSystemUiFlags);
+                }
             } else if (mTopFullscreenOpaqueWindowState != null) {
                 if (localLOGV) {
                     Slog.d(TAG, "frame: " + mTopFullscreenOpaqueWindowState.getFrameLw()
@@ -3507,7 +3519,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
         }
 
-        mTopIsFullscreen = topIsFullscreen;
+        if (mTopIsFullscreen != topIsFullscreen) {
+            if (!topIsFullscreen) {
+                // Force another layout when status bar becomes fully shown.
+                changes |= FINISH_LAYOUT_REDO_LAYOUT;
+            }
+            mTopIsFullscreen = topIsFullscreen;
+        }
 
         // Hide the key guard if a visible window explicitly specifies that it wants to be
         // displayed when the screen is locked.
@@ -4586,7 +4604,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     if (preferredRotation >= 0) {
                         return preferredRotation;
                     }
-                    return Surface.ROTATION_0;
+                    return mPanelOrientation;
             }
         }
     }
@@ -5173,9 +5191,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mNavigationBar != null &&
                 hideNavBarSysui && immersiveSticky;
 
-        boolean denyTransientStatus = mStatusBarController.isTransientShowing()
+        boolean denyTransientStatus = mStatusBarController.isTransientShowRequested()
                 && !transientStatusBarAllowed && hideStatusBarSysui;
-        boolean denyTransientNav = mNavigationBarController.isTransientShowing()
+        boolean denyTransientNav = mNavigationBarController.isTransientShowRequested()
                 && !transientNavBarAllowed;
         if (denyTransientStatus || denyTransientNav) {
             // clear the clearable flags instead
