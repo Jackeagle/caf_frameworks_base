@@ -19,37 +19,29 @@
 
 namespace android {
 
-static jint DBG = false;
+static jint DBG = true;
 
 struct accessPointObjectItem *g_pItemList = NULL;
 struct accessPointObjectItem *g_pLastNode = NULL;
 pthread_mutex_t *g_pItemListMutex = NULL;
-String8 *g_pCurrentSSID = NULL;
-bool g_isSbMs = false;
-bool g_isInList = false;
 
-static void addAPObjectItem(const char *ssid, const char *bssid)
+static void addAPObjectItem(const char *ssid, const char *ssid_utf8)
 {
-    if (NULL == ssid || NULL == bssid) {
-        ALOGE("ssid or bssid is NULL");
+    if (NULL == ssid || NULL == ssid_utf8) {
+        ALOGE("ssid or ssid_utf8 is NULL");
         return;
     }
 
     struct accessPointObjectItem *pTmpItemNode = NULL;
     struct accessPointObjectItem *pItemNode = NULL;
     bool foundItem = false;
-    bool foundSbMs = false;
+
     pthread_mutex_lock(g_pItemListMutex);
     pTmpItemNode = g_pItemList;
     while (pTmpItemNode) {
-        if (pTmpItemNode->bssid && (*(pTmpItemNode->bssid) == bssid)) {
-            if (pTmpItemNode->ssid && (*(pTmpItemNode->ssid) == ssid)) {
-                foundItem = true;
-                break;
-            } else {
-                foundSbMs = true;
-                pTmpItemNode->isSbMs = true;
-            }
+        if (pTmpItemNode->ssid && (*(pTmpItemNode->ssid) == ssid)) {
+            foundItem = true;
+            break;
         }
         pTmpItemNode = pTmpItemNode->pNext;
     }
@@ -63,23 +55,19 @@ static void addAPObjectItem(const char *ssid, const char *bssid)
             goto EXIT;
         }
         memset(pItemNode, 0, sizeof(accessPointObjectItem));
-        pItemNode->bssid = new String8(bssid);
-        if (NULL == pItemNode->bssid) {
-            ALOGE("Failed to allocate memory for new bssid!");
+        pItemNode->ssid_utf8 = new String8(ssid_utf8);
+        if (NULL == pItemNode->ssid_utf8) {
+            ALOGE("Failed to allocate memory for new ssid_utf8!");
             delete pItemNode;
             goto EXIT;
         }
         pItemNode->ssid = new String8(ssid);
         if (NULL == pItemNode->ssid) {
             ALOGE("Failed to allocate memory for new ssid!");
-            delete pItemNode->bssid;
             delete pItemNode;
             goto EXIT;
         }
-        if (foundSbMs)
-            pItemNode->isSbMs = true;
-        else
-            pItemNode->isSbMs = false;
+
         pItemNode->pNext = NULL;
         if (DBG)
             ALOGD("AP doesn't exist, new one for %s", ssid);
@@ -338,8 +326,8 @@ void parseScanResults(String16& str, const char *reply)
     unsigned int lineBeg = 0, lineEnd = 0;
     size_t  replyLen = strlen(reply);
     char    *pos = NULL;
-    char    bssid[BUF_SIZE] = {0};
     char    ssid[BUF_SIZE] = {0};
+    char    ssid_utf8[BUF_SIZE] = {0};
     char    ssid_txt[BUF_SIZE] ={0};
     bool    isUTF8 = false, isCh = false;
     char    buf[BUF_SIZE] = {0};
@@ -359,9 +347,7 @@ void parseScanResults(String16& str, const char *reply)
             line.setTo(reply + lineBeg, lineEnd - lineBeg + 1);
             if (DBG)
                 ALOGD("%s, line=%s ", __FUNCTION__, line.string());
-            if (strncmp(line.string(), "bssid=", 6) == 0) {
-                sscanf(line.string() + 6, "%[^\n]", bssid);
-            } else if (strncmp(line.string(), "ssid=", 5) == 0) {
+            if (strncmp(line.string(), "ssid=", 5) == 0) {
                 sscanf(line.string() + 5, "%[^\n]", ssid);
                 ssid_decode(buf,BUF_SIZE,ssid);
                 isUTF8 = isUTF8String(buf,sizeof(buf));
@@ -388,6 +374,7 @@ void parseScanResults(String16& str, const char *reply)
                     str += String16("ssid=");
                     str += String16(ssid_txt);
                     str += String16("\n");
+                    strncpy(ssid_utf8, dest, strlen(dest));
                     memset(dest, 0, CONVERT_LINE_LEN);
                     memset(ssid_txt, 0, BUF_SIZE);
                 } else {
@@ -396,13 +383,13 @@ void parseScanResults(String16& str, const char *reply)
                 }
             } else if (strncmp(line.string(), "====", 4) == 0) {
                 if (DBG)
-                    ALOGD("After sscanf, bssid:%s, ssid:%s, isCh:%d",
-                        bssid, ssid, isCh);
+                    ALOGD("After sscanf,ssid:%s, isCh:%d",
+                        ssid, isCh);
                 if( !isUTF8 && isCh){
                     if (DBG)
-                        ALOGD("add AP Object Item, bssid:%s, ssid:%s",
-                            bssid, ssid);
-                    addAPObjectItem(buf, bssid);
+                        ALOGD("add AP Object Item,  ssid:%s l=%d, UTF8:%s, l=%d",
+                            ssid, strlen(ssid), ssid_utf8,  strlen(ssid_utf8));
+                    addAPObjectItem(buf, ssid_utf8);
                     memset(buf, 0, BUF_SIZE);
                 }
             }
@@ -475,6 +462,7 @@ jboolean setNetworkVariable(char *buf)
     struct accessPointObjectItem *pTmpItemNode = NULL;
     char pos[BUF_SIZE] = {0};
     bool isCh = false;
+    bool gbk_found = false;
     int i;
 
     unsigned int netId;
@@ -482,106 +470,37 @@ jboolean setNetworkVariable(char *buf)
     char value[BUF_SIZE] = {0};
 
     /* parse SET_NETWORK command*/
-    sscanf(buf + 12 , "%d %s %s", &netId, name, value);
+    sscanf(buf + 12 , "%d %s \"%s\"", &netId, name, value);
 
     if (DBG)
-        ALOGD("parse SET_NETWORK command success, netId = %d, name = %s, value =%s",
-               netId, name, value);
+        ALOGD("parse SET_NETWORK command success, netId = %d, name = %s, value =%s, length=%d",
+               netId, name, value, strlen(value));
 
-    if (strncmp(name, "bssid", 5) == 0) {
-        if (NULL == g_pCurrentSSID) {
-            ALOGE("g_pCurrentSSID is NULL");
-            g_pCurrentSSID = new String8();
-            if (NULL == g_pCurrentSSID) {
-                ALOGE("Failed to allocate memory for g_pCurrentSSID!");
-                return JNI_FALSE;
-            }
+    pthread_mutex_lock(g_pItemListMutex);
+    pTmpItemNode = g_pItemList;
+    if (NULL == pTmpItemNode) {
+        ALOGE("g_pItemList is NULL");
+    }
+    while (pTmpItemNode) {
+        ALOGD("ssid_utf8 = %s, length=%d, value =%s, length=%d",
+               pTmpItemNode->ssid_utf8->string(),strlen(pTmpItemNode->ssid_utf8->string()), value, strlen(value));
+        if (pTmpItemNode->ssid_utf8 && (0 == memcmp(pTmpItemNode->ssid_utf8->string(), value,
+            pTmpItemNode->ssid_utf8->length()))) {
+            gbk_found = true;
+            break;
         }
-        pthread_mutex_lock(g_pItemListMutex);
-        pTmpItemNode = g_pItemList;
-        if (NULL == pTmpItemNode) {
-            ALOGE("g_pItemList is NULL");
-        }
-        while (pTmpItemNode) {
-            if (pTmpItemNode->bssid && (0 == strcmp(pTmpItemNode->bssid->string(),
-                value)) && pTmpItemNode->ssid) {
-                g_isInList = true;
-                if (!pTmpItemNode->isSbMs) {
-                    *g_pCurrentSSID = *(pTmpItemNode->ssid);
-                     if (DBG)
-                         ALOGD("Found bssid:%s, g_pCurrentSSID:%s, g_isSbMs:%d",
-                                pTmpItemNode->bssid->string(), g_pCurrentSSID->string(),
-                                g_isSbMs);
-                } else {
-                    g_isSbMs = true;
-                    if (DBG)
-                        ALOGD("Multi SSIDs Single BSSID case. bssid:%s",pTmpItemNode->bssid->string());
-                }
-                break;
-            }
-            pTmpItemNode = pTmpItemNode->pNext;
-        }
-        pthread_mutex_unlock(g_pItemListMutex);
+        pTmpItemNode = pTmpItemNode->pNext;
     }
 
-    if (0 == strncmp(name, "ssid", 4) && g_isInList) {
-        g_isInList = false;
-        isCh = false;
-        memcpy(pos,value,strlen(value));
-        for (i = 0; i < strlen(value); i++) {
-            if (0x80 == (pos[i] & 0x80)) {
-                isCh = true;
-                break;
-            }
-        }
-        if (DBG)
-            ALOGD("setNetworkVariableCommand: isCh:%d",isCh);
-        if (isCh) {
-           if (!g_isSbMs) {
-               snprintf(buf, BUF_SIZE, "SET_NETWORK %d ssid \"%s\"", netId, g_pCurrentSSID->string());
-               if (DBG)
-                   ALOGD("new SET_NETWORK command is: %s", buf);
-            } else {
-                g_isSbMs = false;
-                UChar dest[CONVERT_LINE_LEN] = {0};
-                UErrorCode err = U_ZERO_ERROR;
-                UConverter* pConverter = ucnv_open("utf-8", &err);
-                char ssid_gbk[CONVERT_LINE_LEN] = {0};
-                char ssid[CONVERT_LINE_LEN] = {0};
-                if (U_FAILURE(err)) {
-                    ALOGE("ucnv_open error");
-                    return JNI_FALSE;
-                }
-                int len = ucnv_toUChars(pConverter, dest, CONVERT_LINE_LEN,
-                                        value, strlen(value), &err);
-                if (U_FAILURE(err)) {
-                    ALOGE("ucnv_toUChars error");
-                    ucnv_close(pConverter);
-                    return JNI_FALSE;
-                }
-                ucnv_close(pConverter);
-                pConverter = ucnv_open(CHARSET_CN, &err);
-                if (U_FAILURE(err)) {
-                    ALOGE("ucnv_open error");
-                    return JNI_FALSE;
-                }
-                ucnv_fromUChars(pConverter, ssid_gbk, CONVERT_LINE_LEN, dest, len, &err);
-                if (U_FAILURE(err)) {
-                    ALOGE("ucnv_toUChars error");
-                    ucnv_close(pConverter);
-                    return JNI_FALSE;
-                }
-                ucnv_close(pConverter);
-                /* strip off quotation mark */
-                memcpy(ssid, ssid_gbk + 1, strlen(ssid_gbk) - 2);
-                if (DBG)
-                    ALOGD("%s, ssid_gbk = %s, ssid = %s", __FUNCTION__,ssid_gbk,ssid);
-                snprintf(buf, BUF_SIZE, "SET_NETWORK %d ssid \"%s\"", netId, ssid);
-                if (DBG)
-                    ALOGD("new SET_NETWORK command is: %s", buf);
-            }
-        }
+    if (0 == strncmp(name, "ssid", 4) && gbk_found) {
+        snprintf(buf, BUF_SIZE, "SET_NETWORK %d ssid \"%s\"", netId, pTmpItemNode->ssid->string());
+    if (DBG)
+        ALOGD("new SET_NETWORK command is: %s", buf);
     }
+
+    pthread_mutex_unlock(g_pItemListMutex);
+
+
     return JNI_TRUE;
 }
 

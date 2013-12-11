@@ -139,20 +139,12 @@ static jboolean android_net_wifi_loadDriver(JNIEnv* env, jobject)
         return JNI_FALSE;
     }
     pthread_mutex_init(g_pItemListMutex, NULL);
-    g_pCurrentSSID = new String8();
-    if (NULL == g_pCurrentSSID) {
-        ALOGE("Failed to allocate memory for g_pCurrentSSID!");
-        return JNI_FALSE;
-    }
+
     return (jboolean)(::wifi_load_driver() == 0);
 }
 
 static jboolean android_net_wifi_unloadDriver(JNIEnv* env, jobject)
 {
-    if (g_pCurrentSSID != NULL) {
-        delete g_pCurrentSSID;
-        g_pCurrentSSID = NULL;
-    }
     if (g_pItemListMutex != NULL) {
         pthread_mutex_lock(g_pItemListMutex);
         struct accessPointObjectItem *pCurrentNode = g_pItemList;
@@ -163,9 +155,9 @@ static jboolean android_net_wifi_unloadDriver(JNIEnv* env, jobject)
                 delete pCurrentNode->ssid;
                 pCurrentNode->ssid = NULL;
             }
-            if (NULL != pCurrentNode->bssid) {
-                delete pCurrentNode->bssid;
-                pCurrentNode->bssid = NULL;
+            if (NULL != pCurrentNode->ssid_utf8) {
+                delete pCurrentNode->ssid_utf8;
+                pCurrentNode->ssid_utf8 = NULL;
             }
             delete pCurrentNode;
             pCurrentNode = pNextNode;
