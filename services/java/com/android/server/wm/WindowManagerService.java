@@ -39,6 +39,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ERROR;
 import static android.view.WindowManager.LayoutParams.TYPE_UNIVERSE_BACKGROUND;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
+import static android.view.WindowManagerPolicy.FLAG_TRUSTED;
 
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.policy.PolicyManager;
@@ -4599,7 +4600,12 @@ public class WindowManagerService extends IWindowManager.Stub
                 Slog.w(TAG, "Attempted to set visibility of non-existing app token: " + token);
                 return;
             }
-           
+
+            if (isHDMIApp(wtoken)) {
+                Slog.i(TAG,"find hdmi window return");
+                return;
+            }
+
             if (DEBUG_APP_TRANSITIONS || DEBUG_ORIENTATION) {
                 RuntimeException e = null;
                 if (!HIDE_STACK_CRAWLS) {
@@ -11200,4 +11206,14 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    private boolean isHDMIApp(AppWindowToken wtoken) {
+        final int N = wtoken.allAppWindows.size();
+        for (int i=0; i<N; i++) {
+            WindowState win = wtoken.allAppWindows.get(i);
+            if ((win.getAttrs().flags & FLAG_TRUSTED) != 0) {  /* FLAG_TRUSTED:0x02000000 */
+                return true;
+            }
+        }
+        return false;
+    }
 }
