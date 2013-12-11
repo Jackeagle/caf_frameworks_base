@@ -40,9 +40,8 @@
 namespace android {
 
 struct accessPointObjectItem {
+    String8 *ssid_utf8;
     String8 *ssid;
-    String8 *bssid;
-    bool    isSbMs;   /* multi SSIDs with single BSSID */
     struct  accessPointObjectItem *pNext;
 };
 
