@@ -445,7 +445,9 @@ public class Build {
     public static final String TAGS = getString("ro.build.tags");
 
     /** A string that uniquely identifies this build.  Do not attempt to parse this value. */
-    public static final String FINGERPRINT = getString("persist.sys.build.fingerprint", getString("ro.build.fingerprint"));
+    public static final String FINGERPRINT = BRAND + "/" + PRODUCT + "/" + DEVICE + ":"
+        + VERSION.RELEASE + "/" + ID + "/" + VERSION.INCREMENTAL + ":"
+        + TYPE + "/" + TAGS;
 
     // The following properties only make sense for internal engineering builds.
     public static final long TIME = getLong("ro.build.date.utc") * 1000;
