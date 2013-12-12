@@ -981,7 +981,9 @@ final class ActivityStack {
         mLastPausedActivity = prev;
         prev.state = ActivityState.PAUSING;
         prev.task.touchActiveTime();
-        prev.updateThumbnail(screenshotActivities(prev), null);
+        if (!prev.isHomeActivity) {
+            prev.updateThumbnail(screenshotActivities(prev), null);
+        }
 
         mService.updateCpuStats();
         
