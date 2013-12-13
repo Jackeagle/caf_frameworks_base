@@ -34,6 +34,7 @@ import java.util.Date;
 import java.util.Locale;
 
 import libcore.icu.ICU;
+import android.text.format.DateFormat;
 
 public class KeyguardStatusView extends GridLayout {
     private static final boolean DEBUG = KeyguardViewMediator.DEBUG;
@@ -127,7 +128,11 @@ public class KeyguardStatusView extends GridLayout {
     }
 
     void refreshDate() {
-        maybeSetUpperCaseText(mDateView, mDateFormat.format(new Date()));
+        if(getContext().getResources().getBoolean(com.android.internal.R.bool.def_custome_dateformat)){
+           maybeSetUpperCaseText(mDateView, DateFormat.getDateFormat(getContext()).format(new Date()));
+        }else {
+           maybeSetUpperCaseText(mDateView, mDateFormat.format(new Date()));
+        }
     }
 
     @Override

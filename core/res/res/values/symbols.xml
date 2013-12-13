@@ -289,6 +289,7 @@
   <java-symbol type="bool" name="config_useFixedVolume" />
   <java-symbol type="bool" name="skip_radio_power_off_on_sim_refresh_reset" />
   <java-symbol type="bool" name="config_radio_reset_on_regular_deactivation" />
+  <java-symbol type="bool" name="def_custome_dateformat"/>
 
   <java-symbol type="integer" name="config_cursorWindowSize" />
   <java-symbol type="integer" name="config_longPressOnPowerBehavior" />

@@ -27,6 +27,7 @@ import android.widget.TextView;
 
 import com.android.systemui.R;
 
+import android.text.format.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -91,11 +92,15 @@ public class DateView extends TextView {
     }
 
     protected void updateClock() {
-        final String dateFormat = getContext().getString(R.string.system_ui_date_pattern);
-        final Locale l = Locale.getDefault();
-        String fmt = ICU.getBestDateTimePattern(dateFormat, l.toString());
-        SimpleDateFormat sdf = new SimpleDateFormat(fmt, l);
-        setText(sdf.format(new Date()));
+         if(getContext().getResources().getBoolean(com.android.internal.R.bool.def_custome_dateformat)){
+             setText(DateFormat.getDateFormat(getContext()).format(new Date()));
+         }else{
+             final String dateFormat = getContext().getString(R.string.system_ui_date_pattern);
+             final Locale l = Locale.getDefault();
+             String fmt = ICU.getBestDateTimePattern(dateFormat, l.toString());
+             SimpleDateFormat sdf = new SimpleDateFormat(fmt, l);
+             setText(sdf.format(new Date()));
+         }
     }
 
     private boolean isVisible() {
