@@ -30,7 +30,8 @@ public class SignalStrength implements Parcelable {
     private static final String LOG_TAG = "SignalStrength";
     private static final boolean DBG = false;
     private static final boolean is5barSignal = SystemProperties
-            .getInt("persist.env.c.sb.style", 0) == 3;
+            .getInt("persist.env.c.sb.style", 0) == 3
+            && !MSimTelephonyManager.getDefault().isMultiSimEnabled();
     /** @hide */
     public static final int SIGNAL_STRENGTH_NONE_OR_UNKNOWN = 0;
     /** @hide */
