@@ -155,6 +155,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 
+import android.os.Parcel;
+
 /**
  * WindowManagerPolicy implementation for the Android phone UI.  This
  * introduces a new method suffix, Lp, for an internal lock of the
@@ -973,6 +975,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Controls rotation and the like.
         initializeHdmiState();
+        mGearModeObserver.startObserving("DEVPATH=/devices/virtual/switch/reverse");
 
         // Match current screen state.
         if (mPowerManager.isScreenOn()) {
@@ -3814,6 +3817,32 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             }
+            case KeyEvent.KEYCODE_BUTTON_16:
+                //reuse key as rear key
+                result &= ~ACTION_PASS_TO_USER;
+                if (down) {
+                    mHandler.removeCallbacks(mRearModeRunnable);
+                    mRearModeRunnable.setRearMode(true);
+                    Log.d(TAG,"Reverse key down, should delay 0ms");
+                    mHandler.postDelayed(mRearModeRunnable, 0);
+                    /*
+                } else {
+                    mHandler.removeCallbacks(mRearModeRunnable);
+                    mRearModeRunnable.setRearMode(false);
+                    Log.d(TAG,"Reverse key up, should delay 0ms");
+                    mHandler.postDelayed(mRearModeRunnable, 0);// delay 800ms for temp, TODO
+                    */
+                }
+                break;
+
+            case KeyEvent.KEYCODE_BUTTON_15:
+                result &= ~ACTION_PASS_TO_USER;
+                if (down) {
+                    mHandler.removeCallbacks(mRearModeRunnable);
+                    mRearModeRunnable.setRearMode(false);
+                    mHandler.postDelayed(mRearModeRunnable, 0);
+                }
+                break;
         }
         return result;
     }
@@ -4923,5 +4952,55 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.print(" mUpsideDownRotation="); pw.println(mUpsideDownRotation);
         pw.print(prefix); pw.print("mHdmiRotation="); pw.print(mHdmiRotation);
                 pw.print(" mHdmiRotationLock="); pw.println(mHdmiRotationLock);
+    }
+
+    private final UEventObserver mGearModeObserver = new UEventObserver() {
+        public void onUEvent(UEventObserver.UEvent event) {
+            final boolean isInGearMode = "1".equals(event.get("SWITCH_STATE"));
+            //hack for gear mode in car project
+            mHandler.removeCallbacks(mRearModeRunnable);
+            mRearModeRunnable.setRearMode(isInGearMode);
+            Log.d(TAG,"get Reverse switch "+isInGearMode);
+            mHandler.postDelayed(mRearModeRunnable, 0);
+        }
+    };
+
+    private RearModeRunnable mRearModeRunnable = new RearModeRunnable();
+    class RearModeRunnable implements Runnable {
+        private int mCurrentRearMode = 0;
+        public void setRearMode(boolean enter) {
+            synchronized (mRearModeRunnable) {
+                mCurrentRearMode = enter ? 1 : 0;
+            }
+        }
+        public void run() {
+            synchronized (mRearModeRunnable) {
+                String action = null;
+                if (mCurrentRearMode == 0) {
+                    //exit rear mode
+                    action = "action.rearmode.exit";
+                } else if (mCurrentRearMode == 1) {
+                    //enter rear mode
+                    action = "action.rearmode.enter";
+                }
+                Intent intent = new Intent(action);
+                mContext.sendBroadcast(intent);
+                Slog.i(TAG,"RearMode = "+mCurrentRearMode);
+                //inform surfaceflinger
+                try {
+                    IBinder surfaceFlinger = ServiceManager.getService("SurfaceFlinger");
+                    if (surfaceFlinger != null) {
+                        Parcel data = Parcel.obtain();
+                        data.writeInterfaceToken("android.ui.ISurfaceComposer");
+                        data.writeInt(mCurrentRearMode);
+                        surfaceFlinger.transact(2000,
+                                data, null, 0);
+                        data.recycle();
+                    }
+                } catch (RemoteException ex) {
+                    Slog.e(TAG, "can not notify surfaceflinger enter/exit rear camera mode");
+                }
+            }
+        }
     }
 }
