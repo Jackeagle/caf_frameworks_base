@@ -152,13 +152,16 @@ public class HTML5VideoView implements MediaPlayer.OnPreparedListener {
     }
 
     public void seekTo(int pos) {
-        if (mCurrentState == STATE_PREPARED || mCurrentState == STATE_SUSPENDED)
+        if (mCurrentState == STATE_PREPARED) {
             // Seek only when position is different
             // Check difference for floating-point error in webkit
-            if (Math.abs(mPlayer.getCurrentPosition() - pos) > 500)
+            if (Math.abs(mPlayer.getCurrentPosition() - pos) > 500) {
                 mPlayer.seekTo(pos);
-        else
+            }
+        }
+        else {
             mSaveSeekTime = pos;
+        }
     }
 
     public boolean isPlaying() {
