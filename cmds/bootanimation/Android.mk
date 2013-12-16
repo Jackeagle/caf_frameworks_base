@@ -5,6 +5,11 @@ LOCAL_SRC_FILES:= \
 	bootanimation_main.cpp \
 	BootAnimation.cpp
 
+ifeq ($(AUTOPLAT_001), true)
+LOCAL_CFLAGS += -DAUTOPLAT_001
+endif
+
+
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 
 LOCAL_SHARED_LIBRARIES := \
