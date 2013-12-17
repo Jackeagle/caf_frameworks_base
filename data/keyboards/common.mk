@@ -15,6 +15,10 @@
 # This is the list of framework provided keylayouts and key character maps to include.
 # Used by Android.mk and keyboards.mk.
 
+# Automotive platform flag
+#AUTOPLAT_001 := true
+AUTOPLAT_001 := false
+
 keylayouts := \
     Generic.kl \
     AVRCP.kl \
@@ -34,7 +38,13 @@ keycharmaps := \
     qwerty.kcm \
     qwerty2.kcm
 
+ifeq ($(AUTOPLAT_001), true)
+keyconfigs := \
+    qwerty.idc \
+    qwerty2.idc \
+    Atmel_maXTouch_Touchscreen.idc
+else
 keyconfigs := \
     qwerty.idc \
     qwerty2.idc
-
+endif
