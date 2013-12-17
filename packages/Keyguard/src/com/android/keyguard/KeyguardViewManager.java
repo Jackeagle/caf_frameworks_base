@@ -61,8 +61,11 @@ import android.widget.FrameLayout;
 public class KeyguardViewManager {
     private final static boolean DEBUG = KeyguardViewMediator.DEBUG;
     private static String TAG = "KeyguardViewManager";
-    public static boolean USE_UPPER_CASE = true;
     public final static String IS_SWITCHING_USER = "is_switching_user";
+    public static boolean USE_UPPER_CASE = true;
+
+    // Delay dismissing keyguard to allow animations to complete.
+    private static final int HIDE_KEYGUARD_DELAY = 500;
 
     // Timeout used for keypresses
     static final int DIGIT_PRESS_WAKE_MILLIS = 5000;
@@ -79,6 +82,7 @@ public class KeyguardViewManager {
 
     private boolean mScreenOn = false;
     private LockPatternUtils mLockPatternUtils;
+    private int mPanelOrientation = 0;
 
     private KeyguardUpdateMonitorCallback mBackgroundChanger = new KeyguardUpdateMonitorCallback() {
         @Override
@@ -106,6 +110,8 @@ public class KeyguardViewManager {
         mViewManager = viewManager;
         mViewMediatorCallback = callback;
         mLockPatternUtils = lockPatternUtils;
+        mPanelOrientation =
+                SystemProperties.getInt("persist.panel.orientation", 0) / 90;
     }
 
     /**
@@ -116,6 +122,12 @@ public class KeyguardViewManager {
         if (DEBUG) Log.d(TAG, "show(); mKeyguardView==" + mKeyguardView);
 
         boolean enableScreenRotation = shouldEnableScreenRotation();
+
+        if(mPanelOrientation != 0) {
+            // override the enableScreen Rotation value, if the panel
+            // orientation is not portrait.
+            enableScreenRotation = false;
+        }
 
         maybeCreateKeyguardLocked(enableScreenRotation, false, options);
         maybeEnableScreenRotation(enableScreenRotation);
@@ -509,9 +521,10 @@ public class KeyguardViewManager {
                             mKeyguardHost.setCustomBackground(null);
                             updateShowWallpaper(true);
                             mKeyguardHost.removeView(lastView);
+                            mViewMediatorCallback.keyguardGone();
                         }
                     }
-                }, 500);
+                }, HIDE_KEYGUARD_DELAY);
             }
         }
     }
