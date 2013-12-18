@@ -25,6 +25,7 @@ interface IEthernetManager
     void updateDevInfo(in EthernetDevInfo info);
     boolean isConfigured();
     EthernetDevInfo getSavedConfig();
+    EthernetDevInfo getEthernetDevInfo();
     int getTotalInterface();
     void setMode(String mode);
 }

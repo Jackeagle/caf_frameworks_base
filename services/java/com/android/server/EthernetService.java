@@ -92,13 +92,22 @@ public class EthernetService<syncronized> extends IEthernetManager.Stub {
     }
 
     /**
+     * Return the saved ethernet configuration
+     * @return ethernet interface configuration on success, {@code null} on failure
+     */
+    public EthernetDevInfo getEthernetDevInfo() {
+
+        return  mTracker.getEthernetDevInfo();
+    }
+
+    /**
      * Set the ethernet interface configuration mode
      * @param mode {@code ETHERNET_CONN_MODE_DHCP} for dhcp {@code ETHERNET_CONN_MODE_MANUAL} for manual configure
      */
     public synchronized void setMode(String mode) {
         final ContentResolver cr = mContext.getContentResolver();
         if (DevName != null) {
-            Settings.Secure.putString(cr, Settings.Secure.ETHERNET_IFNAME, DevName[0]);
+            Settings.Secure.putString(cr, Settings.Secure.ETHERNET_IFNAME, "eth0");
             Settings.Secure.putInt(cr, Settings.Secure.ETHERNET_CONF, 1);
             Settings.Secure.putString(cr, Settings.Secure.ETHERNET_MODE, mode);
         }

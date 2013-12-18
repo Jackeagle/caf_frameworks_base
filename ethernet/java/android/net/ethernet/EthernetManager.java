@@ -77,6 +77,9 @@ public class EthernetManager {
     IEthernetManager mService;
     Handler mHandler;
 
+    public static final String ETHERNET_CONNECTED_ACTION = "android.net.ethernet.ETHERNET_CONNECTED";
+    public static final String ETHERNET_DISCONNECTED_ACTION = "android.net.ethernet.ETHERNET_DISCONNECTED";
+
     public EthernetManager(IEthernetManager service, Handler handler) {
         Slog.i(TAG, "Init Ethernet Manager, service: " +service);
         mService = service;
@@ -98,11 +101,25 @@ public class EthernetManager {
 
     /**
      * Return the saved ethernet configuration
+     * This api needs to be used only when the interface is up
      * @return ethernet interface configuration on success, {@code null} on failure
      */
     public EthernetDevInfo getSavedConfig() {
         try {
             return mService.getSavedConfig();
+        } catch (RemoteException e) {
+            Slog.i(TAG, "Can not get eth config");
+        }
+        return null;
+    }
+
+   /**
+     * Return ethernet interface information
+     * @return  ethernet interface configuration on success, {@code null} on failure
+    */
+    public EthernetDevInfo getEthernetDevInfo() {
+        try {
+            return mService.getEthernetDevInfo();
         } catch (RemoteException e) {
             Slog.i(TAG, "Can not get eth config");
         }

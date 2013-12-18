@@ -34,19 +34,28 @@ import android.net.LinkCapabilities;
 import android.net.LinkProperties;
 import android.net.ConnectivityManager;
 import android.net.DhcpResults;
+import android.net.RouteInfo;
 import android.net.NetworkStateTracker;
 import android.net.NetworkUtils;
 import android.net.LinkCapabilities;
+import android.net.LinkAddress;
 import android.net.NetworkInfo;
 import android.net.NetworkInfo.DetailedState;
+import android.net.InterfaceConfiguration;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
+import android.os.IBinder;
+import android.os.INetworkManagementService;
 import android.os.SystemProperties;
 import android.os.Messenger;
+import android.os.ServiceManager;
+import android.os.RemoteException;
+import android.os.SystemClock;
 import android.util.*;
+import java.util.Collection;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -81,26 +90,24 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
     private boolean mInterfaceStopped;
     private DhcpHandler mDhcpTarget;
     private String mInterfaceName ;
-    //private DhcpInfoInternal mDhcpInfo;
     private DhcpResults mDhcpResults;
     private EthernetMonitor mMonitor;
+    private EthernetDevInfo mEthInfo;
     private String[] sDnsPropNames;
     private boolean mStartingDhcp;
     private NotificationManager mNotificationManager;
     private Notification mNotification;
     private Handler mTrackerTarget;
-
-    //private LinkProperties mLinkProperties;
+    private INetworkManagementService mNwService;
 
     private BroadcastReceiver mEthernetStateReceiver;
 
     /* For sending events to connectivity service handler */
     private Handler mCsHandler;
-	private Context mContext;
+    private Context mContext;
 
     public EthernetStateTracker(Context context, Handler target) {
         mNetworkInfo = new NetworkInfo(ConnectivityManager.TYPE_ETHERNET, 0, "ETH", "");
-        //mLinkProperties = new LinkProperties();
         if (localLOGV) Slog.v(TAG, "Starts...");
 
         if (EthernetNative.initEthernetNative() != 0) {
@@ -114,8 +121,10 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
         dhcpThread.start();
         mDhcpTarget = new DhcpHandler(dhcpThread.getLooper(), this);
         mMonitor = new EthernetMonitor(this);
-        //mDhcpInfo = new DhcpInfoInternal();
         mDhcpResults = new DhcpResults();
+        mEthInfo = new EthernetDevInfo();
+        IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+        mNwService = INetworkManagementService.Stub.asInterface(b);
     }
 
     /**
@@ -139,9 +148,23 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                     NetworkUtils.resetConnections(ifname, NetworkUtils.RESET_ALL_ADDRESSES);
                     if (!suspend)
                         NetworkUtils.disableInterface(ifname);
+                    IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+                    INetworkManagementService service = INetworkManagementService.Stub.asInterface(b);
+                    try {
+                        Log.d(TAG, "ethernet will clear ethernet IP");
+                        service.clearInterfaceAddresses(ifname);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to clear addresses or disable ip" + e);
+                    }
 
-                    //mLinkProperties.clear();
                     mDhcpResults.clear();
+                    mEthInfo.setIpAddress("null");
+                    mEthInfo.setIfName("null");
+                    mEthInfo.setDnsAddr("null");
+                    mEthInfo.setRouteAddr("null");
+                    mEthInfo.setNetMask("null");
+                    Intent intent = new Intent(EthernetManager.ETHERNET_DISCONNECTED_ACTION);
+                    mContext.sendBroadcast(intent);
                 }
             }
         }
@@ -159,35 +182,64 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                 "dhcp." + mInterfaceName + ".dns1",
                 "dhcp." + mInterfaceName + ".dns2"
              };
-
+         try {
+               // mNwService.setInterfaceDown(info.getIfName());
+                mNwService.setInterfaceUp(info.getIfName());
+            } catch (RemoteException re){
+                Slog.e(TAG,"Set interface up failed: " + re);
+            } catch (IllegalStateException e) {
+                Slog.e(TAG,"Set interface up fialed: " + e);
+            }
+            //bootcnt++;
             mDhcpTarget.sendEmptyMessage(EVENT_DHCP_START);
         } else {
-/* HFM
+            /*if (bootcnt == 0)
+            {
+               //mDhcpTarget.sendEmptyMessage(EVENT_DHCP_START);
+            }*/
             int event;
+            InterfaceConfiguration ifcfg = null;
+
             sDnsPropNames = new String[] {
                 "net." + mInterfaceName + ".dns1",
                 "net." + mInterfaceName + ".dns2"
              };
-            mDhcpInfo.ipAddress = lookupHost(info.getIpAddress());
-            mDhcpInfo.gateway = lookupHost(info.getRouteAddr());
-            mDhcpInfo.netmask = lookupHost(info.getNetMask());
-            mDhcpInfo.dns1 = lookupHost(info.getDnsAddr());
-            mDhcpInfo.dns2 = 0;
+            Slog.v(TAG, "Static IP =" + info.getIpAddress());
+            Slog.v(TAG, "Static dns1 =" + info.getDnsAddr());
+            try {
+                ifcfg = mNwService.getInterfaceConfig(info.getIfName());
+                ifcfg.setLinkAddress(new LinkAddress(NetworkUtils.numericToInetAddress(info.getIpAddress()),0 ));
+                ifcfg.setFlag("up");
+                mNwService.setInterfaceConfig(info.getIfName(), ifcfg);
+                mNwService.setInterfaceUp(info.getIfName());
+                RouteInfo ri = new RouteInfo(NetworkUtils.numericToInetAddress(info.getRouteAddr()));
+                mNwService.addRoute(info.getIfName(),ri);
+                /* Filling the ethernet Configuration */
+                mEthInfo.setIpAddress(info.getIpAddress());
+                mEthInfo.setIfName("eth0");
+                mEthInfo.setConnectMode("manual");
+                mEthInfo.setDnsAddr(info.getDnsAddr());
+                RouteInfo[] array = mNwService.getRoutes(info.getIfName());
+                mEthInfo.setRouteAddr(array[0].toString());
+                mEthInfo.setNetMask(info.getNetMask());
 
-            if (localLOGV) Slog.i(TAG, "set ip manually " + mDhcpInfo.toString());
-            NetworkUtils.removeDefaultRoute(info.getIfName());
-            if (NetworkUtils.configureInterface(info.getIfName(), mDhcpInfo)) {
-                event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
-                SystemProperties.set("net.dns1", info.getDnsAddr());
-		SystemProperties.set("net." + info.getIfName() + ".dns1", info.getDnsAddr());
-		SystemProperties.set("net." + info.getIfName() + ".dns2", "0.0.0.0");
-                if (localLOGV) Slog.v(TAG, "Static IP configuration succeeded");
-            } else {
-                event = EVENT_INTERFACE_CONFIGURATION_FAILED;
-                if (localLOGV) Slog.w(TAG, "Static IP configuration failed");
+                mStartingDhcp = false;
+                Intent intent = new Intent(EthernetManager.ETHERNET_CONNECTED_ACTION);
+                mContext.sendBroadcast(intent);
+                Slog.i(TAG,"Static IP configuration succeeded");
+            } catch (RemoteException re){
+                Slog.e(TAG,"Static IP configuration failed: " + re);
+            } catch (IllegalStateException e) {
+                Slog.e(TAG,"Static IP configuration fialed: " + e);
             }
+
+            //Slog.i(TAG, "set ip manually " + mDhcpInfo.toString());
+            event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
+            SystemProperties.set("net.dns1", info.getDnsAddr());
+            SystemProperties.set("net." + info.getIfName() + ".dns1", info.getDnsAddr());
+            SystemProperties.set("net." + info.getIfName() + ".dns2", "0.0.0.0");
             this.sendEmptyMessage(event);
-*/
+
         }
         return true;
     }
@@ -215,7 +267,6 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                     if (!NetworkUtils.stopDhcp(mInterfaceName)) {
                         if (localLOGV) Slog.w(TAG, "Could not stop DHCP");
                     }
-                    //mLinkProperties.clear();
                     mDhcpResults.clear();
                     configureInterface(info);
                 }
@@ -424,19 +475,26 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
                      synchronized (mDhcpTarget) {
                          if (!mInterfaceStopped) {
                              if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request started");
-                             /*if (NetworkUtils.runDhcp(mInterfaceName, mDhcpInfo)) {
-                                 event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
-                                 if (localLOGV) Slog.d(TAG, "DhcpHandler: DHCP request succeeded: " + mDhcpInfo.toString());
-                                 mLinkProperties = mDhcpInfo.makeLinkProperties();
-                                 mLinkProperties.setInterfaceName(mInterfaceName);
-                             } else {
-                                 event = EVENT_INTERFACE_CONFIGURATION_FAILED;
-                                 Slog.e(TAG, "DhcpHandler: DHCP request failed: " + NetworkUtils.getDhcpError());
-                             }*/
-
                              if (NetworkUtils.runDhcp(mInterfaceName, mDhcpResults)) {
                                  event = EVENT_INTERFACE_CONFIGURATION_SUCCEEDED;
+                                 mEthInfo.setLastDhcpRequestTime(SystemClock.elapsedRealtime());
+                                 mEthInfo.setDhcpLeaseDuration(mDhcpResults.leaseDuration);
+                                 mEthInfo.setIpAddress(mDhcpResults.linkProperties.getAddresses().toArray()[(mDhcpResults.linkProperties.getAddresses().size())-1].toString());
+                                 mEthInfo.setIfName("eth0");
+                                 mEthInfo.setConnectMode("dhcp");
+                                 mEthInfo.setDnsAddr(mDhcpResults.linkProperties.getDnses().toArray()[(mDhcpResults.linkProperties.getDnses().size())-1].toString());
+                                 mEthInfo.setRouteAddr((mDhcpResults.linkProperties.getRoutes().toArray()[(mDhcpResults.linkProperties.getRoutes().size())-1]).toString());
                                  mDhcpResults.setInterfaceName(mInterfaceName);
+                                 int addr = 0;
+                                 for (RouteInfo ri : mDhcpResults.linkProperties.getRoutes()) {
+                                      addr = NetworkUtils.prefixLengthToNetmaskInt(ri.getDestination().getNetworkPrefixLength());
+                                 }
+                                 StringBuffer str = new StringBuffer();
+                                 str.append(NetworkUtils.intToInetAddress(addr).getHostAddress());
+                                 mEthInfo.setNetMask(str.toString());
+
+                                 Intent intent = new Intent(EthernetManager.ETHERNET_CONNECTED_ACTION);
+                                 mContext.sendBroadcast(intent);
                              } else {
                                  event = EVENT_INTERFACE_CONFIGURATION_FAILED;
                                  Slog.e(TAG, "DhcpHandler: DHCP request failed: " + NetworkUtils.getDhcpError());
@@ -532,6 +590,13 @@ public class EthernetStateTracker extends Handler implements NetworkStateTracker
      */
     public LinkProperties getLinkProperties() {
         return new LinkProperties(mDhcpResults.linkProperties);
+    }
+
+    /**
+     * Fetch Ethernet Interface configuration
+     */
+    public EthernetDevInfo getEthernetDevInfo() {
+        return mEthInfo;
     }
 
     /**
