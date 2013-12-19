@@ -83,11 +83,14 @@ public class NetworkController extends BroadcastReceiver {
     boolean mHspaDataDistinguishable;
     private TelephonyManager mPhone;
     boolean mDataConnected;
+    boolean isRoam = false;
     IccCardConstants.State mSimState = IccCardConstants.State.READY;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
     int mDataNetType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
     int mDataState = TelephonyManager.DATA_DISCONNECTED;
     int mDataActivity = TelephonyManager.DATA_ACTIVITY_NONE;
+    int mLastVoiceType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
+    int mVoiceType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
     ServiceState mServiceState;
     SignalStrength mSignalStrength;
     int[] mDataIconList = TelephonyIcons.DATA_G[0];
@@ -202,7 +205,7 @@ public class NetworkController extends BroadcastReceiver {
                 String contentDescription);
         void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
                 int typeIcon, String contentDescription, String typeContentDescription,
-                int noSimIcon);
+                int noSimIcon, ServiceState simServiceState, boolean isRoam);
         void setIsAirplaneMode(boolean is, int airplaneIcon);
     }
 
@@ -397,7 +400,9 @@ public class NetworkController extends BroadcastReceiver {
                     mDataTypeIconId,
                     mContentDescriptionWimax,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mServiceState,
+                    isRoam);
         } else if (cluster instanceof CtSignalCluster) {
             ((CtSignalCluster)cluster).setMobileDataIndicators(
                     mHasMobileDataFeature,
@@ -419,7 +424,9 @@ public class NetworkController extends BroadcastReceiver {
                     mDataTypeIconId,
                     mContentDescriptionPhoneSignal,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mServiceState,
+                    isRoam);
         }
         cluster.setIsAirplaneMode(mAirplaneMode, mAirplaneIconId);
     }
@@ -526,6 +533,9 @@ public class NetworkController extends BroadcastReceiver {
                 if (DEBUG) {
                     Slog.d(TAG, "Combining data service state" + mDataServiceState + "for signal");
                 }
+            }
+            if (mServiceState != null) {
+                mVoiceType = mServiceState.getRilVoiceRadioTechnology();
             }
             updateTelephonySignalStrength();
             updateDataNetType();
@@ -735,8 +745,10 @@ public class NetworkController extends BroadcastReceiver {
                 // Though mPhone is a Manager, this call is not an IPC
                 if ((isCdma() && isCdmaEri()) || mPhone.isNetworkRoaming()) {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH_ROAMING[mInetCondition];
+                    isRoam=true;
                 } else {
                     iconList = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH[mInetCondition];
+                    isRoam=false;
                 }
 
                 if (isCdma()) {
@@ -762,8 +774,14 @@ public class NetworkController extends BroadcastReceiver {
                 mPhoneSignalIconId = iconList[iconLevel];
                 mQSPhoneSignalIconId =
                         TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH[mInetCondition][iconLevel];
-                mContentDescriptionPhoneSignal = mContext.getString(
-                        AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[iconLevel]);
+                if (SystemProperties
+                        .getInt("persist.env.c.sb.style", 0) == 3) {
+                    mContentDescriptionPhoneSignal = mContext.getString(
+                            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH_CMCC[iconLevel]);
+                } else {
+                    mContentDescriptionPhoneSignal = mContext.getString(
+                            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[iconLevel]);
+                }
                 mDataSignalIconId = TelephonyIcons.DATA_SIGNAL_STRENGTH[mInetCondition][iconLevel];
             }
         }
@@ -1482,6 +1500,7 @@ public class NetworkController extends BroadcastReceiver {
          || mLastWifiIconId                 != mWifiIconId
          || mLastWimaxIconId                != mWimaxIconId
          || mLastDataTypeIconId             != mDataTypeIconId
+         || mLastVoiceType                  != mVoiceType
          || mLastAirplaneMode               != mAirplaneMode
          || mLastLocale                     != mLocale
          || mLastSimIconId                  != mNoSimIconId)
@@ -1493,6 +1512,10 @@ public class NetworkController extends BroadcastReceiver {
             for (NetworkSignalChangedCallback cb : mSignalsChangedCallbacks) {
                 notifySignalsChangedCallbacks(cb);
             }
+        }
+
+        if (mLastVoiceType != mVoiceType) {
+            mLastVoiceType = mVoiceType;
         }
 
         if (mLastAirplaneMode != mAirplaneMode) {
@@ -1689,6 +1712,16 @@ public class NetworkController extends BroadcastReceiver {
         pw.println(mPhoneState);
         pw.print("  mDataState=");
         pw.println(mDataState);
+        pw.print("  isRoam=");
+        pw.println(isRoam);
+        pw.print("  mVoiceType=");
+        pw.print(mVoiceType);
+        pw.print("/");
+        pw.println(TelephonyManager.getNetworkTypeName(mVoiceType));
+        pw.print("  mLastVoiceType=");
+        pw.print(mLastVoiceType);
+        pw.print("/");
+        pw.println(TelephonyManager.getNetworkTypeName(mLastVoiceType));
         pw.print("  mDataActivity=");
         pw.println(mDataActivity);
         pw.print("  mDataNetType=");
