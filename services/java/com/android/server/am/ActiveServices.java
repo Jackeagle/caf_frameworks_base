@@ -965,10 +965,13 @@ public class ActiveServices {
             long available_mem = Process.getFreeMemory();
             long ServiceThreshold = mProcessList.getMemLevel(ProcessList.BACKUP_APP_ADJ);;
             ActivityRecord top_rc = mAm.mMainStack.topRunningActivityLocked(null);
-            Slog.i(TAG, "available_mem : " + available_mem + ", ServiceThreshold : " + ServiceThreshold
-                         + "top_rc.nowVisible : " + top_rc.nowVisible);
+            Slog.i(TAG, "available_mem : " + available_mem + ", ServiceThreshold : " + ServiceThreshold);
+            if(top_rc != null && top_rc.nowVisible != true)
+            {
+                Slog.i(TAG, "App is in the process of launch " + top_rc.packageName);
+            }
             // Start the service if there is enough memory and app is visible.
-            if(available_mem > ServiceThreshold && top_rc.nowVisible)
+            if(available_mem > ServiceThreshold && top_rc != null && top_rc.nowVisible)
 	        {
                 bringUpServiceLocked(r, r.intent.getIntent().getFlags(), true);
             }
