@@ -1056,7 +1056,11 @@ public class NetworkController extends BroadcastReceiver {
         }
 
         if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, false)) {
-            String networkName = mContext.getLocalString(mPhone.getNetworkOperatorName(),
+            String operatorName = mPhone.getNetworkOperatorName();
+            if ("null".equalsIgnoreCase(operatorName)) {
+                operatorName = "";
+            }
+            String networkName = mContext.getLocalString(operatorName,
                 com.android.internal.R.array.origin_carrier_names,
                 com.android.internal.R.array.locale_carrier_names);
             // For CMCC requirement to show 3G in plmn if camping in TD_SCDMA.
