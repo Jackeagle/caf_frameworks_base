@@ -1522,6 +1522,7 @@ public class SyncStorageEngine extends Handler {
                     Random random = new Random(System.currentTimeMillis());
                     mSyncRandomOffset = random.nextInt(86400);
                 }
+                Log.e(TAG, "listen == null " + listen  + "Boolean.parseBoolean(listen) " +Boolean.parseBoolean(listen));
                 mMasterSyncAutomatically.put(0, listen == null || Boolean.parseBoolean(listen));
                 eventType = parser.next();
                 AuthorityInfo authority = null;
