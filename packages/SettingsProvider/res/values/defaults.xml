@@ -168,7 +168,4 @@
 
     <!-- Default for Settings.Secure.USER_SETUP_COMPLETE -->
     <bool name="def_user_setup_complete">false</bool>
-
-    <!-- Default for Settings.Secure.BACKGROUND_DATA -->
-    <integer name="def_background_data">0</integer>
 </resources>
