@@ -2060,6 +2060,9 @@ public final class BatteryStatsImpl extends BatteryStats {
             if (mPhoneSignalStrengthBin >= 0) {
                 mPhoneSignalStrengthsTimer[mPhoneSignalStrengthBin].stopRunningLocked(this);
             }
+            if (bin >= SignalStrength.NUM_SIGNAL_STRENGTH_BINS) {
+                bin = SignalStrength.NUM_SIGNAL_STRENGTH_BINS - 1;
+            }
             if (bin >= 0) {
                 if (!mPhoneSignalStrengthsTimer[bin].isRunningLocked()) {
                     mPhoneSignalStrengthsTimer[bin].startRunningLocked(this);
