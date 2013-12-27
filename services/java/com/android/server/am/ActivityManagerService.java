@@ -288,6 +288,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
     // devices.
     private boolean mShowDialogs = true;
 
+    private static final boolean AVOID_FORCE_CLOSE_DIALOG = SystemProperties.getBoolean("persist.env.sys.avoiddialog", false);
+
     /**
      * Description of a request to start a new activity, which has been held
      * due to app switches being disabled.
@@ -12715,7 +12717,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 
                 // TODO: If our config changes, should we auto dismiss any currently
                 // showing dialogs?
-                mShowDialogs = shouldShowDialogs(newConfig);
+                mShowDialogs = shouldShowDialogs(newConfig) && !AVOID_FORCE_CLOSE_DIALOG;
 
                 AttributeCache ac = AttributeCache.instance();
                 if (ac != null) {
