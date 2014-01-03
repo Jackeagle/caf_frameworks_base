@@ -34,6 +34,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.SystemProperties;
 import android.telephony.ServiceState;
+import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Slog;
@@ -426,6 +427,10 @@ public class CMCCSignalClusterView
     private boolean isDataConnect() {
         ConnectivityManager cm = (ConnectivityManager) mContext
                 .getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        TelephonyManager tm = (TelephonyManager) mContext
+                .getSystemService(Context.TELEPHONY_SERVICE);
+
         if (null == cm) {
             Slog.d(TAG, "failed to get ConnectivityManager.");
             return false;
@@ -434,7 +439,7 @@ public class CMCCSignalClusterView
                 .getState();
         NetworkInfo.State mmsState = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_MMS)
                 .getState();
-        boolean isDataOn = (mobileState == NetworkInfo.State.CONNECTED);
+        boolean isDataOn = ((null != tm) && (tm.getDataState() == TelephonyManager.DATA_CONNECTED));
         boolean isMMSOn = (mmsState == NetworkInfo.State.CONNECTED);
         boolean isDataConnectOn = cm.getMobileDataEnabled();
         Slog.d(TAG, " isDataOn=" + isDataOn + " isDataConnectOn=" + isDataConnectOn + " isMMSOn="
