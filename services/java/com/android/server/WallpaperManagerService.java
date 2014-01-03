@@ -573,9 +573,23 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
         if (f.exists()) {
             f.delete();
         }
+
         final long ident = Binder.clearCallingIdentity();
         RuntimeException e = null;
-        
+        try {
+            wallpaper.imageWallpaperPending = false;
+            if (userId != mCurrentUserId) return;
+            if (bindWallpaperComponentLocked(defaultFailed
+                    ? IMAGE_WALLPAPER
+                    : null, true, false, wallpaper, reply)) {
+                return;
+            }
+        } catch (IllegalArgumentException e1) {
+            e = e1;
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+
         // This can happen if the default wallpaper component doesn't
         // exist.  This should be a system configuration problem, but
         // let's not let it crash the system and just live with no
@@ -706,13 +720,21 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
         checkPermission(android.Manifest.permission.SET_WALLPAPER);
         synchronized (mLock) {
             if (DEBUG) Slog.v(TAG, "setWallpaper");
+
             int userId = UserHandle.getCallingUserId();
             WallpaperData wallpaper = mWallpaperMap.get(userId);
             if (wallpaper == null) {
                 throw new IllegalStateException("Wallpaper not yet initialized for user " + userId);
             }
             final long ident = Binder.clearCallingIdentity();
+
             try {
+                if (name != null && name.equals("EMPTY_WINDOW")) {
+                    // Special case, clear the wallpaper
+                    clearWallpaperComponentLocked(wallpaper);
+                    return null;
+                }
+
                 ParcelFileDescriptor pfd = updateWallpaperBitmapLocked(name, wallpaper);
                 if (pfd != null) {
                     wallpaper.imageWallpaperPending = true;
@@ -893,7 +915,7 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
                 if (wallpaper.userId == mCurrentUserId) {
                     if (DEBUG)
                         Slog.v(TAG, "Adding window token: " + newConn.mToken);
-                    Slog.w(TAG, "lmark132_55 Wallpaper create window");
+                    Slog.i(TAG, "Wallpaper create window");
 
                     mIWindowManager.addWindowToken(newConn.mToken,
                             WindowManager.LayoutParams.TYPE_WALLPAPER);
@@ -931,8 +953,7 @@ class WallpaperManagerService extends IWallpaperManager.Stub {
             try {
                 if (DEBUG)
                     Slog.v(TAG, "Removing window token: " + wallpaper.connection.mToken);
-                Slog.w(TAG, "lmark132_55 wallpaper drop window");
-
+                Slog.i(TAG, "Wallpaper drop window");
                 mIWindowManager.removeWindowToken(wallpaper.connection.mToken);
             } catch (RemoteException e) {
             }
