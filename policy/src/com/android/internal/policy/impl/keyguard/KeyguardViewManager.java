@@ -166,7 +166,8 @@ public class KeyguardViewManager {
                     }
                 }
                 // Always process media keys, regardless of focus
-                if (mKeyguardView.dispatchKeyEvent(event)) {
+                if (event.getKeyCode() != KeyEvent.KEYCODE_DEL
+                        && mKeyguardView.dispatchKeyEvent(event)) {
                     return true;
                 }
             }
