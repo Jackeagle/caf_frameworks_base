@@ -3761,12 +3761,22 @@ public class WifiStateMachine extends StateMachine {
                                 Settings.Global.WIFI_SCAN_INTERVAL_WHEN_P2P_CONNECTED_MS,
                                 defaultInterval);
                         mWifiNative.setScanInterval((int) scanIntervalMs/1000);
-                    } else if (mWifiConfigStore.getConfiguredNetworks().size() == 0) {
-                        if (DBG) log("Turn on scanning after p2p disconnected");
-                        sendMessageDelayed(obtainMessage(CMD_NO_NETWORKS_PERIODIC_SCAN,
-                                    ++mPeriodicScanToken, 0), mSupplicantScanIntervalMs);
-                    }
-                case CMD_RECONNECT:
+                    } else {
+			if (mWifiConfigStore.getConfiguredNetworks().size() == 0) {
+				if (DBG) log("Turn on scanning after p2p disconnected");
+                               		sendMessageDelayed(obtainMessage(CMD_NO_NETWORKS_PERIODIC_SCAN,
+					++mPeriodicScanToken, 0), mSupplicantScanIntervalMs);
+			} else {
+				if (DBG) log("Roll back to default scan interval if has profile");
+				int defaultInterval = mContext.getResources().getInteger(
+					R.integer.config_wifi_supplicant_scan_interval);
+				long scanIntervalMs = Settings.Global.getLong(mContext.getContentResolver(),
+					Settings.Global.WIFI_SUPPLICANT_SCAN_INTERVAL_MS,
+					defaultInterval);
+				mWifiNative.setScanInterval((int) scanIntervalMs/1000);
+			}
+		    }                 
+		case CMD_RECONNECT:
                 case CMD_REASSOCIATE:
                 {
                     log("CMD_RECONNECT / CMD_REASSOCIATE received in DisconnectedState");
