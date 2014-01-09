@@ -1,4 +1,6 @@
 /*
+ * Copyright (C) 2013 The Linux Foundation. All rights reserved
+ * Not a Contribution.
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,6 +88,18 @@ public interface BluetoothProfile {
      * @hide
      */
     public static final int PBAP = 6;
+
+    /**
+     * SAP
+     * @hide
+     */
+    public static final int SAP = 20;
+
+     /**
+     * Handsfree Client - HFP HF Role
+     * @hide
+     */
+    public static final int HANDSFREE_CLIENT = 9;
 
     /**
      * Default priority for devices that we try to auto-connect to and
