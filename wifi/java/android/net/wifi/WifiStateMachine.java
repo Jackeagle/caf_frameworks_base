@@ -3935,15 +3935,14 @@ public class WifiStateMachine extends StateMachine {
         int dataToWiFiPolicy = Settings.System.getInt(mContext.getContentResolver(),
                 Settings.System.DATA_WIFI_CONNECT_TYPE, DATA_WIFI_CONNECT_TYPE_AUTO);
 
-        // If no active network(info == null) and wifi connection type is auto
-        // connect, auto connect to wifi;
+        // If no active network(info == null) or have another availble AP and
+        // wifi connection type is auto connect, auto connect to wifi;
         // If the active network type is mobile, wifi connection type is auto
         // connect and GSM to WLAN connection type is auto connect,
         // auto connect to wifi.
         if (autoConnectPolicy == WIFI_AUTO_CONNECT_TYPE_AUTO
-                && (info == null || (info != null && info.getType()
-                            == ConnectivityManager.TYPE_MOBILE && dataToWiFiPolicy
-                    == DATA_WIFI_CONNECT_TYPE_AUTO))) {
+                && ((info == null || info.getType() == ConnectivityManager.TYPE_WIFI) || (info != null
+                        && info.getType() == ConnectivityManager.TYPE_MOBILE && dataToWiFiPolicy == DATA_WIFI_CONNECT_TYPE_AUTO))) {
             Log.d(TAG, "Should auto connect");
             return true;
         } else {
