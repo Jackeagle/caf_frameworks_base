@@ -77,7 +77,6 @@ public class MenuDialogHelper implements DialogInterface.OnKeyListener,
         
         // Show the menu
         mDialog = builder.create();
-        mDialog.setOnDismissListener(this);
         
         WindowManager.LayoutParams lp = mDialog.getWindow().getAttributes();
         lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
