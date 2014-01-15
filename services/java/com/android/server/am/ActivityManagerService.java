@@ -14230,34 +14230,51 @@ public final class ActivityManagerService  extends ActivityManagerNative
         // are managing to keep around is less than half the maximum we desire;
         // if we are keeping a good number around, we'll let them use whatever
         // memory they want.
-
+        final int numHiddenAndEmpty = numHidden + numEmpty;
         final int N = mLruProcesses.size();
         i = 0;
+
+        int fgTrimLevel;
+        if (numHiddenAndEmpty <= ProcessList.TRIM_CRITICAL_THRESHOLD) {
+            fgTrimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL;
+        } else if (numHiddenAndEmpty <= ProcessList.TRIM_LOW_THRESHOLD) {
+            fgTrimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW;
+        } else {
+            fgTrimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE;
+        }
 
         try {
             for (i=0; i<N; i++) {
                 ProcessRecord app = mLruProcesses.get(i);
                 boolean doTrim = false;
                 int trimLevel = ComponentCallbacks2.TRIM_MEMORY_COMPLETE;
-                if (app.curAdj ==0  && (app.trimMemoryLevel != ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) && app.thread != null) {
+
+                if ((app.nonStoppingAdj == 0)
+                        && app.trimMemoryLevel != fgTrimLevel
+                        && app.thread != null) {
                     doTrim = true;
-                    trimLevel = ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW;
-                } else if ((app.curAdj > 0) && (app.curAdj < 6) && (app.trimMemoryLevel != ComponentCallbacks2.TRIM_MEMORY_MODERATE) && app.thread != null) {
+                    trimLevel = fgTrimLevel;
+                }
+                else if ((app.nonStoppingAdj > 0)
+                        && (app.nonStoppingAdj < 6)
+                        && (app.trimMemoryLevel != ComponentCallbacks2.TRIM_MEMORY_MODERATE)
+                        && app.thread != null) {
                     doTrim = true;
                     trimLevel = ComponentCallbacks2.TRIM_MEMORY_MODERATE;
                 }
-                else if ((app.curAdj >= 6) && app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_COMPLETE && app.thread != null) {
+                else if ((app.nonStoppingAdj >= 6)
+                        && app.trimMemoryLevel < ComponentCallbacks2.TRIM_MEMORY_COMPLETE
+                        && app.thread != null) {
                     doTrim = true;
                     trimLevel = ComponentCallbacks2.TRIM_MEMORY_COMPLETE;
                 }
 
                 if (doTrim) {
                     try {
-		                //Slog.e(TAG, "lmark132_92 trim level:"+ trimLevel + " app: "+ app + " adj:" + app.curAdj);
                         app.thread.scheduleTrimMemory(trimLevel);
                         app.trimMemoryLevel = trimLevel;
                     } catch (RemoteException e) {
-                        Slog.w(TAG, "lmark132_93 Exception during scheduleTrimMemory, ex:"+e);
+                        Slog.w(TAG, "Exception during scheduleTrimMemory, ex:"+e);
                     }
                     app.pendingUiClean = false;
                 }
