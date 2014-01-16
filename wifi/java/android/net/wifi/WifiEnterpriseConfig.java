@@ -222,7 +222,11 @@ public class WifiEnterpriseConfig implements Parcelable {
         /** EAP-Password */
         public static final int PWD     = 3;
         /** @hide */
-        public static final String[] strings = { "PEAP", "TLS", "TTLS", "PWD" };
+        public static final int SIM     = 4;
+        /** @hide */
+        public static final int AKA     = 5;
+        /** @hide */
+        public static final String[] strings = { "PEAP", "TLS", "TTLS", "PWD", "SIM", "AKA" };
 
         /** Prevent initialization */
         private Eap() {}
@@ -272,6 +276,8 @@ public class WifiEnterpriseConfig implements Parcelable {
             case Eap.PWD:
             case Eap.TLS:
             case Eap.TTLS:
+            case Eap.SIM:
+            case Eap.AKA:
                 mFields.put(EAP_KEY, Eap.strings[eapMethod]);
                 break;
             default:

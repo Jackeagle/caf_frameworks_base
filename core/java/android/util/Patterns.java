@@ -120,7 +120,8 @@ public class Patterns {
      *  added.
      */
     public static final Pattern WEB_URL = Pattern.compile(
-        "((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/(?:(?:[a-zA-Z0-9\\$\\-\\_\\.\\+\\!\\*\\'\\(\\)"
+        "((?=[^\u0391-\uffe5])(?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/"
+        + "(?:(?:[a-zA-Z0-9\\$\\-\\_\\.\\+\\!\\*\\'\\(\\)"
         + "\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,64}(?:\\:(?:[a-zA-Z0-9\\$\\-\\_"
         + "\\.\\+\\!\\*\\'\\(\\)\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,25})?\\@)?)?"
         + "((?:(?:[" + GOOD_IRI_HOST_CHAR + "][" + GOOD_IRI_CHAR + "\\-]{0,64}\\.)+"   // named host
@@ -132,7 +133,8 @@ public class Patterns {
         + "|[1-9][0-9]|[0-9])))"
         + "(?:\\:\\d{1,5})?)" // plus option port number
         + "(\\/(?:(?:[" + GOOD_IRI_CHAR + "\\;\\/\\?\\:\\@\\&\\=\\#\\~"  // plus option query params
-        + "\\-\\.\\+\\!\\*\\'\\(\\)\\_])|(?:\\,[" + GOOD_IRI_CHAR + "])|(?:\\%[a-fA-F0-9]{2}))*)?");
+        + "\\-\\.\\+\\!\\*\\'\\(\\)\\_])|(?:\\,[" + GOOD_IRI_CHAR + "])|(?:\\%[a-fA-F0-9]{2}))*)?",
+          Pattern.CASE_INSENSITIVE);
 
     public static final Pattern IP_ADDRESS
         = Pattern.compile(

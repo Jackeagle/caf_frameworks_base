@@ -19,6 +19,7 @@ package android.telephony;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.telephony.Rlog;
 
 /**
@@ -28,7 +29,8 @@ public class SignalStrength implements Parcelable {
 
     private static final String LOG_TAG = "SignalStrength";
     private static final boolean DBG = false;
-
+    private static final boolean is5barSignal = SystemProperties
+            .getInt("persist.env.c.sb.style", 0) == 3;
     /** @hide */
     public static final int SIGNAL_STRENGTH_NONE_OR_UNKNOWN = 0;
     /** @hide */
@@ -40,10 +42,13 @@ public class SignalStrength implements Parcelable {
     /** @hide */
     public static final int SIGNAL_STRENGTH_GREAT = 4;
     /** @hide */
+    public static final int SIGNAL_STRENGTH_EXCELLENT = 5;
+    /** @hide */
     public static final int NUM_SIGNAL_STRENGTH_BINS = 5;
+
     /** @hide */
     public static final String[] SIGNAL_STRENGTH_NAMES = {
-        "none", "poor", "moderate", "good", "great"
+        "none", "poor", "moderate", "good", "great" , "excellent"
     };
 
     /** @hide */
@@ -619,11 +624,21 @@ public class SignalStrength implements Parcelable {
         // signal, its better to show 0 bars to the user in such cases.
         // asu = 99 is a special case, where the signal strength is unknown.
         int asu = getGsmSignalStrength();
-        if (asu <= 2 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (asu >= 12) level = SIGNAL_STRENGTH_GREAT;
-        else if (asu >= 8)  level = SIGNAL_STRENGTH_GOOD;
-        else if (asu >= 5)  level = SIGNAL_STRENGTH_MODERATE;
-        else level = SIGNAL_STRENGTH_POOR;
+        if (is5barSignal) {
+            if (asu <= 0 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+            else if (asu >= 12) level = SIGNAL_STRENGTH_EXCELLENT;
+            else if (asu >= 9) level = SIGNAL_STRENGTH_GREAT;
+            else if (asu >= 7)  level = SIGNAL_STRENGTH_GOOD;
+            else if (asu >= 4)  level = SIGNAL_STRENGTH_MODERATE;
+            else level = SIGNAL_STRENGTH_POOR;
+        } else {
+            if (asu <= 2 || asu == 99) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+            else if (asu >= 12) level = SIGNAL_STRENGTH_GREAT;
+            else if (asu >= 8)  level = SIGNAL_STRENGTH_GOOD;
+            else if (asu >= 5)  level = SIGNAL_STRENGTH_MODERATE;
+            else level = SIGNAL_STRENGTH_POOR;
+        }
+
         if (DBG) log("getGsmLevel=" + level);
         return level;
     }
@@ -784,12 +799,23 @@ public class SignalStrength implements Parcelable {
          */
         int rssiIconLevel = SIGNAL_STRENGTH_NONE_OR_UNKNOWN, rsrpIconLevel = -1, snrIconLevel = -1;
 
-        if (mLteRsrp > -44) rsrpIconLevel = -1;
-        else if (mLteRsrp >= -85) rsrpIconLevel = SIGNAL_STRENGTH_GREAT;
-        else if (mLteRsrp >= -95) rsrpIconLevel = SIGNAL_STRENGTH_GOOD;
-        else if (mLteRsrp >= -105) rsrpIconLevel = SIGNAL_STRENGTH_MODERATE;
-        else if (mLteRsrp >= -115) rsrpIconLevel = SIGNAL_STRENGTH_POOR;
-        else if (mLteRsrp >= -140) rsrpIconLevel = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        if (is5barSignal) {
+            if (mLteRsrp > -44) rsrpIconLevel = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+            else if (mLteRsrp >= -90) rsrpIconLevel = SIGNAL_STRENGTH_EXCELLENT;
+            else if (mLteRsrp >= -98) rsrpIconLevel = SIGNAL_STRENGTH_GREAT;
+            else if (mLteRsrp >= -105) rsrpIconLevel = SIGNAL_STRENGTH_GOOD;
+            else if (mLteRsrp >= -113) rsrpIconLevel = SIGNAL_STRENGTH_MODERATE;
+            else if (mLteRsrp >= -119) rsrpIconLevel = SIGNAL_STRENGTH_POOR;
+            else rsrpIconLevel = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+            return rsrpIconLevel;
+        } else {
+            if (mLteRsrp > -44) rsrpIconLevel = -1;
+            else if (mLteRsrp >= -85) rsrpIconLevel = SIGNAL_STRENGTH_GREAT;
+            else if (mLteRsrp >= -95) rsrpIconLevel = SIGNAL_STRENGTH_GOOD;
+            else if (mLteRsrp >= -105) rsrpIconLevel = SIGNAL_STRENGTH_MODERATE;
+            else if (mLteRsrp >= -115) rsrpIconLevel = SIGNAL_STRENGTH_POOR;
+            else if (mLteRsrp >= -140) rsrpIconLevel = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        }
 
         /*
          * Values are -200 dB to +300 (SNR*10dB) RS_SNR >= 13.0 dB =>4 bars 4.5
@@ -889,13 +915,23 @@ public class SignalStrength implements Parcelable {
         final int tdScdmaDbm = getTdScdmaDbm();
         int level;
 
-        if ((tdScdmaDbm > -25) || (tdScdmaDbm == SignalStrength.INVALID))
-                level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (tdScdmaDbm >= -49) level = SIGNAL_STRENGTH_GREAT;
-        else if (tdScdmaDbm >= -73) level = SIGNAL_STRENGTH_GOOD;
-        else if (tdScdmaDbm >= -97) level = SIGNAL_STRENGTH_MODERATE;
-        else if (tdScdmaDbm >= -120) level = SIGNAL_STRENGTH_POOR;
-        else level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        if (is5barSignal) {
+            if ((tdScdmaDbm > -25) || (tdScdmaDbm == SignalStrength.INVALID))
+                    level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+            else if (tdScdmaDbm >= -82) level = SIGNAL_STRENGTH_EXCELLENT;
+            else if (tdScdmaDbm >= -88) level = SIGNAL_STRENGTH_GREAT;
+            else if (tdScdmaDbm >= -94) level = SIGNAL_STRENGTH_GOOD;
+            else if (tdScdmaDbm >= -105) level = SIGNAL_STRENGTH_MODERATE;
+            else level = SIGNAL_STRENGTH_POOR;
+        } else {
+            if ((tdScdmaDbm > -25) || (tdScdmaDbm == SignalStrength.INVALID))
+                    level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+            else if (tdScdmaDbm >= -49) level = SIGNAL_STRENGTH_GREAT;
+            else if (tdScdmaDbm >= -73) level = SIGNAL_STRENGTH_GOOD;
+            else if (tdScdmaDbm >= -97) level = SIGNAL_STRENGTH_MODERATE;
+            else if (tdScdmaDbm >= -120) level = SIGNAL_STRENGTH_POOR;
+            else level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+        }
 
         if (DBG) log("getTdScdmaLevel = " + level);
         return level;
