@@ -117,6 +117,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
     private final AlarmHandler mHandler = new AlarmHandler();
     private ClockReceiver mClockReceiver;
     private UninstallReceiver mUninstallReceiver;
+    private QuickBootReceiver mQuickBootReceiver;
     private final ResultReceiver mResultReceiver = new ResultReceiver();
     private final PendingIntent mTimeTickSender;
     private final PendingIntent mDateChangeSender;
@@ -438,8 +439,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
         final Pair<String, ComponentName> mTarget;
         final BroadcastStats mBroadcastStats;
         final FilterStats mFilterStats;
+        final int mUid;
 
-        InFlight(AlarmManagerService service, PendingIntent pendingIntent, WorkSource workSource) {
+        InFlight(AlarmManagerService service, PendingIntent pendingIntent,
+                      WorkSource workSource, int uid) {
             mPendingIntent = pendingIntent;
             mWorkSource = workSource;
             Intent intent = pendingIntent.getIntent();
@@ -453,6 +456,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 mBroadcastStats.filterStats.put(mTarget, fs);
             }
             mFilterStats = fs;
+            mUid = uid;
         }
     }
 
@@ -521,6 +525,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
         mClockReceiver.scheduleTimeTickEvent();
         mClockReceiver.scheduleDateChangedEvent();
         mUninstallReceiver = new UninstallReceiver();
+        mQuickBootReceiver = new QuickBootReceiver();
         
         if (mDescriptor != -1) {
             mWaitThread.start();
@@ -783,7 +788,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
         if (localLOGV) Slog.v(TAG, "UpdateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
         synchronized(mLock) {
             if(isBlocked) {
-                for( int i=0; i< mTriggeredUids.size(); i++) {
+                for( int i=0; i < mTriggeredUids.size(); i++) {
                     if(mTriggeredUids.contains(new Integer(uid))) {
                         if (localLOGV) {
                             Slog.v(TAG,"TriggeredUids has this uid, mBroadcastRefCount="
@@ -811,7 +816,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     }
                 }
             } else {
-                for(int i =0; i<mBlockedUids.size(); i++) {
+                for(int i =0; i < mBlockedUids.size(); i++) {
                     if(!mBlockedUids.remove(new Integer(uid))) {
                         //no more matching uids break from the for loop
                         break;
@@ -1260,6 +1265,19 @@ class AlarmManagerService extends IAlarmManager.Stub {
         }
     }
 
+    private void filtQuickBootAlarms(ArrayList<Alarm> triggerList) {
+
+        for (int i = triggerList.size() - 1; i >= 0; i--) {
+            Alarm alarm = triggerList.get(i);
+
+            // bypass system alarms
+            if (!"android".equals(alarm.operation.getTargetPackage())) {
+                triggerList.remove(i);
+                Slog.v(TAG, "ignore -> " + alarm.operation.getTargetPackage());
+            }
+        }
+    }
+
     private class AlarmThread extends Thread
     {
         public AlarmThread()
@@ -1315,6 +1333,10 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     triggerAlarmsLocked(triggerList, nowELAPSED, nowRTC);
                     rescheduleKernelAlarmsLocked();
 
+                    if (SystemProperties.getInt("sys.quickboot.enable", 0) == 1) {
+                        filtQuickBootAlarms(triggerList);
+                    }
+
                     // now deliver the alarm intents
                     for (int i=0; i<triggerList.size(); i++) {
                         Alarm alarm = triggerList.get(i);
@@ -1331,7 +1353,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                                 mWakeLock.acquire();
                             }
                             final InFlight inflight = new InFlight(AlarmManagerService.this,
-                                    alarm.operation, alarm.workSource);
+                                    alarm.operation, alarm.workSource, alarm.uid);
                             mInFlight.add(inflight);
                             mBroadcastRefCount++;
                             mTriggeredUids.add(new Integer(alarm.uid));
@@ -1431,7 +1453,32 @@ class AlarmManagerService extends IAlarmManager.Stub {
             }
         }
     }
-    
+
+    private class QuickBootReceiver extends BroadcastReceiver {
+
+        public QuickBootReceiver() {
+            IntentFilter filter = new IntentFilter();
+            filter.addAction("intent.quickboot.appkilled");
+            mContext.registerReceiver(this, filter,
+                    "android.permission.DEVICE_POWER", null);
+        }
+
+        @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                String pkgList[] = null;
+                if ("intent.quickboot.appkilled".equals(action)) {
+                    pkgList = intent.getStringArrayExtra(Intent.EXTRA_PACKAGES);
+                    if (pkgList != null && (pkgList.length > 0)) {
+                        for (String pkg : pkgList) {
+                            removeLocked(pkg);
+                            mBroadcastStats.remove(pkg);
+                        }
+                    }
+                }
+            }
+    }
+
     class ClockReceiver extends BroadcastReceiver {
         public ClockReceiver() {
             IntentFilter filter = new IntentFilter();
@@ -1560,9 +1607,11 @@ class AlarmManagerService extends IAlarmManager.Stub {
         public void onSendFinished(PendingIntent pi, Intent intent, int resultCode,
                 String resultData, Bundle resultExtras) {
             synchronized (mLock) {
+                int uid = 0;
                 InFlight inflight = null;
                 for (int i=0; i<mInFlight.size(); i++) {
                     if (mInFlight.get(i).mPendingIntent == pi) {
+                        uid = mInFlight.get(i).mUid;
                         inflight = mInFlight.remove(i);
                         break;
                     }
@@ -1584,18 +1633,7 @@ class AlarmManagerService extends IAlarmManager.Stub {
                 } else {
                     mLog.w("No in-flight alarm for " + pi + " " + intent);
                 }
-                String pkg = null;
-                int uid = 0;
-                try {
-                    pkg = pi.getTargetPackage();
-                    final PackageManager pm = mContext.getPackageManager();
-                    ApplicationInfo appInfo =
-                        pm.getApplicationInfo(pkg, PackageManager.GET_META_DATA);
-                    uid = appInfo.uid;
-                    mTriggeredUids.remove(new Integer(uid));
-                } catch (PackageManager.NameNotFoundException ex) {
-                    Slog.w(TAG, "onSendFinished NameNotFoundException Pkg = " + pkg);
-                }
+                mTriggeredUids.remove(new Integer(uid));
                 if(mBlockedUids.contains(new Integer(uid))) {
                     mBlockedUids.remove(new Integer(uid));
                 } else {
