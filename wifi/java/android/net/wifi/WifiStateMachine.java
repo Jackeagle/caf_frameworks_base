@@ -3610,6 +3610,19 @@ public class WifiStateMachine extends StateMachine {
                     handleNetworkDisconnect();
                     transitionTo(mDisconnectedState);
                     break;
+                case WifiP2pService.P2P_CONNECTION_CHANGED:
+                    NetworkInfo info = (NetworkInfo) message.obj;
+                    mP2pConnected.set(info.isConnected());
+                    if (!mP2pConnected.get()) {
+			log("Roll back to default scan interval by Case \"Disconnecting State\"");
+			int defaultInterval = mContext.getResources().getInteger(
+				R.integer.config_wifi_supplicant_scan_interval);
+			long scanIntervalMs = Settings.Global.getLong(mContext.getContentResolver(),
+				Settings.Global.WIFI_SUPPLICANT_SCAN_INTERVAL_MS,
+				defaultInterval);
+			mWifiNative.setScanInterval((int) scanIntervalMs/1000);
+                    }
+		    break;
                 default:
                     return NOT_HANDLED;
             }
@@ -3762,18 +3775,19 @@ public class WifiStateMachine extends StateMachine {
                                 defaultInterval);
                         mWifiNative.setScanInterval((int) scanIntervalMs/1000);
                     } else {
+			if (DBG) log("Roll back to default scan interval by case \"DisconnectedState\"");
+
+			int defaultInterval = mContext.getResources().getInteger(
+				R.integer.config_wifi_supplicant_scan_interval);
+			long scanIntervalMs = Settings.Global.getLong(mContext.getContentResolver(),
+				Settings.Global.WIFI_SUPPLICANT_SCAN_INTERVAL_MS,
+				defaultInterval);
+			mWifiNative.setScanInterval((int) scanIntervalMs/1000);
+
 			if (mWifiConfigStore.getConfiguredNetworks().size() == 0) {
-				if (DBG) log("Turn on scanning after p2p disconnected");
-                               		sendMessageDelayed(obtainMessage(CMD_NO_NETWORKS_PERIODIC_SCAN,
-					++mPeriodicScanToken, 0), mSupplicantScanIntervalMs);
-			} else {
-				if (DBG) log("Roll back to default scan interval if has profile");
-				int defaultInterval = mContext.getResources().getInteger(
-					R.integer.config_wifi_supplicant_scan_interval);
-				long scanIntervalMs = Settings.Global.getLong(mContext.getContentResolver(),
-					Settings.Global.WIFI_SUPPLICANT_SCAN_INTERVAL_MS,
-					defaultInterval);
-				mWifiNative.setScanInterval((int) scanIntervalMs/1000);
+                               if (DBG) log("Turn on scanning after p2p disconnected");
+                               sendMessageDelayed(obtainMessage(CMD_NO_NETWORKS_PERIODIC_SCAN,
+                                       ++mPeriodicScanToken, 0), mSupplicantScanIntervalMs);
 			}
 		    }                 
 		case CMD_RECONNECT:
