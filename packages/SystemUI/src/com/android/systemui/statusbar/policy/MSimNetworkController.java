@@ -1067,6 +1067,10 @@ public class MSimNetworkController extends NetworkController {
             boolean show3G = ss[subscription] != null &&
                 ss[subscription].getRilVoiceRadioTechnology() ==
                     ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA;
+            if (SystemProperties.getBoolean("persist.env.sys.shortplmn", false)
+                && ss[subscription] != null) {
+                networkName = ss[subscription].getOperatorAlphaShort();
+            }
             mMSimNetworkName[subscription] =
                     TextUtils.isEmpty(networkName) ? mNetworkNameDefault :
                     networkName + (show3G ? " 3G" : "");
