@@ -18,6 +18,15 @@ public class AccessibilityContentDescriptions {
         R.string.accessibility_phone_signal_full
     };
 
+    static final int[] PHONE_SIGNAL_STRENGTH_CMCC = {
+        R.string.accessibility_no_phone,
+        R.string.accessibility_phone_one_bar,
+        R.string.accessibility_phone_two_bars,
+        R.string.accessibility_phone_three_bars,
+        R.string.accessibility_phone_four_bars,
+        R.string.accessibility_phone_signal_full
+    };
+
     static final int[] DATA_CONNECTION_STRENGTH = {
         R.string.accessibility_no_data,
         R.string.accessibility_data_one_bar,

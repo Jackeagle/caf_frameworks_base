@@ -1054,8 +1054,11 @@ public class MSimNetworkController extends NetworkController {
         }
 
         if (SystemProperties.getBoolean(PROP_KEY_SHOW_CARRIER, true)) {
-            String networkName = mContext.getLocalString(
-                mPhone.getNetworkOperatorName(subscription),
+            String operatorName = mPhone.getNetworkOperatorName(subscription);
+            if ("null".equalsIgnoreCase(operatorName)) {
+                operatorName = "";
+            }
+            String networkName = mContext.getLocalString(operatorName,
                 ORIGIN_CARRIER_NAME_ID,
                 LOCALE_CARRIER_NAME_ID);
 

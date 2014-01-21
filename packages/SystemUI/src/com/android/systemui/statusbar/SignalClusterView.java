@@ -20,6 +20,7 @@
 package com.android.systemui.statusbar;
 
 import android.content.Context;
+import android.telephony.ServiceState;
 import android.util.AttributeSet;
 import android.util.Slog;
 import android.view.View;
@@ -126,7 +127,7 @@ public class SignalClusterView
     @Override
     public void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
             int typeIcon, String contentDescription, String typeContentDescription,
-            int noSimIcon) {
+            int noSimIcon, ServiceState simServiceState, boolean isRoam) {
         mMobileVisible = visible;
         mMobileStrengthId = strengthIcon;
         mMobileActivityId = activityIcon;

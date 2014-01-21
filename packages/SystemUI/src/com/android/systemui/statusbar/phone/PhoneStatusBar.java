@@ -86,6 +86,7 @@ import com.android.internal.statusbar.StatusBarIcon;
 import com.android.systemui.EventLogTags;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.BaseStatusBar;
+import com.android.systemui.statusbar.CMCCSignalClusterView;
 import com.android.systemui.statusbar.CTMSimSignalClusterView;
 import com.android.systemui.statusbar.CUMSimSignalClusterView;
 import com.android.systemui.statusbar.CommandQueue;
@@ -133,6 +134,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     public static final int STATUSBAR_STYLE_DEFAULT = 0;
     public static final int STATUSBAR_STYLE_CU = 1;
     public static final int STATUSBAR_STYLE_CT = 2;
+    public static final int STATUSBAR_STYLE_CMCC = 3;
 
     // Get current configurated style of status bar from property.
     public static final int STATUSBAR_STYLE = SystemProperties
@@ -546,8 +548,11 @@ public class PhoneStatusBar extends BaseStatusBar {
                     signalClusterView = (CUMSimSignalClusterView) View
                             .inflate(context, R.layout.msim_signal_cluster_view_cu, null);
                     break;
+                case STATUSBAR_STYLE_CMCC:
                 default:
                     Log.e(TAG, "The status bar's style is: " + STATUSBAR_STYLE);
+                    signalClusterView = (MSimSignalClusterView) View
+                            .inflate(context, R.layout.msim_signal_cluster_view, null);
                     break;
             }
 
@@ -570,6 +575,16 @@ public class PhoneStatusBar extends BaseStatusBar {
                         v.setId(R.id.signal_cluster);
                         p.removeView((View)signalCluster);
                         p.addView(v, 0);
+                        signalCluster = (SignalClusterView)v;
+                    }
+                    break;
+                case STATUSBAR_STYLE_CMCC:
+                    final ViewGroup p_cmcc = (ViewGroup)signalCluster.getParent();
+                    if (p_cmcc != null) {
+                        View v = View.inflate(context, R.layout.signal_cluster_view_cmcc, null);
+                        v.setId(R.id.signal_cluster);
+                        p_cmcc.removeView((View)signalCluster);
+                        p_cmcc.addView(v, 0);
                         signalCluster = (SignalClusterView)v;
                     }
                     break;
