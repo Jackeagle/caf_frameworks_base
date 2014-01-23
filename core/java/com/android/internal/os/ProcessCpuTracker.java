@@ -22,6 +22,7 @@ import android.os.FileUtils;
 import android.os.Process;
 import android.os.StrictMode;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.Slog;
 import com.android.internal.util.FastPrintWriter;
 
@@ -273,9 +274,13 @@ public class ProcessCpuTracker {
     }
 
     public void init() {
+        boolean mAutoEnv = SystemProperties.getBoolean("AUTOPLATFORM", true );
         if (DEBUG) Slog.v(TAG, "Init: " + this);
         mFirst = true;
-        update();
+       /* donot call update() [CPU usage data collection] for autoplatform */
+        if (!mAutoEnv) {
+             update();
+        }
     }
 
     public void update() {
