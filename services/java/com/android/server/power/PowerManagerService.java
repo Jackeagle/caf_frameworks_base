@@ -1760,7 +1760,10 @@ public final class PowerManagerService extends IPowerManager.Stub
 
             mDisplayPowerRequest.useProximitySensor = shouldUseProximitySensorLocked();
 
-            mDisplayPowerRequest.blockScreenOn = mScreenOnBlocker.isHeld();
+            if (SystemProperties.getBoolean("AUTOPLATFORM", true ))
+                mDisplayPowerRequest.blockScreenOn = false;
+            else
+                mDisplayPowerRequest.blockScreenOn = mScreenOnBlocker.isHeld();
 
             mDisplayReady = mDisplayPowerController.requestPowerState(mDisplayPowerRequest,
                     mRequestWaitForNegativeProximity);
