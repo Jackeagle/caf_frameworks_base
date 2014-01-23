@@ -417,6 +417,7 @@ interface IPackageManager {
 
     /** Reflects current DeviceStorageMonitorService state */
     boolean isStorageLow();
+    void laterScanApp();
 
     boolean setApplicationBlockedSettingAsUser(String packageName, boolean blocked, int userId);
     boolean getApplicationBlockedSettingAsUser(String packageName, int userId);
