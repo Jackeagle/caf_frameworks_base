@@ -38,6 +38,7 @@ public class MenuDialogHelper implements DialogInterface.OnKeyListener,
     private AlertDialog mDialog;
     ListMenuPresenter mPresenter;
     private MenuPresenter.Callback mPresenterCallback;
+    public static boolean mIsShowing = false;
     
     public MenuDialogHelper(MenuBuilder menu) {
         mMenu = menu;
@@ -77,6 +78,7 @@ public class MenuDialogHelper implements DialogInterface.OnKeyListener,
         
         // Show the menu
         mDialog = builder.create();
+        mDialog.setOnDismissListener(this);
         
         WindowManager.LayoutParams lp = mDialog.getWindow().getAttributes();
         lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
@@ -85,6 +87,7 @@ public class MenuDialogHelper implements DialogInterface.OnKeyListener,
         }
         lp.flags |= WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM;
         
+        mIsShowing = true;
         mDialog.show();
     }
     
@@ -141,6 +144,7 @@ public class MenuDialogHelper implements DialogInterface.OnKeyListener,
 
     @Override
     public void onDismiss(DialogInterface dialog) {
+        mIsShowing = false;
         mPresenter.onCloseMenu(mMenu, true);
     }
 
@@ -164,5 +168,10 @@ public class MenuDialogHelper implements DialogInterface.OnKeyListener,
 
     public void onClick(DialogInterface dialog, int which) {
         mMenu.performItemAction((MenuItemImpl) mPresenter.getAdapter().getItem(which), 0);
+    }
+
+    public static boolean Isshowing()
+    {
+        return mIsShowing;
     }
 }
