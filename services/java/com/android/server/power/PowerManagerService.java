@@ -1409,6 +1409,15 @@ public final class PowerManagerService extends IPowerManager.Stub
      * This function must have no other side-effects.
      */
     private void updateUserActivitySummaryLocked(long now, int dirty) {
+
+        /*Added to avoid functions not required for Auto project */
+        boolean mAutoEnv = SystemProperties.getBoolean("AUTOPLATFORM", true );
+
+	// Disable screen timeout for Automotive platform
+        if (mAutoEnv) {
+           mUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
+        } else {
+
         // Update the status of the user activity timeout timer.
         if ((dirty & (DIRTY_USER_ACTIVITY | DIRTY_WAKEFULNESS | DIRTY_SETTINGS)) != 0) {
             mHandler.removeMessages(MSG_USER_ACTIVITY_TIMEOUT);
@@ -1458,6 +1467,7 @@ public final class PowerManagerService extends IPowerManager.Stub
                         + ", nextTimeout=" + TimeUtils.formatUptime(nextTimeout));
             }
         }
+      } /* mAutoEnv */
     }
 
     /**
