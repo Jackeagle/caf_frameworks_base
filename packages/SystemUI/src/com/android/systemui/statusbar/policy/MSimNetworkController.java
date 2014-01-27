@@ -1069,7 +1069,9 @@ public class MSimNetworkController extends NetworkController {
                     ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA;
             if (SystemProperties.getBoolean("persist.env.sys.shortplmn", false)
                 && ss[subscription] != null) {
-                networkName = ss[subscription].getOperatorAlphaShort();
+                String shortName = ss[subscription].getOperatorAlphaShort();
+                if (!TextUtils.isEmpty(shortName))
+                    networkName = shortName;
             }
             mMSimNetworkName[subscription] =
                     TextUtils.isEmpty(networkName) ? mNetworkNameDefault :
