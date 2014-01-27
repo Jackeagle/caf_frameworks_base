@@ -428,7 +428,7 @@ public class WindowManagerService extends IWindowManager.Stub
     boolean mSystemBooted = false;
     boolean mForceDisplayEnabled = false;
     boolean mShowingBootMessages = false;
-
+    boolean mAutoEnv = SystemProperties.getBoolean("AUTOPLATFORM", true );
     String mLastANRState;
 
     /** All DisplayContents in the world, kept here */
@@ -5286,7 +5286,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
 
-            if (!mForceDisplayEnabled) {
+            /* locking of screen is disabled for autoplatform.
+               So, this condition doesnot occur */
+            if (!mAutoEnv && !mForceDisplayEnabled) {
                 // Don't enable the screen until all existing windows
                 // have been drawn.
                 boolean haveBootMsg = false;
