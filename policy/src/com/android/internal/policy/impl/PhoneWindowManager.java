@@ -300,6 +300,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mTranslucentDecorEnabled = true;
 
     int mPointerLocationMode = 0; // guarded by mLock
+    boolean mAutoEnv = false;
 
     // The last window we were told about in focusChanged.
     WindowState mFocusedWindow;
@@ -3382,7 +3383,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mForcingShowNavBar = false;
         mForcingShowNavBarLayer = -1;
         
-        mHideLockScreen = false;
+        if (SystemProperties.getBoolean("AUTOPLATFORM", true ))
+           mHideLockScreen = true;
+        else
+           mHideLockScreen = false;
         mAllowLockscreenWhenOn = false;
         mDismissKeyguard = DISMISS_KEYGUARD_NONE;
         mShowingLockscreen = false;
@@ -4415,6 +4419,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /** {@inheritDoc} */
     public boolean inKeyguardRestrictedKeyInputMode() {
+        if (SystemProperties.getBoolean("AUTOPLATFORM", true ))
+           return false;
         if (mKeyguardDelegate == null) return false;
         return mKeyguardDelegate.isInputRestricted();
     }
