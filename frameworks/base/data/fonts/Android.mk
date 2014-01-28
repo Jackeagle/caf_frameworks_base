@@ -52,26 +52,16 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
 
-
-ifneq ($(MULTI_LANG_ENGINE),REVERIE)
 include $(CLEAR_VARS)
-LOCAL_MODULE := DroidSansTamil-Regular.ttf
+LOCAL_MODULE := MTLmr3m.ttf
 LOCAL_SRC_FILES := $(LOCAL_MODULE)
 LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := DroidSansTamil-Bold.ttf
-LOCAL_SRC_FILES := $(LOCAL_MODULE)
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
-include $(BUILD_PREBUILT)
-endif
 
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := DroidSansTamil.ttf
 LOCAL_SRC_FILES := ../../../../vendor/qcom/proprietary/qrdplus/globalization/engine/DroidSansTamil.ttf
@@ -97,16 +87,16 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := DroidSansPunjabi.ttf
-LOCAL_SRC_FILES := ../../../../vendor/qcom/proprietary/qrdplus/globalization/engine/DroidSansPunjabi.ttf
+LOCAL_MODULE := DroidSansGujarati.ttf
+LOCAL_SRC_FILES := ../../../../vendor/qcom/proprietary/qrdplus/globalization/engine/DroidSansGujarati.ttf
 LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := DroidSansGujarati.ttf
-LOCAL_SRC_FILES := ../../../../vendor/qcom/proprietary/qrdplus/globalization/engine/DroidSansGujarati.ttf
+LOCAL_MODULE := DroidSansPunjabi.ttf
+LOCAL_SRC_FILES := ../../../../vendor/qcom/proprietary/qrdplus/globalization/engine/DroidSansPunjabi.ttf
 LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
@@ -136,16 +126,11 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 include $(BUILD_PREBUILT)
 
+
 endif
 
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := MTLmr3m.ttf
-LOCAL_SRC_FILES := $(LOCAL_MODULE)
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
-include $(BUILD_PREBUILT)
+
 
 droidsans_fallback_src := DroidSansFallbackFull.ttf
 extra_font_files := \
@@ -153,13 +138,6 @@ extra_font_files := \
 	DroidSans-Bold.ttf \
 	DroidSansEthiopic-Regular.ttf \
 	MTLmr3m.ttf
-
-ifneq ($(MULTI_LANG_ENGINE),REVERIE)
-extra_font_files += \
-        DroidSansTamil-Regular.ttf \
-        DroidSansTamil-Bold.ttf
-endif
-
 endif  # SMALLER_FONT_FOOTPRINT
 
 ################################
@@ -231,15 +209,9 @@ font_src_files += \
     DroidNaskhUI-Regular.ttf \
     DroidSansHebrew-Regular.ttf \
     DroidSansHebrew-Bold.ttf \
-    DroidSansThai.ttf \
     DroidSansArmenian.ttf \
     DroidSansGeorgian.ttf \
     AndroidEmoji.ttf
-
-ifneq ($(MULTI_LANG_ENGINE),REVERIE)
-font_src_files += \
-    DroidSansDevanagari-Regular.ttf
-endif
 
 endif # !MINIMAL_FONT
 

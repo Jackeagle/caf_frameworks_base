@@ -43,7 +43,6 @@ PRODUCT_PACKAGES := \
     DroidNaskhUI-Regular.ttf \
     DroidSansHebrew-Regular.ttf \
     DroidSansHebrew-Bold.ttf \
-    DroidSansThai.ttf \
     DroidSerif-Regular.ttf \
     DroidSerif-Bold.ttf \
     DroidSerif-Italic.ttf \
@@ -55,21 +54,17 @@ PRODUCT_PACKAGES := \
     Clockopia.ttf \
     AndroidClock.ttf \
     AndroidClock_Highlight.ttf \
-    AndroidClock_Solid.ttf \
-
+    AndroidClock_Solid.ttf 
 
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_PACKAGES += \
     DroidSansHindi.ttf \
     DroidSansTamil.ttf \
     DroidSansTelugu.ttf \
+    DroidSansGujarati.ttf \
     DroidSansPunjabi.ttf \
     DroidSansKannada.ttf \
     DroidSansBengali.ttf \
-    DroidSansGujarati.ttf \
     DroidSansMalayalam.ttf 
 
-else
-PRODUCT_PACKAGES += \
-    DroidSansDevanagari-Regular.ttf
 endif

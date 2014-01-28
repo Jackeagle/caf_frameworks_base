@@ -20,7 +20,6 @@
 
 #include "TextLayoutCache.h"
 #include "TextLayout.h"
-#include "SkFontHost.h"
 #include "SkTypeface_android.h"
 #include "HarfBuzzNGFaceSkia.h"
 #include <unicode/unistr.h>
@@ -219,7 +218,8 @@ void TextLayoutCache::dumpCacheStats() {
  */
 TextLayoutCacheKey::TextLayoutCacheKey(): start(0), count(0), contextCount(0),
         dirFlags(0), typeface(NULL), textSize(0), textSkewX(0), textScaleX(0), flags(0),
-        hinting(SkPaint::kNo_Hinting), variant(SkPaint::kDefault_Variant), language()  {
+        hinting(SkPaint::kNo_Hinting) {
+    paintOpts.setUseFontFallbacks(true);
 }
 
 TextLayoutCacheKey::TextLayoutCacheKey(const SkPaint* paint, const UChar* text,
@@ -233,8 +233,7 @@ TextLayoutCacheKey::TextLayoutCacheKey(const SkPaint* paint, const UChar* text,
     textScaleX = paint->getTextScaleX();
     flags = paint->getFlags();
     hinting = paint->getHinting();
-    variant = paint->getFontVariant();
-    language = paint->getLanguage();
+    paintOpts = paint->getPaintOptionsAndroid();
 }
 
 TextLayoutCacheKey::TextLayoutCacheKey(const TextLayoutCacheKey& other) :
@@ -249,8 +248,7 @@ TextLayoutCacheKey::TextLayoutCacheKey(const TextLayoutCacheKey& other) :
         textScaleX(other.textScaleX),
         flags(other.flags),
         hinting(other.hinting),
-        variant(other.variant),
-        language(other.language) {
+        paintOpts(other.paintOpts) {
 }
 
 int TextLayoutCacheKey::compare(const TextLayoutCacheKey& lhs, const TextLayoutCacheKey& rhs) {
@@ -284,11 +282,8 @@ int TextLayoutCacheKey::compare(const TextLayoutCacheKey& lhs, const TextLayoutC
     deltaInt = lhs.dirFlags - rhs.dirFlags;
     if (deltaInt) return (deltaInt);
 
-    deltaInt = lhs.variant - rhs.variant;
-    if (deltaInt) return (deltaInt);
-
-    if (lhs.language < rhs.language) return -1;
-    if (lhs.language > rhs.language) return +1;
+    if (lhs.paintOpts != rhs.paintOpts)
+        return memcmp(&lhs.paintOpts, &rhs.paintOpts, sizeof(SkPaintOptionsAndroid));
 
     return memcmp(lhs.getText(), rhs.getText(), lhs.contextCount * sizeof(UChar));
 }
@@ -307,7 +302,7 @@ hash_t TextLayoutCacheKey::hash() const {
     hash = JenkinsHashMix(hash, hash_type(textScaleX));
     hash = JenkinsHashMix(hash, flags);
     hash = JenkinsHashMix(hash, hinting);
-    hash = JenkinsHashMix(hash, variant);
+    hash = JenkinsHashMix(hash, paintOpts.getFontVariant());
     // Note: leaving out language is not problematic, as equality comparisons
     // are still valid - the only bad thing that could happen is collisions.
     hash = JenkinsHashMixShorts(hash, getText(), contextCount);
@@ -319,6 +314,7 @@ hash_t TextLayoutCacheKey::hash() const {
  */
 TextLayoutValue::TextLayoutValue(size_t contextCount) :
         mTotalAdvance(0), mElapsedTime(0) {
+    mBounds.setEmpty();
     // Give a hint for advances and glyphs vectors size
     mAdvances.setCapacity(contextCount);
     mGlyphs.setCapacity(contextCount);
@@ -346,11 +342,11 @@ TextLayoutShaper::~TextLayoutShaper() {
     hb_buffer_destroy(mBuffer);
 }
 
-void TextLayoutShaper::computeValues(TextLayoutValue* value, const SkPaint* paint, const UChar* chars,
-        size_t start, size_t count, size_t contextCount, int dirFlags) {
-
+void TextLayoutShaper::computeValues(TextLayoutValue* value, const SkPaint* paint,
+        const UChar* chars, size_t start, size_t count, size_t contextCount, int dirFlags) {
     computeValues(paint, chars, start, count, contextCount, dirFlags,
-            &value->mAdvances, &value->mTotalAdvance, &value->mGlyphs, &value->mPos);
+            &value->mAdvances, &value->mTotalAdvance, &value->mBounds,
+            &value->mGlyphs, &value->mPos);
 #if DEBUG_ADVANCES
     ALOGD("Advances - start = %d, count = %d, contextCount = %d, totalAdvance = %f", start, count,
             contextCount, value->mTotalAdvance);
@@ -359,7 +355,7 @@ void TextLayoutShaper::computeValues(TextLayoutValue* value, const SkPaint* pain
 
 void TextLayoutShaper::computeValues(const SkPaint* paint, const UChar* chars,
         size_t start, size_t count, size_t contextCount, int dirFlags,
-        Vector<jfloat>* const outAdvances, jfloat* outTotalAdvance,
+        Vector<jfloat>* const outAdvances, jfloat* outTotalAdvance, SkRect* outBounds,
         Vector<jchar>* const outGlyphs, Vector<jfloat>* const outPos) {
         *outTotalAdvance = 0;
         if (!count) {
@@ -455,7 +451,7 @@ void TextLayoutShaper::computeValues(const SkPaint* paint, const UChar* chars,
                                     i, startRun, lengthRun, isRTL);
 #endif
                             computeRunValues(paint, chars, startRun, lengthRun, contextCount, isRTL,
-                                    outAdvances, outTotalAdvance, outGlyphs, outPos);
+                                    outAdvances, outTotalAdvance, outBounds, outGlyphs, outPos);
 
                         }
                     }
@@ -479,7 +475,7 @@ void TextLayoutShaper::computeValues(const SkPaint* paint, const UChar* chars,
                     "-- run-start = %d, run-len = %d, isRTL = %d", start, count, isRTL);
 #endif
             computeRunValues(paint, chars, start, count, contextCount, isRTL,
-                    outAdvances, outTotalAdvance, outGlyphs, outPos);
+                    outAdvances, outTotalAdvance, outBounds, outGlyphs, outPos);
         }
 
 #if DEBUG_GLYPHS
@@ -676,7 +672,7 @@ static void logGlyphs(hb_buffer_t* buffer) {
 
 void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* contextChars,
         size_t start, size_t count, size_t contextCount, bool isRTL,
-        Vector<jfloat>* const outAdvances, jfloat* outTotalAdvance,
+        Vector<jfloat>* const outAdvances, jfloat* outTotalAdvance, SkRect* outBounds,
         Vector<jchar>* const outGlyphs, Vector<jfloat>* const outPos) {
     if (!count) {
         // We cannot shape an empty run.
@@ -698,8 +694,7 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
     mShapingPaint.setTextScaleX(paint->getTextScaleX());
     mShapingPaint.setFlags(paint->getFlags());
     mShapingPaint.setHinting(paint->getHinting());
-    mShapingPaint.setFontVariant(paint->getFontVariant());
-    mShapingPaint.setLanguage(paint->getLanguage());
+    mShapingPaint.setPaintOptionsAndroid(paint->getPaintOptionsAndroid());
 
     // Split the BiDi run into Script runs. Harfbuzz will populate the pos, length and script
     // into the shaperItem
@@ -755,53 +750,63 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
             size_t cluster = info[i].cluster - start;
             float xAdvance = HBFixedToFloat(positions[i].x_advance);
             outAdvances->replaceAt(outAdvances->itemAt(cluster) + xAdvance, cluster);
-            outGlyphs->add(info[i].codepoint + glyphBaseCount);
+            jchar glyphId = info[i].codepoint + glyphBaseCount;
+            outGlyphs->add(glyphId);
             float xo = HBFixedToFloat(positions[i].x_offset);
             float yo = -HBFixedToFloat(positions[i].y_offset);
-            outPos->add(totalAdvance + xo + yo * skewX);
-            outPos->add(yo);
+
+            float xpos = totalAdvance + xo + yo * skewX;
+            float ypos = yo;
+            outPos->add(xpos);
+            outPos->add(ypos);
             totalAdvance += xAdvance;
+
+            // TODO: consider using glyph cache
+            const SkGlyph& metrics = mShapingPaint.getGlyphMetrics(glyphId, NULL);
+            outBounds->join(xpos + metrics.fLeft, ypos + metrics.fTop,
+                    xpos + metrics.fLeft + metrics.fWidth, ypos + metrics.fTop + metrics.fHeight);
+
         }
     }
 
     *outTotalAdvance = totalAdvance;
 
-
-    #ifdef REVERIE
-        int ii=0;
-        for(int i=0;i<count;i++){
-                if((chars[i]>0x900 && chars[i]<0xaff) || (chars[i]>0xb80 && chars[i]<0xd7f) ){
-                        ii=1;
-                        break;
-                }
+#ifdef REVERIE
+    int ii = 0;
+    for(int i = 0; i < count; i++){
+     	if((chars[i] > 0x900 && chars[i] < 0xaff) || (chars[i] > 0xb80 && 
+     		chars[i] < 0xd7f) || (chars[i] >= 0xe00 && chars[i] < 0xe7f) ){
+            
+            ii = 1;
+            break;
         }
-        if(ii==1){
-                SkScalar* scalarArray = new SkScalar[count];//(SkScalar*)resultAdvances;
-                size_t widths;
-                char* text = new char[count*2];
-                for(int i=0;i<count*2;i+=2){
-                        int unichar = paint->unicharToGlyph(chars[(i/2)]);
-                        text[i]=(char)(unichar&0xff);
-                        text[i+1]=(char)((unichar&0xff00)>>8);
-                }
-                const char *text2 = text;
-                widths = paint->getTextWidths(text2, count << 1, scalarArray);
-                for (size_t i = 0; i < widths; i++) {
-                        if(scalarArray[i]!=0)
-                                totalAdvance1 += SkScalarToFloat(scalarArray[i]);
-                        //resultAdvances[i] = SkScalarToFloat(scalarArray[i]);
-                }
-                *outTotalAdvance = totalAdvance1;
-                if(text){
-                        delete(text);
-                        text = NULL;
-                }
-                if(scalarArray){
-                        delete(scalarArray);
-                        scalarArray = NULL;
-                }
-	}
-	#endif
+     }
+    if(ii == 1){
+        SkScalar * scalarArray = new SkScalar[count + 2];//(SkScalar*)resultAdvances;
+        size_t widths;
+        char* text = new char[ (count * 2) + 2];
+        for(int i = 0; i < count * 2; i+=2){
+	        int unichar = paint->unicharToGlyph(chars[(i / 2)]);
+	        text[i] = (char)(unichar & 0xff);
+	        text[i+1] = (char)((unichar & 0xff00) >> 8);
+        }
+        const char * text2 = text;
+        widths = paint->getTextWidths(text2, count << 1, scalarArray);
+        for (size_t i = 0; i < widths; i++) {
+            if(scalarArray[i]!=0)
+            	totalAdvance1 += SkScalarToFloat(scalarArray[i]);
+        }
+        *outTotalAdvance = totalAdvance1;
+        if(text){
+            delete(text);
+            text = NULL;
+        }
+        if(scalarArray){
+        	delete(scalarArray);
+            scalarArray = NULL;
+        }
+    }
+#endif
 
 
 #if DEBUG_GLYPHS
@@ -846,8 +851,10 @@ bool TextLayoutShaper::isComplexScript(hb_script_t script) {
     case HB_SCRIPT_TELUGU:
     case HB_SCRIPT_KANNADA:
     case HB_SCRIPT_MALAYALAM:
+    case HB_SCRIPT_ORIYA:
     case HB_SCRIPT_THAI:
 #endif
+
         return false;
     default:
         return true;
@@ -893,7 +900,7 @@ size_t TextLayoutShaper::shapeFontRun(const SkPaint* paint) {
         if (typeface) {
             SkSafeRef(typeface);
         } else {
-            typeface = SkFontHost::CreateTypeface(NULL, NULL, SkTypeface::kNormal);
+            typeface = SkTypeface::CreateFromName(NULL, SkTypeface::kNormal);
 #if DEBUG_GLYPHS
             ALOGD("Using Default Typeface (normal style)");
 #endif
@@ -916,7 +923,8 @@ size_t TextLayoutShaper::shapeFontRun(const SkPaint* paint) {
 
     hb_shape(font, mBuffer, NULL, 0);
     hb_font_destroy(font);
-    
+
+    mShapingPaint.setTypeface(paint->getTypeface());
     return baseGlyphCount;
 }
 
@@ -961,7 +969,6 @@ sp<TextLayoutValue> TextLayoutEngine::getValue(const SkPaint* paint, const jchar
         jint start, jint count, jint contextCount, jint dirFlags) {
     sp<TextLayoutValue> value;
 #if USE_TEXT_LAYOUT_CACHE
-    ALOGE("TextLayoutCache is present\n");
     value = mTextLayoutCache->getValue(paint, text, start, count,
             contextCount, dirFlags);
     if (value == NULL) {
