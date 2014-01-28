@@ -292,7 +292,7 @@ public class WindowManagerService extends IWindowManager.Stub
     final private KeyguardDisableHandler mKeyguardDisableHandler;
 
     boolean mWallpaperDropped = false;
-
+    boolean mSetWallpaper = false;
     ComponentName mWallpaperComponentName = null;
 
     private final boolean mHeadless;
@@ -6927,6 +6927,22 @@ public class WindowManagerService extends IWindowManager.Stub
                         mTraversalScheduled = false;
                         performLayoutAndPlaceSurfacesLocked();
                     }
+                    if(mSetWallpaper == true){
+                        try {
+                            IWallpaperManager wpService;
+                            IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
+                            wpService = IWallpaperManager.Stub.asInterface(b);
+                            if (wpService != null && mWallpaperComponentName != null) {
+                                wpService.setWallpaperComponent(mWallpaperComponentName);
+                            } else {
+                                Slog.w(TAG, "failed to get wallpaper service:");
+                            }
+                        } catch (Exception ex) {
+                            Slog.w(TAG, "wallpaper exception:" + ex);
+                        } finally {
+                            mSetWallpaper = false;
+                        }
+                    }
                 } break;
 
                 case ADD_STARTING: {
@@ -8792,8 +8808,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
                                     if (wpService != null) {
                                         if (mWallpaperDropped) {
-                                            // The wallpaper is needed, re-create it
-                                            wpService.setWallpaperComponent(mWallpaperComponentName);
+                                            mSetWallpaper = true;
                                         } else {
                                             // Record the wallpaper component name in case we have
                                             // to re-create it.
