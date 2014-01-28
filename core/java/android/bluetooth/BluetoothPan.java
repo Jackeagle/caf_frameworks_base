@@ -137,12 +137,17 @@ public final class BluetoothPan implements BluetoothProfile {
         } catch (RemoteException re) {
             Log.w(TAG,"Unable to register BluetoothStateChangeCallback",re);
         }
-        Log.d(TAG, "BluetoothPan() call bindService");
-        if (!context.bindService(new Intent(IBluetoothPan.class.getName()),
-                                 mConnection, 0)) {
-            Log.e(TAG, "Could not bind to Bluetooth HID Service");
+        if (VDBG) Log.d(TAG, "BluetoothPan() call bindService");
+        doBind();
+    }
+
+    boolean doBind() {
+        Intent intent = new Intent(IBluetoothPan.class.getName());
+        if (!mContext.bindService(intent, mConnection, 0)) {
+            Log.e(TAG, "Could not bind to Bluetooth Pan Service with " + intent);
+            return false;
         }
-        Log.d(TAG, "BluetoothPan(), bindService called");
+        return true;
     }
 
     /*package*/ void close() {
@@ -166,15 +171,20 @@ public final class BluetoothPan implements BluetoothProfile {
     private IBluetoothStateChangeCallback mStateChangeCallback = new IBluetoothStateChangeCallback.Stub() {
 
         @Override
-        public void onBluetoothStateChange(boolean on) throws RemoteException {
+        public void onBluetoothStateChange(boolean on) {
             //Handle enable request to bind again.
+            Log.d(TAG, "onBluetoothStateChange on: " + on);
             if (on) {
-                Log.d(TAG, "onBluetoothStateChange(on) call bindService");
-                if (!mContext.bindService(new Intent(IBluetoothPan.class.getName()),
-                                     mConnection, 0)) {
-                    Log.e(TAG, "Could not bind to Bluetooth HID Service");
+                try {
+                    if (mPanService == null) {
+                        Log.d(TAG, "onBluetoothStateChange call bindService");
+                        doBind();
+                    }
+                } catch (IllegalStateException e) {
+                    Log.e(TAG,"onBluetoothStateChange: could not bind to PAN service: ", e);
+                } catch (SecurityException e) {
+                    Log.e(TAG,"onBluetoothStateChange: could not bind to PAN service: ", e);
                 }
-                Log.d(TAG, "BluetoothPan(), bindService called");
             } else {
                 if (VDBG) Log.d(TAG,"Unbinding service...");
                 synchronized (mConnection) {
