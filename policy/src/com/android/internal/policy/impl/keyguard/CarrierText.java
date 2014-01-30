@@ -168,7 +168,8 @@ public class CarrierText extends TextView {
                 com.android.internal.R.array.origin_carrier_names,
                 com.android.internal.R.array.locale_carrier_names);
         }
-        Log.d(TAG, "getCarrierTextForSimState, localPlmn: " + localPlmn + ", localSpn: " + localSpn);
+        Log.d(TAG, "getCarrierTextForSimState, localPlmn: "
+            + localPlmn + ", localSpn: " + localSpn);
 
 
         int resTextIdOfNoSimCard = R.string.lockscreen_missing_sim_message_short;
