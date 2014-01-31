@@ -1147,6 +1147,11 @@
          may have a specific value set in an overlay config.xml file. -->
     <integer name="config_mobile_mtu">1500</integer>
 
+
+    <!-- Configuration to send sms on 1x when UE is attached to eHRPD and there is an active
+         1xRTT voice call, irrespective of IMS registration state  -->
+    <bool name="config_send_sms1x_on_voice_call">true</bool>
+
     <!-- Whether WiFi display is supported by this device.
          There are many prerequisites for this feature to work correctly.
          Here are a few of them:
@@ -1268,6 +1273,12 @@
         <item>com.android.inputmethod.latin</item>
     </string-array>
 
+    <!-- Button back light brightness value, 2 means 10 mA, friendly user light brightness -->
+    <integer name="config_button_light_bright_level">2</integer>
+    <!-- Button back light brightness friendly time break. -->
+    <integer name="config_button_light_timeout_msec">4000</integer>
+    <bool name="config_button_light_enabled">false</bool>
+
     <string-array name="config_notificationScorers">
         <item>com.android.internal.notification.DemoContactNotificationScorer</item>
     </string-array>
@@ -1378,9 +1389,18 @@
         <item>Trying to send MMS</item>
         <item>Trying to read MMS</item>
         <item>Trying to write MMS</item>
+        <item>Trying to start at bootup</item>
     </string-array>
 
     <!-- Configuration to restart radio upon PDP_DEACTIVATE with
          error cause as Regular deactivation(36). -->
     <bool name="config_radio_reset_on_regular_deactivation">true</bool>
+
+    <!-- Configuartion to support 7bit Ascii encoding and decoding
+         for long messages. -->
+    <bool name="config_ascii_7bit_support_for_long_message">false</bool>
+
+    <!-- bool value to for enabling motion accelerometer -->
+    <bool name="use_motion_accel">false</bool>
+
 </resources>
