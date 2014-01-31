@@ -1954,7 +1954,8 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     private Location screenLocationLocked(Location location, String provider) {
 
-        if (false == provider.equals(LocationManager.NETWORK_PROVIDER)) {
+        if (false == provider.equals(LocationManager.NETWORK_PROVIDER) ||
+            isMockProvider(LocationManager.NETWORK_PROVIDER)) {
             return location;
         }
 
