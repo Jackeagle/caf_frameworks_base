@@ -1666,10 +1666,12 @@ public class WifiStateMachine extends StateMachine {
     private void configureLinkProperties() {
         if (mWifiConfigStore.isUsingStaticIp(mLastNetworkId)) {
             mLinkProperties = mWifiConfigStore.getLinkProperties(mLastNetworkId);
+            mLinkProperties = WifiConfiguration.stripUndisplayableConfig(mLinkProperties);
         } else {
             synchronized (mDhcpResultsLock) {
                 if ((mDhcpResults != null) && (mDhcpResults.linkProperties != null)) {
-                    mLinkProperties = mDhcpResults.linkProperties;
+                    mLinkProperties = WifiConfiguration.stripUndisplayableConfig(
+                        mDhcpResults.linkProperties);
                 }
             }
             mLinkProperties.setHttpProxy(mWifiConfigStore.getProxyProperties(mLastNetworkId));
@@ -1918,6 +1920,7 @@ public class WifiStateMachine extends StateMachine {
         if (getNetworkDetailedState() == DetailedState.CONNECTED) {
             //DHCP renewal in connected state
             linkProperties.setHttpProxy(mWifiConfigStore.getProxyProperties(mLastNetworkId));
+            linkProperties = WifiConfiguration.stripUndisplayableConfig(linkProperties);
             if (!linkProperties.equals(mLinkProperties)) {
                 if (DBG) {
                     log("Link configuration changed for netId: " + mLastNetworkId
