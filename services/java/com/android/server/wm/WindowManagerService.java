@@ -168,8 +168,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import android.app.IWallpaperManager;
-import android.content.ComponentName;
 
 /** {@hide} */
 public class WindowManagerService extends IWindowManager.Stub
@@ -290,10 +288,6 @@ public class WindowManagerService extends IWindowManager.Stub
     private static final int MAX_SCREENSHOT_RETRIES = 3;
 
     final private KeyguardDisableHandler mKeyguardDisableHandler;
-
-    boolean mWallpaperDropped = false;
-
-    ComponentName mWallpaperComponentName = null;
 
     private final boolean mHeadless;
 
@@ -3241,7 +3235,6 @@ public class WindowManagerService extends IWindowManager.Stub
             wtoken = new WindowToken(this, token, type, true);
             mTokenMap.put(token, wtoken);
             if (type == TYPE_WALLPAPER) {
-                mWallpaperDropped = false;
                 mWallpaperTokens.add(wtoken);
             }
         }
@@ -3298,10 +3291,6 @@ public class WindowManagerService extends IWindowManager.Stub
                         mWallpaperTokens.remove(wtoken);
                     }
                 }
-                if (wtoken.windowType == TYPE_WALLPAPER) {
-                    mWallpaperDropped = true;
-                }
-
 
                 mInputMonitor.updateInputWindowsLw(true /*force*/);
             } else {
@@ -8785,34 +8774,6 @@ public class WindowManagerService extends IWindowManager.Stub
                                 }
                             }
                             if ((w.mAttrs.flags & FLAG_SHOW_WALLPAPER) != 0) {
-                                try {
-                                    IWallpaperManager wpService;
-                                    IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
-                                    wpService = IWallpaperManager.Stub.asInterface(b);
-
-                                    if (wpService != null) {
-                                        if (mWallpaperDropped) {
-                                            // The wallpaper is needed, re-create it
-                                            wpService.setWallpaperComponent(mWallpaperComponentName);
-                                        } else {
-                                            // Record the wallpaper component name in case we have
-                                            // to re-create it.
-                                            if (wpService.getWallpaperInfo() != null) {
-                                                mWallpaperComponentName =
-                                                    wpService.getWallpaperInfo().getComponent();
-                                            }
-                                            else {
-                                                mWallpaperComponentName = null;
-                                            }
-                                        }
-                                    } else {
-                                        Slog.w(TAG, "failed to get wallpaper service:");
-                                    }
-                                } catch (Exception ex) {
-                                    Slog.w(TAG, "wallpaper exception:" + ex);
-                                }
-                                mWallpaperDropped = false;
-
                                 if (DEBUG_WALLPAPER_LIGHT) Slog.v(TAG,
                                         "First draw done in potential wallpaper target " + w);
                                 mInnerFields.mWallpaperMayChange = true;
