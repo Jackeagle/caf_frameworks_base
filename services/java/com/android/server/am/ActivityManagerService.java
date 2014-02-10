@@ -141,7 +141,6 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.WindowManagerPolicy;
 import android.content.BroadcastReceiver;
-import android.app.IWallpaperManager;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -215,9 +214,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
     static final long MONITOR_CPU_MIN_TIME = 5*1000;        // don't sample cpu less than every 5 seconds.
     static final long MONITOR_CPU_MAX_TIME = 0x0fffffff;    // wait possibly forever for next cpu sample.
     static final boolean MONITOR_THREAD_CPU_USAGE = false;
-
-    boolean mDroppedWallpaper = false;
-    ComponentName mWallpaperComponentName = null;
 
     // The flags that are set for all calls we make to the package manager.
     static final int STOCK_PM_FLAGS = PackageManager.GET_SHARED_LIBRARY_FILES;
@@ -3176,31 +3172,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
 
         if (mProfileProc == app) {
             clearProfilerLocked();
-        }
-
-        try {
-            if (app.processName != null && app.processName.equals("com.android.launcher")) {
-                if (!mDroppedWallpaper) {
-                    IWallpaperManager mService;
-                    IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
-                    mService = IWallpaperManager.Stub.asInterface(b);
-                    if (mService != null) {
-	                    if (mService.getWallpaperInfo() != null) {
-		                    mWallpaperComponentName =  mService.getWallpaperInfo().getComponent();
-	                    }
-	                    else {
-		                    mWallpaperComponentName = null;
-	                    }
-	                    mService.clearWallpaper();
-	                    mDroppedWallpaper = true;
-                    }
-                    else {
-	                    Slog.w(TAG, "lmark132_31 home bg failed to get wallpaerservice:");
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            Slog.w(TAG, "lmark132_31 wallpaper1 exception:" + ex);
         }
 
         // Just in case...
@@ -13299,23 +13270,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
             if (mPrevAppSwithcProcess != null &&
                 app == mHomeProcess) {
                 mPrevAppSwithcProcess = null;
-            }
-
-            try {
-                if (mDroppedWallpaper && app == mHomeProcess) {
-                    mDroppedWallpaper = false;
-                    IWallpaperManager mService;
-                    IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
-                    mService = IWallpaperManager.Stub.asInterface(b);
-                    if (mService != null) {
-                        mService.setWallpaperComponent(mWallpaperComponentName);
-                    }
-                    else {
-                        Slog.w(TAG, "lmark132_31 home fg failed to get wallpaerservice:");
-                    }
-                }
-            } catch (Exception ex) {
-	                    Slog.w(TAG, "lmark132_31 wallpaper0 exception:" + ex);
             }
 
         } else if (app.instrumentationClass != null) {
