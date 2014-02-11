@@ -2733,6 +2733,18 @@ public class Camera {
             return splitSize(str);
         }
 
+         /**
+         * Gets the supported scaled picture sizes.
+         *
+         * @return a list of supported scaledpicture sizes.
+         *         This method will always
+         *         return a list with at least one element.
+         */
+        public List<Size> getSupportedScaledPictureSizes() {
+            String str = get("scaled-picture-sizes");
+            return splitSize(str);
+        }
+
         /**
          * Sets the image format for pictures.
          *
