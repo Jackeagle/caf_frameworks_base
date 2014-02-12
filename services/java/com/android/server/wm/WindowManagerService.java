@@ -5316,7 +5316,7 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     @Override
     public Bitmap screenshotApplications(IBinder appToken, int displayId, int width,
-            int height, boolean force565) {
+            int height) {
         if (!checkCallingPermission(android.Manifest.permission.READ_FRAME_BUFFER,
                 "screenshotApplications()")) {
             throw new SecurityException("Requires READ_FRAME_BUFFER permission");
@@ -5508,7 +5508,7 @@ public class WindowManagerService extends IWindowManager.Stub
             return null;
         }
 
-        Bitmap bm = Bitmap.createBitmap(width, height, force565 ? Config.RGB_565 : rawss.getConfig());
+        Bitmap bm = Bitmap.createBitmap(width, height, Config.RGB_565);
         Matrix matrix = new Matrix();
         ScreenRotationAnimation.createRotationMatrix(rot, dw, dh, matrix);
         matrix.postTranslate(-FloatMath.ceil(frame.left*scale), -FloatMath.ceil(frame.top*scale));

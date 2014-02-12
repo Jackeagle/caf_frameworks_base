@@ -128,8 +128,6 @@ final class ActivityStack {
     // How long between activity launches that we consider safe to not warn
     // the user about an unexpected activity being launched on top.
     static final long START_WARN_TIME = 5*1000;
-
-    static final boolean SCREENSHOT_FORCE_565 = true;
     
     // Set to false to disable the preview that is shown while a new activity
     // is being started.
@@ -954,7 +952,7 @@ final class ActivityStack {
                     || mLastScreenshotBitmap.getHeight() != h) {
                 mLastScreenshotActivity = who;
                 mLastScreenshotBitmap = mService.mWindowManager.screenshotApplications(
-                        who.appToken, Display.DEFAULT_DISPLAY, w, h, SCREENSHOT_FORCE_565);
+                        who.appToken, Display.DEFAULT_DISPLAY, w, h);
             }
             if (mLastScreenshotBitmap != null) {
                 return mLastScreenshotBitmap.copy(mLastScreenshotBitmap.getConfig(), true);
