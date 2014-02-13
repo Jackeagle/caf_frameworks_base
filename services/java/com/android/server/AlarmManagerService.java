@@ -788,13 +788,14 @@ class AlarmManagerService extends IAlarmManager.Stub {
         if (localLOGV) Slog.v(TAG, "UpdateBlockedUids: uid = "+uid +"isBlocked = "+isBlocked);
         synchronized(mLock) {
             if(isBlocked) {
-                for( int i=0; i < mTriggeredUids.size(); i++) {
+                for( int i = 0; i < mTriggeredUids.size(); i++) {
                     if(mTriggeredUids.contains(new Integer(uid))) {
                         if (localLOGV) {
                             Slog.v(TAG,"TriggeredUids has this uid, mBroadcastRefCount="
                                 +mBroadcastRefCount);
                         }
                         mTriggeredUids.remove(new Integer(uid));
+                        i--;
                         mBlockedUids.add(new Integer(uid));
                         if(mBroadcastRefCount > 0){
                             mBroadcastRefCount--;
@@ -816,11 +817,12 @@ class AlarmManagerService extends IAlarmManager.Stub {
                     }
                 }
             } else {
-                for(int i =0; i < mBlockedUids.size(); i++) {
+                for(int i = 0; i < mBlockedUids.size(); i++) {
                     if(!mBlockedUids.remove(new Integer(uid))) {
                         //no more matching uids break from the for loop
                         break;
                      }
+                     i--;
                 }
             }
         }
@@ -1267,11 +1269,14 @@ class AlarmManagerService extends IAlarmManager.Stub {
 
     private void filtQuickBootAlarms(ArrayList<Alarm> triggerList) {
 
+        ArrayList<String> whiteList = new ArrayList();
+        whiteList.add("android");
+        whiteList.add("com.android.deskclock");
+
         for (int i = triggerList.size() - 1; i >= 0; i--) {
             Alarm alarm = triggerList.get(i);
 
-            // bypass system alarms
-            if (!"android".equals(alarm.operation.getTargetPackage())) {
+            if (!whiteList.contains(alarm.operation.getTargetPackage())) {
                 triggerList.remove(i);
                 Slog.v(TAG, "ignore -> " + alarm.operation.getTargetPackage());
             }
