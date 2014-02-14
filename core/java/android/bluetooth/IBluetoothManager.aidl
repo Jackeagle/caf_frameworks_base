@@ -22,6 +22,7 @@ import android.bluetooth.IQBluetooth;
 import android.bluetooth.IBluetoothManagerCallback;
 import android.bluetooth.IQBluetoothManagerCallback;
 import android.bluetooth.IBluetoothStateChangeCallback;
+import android.os.IBinder;
 
 /**
  * System private API for talking with the Bluetooth service.
@@ -45,4 +46,6 @@ interface IBluetoothManager
 
     String getAddress();
     String getName();
+    int updateBleAppCount(IBinder b, boolean enable);
+    boolean isBleAppPresent();
 }
