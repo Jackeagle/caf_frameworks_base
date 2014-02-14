@@ -41,6 +41,7 @@ import android.net.LinkProperties;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.net.NetworkInfo;
+import android.net.NetworkUtils;
 import android.net.RouteInfo;
 import android.net.NetworkInfo.DetailedState;
 import android.os.Binder;
@@ -70,6 +71,7 @@ import com.android.server.net.BaseNetworkObserver;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.nio.charset.Charsets;
@@ -340,6 +342,118 @@ public class Vpn extends BaseNetworkStateTracker {
         // TODO: ensure that contract class eventually marks as connected
         updateState(DetailedState.AUTHENTICATING, "establish");
         return tun;
+    }
+
+    /**
+     * Check if a given address is covered by the VPN's routing rules.
+     */
+    public boolean isAddressCovered(InetAddress address) {
+        synchronized (Vpn.this) {
+            if (!isRunningLocked()) {
+                return false;
+            }
+            return RouteInfo.selectBestRoute(mConfig.routes, address) != null;
+        }
+    }
+
+    private boolean isRunningLocked() {
+        return mVpnUsers != null;
+    }
+
+    private void addVpnUserLocked(int user) {
+        enforceControlPermission();
+
+        if (!isRunningLocked()) {
+            throw new IllegalStateException("VPN is not active");
+        }
+
+        final boolean forwardDns = (mConfig.dnsServers != null &&
+                mConfig.dnsServers.size() != 0);
+
+        // add the user
+        mCallback.addUserForwarding(mInterface, user, forwardDns);
+        mVpnUsers.put(user, true);
+
+        // show the notification
+        if (!mPackage.equals(VpnConfig.LEGACY_VPN)) {
+            // Load everything for the user's notification
+            PackageManager pm = mContext.getPackageManager();
+            ApplicationInfo app = null;
+            try {
+                app = AppGlobals.getPackageManager().getApplicationInfo(mPackage, 0, mUserId);
+            } catch (RemoteException e) {
+                throw new IllegalStateException("Invalid application");
+            }
+            String label = app.loadLabel(pm).toString();
+            // Load the icon and convert it into a bitmap.
+            Drawable icon = app.loadIcon(pm);
+            Bitmap bitmap = null;
+            if (icon.getIntrinsicWidth() > 0 && icon.getIntrinsicHeight() > 0) {
+                int width = mContext.getResources().getDimensionPixelSize(
+                        android.R.dimen.notification_large_icon_width);
+                int height = mContext.getResources().getDimensionPixelSize(
+                        android.R.dimen.notification_large_icon_height);
+                icon.setBounds(0, 0, width, height);
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                Canvas c = new Canvas(bitmap);
+                icon.draw(c);
+                c.setBitmap(null);
+            }
+            showNotification(label, bitmap, user);
+        } else {
+            showNotification(null, null, user);
+        }
+    }
+
+    private void removeVpnUserLocked(int user) {
+            enforceControlPermission();
+
+            if (!isRunningLocked()) {
+                throw new IllegalStateException("VPN is not active");
+            }
+            final boolean forwardDns = (mConfig.dnsServers != null &&
+                    mConfig.dnsServers.size() != 0);
+            mCallback.clearUserForwarding(mInterface, user, forwardDns);
+            mVpnUsers.delete(user);
+            hideNotification(user);
+    }
+
+    private void onUserAdded(int userId) {
+        // If the user is restricted tie them to the owner's VPN
+        synchronized(Vpn.this) {
+            UserManager mgr = UserManager.get(mContext);
+            UserInfo user = mgr.getUserInfo(userId);
+            if (user.isRestricted()) {
+                try {
+                    addVpnUserLocked(userId);
+                } catch (Exception e) {
+                    Log.wtf(TAG, "Failed to add restricted user to owner", e);
+                }
+            }
+        }
+    }
+
+    private void onUserRemoved(int userId) {
+        // clean up if restricted
+        synchronized(Vpn.this) {
+            UserManager mgr = UserManager.get(mContext);
+            UserInfo user = mgr.getUserInfo(userId);
+            if (user.isRestricted()) {
+                try {
+                    removeVpnUserLocked(userId);
+                } catch (Exception e) {
+                    Log.wtf(TAG, "Failed to remove restricted user to owner", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Return the configuration of the currently running VPN.
+     */
+    public VpnConfig getVpnConfig() {
+        enforceControlPermission();
+        return mConfig;
     }
 
     @Deprecated
