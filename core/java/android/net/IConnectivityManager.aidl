@@ -49,13 +49,9 @@ interface IConnectivityManager
 
     int stopUsingNetworkFeature(int networkType, in String feature);
 
-    boolean requestRouteToHost(int networkType, int hostAddress);
+    boolean requestRouteToHost(int networkType, int hostAddress, String packageName);
 
-    boolean requestRouteToHostAddress(int networkType, in String hostAddress);
-
-    boolean getBackgroundDataSetting();
-
-    void setBackgroundDataSetting(boolean allowBackgroundData);
+    boolean requestRouteToHostAddress(int networkType, in byte[] hostAddress, String packageName);
 
     boolean getMobileDataEnabled();
 
