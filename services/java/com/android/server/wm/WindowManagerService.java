@@ -6932,7 +6932,7 @@ public class WindowManagerService extends IWindowManager.Stub
                             IWallpaperManager wpService;
                             IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
                             wpService = IWallpaperManager.Stub.asInterface(b);
-                            if (wpService != null) {
+                            if (wpService != null && mWallpaperComponentName != null) {
                                 wpService.setWallpaperComponent(mWallpaperComponentName);
                             } else {
                                 Slog.w(TAG, "failed to get wallpaper service:");
