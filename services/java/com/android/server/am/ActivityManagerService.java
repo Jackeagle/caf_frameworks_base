@@ -3146,38 +3146,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
         }
     }
     
-    private boolean isHomeApp(ProcessRecord app)
-    {
-        boolean ret = false;
-
-        if (app.activities != null) {
-            for (int i = 0; i < app.activities.size(); i++) {
-                if (app.activities.get(i).isHomeActivity) {
-                    ret = true;
-                    break;
-                }
-            }
-        }
-        return ret;
-    }
-
-    private void clearWallpaper()
-    {
-        try {
-            IWallpaperManager service;
-            IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
-            service = IWallpaperManager.Stub.asInterface(b);
-            if (service != null) {
-                service.setWallpaper("EMPTY_WINDOW");
-            }
-            else {
-                Slog.w(TAG, "Failed to get WALLPAPER_SERVICE");
-            }
-        } catch (Exception ex) {
-                Slog.w(TAG, "Clear wallpaer exception ex:" + ex);
-        }
-    }
-
     /**
      * Main function for removing an existing process from the activity manager
      * as a result of that process going away.  Clears out all connections
@@ -3211,11 +3179,28 @@ public final class ActivityManagerService  extends ActivityManagerNative
         }
 
         try {
-            if (isHomeApp(app)) {
-                clearWallpaper();
+            if (app.processName != null && app.processName.equals("com.android.launcher")) {
+                if (!mDroppedWallpaper) {
+                    IWallpaperManager mService;
+                    IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
+                    mService = IWallpaperManager.Stub.asInterface(b);
+                    if (mService != null) {
+	                    if (mService.getWallpaperInfo() != null) {
+		                    mWallpaperComponentName =  mService.getWallpaperInfo().getComponent();
+	                    }
+	                    else {
+		                    mWallpaperComponentName = null;
+	                    }
+	                    mService.clearWallpaper();
+	                    mDroppedWallpaper = true;
+                    }
+                    else {
+	                    Slog.w(TAG, "lmark132_31 home bg failed to get wallpaerservice:");
+                    }
+                }
             }
         } catch (Exception ex) {
-            Slog.w(TAG, "Clear wallpaper exception:" + ex);
+            Slog.w(TAG, "lmark132_31 wallpaper1 exception:" + ex);
         }
 
         // Just in case...
@@ -13315,6 +13300,24 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 app == mHomeProcess) {
                 mPrevAppSwithcProcess = null;
             }
+
+            try {
+                if (mDroppedWallpaper && app == mHomeProcess) {
+                    mDroppedWallpaper = false;
+                    IWallpaperManager mService;
+                    IBinder b = ServiceManager.getService(Context.WALLPAPER_SERVICE);
+                    mService = IWallpaperManager.Stub.asInterface(b);
+                    if (mService != null) {
+                        mService.setWallpaperComponent(mWallpaperComponentName);
+                    }
+                    else {
+                        Slog.w(TAG, "lmark132_31 home fg failed to get wallpaerservice:");
+                    }
+                }
+            } catch (Exception ex) {
+	                    Slog.w(TAG, "lmark132_31 wallpaper0 exception:" + ex);
+            }
+
         } else if (app.instrumentationClass != null) {
             // Don't want to kill running instrumentation.
             if (mImportantProcessRunning) {
