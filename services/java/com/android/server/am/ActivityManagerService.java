@@ -168,8 +168,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -890,35 +888,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
     private int mCurrentUserId = 0;
     private int[] mCurrentUserArray = new int[] { 0 };
     private UserManagerService mUserManager;
-
-    class ThrottleAppInfo {
-        String processName;
-        int uid;
-        int gid;
-        int[] gids;
-        int debugFlags;
-        int mountExternal;
-        int targetSdkVersion;
-        String seInfo;
-        boolean scheduled = false;
-        long lastLaunchTime = -1;
-        TimerTask timerTask;
-        Timer timer;
-        int launchDelay;
-        int restartCount = 0;
-        boolean throttle = false;
-
-        ThrottleAppInfo(String processName, int launchDelay){
-            this.processName = processName;
-            this.launchDelay = launchDelay;
-        }
-
-    }
-
-    private final int mRestartLimit = 2;
-
-    int THROTTLE_APP_LAUNCH_DELAY_DEFAULT = 2000;
-    private final HashMap<String, ThrottleAppInfo> mThrottleAppList = new HashMap<String, ThrottleAppInfo>(16);
 
     private final class AppDeathRecipient implements IBinder.DeathRecipient {
         final ProcessRecord mApp;
@@ -2059,56 +2028,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 || transit == AppTransition.TRANSIT_TASK_OPEN
                 || transit == AppTransition.TRANSIT_TASK_TO_FRONT;
     }
-
-    public void processStartDelay(ThrottleAppInfo tAppInfo,
-                                      int uid, int gid, int[] gids,
-                                      int debugFlags, int mountExternal,
-                                      int targetSdkVersion,
-                                      String seInfo) {
-        tAppInfo.uid = uid;
-        tAppInfo.gid = gid;
-        tAppInfo.gids = gids;
-        tAppInfo.debugFlags = debugFlags;
-        tAppInfo.mountExternal = mountExternal;
-        tAppInfo.targetSdkVersion = targetSdkVersion;
-        tAppInfo.seInfo = seInfo;
-        tAppInfo.scheduled = true;
-        tAppInfo.timerTask = new ProcessStartDelayTimerTask(tAppInfo);
-        tAppInfo.timer = new Timer();
-        if (DEBUG) Slog.w(TAG, "Schedule throttle proc :" + tAppInfo.processName
-                + " to run in " + tAppInfo.launchDelay + " ms");
-
-        tAppInfo.timer.schedule(tAppInfo.timerTask, tAppInfo.launchDelay);
-
-    }
-
-
-    class ProcessStartDelayTimerTask extends TimerTask {
-        ThrottleAppInfo mAppInfo;
-
-        ProcessStartDelayTimerTask(ThrottleAppInfo tAppInfo) {
-            super();
-            mAppInfo = tAppInfo;
-        }
-
-        @Override
-        public void run() {
-            synchronized(mAppInfo) {
-                try {
-                    if(DEBUG) Slog.w(TAG, "Run scheduled throttle proc :" + mAppInfo.processName);
-                    Process.ProcessStartResult startResult = Process.start("android.app.ActivityThread",
-                            mAppInfo.processName, mAppInfo.uid, mAppInfo.gid, mAppInfo.gids, 
-                            mAppInfo.debugFlags, mAppInfo.mountExternal,
-                            mAppInfo.targetSdkVersion, mAppInfo.seInfo, null);
-                } catch (Exception ex) {
-                    Slog.e(TAG, "Run scheduled throttle of Process.start failed ex:" + ex);
-                }
-                mAppInfo.lastLaunchTime = SystemClock.uptimeMillis();
-                mAppInfo.scheduled = false;
-                mAppInfo.timerTask = null;
-            }
-        }
-    }
     
     final ProcessRecord startProcessLocked(String processName,
             ApplicationInfo info, boolean knownToBeDead, int intentFlags,
@@ -2304,68 +2223,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 debugFlags |= Zygote.DEBUG_ENABLE_ASSERT;
             }
 
-            try {
-                if(hostingType.equals("activity")) {
-                    // Starting process an activity. Never throttle activity Intents.
-                    // If a part of the process(Ex: Background service is already
-                    // throttled, de-throttle it.
-                    if (mThrottleAppList.containsKey(app.processName)) {
-                        ThrottleAppInfo tAppInfo = mThrottleAppList.get(app.processName);
-                        synchronized (tAppInfo) {
-                            if (tAppInfo.scheduled) {
-                                //De-throttle
-                                tAppInfo.timer.cancel();
-                                tAppInfo.throttle = false;
-                                tAppInfo.scheduled = false;
-                                tAppInfo.restartCount = 0; 
-                                tAppInfo.lastLaunchTime = SystemClock.uptimeMillis();
-                            }
-                        }
-                    }
-                } else {
-                    if(!(app.nonStoppingAdj < ProcessList.FOREGROUND_APP_ADJ)) {
-                        if (mThrottleAppList.containsKey(app.processName)
-                            && mThrottleAppList.get(app.processName).throttle) {
-                            ThrottleAppInfo tAppInfo = mThrottleAppList.get(app.processName);
-                            synchronized (tAppInfo) {
-                                if (tAppInfo.scheduled) {
-                                    //already scheduled so return
-                                    if (DEBUG) Slog.w(TAG, "Throttle Proc already scheduled proc:"
-                                        + app.processName);
-                                    return;
-                                }
-                                long currentTime = SystemClock.uptimeMillis();
-                                if (currentTime - tAppInfo.lastLaunchTime <= tAppInfo.launchDelay) {
-                                    processStartDelay(tAppInfo,uid, uid, gids, debugFlags,
-                                        mountExternal, app.info.targetSdkVersion, app.info.seinfo);
-                                    tAppInfo.throttle = false;
-                                    return;
-                                }
-
-                                // Let the app launch
-                                if (DEBUG) Slog.w(TAG, "Let throttle Proc proc:" + app.processName
-                                    + " previous time:" + tAppInfo.lastLaunchTime
-                                    + " cur time:" + currentTime);
-                                tAppInfo.lastLaunchTime = currentTime;
-                            }
-                            // Sentence completed. De-throttle process.
-                            tAppInfo.throttle = false;
-                        } else if (mThrottleAppList.containsKey(app.processName)  && !mThrottleAppList.get(app.processName).throttle) {
-                            ThrottleAppInfo tAppInfo = mThrottleAppList.get(app.processName);
-                            tAppInfo.lastLaunchTime = SystemClock.uptimeMillis();
-                        }
-                    }
-                    else {
-                        if (mThrottleAppList.containsKey(app.processName)) {
-                            ThrottleAppInfo tAppInfo = mThrottleAppList.get(app.processName);
-                            tAppInfo.lastLaunchTime = SystemClock.uptimeMillis();
-                        }
-                    }
-                }
-            } catch (Exception ex) {
-                Slog.e(TAG, "Throttling error:" + ex);
-            }
-
+            // Start the process.  It will either succeed and return a result containing
+            // the PID of the new process, or else throw a RuntimeException.
             Process.ProcessStartResult startResult = Process.start("android.app.ActivityThread",
                     app.processName, uid, uid, gids, debugFlags, mountExternal,
                     app.info.targetSdkVersion, app.info.seinfo, null);
@@ -3149,22 +3008,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
      */
     private final void handleAppDiedLocked(ProcessRecord app,
             boolean restarting, boolean allowRestart) {
-        if(allowRestart) {
-            ThrottleAppInfo tAppInfo;
-            if (mThrottleAppList.containsKey(app.processName)) {
-                tAppInfo = mThrottleAppList.get(app.processName);
-                tAppInfo.restartCount++;
-                if(tAppInfo.restartCount == mRestartLimit) {
-                    // Throttle process
-                    tAppInfo.throttle = true;
-                    tAppInfo.restartCount = 0;
-                }
-            } else {
-                tAppInfo = new ThrottleAppInfo(app.processName, THROTTLE_APP_LAUNCH_DELAY_DEFAULT);
-                mThrottleAppList.put(app.processName, tAppInfo);
-                tAppInfo.restartCount = 1;
-            }
-        }
         cleanUpApplicationRecordLocked(app, restarting, allowRestart, -1);
         if (!restarting) {
             mLruProcesses.remove(app);
