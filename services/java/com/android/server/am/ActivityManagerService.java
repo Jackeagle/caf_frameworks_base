@@ -126,7 +126,6 @@ import android.os.SystemProperties;
 import android.os.UpdateLock;
 import android.os.UserHandle;
 import android.provider.Settings;
-import android.telephony.TelephonyManager;
 import android.text.format.Time;
 import android.util.EventLog;
 import android.util.Log;
@@ -522,7 +521,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
 
     boolean mReceivingSMS = false;
     String DEFAULT_SMS_APP = "com.android.mms";
-    boolean mImportantProcessRunning = false;
 
     /**
      * Set of IntentSenderRecord objects that are currently active.
@@ -1508,7 +1506,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
         }
 
         m.startRunning(null, null, null, null);
-
+        
         return context;
     }
 
@@ -12366,27 +12364,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
             mReceivingSMS = true;
         }
 
-        if (intent != null && intent.getAction() != null &&
-                intent.getAction().equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)) {
-            Bundle bundle = intent.getExtras();
-            if (bundle != null) {
-                String state = bundle.getString(TelephonyManager.EXTRA_STATE);
-                if (state != null) {
-                    if (state.equalsIgnoreCase(TelephonyManager.EXTRA_STATE_RINGING)) {
-                        Slog.i(TAG, "Received EXTRA_STATE_RINGING");
-                        mImportantProcessRunning = true;
-                        updateOomAdjLocked();
-                    } else if (state.equalsIgnoreCase(TelephonyManager.EXTRA_STATE_IDLE)) {
-                        Slog.i(TAG, "Received EXTRA_STATE_IDLE");
-                        mImportantProcessRunning = false;
-                    } else if (state.equalsIgnoreCase(TelephonyManager.EXTRA_STATE_OFFHOOK )) {
-                        Slog.i(TAG, "Received EXTRA_STATE_OFFHOOK");
-                        mImportantProcessRunning = false;
-                    }
-                }
-            }
-        }
-
         enforceNotIsolatedCaller("broadcastIntent");
         synchronized(this) {
             intent = verifyBroadcastLocked(intent);
@@ -13096,15 +13073,8 @@ public final class ActivityManagerService  extends ActivityManagerNative
         BroadcastQueue queue;
         if (app == TOP_APP) {
             // The last app on the list is the foreground app.
-            if (mImportantProcessRunning) {
-                // Limit the priority of the foreground app to free up memory
-                adj = ProcessList.SERVICE_ADJ;
-                schedGroup = Process.THREAD_GROUP_BG_NONINTERACTIVE;
-            } else {
-                adj = ProcessList.FOREGROUND_APP_ADJ;
-                schedGroup = Process.THREAD_GROUP_DEFAULT;
-            }
-
+            adj = ProcessList.FOREGROUND_APP_ADJ;
+            schedGroup = Process.THREAD_GROUP_DEFAULT;
             app.adjType = "top-activity";
             foregroundActivities = true;
             interesting = true;
@@ -13117,13 +13087,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
 
         } else if (app.instrumentationClass != null) {
             // Don't want to kill running instrumentation.
-            if (mImportantProcessRunning) {
-                // Limit the priority of the foreground app to free up memory
-                adj = ProcessList.VISIBLE_APP_ADJ;
-            } else {
-                adj = ProcessList.FOREGROUND_APP_ADJ;
-            }
-
+            adj = ProcessList.FOREGROUND_APP_ADJ;
             schedGroup = Process.THREAD_GROUP_DEFAULT;
             app.adjType = "instrumentation";
             interesting = true;
@@ -13132,24 +13096,14 @@ public final class ActivityManagerService  extends ActivityManagerNative
             // counts as being in the foreground for OOM killer purposes.
             // It's placed in a sched group based on the nature of the
             // broadcast as reflected by which queue it's active in.
-            if (mImportantProcessRunning) {
-                // Limit the priority of the foreground app to free up memory
-                adj = ProcessList.VISIBLE_APP_ADJ;
-            } else {
-                adj = ProcessList.FOREGROUND_APP_ADJ;
-            }
+            adj = ProcessList.FOREGROUND_APP_ADJ;
             schedGroup = (queue == mFgBroadcastQueue)
                     ? Process.THREAD_GROUP_DEFAULT : Process.THREAD_GROUP_BG_NONINTERACTIVE;
             app.adjType = "broadcast";
         } else if (app.executingServices.size() > 0) {
             // An app that is currently executing a service callback also
             // counts as being in the foreground.
-            if (mImportantProcessRunning) {
-                // Limit the priority of the foreground app to free up memory
-                adj = ProcessList.VISIBLE_APP_ADJ;
-            } else {
-                adj = ProcessList.FOREGROUND_APP_ADJ;
-            }
+            adj = ProcessList.FOREGROUND_APP_ADJ;
             schedGroup = Process.THREAD_GROUP_DEFAULT;
             app.adjType = "exec-service";
         } else {
@@ -13474,14 +13428,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                                 if (a != null && adj > ProcessList.FOREGROUND_APP_ADJ &&
                                         (a.visible || a.state == ActivityState.RESUMED
                                          || a.state == ActivityState.PAUSING)) {
-
-                                    if (mImportantProcessRunning) {
-                                        // Limit the priority of the foreground app to
-                                        // free up memory
-                                        adj = ProcessList.VISIBLE_APP_ADJ;
-                                    } else {
-                                        adj = ProcessList.FOREGROUND_APP_ADJ;
-                                    }
+                                    adj = ProcessList.FOREGROUND_APP_ADJ;
                                     if ((cr.flags&Context.BIND_NOT_FOREGROUND) == 0) {
                                         schedGroup = Process.THREAD_GROUP_DEFAULT;
                                     }
@@ -13583,12 +13530,7 @@ public final class ActivityManagerService  extends ActivityManagerNative
                 // FOREGROUND_APP_ADJ.
                 if (cpr.hasExternalProcessHandles()) {
                     if (adj > ProcessList.FOREGROUND_APP_ADJ) {
-                        if (mImportantProcessRunning) {
-                            // Limit the priority of the foreground app to free up memory
-                            adj = ProcessList.VISIBLE_APP_ADJ;
-                        } else {
-                            adj = ProcessList.FOREGROUND_APP_ADJ;
-                        }
+                        adj = ProcessList.FOREGROUND_APP_ADJ;
                         schedGroup = Process.THREAD_GROUP_DEFAULT;
                         app.hidden = false;
                         app.keeping = true;
