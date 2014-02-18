@@ -13881,6 +13881,43 @@ public final class ActivityManagerService  extends ActivityManagerNative
             app.setRawAdj = app.curRawAdj;
         }
 
+        int penaliseHeavyApps = SystemProperties.getInt("ro.am.penalise_heavy_apps", 3 );
+        // if "ro.am.penalise_heavy_apps" is 0 do not take any action.
+        // if "ro.am.penalise_heavy_apps" is 1 detect if heavy app.
+        // if "ro.am.penalise_heavy_apps" is 2 detect and kill if heavy app.
+        // if "ro.am.penalise_heavy_apps" is 3 detect and set its adj to 15.
+        if ((penaliseHeavyApps > 0) && ((app.curAdj == ProcessList.PREVIOUS_APP_ADJ)
+                || ((app.curAdj >= ProcessList.HIDDEN_APP_MIN_ADJ)
+                && (app.curAdj < ProcessList.HIDDEN_APP_MAX_ADJ)))) {
+            // app.bgPss is calculated only once and then stored. It is calculated when the app
+            // goes to bg from the first time.
+            if (app.bgPss == 0) {
+                Debug.MemoryInfo mi = new Debug.MemoryInfo();
+                Debug.getMemoryInfo(app.pid, mi);
+                int pss = mi.getTotalPss();
+                app.bgPss = pss;
+            }
+            long thresholdSize = SystemProperties.getLong( "ro.am.penalise_heavy_apps.pss", 40*1024 );
+            if (app.bgPss > thresholdSize) {
+                if (penaliseHeavyApps == 1)
+                        Slog.i(TAG,"New BG app : " + app.processName + " is heavy! (pss = " +
+                                app.bgPss + " kB)");
+                if (penaliseHeavyApps == 2) {
+                    Slog.i(TAG,"New BG app : " + app.processName + " is heavy! (pss = " +
+                            app.bgPss + " kB). Killing it!");
+                    EventLog.writeEvent(EventLogTags.AM_KILL, app.pid,
+                            app.processName, app.setAdj, "Heavy BG task penalised");
+                    Process.killProcess(app.pid);
+                }
+                if (penaliseHeavyApps == 3) {
+                    if (app.setAdj != ProcessList.HIDDEN_APP_MAX_ADJ)
+                            Slog.i(TAG,"New BG app : " + app.processName + " is heavy! (pss = " +
+                                    app.bgPss + " kB). Forcing to HIDDEN_APP_MAX_ADJ");
+                    app.curAdj = ProcessList.HIDDEN_APP_MAX_ADJ;
+                }
+            }
+        }
+
         if (app.curAdj != app.setAdj) {
             if (Process.setOomAdj(app.pid, app.curAdj)) {
                 if (DEBUG_SWITCH || DEBUG_OOM_ADJ) Slog.v(
