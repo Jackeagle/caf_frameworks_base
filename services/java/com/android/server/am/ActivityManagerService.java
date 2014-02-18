@@ -13482,6 +13482,19 @@ public final class ActivityManagerService  extends ActivityManagerNative
             if (doingAll) {
                 app.serviceb = mNewNumServiceProcs > (mNumServiceProcs/3);
                 mNewNumServiceProcs++;
+                if (!app.serviceb) {
+                    // This service isn't far enough down on the LRU list to
+                    // normally be a B service, but if we are low on RAM and it
+                    // is large we want to force it down since we would prefer to
+                    // keep launcher over it.
+                    if (Process.getFreeMemory()
+                            > mProcessList.getMemLevel(ProcessList.SERVICE_B_ADJ)
+                            && Debug.getPss(app.pid)
+                            >= ((mProcessList.getMemLevel(ProcessList.HIDDEN_APP_MAX_ADJ)/1024)/3)) {
+                        app.serviceb = true;
+                        // Slog.e(TAG, "Force SERVICE_B_ADJ for the app " + app);
+                    }
+                }
             }
             if (app.serviceb) {
                 adj = ProcessList.SERVICE_B_ADJ;
