@@ -228,7 +228,7 @@ public class ZygoteInit {
     }
 
     static void preload() {
-        preloadClasses();
+        //preloadClasses();
         preloadResources();
         preloadOpenGL();
     }
