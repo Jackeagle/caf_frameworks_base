@@ -1953,12 +1953,16 @@ public class LocationManagerService extends ILocationManager.Stub {
     }
 
     private Location screenLocationLocked(Location location, String provider) {
+        LocationProviderProxy providerProxy;
 
-        LocationProviderProxy providerProxy =
+        if (isMockProvider(LocationManager.NETWORK_PROVIDER)) {
+            return location;
+        }
+
+        providerProxy =
                 (LocationProviderProxy)mProvidersByName.get(LocationManager.NETWORK_PROVIDER);
         if (providerProxy == null ||
-            false == provider.equals(LocationManager.NETWORK_PROVIDER) ||
-            isMockProvider(LocationManager.NETWORK_PROVIDER)) {
+            false == provider.equals(LocationManager.NETWORK_PROVIDER)) {
             return location;
         }
 
