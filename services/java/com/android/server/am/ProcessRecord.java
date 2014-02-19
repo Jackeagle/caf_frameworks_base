@@ -115,7 +115,8 @@ class ProcessRecord {
     Object adjSource;           // Debugging: option dependent object.
     int adjSourceOom;           // Debugging: oom_adj of adjSource's process.
     Object adjTarget;           // Debugging: target component impacting oom_adj.
-    
+    int bgPss;                  //  Pss of app when it goes to bg for the first time
+
     // contains HistoryRecord objects
     final ArrayList<ActivityRecord> activities = new ArrayList<ActivityRecord>();
     // all ServiceRecord running in this process
