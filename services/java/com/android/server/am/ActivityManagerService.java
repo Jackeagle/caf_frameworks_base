@@ -519,9 +519,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
      */
     final HashSet mPendingResultRecords = new HashSet();
 
-    boolean mReceivingSMS = false;
-    String DEFAULT_SMS_APP = "com.android.mms";
-
     /**
      * Set of IntentSenderRecord objects that are currently active.
      */
@@ -12357,13 +12354,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
             Intent intent, String resolvedType, IIntentReceiver resultTo,
             int resultCode, String resultData, Bundle map,
             String requiredPermission, int appOp, boolean serialized, boolean sticky, int userId) {
-
-        if (intent != null && intent.getAction() != null
-                && intent.getAction().equals("android.provider.Telephony.SMS_RECEIVED")) {
-            Slog.w(TAG, "mReceivingSMS = true");
-            mReceivingSMS = true;
-        }
-
         enforceNotIsolatedCaller("broadcastIntent");
         synchronized(this) {
             intent = verifyBroadcastLocked(intent);
@@ -13022,42 +13012,35 @@ public final class ActivityManagerService  extends ActivityManagerNative
         final int activitiesSize = app.activities.size();
 
         if (app.maxAdj <= ProcessList.FOREGROUND_APP_ADJ) {
-            if ((app.processName.equals(DEFAULT_SMS_APP)) && (app.services.isEmpty())) {
-                Slog.w(TAG, "set maxAdj of " + app.processName +
-                        " to HIDDEN_APP_MAX_ADJ and mReceivingSMS = false");
-                app.maxAdj = ProcessList.HIDDEN_APP_MAX_ADJ;
-                mReceivingSMS = false;
-            } else {
-                // The max adjustment doesn't allow this app to be anything
-                // below foreground, so it is not worth doing work for it.
-                app.adjType = "fixed";
-                app.adjSeq = mAdjSeq;
-                app.curRawAdj = app.nonStoppingAdj = app.maxAdj;
-                app.hasActivities = false;
-                app.foregroundActivities = false;
-                app.keeping = true;
-                app.curSchedGroup = Process.THREAD_GROUP_DEFAULT;
-                // System process can do UI, and when they do we want to have
-                // them trim their memory after the user leaves the UI.  To
-                // facilitate this, here we need to determine whether or not it
-                // is currently showing UI.
-                app.systemNoUi = true;
-                if (app == TOP_APP) {
-                    app.systemNoUi = false;
-                    app.hasActivities = true;
-                } else if (activitiesSize > 0) {
-                    for (int j = 0; j < activitiesSize; j++) {
-                        final ActivityRecord r = app.activities.get(j);
-                        if (r.visible) {
-                            app.systemNoUi = false;
-                        }
-                        if (r.app == app) {
-                            app.hasActivities = true;
-                        }
+            // The max adjustment doesn't allow this app to be anything
+            // below foreground, so it is not worth doing work for it.
+            app.adjType = "fixed";
+            app.adjSeq = mAdjSeq;
+            app.curRawAdj = app.nonStoppingAdj = app.maxAdj;
+            app.hasActivities = false;
+            app.foregroundActivities = false;
+            app.keeping = true;
+            app.curSchedGroup = Process.THREAD_GROUP_DEFAULT;
+            // System process can do UI, and when they do we want to have
+            // them trim their memory after the user leaves the UI.  To
+            // facilitate this, here we need to determine whether or not it
+            // is currently showing UI.
+            app.systemNoUi = true;
+            if (app == TOP_APP) {
+                app.systemNoUi = false;
+                app.hasActivities = true;
+            } else if (activitiesSize > 0) {
+                for (int j = 0; j < activitiesSize; j++) {
+                    final ActivityRecord r = app.activities.get(j);
+                    if (r.visible) {
+                        app.systemNoUi = false;
+                    }
+                    if (r.app == app) {
+                        app.hasActivities = true;
                     }
                 }
-                return (app.curAdj=app.maxAdj);
             }
+            return (app.curAdj=app.maxAdj);
         }
 
         app.keeping = false;
@@ -13271,10 +13254,6 @@ public final class ActivityManagerService  extends ActivityManagerNative
                                 adj = ProcessList.SERVICE_ADJ;
                                 app.adjType = "started-services";
                                 app.hidden = false;
-                                if (mReceivingSMS && (app.processName.equals(DEFAULT_SMS_APP))) {
-                                    Slog.w(TAG, "set maxAdj of " + app.processName + "  to FOREGROUND_APP_ADJ");
-                                    app.maxAdj = ProcessList.FOREGROUND_APP_ADJ;
-                                }
                             }
                         }
                         // If we have let the service slide into the background
