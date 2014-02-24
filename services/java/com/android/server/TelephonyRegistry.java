@@ -655,6 +655,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         }
 
         Intent intent = new Intent(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED);
+        intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         Bundle data = new Bundle();
         state.fillInNotifierBundle(data);
         intent.putExtras(data);
@@ -723,6 +724,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         // status bar takes care of that after taking into account all of the
         // required info.
         Intent intent = new Intent(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
+        intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         intent.putExtra(PhoneConstants.STATE_KEY,
                 DefaultPhoneNotifier.convertDataState(state).toString());
         if (!isDataConnectivityPossible) {
@@ -754,6 +756,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             return;
         }
         Intent intent = new Intent(TelephonyIntents.ACTION_DATA_CONNECTION_FAILED);
+        intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
         intent.putExtra(PhoneConstants.FAILURE_REASON_KEY, reason);
         intent.putExtra(PhoneConstants.DATA_APN_TYPE_KEY, apnType);
         mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
