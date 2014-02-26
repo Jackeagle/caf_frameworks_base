@@ -774,7 +774,7 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
 #ifdef REVERIE
     int ii = 0;
     for(int i = 0; i < count; i++){
-     	if((chars[i] > 0x900 && chars[i] < 0xaff) || (chars[i] > 0xb80 && 
+     	if((chars[i] > 0x900 && chars[i] < 0xaff) || (chars[i] > 0xb80 &&
      		chars[i] < 0xd7f) || (chars[i] >= 0xe00 && chars[i] < 0xe7f) ){
             
             ii = 1;
