@@ -71,7 +71,7 @@ void TextLayout::getTextRunAdvances(SkPaint* paint, const jchar* chars, jint sta
 #ifdef REVERIE
     int ii = 0;
     for(int i = 0; i < count; i++){
-    	if((chars[i + start] > 0x900 && chars[i + start] < 0xaff) || (chars[i + start] >0xb80 && 
+    	if((chars[i + start] > 0x900 && chars[i + start] < 0xaff) || (chars[i + start] >0xb80 &&
     		chars[i + start] < 0xd7f) || (chars[i + start] >= 0xe00 && chars[i + start] <0xe7f))
         	ii = 1;
     }
