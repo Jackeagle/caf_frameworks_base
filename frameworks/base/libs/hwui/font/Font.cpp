@@ -402,7 +402,7 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
                 text2[i] = (char)(GIDS[i / 2] & 0xff);
                 text2[i + 1] = (char)((GIDS[i / 2] & 0xff00) >> 8);
         }
-      const char* text1 = (const char*) text2;
+        const char* text1 = (const char*) text2;
         SkFixed prevRsbDelta = 0;
         float penX = x + 0.5f, prevX = 0, prevToPrevX = 0;
         int penY = y, retVal, x1, y1;
@@ -417,11 +417,11 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
             prevRsbDelta = cachedGlyph->mRsbDelta;
 
             if(glyphsCount > 1){
-                retVal = paint->getXYPos(GIDS[glyphsCount - 2], 
+                retVal = paint->getXYPos(GIDS[glyphsCount - 2],
                 	GIDS[glyphsCount - 1], GIDS[glyphsCount], 3, &x1, &y1);
             }
             else if(glyphsCount == 1){
-                retVal = paint->getXYPos(GIDS[glyphsCount - 1], GIDS[glyphsCount], 
+                retVal = paint->getXYPos(GIDS[glyphsCount - 1], GIDS[glyphsCount],
                 	0, 2, &x1, &y1);
             }
             else{
