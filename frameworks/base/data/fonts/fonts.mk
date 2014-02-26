@@ -18,7 +18,7 @@ PRODUCT_COPY_FILES := \
     frameworks/base/data/fonts/system_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/system_fonts.xml 
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_COPY_FILES += \
-    vendor/qcom/proprietary/qrdplus/globalization/engine/fallback_fonts-Rev.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
+    $(PRODUCT_RENDERING_ENGINE_PATH)/$(PRODUCT_RENDERING_ENGINE_FONTS_XML):$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
 else
 PRODUCT_COPY_FILES += \
     frameworks/base/data/fonts/fallback_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
@@ -58,13 +58,6 @@ PRODUCT_PACKAGES := \
 
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_PACKAGES += \
-    DroidSansHindi.ttf \
-    DroidSansTamil.ttf \
-    DroidSansTelugu.ttf \
-    DroidSansGujarati.ttf \
-    DroidSansPunjabi.ttf \
-    DroidSansKannada.ttf \
-    DroidSansBengali.ttf \
-    DroidSansMalayalam.ttf 
+     $(PRODUCT_RENDERING_ENGINE_TTF_FILES)
 
 endif
