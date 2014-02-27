@@ -958,6 +958,10 @@ public class MSimTelephonyManager {
         String p[] = null;
         String prop = SystemProperties.get(property);
 
+        if (value == null) {
+            value = "";
+        }
+
         if (prop != null) {
             p = prop.split(",");
         }
