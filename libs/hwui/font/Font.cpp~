@@ -418,11 +418,11 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
 
             if(glyphsCount > 1){
                 retVal = paint->getXYPos(GIDS[glyphsCount - 2],
-                    GIDS[glyphsCount - 1], GIDS[glyphsCount], 3, &x1, &y1);
+                	GIDS[glyphsCount - 1], GIDS[glyphsCount], 3, &x1, &y1);
             }
             else if(glyphsCount == 1){
                 retVal = paint->getXYPos(GIDS[glyphsCount - 1], GIDS[glyphsCount],
-                    0, 2, &x1, &y1);
+                	0, 2, &x1, &y1);
             }
             else{
                 x1 = 0; y1 = 0;

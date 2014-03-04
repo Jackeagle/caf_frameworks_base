@@ -841,18 +841,6 @@ bool TextLayoutShaper::isComplexScript(hb_script_t script) {
     case HB_SCRIPT_HAN:
     case HB_SCRIPT_KATAKANA:
     case HB_SCRIPT_HIRAGANA:
-#ifdef REVERIE
-    case HB_SCRIPT_DEVANAGARI:
-    case HB_SCRIPT_BENGALI:
-    case HB_SCRIPT_GURMUKHI:
-    case HB_SCRIPT_GUJARATI:
-    case HB_SCRIPT_TAMIL:
-    case HB_SCRIPT_TELUGU:
-    case HB_SCRIPT_KANNADA:
-    case HB_SCRIPT_MALAYALAM:
-    case HB_SCRIPT_ORIYA:
-    case HB_SCRIPT_THAI:
-#endif
         return false;
     default:
         return true;

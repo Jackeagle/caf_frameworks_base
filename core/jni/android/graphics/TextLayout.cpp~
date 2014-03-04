@@ -76,7 +76,7 @@ void TextLayout::getTextRunAdvances(SkPaint* paint, const jchar* chars, jint sta
             ii = 1;
     }
     if(ii == 1 ){
-        jfloat totalAdvance = 0;
+    	jfloat totalAdvance = 0;
         SkScalar* scalarArray = new SkScalar[(count + 2)];
         size_t widths;
         char* text = new char[(count * 2) + 2];
@@ -90,7 +90,7 @@ void TextLayout::getTextRunAdvances(SkPaint* paint, const jchar* chars, jint sta
         for (size_t i = 0; i < widths; i++) {
             totalAdvance += SkScalarToFloat(scalarArray[i]);
             if (resultAdvances)
-                resultAdvances[i] = SkScalarToFloat(scalarArray[i]);
+            	resultAdvances[i] = SkScalarToFloat(scalarArray[i]);
         }
         if (resultTotalAdvance)
             *resultTotalAdvance = totalAdvance;
