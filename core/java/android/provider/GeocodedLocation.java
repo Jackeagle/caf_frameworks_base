@@ -33,6 +33,7 @@ import java.util.Locale;
 
 import android.content.Context;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteException;
 import android.net.Uri;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -299,6 +300,8 @@ public class GeocodedLocation {
             if (c != null && c.moveToNext()) {
                 location = new GeocodedLocation(c, phoneNumber.type);
             }
+        } catch (SQLiteException e) {
+            e.printStackTrace();
         } finally {
             if (c != null && !c.isClosed()) {
                 c.close();
