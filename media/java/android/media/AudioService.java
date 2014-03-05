@@ -4538,9 +4538,6 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
     public int requestAudioFocus(int mainStreamType, int focusChangeHint, IBinder cb,
             IAudioFocusDispatcher fd, String clientId, String callingPackageName) {
         Log.i(TAG, " AudioFocus  requestAudioFocus() from " + clientId);
-
-        int result  = AudioManager.AUDIOFOCUS_REQUEST_FAILED;
-
         // the main stream type for the audio focus request is currently not used. It may
         // potentially be used to handle multiple stream type-dependent audio focuses.
 
@@ -4551,6 +4548,12 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
         }
 
         synchronized(mAudioFocusLock) {
+            if (!canReassignAudioFocus(clientId)) {
+                return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
+            }
+            if (!canReassignAudioFocusFromQchat(mainStreamType, clientId)) {
+                return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
+            }
 
             // handle the potential premature death of the new holder of the focus
             // (premature death == death before abandoning focus)
@@ -4564,35 +4567,31 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
                 return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
             }
 
-            if (canReassignAudioFocus(clientId) && canReassignAudioFocusFromQchat(mainStreamType, clientId)) {
-                if (!mFocusStack.empty() && mFocusStack.peek().mClientId.equals(clientId)) {
-                    // if focus is already owned by this client and the reason for acquiring the focus
-                    // hasn't changed, don't do anything
-                    if (mFocusStack.peek().mFocusChangeType == focusChangeHint) {
-                        // unlink death handler so it can be gc'ed.
-                        // linkToDeath() creates a JNI global reference preventing collection.
-                        cb.unlinkToDeath(afdh, 0);
-                        return AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
-                    }
-                    // the reason for the audio focus request has changed: remove the current top of
-                    // stack and respond as if we had a new focus owner
-                    FocusStackEntry fse = mFocusStack.pop();
-                    fse.unlinkToDeath();
+            if (!mFocusStack.empty() && mFocusStack.peek().mClientId.equals(clientId)) {
+                // if focus is already owned by this client and the reason for acquiring the focus
+                // hasn't changed, don't do anything
+                if (mFocusStack.peek().mFocusChangeType == focusChangeHint) {
+                    // unlink death handler so it can be gc'ed.
+                    // linkToDeath() creates a JNI global reference preventing collection.
+                    cb.unlinkToDeath(afdh, 0);
+                    return AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
                 }
+                // the reason for the audio focus request has changed: remove the current top of
+                // stack and respond as if we had a new focus owner
+                FocusStackEntry fse = mFocusStack.pop();
+                fse.unlinkToDeath();
+            }
 
-                // notify current top of stack it is losing focus
-                if (!mFocusStack.empty() && (mFocusStack.peek().mFocusDispatcher != null)) {
-                    try {
-                        mFocusStack.peek().mFocusDispatcher.dispatchAudioFocusChange(
-                                -1 * focusChangeHint, // loss and gain codes are inverse of each other
-                                mFocusStack.peek().mClientId);
-                    } catch (RemoteException e) {
-                        Log.e(TAG, " Failure to signal loss of focus due to "+ e);
-                        e.printStackTrace();
-                    }
+            // notify current top of stack it is losing focus
+            if (!mFocusStack.empty() && (mFocusStack.peek().mFocusDispatcher != null)) {
+                try {
+                    mFocusStack.peek().mFocusDispatcher.dispatchAudioFocusChange(
+                            -1 * focusChangeHint, // loss and gain codes are inverse of each other
+                            mFocusStack.peek().mClientId);
+                } catch (RemoteException e) {
+                    Log.e(TAG, " Failure to signal loss of focus due to "+ e);
+                    e.printStackTrace();
                 }
-
-                result = AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
             }
 
             // focus requester might already be somewhere below in the stack, remove it
@@ -4608,7 +4607,7 @@ public class AudioService extends IAudioService.Stub implements OnFinished {
             }
         }//synchronized(mAudioFocusLock)
 
-        return result;
+        return AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
 
     /** @see AudioManager#abandonAudioFocus(AudioManager.OnAudioFocusChangeListener)  */
