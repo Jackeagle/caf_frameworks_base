@@ -297,6 +297,7 @@
   <java-symbol type="bool" name="config_radio_reset_on_regular_deactivation" />
   <java-symbol type="bool" name="config_send_sms1x_on_voice_call" />
   <java-symbol type="bool" name="config_ascii_7bit_support_for_long_message" />
+  <java-symbol type="bool" name="config_feature_iwlan_enabled" />
 
   <java-symbol type="integer" name="config_cursorWindowSize" />
   <java-symbol type="integer" name="config_extraFreeKbytesAdjust" />
@@ -1565,7 +1566,8 @@
   <java-symbol type="string" name="config_geocoderProviderPackageName" />
   <java-symbol type="string" name="config_geofenceProviderPackageName" />
   <java-symbol type="string" name="config_networkLocationProviderPackageName" />
-  <java-symbol type="string" name="config_geofenceProvider" />
+  <java-symbol type="string" name="config_geofenceServicesProvider" />
+  <java-symbol type="string" name="config_comboNetworkLocationProvider" />
   <java-symbol type="string" name="config_wimaxManagerClassname" />
   <java-symbol type="string" name="config_wimaxNativeLibLocation" />
   <java-symbol type="string" name="config_wimaxServiceClassname" />
@@ -1793,4 +1795,8 @@
   <!-- cpu boost for overscroller fling -->
   <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
   <java-symbol type="bool" name="use_motion_accel" />
+  <java-symbol type="bool" name="config_setup_mms_data" />
+
+  <!-- Configuration to play sms ringtone during MO/MT call -->
+  <java-symbol type="bool" name="config_sms_ringtone_incall" />
 </resources>
