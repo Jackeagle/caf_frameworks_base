@@ -437,7 +437,7 @@ public class LocationManagerService extends ILocationManager.Stub {
                 mContext,
                 mLocationHandler,
                 flpHardwareProvider.getLocationHardware(),
-                com.android.internal.R.bool.config_enableFusedLocationOverlay,
+                com.android.internal.R.bool.config_enableHwFlpOverlay,
                 com.android.internal.R.string.config_fusedLocationProviderPackageName,
                 com.android.internal.R.array.config_locationProviderPackageNames);
         if(fusedProxy == null) {
@@ -2135,11 +2135,14 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     private Location screenLocationLocked(Location location, String provider) {
 
+        if (isMockProvider(LocationManager.NETWORK_PROVIDER)) {
+            return location;
+        }
+
         LocationProviderProxy providerProxy =
                 (LocationProviderProxy)mProvidersByName.get(LocationManager.NETWORK_PROVIDER);
         if (mComboNlpPackageName == null || providerProxy == null ||
-            false == provider.equals(LocationManager.NETWORK_PROVIDER) ||
-            isMockProvider(LocationManager.NETWORK_PROVIDER)) {
+            false == provider.equals(LocationManager.NETWORK_PROVIDER)) {
             return location;
         }
 
