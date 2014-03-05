@@ -121,7 +121,7 @@ public class FindActionModeCallback implements ActionMode.Callback, TextWatcher,
     public void onFindResultReceived(int activeMatchOrdinal, int numberOfMatches,
             boolean isDoneCounting) {
         if (isDoneCounting) {
-            updateMatchCount(activeMatchOrdinal, numberOfMatches, numberOfMatches == 0);
+            updateMatchCount(activeMatchOrdinal, numberOfMatches, false);
         }
     }
 

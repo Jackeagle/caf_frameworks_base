@@ -3655,7 +3655,10 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
 
             // The window manager will give us a valid window token
             mSubMenuHelper = new MenuDialogHelper(subMenu);
-            mSubMenuHelper.show(null);
+            if(!mSubMenuHelper.Isshowing())
+            {
+                mSubMenuHelper.show(null);
+            }
 
             return true;
         }

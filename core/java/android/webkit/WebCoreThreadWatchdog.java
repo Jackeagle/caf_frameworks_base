@@ -58,6 +58,7 @@ class WebCoreThreadWatchdog implements Runnable {
     private Handler mWebCoreThreadHandler;
     private Handler mHandler;
     private boolean mPaused;
+    private boolean mLocked = false;
 
     private Set<WebViewClassic> mWebViews;
 
@@ -86,6 +87,18 @@ class WebCoreThreadWatchdog implements Runnable {
     public synchronized static void pause() {
         if (sInstance != null) {
             sInstance.pauseWatchdog();
+        }
+    }
+
+    /**
+     * Changes the lock state of this watchdog.
+     *
+     * @param locked true if the watchdog lifecycle can not change, false
+     *            otherwise.
+     */
+    public synchronized static void setLocked(boolean locked) {
+        if (sInstance != null) {
+            sInstance.mLocked = locked;
         }
     }
 
@@ -123,7 +136,8 @@ class WebCoreThreadWatchdog implements Runnable {
     }
 
     private void resumeWatchdog() {
-        if (!mPaused) {
+        // If mLocked is ture, we want not call to resume the watchdog.
+        if (!mPaused || mLocked) {
             // Do nothing if we get a call to resume without being paused.
             // This can happen during the initialisation of the WebView.
             return;
