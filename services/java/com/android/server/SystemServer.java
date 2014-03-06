@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013. The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2013, 2014. The Linux Foundation. All rights reserved.
  * Not a Contribution.
  * Copyright (C) 2006 The Android Open Source Project
  *
@@ -219,6 +219,7 @@ class ServerThread {
         boolean disableSystemUI = SystemProperties.getBoolean("config.disable_systemui", false);
         boolean disableNonCoreServices = SystemProperties.getBoolean("config.disable_noncore", false);
         boolean disableNetwork = SystemProperties.getBoolean("config.disable_network", false);
+        boolean disableAtlas = SystemProperties.getBoolean("config.disable_atlas", false);
 
         try {
             Slog.i(TAG, "Display Manager");
@@ -536,7 +537,7 @@ class ServerThread {
                    int cneFeature = (enableCne == 1) ?
                        SystemProperties.getInt("persist.cne.feature", 0) : 0;
 
-                   if ( cneFeature > 0 && cneFeature < 7 ) {
+                   if ( cneFeature > 0 && cneFeature < 10 ) {
                        Slog.i(TAG, "QcConnectivity Service");
                        PathClassLoader qcsClassLoader =
                            new PathClassLoader("/system/framework/services-ext.jar",
@@ -823,7 +824,7 @@ class ServerThread {
                 }
             }
 
-            if (!disableNonCoreServices) {
+            if (!disableNonCoreServices && !disableAtlas) {
                 try {
                     Slog.i(TAG, "Assets Atlas Service");
                     atlas = new AssetAtlasService(context);

@@ -286,6 +286,10 @@ LOCAL_SRC_FILES += \
 	packages/services/Proxy/com/android/net/IProxyCallback.aidl \
 	packages/services/Proxy/com/android/net/IProxyPortListener.aidl \
 
+LOCAL_SRC_FILES += \
+        security-bridge/src/com/android/services/SecurityBridge/api/PackageManagerMonitor.java \
+        security-bridge/src/com/android/services/SecurityBridge/api/ClipboardManagerMonitor.java
+
 # FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
 LOCAL_AIDL_INCLUDES += $(FRAMEWORKS_BASE_JAVA_SRC_DIRS)
 
@@ -339,7 +343,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := framework-base
 LOCAL_DX_FLAGS := --core-library
 
 # Packages to include, use \* wildcard to include descendants.
-LOCAL_JAR_PACKAGES := com\* javax\*
+LOCAL_JAR_PACKAGES := com\* javax\* org\*
 
 include $(BUILD_JAVA_LIBRARY)
 framework2_module := $(LOCAL_INSTALLED_MODULE)
