@@ -319,7 +319,8 @@ public class MediaScanner
     private final boolean mExternalIsEmulated;
 
     /** whether to use bulk inserts or individual inserts for each item */
-    private static final boolean ENABLE_BULK_INSERTS = true;
+    //private static final boolean ENABLE_BULK_INSERTS = true;
+    private static final boolean ENABLE_BULK_INSERTS = false;
 
     // used when scanning the image database so we know whether we have to prune
     // old thumbnail files
