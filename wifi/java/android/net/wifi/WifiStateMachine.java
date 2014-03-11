@@ -1688,6 +1688,7 @@ public class WifiStateMachine extends StateMachine {
         noteScanEnd();
         Intent intent = new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+        intent.putExtra(WifiManager.EXTRA_NETWORK_INFO, new NetworkInfo(mNetworkInfo));
         mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
     }
 
