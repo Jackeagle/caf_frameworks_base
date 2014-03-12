@@ -329,8 +329,13 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     }
 
     public void connectivityServiceReady() {
+        Slog.d(TAG,"Initialising NetworkManagement Service");
         IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
         mNwService = INetworkManagementService.Stub.asInterface(b);
+        if (mNwService==null) {
+           throw new NullPointerException(
+           "Failed to intialise NetwrokManagement service from Binder interface");
+        }
     }
 
     private void enforceAccessPermission() {
@@ -811,6 +816,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             switch (message.what) {
                 case WifiStateMachine.CMD_ENABLE_P2P:
                     try {
+                        if(mNwService == null)
+                           loge("NetworkManagement service is null");
                         mNwService.setInterfaceUp(mInterface);
                     } catch (RemoteException re) {
                         loge("Unable to change interface settings: " + re);
@@ -2669,6 +2676,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             boolean peersChanged = mPeers.remove(mPeersLostDuringConnection);
             if (mPeers.remove(mSavedPeerConfig.deviceAddress) != null) {
                 peersChanged = true;
+                mWifiNative.p2pFlush();
             }
             if (peersChanged) {
                 sendPeersChangedBroadcast();

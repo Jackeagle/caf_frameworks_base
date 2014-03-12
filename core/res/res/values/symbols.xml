@@ -1473,6 +1473,7 @@
   <java-symbol type="bool" name="config_animateScreenLights" />
   <java-symbol type="bool" name="config_automatic_brightness_available" />
   <java-symbol type="bool" name="config_enableFusedLocationOverlay" />
+  <java-symbol type="bool" name="config_enableHwFlpOverlay" />
   <java-symbol type="bool" name="config_enableGeocoderOverlay" />
   <java-symbol type="bool" name="config_enableGeofenceOverlay" />
   <java-symbol type="bool" name="config_enableNetworkLocationOverlay" />
@@ -1726,6 +1727,7 @@
   <java-symbol type="id" name="body" />
   <java-symbol type="string" name="fast_scroll_alphabet" />
   <java-symbol type="string" name="ssl_certificate" />
+  <java-symbol type="string" name="transport_destination_string" />
 
   <!-- From Phone -->
   <java-symbol type="bool" name="config_built_in_sip_phone" />
@@ -1806,4 +1808,8 @@
 
   <!-- for wifi auto connection -->
   <java-symbol type="bool" name="wifi_autocon" />
+
+  <!-- sim refresh for dual mode card -->
+  <java-symbol type="bool" name="config_sim_refresh_for_dual_mode_card" />
+  <java-symbol type="bool" name="config_global_phone_enabled" />
 </resources>
