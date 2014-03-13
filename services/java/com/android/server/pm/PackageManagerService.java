@@ -10768,9 +10768,8 @@ public class PackageManagerService extends IPackageManager.Stub {
                                     final String newNativePath = mp.targetArgs
                                             .getNativeLibraryPath();
 
-                                    final File newNativeDir = new File(newNativePath);
-
                                     if (!isForwardLocked(pkg) && !isExternal(pkg)) {
+                                        final File newNativeDir = new File(newNativePath);
                                         NativeLibraryHelper.copyNativeBinariesIfNeededLI(
                                                 new File(newCodePath), newNativeDir);
                                     }
