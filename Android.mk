@@ -449,9 +449,6 @@ fwbase_dirs_to_document := \
 	   ) \
 	 )
 
-# include definition of libcore_to_document
-include libcore/Docs.mk
-
 non_base_dirs := \
 	../../external/apache-http/src/org/apache/http \
 	../opt/telephony/src/java/android/provider \
