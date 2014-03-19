@@ -125,6 +125,9 @@ final class WifiNotificationController {
                             }
                         } else if (intent.getAction().equals(
                                 WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)) {
+                            if (mNetworkInfo == null)
+                                mNetworkInfo = (NetworkInfo) intent.getParcelableExtra(
+                                WifiManager.EXTRA_NETWORK_INFO);
                             checkAndSetNotification(mNetworkInfo,
                                     mWifiStateMachine.syncGetScanResultsList());
                         }
