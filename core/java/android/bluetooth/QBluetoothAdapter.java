@@ -96,6 +96,52 @@ public final class QBluetoothAdapter {
     public static final String ACTION_ADV_ENABLE_CHANGED=
             "android.bluetooth.adapter.action.ADV_ENABLE_CHANGED";
     /**
+     * Broadcast Action: Broadcasts an intent for BLE connection
+     * parameter update complete/remote connection parameter request events
+     * <p>Always contains the extra field {@link #EXTRA_DEVICE}.
+     * <p>Always contains the extra field {@link #CONN_INTERVAL_MIN}.
+     * <p>Always contains the extra field {@link #CONN_INTERVAL_MAX}.
+     * <p>Always contains the extra field {@link #CONN_LATENCY}.
+     * <p>Always contains the extra field {@link #SUPERVISION_TIMEOUT}.
+     * <p>Always contains the extra field {@link #STATUS}.
+     * <p>Always contains the extra field {@link #EVENT}.
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_BLE_CONN_PARAMS =
+            "android.bluetooth.adapter.action.ACTION_BLE_CONN_PARAMS";
+    /**
+     *Used as an extra field in {@link #ACTION_BLE_CONN_PARAMS} intent.
+     * @hide
+     */
+    public static final String EXTRA_CONN_INTERVAL_MIN = "android.bluetooth.adapter.extra.CONN_INTERVAL_MIN";
+    /**
+     *Used as an extra field in {@link #ACTION_BLE_CONN_PARAMS} intent.
+     * @hide
+     */
+    public static final String EXTRA_CONN_INTERVAL_MAX = "android.bluetooth.adapter.extra.CONN_INTERVAL_MAX";
+    /**
+     *Used as an extra field in {@link #ACTION_BLE_CONN_PARAMS} intent.
+     * @hide
+     */
+    public static final String EXTRA_CONN_LATENCY = "android.bluetooth.adapter.extra.CONN_LATENCY";
+    /**
+     *Used as an extra field in {@link #ACTION_BLE_CONN_PARAMS} intent.
+     * @hide
+     */
+    public static final String EXTRA_SUPERVISION_TIMEOUT = "android.bluetooth.adapter.extra.SUPERVISION_TIMEOUT";
+    /**
+     * Used as an extra field in {@link #ACTION_BLE_CONN_PARAMS} intent.
+     * @hide
+     */
+    public static final String EXTRA_STATUS = "android.bluetooth.adapter.extra.STATUS";
+    /**
+    * Used as an extra field in {@link #ACTION_BLE_CONN_PARAMS} intent.
+     * @hide
+     */
+    public static final String EXTRA_EVENT = "android.bluetooth.adpater.extra.EVENT";
+    /**
      * Used as a String extra field in {@link #ACTION_LOCAL_NAME_CHANGED}
      * intents to request the local Bluetooth name.
      */
@@ -485,6 +531,28 @@ public final class QBluetoothAdapter {
         wrapper.readRssiThreshold();
         return true;
     }
+
+    /**
+     * sends LE Conn update
+     * <p>Requires the {@link android.Manifest.permission#BLUETOOTH_ADMIN}
+     * permission
+     * @return returns true if operation successful
+     /** @hide */
+     public boolean sendLEConnUpdate(BluetoothDevice device, int interval_min, int interval_max,
+             int latency, int supervisionTimeout){
+         if (mAdapter.getState() != BluetoothAdapter.STATE_ON)
+             return false;
+         Log.v(TAG, "QBluetooth adapter, sendLEConnUpdate interval_min" + interval_min +"" +
+                 " max interval_max:"+interval_max + "latency:" +latency + " supervisionTimeout="+ supervisionTimeout);
+         try {
+             synchronized(mManagerCallback) {
+                 if (mService!=null && mQService != null)
+                     return mQService.sendLEConnUpdate(device, interval_min, interval_max,
+                             latency, supervisionTimeout);
+             }
+         } catch (RemoteException e) {Log.e(TAG, "sendLEConnUpdate", e);}
+         return false;
+     }
 
     protected void finalize() throws Throwable {
         try {
