@@ -436,7 +436,7 @@ public class WindowManagerService extends IWindowManager.Stub
     /** All DisplayContents in the world, kept here */
     SparseArray<DisplayContent> mDisplayContents = new SparseArray<DisplayContent>(2);
 
-    int mRotation = 0;
+    int mRotation = SystemProperties.getInt("persist.panel.orientation", 0) / 90;
     int mForcedAppOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
     boolean mAltOrientation = false;
     ArrayList<IRotationWatcher> mRotationWatchers
@@ -9804,6 +9804,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 // doing this part.
                 finishUpdateFocusedWindowAfterAssignLayersLocked(updateInputWindows);
             }
+
+            mInputManager.notifyWindowFocusChanged();
 
             Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
             return true;
