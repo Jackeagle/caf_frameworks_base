@@ -2157,12 +2157,8 @@ public class AudioService extends IAudioService.Stub {
                                                 SCO_MODE_VIRTUAL_CALL : SCO_MODE_RAW;
                                 if (mBluetoothHeadset != null && mBluetoothHeadsetDevice != null) {
                                     boolean status;
-                                    if (mScoAudioMode == SCO_MODE_RAW) {
-                                        status = mBluetoothHeadset.connectAudio();
-                                    } else {
-                                        status = mBluetoothHeadset.startScoUsingVirtualVoiceCall(
+                                    status = mBluetoothHeadset.startScoUsingVirtualVoiceCall(
                                                                             mBluetoothHeadsetDevice);
-                                    }
                                     if (status) {
                                         mScoAudioState = SCO_STATE_ACTIVE_INTERNAL;
                                     } else {
@@ -2186,12 +2182,8 @@ public class AudioService extends IAudioService.Stub {
                     if (mScoAudioState == SCO_STATE_ACTIVE_INTERNAL) {
                         if (mBluetoothHeadset != null && mBluetoothHeadsetDevice != null) {
                             boolean status;
-                            if (mScoAudioMode == SCO_MODE_RAW) {
-                                status = mBluetoothHeadset.disconnectAudio();
-                            } else {
                                 status = mBluetoothHeadset.stopScoUsingVirtualVoiceCall(
                                                                         mBluetoothHeadsetDevice);
-                            }
                             if (!status) {
                                 mScoAudioState = SCO_STATE_INACTIVE;
                                 broadcastScoConnectionState(
@@ -2367,20 +2359,12 @@ public class AudioService extends IAudioService.Stub {
                             switch (mScoAudioState) {
                             case SCO_STATE_ACTIVATE_REQ:
                                 mScoAudioState = SCO_STATE_ACTIVE_INTERNAL;
-                                if (mScoAudioMode == SCO_MODE_RAW) {
-                                    status = mBluetoothHeadset.connectAudio();
-                                } else {
-                                    status = mBluetoothHeadset.startScoUsingVirtualVoiceCall(
+                                status = mBluetoothHeadset.startScoUsingVirtualVoiceCall(
                                                                         mBluetoothHeadsetDevice);
-                                }
                                 break;
                             case SCO_STATE_DEACTIVATE_REQ:
-                                if (mScoAudioMode == SCO_MODE_RAW) {
-                                    status = mBluetoothHeadset.disconnectAudio();
-                                } else {
-                                    status = mBluetoothHeadset.stopScoUsingVirtualVoiceCall(
+                                 status = mBluetoothHeadset.stopScoUsingVirtualVoiceCall(
                                                                         mBluetoothHeadsetDevice);
-                                }
                                 break;
                             case SCO_STATE_DEACTIVATE_EXT_REQ:
                                 status = mBluetoothHeadset.stopVoiceRecognition(
@@ -2400,14 +2384,25 @@ public class AudioService extends IAudioService.Stub {
             }
         }
         public void onServiceDisconnected(int profile) {
+            Log.d(TAG, "onServiceDisconnected: Bluetooth profile: " + profile);
             switch(profile) {
             case BluetoothProfile.A2DP:
                 synchronized (mA2dpAvrcpLock) {
                     mA2dp = null;
                     synchronized (mConnectedDevices) {
                         if (mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP)) {
-                            makeA2dpDeviceUnavailableNow(
-                                    mConnectedDevices.get(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP));
+                            Log.d(TAG, "A2dp service disconnects, pause music player");
+                            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+                            BluetoothDevice btDevice = adapter.getRemoteDevice
+                                    (mConnectedDevices.get(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP));
+                            int delay = checkSendBecomingNoisyIntent(
+                                                AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, 0);
+                            queueMsgUnderWakeLock(mAudioHandler,
+                                                MSG_SET_A2DP_CONNECTION_STATE,
+                                                BluetoothA2dp.STATE_DISCONNECTED,
+                                                0,
+                                                btDevice,
+                                                delay);
                         }
                     }
                 }
