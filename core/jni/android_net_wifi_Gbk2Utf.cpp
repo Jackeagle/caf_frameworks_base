@@ -504,4 +504,60 @@ jboolean setNetworkVariable(char *buf)
     return JNI_TRUE;
 }
 
+void constructEventSsid(char *eventstr)
+{
+     char *pos = NULL;
+     char *tmp = NULL;
+     char ssid[BUF_SIZE] = {0};
+     char ssid_txt[BUF_SIZE] = {0};
+     char buf[BUF_SIZE] = {0};
+     bool isUTF8 = false, isCh = false;
+
+     UConverterType conType = UCNV_UTF8;
+     char dest[CONVERT_LINE_LEN] = {0};
+     UErrorCode err = U_ZERO_ERROR;
+     UConverter* pConverter = ucnv_open(CHARSET_CN, &err);
+     if (U_FAILURE(err)) {
+         ALOGE("ucnv_open error");
+         return;
+     }
+
+     tmp = strstr(eventstr, " SSID");
+     if (strlen(tmp) > 6 ) {
+         if(!strstr(tmp,"="))
+             sscanf(tmp + 7, "%[^\']", ssid);
+	else
+             sscanf(tmp + 6, "%s", ssid);
+         if (DBG)
+             ALOGD("%s, SSID = %s", __FUNCTION__, ssid);
+         ssid_decode(buf,BUF_SIZE,ssid);
+         isUTF8 = isUTF8String(buf,sizeof(buf));
+         isCh = false;
+         for (pos = buf; '\0' != *pos; pos++) {
+             if (0x80 == (*pos & 0x80)) {
+                 isCh = true;
+                 break;
+             }
+         }
+         if (!isUTF8 && isCh) {
+             ucnv_toAlgorithmic(conType, pConverter, dest, CONVERT_LINE_LEN,
+                             buf, strlen(buf), &err);
+             if (U_FAILURE(err)) {
+                 ALOGE("ucnv_toUChars error");
+                 goto EXIT;
+             }
+             ssid_encode(ssid_txt, BUF_SIZE, dest, strlen(dest));
+             if (!strstr(tmp,"="))
+                 snprintf(eventstr + (strlen(eventstr) - strlen(tmp)), strlen(eventstr), " SSID \'%s\'", ssid_txt);
+             else
+                 snprintf(eventstr + (strlen(eventstr) - strlen(tmp)), strlen(eventstr), " SSID=%s", ssid_txt);
+             if (DBG)
+                 ALOGD("%s, ssid_txt = %s, eventsrt = %s", __FUNCTION__, ssid_txt, eventstr);
+         }
+     }
+
+EXIT:
+     ucnv_close(pConverter);
+}
+
 } //namespace android

@@ -200,7 +200,10 @@ static jstring android_net_wifi_waitForEvent(JNIEnv* env, jobject, jstring jIfac
     ScopedUtfChars ifname(env, jIface);
     int nread = ::wifi_wait_for_event(ifname.c_str(), buf, sizeof buf);
     if (nread > 0) {
-        return env->NewStringUTF(buf);
+	    if (strstr(buf, " SSID=") || strstr(buf, " SSID ")){
+	        constructEventSsid(buf);
+	    }
+	    return env->NewStringUTF(buf);
     } else {
         return NULL;
     }
