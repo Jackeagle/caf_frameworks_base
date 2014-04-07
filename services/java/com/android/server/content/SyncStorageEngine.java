@@ -629,8 +629,8 @@ public class SyncStorageEngine extends Handler {
 
     public void clearAllBackoffs(SyncQueue syncQueue) {
         boolean changed = false;
-        synchronized (mAuthorities) {
-            synchronized (syncQueue) {
+        synchronized (syncQueue) {
+            synchronized (mAuthorities) {
                 for (AccountInfo accountInfo : mAccounts.values()) {
                     for (AuthorityInfo authorityInfo : accountInfo.authorities.values()) {
                         if (authorityInfo.backoffTime != NOT_IN_BACKOFF_MODE
