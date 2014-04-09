@@ -48,6 +48,7 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
 
     protected ProgressDialog mSimUnlockProgressDialog = null;
     protected volatile boolean mSimCheckInProgress;
+    protected boolean mGetDefaultRemaining = true;
 
     public KeyguardSimPinView(Context context) {
         this(context, null);
@@ -72,12 +73,23 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
     public void resetState() {
         String  displayMessage = "";
         try {
+            if (mGetDefaultRemaining) {
+                int result = ITelephony.Stub.asInterface(ServiceManager
+                        .checkService("phone")).supplyPinReportResult("");
+            }
             int attemptsRemaining = ITelephony.Stub.asInterface(ServiceManager
                     .checkService("phone")).getIccPin1RetryCount();
-            if (attemptsRemaining >= 0) {
-                displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
-                        + getContext().getString(R.string.pinpuk_attempts)
-                        + attemptsRemaining + ". ";
+            if (mGetDefaultRemaining) {
+                if (attemptsRemaining >= 0) {
+                    displayMessage = getContext().getString(R.string.pinpuk_attempts)
+                            + attemptsRemaining + ". ";
+                }
+            } else {
+                if (attemptsRemaining >= 0) {
+                    displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
+                            + getContext().getString(R.string.pinpuk_attempts)
+                            + attemptsRemaining + ". ";
+                }
             }
         } catch (RemoteException ex) {
             displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
@@ -228,6 +240,7 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                                 KeyguardUpdateMonitor.getInstance(getContext()).reportSimUnlocked();
                                 mCallback.dismiss(true);
                             } else {
+                                mGetDefaultRemaining = false;
                                 if (result == PhoneConstants.PIN_PASSWORD_INCORRECT) {
                                     mSecurityMessageDisplay.setMessage
                                             (R.string.kg_password_wrong_pin_code, true);
