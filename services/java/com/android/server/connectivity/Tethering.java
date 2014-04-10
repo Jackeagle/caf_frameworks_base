@@ -1417,9 +1417,10 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                                                 (mPreferredUpstreamMobileApn) == true)) {
                                     // we think mobile should be coming up - don't set a retry
                                     tryAgainLater = false;
-                                    mRetryCount++;
+                                    mRetryCount = 0;
                                 }
                                 if (tryAgainLater) {
+                                    mRetryCount++;
                                     sendMessageDelayed(CMD_RETRY_UPSTREAM, UPSTREAM_SETTLE_TIME_MS);
                                 }
                             } else {
