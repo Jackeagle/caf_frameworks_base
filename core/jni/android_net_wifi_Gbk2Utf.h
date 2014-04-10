@@ -49,6 +49,8 @@ extern void parseScanResults(String16& str, const char *reply);
 
 extern void constructSsid(String16& str, const char *reply);
 
+extern void constructEventSsid(char *eventstr);
+
 extern jboolean setNetworkVariable(char *buf);
 
 } //namespace android
