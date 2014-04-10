@@ -663,11 +663,17 @@ public final class BluetoothDevice implements Parcelable {
     /**
      * Get trust state of a remote device.
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
+     * @return true/false
      * @hide
      */
     public boolean getTrustState() {
+        if (sService == null) {
+            Log.e(TAG, "BT not enabled. Cannot get Remote Device Alias");
+            return false;
+        }
+
         try {
-            return sService.getTrustState(mAddress);
+            return sService.getRemoteTrust(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
@@ -678,11 +684,16 @@ public final class BluetoothDevice implements Parcelable {
      * Set trust state for a remote device.
      * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
      * @param value the trust state value (true or false)
+     * @return true/false
      * @hide
      */
-    public boolean setTrust(boolean value) {
+    public boolean setTrust(boolean trustValue) {
+        if (sService == null) {
+            Log.e(TAG, "BT not enabled. Cannot set Remote Device name");
+            return false;
+        }
         try {
-            return sService.setTrust(mAddress, value);
+            return sService.setRemoteTrust(this, trustValue);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
