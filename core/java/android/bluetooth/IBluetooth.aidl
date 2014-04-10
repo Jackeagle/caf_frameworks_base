@@ -71,9 +71,15 @@ interface IBluetooth
     boolean setRemoteOutOfBandData(in String addres);
     boolean cancelPairingUserInput(in String address);
 
-    boolean setTrust(in String address, in boolean value);
-    boolean getTrustState(in String address);
-    boolean isBluetoothDock(in String address);
+    String getRemoteName(in BluetoothDevice device);
+    int getRemoteType(in BluetoothDevice device);
+    String getRemoteAlias(in BluetoothDevice device);
+    boolean setRemoteAlias(in BluetoothDevice device, in String name);
+    boolean setRemoteTrust(in BluetoothDevice device, in boolean value);
+    boolean getRemoteTrust(in BluetoothDevice device);
+    int getRemoteClass(in BluetoothDevice device);
+    ParcelUuid[] getRemoteUuids(in BluetoothDevice device);
+    boolean fetchRemoteUuids(in BluetoothDevice device);
 
     int addRfcommServiceRecord(in String serviceName, in ParcelUuid uuid, int channel, IBinder b);
     void removeServiceRecord(int handle);
