@@ -106,7 +106,8 @@ public class AppOpsManager {
     public static final int OP_SEND_MMS = 34;
     public static final int OP_READ_MMS = 35;
     public static final int OP_WRITE_MMS = 36;
-    public static final int _NUM_OP = 37;
+    public static final int OP_BOOT_COMPLETED = 37;
+    public static final int _NUM_OP = 38;
 
 
     /**
@@ -153,6 +154,7 @@ public class AppOpsManager {
         true,   //OP_SEND_MMS
         true,   //OP_READ_MMS
         true,   //OP_WRITE_MMS
+        false,  //OP_BOOT_COMPLETED
     };
 
     /**
@@ -201,6 +203,7 @@ public class AppOpsManager {
             OP_SEND_MMS,
             OP_READ_MMS,
             OP_WRITE_MMS,
+            OP_BOOT_COMPLETED,
     };
 
     /**
@@ -245,6 +248,7 @@ public class AppOpsManager {
             "SEND_MMS",
             "READ_MMS",
             "WRITE_MMS",
+            "BOOT_COMPLETED",
     };
 
     /**
@@ -289,6 +293,7 @@ public class AppOpsManager {
             android.Manifest.permission.SEND_SMS,
             android.Manifest.permission.READ_SMS,
             android.Manifest.permission.WRITE_SMS,
+            android.Manifest.permission.RECEIVE_BOOT_COMPLETED,
     };
 
     /**
