@@ -444,31 +444,6 @@ public class UsbDeviceManager {
             }
         }
 
-        // We could not know what's the usb charging mode config of each device,
-        // which may be defined in some sh source file. So here we filter the
-        // extra functions to check whether contains multi main functions.
-        private boolean isInChargingMode() {
-            String functions = new String(mCurrentFunctions);
-
-            // Filter all extra functions
-            final String mExtraFunctions = SystemProperties.get("persist.sys.usb.config.extra");
-            final String isUserRelease = SystemProperties.get("ro.debuggable");
-
-            if (!mExtraFunctions.equals("")) {
-                functions = removeFunction(functions, mExtraFunctions);
-            }
-
-            // Filter the adb function
-            if (mAdbEnabled) {
-                functions = removeFunction(functions, UsbManager.USB_FUNCTION_ADB);
-            }
-            // For User Release version, sys.usb.config is always "none" as default.
-            if ("0".equals(isUserRelease)) {
-                return ("none".equals(functions) || functions.split(",").length > 1);
-            }
-            return (!"none".equals(functions) && functions.split(",").length > 1);
-        }
-
         private boolean waitForState(String state) {
             // wait for the transition to complete.
             // give up after 1 second.
@@ -705,7 +680,7 @@ public class UsbDeviceManager {
             int id = 0;
             Resources r = mContext.getResources();
             if (mConnected) {
-                if (isInChargingMode()) {
+                if (containsFunction(mCurrentFunctions, UsbManager.USB_FUNCTION_CHARGING)) {
                     id = com.android.internal.R.string.usb_charging_notification_title;
                 } else if (containsFunction(mCurrentFunctions, UsbManager.USB_FUNCTION_MTP)) {
                     id = com.android.internal.R.string.usb_mtp_notification_title;
