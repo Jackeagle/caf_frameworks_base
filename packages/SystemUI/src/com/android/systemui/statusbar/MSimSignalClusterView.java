@@ -296,7 +296,6 @@ public class MSimSignalClusterView
         } else {
             mMobileCdmaVisible = false;
             mMobileCdma1xOnlyVisible = false;
-
             mMobileDataVoiceVisible[subscription] = false;
         }
 
@@ -315,9 +314,11 @@ public class MSimSignalClusterView
     public boolean dispatchPopulateAccessibilityEvent(AccessibilityEvent event) {
         // Standard group layout onPopulateAccessibilityEvent() implementations
         // ignore content description, so populate manually
-        if (mWifiVisible && mWifiGroup.getContentDescription() != null)
+        if (mWifiVisible && mWifiGroup != null &&
+                mWifiGroup.getContentDescription() != null)
             event.getText().add(mWifiGroup.getContentDescription());
-        if (mMobileVisible && mMobileGroup[MSimConstants.DEFAULT_SUBSCRIPTION].
+        if (mMobileVisible && mMobileGroup[MSimConstants.DEFAULT_SUBSCRIPTION] != null
+                && mMobileGroup[MSimConstants.DEFAULT_SUBSCRIPTION].
                 getContentDescription() != null)
             event.getText().add(mMobileGroup[MSimConstants.DEFAULT_SUBSCRIPTION].
                     getContentDescription());
@@ -349,6 +350,9 @@ public class MSimSignalClusterView
             mMobileGroup[subscription].setVisibility(View.VISIBLE);
         } else {
             mMobileGroup[subscription].setVisibility(View.GONE);
+            mMobileCdmaGroup.setVisibility(View.GONE);
+            mMobileCdma1xOnly.setVisibility(View.GONE);
+            mDataGroup[subscription].setVisibility(View.GONE);
         }
 
         if (mIsAirplaneMode) {
