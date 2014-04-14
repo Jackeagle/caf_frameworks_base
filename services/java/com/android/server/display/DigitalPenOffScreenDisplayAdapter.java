@@ -89,6 +89,9 @@ final class DigitalPenOffScreenDisplayAdapter extends DisplayAdapter {
 
     private void registerOffScreenDimensionsCallbackLocked() {
         IBinder digitalPenService = ServiceManager.getService("DigitalPen");
+        if (digitalPenService == null) {
+            return;
+        }
         Class digitalPenServiceClass = digitalPenService.getClass();
         try {
             Class args[] = {
