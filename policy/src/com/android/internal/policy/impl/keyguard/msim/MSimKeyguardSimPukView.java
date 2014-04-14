@@ -71,14 +71,26 @@ public class MSimKeyguardSimPukView extends KeyguardSimPukView {
         void reset() {
             String  displayMessage = "";
             try {
+                if (mGetDefaultRemaining) {
+                    boolean result = ITelephonyMSim.Stub.asInterface(ServiceManager
+                            .checkService("phone_msim")).supplyPuk("", "", KeyguardUpdateMonitor
+                            .getInstance(mContext).getPukLockedSubscription());
+                }
                 int attemptsRemaining = ITelephonyMSim.Stub.asInterface(ServiceManager
                         .checkService("phone_msim")).getIccPin1RetryCount(KeyguardUpdateMonitor
                         .getInstance(mContext).getPukLockedSubscription());
-                if (attemptsRemaining >= 0) {
-                    displayMessage = getContext().getString(
-                            R.string.keyguard_password_wrong_puk_code)
-                            + getContext().getString(R.string.pinpuk_attempts)
-                            + attemptsRemaining + ". ";
+                if (mGetDefaultRemaining) {
+                    if (attemptsRemaining >= 0) {
+                        displayMessage = getContext().getString(R.string.pinpuk_attempts)
+                                + attemptsRemaining + ". ";
+                    }
+                } else {
+                    if (attemptsRemaining >= 0) {
+                        displayMessage = getContext().getString(
+                                R.string.keyguard_password_wrong_puk_code)
+                                + getContext().getString(R.string.pinpuk_attempts)
+                                + attemptsRemaining + ". ";
+                    }
                 }
             } catch (RemoteException ex) {
                 displayMessage = getContext().getString(
@@ -162,6 +174,7 @@ public class MSimKeyguardSimPukView extends KeyguardSimPukView {
                             if (success) {
                                 mCallback.dismiss(true);
                             } else {
+                                mGetDefaultRemaining = false;
                                 mStateMachine.reset();
                                 mSecurityMessageDisplay.setMessage(
                                     getSecurityMessageDisplay(R.string.kg_invalid_puk), true);
