@@ -49,6 +49,7 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
     protected String mPukText;
     protected String mPinText;
     protected StateMachine mStateMachine = new StateMachine();
+    protected boolean mGetDefaultRemaining = true;
 
     protected class StateMachine {
         final int ENTER_PUK = 0;
@@ -93,13 +94,26 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
         void reset() {
             String  displayMessage = "";
             try {
+                if (mGetDefaultRemaining) {
+                    final int result = ITelephony.Stub.asInterface(ServiceManager
+                            .checkService("phone")).supplyPukReportResult("", "");
+                }
                 int attemptsRemaining = ITelephony.Stub.asInterface(ServiceManager
                         .checkService("phone")).getIccPin1RetryCount();
-                if (attemptsRemaining >= 0) {
-                    displayMessage = getContext().getString(
-                            R.string.keyguard_password_wrong_puk_code)
-                            + getContext().getString(R.string.pinpuk_attempts)
-                            + attemptsRemaining + ". ";
+                if (mGetDefaultRemaining) {
+                    if (attemptsRemaining >= 0) {
+                        displayMessage = getContext().getString(
+                                R.string.keyguard_password_wrong_puk_code)
+                                + getContext().getString(R.string.pinpuk_attempts)
+                                + attemptsRemaining + ". ";
+                    }
+                } else {
+                    if (attemptsRemaining >= 0) {
+                        displayMessage = getContext().getString(
+                                R.string.keyguard_password_wrong_puk_code)
+                                + getContext().getString(R.string.pinpuk_attempts)
+                                + attemptsRemaining + ". ";
+                    }
                 }
             } catch (RemoteException ex) {
                 displayMessage = getContext().getString(
@@ -282,6 +296,7 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
                             if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
                                 mCallback.dismiss(true);
                             } else {
+                                mGetDefaultRemaining = false;
                                 if (result == PhoneConstants.PIN_PASSWORD_INCORRECT) {
                                     mSecurityMessageDisplay.setMessage
                                             (R.string.kg_invalid_puk, true);
