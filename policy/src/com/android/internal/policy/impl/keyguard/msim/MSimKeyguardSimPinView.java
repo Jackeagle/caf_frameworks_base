@@ -136,13 +136,29 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
         try {
             mSubscription = KeyguardUpdateMonitor.getInstance(mContext)
                     .getPinLockedSubscription();
+            if (mGetDefaultRemaining) {
+                boolean result = ITelephonyMSim.Stub.asInterface(ServiceManager
+                        .checkService("phone_msim")).supplyPin("", mSubscription);
+                if (DEBUG) Log.d(TAG, "resetState(), result = " + result
+                        + " mSubscription = " + mSubscription);
+            }
             int attemptsRemaining = ITelephonyMSim.Stub.asInterface(ServiceManager
                     .checkService("phone_msim")).getIccPin1RetryCount(mSubscription);
 
-            if (attemptsRemaining >= 0) {
-                displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
-                        + getContext().getString(R.string.pinpuk_attempts)
-                        + attemptsRemaining + ". ";
+            if (mGetDefaultRemaining) {
+                Log.d(TAG, "resetState(), mGetDefaultRemaining");
+                if (attemptsRemaining >= 0) {
+                    displayMessage = getContext().getString(R.string.pinpuk_attempts)
+                            + attemptsRemaining + ". ";
+                }
+
+            } else {
+                Log.d(TAG, "resetState(), !mGetDefaultRemaining");
+                if (attemptsRemaining >= 0) {
+                    displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
+                            + getContext().getString(R.string.pinpuk_attempts)
+                            + attemptsRemaining + ". ";
+                }
             }
         } catch (RemoteException ex) {
             displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
@@ -222,6 +238,7 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
                                 // so it knows right away.
                                 closeKeyGuard(success);
                             } else {
+                                mGetDefaultRemaining = false;
                                 mSecurityMessageDisplay.setMessage(getSecurityMessageDisplay
                                         (R.string.kg_password_wrong_pin_code), true);
                                 mPasswordEntry.setText("");
