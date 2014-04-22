@@ -254,9 +254,15 @@ public final class AndroidHttpClient implements HttpClient {
 
     private boolean isMmsRequest()
     {
-        if(delegate.getParams().getParameter(CoreProtocolPNames.USER_AGENT).toString().contains("Android-Mms"))
-            return true;
-
+        if (delegate != null) {
+            HttpParams httpParams = getParams();
+            if (httpParams != null) {
+                Object parameter = httpParams.getParameter(CoreProtocolPNames.USER_AGENT);
+                if (parameter != null && parameter.toString().contains("Android-Mms")) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
