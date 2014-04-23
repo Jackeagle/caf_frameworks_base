@@ -4380,12 +4380,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 sensorRotation = lastRotation;
             }
             final int preferredRotation;
-            if(isTargetHdmiPrimary()) {
-                /* Do exactly what the application asked us to do.
-                 * Donot override preference
-                 */
-                preferredRotation = -1;
-            } else if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
+            if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
                 // Ignore sensor when lid switch is open and rotation is forced.
                 preferredRotation = mLidOpenRotation;
             } else if (mDockMode == Intent.EXTRA_DOCK_STATE_CAR
@@ -4441,7 +4436,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         || mAllowAllRotations == 1
                         || orientation == ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
                         || orientation == ActivityInfo.SCREEN_ORIENTATION_FULL_USER) {
-                    preferredRotation = sensorRotation;
+                    if(isTargetHdmiPrimary()) {
+                        /* Do exactly what the application asked us to do.
+                         * Donot override preference
+                         */
+                        preferredRotation = -1;
+                    } else {
+                        preferredRotation = sensorRotation;
+                    }
                 } else {
                     preferredRotation = lastRotation;
                 }
