@@ -17,6 +17,7 @@
 package android.nfc;
 
 import android.os.Bundle;
+import android.content.Intent;
 
 
 /**
@@ -30,4 +31,6 @@ interface INfcAdapterExtras {
     void setCardEmulationRoute(in String pkg, int route);
     void authenticate(in String pkg, in byte[] token);
     String getDriverName(in String pkg);
+    boolean isSeEnabled(in String pkg, int sEID);
+    void deliverSeIntent(in String pkg, in Intent seIntent);
 }
