@@ -49,6 +49,7 @@ public class MSimSignalClusterView
     private final int STATUS_BAR_STYLE_DATA_VOICE = 3;
 
     private int mStyle = 0;
+    private int[] mShowTwoBars;
 
     MSimNetworkController mMSimNC;
 
@@ -161,6 +162,8 @@ public class MSimSignalClusterView
         }
 
         mStyle = context.getResources().getInteger(R.integer.status_bar_style);
+        mShowTwoBars = context.getResources().getIntArray(
+                R.array.config_showVoiceAndDataForSub);
     }
 
     public void setNetworkController(MSimNetworkController nc) {
@@ -375,10 +378,14 @@ public class MSimSignalClusterView
             mMobileType[subscription].setVisibility(View.GONE);
         }
 
-        if (mStyle != STATUS_BAR_STYLE_ANDROID_DEFAULT
-                && mNoSimIconId[subscription] != 0) {
-            mNoSimSlot[subscription].setVisibility(View.VISIBLE);
-            mMobile[subscription].setVisibility(View.GONE);
+        if (mStyle != STATUS_BAR_STYLE_ANDROID_DEFAULT) {
+            if (mNoSimIconId[subscription] != 0) {
+                mNoSimSlot[subscription].setVisibility(View.VISIBLE);
+                mMobile[subscription].setVisibility(View.GONE);
+            } else {
+                mNoSimSlot[subscription].setVisibility(View.GONE);
+                mMobile[subscription].setVisibility(View.VISIBLE);
+            }
         }
 
         if (subscription == 0) {
@@ -438,11 +445,18 @@ public class MSimSignalClusterView
     }
 
     private boolean showBothDataAndVoice(int sub) {
-        return mStyle == STATUS_BAR_STYLE_DATA_VOICE
-            &&((mMobileTypeId[sub] == R.drawable.stat_sys_data_connected_3g)
+        if (mStyle != STATUS_BAR_STYLE_DATA_VOICE) {
+            return false;
+        }
+
+        if (mShowTwoBars[sub] == 0) {
+            return false;
+        }
+
+        return (mMobileTypeId[sub] == R.drawable.stat_sys_data_connected_3g)
                 || (mMobileTypeId[sub] == R.drawable.stat_sys_data_connected_4g)
                 || (mMobileTypeId[sub] == R.drawable.stat_sys_data_fully_connected_3g)
-                || (mMobileTypeId[sub] == R.drawable.stat_sys_data_fully_connected_4g));
+                || (mMobileTypeId[sub] == R.drawable.stat_sys_data_fully_connected_4g);
     }
 
     private boolean showBoth3gAnd1x() {
