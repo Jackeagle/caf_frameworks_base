@@ -845,6 +845,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
+            plmn = getLocaleString(plmn);
             if(mContext.getResources().getBoolean(R.bool.config_display_rat) &&
                     mServiceState != null) {
                 plmn = appendRatToNetworkName(plmn, mServiceState);
@@ -856,6 +857,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
+            spn = getLocaleString(spn);
             if(mContext.getResources().getBoolean(R.bool.config_display_rat) &&
                     mServiceState != null) {
                 spn = appendRatToNetworkName(spn, mServiceState);
