@@ -982,9 +982,9 @@ public class AudioService extends IAudioService.Stub {
                 (mStreamVolumeAlias[streamType] == getMasterStreamType())) {
             int newRingerMode = getRingerMode();
             if (index == 0) {
-                if (newRingerMode != AudioManager.RINGER_MODE_SILENT) {
+                if( streamType !=  AudioSystem.STREAM_RING && streamType != AudioSystem.STREAM_NOTIFICATION) {
                     newRingerMode = mHasVibrator ? AudioManager.RINGER_MODE_VIBRATE
-                                                  : AudioManager.RINGER_MODE_SILENT;
+                                                 : AudioManager.RINGER_MODE_SILENT;
                 }
             } else {
                 newRingerMode = AudioManager.RINGER_MODE_NORMAL;
