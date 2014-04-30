@@ -19,6 +19,7 @@
 package com.android.internal.policy.impl.keyguard;
 
 import com.android.internal.telephony.msim.ITelephonyMSim;
+import com.android.internal.telephony.PhoneConstants;
 
 import android.content.Context;
 import android.os.RemoteException;
@@ -133,23 +134,26 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
 
     public void resetState() {
         String  displayMessage = "";
-        try {
-            mSubscription = KeyguardUpdateMonitor.getInstance(mContext)
-                    .getPinLockedSubscription();
-            int attemptsRemaining = ITelephonyMSim.Stub.asInterface(ServiceManager
-                    .checkService("phone_msim")).getIccPin1RetryCount(mSubscription);
+        if (mShowDefaultMessage) {
+            try {
+                mSubscription = KeyguardUpdateMonitor.getInstance(mContext)
+                        .getPinLockedSubscription();
+                int attemptsRemaining = ITelephonyMSim.Stub.asInterface(ServiceManager
+                        .checkService("phone_msim")).getIccPin1RetryCount(mSubscription);
 
-            if (attemptsRemaining >= 0) {
-                displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
-                        + getContext().getString(R.string.pinpuk_attempts)
-                        + attemptsRemaining + ". ";
+                if (attemptsRemaining >= 0) {
+                    displayMessage = getContext().getString(
+                            R.string.keyguard_password_wrong_pin_code)
+                            + getContext().getString(R.string.pinpuk_attempts)
+                            + attemptsRemaining + ". ";
+                }
+            } catch (RemoteException ex) {
+                displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
             }
-        } catch (RemoteException ex) {
-            displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
+            displayMessage = getSecurityMessageDisplay(R.string.kg_sim_pin_instructions)
+                    + displayMessage;
+            mSecurityMessageDisplay.setMessage(displayMessage, true);
         }
-        displayMessage = getSecurityMessageDisplay(R.string.kg_sim_pin_instructions)
-                + displayMessage;
-        mSecurityMessageDisplay.setMessage(displayMessage, true);
         mPasswordEntry.setEnabled(true);
     }
 
@@ -165,15 +169,15 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
             mSubscription = sub;
         }
 
-        abstract void onSimCheckResponse(boolean success);
+        abstract void onSimCheckResponse(final int result);
 
         @Override
         public void run() {
             try {
                 if (DEBUG) Log.d(TAG, "MSimCheckSimPin:run(), mPin = " + mPin
                         + " mSubscription = " + mSubscription);
-                final boolean result = ITelephonyMSim.Stub.asInterface(ServiceManager
-                        .checkService("phone_msim")).supplyPin(mPin, mSubscription);
+                final int result = ITelephonyMSim.Stub.asInterface(ServiceManager
+                        .checkService("phone_msim")).supplyPinReportResult(mPin, mSubscription);
                 post(new Runnable() {
                     public void run() {
                         onSimCheckResponse(result);
@@ -182,7 +186,7 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
             } catch (RemoteException e) {
                 post(new Runnable() {
                     public void run() {
-                        onSimCheckResponse(false);
+                        onSimCheckResponse(PhoneConstants.PIN_GENERAL_FAILURE);
                     }
                 });
             }
@@ -211,19 +215,26 @@ public class MSimKeyguardSimPinView extends KeyguardSimPinView {
             if (DEBUG) Log.d(TAG, "startCheckSimPin(), Multi SIM enabled");
             new MSimCheckSimPin(mPasswordEntry.getText().toString(),
                     KeyguardUpdateMonitor.getInstance(mContext).getPinLockedSubscription()) {
-                void onSimCheckResponse(final boolean success) {
+                void onSimCheckResponse(final int result) {
                     post(new Runnable() {
                         public void run() {
                             if (mSimUnlockProgressDialog != null) {
                                 mSimUnlockProgressDialog.hide();
                             }
-                            if (success) {
+                            if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
                                 // before closing the keyguard, report back that the sim is unlocked
                                 // so it knows right away.
-                                closeKeyGuard(success);
+                                closeKeyGuard(true);
+                                mShowDefaultMessage = true;
                             } else {
-                                mSecurityMessageDisplay.setMessage(getSecurityMessageDisplay
-                                        (R.string.kg_password_wrong_pin_code), true);
+                                mShowDefaultMessage = false;
+                                if (result == PhoneConstants.PIN_PASSWORD_INCORRECT) {
+                                    mSecurityMessageDisplay.setMessage(getSecurityMessageDisplay
+                                            (R.string.kg_password_wrong_pin_code), true);
+                                } else {
+                                    mSecurityMessageDisplay.setMessage(getSecurityMessageDisplay
+                                            (R.string.keyguard_password_pin_failed), true);
+                                }
                                 mPasswordEntry.setText("");
                             }
                             mCallback.userActivity(0);
