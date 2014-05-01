@@ -303,6 +303,7 @@
   <java-symbol type="bool" name="config_send_sms1x_on_voice_call" />
   <java-symbol type="bool" name="config_ascii_7bit_support_for_long_message" />
   <java-symbol type="bool" name="config_feature_iwlan_enabled" />
+  <java-symbol type="bool" name="config_lte_capable" />
 
   <java-symbol type="integer" name="config_cursorWindowSize" />
   <java-symbol type="integer" name="config_extraFreeKbytesAdjust" />
@@ -1808,6 +1809,9 @@
   <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
   <java-symbol type="bool" name="use_motion_accel" />
   <java-symbol type="bool" name="config_setup_mms_data" />
+
+  <!-- cpu boost for horizontal scroll -->
+  <java-symbol type="bool" name="config_enableCpuBoostForScroller" />
 
   <!-- Configuration to play sms ringtone during MO/MT call -->
   <java-symbol type="bool" name="config_sms_ringtone_incall" />
