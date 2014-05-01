@@ -481,6 +481,9 @@ public class WindowManagerService extends IWindowManager.Stub
     // State while inside of layoutAndPlaceSurfacesLocked().
     boolean mFocusMayChange;
 
+    //Display is forced to portrait by portrait app.
+    boolean mForcedPortraitDisplay = false;
+
     Configuration mCurConfiguration = new Configuration();
 
     // This is held as long as we have the screen frozen, to give us time to
@@ -5644,6 +5647,26 @@ public class WindowManagerService extends IWindowManager.Stub
         Binder.restoreCallingIdentity(origId);
     }
 
+    //returns true if Primary display is locked to landscape.
+    public boolean isPrimaryLandscapeLocked() {
+        if (SystemProperties.getInt("persist.debug.landscape.locked", 0) != 0)
+            return true;
+        return false;
+    }
+
+    //returns true if Activity is Portrait locked.
+    public boolean isPortraitActivity() {
+        switch(mForcedAppOrientation) {
+            case ActivityInfo.SCREEN_ORIENTATION_PORTRAIT:
+            case ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT:
+            case ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT:
+            case ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     // TODO(multidisplay): Rotate any display?
     /**
      * Updates the current rotation.
@@ -5673,6 +5696,40 @@ public class WindowManagerService extends IWindowManager.Stub
             // No point choosing a rotation if the display is not enabled.
             if (DEBUG_ORIENTATION) Slog.v(TAG, "Deferring rotation, display is not enabled.");
             return false;
+        }
+
+        if (isPortraitActivity() && isPrimaryLandscapeLocked()) {
+            /* - Force Display to portrait so that portrait activity
+             *   render in portrait mode.
+             * - Use appropriate size of the portrait display to avoid scaling.
+             * - Width of Portrait Display: Downscaled height of activity.
+             * - Height of Portrait Display: Same as Primary Display Height.
+             * */
+            if (DEBUG_ORIENTATION) Slog.v(TAG, "Portrait activity on " +
+                                         "Landscape locked device found");
+
+            DisplayContent displayContent = getDefaultDisplayContentLocked();
+            //Read user specified aspect ratio of portrait activity.
+            int w = SystemProperties.getInt("persist.debug.portrait.width",
+                                        displayContent.mInitialDisplayWidth);
+            int h = SystemProperties.getInt("persist.debug.portrait.height",
+                                        displayContent.mInitialDisplayHeight);
+            //Validate width and height.
+            //Set them to default if they are not valid.
+            if (w < 0 || h < 0 || w < h) {
+                w = displayContent.mInitialDisplayWidth;
+                h = displayContent.mInitialDisplayHeight;
+            }
+            float aspectRatio = (float)w / h;
+            int newWidth = (int)(displayContent.mInitialDisplayHeight /
+                                                              aspectRatio);
+            mForcedPortraitDisplay = true;
+            setForcedDisplaySize(Display.DEFAULT_DISPLAY,
+                    newWidth, displayContent.mInitialDisplayHeight);
+        } else if (mForcedPortraitDisplay) {
+            //reset forced portrait display to landscape.
+            clearForcedDisplaySize(Display.DEFAULT_DISPLAY);
+            mForcedPortraitDisplay = false;
         }
 
         // TODO: Implement forced rotation changes.
@@ -7395,8 +7452,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 height = Math.min(Math.max(height, MIN_HEIGHT),
                         displayContent.mInitialDisplayHeight * MAX_SCALE);
                 setForcedDisplaySizeLocked(displayContent, width, height);
-                Settings.Global.putString(mContext.getContentResolver(),
+                if(!mForcedPortraitDisplay) {
+                    //Do not save forced display size, if it is for Portrait Activity.
+                    Settings.Global.putString(mContext.getContentResolver(),
                         Settings.Global.DISPLAY_SIZE_FORCED, width + "," + height);
+                }
             }
         }
     }
