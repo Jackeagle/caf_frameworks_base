@@ -606,33 +606,6 @@ public class TelephonyManager {
         return  SystemProperties.getInt(TelephonyProperties.PROPERTY_DEFAULT_SUBSCRIPTION, 0);
     }
 
-    /**
-     * Convert network type to String
-     *
-     * @param networkType
-     * @return String representation of the networkClass
-     * @hide
-     */
-    public String networkTypeToString(int networkType) {
-        String ratClassName = "";
-        int networkClass = getNetworkClass(networkType);
-        Rlog.d(TAG, "networkType = " + networkType + " networkClass = " + networkClass);
-        switch (networkClass) {
-            case TelephonyManager.NETWORK_CLASS_2_G:
-                ratClassName = "2G";
-                break;
-            case TelephonyManager.NETWORK_CLASS_3_G:
-                ratClassName = "3G";
-                break;
-            case TelephonyManager.NETWORK_CLASS_4_G:
-                ratClassName = "4G";
-                break;
-            default:
-                ratClassName = "";
-                break;
-        }
-        return ratClassName;
-    }
 
     /**
      * Gets the telephony property.
