@@ -1428,4 +1428,7 @@
          -->
     <bool name="config_enableHwFlpOverlay" translatable="false">true</bool>
 
+    <!-- Is the device capable of supporting digital pen -->
+    <bool name="config_digitalPenCapable">false</bool>
+
 </resources>
