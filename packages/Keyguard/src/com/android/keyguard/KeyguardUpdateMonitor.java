@@ -364,18 +364,49 @@ public class KeyguardUpdateMonitor {
                 + serviceState.getVoiceRegState() + " sub = " + sub);
         if (ServiceState.STATE_IN_SERVICE == serviceState.getDataRegState()
                 && ServiceState.RIL_RADIO_TECHNOLOGY_UNKNOWN
-                != serviceState.getRilDataRadioTechnology()) {
+                != serviceState.getRadioTechnology()) {
             networkType = serviceState.getDataNetworkType();
-            radioTech = new StringBuilder().append(" ").append(TelephonyManager.getDefault().
-                    networkTypeToString(networkType)).toString();
+            radioTech = new StringBuilder().append(" ").append(networkTypeToString(networkType))
+                    .toString();
         } else if (ServiceState.STATE_IN_SERVICE == serviceState.getVoiceRegState()
                 && ServiceState.RIL_RADIO_TECHNOLOGY_UNKNOWN
                 != serviceState.getRilVoiceRadioTechnology()) {
             networkType = serviceState.getVoiceNetworkType();
-            radioTech = new StringBuilder().append(" ").append(TelephonyManager.getDefault().
-                    networkTypeToString(networkType)).toString();
+            radioTech = new StringBuilder().append(" ").append(networkTypeToString(networkType))
+                    .toString();
         }
         return radioTech;
+    }
+
+    /**
+     * Convert network type to String
+     *
+     * @param networkType
+     * @return String representation of the NetworkType
+     *
+     */
+    private String networkTypeToString(int networkType) {
+        String ratClassName = "";
+        int networkClass = TelephonyManager.getNetworkClass(networkType);
+        Log.d(TAG, "networkType = " + networkType + " networkClass = " + networkClass);
+        switch (networkClass) {
+            case TelephonyManager.NETWORK_CLASS_UNKNOWN:
+                ratClassName = "";
+                break;
+            case TelephonyManager.NETWORK_CLASS_2_G:
+                ratClassName = "2G";
+                break;
+            case TelephonyManager.NETWORK_CLASS_3_G:
+                ratClassName = "3G";
+                break;
+            case TelephonyManager.NETWORK_CLASS_4_G:
+                ratClassName = "4G";
+                break;
+            default:
+                ratClassName = "";
+                break;
+        }
+        return ratClassName;
     }
 
     private final BroadcastReceiver mBroadcastAllReceiver = new BroadcastReceiver() {
