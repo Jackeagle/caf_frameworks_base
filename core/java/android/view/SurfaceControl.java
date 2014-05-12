@@ -183,11 +183,16 @@ public class SurfaceControl {
     public static final int BUILT_IN_DISPLAY_ID_MAIN = 0;
 
     /**
-     * Built-in physical display id: Attached HDMI display.
+     * Built-in physical display id: Attached  HDMI display.
      * Use only with {@link SurfaceControl#getBuiltInDisplay()}.
      */
     public static final int BUILT_IN_DISPLAY_ID_HDMI = 1;
 
+    /**
+     * Built-in physical display id: Attached Tertiary display.
+     * Use only with {@link SurfaceControl#getBuiltInDisplay()}.
+     */
+    public static final int BUILT_IN_DISPLAY_ID_TERTIARY = 2;
 
 
     /**
