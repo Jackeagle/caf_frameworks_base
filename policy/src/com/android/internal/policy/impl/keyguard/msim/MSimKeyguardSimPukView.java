@@ -24,6 +24,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 
 import com.android.internal.telephony.msim.ITelephonyMSim;
+import com.android.internal.telephony.PhoneConstants;
 
 import com.android.internal.R;
 
@@ -117,15 +118,15 @@ public class MSimKeyguardSimPukView extends KeyguardSimPukView {
             mSubscription = sub;
         }
 
-        abstract void onSimLockChangedResponse(boolean success);
+        abstract void onSimLockChangedResponse(final int result);
 
         @Override
         public void run() {
             if (DEBUG) Log.d(TAG, "MSimCheckSimPuk:run(), mPuk = " + mPuk
                     + " mPin = " + mPin + " mSubscription = " + mSubscription);
             try {
-                final boolean result = ITelephonyMSim.Stub.asInterface(ServiceManager
-                        .checkService("phone_msim")).supplyPuk(mPuk, mPin, mSubscription);
+                final int result = ITelephonyMSim.Stub.asInterface(ServiceManager
+                        .checkService("phone_msim")).supplyPukReportResult(mPuk, mPin, mSubscription);
 
                 post(new Runnable() {
                     public void run() {
@@ -135,7 +136,7 @@ public class MSimKeyguardSimPukView extends KeyguardSimPukView {
             } catch (RemoteException e) {
                 post(new Runnable() {
                     public void run() {
-                        onSimLockChangedResponse(false);
+                        onSimLockChangedResponse(PhoneConstants.PIN_GENERAL_FAILURE);
                     }
                 });
             }
@@ -153,18 +154,25 @@ public class MSimKeyguardSimPukView extends KeyguardSimPukView {
 
             new MSimCheckSimPuk(mPukText, mPinText,
                     KeyguardUpdateMonitor.getInstance(mContext).getPukLockedSubscription()) {
-                void onSimLockChangedResponse(final boolean success) {
+                void onSimLockChangedResponse(final int result) {
                     post(new Runnable() {
                         public void run() {
                             if (mSimUnlockProgressDialog != null) {
                                 mSimUnlockProgressDialog.hide();
                             }
-                            if (success) {
+                            if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
                                 mCallback.dismiss(true);
                             } else {
+                                if (result == PhoneConstants.PIN_PASSWORD_INCORRECT) {
+                                    mSecurityMessageDisplay.setMessage(
+                                            getSecurityMessageDisplay(R.string.kg_invalid_puk),
+                                            true);
+                                } else {
+                                    mSecurityMessageDisplay.setMessage(
+                                            getSecurityMessageDisplay(
+                                            R.string.keyguard_password_puk_failed), true);
+                                }
                                 mStateMachine.reset();
-                                mSecurityMessageDisplay.setMessage(
-                                    getSecurityMessageDisplay(R.string.kg_invalid_puk), true);
                             }
                             mCheckInProgress = false;
                         }

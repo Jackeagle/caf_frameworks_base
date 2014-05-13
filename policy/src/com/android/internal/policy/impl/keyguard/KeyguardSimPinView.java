@@ -47,6 +47,7 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
         implements KeyguardSecurityView, OnEditorActionListener, TextWatcher {
 
     protected ProgressDialog mSimUnlockProgressDialog = null;
+    protected boolean mShowDefaultMessage = true;
     protected volatile boolean mSimCheckInProgress;
 
     public KeyguardSimPinView(Context context) {
@@ -71,19 +72,23 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
 
     public void resetState() {
         String  displayMessage = "";
-        try {
-            int attemptsRemaining = ITelephony.Stub.asInterface(ServiceManager
-                    .checkService("phone")).getIccPin1RetryCount();
-            if (attemptsRemaining >= 0) {
-                displayMessage = getContext().getString(R.string.keyguard_password_wrong_pin_code)
-                        + getContext().getString(R.string.pinpuk_attempts)
-                        + attemptsRemaining + ". ";
+        if (mShowDefaultMessage) {
+            try {
+                int attemptsRemaining = ITelephony.Stub.asInterface(ServiceManager
+                        .checkService("phone")).getIccPin1RetryCount();
+                if (attemptsRemaining >= 0) {
+                    displayMessage = getContext().getString(
+                            R.string.keyguard_password_wrong_pin_code)
+                            + getContext().getString(R.string.pinpuk_attempts)
+                            + attemptsRemaining + ". ";
+                }
+            } catch (RemoteException ex) {
+                displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
             }
-        } catch (RemoteException ex) {
-            displayMessage = getContext().getString(R.string.keyguard_password_pin_failed);
+            displayMessage = displayMessage + getContext().getString(
+                    R.string.kg_sim_pin_instructions);
+            mSecurityMessageDisplay.setMessage(displayMessage, true);
         }
-        displayMessage = displayMessage + getContext().getString(R.string.kg_sim_pin_instructions) ;
-        mSecurityMessageDisplay.setMessage(displayMessage, true);
         mPasswordEntry.setEnabled(true);
     }
 
@@ -225,7 +230,9 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                             if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
                                 KeyguardUpdateMonitor.getInstance(getContext()).reportSimUnlocked();
                                 mCallback.dismiss(true);
+                                mShowDefaultMessage = true;
                             } else {
+                                mShowDefaultMessage = false;
                                 if (result == PhoneConstants.PIN_PASSWORD_INCORRECT) {
                                     mSecurityMessageDisplay.setMessage
                                             (R.string.kg_password_wrong_pin_code, true);

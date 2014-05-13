@@ -165,6 +165,26 @@ interface ITelephonyMSim {
     boolean supplyPin(String pin, int subscription);
 
     /**
+     * Supply a pin to unlock the SIM. Blocks until a result is determined.
+     * Returns a specific success/error code.
+     * @param pin The pin to check.
+     * @param subscription user preferred subscription.
+     * @return Phone.PIN_RESULT_SUCCESS on success. Otherwise error code
+     */
+    int supplyPinReportResult(String pin, int subscription);
+
+    /**
+     * Supply puk to unlock the SIM and set SIM pin to new pin.
+     * Blocks until a result is determined.
+     * Returns a specific success/error code.
+     * @param puk The puk to check
+     * @param pin The pin to check.
+     * @param subscription user preferred subscription.
+     * @return Phone.PIN_RESULT_SUCCESS on success. Otherwise error code
+     */
+    int supplyPukReportResult(String puk, String pin, int subscription);
+
+    /**
      * Supply puk to unlock the SIM and set SIM pin to new pin.
      *  Blocks until a result is determined.
      * @param puk The puk to check.
