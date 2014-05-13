@@ -74,6 +74,7 @@ public class MSimNetworkController extends NetworkController {
     private CharSequence[] mCarrierTextSub;
 
     String[] mMSimNetworkName;
+    String[] mOriginalMSimNetworkName;
     int[] mMSimPhoneSignalIconId;
     int[] mMSimLastPhoneSignalIconId;
     private int[] mMSimIconId;
@@ -131,6 +132,7 @@ public class MSimNetworkController extends NetworkController {
         mMSimContentDescriptionPhoneSignal = new String[numPhones];
         mMSimLastPhoneSignalIconId = new int[numPhones];
         mMSimNetworkName = new String[numPhones];
+        mOriginalMSimNetworkName = new String[numPhones];
         mMSimLastDataTypeIconId = new int[numPhones];
         mMSimDataConnected = new boolean[numPhones];
         mMSimDataSignalIconId = new int[numPhones];
@@ -168,6 +170,7 @@ public class MSimNetworkController extends NetworkController {
             mMSimDataActivity[i] = TelephonyManager.DATA_ACTIVITY_NONE;
             mMSimLastSimIconId[i] = 0;
             mMSimNetworkName[i] = mNetworkNameDefault;
+            mOriginalMSimNetworkName[i] = mNetworkNameDefault;
             mMSimDataServiceState[i] = ServiceState.STATE_OUT_OF_SERVICE;
         }
 
@@ -319,7 +322,7 @@ public class MSimNetworkController extends NetworkController {
         } else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
             if (mContext.getResources().getBoolean(R.bool.config_monitor_locale_change)) {
                 for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
-                    updateNetworkName(mMSimNetworkName[i], i);
+                    updateNetworkName(mShowSpn[i], mSpn[i], mShowPlmn[i], mPlmn[i], i);
                     updateCarrierText(i);
                     refreshViews(i);
                 }
@@ -719,21 +722,21 @@ public class MSimNetworkController extends NetworkController {
 
     private void updateIconSet(int subscription) {
         Slog.d(TAG, "updateIconSet, subscription = " + subscription);
-        int voiceNetorkType = mMSimServiceState[subscription].getVoiceNetworkType();
-        int dataNetorkType =  mMSimServiceState[subscription].getDataNetworkType();
-        Slog.d(TAG, "updateIconSet, voice network type is: " + voiceNetorkType
-            + "/" + TelephonyManager.getNetworkTypeName(voiceNetorkType)
-            + ", data network type is: " + dataNetorkType
-            + "/" + TelephonyManager.getNetworkTypeName(dataNetorkType));
+        int voiceNetType = mMSimServiceState[subscription].getVoiceNetworkType();
+        mDataNetType =  mMSimServiceState[subscription].getDataNetworkType();
+        Slog.d(TAG, "updateIconSet, voice network type is: " + voiceNetType
+            + "/" + TelephonyManager.getNetworkTypeName(voiceNetType)
+            + ", data network type is: " + mDataNetType
+            + "/" + TelephonyManager.getNetworkTypeName(mDataNetType));
 
-        int chosenNetworkType = ((dataNetorkType == TelephonyManager.NETWORK_TYPE_UNKNOWN)
-                    ? voiceNetorkType : dataNetorkType);
+        int chosenNetType = ((mDataNetType == TelephonyManager.NETWORK_TYPE_UNKNOWN)
+                    ? voiceNetType : mDataNetType);
 
-        Slog.d(TAG, "updateIconSet, chosenNetworkType=" + chosenNetworkType
+        Slog.d(TAG, "updateIconSet, chosenNetType=" + chosenNetType
             + " hspaDataDistinguishable=" + String.valueOf(mHspaDataDistinguishable)
             + " showAtLeastThreeGees=" + String.valueOf(mShowAtLeastThreeGees));
 
-        TelephonyIcons.updateDataType(subscription, chosenNetworkType, mShowAtLeastThreeGees,
+        TelephonyIcons.updateDataType(subscription, chosenNetType, mShowAtLeastThreeGees,
             mShow4GforLTE, mHspaDataDistinguishable, mInetCondition);
     }
 
@@ -814,6 +817,7 @@ public class MSimNetworkController extends NetworkController {
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
+            plmn = getLocaleString(plmn);
             str.append(plmn);
             something = true;
         }
@@ -821,6 +825,7 @@ public class MSimNetworkController extends NetworkController {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
+            spn = getLocaleString(spn);
             str.append(spn);
             something = true;
         }
@@ -830,17 +835,27 @@ public class MSimNetworkController extends NetworkController {
             mMSimNetworkName[subscription] = mNetworkNameDefault;
         }
 
-        // parse the string to current language string in public resources
-        if (mContext.getResources().getBoolean(R.bool.config_monitor_locale_change)) {
-            updateNetworkName(mMSimNetworkName[subscription], subscription);
+        //display 2G/3G/4G if operator ask for showing radio tech
+        if (mContext.getResources().getBoolean(R.bool.config_display_rat)) {
+            mOriginalMSimNetworkName[subscription] = mMSimNetworkName[subscription];
+            if ((mMSimServiceState[subscription] != null) && (mMSimDataServiceState[subscription]
+                    == ServiceState.STATE_IN_SERVICE || mMSimServiceState[subscription].
+                    getVoiceRegState() == ServiceState.STATE_IN_SERVICE)) {
+                int voiceNetType = mMSimServiceState[subscription].getVoiceNetworkType();
+                mDataNetType =  mMSimServiceState[subscription].getDataNetworkType();
+                int chosenNetType = ((mDataNetType == TelephonyManager.NETWORK_TYPE_UNKNOWN)
+                        ? voiceNetType : mDataNetType);
+                appendRatToNetworkName(chosenNetType, subscription);
+            }
         }
         Slog.d(TAG, "mMSimNetworkName[subscription] " + mMSimNetworkName[subscription]
                                                       + "subscription " + subscription);
     }
 
-    private void updateNetworkName(String networkName, int subscription) {
-        updateNetworkName(networkName);
-        mMSimNetworkName[subscription] = mNetworkName;
+    private void appendRatToNetworkName(int type, int subscription) {
+        String ratString = TelephonyManager.getDefault().networkTypeToString(type);
+        mMSimNetworkName[subscription] = new StringBuilder().append(mOriginalMSimNetworkName
+                [subscription]).append(" ").append(ratString).toString();
     }
 
     // ===== Full or limited Internet connectivity ==================================
