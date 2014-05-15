@@ -738,6 +738,7 @@ public class KeyguardHostView extends KeyguardViewBase {
     private void showNextSecurityScreenOrFinish(boolean authenticated) {
         if (DEBUG) Log.d(TAG, "showNextSecurityScreenOrFinish(" + authenticated + ")");
         boolean finish = false;
+        boolean migrateBetweenSimPins = false;
         if (SecurityMode.None == mCurrentSecuritySelection) {
             SecurityMode securityMode = mSecurityModel.getSecurityMode();
             // Allow an alternate, such as biometric unlock
@@ -763,6 +764,10 @@ public class KeyguardHostView extends KeyguardViewBase {
                     SecurityMode securityMode = mSecurityModel.getSecurityMode();
                     if (securityMode != SecurityMode.None) {
                         showSecurityScreen(securityMode);
+                        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                            migrateBetweenSimPins = securityMode == SecurityMode.SimPin ||
+                                    securityMode == SecurityMode.SimPuk;
+                        }
                     } else {
                         finish = true;
                     }
@@ -796,7 +801,9 @@ public class KeyguardHostView extends KeyguardViewBase {
                 }
             }
         } else {
-            mViewStateManager.showBouncer(true);
+            if (!migrateBetweenSimPins) {
+                mViewStateManager.showBouncer(true);
+            }
         }
     }
 
