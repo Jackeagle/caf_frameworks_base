@@ -502,6 +502,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
         // Battery statistics service to be notified when GPS turns on or off
         mBatteryStats = IBatteryStats.Stub.asInterface(ServiceManager.getService("batteryinfo"));
 
+        ContentResolver objContentResolver = mContext.getContentResolver();
         mProperties = new Properties();
         try {
             File file = new File(PROPERTIES_FILE);
@@ -511,6 +512,15 @@ public class GpsLocationProvider implements LocationProviderInterface {
 
             mSuplServerHost = mProperties.getProperty("SUPL_HOST");
             String portString = mProperties.getProperty("SUPL_PORT");
+            if (Settings.Global.getString(objContentResolver,
+                    Settings.Global.ASSISTED_GPS_SUPL_HOST) == null
+                    || Settings.Global.getString(objContentResolver,
+                            Settings.Global.ASSISTED_GPS_SUPL_PORT) == null) {
+                Settings.Global.putString(objContentResolver,
+                        Settings.Global.ASSISTED_GPS_SUPL_HOST, mSuplServerHost);
+                Settings.Global.putString(objContentResolver,
+                        Settings.Global.ASSISTED_GPS_SUPL_PORT, portString);
+            }
             if (mSuplServerHost != null && portString != null) {
                 try {
                     mSuplServerPort = Integer.parseInt(portString);
@@ -532,7 +542,6 @@ public class GpsLocationProvider implements LocationProviderInterface {
             Log.w(TAG, "Could not open GPS configuration file " + PROPERTIES_FILE);
         }
 
-        ContentResolver objContentResolver = mContext.getContentResolver();
         String prefAGpsType = Settings.Global.getString(
             objContentResolver,Settings.Global.ASSISTED_GPS_POSITION_MODE);
         int prefAGpsTypeInt;
