@@ -237,7 +237,7 @@ public class MSimNetworkController extends NetworkController {
     public void refreshSignalCluster(MSimSignalCluster cluster, int subscription) {
         cluster.setWifiIndicators(
                 // only show wifi in the cluster if connected or if wifi-only
-                mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature),
+                mWifiEnabled && (mWifiConnected || !mHasMobileDataFeature || mAppOpsStrictEnabled),
                 mWifiIconId,
                 mWifiActivityIconId,
                 mContentDescriptionWifi);
@@ -1173,15 +1173,19 @@ public class MSimNetworkController extends NetworkController {
             }
         }
 
-        // mobile label
-        N = mMobileLabelViews.size();
-        for (int i=0; i<N; i++) {
-            TextView v = mMobileLabelViews.get(i);
-            v.setText(mobileLabel);
-            if ("".equals(mobileLabel)) {
-                v.setVisibility(View.GONE);
-            } else {
-                v.setVisibility(View.VISIBLE);
+        //Update mobile label only for preferred data subscription and in airplane mode
+        if (subscription ==
+                MSimTelephonyManager.getDefault().getPreferredDataSubscription() || mAirplaneMode) {
+            // mobile label
+            N = mMobileLabelViews.size();
+            for (int i=0; i<N; i++) {
+                TextView v = mMobileLabelViews.get(i);
+                v.setText(mobileLabel);
+                if ("".equals(mobileLabel)) {
+                    v.setVisibility(View.GONE);
+                } else {
+                    v.setVisibility(View.VISIBLE);
+                }
             }
         }
         setCarrierText();
