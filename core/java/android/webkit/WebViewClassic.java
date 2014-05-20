@@ -208,6 +208,11 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             if (!mIsKeySentByMe) {
                 if (event.getAction() == KeyEvent.ACTION_UP) {
                     if (event.getKeyCode() == KeyEvent.KEYCODE_DEL) {
+                        final Editable content = getEditable();
+                        if (Selection.getSelectionStart(content) !=
+                                Selection.getSelectionEnd(content)) {
+                            return commitText("", 0);
+                        }
                         return deleteSurroundingText(1, 0);
                     } else if (event.getKeyCode() == KeyEvent.KEYCODE_FORWARD_DEL) {
                         return deleteSurroundingText(0, 1);
