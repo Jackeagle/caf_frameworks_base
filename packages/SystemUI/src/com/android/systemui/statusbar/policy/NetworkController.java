@@ -79,8 +79,11 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     SignalStrength mSignalStrength;
     int[] mDataIconList = TelephonyIcons.DATA_G[0];
     String mNetworkName;
+    String mOriginalNetworkName;
     String mNetworkNameDefault;
     String mNetworkNameSeparator;
+    String mSpn;
+    String mPlmn;
     int mPhoneSignalIconId;
     int mQSPhoneSignalIconId;
     int mDataDirectionIconId; // data + data direction on phones
@@ -99,6 +102,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     boolean mAlwaysShowCdmaRssi = false;
     boolean mShow4GforLTE = false;
     boolean mShowRsrpSignalLevelforLTE = false;
+    boolean mShowSpn = false;
+    boolean mShowPlmn = false;
 
     private String mCarrierText = "";
 
@@ -406,10 +411,12 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
             updateDataIcon();
             refreshViews();
         } else if (action.equals(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION)) {
-            updateNetworkName(intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_SPN, false),
-                        intent.getStringExtra(TelephonyIntents.EXTRA_SPN),
-                        intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_PLMN, false),
-                        intent.getStringExtra(TelephonyIntents.EXTRA_PLMN));
+            mShowSpn = intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_SPN, false);
+            mShowPlmn = intent.getBooleanExtra(TelephonyIntents.EXTRA_SHOW_PLMN, false);
+            mSpn = intent.getStringExtra(TelephonyIntents.EXTRA_SPN);
+            mPlmn = intent.getStringExtra(TelephonyIntents.EXTRA_PLMN);
+            updateNetworkName(mShowSpn, mSpn, mShowPlmn, mPlmn);
+            updateCarrierText();
             refreshViews();
         } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION) ||
                  action.equals(ConnectivityManager.INET_CONDITION_ACTION)) {
@@ -417,9 +424,10 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
             refreshViews();
         } else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
             refreshLocale();
+            // parse the string to current language string in public resources
             if (mContext.getResources().getBoolean(R.bool.config_monitor_locale_change)) {
-                // parse the string to current language string in public resources
-                updateNetworkName(mNetworkName);
+                updateNetworkName(mShowSpn, mSpn, mShowPlmn, mPlmn);
+                updateCarrierText();
             }
             refreshViews();
         } else if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
@@ -516,7 +524,6 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
         }
     };
 
-
     private void updateCarrierText() {
         int textResId = 0;
         if (mAirplaneMode) {
@@ -566,26 +573,26 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     }
 
     private void updateIconSet() {
-        int voiceNetworkType = mServiceState.getVoiceNetworkType();
-        int dataNetworkType =  mServiceState.getDataNetworkType();
+        int voiceNetType = mServiceState.getVoiceNetworkType();
+        mDataNetType =  mServiceState.getDataNetworkType();
 
         if (DEBUG) {
-            Log.d(TAG, "updateIconSet, voice network type is: " + voiceNetworkType
-                + "/" + TelephonyManager.getNetworkTypeName(voiceNetworkType)
-                + ", data network type is: " + dataNetworkType
-                + "/" + TelephonyManager.getNetworkTypeName(dataNetworkType));
+            Log.d(TAG, "updateIconSet, voice network type is: " + voiceNetType
+                + "/" + TelephonyManager.getNetworkTypeName(voiceNetType)
+                + ", data network type is: " + mDataNetType
+                + "/" + TelephonyManager.getNetworkTypeName(mDataNetType));
         }
 
-        int chosenNetworkType =
-            ((dataNetworkType == TelephonyManager.NETWORK_TYPE_UNKNOWN)
-            ? voiceNetworkType : dataNetworkType);
+        int chosenNetType =
+            ((mDataNetType == TelephonyManager.NETWORK_TYPE_UNKNOWN)
+            ? voiceNetType : mDataNetType);
 
-        Log.d(TAG, " chosenNetworkType=" + chosenNetworkType
+        Log.d(TAG, " chosenNetType=" + chosenNetType
             + " hspaDataDistinguishable=" + String.valueOf(mHspaDataDistinguishable)
             + " hspapDistinguishable=" + "false"
             + " showAtLeastThreeGees=" + String.valueOf(mShowAtLeastThreeGees));
 
-        TelephonyIcons.updateDataType(chosenNetworkType, mShowAtLeastThreeGees,
+        TelephonyIcons.updateDataType(chosenNetType, mShowAtLeastThreeGees,
             mShow4GforLTE, mHspaDataDistinguishable, mInetCondition);
     }
 
@@ -820,6 +827,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
+            plmn = getLocaleString(plmn);
             str.append(plmn);
             something = true;
         }
@@ -827,6 +835,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
+            spn = getLocaleString(spn);
             str.append(spn);
             something = true;
         }
@@ -836,19 +845,34 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
             mNetworkName = mNetworkNameDefault;
         }
 
-        if (mContext.getResources().getBoolean(R.bool.config_monitor_locale_change)) {
-            // parse the string to current language string in public resources
-            updateNetworkName(mNetworkName);
+        //display 2G/3G/4G if operator ask for showing radio tech
+        if (mContext.getResources().getBoolean(R.bool.config_display_rat)) {
+            mOriginalNetworkName = mNetworkName;
+            if ((mServiceState != null) &&
+                    (mServiceState.getDataRegState() == ServiceState.STATE_IN_SERVICE ||
+                    mServiceState.getVoiceRegState() == ServiceState.STATE_IN_SERVICE)) {
+                int voiceNetType = mServiceState.getVoiceNetworkType();
+                mDataNetType =  mServiceState.getDataNetworkType();
+                int chosenNetType =
+                        ((mDataNetType == TelephonyManager.NETWORK_TYPE_UNKNOWN)
+                        ? voiceNetType : mDataNetType);
+                appendRatToNetworkName(chosenNetType);
+            }
         }
     }
 
-    protected void updateNetworkName(String networkName) {
-        if (networkName != null) {
-            mNetworkName = android.util.NativeTextHelper.getInternalLocalString(mContext,
-                    networkName,
-                    R.array.origin_carrier_names,
-                    R.array.locale_carrier_names);
-        }
+    protected String getLocaleString(String networkName) {
+        networkName = android.util.NativeTextHelper.getInternalLocalString(mContext,
+                networkName,
+                R.array.origin_carrier_names,
+                R.array.locale_carrier_names);
+        return networkName;
+    }
+
+    private void appendRatToNetworkName(int type) {
+        String ratString = mPhone.networkTypeToString(type);
+        mNetworkName = new StringBuilder().append(mOriginalNetworkName).append(" ").append(
+                ratString).toString();
     }
 
     // ===== Wifi ===================================================================
