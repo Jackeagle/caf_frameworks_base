@@ -287,13 +287,8 @@ public class KeyguardUpdateMonitor {
                 // Update PLMN and SPN for corresponding subscriptions.
                 mTelephonyPlmn[subscription] = getTelephonyPlmnFrom(intent);
                 mTelephonySpn[subscription] = getTelephonySpnFrom(intent);
-                if (mTelephonyPlmn[subscription] != null) {
-                    mOriginalTelephonyPlmn[subscription] = getLocaleString(
-                            mTelephonyPlmn[subscription].toString());
-                } else if (mTelephonySpn[subscription] != null) {
-                    mOriginalTelephonySpn[subscription] = getLocaleString(
-                            mTelephonySpn[subscription].toString());
-                }
+                mOriginalTelephonyPlmn[subscription] = mTelephonyPlmn[subscription];
+                mOriginalTelephonySpn[subscription] = mTelephonySpn[subscription];
                 mShowSpn[subscription] = intent.getBooleanExtra(
                         TelephonyIntents.EXTRA_SHOW_SPN, false);
                 mShowPlmn[subscription] = intent.getBooleanExtra(
@@ -353,13 +348,6 @@ public class KeyguardUpdateMonitor {
                 Log.d(TAG, "Received CONFIGURATION_CHANGED intent");
                 if (mContext.getResources().getBoolean(R.bool.config_monitor_locale_change)) {
                     for (int i = 0; i < MSimTelephonyManager.getDefault().getPhoneCount(); i++) {
-                        if (mOriginalTelephonySpn[i] != null) {
-                            mOriginalTelephonySpn[i] = getLocaleString(mOriginalTelephonySpn[i].
-                                    toString());
-                        } else if (mOriginalTelephonyPlmn[i] != null) {
-                            mOriginalTelephonyPlmn[i] = getLocaleString(mOriginalTelephonyPlmn[i].
-                                    toString());
-                        }
                         final Message msg = mHandler.obtainMessage(MSG_CARRIER_INFO_UPDATE);
                         msg.arg1 = i;
                         mHandler.sendMessage(msg);
@@ -372,10 +360,11 @@ public class KeyguardUpdateMonitor {
     private void concatenate(boolean showSpn, boolean showPlmn, int sub, ServiceState state) {
         String rat = getRadioTech(state, sub);
         if (showSpn) {
-            mTelephonySpn[sub] = new StringBuilder().append(mOriginalTelephonySpn[sub]).append(rat)
+            mTelephonySpn[sub] = new StringBuilder().append(mTelephonySpn[sub]).append(rat)
                     .toString();
-        } else if (showPlmn) {
-            mTelephonyPlmn[sub] = new StringBuilder().append(mOriginalTelephonyPlmn[sub]).append
+        }
+        if (showPlmn) {
+            mTelephonyPlmn[sub] = new StringBuilder().append(mTelephonyPlmn[sub]).append
                     (rat).toString();
         }
     }
@@ -387,12 +376,12 @@ public class KeyguardUpdateMonitor {
                 + serviceState.getVoiceRegState() + " sub = " + sub);
         if (serviceState.getRilDataRadioTechnology() != ServiceState.RIL_RADIO_TECHNOLOGY_UNKNOWN) {
             networkType = serviceState.getDataNetworkType();
-            radioTech = new StringBuilder().append(" ").append(TelephonyManager.getDefault().
+            radioTech = new StringBuilder().append(" ").append(TelephonyManager.from(mContext).
                     networkTypeToString(networkType)).toString();
         } else if (serviceState.getRilVoiceRadioTechnology() != ServiceState.
                 RIL_RADIO_TECHNOLOGY_UNKNOWN) {
             networkType = serviceState.getVoiceNetworkType();
-            radioTech = new StringBuilder().append(" ").append(TelephonyManager.getDefault().
+            radioTech = new StringBuilder().append(" ").append(TelephonyManager.from(mContext).
                     networkTypeToString(networkType)).toString();
         }
         return radioTech;
@@ -893,6 +882,17 @@ public class KeyguardUpdateMonitor {
      * Handle {@link #MSG_CARRIER_INFO_UPDATE}
      */
     private void handleCarrierInfoUpdate(int subscription) {
+        if (mContext.getResources().getBoolean(R.bool.config_monitor_locale_change)) {
+            if (mOriginalTelephonyPlmn[subscription] != null) {
+                mTelephonyPlmn[subscription] = getLocaleString(
+                        mOriginalTelephonyPlmn[subscription].toString());
+            }
+            if (mOriginalTelephonySpn[subscription] != null) {
+                mTelephonySpn[subscription] = getLocaleString(
+                        mOriginalTelephonySpn[subscription].toString());
+            }
+        }
+
         //display 2G/3G/4G if operator ask for showing radio tech
         if ((mServiceState[subscription] != null) && (mServiceState[subscription].getDataRegState()
                 == ServiceState.STATE_IN_SERVICE || mServiceState[subscription].getVoiceRegState()

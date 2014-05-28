@@ -617,15 +617,19 @@ public class TelephonyManager {
         String ratClassName = "";
         int networkClass = getNetworkClass(networkType);
         Rlog.d(TAG, "networkType = " + networkType + " networkClass = " + networkClass);
+        if (mContext == null) return null;
         switch (networkClass) {
             case TelephonyManager.NETWORK_CLASS_2_G:
-                ratClassName = "2G";
+                ratClassName = mContext.getResources().getString(
+                        com.android.internal.R.string.config_rat_2g);
                 break;
             case TelephonyManager.NETWORK_CLASS_3_G:
-                ratClassName = "3G";
+                ratClassName = mContext.getResources().getString(
+                        com.android.internal.R.string.config_rat_3g);
                 break;
             case TelephonyManager.NETWORK_CLASS_4_G:
-                ratClassName = "4G";
+                ratClassName = mContext.getResources().getString(
+                        com.android.internal.R.string.config_rat_4g);
                 break;
             default:
                 ratClassName = "";
