@@ -446,6 +446,8 @@ public class AudioService extends IAudioService.Stub {
 
     private PowerManager.WakeLock mAudioEventWakeLock;
 
+    private TelephonyManager mTelephonyManager;
+
     private final MediaFocusControl mMediaFocusControl;
 
     // Reference to BluetoothA2dp to query for AbsoluteVolume.
@@ -468,7 +470,6 @@ public class AudioService extends IAudioService.Stub {
 
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mAudioEventWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "handleAudioEvent");
-
         Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         mHasVibrator = vibrator == null ? false : vibrator.hasVibrator();
 
@@ -481,6 +482,9 @@ public class AudioService extends IAudioService.Stub {
                 com.android.internal.R.integer.config_soundEffectVolumeDb);
 
         mVolumePanel = new VolumePanel(context, this);
+
+        mTelephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+
         mForcedUseForComm = AudioSystem.FORCE_NONE;
 
         createAudioSystemThread();
@@ -1584,6 +1588,11 @@ public class AudioService extends IAudioService.Stub {
         synchronized(mSetModeDeathHandlers) {
             if (mode == AudioSystem.MODE_CURRENT) {
                 mode = mMode;
+            }
+
+            if ((mode == AudioSystem.MODE_IN_CALL) &&
+                (mTelephonyManager.getCallState() != TelephonyManager.CALL_STATE_IDLE)) {
+                 AudioSystem.setParameters("in_call=true");
             }
             newModeOwnerPid = setModeInt(mode, cb, Binder.getCallingPid());
         }
@@ -2981,7 +2990,7 @@ public class AudioService extends IAudioService.Stub {
                             device);
         }
 
-        public synchronized boolean setIndex(int index, int device) {
+        public boolean setIndex(int index, int device) {
             int oldIndex = getIndex(device);
             index = getValidIndex(index);
             synchronized (mCameraSoundForced) {
@@ -2989,8 +2998,9 @@ public class AudioService extends IAudioService.Stub {
                     index = mIndexMax;
                 }
             }
-            mIndex.put(device, index);
-
+            synchronized (this) {
+                mIndex.put(device, index);
+            }
             if (oldIndex != index) {
                 // Apply change to all streams using this one as alias
                 // if changing volume of current device, also change volume of current
