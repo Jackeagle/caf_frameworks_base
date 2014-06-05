@@ -555,4 +555,3 @@ class LocalSocketImpl
         close();
     }
 }
-
