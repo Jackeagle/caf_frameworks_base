@@ -36,4 +36,5 @@ interface IBluetoothA2dp {
     oneway void adjustAvrcpAbsoluteVolume(int direction);
     oneway void setAvrcpAbsoluteVolume(int volume);
     boolean isA2dpPlaying(in BluetoothDevice device);
+    void activateSink (boolean isEnable);
 }
