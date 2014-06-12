@@ -1717,12 +1717,13 @@
         <item>试图阻止手机休眠</item>
         <item>试图获取位置信息</item>
         <item>试图获取位置信息</item>
-        <item>试图开关Wifi</item>
+        <item>试图开关WLAN</item>
         <item>试图开关蓝牙</item>
         <item>试图开关移动数据</item>
         <item>试图发送彩信</item>
         <item>试图读取彩信</item>
         <item>试图修改彩信</item>
         <item>试图自启动</item>
+        <item>试图开关NFC</item>
     </string-array>
 </resources>

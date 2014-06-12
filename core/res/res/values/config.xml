@@ -1378,13 +1378,14 @@
         <item>Trying to Keep device awake</item>
         <item>Trying to access location</item>
         <item>Trying to access location</item>
-        <item>Trying to turn on/off Wifi</item>
+        <item>Trying to turn on/off WLAN</item>
         <item>Trying to turn on/off bluetooth</item>
         <item>Trying to turn on/off mobile data</item>
         <item>Trying to send MMS</item>
         <item>Trying to read MMS</item>
         <item>Trying to write MMS</item>
         <item>Trying to start at bootup</item>
+        <item>Trying to turn on/off NFC</item>
     </string-array>
 
     <!-- Configuration to restart radio upon PDP_DEACTIVATE with
