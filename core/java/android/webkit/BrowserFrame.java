@@ -503,11 +503,12 @@ class BrowserFrame extends Handler {
                         WebAddress uri = new WebAddress(item.getUrl());
                         String schemePlusHost = uri.getScheme() + SCHEME_HOST_DELIMITER +
                                 uri.getHost();
-                        String[] up = mDatabase.getUsernamePassword(
-                                schemePlusHost);
+                        WebViewDatabaseClassic database =
+                                WebViewDatabaseClassic.getInstance(mContext);
+                        String[] up = database.getUsernamePassword(schemePlusHost);
                         if (up == null) { // no row found, try again using the legacy method
                             schemePlusHost = uri.getScheme() + uri.getHost();
-                            up = mDatabase.getUsernamePassword(schemePlusHost);
+                            up = database.getUsernamePassword(schemePlusHost);
                         }
                         if (up != null && up[0] != null) {
                             setUsernamePassword(up[0], up[1]);
