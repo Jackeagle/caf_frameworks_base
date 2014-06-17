@@ -501,6 +501,48 @@ public class MobileDataStateTracker extends BaseNetworkStateTracker {
     }
 
     /**
+     * Return the system properties name associated with the tcp delayed ack settings
+     * for this network.
+     */
+    @Override
+    public String getTcpDelayedAckPropName() {
+        String networkTypeStr = "default";
+        TelephonyManager tm = (TelephonyManager) mContext.getSystemService(
+                         Context.TELEPHONY_SERVICE);
+        if (tm != null) {
+            switch(tm.getNetworkType()) {
+                case TelephonyManager.NETWORK_TYPE_LTE:
+                    networkTypeStr = "lte";
+                    break;
+                default:
+                    break;
+            }
+        }
+        return "net.tcp.delack." + networkTypeStr;
+    }
+
+    /**
+     * Return the system properties name associated with the tcp user config flag
+     * for this network.
+     */
+    @Override
+    public String getTcpUserConfigPropName() {
+        String networkTypeStr = "default";
+        TelephonyManager tm = (TelephonyManager) mContext.getSystemService(
+                         Context.TELEPHONY_SERVICE);
+        if (tm != null) {
+            switch(tm.getNetworkType()) {
+                case TelephonyManager.NETWORK_TYPE_LTE:
+                    networkTypeStr = "lte";
+                    break;
+                default:
+                    break;
+            }
+        }
+        return "net.tcp.usercfg." + networkTypeStr;
+    }
+
+    /**
      * Tear down mobile data connectivity, i.e., disable the ability to create
      * mobile data connections.
      * TODO - make async and return nothing?
@@ -640,6 +682,17 @@ public class MobileDataStateTracker extends BaseNetworkStateTracker {
 
         loge("Could not set radio power to " + (turnOn ? "on" : "off"));
         return false;
+    }
+
+
+    public void setInternalDataEnable(boolean enabled) {
+        if (DBG) log("setInternalDataEnable: E enabled=" + enabled);
+        final AsyncChannel channel = mDataConnectionTrackerAc;
+        if (channel != null) {
+            channel.sendMessage(DctConstants.EVENT_SET_INTERNAL_DATA_ENABLE,
+                    enabled ? DctConstants.ENABLED : DctConstants.DISABLED);
+        }
+        if (VDBG) log("setInternalDataEnable: X enabled=" + enabled);
     }
 
     @Override

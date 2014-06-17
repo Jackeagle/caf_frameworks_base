@@ -2089,6 +2089,9 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                     log("tryFailover: set mActiveDefaultNetwork=-1, prevNetType=" + prevNetType);
                 }
                 mActiveDefaultNetwork = -1;
+
+                // If there is no active connection then tcp delayed ack params are reset
+                resetTcpDelayedAckSettings(mNetTrackers[prevNetType]);
             }
 
             // don't signal a reconnect for anything lower or equal priority than our
@@ -2385,9 +2388,11 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             mInetConditionChangeInFlight = false;
             // Don't do this - if we never sign in stay, grey
             //reportNetworkCondition(mActiveDefaultNetwork, 100);
+
+            // Update TCP delayed ACK settings
+            updateTcpDelayedAckSettings(thisNet);
         }
         thisNet.setTeardownRequested(false);
-        updateNetworkSettings(thisNet);
         updateMtuSizeSettings(thisNet);
         handleConnectivityChange(newNetType, false);
         sendConnectedBroadcastDelayed(info, getConnectivityChangeDelay());
@@ -2772,6 +2777,15 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
             setBufferSize(bufferSizes);
         }
+
+        final String defaultRwndKey = "net.tcp.default_init_rwnd";
+        int defaultRwndValue = SystemProperties.getInt(defaultRwndKey, 0);
+        Integer rwndValue = Settings.Global.getInt(mContext.getContentResolver(),
+            Settings.Global.TCP_DEFAULT_INIT_RWND, defaultRwndValue);
+        final String sysctlKey = "sys.sysctl.tcp_def_init_rwnd";
+        if (rwndValue != 0) {
+            SystemProperties.set(sysctlKey, rwndValue.toString());
+        }
     }
 
     /**
@@ -2798,6 +2812,120 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         } catch (IOException e) {
             loge("Can't set tcp buffer sizes:" + e);
+        }
+    }
+
+    /**
+     * [net.tcp.delack.wifi] and set them for system
+     * wide use
+     */
+    private void resetTcpDelayedAckSettings(NetworkStateTracker nt) {
+        String key1 = nt.getDefaultTcpUserConfigPropName();
+        String key2 = nt.getDefaultTcpDelayedAckPropName();
+
+        String defUserCfg = SystemProperties.get(key1);
+        String defDelAck = SystemProperties.get(key2);
+
+        if (TextUtils.isEmpty(defUserCfg) || defUserCfg.length() == 0) {
+            if (DBG) loge(key1+ " not found in system default properties");
+
+            // Setting to default values so we won't be stuck to previous values
+            // Disable user-overridden values to default
+            defUserCfg = "0";
+        }
+        setUserConfig(defUserCfg);
+
+        if(TextUtils.isEmpty(defDelAck) || defDelAck.length() == 0) {
+            if (DBG) loge(key2 + " not found in system default properties");
+
+            // Setting to default values so we won't be stuck to previous values
+            // Disable user-overridden values to default
+            defDelAck= "1";
+        }
+        setDelAckSize(defDelAck);
+    }
+
+    /**
+     * [net.tcp.delack.default] and set them for system
+     * wide use
+     */
+    private void updateTcpDelayedAckSettings(NetworkStateTracker nt) {
+        String key1 = nt.getTcpUserConfigPropName();
+        String key2 = nt.getTcpDelayedAckPropName();
+
+        String userCfg = SystemProperties.get(key1);
+        String delAck = SystemProperties.get(key2);
+
+        if (TextUtils.isEmpty(userCfg)) {
+            if (DBG) loge(key1 + " not found in system properties. Using defaults");
+
+            // Setting to default values so we won't be stuck to previous values
+            key1 = nt.getDefaultTcpUserConfigPropName();
+            userCfg = SystemProperties.get(key1);
+        }
+
+        if (TextUtils.isEmpty(delAck)) {
+            if (DBG) loge(key2 + " not found in system properties. Using defaults");
+
+            // Setting to default values so we won't be stuck to previous values
+            key2 = nt.getDefaultTcpDelayedAckPropName();
+            delAck = SystemProperties.get(key2);
+        }
+
+        // Set values in kernel
+        if (userCfg.length() != 0) {
+            if (DBG) {
+                log("Setting TCP values: [" + userCfg
+                        + "] which comes from [" + key1 + "]");
+            }
+            setUserConfig(userCfg);
+        }
+
+        if (delAck.length() != 0) {
+            if (DBG) {
+                log("Setting TCP values: [" + delAck
+                        + "] which comes from [" + key2 + "]");
+            }
+            setDelAckSize(delAck);
+        }
+    }
+
+    /**
+     * Writes TCP delayed ACK sizes to /sys/net/ipv4/tcp_delack_seg]
+     *
+     */
+    private void setDelAckSize(String delAckSize) {
+        try {
+            final String mProcFile = "/sys/kernel/ipv4/tcp_delack_seg";
+            int delAck = Integer.parseInt(delAckSize);
+
+            if (delAck <= 0 || delAck > 60) {
+               if (DBG) loge(" delAck size is out of range, configuring to default");
+               delAck = 1;
+            }
+
+            FileUtils.stringToFile(mProcFile, delAckSize);
+        } catch (IOException e) {
+            loge("Can't set delayed ACK size:" + e);
+        }
+    }
+
+    /**
+     * Writes TCP user configuration flag to /sys/net/ipv4/tcp_use_usercfg]
+     *
+     */
+    private void setUserConfig(String userConfig) {
+        try {
+            int userCfg = Integer.parseInt(userConfig);
+            final String mProcFile = "/sys/kernel/ipv4/tcp_use_userconfig";
+
+            if (userCfg == 0 || userCfg == 1) {
+                FileUtils.stringToFile(mProcFile, userConfig);
+            } else {
+                loge("Invalid buffersize string: " + userConfig);
+            }
+        } catch (IOException e) {
+            loge("Can't set delayed ACK size:" + e);
         }
     }
 
@@ -3114,7 +3242,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 case NetworkStateTracker.EVENT_NETWORK_SUBTYPE_CHANGED: {
                     info = (NetworkInfo) msg.obj;
                     int type = info.getType();
-                    updateNetworkSettings(mNetTrackers[type]);
+                    if (mNetConfigs[type].isDefault()) {
+                        updateNetworkSettings(mNetTrackers[type]);
+                        updateTcpDelayedAckSettings(mNetTrackers[type]);
+                    }
                     break;
                 }
             }
@@ -3673,8 +3804,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             int user = UserHandle.getUserId(Binder.getCallingUid());
             if (ConnectivityManager.isNetworkTypeValid(type) && mNetTrackers[type] != null) {
                 synchronized(mVpns) {
-                    mVpns.get(user).protect(socket,
-                            mNetTrackers[type].getLinkProperties().getInterfaceName());
+                    mVpns.get(user).protect(socket);
                 }
                 return true;
             }
@@ -3914,7 +4044,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                 boolean forwardDns) {
             try {
                 mNetd.clearUidRangeRoute(interfaze, uidStart, uidEnd);
-                if (forwardDns) mNetd.clearDnsInterfaceForUidRange(uidStart, uidEnd);
+                if (forwardDns) mNetd.clearDnsInterfaceForUidRange(interfaze, uidStart, uidEnd);
             } catch (RemoteException e) {
             }
 
@@ -4086,6 +4216,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      */
     private static final int CMP_RESULT_CODE_PROVISIONING_NETWORK = 5;
 
+    /**
+     * The mobile network is provisioning
+     */
+    private static final int CMP_RESULT_CODE_IS_PROVISIONING = 6;
+
+    private AtomicBoolean mIsProvisioningNetwork = new AtomicBoolean(false);
+    private AtomicBoolean mIsStartingProvisioning = new AtomicBoolean(false);
+
     private AtomicBoolean mIsCheckingMobileProvisioning = new AtomicBoolean(false);
 
     @Override
@@ -4156,9 +4294,23 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                                 setProvNotificationVisible(true,
                                         ConnectivityManager.TYPE_MOBILE_HIPRI, ni.getExtraInfo(),
                                         url);
+                                // Mark that we've got a provisioning network and
+                                // Disable Mobile Data until user actually starts provisioning.
+                                mIsProvisioningNetwork.set(true);
+                                MobileDataStateTracker mdst = (MobileDataStateTracker)
+                                        mNetTrackers[ConnectivityManager.TYPE_MOBILE];
+                                mdst.setInternalDataEnable(false);
                             } else {
                                 if (DBG) log("CheckMp.onComplete: warm (no dns/tcp), no url");
                             }
+                            break;
+                        }
+                        case CMP_RESULT_CODE_IS_PROVISIONING: {
+                            // FIXME: Need to know when provisioning is done. Probably we can
+                            // check the completion status if successful we're done if we
+                            // "timedout" or still connected to provisioning APN turn off data?
+                            if (DBG) log("CheckMp.onComplete: provisioning started");
+                            mIsStartingProvisioning.set(false);
                             break;
                         }
                         default: {
@@ -4307,6 +4459,12 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             if (mCs.isNetworkSupported(ConnectivityManager.TYPE_MOBILE) == false) {
                 result = CMP_RESULT_CODE_NO_CONNECTION;
                 log("isMobileOk: X not mobile capable result=" + result);
+                return result;
+            }
+
+            if (mCs.mIsStartingProvisioning.get()) {
+                result = CMP_RESULT_CODE_IS_PROVISIONING;
+                log("isMobileOk: X is provisioning result=" + result);
                 return result;
             }
 
@@ -4644,19 +4802,20 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     };
 
     private void handleMobileProvisioningAction(String url) {
-        // Notication mark notification as not visible
+        // Mark notification as not visible
         setProvNotificationVisible(false, ConnectivityManager.TYPE_MOBILE_HIPRI, null, null);
 
         // If provisioning network handle as a special case,
         // otherwise launch browser with the intent directly.
-        NetworkInfo ni = getProvisioningNetworkInfo();
-        if ((ni != null) && ni.isConnectedToProvisioningNetwork()) {
-            if (DBG) log("handleMobileProvisioningAction: on provisioning network");
+        if (mIsProvisioningNetwork.get()) {
+            if (DBG) log("handleMobileProvisioningAction: on prov network enable then launch");
+            mIsStartingProvisioning.set(true);
             MobileDataStateTracker mdst = (MobileDataStateTracker)
                     mNetTrackers[ConnectivityManager.TYPE_MOBILE];
+            mdst.setEnableFailFastMobileData(DctConstants.ENABLED);
             mdst.enableMobileProvisioning(url);
         } else {
-            if (DBG) log("handleMobileProvisioningAction: on default network");
+            if (DBG) log("handleMobileProvisioningAction: not prov network, launch browser directly");
             Intent newIntent = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN,
                     Intent.CATEGORY_APP_BROWSER);
             newIntent.setData(Uri.parse(url));
