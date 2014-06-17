@@ -38,5 +38,6 @@ import android.bluetooth.IQBluetooth;
  */
 interface IQBluetoothManagerCallback {
     void onQBluetoothServiceUp(in IQBluetooth QbluetoothService);
+    void onBrEdrDown();
     void onQBluetoothServiceDown();
 }

@@ -476,6 +476,13 @@ public final class BluetoothAdapter {
                 {
                     int state=  mService.getState();
                     if (VDBG) Log.d(TAG, "" + hashCode() + ": getState(). Returning " + state);
+                    //consider all internal states as OFF
+                    if (state == QBluetoothAdapter.STATE_BLE_ON
+                        || state == QBluetoothAdapter.STATE_BLE_TURNING_ON
+                        || state == QBluetoothAdapter.STATE_BLE_TURNING_OFF) {
+                        if (VDBG) Log.d(TAG, "Consider internal state as OFF");
+                        state = BluetoothAdapter.STATE_OFF;
+                    }
                     return state;
                 }
                 // TODO(BT) there might be a small gap during STATE_TURNING_ON that
@@ -514,10 +521,25 @@ public final class BluetoothAdapter {
      *         immediate error
      */
     public boolean enable() {
+        int state = STATE_OFF;
         if (isEnabled() == true){
-            if (DBG) Log.d(TAG, "enable(): BT is already enabled..!");
+            if (DBG) Log.d(TAG, "enable(): BTService is already enabled..!");
             return true;
         }
+        //Use service interface to get the exact state
+        if (mService != null) {
+            try {
+               state = mService.getState();
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        }
+
+        if (state == QBluetoothAdapter.STATE_BLE_ON) {
+                Log.e(TAG, "BT is in BLE_ON State");
+                QBluetoothAdapter s = QBluetoothAdapter.getDefaultAdapter();
+                s.notifyUserAction(true);
+                return true;
+        }
+
         try {
             return mManagerService.enable(ActivityThread.currentPackageName());
         } catch (RemoteException e) {Log.e(TAG, "", e);}
@@ -1578,8 +1600,20 @@ public final class BluetoothAdapter {
      * @return true, if the scan was started successfully
      */
     public boolean startLeScan(LeScanCallback callback) {
-        if (getState() != STATE_ON) return false;
-        return startLeScan(null, callback);
+        int state = STATE_OFF;
+        //Use service interface to get the exact state
+        if (mService != null) {
+            try {
+               state = mService.getState();
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        }
+
+        if (state == STATE_ON || state == QBluetoothAdapter.STATE_BLE_ON) {
+            return startLeScan(null, callback);
+        } else {
+            Log.e(TAG, "LeScan called in invalid BT state");
+            return false;
+        }
     }
 
     /**
@@ -1640,6 +1674,19 @@ public final class BluetoothAdapter {
      */
     public void stopLeScan(LeScanCallback callback) {
         if (DBG) Log.d(TAG, "stopLeScan()");
+        int state = STATE_OFF;
+        //Use service interface to get the exact state
+        if (mService != null) {
+            try {
+               state = mService.getState();
+            } catch (RemoteException e) {Log.e(TAG, "", e);}
+        }
+
+        if (state != STATE_ON || state != QBluetoothAdapter.STATE_BLE_ON) {
+            Log.e(TAG, "Bluetooth is not in valid state");
+            return;
+        }
+
         GattCallbackWrapper wrapper;
         synchronized(mLeScanClients) {
             wrapper = mLeScanClients.remove(callback);
