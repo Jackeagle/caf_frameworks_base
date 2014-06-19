@@ -932,14 +932,14 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * desired
      * @return {@code true} on success, {@code false} on failure
      */
-    public boolean requestRouteToHost(int networkType, int hostAddress) {
+    public boolean requestRouteToHost(int networkType, int hostAddress, String packageName) {
         InetAddress inetAddress = NetworkUtils.intToInetAddress(hostAddress);
 
         if (inetAddress == null) {
             return false;
         }
 
-        return requestRouteToHostAddress(networkType, inetAddress.getHostAddress());
+        return requestRouteToHostAddress(networkType, inetAddress.getAddress(), packageName);
     }
 
     /**
@@ -951,7 +951,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
      * desired
      * @return {@code true} on success, {@code false} on failure
      */
-    public boolean requestRouteToHostAddress(int networkType, String hostAddress) {
+    public boolean requestRouteToHostAddress(int networkType, byte[] hostAddress,
+            String packageName) {
         enforceChangePermission();
         if (!ConnectivityManager.isNetworkTypeValid(networkType)) {
             return false;
@@ -2195,22 +2196,622 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     /**
      * Triggers QoS transaction using the specified local port
      */
-    public boolean requestQoS(int id, int localPort, String localAddress) {
-        android.util.Log.v(TAG, "requestQoS(aport)");
-        return mLinkManager.requestQoS(id, localPort, localAddress);
+    private static final int CMP_RESULT_CODE_PROVISIONING_NETWORK = 5;
+
+    private AtomicBoolean mIsCheckingMobileProvisioning = new AtomicBoolean(false);
+
+    @Override
+    public int checkMobileProvisioning(int suggestedTimeOutMs) {
+        int timeOutMs = -1;
+        if (DBG) log("checkMobileProvisioning: E suggestedTimeOutMs=" + suggestedTimeOutMs);
+        enforceConnectivityInternalPermission();
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            timeOutMs = suggestedTimeOutMs;
+            if (suggestedTimeOutMs > CheckMp.MAX_TIMEOUT_MS) {
+                timeOutMs = CheckMp.MAX_TIMEOUT_MS;
+            }
+
+            // Check that mobile networks are supported
+            if (!isNetworkSupported(ConnectivityManager.TYPE_MOBILE)
+                    || !isNetworkSupported(ConnectivityManager.TYPE_MOBILE_HIPRI)) {
+                if (DBG) log("checkMobileProvisioning: X no mobile network");
+                return timeOutMs;
+            }
+
+            // If we're already checking don't do it again
+            // TODO: Add a queue of results...
+            if (mIsCheckingMobileProvisioning.getAndSet(true)) {
+                if (DBG) log("checkMobileProvisioning: X already checking ignore for the moment");
+                return timeOutMs;
+            }
+
+            // Start off with mobile notification off
+            setProvNotificationVisible(false, ConnectivityManager.TYPE_MOBILE_HIPRI, null, null);
+
+            CheckMp checkMp = new CheckMp(mContext, this);
+            CheckMp.CallBack cb = new CheckMp.CallBack() {
+                @Override
+                void onComplete(Integer result) {
+                    if (DBG) log("CheckMp.onComplete: result=" + result);
+                    NetworkInfo ni =
+                            mNetTrackers[ConnectivityManager.TYPE_MOBILE_HIPRI].getNetworkInfo();
+                    switch(result) {
+                        case CMP_RESULT_CODE_CONNECTABLE:
+                        case CMP_RESULT_CODE_NO_CONNECTION:
+                        case CMP_RESULT_CODE_NO_DNS:
+                        case CMP_RESULT_CODE_NO_TCP_CONNECTION: {
+                            if (DBG) log("CheckMp.onComplete: ignore, connected or no connection");
+                            break;
+                        }
+                        case CMP_RESULT_CODE_REDIRECTED: {
+                            if (DBG) log("CheckMp.onComplete: warm sim");
+                            String url = getMobileProvisioningUrl();
+                            if (TextUtils.isEmpty(url)) {
+                                url = getMobileRedirectedProvisioningUrl();
+                            }
+                            if (TextUtils.isEmpty(url) == false) {
+                                if (DBG) log("CheckMp.onComplete: warm (redirected), url=" + url);
+                                setProvNotificationVisible(true,
+                                        ConnectivityManager.TYPE_MOBILE_HIPRI, ni.getExtraInfo(),
+                                        url);
+                            } else {
+                                if (DBG) log("CheckMp.onComplete: warm (redirected), no url");
+                            }
+                            break;
+                        }
+                        case CMP_RESULT_CODE_PROVISIONING_NETWORK: {
+                            String url = getMobileProvisioningUrl();
+                            if (TextUtils.isEmpty(url) == false) {
+                                if (DBG) log("CheckMp.onComplete: warm (no dns/tcp), url=" + url);
+                                setProvNotificationVisible(true,
+                                        ConnectivityManager.TYPE_MOBILE_HIPRI, ni.getExtraInfo(),
+                                        url);
+                            } else {
+                                if (DBG) log("CheckMp.onComplete: warm (no dns/tcp), no url");
+                            }
+                            break;
+                        }
+                        default: {
+                            loge("CheckMp.onComplete: ignore unexpected result=" + result);
+                            break;
+                        }
+                    }
+                    mIsCheckingMobileProvisioning.set(false);
+                }
+            };
+            CheckMp.Params params =
+                    new CheckMp.Params(checkMp.getDefaultUrl(), timeOutMs, cb);
+            if (DBG) log("checkMobileProvisioning: params=" + params);
+            checkMp.execute(params);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+            if (DBG) log("checkMobileProvisioning: X");
+        }
+        return timeOutMs;
     }
 
-    public LinkCapabilities requestCapabilities(int id, int[] capability_keys) {
-        android.util.Log.v(TAG, "requestCapabilities(id=" + id + ", capabilities)");
+    static class CheckMp extends
+            AsyncTask<CheckMp.Params, Void, Integer> {
+        private static final String CHECKMP_TAG = "CheckMp";
 
-        int netType;
-        ExtraLinkCapabilities cap = new ExtraLinkCapabilities();
-        for (int key : capability_keys) {
-            String temp = null;
-            switch (key) {
-                case LinkCapabilities.Key.RO_MIN_AVAILABLE_FWD_BW:
-                    if ((temp = mLinkManager.getMinAvailableForwardBandwidth(id)) != null)
-                        cap.put(LinkCapabilities.Key.RO_MIN_AVAILABLE_FWD_BW,temp);
+        // adb shell setprop persist.checkmp.testfailures 1 to enable testing failures
+        private static boolean mTestingFailures;
+
+        // Choosing 4 loops as half of them will use HTTPS and the other half HTTP
+        private static final int MAX_LOOPS = 4;
+
+        // Number of milli-seconds to complete all of the retires
+        public static final int MAX_TIMEOUT_MS =  60000;
+
+        // The socket should retry only 5 seconds, the default is longer
+        private static final int SOCKET_TIMEOUT_MS = 5000;
+
+        // Sleep time for network errors
+        private static final int NET_ERROR_SLEEP_SEC = 3;
+
+        // Sleep time for network route establishment
+        private static final int NET_ROUTE_ESTABLISHMENT_SLEEP_SEC = 3;
+
+        // Short sleep time for polling :(
+        private static final int POLLING_SLEEP_SEC = 1;
+
+        private Context mContext;
+        private ConnectivityService mCs;
+        private TelephonyManager mTm;
+        private Params mParams;
+
+        /**
+         * Parameters for AsyncTask.execute
+         */
+        static class Params {
+            private String mUrl;
+            private long mTimeOutMs;
+            private CallBack mCb;
+
+            Params(String url, long timeOutMs, CallBack cb) {
+                mUrl = url;
+                mTimeOutMs = timeOutMs;
+                mCb = cb;
+            }
+
+            @Override
+            public String toString() {
+                return "{" + " url=" + mUrl + " mTimeOutMs=" + mTimeOutMs + " mCb=" + mCb + "}";
+            }
+        }
+
+        // As explained to me by Brian Carlstrom and Kenny Root, Certificates can be
+        // issued by name or ip address, for Google its by name so when we construct
+        // this HostnameVerifier we'll pass the original Uri and use it to verify
+        // the host. If the host name in the original uril fails we'll test the
+        // hostname parameter just incase things change.
+        static class CheckMpHostnameVerifier implements HostnameVerifier {
+            Uri mOrgUri;
+
+            CheckMpHostnameVerifier(Uri orgUri) {
+                mOrgUri = orgUri;
+            }
+
+            @Override
+            public boolean verify(String hostname, SSLSession session) {
+                HostnameVerifier hv = HttpsURLConnection.getDefaultHostnameVerifier();
+                String orgUriHost = mOrgUri.getHost();
+                boolean retVal = hv.verify(orgUriHost, session) || hv.verify(hostname, session);
+                if (DBG) {
+                    log("isMobileOk: hostnameVerify retVal=" + retVal + " hostname=" + hostname
+                        + " orgUriHost=" + orgUriHost);
+                }
+                return retVal;
+            }
+        }
+
+        /**
+         * The call back object passed in Params. onComplete will be called
+         * on the main thread.
+         */
+        abstract static class CallBack {
+            // Called on the main thread.
+            abstract void onComplete(Integer result);
+        }
+
+        public CheckMp(Context context, ConnectivityService cs) {
+            if (Build.IS_DEBUGGABLE) {
+                mTestingFailures =
+                        SystemProperties.getInt("persist.checkmp.testfailures", 0) == 1;
+            } else {
+                mTestingFailures = false;
+            }
+
+            mContext = context;
+            mCs = cs;
+
+            // Setup access to TelephonyService we'll be using.
+            mTm = (TelephonyManager) mContext.getSystemService(
+                    Context.TELEPHONY_SERVICE);
+        }
+
+        /**
+         * Get the default url to use for the test.
+         */
+        public String getDefaultUrl() {
+            // See http://go/clientsdns for usage approval
+            String server = Settings.Global.getString(mContext.getContentResolver(),
+                    Settings.Global.CAPTIVE_PORTAL_SERVER);
+            if (server == null) {
+                server = "clients3.google.com";
+            }
+            return "http://" + server + "/generate_204";
+        }
+
+        /**
+         * Detect if its possible to connect to the http url. DNS based detection techniques
+         * do not work at all hotspots. The best way to check is to perform a request to
+         * a known address that fetches the data we expect.
+         */
+        private synchronized Integer isMobileOk(Params params) {
+            Integer result = CMP_RESULT_CODE_NO_CONNECTION;
+            Uri orgUri = Uri.parse(params.mUrl);
+            Random rand = new Random();
+            mParams = params;
+
+            if (mCs.isNetworkSupported(ConnectivityManager.TYPE_MOBILE) == false) {
+                result = CMP_RESULT_CODE_NO_CONNECTION;
+                log("isMobileOk: X not mobile capable result=" + result);
+                return result;
+            }
+
+            // See if we've already determined we've got a provisioning connection,
+            // if so we don't need to do anything active.
+            MobileDataStateTracker mdstDefault = (MobileDataStateTracker)
+                    mCs.mNetTrackers[ConnectivityManager.TYPE_MOBILE];
+            boolean isDefaultProvisioning = mdstDefault.isProvisioningNetwork();
+            log("isMobileOk: isDefaultProvisioning=" + isDefaultProvisioning);
+
+            MobileDataStateTracker mdstHipri = (MobileDataStateTracker)
+                    mCs.mNetTrackers[ConnectivityManager.TYPE_MOBILE_HIPRI];
+            boolean isHipriProvisioning = mdstHipri.isProvisioningNetwork();
+            log("isMobileOk: isHipriProvisioning=" + isHipriProvisioning);
+
+            if (isDefaultProvisioning || isHipriProvisioning) {
+                result = CMP_RESULT_CODE_PROVISIONING_NETWORK;
+                log("isMobileOk: X default || hipri is provisioning result=" + result);
+                return result;
+            }
+
+            try {
+                // Continue trying to connect until time has run out
+                long endTime = SystemClock.elapsedRealtime() + params.mTimeOutMs;
+
+                if (!mCs.isMobileDataStateTrackerReady()) {
+                    // Wait for MobileDataStateTracker to be ready.
+                    if (DBG) log("isMobileOk: mdst is not ready");
+                    while(SystemClock.elapsedRealtime() < endTime) {
+                        if (mCs.isMobileDataStateTrackerReady()) {
+                            // Enable fail fast as we'll do retries here and use a
+                            // hipri connection so the default connection stays active.
+                            if (DBG) log("isMobileOk: mdst ready, enable fail fast of mobile data");
+                            mCs.setEnableFailFastMobileData(DctConstants.ENABLED);
+                            break;
+                        }
+                        sleep(POLLING_SLEEP_SEC);
+                    }
+                }
+
+                log("isMobileOk: start hipri url=" + params.mUrl);
+
+                // First wait until we can start using hipri
+                Binder binder = new Binder();
+                while(SystemClock.elapsedRealtime() < endTime) {
+                    int ret = mCs.startUsingNetworkFeature(ConnectivityManager.TYPE_MOBILE,
+                            Phone.FEATURE_ENABLE_HIPRI, binder);
+                    if ((ret == PhoneConstants.APN_ALREADY_ACTIVE)
+                        || (ret == PhoneConstants.APN_REQUEST_STARTED)) {
+                            log("isMobileOk: hipri started");
+                            break;
+                    }
+                    if (VDBG) log("isMobileOk: hipri not started yet");
+                    result = CMP_RESULT_CODE_NO_CONNECTION;
+                    sleep(POLLING_SLEEP_SEC);
+                }
+
+                // Continue trying to connect until time has run out
+                while(SystemClock.elapsedRealtime() < endTime) {
+                    try {
+                        // Wait for hipri to connect.
+                        // TODO: Don't poll and handle situation where hipri fails
+                        // because default is retrying. See b/9569540
+                        NetworkInfo.State state = mCs
+                                .getNetworkInfo(ConnectivityManager.TYPE_MOBILE_HIPRI).getState();
+                        if (state != NetworkInfo.State.CONNECTED) {
+                            if (true/*VDBG*/) {
+                                log("isMobileOk: not connected ni=" +
+                                    mCs.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_HIPRI));
+                            }
+                            sleep(POLLING_SLEEP_SEC);
+                            result = CMP_RESULT_CODE_NO_CONNECTION;
+                            continue;
+                        }
+
+                        // Hipri has started check if this is a provisioning url
+                        MobileDataStateTracker mdst = (MobileDataStateTracker)
+                                mCs.mNetTrackers[ConnectivityManager.TYPE_MOBILE_HIPRI];
+                        if (mdst.isProvisioningNetwork()) {
+                            result = CMP_RESULT_CODE_PROVISIONING_NETWORK;
+                            if (DBG) log("isMobileOk: X isProvisioningNetwork result=" + result);
+                            return result;
+                        } else {
+                            if (DBG) log("isMobileOk: isProvisioningNetwork is false, continue");
+                        }
+
+                        // Get of the addresses associated with the url host. We need to use the
+                        // address otherwise HttpURLConnection object will use the name to get
+                        // the addresses and will try every address but that will bypass the
+                        // route to host we setup and the connection could succeed as the default
+                        // interface might be connected to the internet via wifi or other interface.
+                        InetAddress[] addresses;
+                        try {
+                            addresses = InetAddress.getAllByName(orgUri.getHost());
+                        } catch (UnknownHostException e) {
+                            result = CMP_RESULT_CODE_NO_DNS;
+                            log("isMobileOk: X UnknownHostException result=" + result);
+                            return result;
+                        }
+                        log("isMobileOk: addresses=" + inetAddressesToString(addresses));
+
+                        // Get the type of addresses supported by this link
+                        LinkProperties lp = mCs.getLinkProperties(
+                                ConnectivityManager.TYPE_MOBILE_HIPRI);
+                        boolean linkHasIpv4 = lp.hasIPv4Address();
+                        boolean linkHasIpv6 = lp.hasIPv6Address();
+                        log("isMobileOk: linkHasIpv4=" + linkHasIpv4
+                                + " linkHasIpv6=" + linkHasIpv6);
+
+                        final ArrayList<InetAddress> validAddresses =
+                                new ArrayList<InetAddress>(addresses.length);
+
+                        for (InetAddress addr : addresses) {
+                            if (((addr instanceof Inet4Address) && linkHasIpv4) ||
+                                    ((addr instanceof Inet6Address) && linkHasIpv6)) {
+                                validAddresses.add(addr);
+                            }
+                        }
+
+                        if (validAddresses.size() == 0) {
+                            return CMP_RESULT_CODE_NO_CONNECTION;
+                        }
+
+                        int addrTried = 0;
+                        while (true) {
+                            // Loop through at most MAX_LOOPS valid addresses or until
+                            // we run out of time
+                            if (addrTried++ >= MAX_LOOPS) {
+                                log("isMobileOk: too many loops tried - giving up");
+                                break;
+                            }
+                            if (SystemClock.elapsedRealtime() >= endTime) {
+                                log("isMobileOk: spend too much time - giving up");
+                                break;
+                            }
+
+                            InetAddress hostAddr = validAddresses.get(rand.nextInt(
+                                    validAddresses.size()));
+
+                            // Make a route to host so we check the specific interface.
+                            if (mCs.requestRouteToHostAddress(ConnectivityManager.TYPE_MOBILE_HIPRI,
+                                    hostAddr.getAddress(), null)) {
+                                // Wait a short time to be sure the route is established ??
+                                log("isMobileOk:"
+                                        + " wait to establish route to hostAddr=" + hostAddr);
+                                sleep(NET_ROUTE_ESTABLISHMENT_SLEEP_SEC);
+                            } else {
+                                log("isMobileOk:"
+                                        + " could not establish route to hostAddr=" + hostAddr);
+                                // Wait a short time before the next attempt
+                                sleep(NET_ERROR_SLEEP_SEC);
+                                continue;
+                            }
+
+                            // Rewrite the url to have numeric address to use the specific route
+                            // using http for half the attempts and https for the other half.
+                            // Doing https first and http second as on a redirected walled garden
+                            // such as t-mobile uses we get a SocketTimeoutException: "SSL
+                            // handshake timed out" which we declare as
+                            // CMP_RESULT_CODE_NO_TCP_CONNECTION. We could change this, but by
+                            // having http second we will be using logic used for some time.
+                            URL newUrl;
+                            String scheme = (addrTried <= (MAX_LOOPS/2)) ? "https" : "http";
+                            newUrl = new URL(scheme, hostAddr.getHostAddress(),
+                                        orgUri.getPath());
+                            log("isMobileOk: newUrl=" + newUrl);
+
+                            HttpURLConnection urlConn = null;
+                            try {
+                                // Open the connection set the request headers and get the response
+                                urlConn = (HttpURLConnection)newUrl.openConnection(
+                                        java.net.Proxy.NO_PROXY);
+                                if (scheme.equals("https")) {
+                                    ((HttpsURLConnection)urlConn).setHostnameVerifier(
+                                            new CheckMpHostnameVerifier(orgUri));
+                                }
+                                urlConn.setInstanceFollowRedirects(false);
+                                urlConn.setConnectTimeout(SOCKET_TIMEOUT_MS);
+                                urlConn.setReadTimeout(SOCKET_TIMEOUT_MS);
+                                urlConn.setUseCaches(false);
+                                urlConn.setAllowUserInteraction(false);
+                                // Set the "Connection" to "Close" as by default "Keep-Alive"
+                                // is used which is useless in this case.
+                                urlConn.setRequestProperty("Connection", "close");
+                                int responseCode = urlConn.getResponseCode();
+
+                                // For debug display the headers
+                                Map<String, List<String>> headers = urlConn.getHeaderFields();
+                                log("isMobileOk: headers=" + headers);
+
+                                // Close the connection
+                                urlConn.disconnect();
+                                urlConn = null;
+
+                                if (mTestingFailures) {
+                                    // Pretend no connection, this tests using http and https
+                                    result = CMP_RESULT_CODE_NO_CONNECTION;
+                                    log("isMobileOk: TESTING_FAILURES, pretend no connction");
+                                    continue;
+                                }
+
+                                if (responseCode == 204) {
+                                    // Return
+                                    result = CMP_RESULT_CODE_CONNECTABLE;
+                                    log("isMobileOk: X got expected responseCode=" + responseCode
+                                            + " result=" + result);
+                                    return result;
+                                } else {
+                                    // Retry to be sure this was redirected, we've gotten
+                                    // occasions where a server returned 200 even though
+                                    // the device didn't have a "warm" sim.
+                                    log("isMobileOk: not expected responseCode=" + responseCode);
+                                    // TODO - it would be nice in the single-address case to do
+                                    // another DNS resolve here, but flushing the cache is a bit
+                                    // heavy-handed.
+                                    result = CMP_RESULT_CODE_REDIRECTED;
+                                }
+                            } catch (Exception e) {
+                                log("isMobileOk: HttpURLConnection Exception" + e);
+                                result = CMP_RESULT_CODE_NO_TCP_CONNECTION;
+                                if (urlConn != null) {
+                                    urlConn.disconnect();
+                                    urlConn = null;
+                                }
+                                sleep(NET_ERROR_SLEEP_SEC);
+                                continue;
+                            }
+                        }
+                        log("isMobileOk: X loops|timed out result=" + result);
+                        return result;
+                    } catch (Exception e) {
+                        log("isMobileOk: Exception e=" + e);
+                        continue;
+                    }
+                }
+                log("isMobileOk: timed out");
+            } finally {
+                log("isMobileOk: F stop hipri");
+                mCs.setEnableFailFastMobileData(DctConstants.DISABLED);
+                mCs.stopUsingNetworkFeature(ConnectivityManager.TYPE_MOBILE,
+                        Phone.FEATURE_ENABLE_HIPRI);
+
+                // Wait for hipri to disconnect.
+                long endTime = SystemClock.elapsedRealtime() + 5000;
+
+                while(SystemClock.elapsedRealtime() < endTime) {
+                    NetworkInfo.State state = mCs
+                            .getNetworkInfo(ConnectivityManager.TYPE_MOBILE_HIPRI).getState();
+                    if (state != NetworkInfo.State.DISCONNECTED) {
+                        if (VDBG) {
+                            log("isMobileOk: connected ni=" +
+                                mCs.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_HIPRI));
+                        }
+                        sleep(POLLING_SLEEP_SEC);
+                        continue;
+                    }
+                }
+
+                log("isMobileOk: X result=" + result);
+            }
+            return result;
+        }
+
+        @Override
+        protected Integer doInBackground(Params... params) {
+            return isMobileOk(params[0]);
+        }
+
+        @Override
+        protected void onPostExecute(Integer result) {
+            log("onPostExecute: result=" + result);
+            if ((mParams != null) && (mParams.mCb != null)) {
+                mParams.mCb.onComplete(result);
+            }
+        }
+
+        private String inetAddressesToString(InetAddress[] addresses) {
+            StringBuffer sb = new StringBuffer();
+            boolean firstTime = true;
+            for(InetAddress addr : addresses) {
+                if (firstTime) {
+                    firstTime = false;
+                } else {
+                    sb.append(",");
+                }
+                sb.append(addr);
+            }
+            return sb.toString();
+        }
+
+        private void printNetworkInfo() {
+            boolean hasIccCard = mTm.hasIccCard();
+            int simState = mTm.getSimState();
+            log("hasIccCard=" + hasIccCard
+                    + " simState=" + simState);
+            NetworkInfo[] ni = mCs.getAllNetworkInfo();
+            if (ni != null) {
+                log("ni.length=" + ni.length);
+                for (NetworkInfo netInfo: ni) {
+                    log("netInfo=" + netInfo.toString());
+                }
+            } else {
+                log("no network info ni=null");
+            }
+        }
+
+        /**
+         * Sleep for a few seconds then return.
+         * @param seconds
+         */
+        private static void sleep(int seconds) {
+            try {
+                Thread.sleep(seconds * 1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private static void log(String s) {
+            Slog.d(ConnectivityService.TAG, "[" + CHECKMP_TAG + "] " + s);
+        }
+    }
+
+    // TODO: Move to ConnectivityManager and make public?
+    private static final String CONNECTED_TO_PROVISIONING_NETWORK_ACTION =
+            "com.android.server.connectivityservice.CONNECTED_TO_PROVISIONING_NETWORK_ACTION";
+
+    private BroadcastReceiver mProvisioningReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(CONNECTED_TO_PROVISIONING_NETWORK_ACTION)) {
+                handleMobileProvisioningAction(intent.getStringExtra("EXTRA_URL"));
+            }
+        }
+    };
+
+    private void handleMobileProvisioningAction(String url) {
+        // Notication mark notification as not visible
+        setProvNotificationVisible(false, ConnectivityManager.TYPE_MOBILE_HIPRI, null, null);
+
+        // If provisioning network handle as a special case,
+        // otherwise launch browser with the intent directly.
+        NetworkInfo ni = getProvisioningNetworkInfo();
+        if ((ni != null) && ni.isConnectedToProvisioningNetwork()) {
+            if (DBG) log("handleMobileProvisioningAction: on provisioning network");
+            MobileDataStateTracker mdst = (MobileDataStateTracker)
+                    mNetTrackers[ConnectivityManager.TYPE_MOBILE];
+            mdst.enableMobileProvisioning(url);
+        } else {
+            if (DBG) log("handleMobileProvisioningAction: on default network");
+            Intent newIntent = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN,
+                    Intent.CATEGORY_APP_BROWSER);
+            newIntent.setData(Uri.parse(url));
+            newIntent.setFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT |
+                    Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                mContext.startActivity(newIntent);
+            } catch (ActivityNotFoundException e) {
+                loge("handleMobileProvisioningAction: startActivity failed" + e);
+            }
+        }
+    }
+
+    private static final String NOTIFICATION_ID = "CaptivePortal.Notification";
+    private volatile boolean mIsNotificationVisible = false;
+
+    private void setProvNotificationVisible(boolean visible, int networkType, String extraInfo,
+            String url) {
+        if (DBG) {
+            log("setProvNotificationVisible: E visible=" + visible + " networkType=" + networkType
+                + " extraInfo=" + extraInfo + " url=" + url);
+        }
+
+        Resources r = Resources.getSystem();
+        NotificationManager notificationManager = (NotificationManager) mContext
+            .getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (visible) {
+            CharSequence title;
+            CharSequence details;
+            int icon;
+            Intent intent;
+            Notification notification = new Notification();
+            switch (networkType) {
+                case ConnectivityManager.TYPE_WIFI:
+                    title = r.getString(R.string.wifi_available_sign_in, 0);
+                    details = r.getString(R.string.network_available_sign_in_detailed,
+                            extraInfo);
+                    icon = R.drawable.stat_notify_wifi_in_range;
+                    intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    intent.setFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT |
+                            Intent.FLAG_ACTIVITY_NEW_TASK);
+                    notification.contentIntent = PendingIntent.getActivity(mContext, 0, intent, 0);
                     break;
                 case LinkCapabilities.Key.RO_MAX_AVAILABLE_FWD_BW:
                     if ((temp = mLinkManager.getMaxAvailableForwardBandwidth(id)) != null)

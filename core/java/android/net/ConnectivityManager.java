@@ -230,7 +230,16 @@ public class ConnectivityManager
 
     private IConnectivityManager mService;
 
-    static public boolean isNetworkTypeValid(int networkType) {
+    private final IConnectivityManager mService;
+
+    private final String mPackageName;
+
+    /**
+     * Tests if a given integer represents a valid network type.
+     * @param networkType the type to be tested
+     * @return a boolean.  {@code true} if the type is valid, else {@code false}
+     */
+    public static boolean isNetworkTypeValid(int networkType) {
         return networkType >= 0 && networkType <= MAX_NETWORK_TYPE;
     }
 
@@ -362,7 +371,7 @@ public class ConnectivityManager
     public boolean requestRouteToHostAddress(int networkType, InetAddress hostAddress) {
         String address = hostAddress.getHostAddress();
         try {
-            return mService.requestRouteToHostAddress(networkType, address);
+            return mService.requestRouteToHostAddress(networkType, address, mPackageName);
         } catch (RemoteException e) {
             return false;
         }
@@ -436,8 +445,9 @@ public class ConnectivityManager
     /**
      * Don't allow use of default constructor.
      */
-    @SuppressWarnings({"UnusedDeclaration"})
-    private ConnectivityManager() {
+    public ConnectivityManager(IConnectivityManager service, String packageName) {
+        mService = checkNotNull(service, "missing IConnectivityManager");
+        mPackageName = checkNotNull(packageName, "missing package name");
     }
 
     /**
