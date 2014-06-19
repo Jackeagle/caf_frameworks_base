@@ -73,7 +73,7 @@ public class HTML5VideoInline extends HTML5VideoView{
         // to the better way.
         if (mProxy.getContext().checkCallingOrSelfPermission(permission.WAKE_LOCK)
                 == PackageManager.PERMISSION_GRANTED) {
-            mPlayer.setWakeMode(proxy.getContext(), PowerManager.FULL_WAKE_LOCK);
+            mPlayer.setWakeMode(proxy.getContext(), PowerManager.FULL_WAKE_LOCK|PowerManager.ON_AFTER_RELEASE);
         }
     }
 
