@@ -40,12 +40,14 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.net.ConnectivityManager;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.provider.Telephony;
 import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
+import android.telephony.ServiceState;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -80,6 +82,7 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
 
         private final String DEFAULT = "default";
         private final String WAP = "wap";
+        private final String LTE = "lte";
 
         private final Uri PREFERAPN_URI = Uri.parse("content://telephony/carriers/preferapn");
         private final String APN_ID = "apn_id";
@@ -99,6 +102,7 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
         public ApnState() {
             mApnIconMap.put("ctwap", R.drawable.ic_qs_apn_ctwap);
             mApnIconMap.put("ctnet", R.drawable.ic_qs_apn_ctnet);
+            mApnIconMap.put("ctlte", R.drawable.ic_qs_apn_ctlte);
             mApnIconMap.put("cmnet", R.drawable.ic_qs_apn_cmnet);
             mApnIconMap.put("cmwap", R.drawable.ic_qs_apn_cmwap);
         }
@@ -139,13 +143,10 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
 
         void updateIconId() {
             String apn = getCurrentApnName();
-            Integer icon = mApnIconMap.get(apn);
+            Integer icon = mApnIconMap.get(apn.toLowerCase());
             if (icon != null) {
                 iconId = icon;
-            }
-
-            //if there is no records in apn settings, show ctwap icon as default.
-            if (getSelectedApnKey() == null) {
+            } else {
                 iconId = R.drawable.ic_qs_apn_ctwap;
             }
         }
@@ -223,14 +224,15 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
                 // Sometimes we didn't find the default apn for example, after we reset the DUT,
                 // the selectedkey will be null.
                 // Note: As ct spec, we need set the ctwap as the default apn,
-                //          so if the selectedkey is null,
-                //          We'd like to set it as the default apn.
+                //          so if the selectedkey is null or the selected apn is not in current
+                //          available apn list, we'd like to set it as the default apn.
                 if (currentApn == null) {
-                    if (selectedKey == null) {
+                    if (selectedKey == null || !isSelectedKeyAvailable(selectedKey, apnList)) {
                         for (int i = 0; i < apnList.size(); i++) {
                             Apn apn = apnList.get(i);
                             if (apn.type != null && apn.type.contains(DEFAULT)
-                                    && apn.apn != null && apn.apn.contains(WAP)) {
+                                    && apn.apn != null && (apn.apn.toLowerCase().contains(WAP)
+                                    || apn.apn.toLowerCase().contains(LTE))) {
                                 switchToNextApn(apn);
                             }
                         }
@@ -254,11 +256,39 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
             }
         }
 
+        private boolean isSelectedKeyAvailable(String selectedKey, ArrayList<Apn> apnList) {
+            boolean ret = false;
+            if (apnList != null) {
+                for (Apn apn : apnList) {
+                    if (selectedKey.equals(apn.id)) {
+                        ret = true;
+                        break;
+                    }
+                }
+            }
+            return ret;
+        }
+
         private String getOperatorNumericSelection() {
             String[] mccmncs = getOperatorNumeric();
             String where;
             where = (mccmncs[0] != null) ? "numeric=\"" + mccmncs[0] + "\"" : "";
             where = where + ((mccmncs[1] != null) ? " or numeric=\"" + mccmncs[1] + "\"" : "");
+
+            int netType = 0;
+            if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+                int dataSub = MSimTelephonyManager.getDefault().getPreferredDataSubscription();
+                netType = MSimTelephonyManager.getDefault().getNetworkType(dataSub);
+            } else {
+                netType = TelephonyManager.getDefault().getNetworkType();
+            }
+
+            //UI should filter APN by bearer and enable status
+            int radioType = convertNetworkTypeToRilRadioType(netType);
+            Log.d(TAG, "Current RAT type is " + radioType);
+            where += "and (bearer=\"" + radioType + "\" or bearer =\"" + 0 + "\")";
+            where += " and carrier_enabled = 1";
+
             if (DEBUG) Log.d(TAG, "getOperatorNumericSelection: " + where);
             return where;
         }
@@ -353,11 +383,14 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
 
         public void startObserving() {
             final ContentResolver cr = mContext.getContentResolver();
-            cr.registerContentObserver(Telephony.Carriers.CONTENT_URI, true, this);;
+            cr.registerContentObserver(Telephony.Carriers.CONTENT_URI, true, this);
+            cr.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.MULTI_SIM_DEFAULT_DATA_CALL_SUBSCRIPTION),
+                    false, this, mUserTracker.getCurrentUserId());
         }
     };
 
-    private final ApnObserver mApnObserver;
+    private ApnObserver mApnObserver;
     private QuickSettingsTileView mApnTile;
     private RefreshCallback mApnCallback;
     private ApnState mApnState = new ApnState();
@@ -381,6 +414,10 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
                     if (IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(iccState)) {
                         refreshApnTile();
                     }
+                }
+            } else if (TelephonyIntents.ACTION_SERVICE_STATE_CHANGED.equals(action)) {
+                if (mApnState.enabled) {
+                    refreshApnTile();
                 }
             } else if (Intent.ACTION_AIRPLANE_MODE_CHANGED.equals(action)) {
                 if (intent.getBooleanExtra("state", false)) {
@@ -453,10 +490,10 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
     public ExtQuickSettingsModel(Context context) {
         super(context);
         mContext = context;
-        mApnObserver = new ApnObserver(mHandler);
 
         // APN switcher
         if (mContext.getResources().getBoolean(R.bool.config_showApnSwitch)) {
+            mApnObserver = new ApnObserver(mHandler);
             mApnObserver.startObserving();
             // Register the receiver to handle the sim state changed event.
             // And caused by if we open the airplane mode, we couldn't receive the sim state
@@ -464,6 +501,7 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
             // If the new state is on, we need set the views as gone.
             IntentFilter filter = new IntentFilter(TelephonyIntents.ACTION_SIM_STATE_CHANGED);
             filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+            filter.addAction(TelephonyIntents.ACTION_SERVICE_STATE_CHANGED);
             context.registerReceiver(new SimStateChangedReceiver(), filter);
         }
 
@@ -576,6 +614,19 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
         refreshApnTile();
     }
     void refreshApnTile() {
+        int dataSub = MSimConstants.DEFAULT_SUBSCRIPTION;
+        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+            MSimTelephonyManager msimTM = (MSimTelephonyManager)
+                    mContext.getSystemService(Context.MSIM_TELEPHONY_SERVICE);
+            dataSub = msimTM.getDefaultDataSubscription();
+        }
+        // Hide APN switch button if DDS is set to non default subscription
+        if (dataSub != MSimConstants.DEFAULT_SUBSCRIPTION) {
+            mApnState.enabled = false;
+        } else {
+            mApnState.enabled = hasIccCard() && !isAirplaneModeOn();
+        }
+
         if (mApnTile != null && mApnCallback != null) {
             Resources res = mContext.getResources();
             if (mApnState.enabled) {
@@ -599,6 +650,11 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
         ConnectivityManager cm = (ConnectivityManager)mContext.getSystemService(
                 Context.CONNECTIVITY_SERVICE);
         cm.setMobileDataEnabled(!mRSSIState.enabled);
+        int phoneCount = MSimTelephonyManager.getDefault().getPhoneCount();
+        for (int i = 0; i < phoneCount; i++) {
+            Settings.Global.putInt(mContext.getContentResolver(),
+                    Settings.Global.MOBILE_DATA + i, (!mRSSIState.enabled) ? 1 : 0);
+        }
     }
 
     private void onRoamingDataStateChanged() {
@@ -657,6 +713,7 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
     private QuickSettingsTileView mDdsTile;
     private RefreshCallback mDdsCallback;
     private State mDdsState = new State();
+    private AsyncTask switchDdsAsyncTask = null;
     protected void addDdsTile(QuickSettingsTileView view, RefreshCallback cb) {
         mDdsTile = view;
         mDdsCallback = cb;
@@ -683,13 +740,42 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
 
     void switchDdsToNext() {
         Log.d(DDS_TAG, "switchDdsToNext");
-        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
-            MSimTelephonyManager msimTM = (MSimTelephonyManager)
-                    mContext.getSystemService(Context.MSIM_TELEPHONY_SERVICE);
-            int dataSub = msimTM.getDefaultDataSubscription();
-            int phoneCount = msimTM.getPhoneCount();
-            msimTM.setDefaultDataSubscription((dataSub+1)%phoneCount);
+        if (!MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+            return;
         }
+        if (switchDdsAsyncTask != null &&
+                switchDdsAsyncTask.getStatus() != AsyncTask.Status.FINISHED) {
+            Log.d(DDS_TAG, "Dds switch in progress!");
+            return;
+        }
+        switchDdsAsyncTask = new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected void onPreExecute() {
+                super.onPreExecute();
+                // Make DDS switch grayed out and while changing subscription
+                if (mDdsTile != null) {
+                    mDdsTile.setAlpha(0.5f);
+                    mDdsTile.setEnabled(false);
+                }
+            }
+            @Override
+            protected Void doInBackground(Void... params) {
+                MSimTelephonyManager msimTM = (MSimTelephonyManager)
+                        mContext.getSystemService(Context.MSIM_TELEPHONY_SERVICE);
+                int dataSub = msimTM.getDefaultDataSubscription();
+                int phoneCount = msimTM.getPhoneCount();
+                msimTM.setDefaultDataSubscription((dataSub+1)%phoneCount);
+                return null;
+            }
+            @Override
+            protected void onPostExecute(Void result) {
+                super.onPostExecute(result);
+                if (mDdsTile != null) {
+                    mDdsTile.setAlpha(1f);
+                    mDdsTile.setEnabled(true);
+                }
+            }
+        }.execute();
     }
 
     private void updateDds() {
@@ -737,4 +823,33 @@ class ExtQuickSettingsModel extends QuickSettingsModel {
 
         refreshDdsTile();
     }
+
+    private int convertNetworkTypeToRilRadioType(int networkType) {
+        int ret = ServiceState.RIL_RADIO_TECHNOLOGY_UNKNOWN;
+        switch (networkType) {
+            case TelephonyManager.NETWORK_TYPE_1xRTT:
+                ret = ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT;
+                break;
+            case TelephonyManager.NETWORK_TYPE_EVDO_0:
+                ret = ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_0;
+                break;
+            case TelephonyManager.NETWORK_TYPE_EVDO_A:
+                ret = ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_A;
+                break;
+            case TelephonyManager.NETWORK_TYPE_EVDO_B:
+                ret = ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_B;
+                break;
+            case TelephonyManager.NETWORK_TYPE_EHRPD:
+                ret = ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD;
+                break;
+            case TelephonyManager.NETWORK_TYPE_LTE:
+                ret = ServiceState.RIL_RADIO_TECHNOLOGY_LTE;
+                break;
+            default:
+                ret = networkType;
+                break;
+        }
+        return ret;
+    }
+
 }
