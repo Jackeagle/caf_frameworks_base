@@ -530,7 +530,7 @@ public final class QBluetoothAdapter {
         }
     }
 
-    interface LeLppCallback {
+    public interface LeLppCallback {
         public void onWriteRssiThreshold(int status);
 
         public void onReadRssiThreshold(int low,int upper, int alert, int status);
