@@ -838,6 +838,7 @@ public class MSimNetworkController extends NetworkController {
         StringBuilder str = new StringBuilder();
         boolean something = false;
         if (showPlmn && plmn != null) {
+            plmn = getLocaleString(plmn);
             if(mContext.getResources().getBoolean(R.bool.config_display_rat) &&
                     mMSimServiceState[subscription] != null) {
                 plmn = appendRatToNetworkName(plmn, mMSimServiceState[subscription]);
@@ -849,6 +850,7 @@ public class MSimNetworkController extends NetworkController {
             if (something) {
                 str.append(mNetworkNameSeparator);
             }
+            spn = getLocaleString(spn);
             if(mContext.getResources().getBoolean(R.bool.config_display_rat) &&
                     mMSimServiceState[subscription] != null) {
                 spn = appendRatToNetworkName(spn, mMSimServiceState[subscription]);
