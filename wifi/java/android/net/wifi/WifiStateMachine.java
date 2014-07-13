@@ -2645,6 +2645,8 @@ public class WifiStateMachine extends StateMachine {
                     mTemporarilyDisconnectWifi = (message.arg1 == 1);
                     replyToMessage(message, WifiP2pService.DISCONNECT_WIFI_RESPONSE);
                     break;
+                case WifiP2pService.P2P_MIRACAST_MODE_CHANGED:
+                    break;
                 case CMD_IP_ADDRESS_UPDATED:
                     // addLinkAddress is a no-op if called more than once with the same address.
                     if (mNetlinkLinkProperties.addLinkAddress((LinkAddress) message.obj)) {
@@ -3725,6 +3727,12 @@ public class WifiStateMachine extends StateMachine {
                     NetworkUpdateResult result = mWifiConfigStore.saveNetwork(config);
                     if (mWifiInfo.getNetworkId() == result.getNetworkId()) {
                         if (result.hasIpChanged()) {
+                            try {
+                                log("clear IP address on connection");
+                                mNwService.clearInterfaceAddresses(mInterfaceName);
+                            } catch (Exception e) {
+                                loge("Failed to clear addresses" + e);
+                            }
                             log("Reconfiguring IP on connection");
                             transitionTo(mObtainingIpState);
                         }
@@ -4143,6 +4151,9 @@ public class WifiStateMachine extends StateMachine {
                         ret = NOT_HANDLED;
                     }
                     break;
+                case WifiP2pService.P2P_MIRACAST_MODE_CHANGED:
+                     setScanIntevelOnMiracastModeChange(message.arg1);
+                     break;
                 default:
                     ret = NOT_HANDLED;
             }
@@ -4505,6 +4516,20 @@ public class WifiStateMachine extends StateMachine {
         if (getCurrentState() != mSupplicantStoppingState) {
             mWifiConfigStore.disableNetwork(mLastNetworkId,
                     WifiConfiguration.DISABLED_UNKNOWN_REASON);
+        }
+    }
+
+    private void setScanIntevelOnMiracastModeChange(int mode) {
+        if ((mode == WifiP2pManager.MIRACAST_SOURCE)
+                || (mode == WifiP2pManager.MIRACAST_SINK)) {
+            int defaultWfdIntervel = mContext.getResources().getInteger(
+                    R.integer.config_wifi_scan_interval_wfd_connected);
+            long wfdScanIntervalMs = Settings.Global
+                    .getLong(
+                            mContext.getContentResolver(),
+                            Settings.Global.WIFI_SUPPLICANT_SCAN_INTERVAL_WFD_CONNECTED_MS,
+                            defaultWfdIntervel);
+            mWifiNative.setScanInterval((int) wfdScanIntervalMs / 1000);
         }
     }
 
