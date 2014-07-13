@@ -321,6 +321,7 @@
   <java-symbol type="integer" name="config_wifi_framework_scan_interval" />
   <java-symbol type="integer" name="config_wifi_supplicant_scan_interval" />
   <java-symbol type="integer" name="config_wifi_scan_interval_p2p_connected" />
+  <java-symbol type="integer" name="config_wifi_scan_interval_wfd_connected" />
   <java-symbol type="integer" name="db_connection_pool_size" />
   <java-symbol type="integer" name="db_journal_size_limit" />
   <java-symbol type="integer" name="db_wal_autocheckpoint" />
@@ -1841,4 +1842,6 @@
   <java-symbol type="integer" name="config_delay_startPPPOE_timer" />
 
   <java-symbol type="bool" name="always_popup_usb_computer_connection" />
+  <!-- config network mode to operator specific -->
+  <java-symbol type="bool" name="config_network_mode_overriden" />
 </resources>
