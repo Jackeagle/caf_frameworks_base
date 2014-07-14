@@ -346,6 +346,14 @@
          This will disable all third party applications you have installed.
          They will be restored when you reboot again.</string>
 
+    <!-- Title of dialog to confirm rebooting. -->
+    <string name="reboot_title">Reboot</string>
+
+    <!-- Reboot Confirmation Dialog.  When the user chooses to reboot the device, there will
+         be a confirmation dialog.  This is the message. -->
+    <string name="reboot_confirm" product="tablet">Your tablet will reboot.</string>
+    <string name="reboot_confirm" product="default">Your phone will reboot.</string>
+
     <!-- Recent Tasks dialog: title
      TODO: this should move to SystemUI.apk, but the code for the old
             recent dialog is still in the framework
@@ -367,6 +375,9 @@
 
     <!-- label for item that turns off power in phone options dialog -->
     <string name="global_action_power_off">Power off</string>
+
+    <!-- label for item that reboots the phone in phone options dialog -->
+    <string name="global_action_reboot">Reboot</string>
 
     <!-- label for item that generates a bug report in the phone options dialog -->
     <string name="global_action_bug_report">Bug report</string>
@@ -3755,6 +3766,9 @@
     <!-- Shown when the device is tethered -->
     <string name="tethered_notification_title">Tethering or hotspot active</string>
     <string name="tethered_notification_message">Touch to set up.</string>
+    <string name="tethered_notification_no_device_message">No connected device</string>
+    <string name="tethered_notification_one_device_message"><xliff:g id="count">%1$s</xliff:g> connected device</string>
+    <string name="tethered_notification_multi_device_message"><xliff:g id="count">%1$s</xliff:g> connected devices</string>
 
     <!--  Strings for possible PreferenceActivity Back/Next buttons -->
     <string name="back_button_label">Back</string>
