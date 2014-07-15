@@ -458,6 +458,7 @@ public class Editor {
         if (!mSelectionControllerEnabled) {
             stopSelectionActionMode();
             if (mSelectionModifierCursorController != null) {
+                mSelectionModifierCursorController.hide();
                 mSelectionModifierCursorController.onDetached();
                 mSelectionModifierCursorController = null;
             }
