@@ -391,6 +391,8 @@ void OpenGLRenderer::resume() {
     glEnable(GL_BLEND);
     glBlendFunc(mCaches.lastSrcMode, mCaches.lastDstMode);
     glBlendEquation(GL_FUNC_ADD);
+
+    glStencilMask(0xff);
 }
 
 void OpenGLRenderer::resumeAfterLayer() {
