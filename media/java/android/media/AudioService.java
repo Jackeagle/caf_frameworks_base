@@ -1988,19 +1988,10 @@ public class AudioService extends IAudioService.Stub {
     /** @see AudioManager#setBluetoothA2dpOn(boolean) */
     public void setBluetoothA2dpOn(boolean on) {
         synchronized (mBluetoothA2dpEnabledLock) {
-           int config = AudioSystem.FORCE_NONE;
-           mBluetoothA2dpEnabled = on;
-           config = AudioSystem.getForceUse(AudioSystem.FOR_MEDIA);
-           if((config == AudioSystem.FORCE_BT_A2DP) && (!mBluetoothA2dpEnabled)) {
-               config = AudioSystem.FORCE_NO_BT_A2DP;
-           } else if(mBluetoothA2dpEnabled) {
-               config = AudioSystem.FORCE_NONE;
-           }
-           Log.d(TAG, "BTEnabled "+mBluetoothA2dpEnabled+" config "+config);
-
+            mBluetoothA2dpEnabled = on;
             sendMsg(mAudioHandler, MSG_SET_FORCE_BT_A2DP_USE, SENDMSG_QUEUE,
                     AudioSystem.FOR_MEDIA,
-                    config,
+                    mBluetoothA2dpEnabled ? AudioSystem.FORCE_NONE : AudioSystem.FORCE_NO_BT_A2DP,
                     null, 0);
         }
     }
@@ -2975,7 +2966,7 @@ public class AudioService extends IAudioService.Stub {
                             device);
         }
 
-        public synchronized boolean setIndex(int index, int device) {
+        public boolean setIndex(int index, int device) {
             int oldIndex = getIndex(device);
             index = getValidIndex(index);
             synchronized (mCameraSoundForced) {
@@ -2983,8 +2974,9 @@ public class AudioService extends IAudioService.Stub {
                     index = mIndexMax;
                 }
             }
-            mIndex.put(device, index);
-
+            synchronized (this) {
+                mIndex.put(device, index);
+            }
             if (oldIndex != index) {
                 // Apply change to all streams using this one as alias
                 // if changing volume of current device, also change volume of current
