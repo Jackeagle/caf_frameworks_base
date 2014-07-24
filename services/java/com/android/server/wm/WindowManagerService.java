@@ -134,7 +134,7 @@ import android.view.WindowManagerPolicy.PointerEventListener;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
-
+import static android.view.WindowManagerPolicy.FLAG_TRUSTED;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.File;
@@ -4305,6 +4305,10 @@ public class WindowManagerService extends IWindowManager.Stub
             wtoken = findAppWindowToken(token);
             if (wtoken == null) {
                 Slog.w(TAG, "Attempted to set visibility of non-existing app token: " + token);
+                return;
+            }
+            if (isHDMIApp(wtoken)) {
+                Slog.i(TAG,"find hdmi window return");
                 return;
             }
 
@@ -10894,5 +10898,15 @@ public class WindowManagerService extends IWindowManager.Stub
     @Override
     public Object getWindowManagerLock() {
         return mWindowMap;
+    }
+    private boolean isHDMIApp(AppWindowToken wtoken) {
+        final int N = wtoken.allAppWindows.size();
+        for (int i=0; i<N; i++) {
+            WindowState win = wtoken.allAppWindows.get(i);
+            if ((win.getAttrs().flags & FLAG_TRUSTED) != 0) {  /* FLAG_TRUSTED:0x02000000 */
+                return true;
+            }
+        }
+        return false;
     }
 }
