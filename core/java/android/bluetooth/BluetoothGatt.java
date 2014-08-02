@@ -23,6 +23,7 @@ import android.bluetooth.IBluetoothManager;
 import android.bluetooth.IBluetoothStateChangeCallback;
 
 import android.content.ComponentName;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
@@ -582,6 +583,8 @@ public final class BluetoothGatt implements BluetoothProfile {
     public void close() {
         if (DBG) Log.d(TAG, "close()");
 
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter.getState() != adapter.STATE_ON) return ;
         unregisterApp();
         mConnState = CONN_STATE_CLOSED;
     }
@@ -704,6 +707,8 @@ public final class BluetoothGatt implements BluetoothProfile {
         if (DBG) Log.d(TAG, "cancelOpen() - device: " + mDevice.getAddress());
         if (mService == null || mClientIf == 0) return;
 
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter.getState() != adapter.STATE_ON) return ;
         try {
             mService.clientDisconnect(mClientIf, mDevice.getAddress());
         } catch (RemoteException e) {
