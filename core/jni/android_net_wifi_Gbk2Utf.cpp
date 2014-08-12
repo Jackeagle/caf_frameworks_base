@@ -374,7 +374,8 @@ void parseScanResults(String16& str, const char *reply)
                     str += String16("ssid=");
                     str += String16(ssid_txt);
                     str += String16("\n");
-                    strncpy(ssid_utf8, dest, strlen(dest));
+                    strncpy(ssid_utf8, dest, BUF_SIZE-1);
+                    ssid_utf8[BUF_SIZE-1] = '\0';
                     memset(dest, 0, CONVERT_LINE_LEN);
                     memset(ssid_txt, 0, BUF_SIZE);
                 } else {
@@ -484,8 +485,9 @@ jboolean setNetworkVariable(char *buf)
         ALOGE("g_pItemList is NULL");
     }
     while (pTmpItemNode) {
-        ALOGD("ssid_utf8 = %s, length=%d, value =%s, length=%d",
-               pTmpItemNode->ssid_utf8->string(),strlen(pTmpItemNode->ssid_utf8->string()), value, strlen(value));
+        if (pTmpItemNode->ssid_utf8)
+            ALOGD("ssid_utf8 = %s, length=%d, value =%s, length=%d",
+                   pTmpItemNode->ssid_utf8->string(),strlen(pTmpItemNode->ssid_utf8->string()), value, strlen(value));
         if (pTmpItemNode->ssid_utf8 && (0 == memcmp(pTmpItemNode->ssid_utf8->string(), value,
             pTmpItemNode->ssid_utf8->length()))) {
             gbk_found = true;
@@ -525,7 +527,7 @@ void constructEventSsid(char *eventstr)
      }
 
      tmp = strstr(eventstr, " SSID");
-     if (strlen(tmp) > 6 ) {
+     if (tmp != NULL && strlen(tmp) > 6 ) {
          if(!strstr(tmp,"="))
              sscanf(tmp + 7, "%[^\']", ssid);
 	else
