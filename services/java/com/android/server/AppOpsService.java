@@ -35,13 +35,13 @@ import java.util.Map;
 import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
@@ -71,8 +71,8 @@ public class AppOpsService extends IAppOpsService.Stub {
     static final String TAG = "AppOps";
     static final boolean DEBUG = false;
     static final int SHOW_PERMISSION_DIALOG = 1;
-    static final String CHECKLIST_FILE = "persist.sys.checklist";
-    static final String DEFAULT_CHECKLIST_FILE = "/system/etc/checklist_appops.xml";
+    static final String WHITELIST_FILE = "persist.sys.whitelist";
+    static final String DEFAULT_WHITELIST_FILE = "/system/etc/whitelist_appops.xml";
 
     // Write at most every 30 minutes.
     static final long WRITE_DELAY = DEBUG ? 1000 : 30*60*1000;
@@ -81,6 +81,8 @@ public class AppOpsService extends IAppOpsService.Stub {
     final AtomicFile mFile;
     final Handler mHandler;
     final boolean mStrictEnable;
+
+    Looper mLooper;
 
     boolean mWriteScheduled;
     final Runnable mWriteRunner = new Runnable() {
@@ -207,6 +209,7 @@ public class AppOpsService extends IAppOpsService.Stub {
     public AppOpsService(File storagePath) {
         mStrictEnable = AppOpsManager.isStrictEnable();
         mFile = new AtomicFile(storagePath);
+        mLooper = Looper.myLooper();
         mHandler = new Handler() {
             public void handleMessage(Message msg) {
                 switch (msg.what) {
@@ -233,7 +236,7 @@ public class AppOpsService extends IAppOpsService.Stub {
                 }
             }
         };
-        readChecklist();
+        readWhitelist();
         readState();
     }
 
@@ -641,6 +644,11 @@ public class AppOpsService extends IAppOpsService.Stub {
                 op.rejectTime = 0;
                 return AppOpsManager.MODE_ALLOWED;
             } else {
+                if (Looper.myLooper() == mLooper) {
+                    Log.e(TAG, "noteOperation: This method will deadlock if called from the main thread. (Code: "
+                            + code + " uid: " + uid + " package: " + packageName + ")");
+                    return switchOp.mode;
+                }
                 op.noteOpCount++;
                 userDialogResult = askOperationLocked(code, uid, packageName,
                     switchOp);
@@ -685,6 +693,11 @@ public class AppOpsService extends IAppOpsService.Stub {
                 }
                 return AppOpsManager.MODE_ALLOWED;
             } else {
+                if (Looper.myLooper() == mLooper) {
+                    Log.e(TAG, "startOperation: This method will deadlock if called from the main thread. (Code: "
+                            + code + " uid: " + uid + " package: " + packageName +")");
+                    return switchOp.mode;
+                }
                 op.startOpCount++;
                 IBinder clientToken = client.mAppToken;
                 op.mClientTokens.add(clientToken);
@@ -1158,31 +1171,13 @@ public class AppOpsService extends IAppOpsService.Stub {
     private boolean isStrict(int code, int uid, String packageName) {
         if (!mStrictEnable)
             return false;
-        if (isInBlacklist(packageName))
-            return true;
 
-        return (!isPreInstalledApp(packageName) && !isInWhitelist(packageName));
-    }
-
-    private boolean isPreInstalledApp(String packageName) {
-        ApplicationInfo appInfo = null;
-        try {
-            appInfo = mContext.getPackageManager().getApplicationInfo(packageName, 0);
-        } catch (NameNotFoundException e) {
-            return false;
-        }
-        if ((appInfo != null) && (appInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0)
-            return true;
-
-        return false;
+        return ((uid > Process.FIRST_APPLICATION_UID) &&
+            !isInWhitelist(packageName));
     }
 
     private boolean isInWhitelist(String packageName) {
         return mWhitelist.contains(packageName);
-    }
-
-    private boolean isInBlacklist(String packageName) {
-        return mBlacklist.contains(packageName);
     }
 
     private Result askOperationLocked(int code, int uid, String packageName,
@@ -1309,31 +1304,27 @@ public class AppOpsService extends IAppOpsService.Stub {
     }
 
     final ArrayList<String> mWhitelist = new ArrayList<String>();
-    final ArrayList<String> mBlacklist = new ArrayList<String>();
 
-    void readChecklist() {
-        // Read if checklist file provided
-        String checklistFileName = SystemProperties.get(CHECKLIST_FILE,
-                DEFAULT_CHECKLIST_FILE);
-        if(!mStrictEnable || "".equals(checklistFileName)) {
+    void readWhitelist() {
+        // Read if whitelist file provided
+        String whitelistFileName = SystemProperties.get(WHITELIST_FILE,
+                DEFAULT_WHITELIST_FILE);
+        if(!mStrictEnable || "".equals(whitelistFileName)) {
             return;
         }
-        final File checklistFile = new File(checklistFileName);
-        final AtomicFile mChecklistFile = new AtomicFile(checklistFile);
-        synchronized (mChecklistFile) {
+        final File whitelistFile = new File(whitelistFileName);
+        final AtomicFile mWhitelistFile = new AtomicFile(whitelistFile);
+        synchronized (mWhitelistFile) {
             synchronized (this) {
                 FileInputStream stream;
                 try {
-                    stream = mChecklistFile.openRead();
+                    stream = mWhitelistFile.openRead();
                 } catch (FileNotFoundException e) {
-                    Slog.i(TAG, "No existing app ops checklist " +
-                        mChecklistFile.getBaseFile());
+                    Slog.i(TAG, "No existing app ops whitelist " +
+                        mWhitelistFile.getBaseFile());
                     return;
                 }
                 boolean success = false;
-                mWhitelist.clear();
-                mBlacklist.clear();
-                ArrayList<String> curList = null;
                 try {
                     XmlPullParser parser = Xml.newPullParser();
                     parser.setInput(stream, null);
@@ -1357,15 +1348,12 @@ public class AppOpsService extends IAppOpsService.Stub {
                         }
 
                         String tagName = parser.getName();
-                        if ("whitelist".equals(tagName)) {
-                            curList = mWhitelist;
-                        } else if ("blacklist".equals(tagName)) {
-                            curList = mBlacklist;
-                        } else if (tagName.equals("pkg")) {
+                        if (tagName.equals("pkg")) {
                             String pkgName = parser.getAttributeValue(null, "name");
-                            if (curList != null) curList.add(pkgName);
+                            mWhitelist.add(pkgName);
                         } else {
-                            Slog.w(TAG, "Unknown element: "+ parser.getName());
+                            Slog.w(TAG, "Unknown element under <whitelist-pkgs>: "
+                                    + parser.getName());
                             XmlUtils.skipCurrentTag(parser);
                         }
                     }
@@ -1385,7 +1373,6 @@ public class AppOpsService extends IAppOpsService.Stub {
                 } finally {
                     if (!success) {
                         mWhitelist.clear();
-                        mBlacklist.clear();
                     }
                     try {
                         stream.close();
