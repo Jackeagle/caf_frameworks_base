@@ -160,6 +160,18 @@ public class KeyguardUpdateMonitor {
     private int []mUnreadNum;
     private ComponentName []mComponentName;
     private boolean mShowLockscreenCustomTargets;
+    private Bundle mMessageBundle = new Bundle();
+
+    public Bundle getMessageBundle() {
+        return mMessageBundle;
+    }
+
+    public int getUnreadCallCount() {
+        if (mShowLockscreenCustomTargets) {
+            return mUnreadNum[DIALER_UNREAD];
+        }
+        return -1;
+    }
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -388,6 +400,14 @@ public class KeyguardUpdateMonitor {
                     if (componentName.equals(MMS_COMPONENTNAME)) {
                         mUnreadNum[MESSAGE_UNREAD] = unreadNum;
                         mComponentName[MESSAGE_UNREAD] = componentName;
+                        mMessageBundle.putInt("unread_number", unreadNum);
+                        Log.v(TAG, "onReceive(): unreadNum = " + unreadNum);
+                        if (unreadNum > 0) {
+                            mMessageBundle.putLong("thread_id",
+                                    intent.getLongExtra("thread_id", -1));
+                            mMessageBundle.putLong("_id", intent.getLongExtra("_id", -1));
+                            mMessageBundle.putString("type", intent.getStringExtra("type"));
+                        }
                     } else if (componentName.equals(DIALER_COMPONENTNAME)) {
                         mUnreadNum[DIALER_UNREAD] = unreadNum;
                         mComponentName[DIALER_UNREAD] = componentName;
@@ -1120,11 +1140,25 @@ public class KeyguardUpdateMonitor {
                     R.bool.config_showEmergencyCallOnlyInLockScreen)
                 && plmn.equalsIgnoreCase(strEmergencyCallOnly)) {
                     return getDefaultPlmn();
+            } else if (mContext.getResources().getBoolean(R.bool.config_showEmergencyButton)
+                    && plmn.equalsIgnoreCase(strEmergencyCallOnly)
+                    && !canMakeEmergencyCall()) {
+                return getDefaultPlmn();
             } else {
                 return (plmn != null) ? plmn : getDefaultPlmn();
             }
         }
         return null;
+    }
+
+    private boolean canMakeEmergencyCall() {
+        for (ServiceState state : mServiceState) {
+            if ((state != null) && (state.isEmergencyOnly() ||
+                    state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
