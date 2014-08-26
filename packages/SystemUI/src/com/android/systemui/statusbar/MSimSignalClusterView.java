@@ -324,7 +324,9 @@ public class MSimSignalClusterView
         mIsAirplaneMode = is;
         mAirplaneIconId = airplaneIconId;
 
-        applySubscription(MSimTelephonyManager.getDefault().getDefaultSubscription());
+        for (int i = 0; i < mNumPhones; i++) {
+            applySubscription(i);
+        }
     }
 
     @Override
