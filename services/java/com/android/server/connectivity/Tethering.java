@@ -1053,7 +1053,9 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                         String newUpstreamIfaceName = (String)(message.obj);
                         if ((mMyUpstreamIfaceName == null && newUpstreamIfaceName == null) ||
                                 (mMyUpstreamIfaceName != null &&
-                                mMyUpstreamIfaceName.equals(newUpstreamIfaceName))) {
+                                mMyUpstreamIfaceName.equals(newUpstreamIfaceName)) ||
+                                (newUpstreamIfaceName != null &&
+                                newUpstreamIfaceName.equals(mIfaceName))) {
                             if (VDBG) Log.d(TAG, "Connection changed noop - dropping");
                             break;
                         }
