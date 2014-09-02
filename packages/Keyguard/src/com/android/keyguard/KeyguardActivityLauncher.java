@@ -33,6 +33,8 @@ import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
+import android.provider.CallLog;
+import android.provider.CallLog.Calls;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.WindowManager;
@@ -51,7 +53,7 @@ public abstract class KeyguardActivityLauncher {
     private static final Intent INSECURE_CAMERA_INTENT =
             new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA);
     private static final Intent CALL_INTENT = new Intent(Intent.ACTION_DIAL);
-    private static final Intent SMS_INTENT = new Intent(Intent.ACTION_MAIN);
+    private static final Intent CALL_LOG_LIST_INTENT = new Intent(Intent.ACTION_VIEW);
 
     abstract Context getContext();
 
@@ -124,12 +126,29 @@ public abstract class KeyguardActivityLauncher {
     }
 
     public void launchCall() {
-        launchActivity(CALL_INTENT, false, false, null, null);
+        KeyguardUpdateMonitor monitor = KeyguardUpdateMonitor.getInstance(getContext());
+        final int missedCount = monitor.getUnreadCallCount();
+        if (missedCount > 0) {
+            // Go to call log list
+            CALL_LOG_LIST_INTENT.setType(CallLog.Calls.CONTENT_TYPE);
+            launchActivity(CALL_LOG_LIST_INTENT, false, false, null, null);
+        } else {
+            // Go to dialer by default
+            launchActivity(CALL_INTENT, false, false, null, null);
+        }
     }
 
     public void launchMessage() {
-        SMS_INTENT.setType("vnd.android-dir/mms-sms");
-        launchActivity(SMS_INTENT, false, false, null, null);
+        Intent intent = new Intent(Intent.ACTION_MAIN).setType("vnd.android-dir/mms-sms");
+        KeyguardUpdateMonitor monitor = KeyguardUpdateMonitor.getInstance(getContext());
+        Bundle bundle = monitor.getMessageBundle();
+        if (bundle.getInt("unread_number", 0) > 0) {
+            Log.v(TAG, "launchMessage(): unread_number > 0");
+            intent.putExtra("thread_id", bundle.getLong("thread_id", -1));
+            intent.putExtra("_id", bundle.getLong("_id", -1));
+            intent.putExtra("type", bundle.getString("type", ""));
+        }
+        launchActivity(intent, false, false, null, null);
     }
 
     public void launchWidgetPicker(int appWidgetId) {
