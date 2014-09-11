@@ -33,6 +33,7 @@ import static android.net.wifi.WifiManager.WIFI_MODE_SCAN_ONLY;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLING;
 import android.net.wifi.WifiStateMachine;
+import android.net.wifi.WifiTetherStateMachine;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -60,6 +61,7 @@ class WifiController extends StateMachine {
     private long mIdleMillis;
     private int mSleepPolicy;
     private boolean mFirstUserSignOnSeen = false;
+    private boolean mApStaExist = false;
 
     private AlarmManager mAlarmManager;
     private PendingIntent mIdleIntent;
@@ -92,6 +94,7 @@ class WifiController extends StateMachine {
 
     /* References to values tracked in WifiService */
     final WifiStateMachine mWifiStateMachine;
+    final WifiTetherStateMachine mWifiTetherStateMachine;
     final WifiSettingsStore mSettingsStore;
     final LockList mLocks;
 
@@ -135,6 +138,8 @@ class WifiController extends StateMachine {
         super(TAG, looper);
         mContext = context;
         mWifiStateMachine = service.mWifiStateMachine;
+        mWifiTetherStateMachine =
+            service.mWifiStateMachine.mWifiTetherStateMachine;
         mSettingsStore = service.mSettingsStore;
         mLocks = service.mLocks;
 
@@ -430,9 +435,32 @@ class WifiController extends StateMachine {
                     break;
                 case CMD_SET_AP:
                     if (msg.arg1 == 1) {
-                        mWifiStateMachine.setHostApRunning((WifiConfiguration) msg.obj,
-                                true);
-                        transitionTo(mApEnabledState);
+                        if (mWifiTetherStateMachine != null) {
+                            if (!mApStaExist) {
+                                mWifiTetherStateMachine.setHostApRunning(
+                                        (WifiConfiguration) msg.obj, true);
+                                mApStaExist = true;
+                                if (DBG) {
+                                    Slog.d(TAG, "CMD_SET_AP: SET Host AP True");
+                                }
+                                transitionTo(mApEnabledState);
+                            }
+                        } else {
+                            mWifiStateMachine.setHostApRunning((WifiConfiguration) msg.obj,
+                                                               true);
+                            transitionTo(mApEnabledState);
+                        }
+                    } else {
+                       if (mWifiTetherStateMachine != null) {
+                            if (mApStaExist) {
+                                if (DBG) {
+                                    Slog.d(TAG, "CMD_SET_AP: SET Host AP False");
+                                }
+                                mWifiTetherStateMachine.setHostApRunning(null,
+                                                                         false);
+                                mApStaExist = false;
+                            }
+                        }
                     }
                     break;
                 case CMD_DEFERRED_TOGGLE:
@@ -498,7 +526,33 @@ class WifiController extends StateMachine {
                     * disable entirely (including scan)
                     */
                     if (! mSettingsStore.isWifiToggleEnabled()) {
+                        if (mApStaExist && mWifiTetherStateMachine != null) {
+                            if (DBG) {
+                                Slog.d(TAG, "CMD_AIRPLANE_TOGGLED: Enter");
+                            }
+                            mWifiTetherStateMachine.setHostApRunning(null, false);
+                            mApStaExist = false;
+                        }
                         transitionTo(mApStaDisabledState);
+                    }
+                    break;
+                case CMD_SET_AP:
+                    if (mWifiTetherStateMachine != null) {
+                        if (!mApStaExist) {
+                            if (DBG) {
+                                Slog.d(TAG, "CMD_SET_AP: SET Host AP True");
+                            }
+                            mWifiTetherStateMachine.setHostApRunning(
+                                            (WifiConfiguration) msg.obj, true);
+                            mApStaExist = true;
+                        } else {
+                            if (DBG) {
+                                Slog.d(TAG, "CMD_SET_AP: SET Host AP False");
+                            }
+                            mWifiTetherStateMachine.setHostApRunning(null,
+                                                                     false);
+                            mApStaExist = false;
+                        }
                     }
                     break;
                 case CMD_EMERGENCY_MODE_CHANGED:
@@ -601,18 +655,67 @@ class WifiController extends StateMachine {
     }
 
     class ApEnabledState extends State {
+        private int mDeferredEnableSerialNumber = 0;
+        private boolean mHaveDeferredEnable = false;
+        private long mDisabledTimestamp;
+
+        @Override
+        public void enter() {
+            mWifiStateMachine.setSupplicantRunning(false);
+            // Supplicant can't restart right away,
+            // so save the time it is stopped
+            mDisabledTimestamp = SystemClock.elapsedRealtime();
+            mDeferredEnableSerialNumber++;
+            mHaveDeferredEnable = false;
+        }
         @Override
         public boolean processMessage(Message msg) {
             switch (msg.what) {
                 case CMD_AIRPLANE_TOGGLED:
                     if (mSettingsStore.isAirplaneModeOn()) {
-                        mWifiStateMachine.setHostApRunning(null, false);
+                        if (mWifiTetherStateMachine != null) {
+                            mWifiTetherStateMachine.setHostApRunning(null,
+                                false);
+                            mApStaExist = false;
+                        } else {
+                            mWifiStateMachine.setHostApRunning(null, false);
+                        }
                         transitionTo(mApStaDisabledState);
+                    }
+                    break;
+                case CMD_WIFI_TOGGLED:
+                    if (mSettingsStore.isWifiToggleEnabled()) {
+                        if (DBG) {
+                            Slog.d(TAG, "CMD_WIFI_TOGGLED: Enter");
+                        }
+                        if (doDeferEnable(msg)) {
+                            if (mHaveDeferredEnable) {
+                                //  have 2 toggles now,
+                                // inc serial number an ignore both
+                                mDeferredEnableSerialNumber++;
+                                if (DBG) {
+                                    Slog.d(TAG, "CMD_WIFI_TOGGLED: Defer");
+                                }
+                            }
+                            mHaveDeferredEnable = !mHaveDeferredEnable;
+                            break;
+                        }
+                        if (mDeviceIdle == false) {
+                            transitionTo(mDeviceActiveState);
+                        } else {
+                            checkLocksAndTransitionWhenDeviceIdle();
+                        }
                     }
                     break;
                 case CMD_SET_AP:
                     if (msg.arg1 == 0) {
-                        mWifiStateMachine.setHostApRunning(null, false);
+                        if (mWifiTetherStateMachine != null) {
+                            mWifiTetherStateMachine.setHostApRunning(null,
+                                                                     false);
+                            mApStaExist = false;
+                        } else {
+                            mWifiStateMachine.setHostApRunning(null, false);
+                        }
                         transitionTo(mApStaDisabledState);
                     }
                     break;
@@ -621,6 +724,25 @@ class WifiController extends StateMachine {
             }
             return HANDLED;
         }
+
+        private boolean doDeferEnable(Message msg) {
+            long delaySoFar = SystemClock.elapsedRealtime() - mDisabledTimestamp;
+            if (delaySoFar >= mReEnableDelayMillis) {
+                return false;
+            }
+
+            log("WifiController msg " + msg + " deferred for " +
+                    (mReEnableDelayMillis - delaySoFar) + "ms");
+
+            // need to defer this action.
+            Message deferredMsg = obtainMessage(CMD_DEFERRED_TOGGLE);
+            deferredMsg.obj = Message.obtain(msg);
+            deferredMsg.arg1 = ++mDeferredEnableSerialNumber;
+            sendMessageDelayed(deferredMsg,
+                mReEnableDelayMillis - delaySoFar + DEFER_MARGIN_MS);
+            return true;
+        }
+
     }
 
     class EcmState extends State {

@@ -392,6 +392,16 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
         pw.println();
     }
 
+    private int getAutoGoState() {
+        int AutoGo = 0;
+        try {
+            AutoGo = Settings.Global.getInt(mContext.getContentResolver(),
+            Settings.Global.AUTO_GO);
+        } catch (Settings.SettingNotFoundException e) {
+             Slog.e(TAG, "Failed to getAutoGoState");;
+        }
+        return AutoGo;
+    }
 
     /**
      * Handles interaction with WifiStateMachine
@@ -864,6 +874,14 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             mNetworkInfo.setIsAvailable(true);
             sendP2pConnectionChangedBroadcast();
             initializeP2pSettings();
+            int AutoGO = getAutoGoState();
+            if (AutoGO == 1) {
+                Slog.d(TAG, "Start Auto GO Enabled");
+                sendMessage(WifiP2pManager.CREATE_GROUP,
+                    WifiP2pGroup.PERSISTENT_NET_ID);
+            } else {
+                Slog.d(TAG, "Start Auto GO Disabled");
+            }
         }
 
         @Override
@@ -2111,7 +2129,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             ifcg.setInterfaceUp();
             mNwService.setInterfaceConfig(intf, ifcg);
             /* This starts the dnsmasq server */
-            mNwService.startTethering(DHCP_RANGE);
+            mNwService.startTethering(DHCP_RANGE, intf);
         } catch (Exception e) {
             loge("Error configuring interface " + intf + ", :" + e);
             return;
@@ -2122,7 +2140,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
     private void stopDhcpServer(String intf) {
         try {
-            mNwService.stopTethering();
+            mNwService.stopTethering(intf);
         } catch (Exception e) {
             loge("Error stopping Dhcp server" + e);
             return;

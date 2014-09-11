@@ -5276,6 +5276,12 @@ public final class Settings {
         */
        public static final String WIFI_SCAN_ALWAYS_AVAILABLE =
                 "wifi_scan_always_enabled";
+       /**
+        * Setting to Create P2P Group.
+        * @hide
+        */
+       public static final String AUTO_GO =
+                "create_autonomous_p2p_group";
 
        /**
         * Used to save the Wifi_ON state prior to tethering.

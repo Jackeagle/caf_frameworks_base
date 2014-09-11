@@ -36,6 +36,9 @@ import android.net.LinkProperties;
 import android.net.NetworkInfo;
 import android.net.NetworkUtils;
 import android.net.RouteInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.SupplicantState;
+import android.net.wifi.WifiInfo;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.INetworkManagementService;
@@ -135,6 +138,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
     private boolean mUsbTetherRequested; // true if USB tethering should be started
                                          // when RNDIS is enabled
 
+    private WifiManager mWifiManager = null;
+
     public Tethering(Context context, INetworkManagementService nmService,
             INetworkStatsService statsService, IConnectivityManager connService, Looper looper) {
         mContext = context;
@@ -171,6 +176,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
             mDhcpRange = DHCP_DEFAULT_RANGE;
         }
 
+        mWifiManager =
+            (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
         // load device config info
         updateConfiguration();
 
@@ -185,6 +192,9 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 com.android.internal.R.array.config_tether_usb_regexs);
         String[] tetherableWifiRegexs = mContext.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_wifi_regexs);
+        if (mWifiManager.getConcurrency()) {
+            tetherableWifiRegexs[0] = mWifiManager.getSAPInterfaceName();
+        }
         String[] tetherableBluetoothRegexs = mContext.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_bluetooth_regexs);
 
@@ -258,6 +268,29 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     // ignore usb0 down after enabling RNDIS
                     // we will handle disconnect in interfaceRemoved instead
                     if (VDBG) Log.d(TAG, "ignore interface down for " + iface);
+                } else if (isWifi(iface) && mWifiManager.getConcurrency()) {
+                    int wifiApState = 0;
+                    if (mWifiManager != null) {
+                        wifiApState = mWifiManager.getWifiApState();
+                    }
+
+                    /* Ignore AP interface down after enabling STA connection.
+                     * If STA connects to same  band the SAP is enabled, the
+                     * driver stops SAP before it proceeds for STA connection
+                     * hence ignore interface down. After STA connection,
+                     * driver starts SAP on STA channel.
+                     */
+
+                    if ((wifiApState == WifiManager.WIFI_AP_STATE_DISABLING) ||
+                       (wifiApState == WifiManager.WIFI_AP_STATE_DISABLED)) {
+                        if (VDBG) Log.d(TAG, "Got intf down for " + iface);
+                        sm.sendMessage(TetherInterfaceSM.CMD_INTERFACE_DOWN);
+                        mIfaces.remove(iface);
+                    } else {
+                        if (VDBG) {
+                            Log.d(TAG, "ignore interface down for " + iface);
+                        }
+                    }
                 } else if (sm != null) {
                     sm.sendMessage(TetherInterfaceSM.CMD_INTERFACE_DOWN);
                     mIfaces.remove(iface);
@@ -1274,18 +1307,21 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     return false;
                 }
                 try {
-                    mNMService.startTethering(mDhcpRange);
+                    mNMService.startTethering(mDhcpRange,
+                                              mTetherableWifiRegexs[0]);
                 } catch (Exception e) {
                     try {
-                        mNMService.stopTethering();
-                        mNMService.startTethering(mDhcpRange);
+                        mNMService.stopTethering(mTetherableWifiRegexs[0]);
+                        mNMService.startTethering(mDhcpRange,
+                                                  mTetherableWifiRegexs[0]);
                     } catch (Exception ee) {
                         transitionTo(mStartTetheringErrorState);
                         return false;
                     }
                 }
                 try {
-                    mNMService.setDnsForwarders(mDefaultDnsServers);
+                    mNMService.setDnsForwarders(mDefaultDnsServers,
+                                                mTetherableWifiRegexs[0]);
                 } catch (Exception e) {
                     transitionTo(mSetDnsForwardersErrorState);
                     return false;
@@ -1294,7 +1330,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
             }
             protected boolean turnOffMasterTetherSettings() {
                 try {
-                    mNMService.stopTethering();
+                    mNMService.stopTethering(mTetherableWifiRegexs[0]);
                 } catch (Exception e) {
                     transitionTo(mStopTetheringErrorState);
                     return false;
@@ -1477,7 +1513,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                             }
                         }
                         try {
-                            mNMService.setDnsForwarders(dnsServers);
+                            mNMService.setDnsForwarders(dnsServers,
+                                                        mTetherableWifiRegexs[0]);
                         } catch (Exception e) {
                             transitionTo(mSetDnsForwardersErrorState);
                         }
@@ -1488,10 +1525,12 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
 
             protected void notifyTetheredOfNewUpstreamIface(String ifaceName) {
                 if (DBG) Log.d(TAG, "notifying tethered with iface =" + ifaceName);
-                mUpstreamIfaceName = ifaceName;
-                for (TetherInterfaceSM sm : mNotifyList) {
-                    sm.sendMessage(TetherInterfaceSM.CMD_TETHER_CONNECTION_CHANGED,
-                            ifaceName);
+                if (ifaceName != null) {
+                    mUpstreamIfaceName = ifaceName;
+                    for (TetherInterfaceSM sm : mNotifyList) {
+                        sm.sendMessage(TetherInterfaceSM.CMD_TETHER_CONNECTION_CHANGED,
+                                       ifaceName);
+                    }
                 }
             }
         }
@@ -1684,7 +1723,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 Log.e(TAG, "Error in setDnsForwarders");
                 notify(TetherInterfaceSM.CMD_SET_DNS_FORWARDERS_ERROR);
                 try {
-                    mNMService.stopTethering();
+                    mNMService.stopTethering(mTetherableWifiRegexs[0]);
                 } catch (Exception e) {}
                 try {
                     mNMService.setIpForwardingEnabled(false);

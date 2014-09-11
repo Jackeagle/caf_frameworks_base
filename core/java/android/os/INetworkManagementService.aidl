@@ -146,15 +146,25 @@ interface INetworkManagementService
     void setIpForwardingEnabled(boolean enabled);
 
     /**
+     * Create SAP Interface
+     */
+    void sapCreateIntf(String wlanIface);
+
+   /**
+     * Remove SAP Interface
+     */
+    void sapRemoveIntf(String wlanIface);
+
+    /**
      * Start tethering services with the specified dhcp server range
      * arg is a set of start end pairs defining the ranges.
      */
-    void startTethering(in String[] dhcpRanges);
+    void startTethering(in String[] dhcpRanges, String intf);
 
     /**
      * Stop currently running tethering services
      */
-    void stopTethering();
+    void stopTethering(String intf);
 
     /**
      * Returns true if tethering services are started
@@ -179,7 +189,7 @@ interface INetworkManagementService
     /**
      * Sets the list of DNS forwarders (in order of priority)
      */
-    void setDnsForwarders(in String[] dns);
+    void setDnsForwarders(in String[] dns, String intf);
 
     /**
      * Returns the list of DNS fowarders (in order of priority)
