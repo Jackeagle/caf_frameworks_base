@@ -223,12 +223,20 @@ public final class BatteryService extends SystemService {
         }
         mLowBatteryCloseWarningLevel = mLowBatteryWarningLevel + mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_lowBatteryCloseWarningBump);
-        processValuesLocked(true);
+        if (mBatteryProps != null) {
+            processValuesLocked(true);
+        } else {
+            Slog.w(TAG, "skipping processValuesLocked since mBatteryProps not yet initialized");
+        }
     }
 
     private boolean isPoweredLocked(int plugTypeSet) {
         // assume we are powered if battery state is unknown so
         // the "stay on while plugged in" option will work.
+        if (mBatteryProps == null) {
+            Slog.w(TAG, "returning true for isPoweredLocked");
+            return true;
+        }
         if (mBatteryProps.batteryStatus == BatteryManager.BATTERY_STATUS_UNKNOWN) {
             return true;
         }
@@ -298,11 +306,27 @@ public final class BatteryService extends SystemService {
     }
 
     private void update(BatteryProperties props) {
+        String nobattMode = System.getProperty("debug.batt.no_battery", "false");
+        if (nobattMode == "true") {
+            final int NTIMES = 4;
+            final long NSLEEPMS = 1000;
+            for (int i = 0; i < NTIMES; i++) {
+                Slog.w(TAG, "invoking sleep: " + i);
+                try {
+                    Thread.sleep(NSLEEPMS);
+                }
+                catch (InterruptedException e) {
+                    Slog.w(TAG, "interrupted sleep: " + i + ", exception: " + e.getLocalizedMessage());
+                }
+            }
+            Slog.w(TAG, "done with sleep...");
+        }
         synchronized (mLock) {
             if (!mUpdatesStopped) {
                 mBatteryProps = props;
                 // Process the new values.
-                processValuesLocked(false);
+                if (nobattMode == "false")
+                    processValuesLocked(false);
             } else {
                 mLastBatteryProps.set(props);
             }
@@ -860,7 +884,11 @@ public final class BatteryService extends SystemService {
         @Override
         public int getBatteryLevel() {
             synchronized (mLock) {
-                return mBatteryProps.batteryLevel;
+                if (mBatteryProps != null) {
+                    return mBatteryProps.batteryLevel;
+                }
+                Slog.w(TAG, "getBatteryLevel returning dummy value");
+                return 80;
             }
         }
 

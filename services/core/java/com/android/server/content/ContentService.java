@@ -528,10 +528,13 @@ public final class ContentService extends IContentService.Stub {
         final long identityToken = clearCallingIdentity();
         try {
             SyncManager syncManager = getSyncManager();
-            return syncManager.getSyncAdapterTypes(userId);
+            if (syncManager != null) {
+                return syncManager.getSyncAdapterTypes(userId);
+            }
         } finally {
             restoreCallingIdentity(identityToken);
         }
+        return null;
     }
 
     @Override
@@ -543,7 +546,10 @@ public final class ContentService extends IContentService.Stub {
         final long identityToken = clearCallingIdentity();
         try {
             SyncManager syncManager = getSyncManager();
-            return syncManager.getSyncAdapterPackagesForAuthorityAsUser(authority, userId);
+            if (syncManager != null) {
+                return syncManager.getSyncAdapterPackagesForAuthorityAsUser(authority, userId);
+            }
+            return null;
         } finally {
             restoreCallingIdentity(identityToken);
         }
@@ -631,11 +637,13 @@ public final class ContentService extends IContentService.Stub {
         try {
             SyncStorageEngine.EndPoint info =
                     new SyncStorageEngine.EndPoint(account, authority, userId);
-            getSyncManager().getSyncStorageEngine()
-                .updateOrAddPeriodicSync(info,
-                        pollFrequency,
-                        defaultFlex,
-                        extras);
+            if (getSyncManager() != null)  {
+                getSyncManager().getSyncStorageEngine()
+                    .updateOrAddPeriodicSync(info,
+                    pollFrequency,
+                    defaultFlex,
+                    extras);
+            }
         } finally {
             restoreCallingIdentity(identityToken);
         }
@@ -654,10 +662,12 @@ public final class ContentService extends IContentService.Stub {
         int userId = UserHandle.getCallingUserId();
         long identityToken = clearCallingIdentity();
         try {
-            getSyncManager().getSyncStorageEngine()
+            if (getSyncManager() != null)  {
+                getSyncManager().getSyncStorageEngine()
                 .removePeriodicSync(
-                        new SyncStorageEngine.EndPoint(account, authority, userId),
-                        extras);
+                new SyncStorageEngine.EndPoint(account, authority, userId),
+                extras);
+            }
         } finally {
             restoreCallingIdentity(identityToken);
         }
@@ -678,8 +688,12 @@ public final class ContentService extends IContentService.Stub {
         int userId = UserHandle.getCallingUserId();
         long identityToken = clearCallingIdentity();
         try {
-            return getSyncManager().getSyncStorageEngine().getPeriodicSyncs(
+            if (getSyncManager() != null)  {
+                getSyncManager().getSyncStorageEngine();
+                return getSyncManager().getSyncStorageEngine().getPeriodicSyncs(
                     new SyncStorageEngine.EndPoint(account, providerName, userId));
+            }
+            return null;
         } finally {
             restoreCallingIdentity(identityToken);
         }
