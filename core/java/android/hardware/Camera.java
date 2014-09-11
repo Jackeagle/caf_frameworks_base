@@ -1742,6 +1742,78 @@ public class Camera {
         return cct;
     }
 
+    /** @hide
+     *
+     * Returns the current estimate snapshot exposure time.
+     *
+     */
+    public int getEstSnapExpTime() {
+        Parameters p = new Parameters();
+        String s = native_getParameters();
+        p.unflatten(s);
+
+        int est_exp_time = 0;
+        if (p.getEstSnapExpTime() != null) {
+            est_exp_time = Integer.parseInt(p.getEstSnapExpTime());
+        }
+
+        return est_exp_time;
+    }
+
+    /** @hide
+     *
+     * Returns the current estimate snapshot iso.
+     *
+     */
+    public int getEstSnapISO() {
+        Parameters p = new Parameters();
+        String s = native_getParameters();
+        p.unflatten(s);
+
+        int est_iso = 0;
+        if (p.getEstSnapISO() != null) {
+            est_iso = Integer.parseInt(p.getEstSnapISO());
+        }
+
+        return est_iso;
+    }
+
+    /** @hide
+     *
+     * Returns the estimate current luma value.
+     *
+     */
+    public int getEstCurrentLuma() {
+        Parameters p = new Parameters();
+        String s = native_getParameters();
+        p.unflatten(s);
+
+        int cur_luma = 0;
+        if (p.getEstCurrentLuma() != null) {
+            cur_luma = Integer.parseInt(p.getEstCurrentLuma());
+        }
+
+        return cur_luma;
+    }
+
+    /** @hide
+     *
+     * Returns the estimate luma target.
+     *
+     */
+    public int getEstLumaTarget() {
+        Parameters p = new Parameters();
+        String s = native_getParameters();
+        p.unflatten(s);
+
+        int luma_target = 0;
+        if (p.getEstLumaTarget() != null) {
+            luma_target= Integer.parseInt(p.getEstLumaTarget());
+        }
+
+        return luma_target;
+    }
+
     /**
      * Returns an empty {@link Parameters} for testing purpose.
      *
@@ -4218,6 +4290,10 @@ public class Camera {
         private static final String KEY_QC_LENSSHADE = "lensshade";
         private static final String KEY_QC_HISTOGRAM = "histogram";
         private static final String KEY_QC_SKIN_TONE_ENHANCEMENT = "skinToneEnhancement";
+        private static final String KEY_QC_CURRENT_EST_SNAP_EXP_TIME = "estimate-snap-exp-time";
+        private static final String KEY_QC_CURRENT_EST_SNAP_ISO = "estimate-snap-iso";
+        private static final String KEY_QC_EST_CURRENT_LUMA = "estimate-current-luma";
+        private static final String KEY_QC_EST_LUMA_TARGET = "estimate-luma-target";
         private static final String KEY_QC_AUTO_EXPOSURE = "auto-exposure";
         private static final String KEY_QC_SHARPNESS = "sharpness";
         private static final String KEY_QC_MAX_SHARPNESS = "max-sharpness";
@@ -5096,6 +5172,42 @@ public class Camera {
          */
          public void setAutoExposure(String value) {
             set(KEY_QC_AUTO_EXPOSURE, value);
+         }
+
+         /** @hide
+         * Gets the estimate snapshot exposure time.
+         *
+         * @return current estimate Snapshot Exposure time.
+         */
+         public String getEstSnapExpTime() {
+            return get(KEY_QC_CURRENT_EST_SNAP_EXP_TIME);
+         }
+
+         /** @hide
+         * Gets the estimate snapshot ISO.
+         *
+         * @return current estimate Snapshot ISO.
+         */
+         public String getEstSnapISO() {
+            return get(KEY_QC_CURRENT_EST_SNAP_ISO);
+         }
+
+         /** @hide
+         * Gets the current estimate luma value.
+         *
+         * @return current estimate luma.
+         */
+         public String getEstCurrentLuma() {
+            return get(KEY_QC_EST_CURRENT_LUMA);
+         }
+
+         /** @hide
+         * Gets the esitmate luma target.
+         *
+         * @return esitmate luma target.
+         */
+         public String getEstLumaTarget() {
+            return get(KEY_QC_EST_LUMA_TARGET);
          }
 
          /** @hide
