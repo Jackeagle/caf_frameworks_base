@@ -2920,8 +2920,15 @@ public class AudioService extends IAudioService.Stub {
                 String name = getSettingNameForDevice(device);
                 // if no volume stored for current stream and device, use default volume if default
                 // device, continue otherwise
-                int defaultIndex = (device == AudioSystem.DEVICE_OUT_DEFAULT) ?
+                int defaultIndex = 0;
+                if (mStreamType == AudioSystem.STREAM_MUSIC) {
+                    defaultIndex = SystemProperties.getInt("persist.audio.music.volume", -1);
+                    if (defaultIndex < 0)
+                        defaultIndex = AudioManager.DEFAULT_STREAM_VOLUME[mStreamType];
+                } else {
+                defaultIndex = (device == AudioSystem.DEVICE_OUT_DEFAULT) ?
                                         AudioManager.DEFAULT_STREAM_VOLUME[mStreamType] : -1;
+                }
                 int index = Settings.System.getIntForUser(
                         mContentResolver, name, defaultIndex, UserHandle.USER_CURRENT);
                 if (index == -1) {
