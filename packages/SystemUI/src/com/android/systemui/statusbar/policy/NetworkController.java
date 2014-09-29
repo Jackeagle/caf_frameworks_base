@@ -76,6 +76,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     int mDataState = TelephonyManager.DATA_DISCONNECTED;
     int mDataActivity = TelephonyManager.DATA_ACTIVITY_NONE;
     ServiceState mServiceState;
+    ServiceState mLastServiceState = new ServiceState();
     SignalStrength mSignalStrength;
     int[] mDataIconList = TelephonyIcons.DATA_G[0];
     String mNetworkName;
@@ -103,6 +104,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     boolean mAlwaysShowCdmaRssi = false;
     boolean mShow4GforLTE = false;
     boolean mShowRsrpSignalLevelforLTE = false;
+    boolean mShowAlternateRsrpSignalLevelforLTE = false;
     boolean mShowSpn = false;
     boolean mShowPlmn = false;
 
@@ -216,6 +218,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                 R.bool.config_show4GForLTE);
         mShowRsrpSignalLevelforLTE = mContext.getResources().getBoolean(
                 R.bool.config_showRsrpSignalLevelforLTE);
+        mShowAlternateRsrpSignalLevelforLTE = mContext.getResources().getBoolean(
+                R.bool.config_showAlternateRsrpSignalLevelforLTE);
         // set up the default wifi icon, used when no radios have ever appeared
         updateWifiIcons();
         updateWimaxIcons();
@@ -719,6 +723,14 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                             mLastSignalLevel = iconLevel = (level == -1 ? 0 : level);
                             Log.d(TAG, "updateTelephonySignalStrength, data type is lte, level = "
                                 + level + " | " + mSignalStrength);
+                        }
+                    } else if (mShowAlternateRsrpSignalLevelforLTE) {
+                        if (mServiceState.getDataNetworkType() ==
+                                TelephonyManager.NETWORK_TYPE_LTE) {
+                            int level = mSignalStrength.getLteLevelByRsrp();
+                            mLastSignalLevel = iconLevel = (level == -1 ? 0 : level);
+                            Log.d(TAG, "updateAlternateTelephonySignalStrength, data type is lte," +
+                                    " level = " + level + " | " + mSignalStrength);
                         }
                     }
                 }
@@ -1314,7 +1326,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
          || mLastAirplaneMode               != mAirplaneMode
          || mLastLocale                     != mLocale
          || mLastSimIconId                  != mNoSimIconId
-         || mLastMobileActivityIconId       != mMobileActivityIconId)
+         || mLastMobileActivityIconId       != mMobileActivityIconId
+         || mLastServiceState.getVoiceNetworkType() != getVoiceNetworkType())
         {
             // NB: the mLast*s will be updated later
             for (SignalCluster cluster : mSignalClusters) {
@@ -1364,6 +1377,11 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
         // the data network type overlay
         if (mLastDataTypeIconId != mDataTypeIconId) {
             mLastDataTypeIconId = mDataTypeIconId;
+        }
+
+        // the service state
+        if (mLastServiceState != mServiceState) {
+            mLastServiceState = mServiceState;
         }
 
         // the combinedLabel in the notification panel
