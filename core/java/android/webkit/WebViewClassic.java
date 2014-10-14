@@ -584,6 +584,10 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
                 imm.restartInput(mWebView);
             }
         }
+
+        private void resetBatchLevel() {
+            mBatchLevel = 0;
+        }
     }
 
     private class PastePopupWindow extends PopupWindow implements View.OnClickListener {
@@ -4794,6 +4798,8 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         if (mInputConnection == null) {
             mInputConnection = new WebViewInputConnection();
             mAutoCompletePopup = new AutoCompletePopup(this, mInputConnection);
+        } else {
+            mInputConnection.resetBatchLevel();
         }
         mInputConnection.setupEditorInfo(outAttrs);
         return mInputConnection;
