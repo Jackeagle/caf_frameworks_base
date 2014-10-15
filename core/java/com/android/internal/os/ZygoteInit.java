@@ -96,7 +96,7 @@ public class ZygoteInit {
     private static final String PRELOADED_CLASSES = "preloaded-classes";
 
     /** Controls whether we should preload resources during zygote init. */
-    private static final boolean PRELOAD_RESOURCES = true;
+    private static final boolean PRELOAD_RESOURCES = false;
 
     /**
      * Invokes a static "main(argv[]) method on class "className".
@@ -358,6 +358,7 @@ public class ZygoteInit {
             runtime.runFinalizationSync();
             mResources = Resources.getSystem();
             mResources.startPreloading();
+            Log.e(TAG, "Start Preloading resources...");
             if (PRELOAD_RESOURCES) {
                 Log.i(TAG, "Preloading resources...");
 
@@ -378,6 +379,7 @@ public class ZygoteInit {
                         + (SystemClock.uptimeMillis()-startTime) + "ms.");
             }
             mResources.finishPreloading();
+            Log.e(TAG, "End Preloading resources...");
         } catch (RuntimeException e) {
             Log.w(TAG, "Failure preloading resources", e);
         } finally {
