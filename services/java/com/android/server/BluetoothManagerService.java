@@ -1496,15 +1496,14 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                    //Show prevState of BLE_ON as OFF to standard users
                    prevState = BluetoothAdapter.STATE_OFF;
                }
-                //Send broadcast message to everyone else
-               Intent intent = new Intent(BluetoothAdapter.ACTION_STATE_CHANGED);
-               intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, prevState);
-               intent.putExtra(BluetoothAdapter.EXTRA_STATE, newState);
-               intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-               intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-               if (DBG) Log.d(TAG,"Bluetooth State Change Intent: "
-                   + prevState + " -> " + newState);
-               mContext.sendBroadcastAsUser(intent, UserHandle.ALL,
+            //Send broadcast message to everyone else
+            Intent intent = new Intent(BluetoothAdapter.ACTION_STATE_CHANGED);
+            intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, prevState);
+            intent.putExtra(BluetoothAdapter.EXTRA_STATE, newState);
+            intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+            intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            if (DBG) Log.d(TAG,"Bluetooth State Change Intent: " + prevState + " -> " + newState);
+            mContext.sendBroadcastAsUser(intent, UserHandle.CURRENT,
                     BLUETOOTH_PERM);
             }
         }
