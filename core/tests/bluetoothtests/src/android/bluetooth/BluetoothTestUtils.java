@@ -482,7 +482,7 @@ public class BluetoothTestUtils extends Assert {
      */
     public void disable(BluetoothAdapter adapter) {
         int mask = (BluetoothReceiver.STATE_TURNING_OFF_FLAG | BluetoothReceiver.STATE_OFF_FLAG
-                | BluetoothReceiver.SCAN_MODE_NONE_FLAG);
+                | BluetoothReceiver.SCAN_MODE_CONNECTABLE_FLAG);
         long start = -1;
         BluetoothReceiver receiver = getBluetoothReceiver(mask);
 
