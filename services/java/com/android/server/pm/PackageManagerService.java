@@ -11793,6 +11793,18 @@ public class PackageManagerService extends IPackageManager.Stub {
         Slog.d(TAG, "mUseAppScanList=" + mUseAppScanList);
     }
 
+    private void sendLaterScanBroadcast(ArrayList<String> pkgList) {
+        int size = pkgList.size();
+        if (size > 0) {
+            // Send broadcasts here
+            Bundle extras = new Bundle();
+            extras.putStringArray(Intent.EXTRA_CHANGED_PACKAGE_LIST, pkgList
+                    .toArray(new String[size]));
+            String action = Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE;
+            sendPackageBroadcast(action, null, extras, null, null, null);
+        }
+    }
+
     private void laterScanDir(File dir, HashSet<String> appList, int flags, int scanMode) {
         String[] files = dir.list();
         if (files == null) {
@@ -11801,6 +11813,7 @@ public class PackageManagerService extends IPackageManager.Stub {
         }
 
         int i;
+        ArrayList<String> pkgList = new ArrayList<String>();
         for (i=0; i<files.length; i++) {
             File file = new File(dir, files[i]);
             if (appList.contains(files[i])
@@ -11810,6 +11823,8 @@ public class PackageManagerService extends IPackageManager.Stub {
             Slog.d(TAG, "later scan apk=" + file.getPath());
             PackageParser.Package pkg = scanPackageLI(file,
                     flags|PackageParser.PARSE_MUST_BE_APK, scanMode, 0, null);
+            pkgList.add(pkg.packageName);
+
             // Don't mess around with apps in system partition.
             if (pkg == null && (flags & PackageParser.PARSE_IS_SYSTEM) == 0 &&
                     mLastScanError == PackageManager.INSTALL_FAILED_INVALID_APK) {
@@ -11818,6 +11833,8 @@ public class PackageManagerService extends IPackageManager.Stub {
                 file.delete();
             }
         }
+        Slog.d(TAG, "Sending notification to launcher" );
+        sendLaterScanBroadcast(pkgList);
     }
 
     public void laterScanApp() {
@@ -11982,17 +11999,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                     if (null == mRequiredVerifierPackage) {
                         mRequiredVerifierPackage = getRequiredVerifierLPr();
                     }
-
                 }
-
-                // Notify launcher to update app list
-                Intent intent = new Intent("intent.action.PACKAGE_LATER_SCANNED");
-                // Now just let launcher receive this intent
-                // If want other app receive, please do not do this.
-                intent.setPackage("com.android.launcher");
-                intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-                mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
-                // release resource
                 mSystemAppList.clear();
                 mDataAppList.clear();
                 mVendorAppList.clear();
