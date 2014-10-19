@@ -17,6 +17,7 @@
 package android.bluetooth;
 
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.bluetooth.IBluetoothManager;
@@ -704,6 +705,8 @@ public final class BluetoothGatt implements BluetoothProfile {
         if (DBG) Log.d(TAG, "cancelOpen() - device: " + mDevice.getAddress());
         if (mService == null || mClientIf == 0) return;
 
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter.getState() != adapter.STATE_ON) return ;
         try {
             mService.clientDisconnect(mClientIf, mDevice.getAddress());
         } catch (RemoteException e) {
