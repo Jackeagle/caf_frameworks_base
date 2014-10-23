@@ -592,7 +592,7 @@ public class TelephonyManager {
     /** {@hide} */
     public String getDeviceSoftwareVersion(int slotId) {
         // FIXME methods taking slot id should not use subscription, instead us Uicc directly
-        long[] subId = SubscriptionManager.getSubId(slotId);
+        int[] subId = SubscriptionManager.getSubId(slotId);
         if (subId == null || subId.length == 0) {
             return null;
         }
@@ -628,7 +628,7 @@ public class TelephonyManager {
     /** {@hide} */
     public String getDeviceId(int slotId) {
         // FIXME methods taking slot id should not use subscription, instead us Uicc directly
-        long[] subId = SubscriptionManager.getSubId(slotId);
+        int[] subId = SubscriptionManager.getSubId(slotId);
         if (subId == null || subId.length == 0) {
             return null;
         }
@@ -662,7 +662,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getImei(int slotId) {
-        long[] subId = SubscriptionManager.getSubId(slotId);
+        int[] subId = SubscriptionManager.getSubId(slotId);
         try {
             return getSubscriberInfo().getImeiForSubscriber(subId[0]);
         } catch (RemoteException ex) {
@@ -688,7 +688,7 @@ public class TelephonyManager {
      */
     /** {@hide}*/
     public String getNai(int slotId) {
-        long[] subId = SubscriptionManager.getSubId(slotId);
+        int[] subId = SubscriptionManager.getSubId(slotId);
         try {
             return getSubscriberInfo().getNaiForSubscriber(subId[0]);
         } catch (RemoteException ex) {
@@ -752,7 +752,7 @@ public class TelephonyManager {
      * @param subId for which the location updates are enabled
      */
     /** @hide */
-    public void enableLocationUpdates(long subId) {
+    public void enableLocationUpdates(int subId) {
         try {
             getITelephony().enableLocationUpdatesForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -774,7 +774,7 @@ public class TelephonyManager {
     }
 
     /** @hide */
-    public void disableLocationUpdates(long subId) {
+    public void disableLocationUpdates(int subId) {
         try {
             getITelephony().disableLocationUpdatesForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -839,7 +839,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     @SystemApi
-    public int getCurrentPhoneType(long subId) {
+    public int getCurrentPhoneType(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         try{
             ITelephony telephony = getITelephony();
@@ -1066,7 +1066,7 @@ public class TelephonyManager {
      * @param subId
      */
     /** {@hide} */
-    public String getNetworkOperatorName(long subId) {
+    public String getNetworkOperatorName(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         return getTelephonyProperty(phoneId, TelephonyProperties.PROPERTY_OPERATOR_ALPHA, "");
     }
@@ -1093,7 +1093,7 @@ public class TelephonyManager {
      * @param subId
      */
     /** {@hide} */
-   public String getNetworkOperator(long subId) {
+   public String getNetworkOperator(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         return getTelephonyProperty(phoneId, TelephonyProperties.PROPERTY_OPERATOR_NUMERIC, "");
      }
@@ -1117,7 +1117,7 @@ public class TelephonyManager {
      * @param subId
      */
     /** {@hide} */
-    public boolean isNetworkRoaming(long subId) {
+    public boolean isNetworkRoaming(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         return Boolean.parseBoolean(getTelephonyProperty(phoneId,
                 TelephonyProperties.PROPERTY_OPERATOR_ISROAMING, null));
@@ -1146,7 +1146,7 @@ public class TelephonyManager {
      * @param subId for which Network CountryIso is returned
      */
     /** {@hide} */
-    public String getNetworkCountryIso(long subId) {
+    public String getNetworkCountryIso(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         return getTelephonyProperty(phoneId, TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, "");
     }
@@ -1257,7 +1257,7 @@ public class TelephonyManager {
      * @hide
      */
     /** {@hide} */
-   public int getNetworkType(long subId) {
+   public int getNetworkType(int subId) {
        try {
            ITelephony telephony = getITelephony();
            if (telephony != null) {
@@ -1311,7 +1311,7 @@ public class TelephonyManager {
      * @param subId for which network type is returned
      */
     /** {@hide} */
-    public int getDataNetworkType(long subId) {
+    public int getDataNetworkType(int subId) {
         try{
             ITelephony telephony = getITelephony();
             if (telephony != null) {
@@ -1343,7 +1343,7 @@ public class TelephonyManager {
      *
      */
     /** {@hide} */
-    public int getVoiceNetworkType(long subId) {
+    public int getVoiceNetworkType(int subId) {
         try{
             ITelephony telephony = getITelephony();
             if (telephony != null) {
@@ -1566,7 +1566,7 @@ public class TelephonyManager {
     /** {@hide} */
     // FIXME the argument to pass is subId ??
     public int getSimState(int slotId) {
-        long[] subId = SubscriptionManager.getSubId(slotId);
+        int[] subId = SubscriptionManager.getSubId(slotId);
         if (subId == null || subId.length == 0) {
             return SIM_STATE_ABSENT;
         }
@@ -1606,7 +1606,7 @@ public class TelephonyManager {
      * @see #getSimState
      */
     public String getSimOperator() {
-        long subId = SubscriptionManager.getDefaultDataSubId();
+        int subId = SubscriptionManager.getDefaultDataSubId();
         if (!SubscriptionManager.isUsableSubIdValue(subId)) {
             subId = SubscriptionManager.getDefaultSmsSubId();
             if (!SubscriptionManager.isUsableSubIdValue(subId)) {
@@ -1631,7 +1631,7 @@ public class TelephonyManager {
      * @param subId for which SimOperator is returned
      */
     /** {@hide} */
-    public String getSimOperator(long subId) {
+    public String getSimOperator(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         String operator = getTelephonyProperty(phoneId,
                 TelephonyProperties.PROPERTY_ICC_OPERATOR_NUMERIC, "");
@@ -1660,7 +1660,7 @@ public class TelephonyManager {
      * @param subId for which SimOperatorName is returned
      */
     /** {@hide} */
-    public String getSimOperatorName(long subId) {
+    public String getSimOperatorName(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         return getTelephonyProperty(phoneId, TelephonyProperties.PROPERTY_ICC_OPERATOR_ALPHA, "");
     }
@@ -1678,7 +1678,7 @@ public class TelephonyManager {
      * @param subId for which SimCountryIso is returned
      */
     /** {@hide} */
-    public String getSimCountryIso(long subId) {
+    public String getSimCountryIso(int subId) {
         int phoneId = SubscriptionManager.getPhoneId(subId);
         return getTelephonyProperty(phoneId, TelephonyProperties.PROPERTY_ICC_OPERATOR_ISO_COUNTRY,
                 "");
@@ -1704,7 +1704,7 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     /** {@hide} */
-    public String getSimSerialNumber(long subId) {
+    public String getSimSerialNumber(int subId) {
         try {
             return getSubscriberInfo().getIccSerialNumberForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1740,7 +1740,7 @@ public class TelephonyManager {
      *
      */
     /** {@hide} */
-    public int getLteOnCdmaMode(long subId) {
+    public int getLteOnCdmaMode(int subId) {
         try {
             return getITelephony().getLteOnCdmaModeForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1780,7 +1780,7 @@ public class TelephonyManager {
      * @param subId whose subscriber id is returned
      */
     /** {@hide} */
-    public String getSubscriberId(long subId) {
+    public String getSubscriberId(int subId) {
         try {
             return getSubscriberInfo().getSubscriberIdForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1819,7 +1819,7 @@ public class TelephonyManager {
      * @param subscription whose subscriber id is returned
      */
     /** {@hide} */
-    public String getGroupIdLevel1(long subId) {
+    public String getGroupIdLevel1(int subId) {
         try {
             return getSubscriberInfo().getGroupIdLevel1ForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1851,7 +1851,7 @@ public class TelephonyManager {
      * @param subId whose phone number for line 1 is returned
      */
     /** {@hide} */
-    public String getLine1NumberForSubscriber(long subId) {
+    public String getLine1NumberForSubscriber(int subId) {
         String number = null;
         try {
             number = getITelephony().getLine1NumberForDisplay(subId);
@@ -1903,7 +1903,7 @@ public class TelephonyManager {
      * @param number The dialing number
      * @hide
      */
-    public void setLine1NumberForDisplayForSubscriber(long subId, String alphaTag, String number) {
+    public void setLine1NumberForDisplayForSubscriber(int subId, String alphaTag, String number) {
         try {
             getITelephony().setLine1NumberForDisplayForSubscriber(subId, alphaTag, number);
         } catch (RemoteException ex) {
@@ -1935,7 +1935,7 @@ public class TelephonyManager {
      * nobody seems to call this.
      */
     /** {@hide} */
-    public String getLine1AlphaTagForSubscriber(long subId) {
+    public String getLine1AlphaTagForSubscriber(int subId) {
         String alphaTag = null;
         try {
             alphaTag = getITelephony().getLine1AlphaTagForDisplay(subId);
@@ -1978,7 +1978,7 @@ public class TelephonyManager {
      * @param subId for which msisdn is returned
      */
     /** {@hide} */
-    public String getMsisdn(long subId) {
+    public String getMsisdn(int subId) {
         try {
             return getSubscriberInfo().getMsisdnForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2008,7 +2008,7 @@ public class TelephonyManager {
      * @param subId whose voice mail number is returned
      */
     /** {@hide} */
-    public String getVoiceMailNumber(long subId) {
+    public String getVoiceMailNumber(int subId) {
         try {
             return getSubscriberInfo().getVoiceMailNumberForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2040,7 +2040,7 @@ public class TelephonyManager {
      * @param subId
      */
     /** {@hide} */
-    public String getCompleteVoiceMailNumber(long subId) {
+    public String getCompleteVoiceMailNumber(int subId) {
         try {
             return getSubscriberInfo().getCompleteVoiceMailNumberForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2070,7 +2070,7 @@ public class TelephonyManager {
      * @param subId whose voice message count is returned
      */
     /** {@hide} */
-    public int getVoiceMessageCount(long subId) {
+    public int getVoiceMessageCount(int subId) {
         try {
             return getITelephony().getVoiceMessageCountForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2102,7 +2102,7 @@ public class TelephonyManager {
      * voice mail number is returned
      */
     /** {@hide} */
-    public String getVoiceMailAlphaTag(long subId) {
+    public String getVoiceMailAlphaTag(int subId) {
         try {
             return getSubscriberInfo().getVoiceMailAlphaTagForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2199,7 +2199,7 @@ public class TelephonyManager {
      * @param subId whose call state is returned
      */
     /** {@hide} */
-    public int getCallState(long subId) {
+    public int getCallState(int subId) {
         try {
             return getITelephony().getCallStateForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2350,7 +2350,7 @@ public class TelephonyManager {
      * Returns the CDMA ERI icon index to display for a subscription
      */
     /** {@hide} */
-    public int getCdmaEriIconIndex(long subId) {
+    public int getCdmaEriIconIndex(int subId) {
         try {
             return getITelephony().getCdmaEriIconIndexForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2378,7 +2378,7 @@ public class TelephonyManager {
      * 1 - FLASHING
      */
     /** {@hide} */
-    public int getCdmaEriIconMode(long subId) {
+    public int getCdmaEriIconMode(int subId) {
         try {
             return getITelephony().getCdmaEriIconModeForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2403,7 +2403,7 @@ public class TelephonyManager {
      *
      */
     /** {@hide} */
-    public String getCdmaEriText(long subId) {
+    public String getCdmaEriText(int subId) {
         try {
             return getITelephony().getCdmaEriTextForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -2780,7 +2780,7 @@ public class TelephonyManager {
     /**
      * Returns Default subscription.
      */
-    private static long getDefaultSubscription() {
+    private static int getDefaultSubscription() {
         return SubscriptionManager.getDefaultSubId();
     }
 
@@ -3034,7 +3034,7 @@ public class TelephonyManager {
      * @return the response of SIM Authentication, or null if not available
      * @hide
      */
-    public String getIccSimChallengeResponse(long subId, int appType, String data) {
+    public String getIccSimChallengeResponse(int subId, int appType, String data) {
         try {
             return getSubscriberInfo().getIccSimChallengeResponse(subId, appType, data);
         } catch (RemoteException ex) {
@@ -3215,7 +3215,7 @@ public class TelephonyManager {
 
     /** @hide */
     @SystemApi
-    public String getCdmaMdn(long subId) {
+    public String getCdmaMdn(int subId) {
         try {
             return getITelephony().getCdmaMdn(subId);
         } catch (RemoteException ex) {
@@ -3233,7 +3233,7 @@ public class TelephonyManager {
 
     /** @hide */
     @SystemApi
-    public String getCdmaMin(long subId) {
+    public String getCdmaMin(int subId) {
         try {
             return getITelephony().getCdmaMin(subId);
         } catch (RemoteException ex) {
@@ -3588,7 +3588,7 @@ public class TelephonyManager {
      * @param enable true means enabling the simplified UI.
      * @hide
      */
-    public void enableSimplifiedNetworkSettingsForSubscriber(long subId, boolean enable) {
+    public void enableSimplifiedNetworkSettingsForSubscriber(int subId, boolean enable) {
         try {
             getITelephony().enableSimplifiedNetworkSettingsForSubscriber(subId, enable);
         } catch (RemoteException ex) {
@@ -3621,7 +3621,7 @@ public class TelephonyManager {
      * @return true if the simplified UI is enabled.
      * @hide
      */
-    public boolean getSimplifiedNetworkSettingsEnabledForSubscriber(long subId) {
+    public boolean getSimplifiedNetworkSettingsEnabledForSubscriber(int subId) {
         try {
             return getITelephony().getSimplifiedNetworkSettingsEnabledForSubscriber(subId);
         } catch (RemoteException ex) {
