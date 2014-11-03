@@ -890,11 +890,6 @@ final class ActivityRecord {
         synchronized(service) {
             if (displayStartTime != 0) {
                 reportLaunchTimeLocked(SystemClock.uptimeMillis());
-                if(mStackSupervisor.mIsPerfLockAcquired == true)
-                {
-                    mStackSupervisor.mPerf.perfLockRelease();
-                    mStackSupervisor.mIsPerfLockAcquired = false;
-                }
             }
             startTime = 0;
             finishLaunchTickingLocked();
