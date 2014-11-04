@@ -55,6 +55,7 @@ import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 import com.android.server.IoThread;
 import com.google.android.collect.Lists;
+import com.android.server.connectivity.Nat464Xlat;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -136,6 +137,8 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
         "192.168.48.2", "192.168.48.254",
     };
 
+    private Nat464Xlat mClat;
+
     private String[] mDefaultDnsServers;
     private static final String DNS_DEFAULT_SERVER1 = "8.8.8.8";
     private static final String DNS_DEFAULT_SERVER2 = "8.8.4.4";
@@ -160,11 +163,12 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
     private static final int DNSMASQ_POLLING_MAX_TIMES = 10;
 
     public Tethering(Context context, INetworkManagementService nmService,
-            INetworkStatsService statsService, IConnectivityManager connService, Looper looper) {
+            INetworkStatsService statsService, IConnectivityManager connService, Nat464Xlat clat, Looper looper) {
         mContext = context;
         mNMService = nmService;
         mStatsService = statsService;
         mConnService = connService;
+        mClat = clat;
         mLooper = looper;
 
         mPublicSync = new Object();
@@ -1471,7 +1475,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
             }
             protected boolean turnOnMasterTetherSettings() {
                 try {
-                    mNMService.setIpForwardingEnabled(true);
+                    if(!mClat.isRunning()) mNMService.setIpForwardingEnabled(true);
                 } catch (Exception e) {
                     transitionTo(mSetIpForwardingEnabledErrorState);
                     return false;
@@ -1503,7 +1507,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     return false;
                 }
                 try {
-                    mNMService.setIpForwardingEnabled(false);
+                    if(!mClat.isRunning()) mNMService.setIpForwardingEnabled(false);
                 } catch (Exception e) {
                     transitionTo(mSetIpForwardingDisabledErrorState);
                     return false;
@@ -1533,6 +1537,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     service.removeUpstreamV6Interface(iface);
                 } catch (RemoteException e) {
                     Log.e(TAG, "Unable to remove v6 upstream interface");
+                } catch (IllegalStateException e) {
                 }
             }
 
@@ -1862,7 +1867,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 Log.e(TAG, "Error in startTethering");
                 notify(TetherInterfaceSM.CMD_START_TETHERING_ERROR);
                 try {
-                    mNMService.setIpForwardingEnabled(false);
+                    if(!mClat.isRunning()) mNMService.setIpForwardingEnabled(false);
                 } catch (Exception e) {}
             }
         }
@@ -1873,7 +1878,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                 Log.e(TAG, "Error in stopTethering");
                 notify(TetherInterfaceSM.CMD_STOP_TETHERING_ERROR);
                 try {
-                    mNMService.setIpForwardingEnabled(false);
+                    if(!mClat.isRunning()) mNMService.setIpForwardingEnabled(false);
                 } catch (Exception e) {}
             }
         }
@@ -1887,11 +1892,12 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     mNMService.stopTethering();
                 } catch (Exception e) {}
                 try {
-                    mNMService.setIpForwardingEnabled(false);
+                    if(!mClat.isRunning()) mNMService.setIpForwardingEnabled(false);
                 } catch (Exception e) {}
             }
         }
     }
+
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         if (mContext.checkCallingOrSelfPermission(

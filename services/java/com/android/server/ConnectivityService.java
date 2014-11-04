@@ -653,7 +653,6 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             }
         }
 
-        mTethering = new Tethering(mContext, mNetd, statsService, this, mHandler.getLooper());
 
         //set up the listener for user state for creating user VPNs
         IntentFilter intentFilter = new IntentFilter();
@@ -662,6 +661,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mContext.registerReceiverAsUser(
                 mUserIntentReceiver, UserHandle.ALL, intentFilter, null, null);
         mClat = new Nat464Xlat(mContext, mNetd, this, mTrackerHandler);
+
+        mTethering = new Tethering(mContext, mNetd, statsService, this, mClat, mHandler.getLooper());
 
         try {
             mNetd.registerObserver(mTethering);
