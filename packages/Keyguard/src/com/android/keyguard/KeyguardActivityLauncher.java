@@ -34,6 +34,7 @@ import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.MediaStore;
+import android.provider.Telephony;
 import android.util.Log;
 import android.view.WindowManager;
 
@@ -128,8 +129,20 @@ public abstract class KeyguardActivityLauncher {
     }
 
     public void launchMessage() {
-        SMS_INTENT.setType("vnd.android-dir/mms-sms");
-        launchActivity(SMS_INTENT, false, false, null, null);
+        Intent intent = new Intent(Intent.ACTION_MAIN).setType("vnd.android-dir/mms-sms");
+        KeyguardUpdateMonitor monitor = KeyguardUpdateMonitor.getInstance(getContext());
+        Bundle bundle = monitor.getMessageBundle();
+        if (bundle.getInt("unread_number", 0) > 0) {
+            Log.v(TAG, "launchMessage(): unread_number > 0");
+            intent.putExtra("thread_id", bundle.getLong("thread_id", -1));
+            intent.putExtra("_id", bundle.getLong("_id", -1));
+            intent.putExtra("type", bundle.getString("type", ""));
+        }
+        final String smsAppPackage = Telephony.Sms.getDefaultSmsPackage(getContext());
+        if (smsAppPackage != null) {
+            intent.setPackage(smsAppPackage);
+        }
+        launchActivity(intent, false, false, null, null);
     }
 
     public void launchWidgetPicker(int appWidgetId) {
