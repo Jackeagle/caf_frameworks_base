@@ -8,10 +8,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= \
     asset_manager.cpp \
     configuration.cpp \
-    input.cpp \
     looper.cpp \
-    native_activity.cpp \
-    native_window.cpp \
     net.c \
     obb.cpp \
     sensor.cpp \
@@ -27,7 +24,6 @@ LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libui \
     libgui \
-    libandroid_runtime \
     libnetd_client \
 
 LOCAL_STATIC_LIBRARIES := \

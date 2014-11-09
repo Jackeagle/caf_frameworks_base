@@ -38,7 +38,7 @@ ifneq ($(ANDROID_BUILD_EMBEDDED),true)
 include $(CLEAR_VARS)
 
 # FRAMEWORKS_BASE_SUBDIRS comes from build/core/pathmap.mk
-LOCAL_SRC_FILES := $(call find-other-java-files,$(FRAMEWORKS_BASE_SUBDIRS))
+LOCAL_SRC_FILES :=
 
 # EventLogTags files.
 LOCAL_SRC_FILES += \
@@ -658,13 +658,6 @@ fwbase_dirs_to_document := \
 # include definition of junit_to_document
 include external/junit/Common.mk
 
-non_base_dirs := \
-	../opt/telephony/src/java/android/provider \
-	../opt/telephony/src/java/android/telephony \
-	../opt/telephony/src/java/android/telephony/gsm \
-	../opt/net/voip/src/java/android/net/rtp \
-	../opt/net/voip/src/java/android/net/sip
-
 # These are relative to frameworks/base
 dirs_to_check_apis := \
   $(fwbase_dirs_to_document) \
@@ -674,12 +667,9 @@ dirs_to_check_apis := \
 # FRAMEWORKS_BASE_SUBDIRS comes from build/core/pathmap.mk
 dirs_to_document := \
 	$(dirs_to_check_apis) \
-  $(addprefix ../../, $(FRAMEWORKS_DATA_BINDING_JAVA_SRC_DIRS)) \
-  $(addprefix ../../, $(FRAMEWORKS_SUPPORT_JAVA_SRC_DIRS)) \
 
 # These are relative to frameworks/base
 html_dirs := \
-	$(FRAMEWORKS_BASE_SUBDIRS) \
 	$(non_base_dirs)
 
 # Common sources for doc check and api check
@@ -1084,7 +1074,7 @@ ext_dirs := \
 	../../external/nist-sip/java \
 	../../external/tagsoup/src \
 
-ext_src_files := $(call all-java-files-under,$(ext_dirs))
+ext_src_files :=
 
 # ====  the library  =========================================
 include $(CLEAR_VARS)
