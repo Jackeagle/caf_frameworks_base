@@ -655,9 +655,6 @@ fwbase_dirs_to_document := \
 	   ) \
 	 )
 
-# include definition of junit_to_document
-include external/junit/Common.mk
-
 # These are relative to frameworks/base
 dirs_to_check_apis := \
   $(fwbase_dirs_to_document) \
