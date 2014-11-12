@@ -611,11 +611,6 @@ public class OverScroller {
         private Performance mPerf = null;
         private boolean mIsPerfLockAcquired = false;
         private boolean mIsPerfBoostEnabled = false;
-        private int lBoostTimeOut = 0;
-        private int lBoostCpuBoost = 0;
-        private int lBoostSchedBoost = 0;
-        private int lBoostPcDisblBoost = 0;
-        private int lBoostKsmBoost = 0;
 
         static {
             float x_min = 0.0f;
@@ -664,18 +659,6 @@ public class OverScroller {
 
             mIsPerfBoostEnabled = context.getResources().getBoolean(
                    com.android.internal.R.bool.config_enableCpuBoostForOverScrollerFling);
-            if (mIsPerfBoostEnabled) {
-            lBoostSchedBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_schedboost_param);
-            lBoostTimeOut = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_timeout_param);
-            lBoostCpuBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_cpuboost_param);
-            lBoostPcDisblBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_pcdisbl_param);
-            lBoostKsmBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_ksmboost_param);
-            }
         }
 
         void updateScroll(float q) {
@@ -804,12 +787,7 @@ public class OverScroller {
 
                 if (mPerf != null) {
                     mIsPerfLockAcquired = true;
-                    if (0 == lBoostTimeOut) {
-                        lBoostTimeOut = mDuration;
-                    }
-                    mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
-                                          lBoostCpuBoost, lBoostKsmBoost);
-
+                    mPerf.perfLockAcquire(mDuration, mPerf.CPUS_ON_2, 0x1E01, 0x20B, 0x30B, 0x1C00);
                 }
             }
 
