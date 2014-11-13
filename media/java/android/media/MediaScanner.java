@@ -64,6 +64,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
 
+import com.android.internal.R;
+
 /**
  * Internal service helper that no-one should use directly.
  *
@@ -336,8 +338,14 @@ public class MediaScanner
     private boolean mDefaultAlarmSet;
     /** The filename for the default sound for the ringer ringtone. */
     private String mDefaultRingtoneFilename;
+    /** The filename for the default sound for the ringer ringtone 2. */
+    private String mDefaultRingtone2Filename;
+    /** The filename for the default sound for the ringer ringtone 3. */
+    private String mDefaultRingtone3Filename;
     /** The filename for the default sound for the notification ringtone. */
     private String mDefaultNotificationFilename;
+    /** The filename for the default sound for the mms notification ringtone. */
+    private String mDefaultMmsNotificationFilename;
     /** The filename for the default sound for the alarm ringtone. */
     private String mDefaultAlarmAlertFilename;
     /**
@@ -402,13 +410,68 @@ public class MediaScanner
         //mClient.testGenreNameConverter();
     }
 
+    private boolean isSoundCustomized() {
+        return mContext.getResources().getBoolean(R.bool.def_custom_sys_sound);
+    }
+
     private void setDefaultRingtoneFileNames() {
-        mDefaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
-                + Settings.System.RINGTONE);
-        mDefaultNotificationFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
-                + Settings.System.NOTIFICATION_SOUND);
-        mDefaultAlarmAlertFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
-                + Settings.System.ALARM_ALERT);
+        if (isSoundCustomized()) {
+            setCustomizedRingtoneFileNames();
+        } else {
+            mDefaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                    + Settings.System.RINGTONE);
+            mDefaultNotificationFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                    + Settings.System.NOTIFICATION_SOUND);
+            mDefaultAlarmAlertFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                    + Settings.System.ALARM_ALERT);
+        }
+    }
+
+    private void setCustomizedRingtoneFileNames() {
+        if (!TextUtils
+                .isEmpty(mContext.getResources().getString(R.string.def_custom_sys_ringtone))) {
+            mDefaultRingtoneFilename = mContext.getResources().getString(
+                    R.string.def_custom_sys_ringtone);
+        } else {
+            mDefaultRingtoneFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                    + Settings.System.RINGTONE);
+        }
+
+        mDefaultRingtone2Filename = mContext.getResources().getString(
+                R.string.def_custom_sys_ringtone2);
+        if (mDefaultRingtone2Filename == null || TextUtils.isEmpty(mDefaultRingtone2Filename)) {
+            mDefaultRingtone2Filename = mDefaultRingtoneFilename;
+        }
+
+        mDefaultRingtone3Filename = mContext.getResources().getString(
+                R.string.def_custom_sys_ringtone3);
+        if (mDefaultRingtone3Filename == null || TextUtils.isEmpty(mDefaultRingtone3Filename)) {
+            mDefaultRingtone3Filename = mDefaultRingtoneFilename;
+        }
+
+        if (!TextUtils.isEmpty(mContext.getResources().getString(
+                R.string.def_custom_sys_notification))) {
+            mDefaultNotificationFilename = mContext.getResources().getString(
+                    R.string.def_custom_sys_notification);
+        } else {
+            mDefaultNotificationFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                    + Settings.System.NOTIFICATION_SOUND);
+        }
+
+        mDefaultMmsNotificationFilename = mContext.getResources().getString(
+                R.string.def_custom_sys_mms);
+        if (mDefaultMmsNotificationFilename == null
+                || TextUtils.isEmpty(mDefaultMmsNotificationFilename.trim())) {
+            mDefaultMmsNotificationFilename = mDefaultNotificationFilename;
+        }
+
+        if (!TextUtils.isEmpty(mContext.getResources().getString(R.string.def_custom_sys_alarm))) {
+            mDefaultAlarmAlertFilename = mContext.getResources().getString(
+                    R.string.def_custom_sys_alarm);
+        } else {
+            mDefaultAlarmAlertFilename = SystemProperties.get(DEFAULT_RINGTONE_PROPERTY_PREFIX
+                    + Settings.System.ALARM_ALERT);
+        }
     }
 
     private final MyMediaScannerClient mClient = new MyMediaScannerClient();
@@ -939,20 +1002,11 @@ public class MediaScanner
                 // needed.
                 if (mWasEmptyPriorToScan) {
                     if (notifications && !mDefaultNotificationSet) {
-                        if (TextUtils.isEmpty(mDefaultNotificationFilename) ||
-                                doesPathHaveFilename(entry.mPath, mDefaultNotificationFilename)) {
-                            needToSetSettings = true;
-                        }
+                        needToSetSettings = needToSetSettingsForNotification(entry);
                     } else if (ringtones && !mDefaultRingtoneSet) {
-                        if (TextUtils.isEmpty(mDefaultRingtoneFilename) ||
-                                doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename)) {
-                            needToSetSettings = true;
-                        }
+                        needToSetSettings = needToSetSettingsForRingtone(entry);
                     } else if (alarms && !mDefaultAlarmSet) {
-                        if (TextUtils.isEmpty(mDefaultAlarmAlertFilename) ||
-                                doesPathHaveFilename(entry.mPath, mDefaultAlarmAlertFilename)) {
-                            needToSetSettings = true;
-                        }
+                        needToSetSettings = needToSetSettingsForAlarm(entry);
                     }
                 }
 
@@ -1003,6 +1057,10 @@ public class MediaScanner
             if(needToSetSettings) {
                 if (notifications) {
                     setSettingIfNotSet(Settings.System.NOTIFICATION_SOUND, tableUri, rowId);
+                    if (isSoundCustomized()) {
+                        setSettingIfNotSet(Settings.System.MMS_NOTIFICATION_SOUND, tableUri, rowId);
+                    }
+
                     mDefaultNotificationSet = true;
                 } else if (ringtones) {
                     // memorize default system ringtone persistently
@@ -1024,6 +1082,33 @@ public class MediaScanner
             }
 
             return result;
+        }
+
+        private boolean needToSetSettingsForNotification(FileEntry entry) {
+            boolean result = TextUtils.isEmpty(mDefaultNotificationFilename)
+                    || doesPathHaveFilename(entry.mPath, mDefaultNotificationFilename);
+            if (isSoundCustomized()) {
+                result = result || TextUtils.isEmpty(mDefaultMmsNotificationFilename)
+                        || doesPathHaveFilename(entry.mPath, mDefaultMmsNotificationFilename);
+            }
+            return result;
+        }
+
+        private boolean needToSetSettingsForRingtone(FileEntry entry) {
+            boolean result = TextUtils.isEmpty(mDefaultRingtoneFilename)
+                    || doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename);
+            if (isSoundCustomized()) {
+                result = result || TextUtils.isEmpty(mDefaultRingtone2Filename)
+                        || doesPathHaveFilename(entry.mPath, mDefaultRingtone2Filename)
+                        || TextUtils.isEmpty(mDefaultRingtone3Filename)
+                        || doesPathHaveFilename(entry.mPath, mDefaultRingtone3Filename);
+            }
+            return result;
+        }
+
+        private boolean needToSetSettingsForAlarm(FileEntry entry) {
+            return TextUtils.isEmpty(mDefaultAlarmAlertFilename)
+                    || doesPathHaveFilename(entry.mPath, mDefaultAlarmAlertFilename);
         }
 
         private boolean doesPathHaveFilename(String path, String filename) {

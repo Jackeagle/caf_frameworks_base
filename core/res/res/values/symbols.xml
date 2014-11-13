@@ -248,10 +248,13 @@
   <java-symbol type="attr" name="windowFixedHeightMinor" />
   <java-symbol type="attr" name="accessibilityFocusedDrawable"/>
 
+  <java-symbol type="bool" name="def_custom_dateformat" />
+  <java-symbol type="bool" name="def_custom_sys_sound" />
   <java-symbol type="bool" name="action_bar_embed_tabs" />
   <java-symbol type="bool" name="action_bar_embed_tabs_pre_jb" />
   <java-symbol type="bool" name="action_bar_expanded_action_views_exclusive" />
   <java-symbol type="bool" name="config_avoidGfxAccel" />
+  <java-symbol type="bool" name="always_popup_usb_computer_connection_option" />
   <java-symbol type="bool" name="config_allowActionMenuItemTextWithIcon" />
   <java-symbol type="bool" name="config_bluetooth_address_validation" />
   <java-symbol type="bool" name="config_bluetooth_sco_off_call" />
@@ -424,6 +427,7 @@
   <java-symbol type="dimen" name="immersive_mode_cling_width" />
   <java-symbol type="dimen" name="circular_display_mask_offset" />
 
+  <java-symbol type="string" name="locale_codes" />
   <java-symbol type="string" name="add_account_button_label" />
   <java-symbol type="string" name="addToDictionary" />
   <java-symbol type="string" name="action_bar_home_description" />
@@ -454,6 +458,12 @@
   <java-symbol type="string" name="def_wifi_wifihotspot_ssid" />
   <java-symbol type="string" name="def_wifi_wifihotspot_pass" />
   <java-symbol type="string" name="def_wifi_direct_name" />
+  <java-symbol type="string" name="def_custom_sys_ringtone" />
+  <java-symbol type="string" name="def_custom_sys_ringtone2" />
+  <java-symbol type="string" name="def_custom_sys_ringtone3" />
+  <java-symbol type="string" name="def_custom_sys_notification" />
+  <java-symbol type="string" name="def_custom_sys_mms" />
+  <java-symbol type="string" name="def_custom_sys_alarm" />
   <java-symbol type="string" name="CfMmi" />
   <java-symbol type="string" name="ClipMmi" />
   <java-symbol type="string" name="ClirMmi" />
@@ -1617,6 +1627,7 @@
   <java-symbol type="bool" name="config_wifi_background_scan_support" />
   <java-symbol type="bool" name="config_wifi_dual_band_support" />
   <java-symbol type="bool" name="config_wimaxEnabled" />
+  <java-symbol type="bool" name="config_setZenModeWhenSilentModeOn" />
   <java-symbol type="bool" name="show_ongoing_ime_switcher" />
   <java-symbol type="color" name="config_defaultNotificationColor" />
   <java-symbol type="color" name="input_method_navigation_guard" />
@@ -2157,9 +2168,19 @@
 
   <!-- cpu boost for overscroller fling -->
   <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
+  <java-symbol type="integer" name="flingboost_timeout_param" />
+  <java-symbol type="integer" name="flingboost_schedboost_param" />
+  <java-symbol type="integer" name="flingboost_cpuboost_param" />
+  <java-symbol type="integer" name="flingboost_pcdisbl_param" />
+  <java-symbol type="integer" name="flingboost_ksmboost_param" />
 
   <!-- cpu boost for horizontal scroll -->
   <java-symbol type="bool" name="config_enableCpuBoostForScroller" />
+  <java-symbol type="integer" name="scrollboost_timeout_param" />
+  <java-symbol type="integer" name="scrollboost_schedboost_param" />
+  <java-symbol type="integer" name="scrollboost_cpuboost_param" />
+  <java-symbol type="integer" name="scrollboost_pcdisbl_param" />
+  <java-symbol type="integer" name="scrollboost_ksmboost_param" />
 
   <!-- Data Connectivity Error Configurations -->
   <java-symbol type="bool" name="config_reject_ggsn_perm_failure" />

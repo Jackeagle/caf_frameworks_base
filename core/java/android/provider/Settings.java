@@ -2307,6 +2307,22 @@ public final class Settings {
         public static final String ALARM_ALERT = "alarm_alert";
 
         /**
+         * Persistent store for the system-wide default mms notification sound.
+         *
+         * @see #DEFAULT_MMS_NOTIFICATION_URI
+         * @hide
+         */
+        public static final String MMS_NOTIFICATION_SOUND = "mms_notification";
+
+        /**
+         * A {@link Uri} that will point to the current default mms notification
+         * sound at any given time.
+         *
+         * @hide
+         */
+        public static final Uri DEFAULT_MMS_NOTIFICATION_URI = getUriFor(MMS_NOTIFICATION_SOUND);
+
+        /**
          * A {@link Uri} that will point to the current default alarm alert at
          * any given time.
          *
@@ -3060,6 +3076,12 @@ public final class Settings {
             MOVED_TO_GLOBAL = new HashSet<String>();
             MOVED_TO_GLOBAL.add(Settings.Global.ADB_ENABLED);
             MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_ENABLED);
+            MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_CONFIGURABLE_LIST);
+            MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_SUPL_HOST);
+            MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_SUPL_PORT);
+            MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_POSITION_MODE);
+            MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_NETWORK);
+            MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_RESET_TYPE);
             MOVED_TO_GLOBAL.add(Settings.Global.BLUETOOTH_ON);
             MOVED_TO_GLOBAL.add(Settings.Global.BUGREPORT_IN_POWER_MENU);
             MOVED_TO_GLOBAL.add(Settings.Global.CDMA_CELL_BROADCAST_SMS);
@@ -5338,6 +5360,42 @@ public final class Settings {
          * @hide
          */
         public static final String ASSISTED_GPS_ENABLED = "assisted_gps_enabled";
+
+        /**
+         * List for assisted GPS should be configurable.
+         * @hide
+         */
+        public static final String ASSISTED_GPS_CONFIGURABLE_LIST = "assisted_gps_configurable_list";
+
+        /**
+         * Host for assisted GPS supl
+         * @hide
+         */
+        public static final String ASSISTED_GPS_SUPL_HOST = "assisted_gps_supl_host";
+
+        /**
+         * Port for assisted GPS supl
+         * @hide
+         */
+        public static final String ASSISTED_GPS_SUPL_PORT = "assisted_gps_supl_port";
+
+        /**
+         * Position mode for assisted GPS
+         * @hide
+         */
+        public static final String ASSISTED_GPS_POSITION_MODE = "assisted_gps_position_mode";
+
+        /**
+         * Network preference for assisted GPS
+         * @hide
+         */
+        public static final String ASSISTED_GPS_NETWORK = "assisted_gps_network";
+
+        /**
+         * Reset type for assisted GPS
+         * @hide
+         */
+        public static final String ASSISTED_GPS_RESET_TYPE = "assisted_gps_reset_type";
 
         /**
          * Whether bluetooth is enabled/disabled
