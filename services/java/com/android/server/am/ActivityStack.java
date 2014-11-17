@@ -83,6 +83,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.codeaurora.Performance;
 /**
  * State and management of a single stack of activities.
  */
@@ -141,6 +142,7 @@ final class ActivityStack {
 
     final Context mContext;
 
+    private Performance mPerf = new Performance();
     /**
      * The back history of all previous (and possibly still
      * running) activities.  It contains #TaskRecord objects.
@@ -1469,6 +1471,8 @@ final class ActivityStack {
                     mWindowManager.prepareAppTransition(prev.task == next.task
                             ? AppTransition.TRANSIT_ACTIVITY_CLOSE
                             : AppTransition.TRANSIT_TASK_CLOSE, false);
+                    if(prev.task != next.task && mPerf != null)
+                        mPerf.perfLockAcquire(600, 0x1E01, 0x20D);
                 }
                 mWindowManager.setAppWillBeHidden(prev.appToken);
                 mWindowManager.setAppVisibility(prev.appToken, false);
@@ -1481,6 +1485,8 @@ final class ActivityStack {
                     mWindowManager.prepareAppTransition(prev.task == next.task
                             ? AppTransition.TRANSIT_ACTIVITY_OPEN
                             : AppTransition.TRANSIT_TASK_OPEN, false);
+                    if(prev.task != next.task && mPerf != null)
+                        mPerf.perfLockAcquire(600, 0x1E01, 0x20D);
                 }
             }
             if (false) {
