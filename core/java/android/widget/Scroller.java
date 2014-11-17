@@ -424,7 +424,7 @@ public class Scroller  {
         mDurationReciprocal = 1.0f / (float) mDuration;
 
         if ((mPerf != null) && (duration != 0)) {
-            mPerf.perfLockAcquire(mDuration, mPerf.CPUS_ON_2, 0x1E01, 0x20B, 0x30B,0x1C00);
+            mPerf.perfLockAcquire(mDuration, mPerf.CPUS_ON_2, 0x101, 0x1E01, 0x20F, 0x3E01, 0x3F01, 0x1C00);
         }
     }
 
