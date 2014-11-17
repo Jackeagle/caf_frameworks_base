@@ -112,7 +112,6 @@ public final class ActivityStackSupervisor {
     static final int SLEEP_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG + 3;
     static final int LAUNCH_TIMEOUT_MSG = FIRST_SUPERVISOR_STACK_MSG + 4;
     public Performance mPerf = null;
-    public boolean mIsPerfLockAcquired = false;
     // For debugging to make sure the caller when acquiring/releasing our
     // wake lock is the system process.
     static final boolean VALIDATE_WAKE_LOCK_CALLER = false;
@@ -2126,9 +2125,8 @@ public final class ActivityStackSupervisor {
         if (mPerf == null) {
             mPerf = new Performance();
         }
-        if (mPerf != null && mIsPerfLockAcquired == false) {
-            mPerf.perfLockAcquire(2000,0x1E01,0x20D,0x1C00);
-            mIsPerfLockAcquired = true;
+        if (mPerf != null) {
+            mPerf.perfLockAcquire(1500,0x101,0x1E01,0x20D,0x1C00);
         }
         if (DEBUG_TASKS) Slog.d(TAG, "No task found");
         return null;
