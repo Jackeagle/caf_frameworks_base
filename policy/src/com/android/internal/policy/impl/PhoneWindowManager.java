@@ -4248,6 +4248,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             new KeyEvent(event));
                     msg.setAsynchronous(true);
                     msg.sendToTarget();
+                } else {
+                    // acquire wakelock for 1 sec to ensure key can be processed by app
+                    mBroadcastWakeLock.acquire(1000);
                 }
                 break;
             }
