@@ -59,8 +59,10 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -1162,6 +1164,17 @@ class WifiConfigStore {
         }
     }
 
+    /*
+     * Convert string to Hexadecimal before passing to wifi native layer
+     * In native function "doCommand()" have trouble in converting Unicode character string to UTF8
+     * conversion to hex is required because SSIDs can have space characters in them;
+     * and that can confuses the supplicant because it uses space charaters as delimiters
+     */
+    private String encodeSSID(String str){
+        String tmp = removeDoubleQuotes(str);
+        return String.format("%x", new BigInteger(1, tmp.getBytes(Charset.forName("UTF-8"))));
+    }
+
     private NetworkUpdateResult addOrUpdateNetworkNative(WifiConfiguration config) {
         /*
          * If the supplied networkId is INVALID_NETWORK_ID, we create a new empty
@@ -1205,7 +1218,7 @@ class WifiConfigStore {
                     !mWifiNative.setNetworkVariable(
                         netId,
                         WifiConfiguration.ssidVarName,
-                        config.SSID)) {
+                        encodeSSID(config.SSID))) {
                 loge("failed to set SSID: "+config.SSID);
                 break setVariables;
             }
