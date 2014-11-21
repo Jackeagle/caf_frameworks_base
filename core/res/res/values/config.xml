@@ -1494,4 +1494,18 @@
     <!-- spn display control -->
     <bool name="config_spn_display_control">false</bool>
 
+    <!-- config switching DDS switch back to the default sub -->
+    <bool name="config_dds_switch_back">false</bool>
+
+    <!-- config switching DDS to the primary sub -->
+    <bool name="config_setDdsOnPrimarySub">false</bool>
+   <!-- Activities list for boost -->
+   <string-array translatable="false" name="boost_activityList">
+   </string-array>
+
+   <!-- Activity scroll boost params -->
+   <integer name="ascrollboost_timeout">0</integer>
+   <integer name="ascrollboost_schedboost">0</integer>
+   <integer name="ascrollboost_cpuboost">0</integer>
+   <integer name="ascrollboost_pcdisbl">0</integer>
 </resources>
