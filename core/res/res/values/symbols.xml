@@ -1865,4 +1865,13 @@
 
   <!-- config switching DDS to the primary sub -->
   <java-symbol type="bool" name="config_setDdsOnPrimarySub" />
+
+  <!-- Activities list for boost -->
+  <java-symbol type="array"  name="boost_activityList" />
+
+  <!-- Activity scroll boost params -->
+  <java-symbol type="integer" name="ascrollboost_timeout" />
+  <java-symbol type="integer" name="ascrollboost_schedboost" />
+  <java-symbol type="integer" name="ascrollboost_cpuboost" />
+  <java-symbol type="integer" name="ascrollboost_pcdisbl" />
 </resources>
