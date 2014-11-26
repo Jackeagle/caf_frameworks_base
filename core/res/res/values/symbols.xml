@@ -2250,4 +2250,6 @@
   <java-symbol type="string" name="data_conn_status_title" />
   <java-symbol type="string" name="user_authentication_failed" />
   <java-symbol type="string" name="service_not_subscribed" />
+  <!-- for wifi auto connection -->
+  <java-symbol type="bool" name="wifi_autocon" />
 </resources>
