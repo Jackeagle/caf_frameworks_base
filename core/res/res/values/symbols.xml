@@ -2214,4 +2214,6 @@
   <java-symbol type="integer" name="ascrollboost_schedboost" />
   <java-symbol type="integer" name="ascrollboost_cpuboost" />
   <java-symbol type="integer" name="ascrollboost_pcdisbl" />
+  <!-- for wifi auto connection -->
+  <java-symbol type="bool" name="wifi_autocon" />
 </resources>
