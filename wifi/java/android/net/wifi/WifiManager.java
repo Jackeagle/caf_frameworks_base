@@ -2187,4 +2187,49 @@ public class WifiManager {
             super.finalize();
         }
     }
+
+    /**
+     * Check ConCurrency Support
+     *
+     * @return true if concurrency are allowed.
+     *
+     * @hide no intent to publish
+     */
+    public boolean getConcurrency() {
+        try {
+            return mService.getConcurrency();
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check is P2P GO  Supported
+     *
+     * @return true if p2pGO are allowed.
+     *
+     * @hide no intent to publish
+     */
+    public boolean isP2pAutoGoSet() {
+        try {
+            return mService.isP2pAutoGoSet();
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Gets SoftAP Interfacename
+     *
+     * @return SAP interface name
+     *
+     * @hide no intent to publish
+     */
+    public String getSAPInterfaceName() {
+        try {
+            return mService.getSAPInterfaceName();
+        } catch (RemoteException e) {
+            return null;
+        }
+    }
 }

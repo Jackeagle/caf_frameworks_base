@@ -55,6 +55,7 @@ import android.net.RouteInfo;
 import android.net.wifi.WpsResult.Status;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pService;
+import android.net.wifi.WifiTetherStateMachine;
 import android.os.BatteryStats;
 import android.os.Binder;
 import android.os.Bundle;
@@ -113,10 +114,11 @@ public class WifiStateMachine extends StateMachine {
     private static final boolean DBG = false;
 
     private WifiMonitor mWifiMonitor;
-    private WifiNative mWifiNative;
-    private WifiConfigStore mWifiConfigStore;
-    private INetworkManagementService mNwService;
+    public WifiNative mWifiNative;
+    public WifiConfigStore mWifiConfigStore;
+    public INetworkManagementService mNwService;
     private ConnectivityManager mCm;
+    public WifiTetherStateMachine mWifiTetherStateMachine = null;
 
     private final boolean mP2pSupported;
     private final AtomicBoolean mP2pConnected = new AtomicBoolean(false);
@@ -151,7 +153,7 @@ public class WifiStateMachine extends StateMachine {
     private boolean mDisabled5GhzFrequencies = false;
     private int mRssiPollToken = 0;
     private int mReconnectCount = 0;
-    /* 3 operational states for STA operation: CONNECT_MODE, SCAN_ONLY_MODE, SCAN_ONLY_WIFI_OFF_MODE
+   /* 3 operational states for STA operation: CONNECT_MODE, SCAN_ONLY_MODE, SCAN_ONLY_WIFI_OFF_MODE
     * In CONNECT_MODE, the STA can scan and connect to an access point
     * In SCAN_ONLY_MODE, the STA can only scan for access points
     * In SCAN_ONLY_WIFI_OFF_MODE, the STA can only scan for access points with wifi toggle being off
@@ -643,7 +645,9 @@ public class WifiStateMachine extends StateMachine {
     private int mNotedBatchedScanCsph = 0;
 
 
-    public WifiStateMachine(Context context, String wlanInterface) {
+    public WifiStateMachine(Context context, String wlanInterface,
+                            boolean enableConcurrency,
+                            String SAPInterfaceName) {
         super("WifiStateMachine");
         mContext = context;
         mInterfaceName = wlanInterface;
@@ -673,6 +677,13 @@ public class WifiStateMachine extends StateMachine {
         mLastBssid = null;
         mLastNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
         mLastSignalLevel = -1;
+
+        if (enableConcurrency) {
+            mWifiTetherStateMachine =
+                new WifiTetherStateMachine(mContext, SAPInterfaceName,
+                                           mWifiNative, mWifiConfigStore,
+                                           mWifiMonitor, mNwService);
+        }
 
         mInterfaceObserver = new InterfaceObserver(this);
         try {
@@ -2653,7 +2664,17 @@ public class WifiStateMachine extends StateMachine {
     class InitialState extends State {
         @Override
         public void enter() {
-            mWifiNative.unloadDriver();
+            int wifiApState = 0;
+            if (mWifiTetherStateMachine != null) {
+                wifiApState = mWifiTetherStateMachine.syncGetWifiApState();
+            }
+            if ((wifiApState == WifiManager.WIFI_AP_STATE_ENABLING) ||
+                (wifiApState == WifiManager.WIFI_AP_STATE_ENABLED)) {
+                log("Avoid unloading driver, AP_STATE is enabled/enabling");
+            }
+            else {
+                mWifiNative.unloadDriver();
+            }
 
             if (mWifiP2pChannel == null) {
                 mWifiP2pChannel = new AsyncChannel();
@@ -2892,9 +2913,30 @@ public class WifiStateMachine extends StateMachine {
             if (mDhcpStateMachine != null) {
                 mDhcpStateMachine.doQuit();
             }
-
-            if (DBG) log("stopping supplicant");
-            mWifiMonitor.stopSupplicant();
+            int wifiApState = 0;
+            if (mWifiTetherStateMachine != null) {
+                wifiApState = mWifiTetherStateMachine.syncGetWifiApState();
+            }
+            if ((wifiApState == WifiManager.WIFI_AP_STATE_ENABLING) ||
+                (wifiApState == WifiManager.WIFI_AP_STATE_ENABLED)) {
+                log("Do not stop supplicant, just bring down interface");
+                try {
+                      String Interfaces = mWifiNative.getInterfaceList();
+                      String[] intf = Interfaces.split("\n");
+                      for (String i : intf) {
+                          if (DBG) log("Setting interface down " +i);
+                          mNwService.setInterfaceDown(i);
+                      }
+                } catch (RemoteException re) {
+                      loge("RE: Unable to change interface settings: " + re);
+                } catch (IllegalStateException ie) {
+                      loge("IE: Unable to change interface settings: " + ie);
+                }
+            }
+            else {
+                if (DBG) log("stopping supplicant");
+                mWifiMonitor.stopSupplicant();
+            }
 
             /* Send ourselves a delayed message to indicate failure after a wait time */
             sendMessageDelayed(obtainMessage(CMD_STOP_SUPPLICANT_FAILED,
@@ -2917,6 +2959,16 @@ public class WifiStateMachine extends StateMachine {
                     if (message.arg1 == mSupplicantStopFailureToken) {
                         loge("Timed out on a supplicant stop, kill and proceed");
                         handleSupplicantConnectionLoss(true);
+                        transitionTo(mInitialState);
+                    }
+                    break;
+                case WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT:
+                    /* STATE if interfaces are down */
+                    SupplicantState state = handleSupplicantStateChange(message);
+                    if (state == SupplicantState.INTERFACE_DISABLED) {
+                        if (DBG) log("Supplicant event for interface down");
+                        sendSupplicantConnectionChangedBroadcast(false);
+                        setWifiState(WIFI_STATE_DISABLED);
                         transitionTo(mInitialState);
                     }
                     break;

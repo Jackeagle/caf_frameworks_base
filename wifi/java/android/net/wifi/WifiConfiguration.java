@@ -45,6 +45,8 @@ public class WifiConfiguration implements Parcelable {
     public static final String hiddenSSIDVarName = "scan_ssid";
     /** {@hide} */
     public static final int INVALID_NETWORK_ID = -1;
+    /** {@hide} */
+    public int channel = 6;
     /**
      * Recognized key management schemes.
      */

@@ -126,5 +126,11 @@ interface IWifiManager
     boolean isBatchedScanSupported();
 
     void pollBatchedScan();
+
+    boolean getConcurrency();
+
+    boolean isP2pAutoGoSet();
+
+    String getSAPInterfaceName();
 }
 

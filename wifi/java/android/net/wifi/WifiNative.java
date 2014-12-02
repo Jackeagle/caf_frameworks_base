@@ -57,6 +57,7 @@ public class WifiNative {
     public final String mInterfacePrefix;
 
     private boolean mSuspendOptEnabled = false;
+    private static int mP2pOperatingFreq = 0;
 
     public native static boolean loadDriver();
 
@@ -704,6 +705,16 @@ public class WifiNative {
         return false;
     }
 
+    public boolean p2pSetOperatingFreq(int oc) {
+        if (oc >= 1 && oc <= 165 ) {
+            int freq = (oc <= 14 ? 2407 : 5000) + oc * 5;
+            mP2pOperatingFreq = freq;
+            Log.d(mTAG, "p2pSetOperatingFreq: "
+                + mP2pOperatingFreq);
+            return true;
+        }
+        return false;
+    }
     public boolean p2pFlush() {
         return doBooleanCommand("P2P_FLUSH");
     }
@@ -785,13 +796,27 @@ public class WifiNative {
 
     public boolean p2pGroupAdd(boolean persistent) {
         if (persistent) {
-            return doBooleanCommand("P2P_GROUP_ADD persistent");
+            if (mP2pOperatingFreq != 0) {
+                return doBooleanCommand("P2P_GROUP_ADD persistent freq="
+                                         + mP2pOperatingFreq);
+            } else {
+                return doBooleanCommand("P2P_GROUP_ADD persistent");
+            }
         }
-        return doBooleanCommand("P2P_GROUP_ADD");
+        if (mP2pOperatingFreq != 0) {
+            return doBooleanCommand("P2P_GROUP_ADD freq=" + mP2pOperatingFreq);
+        } else {
+            return doBooleanCommand("P2P_GROUP_ADD");
+        }
     }
 
     public boolean p2pGroupAdd(int netId) {
-        return doBooleanCommand("P2P_GROUP_ADD persistent=" + netId);
+        if (mP2pOperatingFreq != 0) {
+            return doBooleanCommand("P2P_GROUP_ADD persistent="
+                                     + netId + " freq=" + mP2pOperatingFreq);
+        } else {
+            return doBooleanCommand("P2P_GROUP_ADD persistent=" + netId);
+        }
     }
 
     public boolean p2pGroupRemove(String iface) {
@@ -977,6 +1002,10 @@ public class WifiNative {
             //Empty set means,it will enable all frequences
             return doBooleanCommand("P2P_SET disallow_freq \"\"");
         }
+    }
+
+    public String getInterfaceList() {
+        return doStringCommand("INTERFACES");
     }
 
 }
