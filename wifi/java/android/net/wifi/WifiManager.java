@@ -2232,4 +2232,19 @@ public class WifiManager {
             return null;
         }
     }
+
+    /**
+     * Gets  station wpa state
+     *
+     * @return true if station in associaiting state
+     *
+     * @hide no intent to publish
+     */
+    public String fetchStaStateNative() {
+        try {
+            return mService.fetchStaStateNative();
+        } catch (RemoteException e) {
+            return null;
+        }
+    }
 }

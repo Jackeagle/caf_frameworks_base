@@ -338,6 +338,9 @@
          capability can provide power savings when wifi needs to be always kept on. -->
     <bool translatable="false" name="config_wifi_background_scan_support">false</bool>
 
+    <!-- Wifi handle safe channel intent from Android Telephony. -->
+    <bool translatable="false" name="config_wifi_handle_safe_channels_intent">false</bool>
+
     <!-- Integer indicating wpa_supplicant scan interval in milliseconds -->
     <integer translatable="false" name="config_wifi_supplicant_scan_interval">15000</integer>
 

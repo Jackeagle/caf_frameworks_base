@@ -96,6 +96,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Iterator;
 import java.util.regex.Pattern;
+import java.util.Random;
 
 /**
  * Track the state of Wifi connectivity. All event handling is done here,
@@ -110,6 +111,7 @@ import java.util.regex.Pattern;
  */
 public class WifiStateMachine extends StateMachine {
 
+    private static final String TAG = "WifiStateMachine";
     private static final String NETWORKTYPE = "WIFI";
     private static final boolean DBG = false;
 
@@ -140,8 +142,11 @@ public class WifiStateMachine extends StateMachine {
 
     /* Chipset supports background scan */
     private final boolean mBackgroundScanSupported;
+    private final boolean mHandleSafeChannelsIntent;
 
     private String mInterfaceName;
+    private int mChannel = 6;
+    private boolean mEnableConcurrency = false;
     /* Tethering interface could be separate from wlan interface */
     private String mTetherInterfaceName;
 
@@ -170,6 +175,10 @@ public class WifiStateMachine extends StateMachine {
     private boolean mBluetoothConnectionActive = false;
 
     private PowerManager.WakeLock mSuspendWakeLock;
+
+    private int mStartWithchannel = 0;
+    private int mStartSafeChannel = 0;
+    private int mEndSafeChannel = 0;
 
     /**
      * Interval in milliseconds between polling for RSSI
@@ -286,6 +295,7 @@ public class WifiStateMachine extends StateMachine {
     private AsyncChannel mReplyChannel = new AsyncChannel();
 
     private WifiP2pManager mWifiP2pManager;
+    private WifiManager mWifiManager;
     //Used to initiate a connection with WifiP2pService
     private AsyncChannel mWifiP2pChannel;
     private AsyncChannel mWifiApConfigChannel;
@@ -609,6 +619,9 @@ public class WifiStateMachine extends StateMachine {
     private static final String ACTION_DELAYED_DRIVER_STOP =
         "com.android.server.WifiManager.action.DELAYED_DRIVER_STOP";
 
+    private static final String ACTION_SAFE_WIFI_CHANNELS_CHANGED =
+            "qualcomm.intent.action.SAFE_WIFI_CHANNELS_CHANGED";
+
     private static final String ACTION_REFRESH_BATCHED_SCAN =
             "com.android.server.WifiManager.action.REFRESH_BATCHED_SCAN";
     /**
@@ -651,6 +664,7 @@ public class WifiStateMachine extends StateMachine {
         super("WifiStateMachine");
         mContext = context;
         mInterfaceName = wlanInterface;
+        mEnableConcurrency = enableConcurrency;
 
         mNetworkInfo = new NetworkInfo(ConnectivityManager.TYPE_WIFI, 0, NETWORKTYPE, "");
         mBatteryStats = IBatteryStats.Stub.asInterface(ServiceManager.getService(
@@ -708,6 +722,9 @@ public class WifiStateMachine extends StateMachine {
         mBackgroundScanSupported = mContext.getResources().getBoolean(
                 R.bool.config_wifi_background_scan_support);
 
+        mHandleSafeChannelsIntent = mContext.getResources().getBoolean(
+                R.bool.config_wifi_handle_safe_channels_intent);
+
         mPrimaryDeviceType = mContext.getResources().getString(
                 R.string.config_wifi_p2p_device_type);
 
@@ -725,6 +742,10 @@ public class WifiStateMachine extends StateMachine {
                     sendMessage(CMD_TETHER_STATE_CHANGE, new TetherStateChange(available, active));
                 }
             },new IntentFilter(ConnectivityManager.ACTION_TETHER_STATE_CHANGED));
+
+        IntentFilter mSafeChannelfilter = new IntentFilter();
+        mSafeChannelfilter.addAction(ACTION_SAFE_WIFI_CHANNELS_CHANGED);
+        mContext.registerReceiver(WifiStateReceiver, mSafeChannelfilter);
 
         mContext.registerReceiver(
                 new BroadcastReceiver() {
@@ -834,6 +855,113 @@ public class WifiStateMachine extends StateMachine {
         mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
     }
 
+    private BroadcastReceiver WifiStateReceiver = new BroadcastReceiver() {
+
+         public void onReceive(Context context, Intent intent) {
+             if (intent.getAction().equals(
+                 ACTION_SAFE_WIFI_CHANNELS_CHANGED)) {
+                 int state = -1;
+                 int staOperatingChannel = 0;
+                 mStartSafeChannel = intent.getIntExtra("start_safe_channel",
+                                                        -1);
+                 mEndSafeChannel = intent.getIntExtra("end_safe_channel", -1);
+                 mStartWithchannel = 0;
+                 if (DBG) {
+                     Log.d(TAG, "Received ACTION_SAFE_WIFI_CHANNELS_CHANGED");
+                     Log.d(TAG, " mStartSafeChannel= " + mStartSafeChannel +
+                                " mEndSafeChannel= " + mEndSafeChannel +
+                                " mEnableConcurrency= " + mEnableConcurrency +
+                                " mHandleSafeChannelsIntent= " +
+                                mHandleSafeChannelsIntent);
+                 }
+
+                 if (!mHandleSafeChannelsIntent) {
+                     return;
+                 }
+
+                 if (mEnableConcurrency &&
+                     mWifiTetherStateMachine != null) {
+                     if (getCurrentState() == mObtainingIpState ||
+                         getCurrentState() == mL2ConnectedState ||
+                         getCurrentState() == mConnectedState) {
+                         staOperatingChannel = mWifiNative.fetchChannelNative();
+                     }
+                     state = mWifiTetherStateMachine.syncGetWifiApState();
+                 } else {
+                     state = syncGetWifiApState();
+                 }
+
+                 if (state == WIFI_AP_STATE_ENABLED) {
+                     int currentChannel = getSapOperatingChannel();
+                     if (DBG) {
+                         Log.d(TAG, "SAP Operating channel = " + currentChannel);
+                         Log.d(TAG, "STA channel = " + staOperatingChannel);
+                     }
+
+                     // if SAP is operating in 5GHz then no need to restart,
+                     // since intent only provides channels in 2.4GHz band.
+                     // STA channel will be populated only in case of 3 port concurrency
+                     // ignore safe channel event if STA and SAP operating in same channel.
+                     if (currentChannel < 1 ||
+                         currentChannel > 14||
+                         currentChannel == staOperatingChannel) {
+                         return;
+                     }
+
+                     if (currentChannel < mStartSafeChannel ||
+                         currentChannel > mEndSafeChannel) {
+                         if (DBG) {
+                             Log.d(TAG,
+                             "SAP operating on interfering channel, restart");
+                         }
+                         if (mStartSafeChannel > 0) {
+                             int[] channels = new int[14];
+                             int count = 0;
+
+                             // Check if we have social channels
+                             // in safe channel list
+                             if (mStartSafeChannel == 1 &&
+                                 mEndSafeChannel >= 1) {
+                                 channels[count++] = 1;
+                             }
+                             if (mStartSafeChannel <= 6 &&
+                                 mEndSafeChannel >= 6) {
+                                 channels[count++] = 6;
+                             }
+                             if (mStartSafeChannel <= 11 &&
+                                 mEndSafeChannel >= 11) {
+                                 channels[count++] = 11;
+                             }
+
+                             if (count == 0) {
+                                 int i;
+                                 // No social channels in safe channel list
+                                 // extarct available channels from the list
+                                 for (i = 1; i <= 14; i++) {
+                                      if (i >= mStartSafeChannel &&
+                                          i <= mEndSafeChannel) {
+                                          channels[count++] = i;
+                                      }
+                                 }
+                             }
+
+                             if (count > 0) {
+                                 Random rand = new Random();
+                                 mStartWithchannel =
+                                                 channels[rand.nextInt(count)];
+                                 if (DBG) {
+                                     Log.d(TAG, "start with channel = " +
+                                                 mStartWithchannel);
+                                 }
+                                 restartSoftApIfOn();
+                             }
+                         }
+                     }
+                 }
+             }
+         }
+    };
+
     /*********************************************************
      * Methods exposed for public use
      ********************************************************/
@@ -861,6 +989,21 @@ public class WifiStateMachine extends StateMachine {
      */
     public void startScan(int callingUid, WorkSource workSource) {
         sendMessage(CMD_START_SCAN, callingUid, 0, workSource);
+    }
+
+    public String fetchStaStateNative() {
+        // Supplicant state and Wifistatemachine supplicant status
+        // will mismatch hence get wpa_state from supplicant.
+        String statusString = mWifiNative.status();
+        String[] dataTokens = statusString.split("\n");
+        for (String token : dataTokens) {
+            String[] nameValue = token.split("=");
+            if (nameValue[0].equals("wpa_state")) {
+                log("wpa_state = " + nameValue[1]);
+                return nameValue[1];
+            }
+        }
+        return null;
     }
 
     /**
@@ -1277,6 +1420,16 @@ public class WifiStateMachine extends StateMachine {
         WifiConfiguration ret = (WifiConfiguration) resultMsg.obj;
         resultMsg.recycle();
         return ret;
+    }
+
+    // Function to get SAP operating Channel
+    public int getSapOperatingChannel() {
+        try {
+            return mNwService.getSapOperatingChannel();
+        } catch(Exception e) {
+            loge("Exception in getSapOperatingChannel");
+            return -1;
+        }
     }
 
     /**
@@ -2453,6 +2606,7 @@ public class WifiStateMachine extends StateMachine {
         new Thread(new Runnable() {
             public void run() {
                 try {
+                    config.channel = mChannel;
                     mNwService.startAccessPoint(config, mInterfaceName);
                 } catch (Exception e) {
                     loge("Exception in softap start " + e);
@@ -4536,5 +4690,30 @@ public class WifiStateMachine extends StateMachine {
         Message msg = Message.obtain();
         msg.arg2 = srcMsg.arg2;
         return msg;
+    }
+
+    private void restartSoftApIfOn() {
+        if (mStartWithchannel <= 0) {
+            Log.e(TAG, "Invalid channel " + mStartWithchannel);
+            return;
+        }
+        if (mEnableConcurrency && mWifiTetherStateMachine != null) {
+            if (DBG) Log.d(TAG, "Disabling wifi ap");
+            mWifiTetherStateMachine.setHostApRunning(null, false);
+            mWifiTetherStateMachine.channel = mStartWithchannel;
+            if (DBG) Log.d(TAG, "Enabling wifi ap");
+            mWifiTetherStateMachine.setHostApRunning(null, true);
+        } else {
+            if (DBG) Log.d(TAG, "Disabling wifi ap");
+            setHostApRunning(null, false);
+            mChannel = mStartWithchannel;
+            if (DBG) Log.d(TAG, "Enabling wifi ap");
+            setHostApRunning(null, true);
+        }
+
+        if (DBG) {
+            Log.d(TAG, "Restart softap Done, mStartWithchannel=" +
+                  mStartWithchannel);
+        }
     }
 }

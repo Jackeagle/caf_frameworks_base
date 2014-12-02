@@ -1670,6 +1670,12 @@ public final class WifiService extends IWifiManager.Stub {
         Log.d(TAG,"SAPInterfaceName:= " + mSAPInterfaceName);
         return mSAPInterfaceName;
     }
+
+    public String fetchStaStateNative() {
+        enforceAccessPermission();
+        return mWifiStateMachine.fetchStaStateNative();
+    }
+
     private void readConcurrencyConfig() {
         BufferedReader reader = null;
         try {
