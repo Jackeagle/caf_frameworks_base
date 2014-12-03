@@ -1495,10 +1495,14 @@ public class TelephonyManager {
     //
     //
 
-    /** SIM card state: Unknown. Signifies that the SIM is in transition
-     *  between states. For example, when the user inputs the SIM pin
-     *  under PIN_REQUIRED state, a query for sim status returns
-     *  this state before turning to SIM_STATE_READY. */
+    /**
+     * SIM card state: Unknown. Signifies that the SIM is in transition
+     * between states. For example, when the user inputs the SIM pin
+     * under PIN_REQUIRED state, a query for sim status returns
+     * this state before turning to SIM_STATE_READY.
+     *
+     * These are the ordinal value of IccCardConstants.State.
+     */
     public static final int SIM_STATE_UNKNOWN = 0;
     /** SIM card state: no SIM card is available in the device */
     public static final int SIM_STATE_ABSENT = 1;
@@ -1506,14 +1510,22 @@ public class TelephonyManager {
     public static final int SIM_STATE_PIN_REQUIRED = 2;
     /** SIM card state: Locked: requires the user's SIM PUK to unlock */
     public static final int SIM_STATE_PUK_REQUIRED = 3;
-    /** SIM card state: Locked: requries a network PIN to unlock */
+    /** SIM card state: Locked: requires a network PIN to unlock */
     public static final int SIM_STATE_NETWORK_LOCKED = 4;
     /** SIM card state: Ready */
     public static final int SIM_STATE_READY = 5;
-    /** SIM card state: SIM Card Error, Sim Card is present but faulty
+    /** SIM card state: SIM Card is NOT READY
      *@hide
      */
-    public static final int SIM_STATE_CARD_IO_ERROR = 6;
+    public static final int SIM_STATE_NOT_READY = 6;
+    /** SIM card state: SIM Card Error, permanently disabled
+     *@hide
+     */
+    public static final int SIM_STATE_PERM_DISABLED = 7;
+    /** SIM card state: SIM Card Error, present but faulty
+     *@hide
+     */
+    public static final int SIM_STATE_CARD_IO_ERROR = 8;
 
     /**
      * @return true if a ICC card is present
@@ -1543,8 +1555,7 @@ public class TelephonyManager {
     }
 
     /**
-     * Returns a constant indicating the state of the
-     * device SIM card.
+     * Returns a constant indicating the state of the default SIM card.
      *
      * @see #SIM_STATE_UNKNOWN
      * @see #SIM_STATE_ABSENT
@@ -1552,6 +1563,8 @@ public class TelephonyManager {
      * @see #SIM_STATE_PUK_REQUIRED
      * @see #SIM_STATE_NETWORK_LOCKED
      * @see #SIM_STATE_READY
+     * @see #SIM_STATE_NOT_READY
+     * @see #SIM_STATE_PERM_DISABLED
      * @see #SIM_STATE_CARD_IO_ERROR
      */
     public int getSimState() {
@@ -1559,10 +1572,9 @@ public class TelephonyManager {
     }
 
     /**
-     * Returns a constant indicating the state of the
-     * device SIM card in a slot.
+     * Returns a constant indicating the state of the device SIM card in a slot.
      *
-     * @param slotId
+     * @param slotIdx
      *
      * @see #SIM_STATE_UNKNOWN
      * @see #SIM_STATE_ABSENT
@@ -1570,39 +1582,20 @@ public class TelephonyManager {
      * @see #SIM_STATE_PUK_REQUIRED
      * @see #SIM_STATE_NETWORK_LOCKED
      * @see #SIM_STATE_READY
+     * @see #SIM_STATE_NOT_READY
+     * @see #SIM_STATE_PERM_DISABLED
+     * @see #SIM_STATE_CARD_IO_ERROR
      */
     /** {@hide} */
-    // FIXME the argument to pass is subId ??
-    public int getSimState(int slotId) {
-        int[] subId = SubscriptionManager.getSubId(slotId);
+    public int getSimState(int slotIdx) {
+        int[] subId = SubscriptionManager.getSubId(slotIdx);
         if (subId == null || subId.length == 0) {
-            return SIM_STATE_ABSENT;
-        }
-        // FIXME Do not use a property to determine SIM_STATE, call
-        // appropriate method on some object.
-        int phoneId = SubscriptionManager.getPhoneId(subId[0]);
-        String prop = getTelephonyProperty(phoneId, TelephonyProperties.PROPERTY_SIM_STATE, "");
-        if ("ABSENT".equals(prop)) {
-            return SIM_STATE_ABSENT;
-        }
-        else if ("PIN_REQUIRED".equals(prop)) {
-            return SIM_STATE_PIN_REQUIRED;
-        }
-        else if ("PUK_REQUIRED".equals(prop)) {
-            return SIM_STATE_PUK_REQUIRED;
-        }
-        else if ("PERSO_LOCKED".equals(prop)) {
-            return SIM_STATE_NETWORK_LOCKED;
-        }
-        else if ("READY".equals(prop)) {
-            return SIM_STATE_READY;
-        }
-        else if ("CARD_IO_ERROR".equals(prop)) {
-            return SIM_STATE_CARD_IO_ERROR;
-        }
-        else {
+            Rlog.d(TAG, "getSimState:- empty subId return SIM_STATE_ABSENT");
             return SIM_STATE_UNKNOWN;
         }
+        int simState = SubscriptionManager.getSimStateForSubscriber(subId[0]);
+        Rlog.d(TAG, "getSimState: simState=" + simState + " slotIdx=" + slotIdx);
+        return simState;
     }
 
     /**
@@ -1614,7 +1607,7 @@ public class TelephonyManager {
      * @see #getSimState
      */
     public String getSimOperator() {
-        int subId = mSubscriptionManager.getDefaultDataSubId();
+        int subId = SubscriptionManager.getDefaultDataSubId();
         if (!SubscriptionManager.isUsableSubIdValue(subId)) {
             subId = SubscriptionManager.getDefaultSmsSubId();
             if (!SubscriptionManager.isUsableSubIdValue(subId)) {
@@ -2846,8 +2839,6 @@ public class TelephonyManager {
      * @hide
      */
     public static void setTelephonyProperty(int phoneId, String property, String value) {
-        Rlog.d(TAG, "setTelephonyProperty property: " + property + " phoneId: " + phoneId +
-                " value: " + value);
         String propVal = "";
         String p[] = null;
         String prop = SystemProperties.get(property);
@@ -2861,7 +2852,8 @@ public class TelephonyManager {
         }
 
         if (!SubscriptionManager.isValidPhoneId(phoneId)) {
-            Rlog.d(TAG, "setTelephonyProperty invalid phone id");
+            Rlog.d(TAG, "setTelephonyProperty: invalid phoneId=" + phoneId +
+                    " property=" + property + " value: " + value + " prop=" + prop);
             return;
         }
 
@@ -2880,13 +2872,15 @@ public class TelephonyManager {
             }
         }
 
-        // TODO: workaround for QC
-        if (property.length() > SystemProperties.PROP_NAME_MAX || propVal.length() > SystemProperties.PROP_VALUE_MAX) {
-            Rlog.d(TAG, "setTelephonyProperty length too long:" + property + ", " + propVal);
+        if (property.length() > SystemProperties.PROP_NAME_MAX
+                || propVal.length() > SystemProperties.PROP_VALUE_MAX) {
+            Rlog.d(TAG, "setTelephonyProperty: property to long phoneId=" + phoneId +
+                    " property=" + property + " value: " + value + " propVal=" + propVal);
             return;
         }
 
-        Rlog.d(TAG, "setTelephonyProperty property=" + property + " propVal=" + propVal);
+        Rlog.d(TAG, "setTelephonyProperty: success phoneId=" + phoneId +
+                " property=" + property + " value: " + value + " propVal=" + propVal);
         SystemProperties.set(property, propVal);
     }
 
@@ -2992,6 +2986,8 @@ public class TelephonyManager {
                 propVal = values[phoneId];
             }
         }
+        Rlog.d(TAG, "getTelephonyProperty: return propVal='" + propVal + "' phoneId=" + phoneId
+                + " property='" + property + "' defaultVal='" + defaultVal + "' prop=" + prop);
         return propVal == null ? defaultVal : propVal;
     }
 
