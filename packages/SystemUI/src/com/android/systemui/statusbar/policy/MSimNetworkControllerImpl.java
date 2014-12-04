@@ -1262,7 +1262,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
          || mMSimLastSimIconId[phoneId] != mNoMSimIconId[phoneId]
          || mMSimLastcombinedActivityIconId[phoneId]
                 != mMSimcombinedActivityIconId[phoneId]
-         || getLastVoiceNetworkType() != getVoiceNetworkType(phoneId))
+         || getLastVoiceNetworkType(phoneId) != getVoiceNetworkType(phoneId))
         {
             // NB: the mLast*s will be updated later
             for (MSimSignalCluster cluster : mSimSignalClusters) {
