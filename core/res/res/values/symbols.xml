@@ -254,6 +254,7 @@
   <java-symbol type="bool" name="action_bar_embed_tabs_pre_jb" />
   <java-symbol type="bool" name="action_bar_expanded_action_views_exclusive" />
   <java-symbol type="bool" name="config_avoidGfxAccel" />
+  <java-symbol type="bool" name="always_popup_usb_computer_connection" />
   <java-symbol type="bool" name="always_popup_usb_computer_connection_option" />
   <java-symbol type="bool" name="config_allowActionMenuItemTextWithIcon" />
   <java-symbol type="bool" name="config_bluetooth_address_validation" />
@@ -2173,6 +2174,7 @@
   <java-symbol type="integer" name="flingboost_cpuboost_param" />
   <java-symbol type="integer" name="flingboost_pcdisbl_param" />
   <java-symbol type="integer" name="flingboost_ksmboost_param" />
+  <java-symbol type="integer" name="flingboost_preferidle_param" />
 
   <!-- cpu boost for horizontal scroll -->
   <java-symbol type="bool" name="config_enableCpuBoostForScroller" />
@@ -2181,6 +2183,7 @@
   <java-symbol type="integer" name="scrollboost_cpuboost_param" />
   <java-symbol type="integer" name="scrollboost_pcdisbl_param" />
   <java-symbol type="integer" name="scrollboost_ksmboost_param" />
+  <java-symbol type="integer" name="scrollboost_preferidle_param" />
 
   <!-- Data Connectivity Error Configurations -->
   <java-symbol type="bool" name="config_reject_ggsn_perm_failure" />
@@ -2199,4 +2202,18 @@
   <java-symbol type="integer" name="launchboost_ksmboost_param" />
 
   <java-symbol type="bool" name="config_fetch_apn_from_omh_card" />
+  <!-- cpu boost for Animationboost -->
+  <java-symbol type="bool" name="config_enablePerfBoostForAnimation" />
+  <java-symbol type="integer" name="animationboost_timeout_param" />
+  <java-symbol type="integer" name="animationboost_schedboost_param" />
+  <java-symbol type="integer" name="animationboost_cpuboost_param" />
+
+  <!-- Activities list for boost -->
+  <java-symbol type="array"  name="boost_activityList" />
+
+  <!-- Activity scroll boost params -->
+  <java-symbol type="integer" name="ascrollboost_timeout" />
+  <java-symbol type="integer" name="ascrollboost_schedboost" />
+  <java-symbol type="integer" name="ascrollboost_cpuboost" />
+  <java-symbol type="integer" name="ascrollboost_pcdisbl" />
 </resources>
