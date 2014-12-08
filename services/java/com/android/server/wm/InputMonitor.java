@@ -320,8 +320,9 @@ final class InputMonitor implements InputManagerService.WindowManagerCallbacks {
     /* Notifies that the input device configuration has changed. */
     @Override
     public void notifyConfigurationChanged() {
-        mService.sendNewConfiguration();
-
+        synchronized (mService.mWindowMap) {
+            mService.sendNewConfiguration();
+        }
         synchronized (mInputDevicesReadyMonitor) {
             if (!mInputDevicesReady) {
                 mInputDevicesReady = true;
