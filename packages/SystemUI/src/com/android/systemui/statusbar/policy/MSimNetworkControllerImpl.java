@@ -74,6 +74,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     int[] mMSimDataActivity;
     int[] mMSimDataServiceState;
     ServiceState[] mMSimServiceState;
+    ServiceState[] mMSimLastServiceState;
     SignalStrength[] mMSimSignalStrength;
     private PhoneStateListener[] mMSimPhoneStateListener;
     private String[] mCarrierTextSub;
@@ -132,6 +133,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         mMSimSignalStrength = new SignalStrength[numPhones];
         mMSimDataServiceState = new int[numPhones];
         mMSimServiceState = new ServiceState[numPhones];
+        mMSimLastServiceState = new ServiceState[numPhones];
         mMSimState = new IccCardConstants.State[numPhones];
         mMSimIconId = new int[numPhones];
         mMSimPhoneSignalIconId = new int[numPhones];
@@ -166,6 +168,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         for (int i=0; i < numPhones; i++) {
             mMSimSignalStrength[i] = new SignalStrength();
             mMSimServiceState[i] = new ServiceState();
+            mMSimLastServiceState[i] = new ServiceState();
             mMSimState[i] = IccCardConstants.State.READY;
             // phone_signal
             mMSimPhoneSignalIconId[i] = 0;
@@ -1258,7 +1261,8 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
          || mLastAirplaneMode               != mAirplaneMode
          || mMSimLastSimIconId[phoneId] != mNoMSimIconId[phoneId]
          || mMSimLastcombinedActivityIconId[phoneId]
-                != mMSimcombinedActivityIconId[phoneId])
+                != mMSimcombinedActivityIconId[phoneId]
+         || getLastVoiceNetworkType() != getVoiceNetworkType(phoneId))
         {
             // NB: the mLast*s will be updated later
             for (MSimSignalCluster cluster : mSimSignalClusters) {
@@ -1268,6 +1272,10 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
 
         if (mLastAirplaneMode != mAirplaneMode) {
             mLastAirplaneMode = mAirplaneMode;
+        }
+
+        if (mMSimLastServiceState[phoneId] != mMSimServiceState[phoneId]) {
+            mMSimLastServiceState[phoneId] = mMSimServiceState[phoneId];
         }
 
         // the phone icon on phones
@@ -1350,6 +1358,13 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             return TelephonyManager.NETWORK_TYPE_UNKNOWN;
         }
         return mMSimServiceState[sub].getVoiceNetworkType();
+    }
+
+    public int getLastVoiceNetworkType(int sub) {
+        if (mMSimLastServiceState[sub] == null) {
+            return TelephonyManager.NETWORK_TYPE_UNKNOWN;
+        }
+        return mMSimLastServiceState[sub].getVoiceNetworkType();
     }
 
     public int getDataNetworkType(int sub) {
