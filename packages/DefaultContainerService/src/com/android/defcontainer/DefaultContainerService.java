@@ -856,7 +856,7 @@ public class DefaultContainerService extends IntentService {
          * real FAT size. Your FAT size varies with how many directory entries
          * you need, how big the whole filesystem is, and other such headaches.
          */
-        sizeMb++;
+        sizeMb += 4;
 
         return sizeMb;
     }
