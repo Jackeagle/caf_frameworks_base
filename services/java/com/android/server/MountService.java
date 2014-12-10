@@ -684,15 +684,18 @@ class MountService extends IMountService.Stub
             if (Environment.MEDIA_UNMOUNTED.equals(state)) {
                 mPms.updateExternalMediaStatus(false, false);
 
-                /*
-                 * Some OBBs might have been unmounted when this volume was
-                 * unmounted, so send a message to the handler to let it know to
-                 * remove those from the list of mounted OBBS.
-                 */
+            /*
+             * Some OBBs might have been unmounted when this volume was
+             * unmounted, so send a message to the handler to let it know to
+             * remove those from the list of mounted OBBS.
+             */
                 mObbActionHandler.sendMessage(mObbActionHandler.obtainMessage(
                         OBB_FLUSH_MOUNT_STATE, path));
             } else if (Environment.MEDIA_MOUNTED.equals(state)) {
                 mPms.updateExternalMediaStatus(true, false);
+            } else if (Environment.MEDIA_BAD_REMOVAL.equals(state)){
+                 Slog.d(TAG, "bad remove call PMS");
+                mPms.unloadInstalledExternalPackages(path);
             }
         }
 

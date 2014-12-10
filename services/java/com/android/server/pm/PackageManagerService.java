@@ -166,6 +166,7 @@ import libcore.io.StructStat;
 import com.android.internal.R;
 
 import com.android.services.SecurityBridge.api.PackageManagerMonitor;
+import android.os.storage.IMountService;
 
 /**
  * Keep track of all those .apks everywhere.
@@ -232,6 +233,9 @@ public class PackageManagerService extends IPackageManager.Stub {
 
     private static final String SECURITY_BRIDGE_NAME = "com.android.services.SecurityBridge.core.PackageManagerSB";
     private PackageManagerMonitor mSecurityBridge;
+
+    // The latest secure container list while external storage mounted.
+    static private String sLatestSecureContainerList[] = null;
 
     /**
      * Timeout (in milliseconds) after which the watchdog should declare that
@@ -910,6 +914,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                     } else {
                         Slog.e(TAG, "Bogus post-install token " + msg.arg1);
                     }
+                    sLatestSecureContainerList = PackageHelper.getSecureContainerList();
                 } break;
                 case UPDATED_MEDIA_STATUS: {
                     if (DEBUG_SD_INSTALL) Log.i(TAG, "Got message UPDATED_MEDIA_STATUS");
@@ -9017,6 +9022,7 @@ public class PackageManagerService extends IPackageManager.Stub {
             res.returnCode = PackageManager.INSTALL_SUCCEEDED;
             //to update install status
             mSettings.writeLPr();
+            sLatestSecureContainerList = PackageHelper.getSecureContainerList();
         }
     }
 
@@ -9608,6 +9614,7 @@ public class PackageManagerService extends IPackageManager.Stub {
             outInfo.args = createInstallArgs(packageFlagsToInstallFlags(ps), ps.codePathString,
                     ps.resourcePathString, ps.nativeLibraryPathString);
         }
+        sLatestSecureContainerList = PackageHelper.getSecureContainerList();
         return true;
     }
 
@@ -11050,6 +11057,136 @@ public class PackageManagerService extends IPackageManager.Stub {
         updateExternalMediaStatusInner(true, false, false);
     }
 
+    /**
+     * unload packages which installed on external storage.
+     * This method only called on external storage unexpected removed.
+     */
+    public void unloadInstalledExternalPackages(final String path) {
+        int callingUid = Binder.getCallingUid();
+        if (callingUid != 0 && callingUid != Process.SYSTEM_UID) {
+            throw new SecurityException("Installed external packages only can be cleared by the system");
+        }
+        // Queue up an async operation since the package installation may take a
+        // little while.
+        mHandler.post(new Runnable() {
+            public void run() {
+                unloadInstalledExternalPackagesInner();
+                unmountExternal(path);
+            }
+        });
+    }
+
+    private void unmountExternal(final String path){
+            IBinder service = ServiceManager.getService("mount");
+            if (service != null && path != null ) {
+                IMountService mountService = IMountService.Stub.asInterface(service);
+                try {
+                    mountService.unmountVolume(path, true, false);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Can't get mount service");
+                }
+            } else {
+                Log.e(TAG, "Can't get mount service");
+            }
+        }
+
+    private void unloadInstalledExternalPackagesInner() {
+        // Collection of uids
+        int uidArr[] = null;
+        // Collection of stale containers
+        HashSet<String> removeCids = new HashSet<String>();
+        // Collection of packages on external media with valid containers.
+        HashMap<AsecInstallArgs, String> processCids = new HashMap<AsecInstallArgs, String>();
+        // Get list of secure containers.
+        final String list[]  = sLatestSecureContainerList ;
+
+        if (list == null || list.length == 0) {
+            Log.i(TAG, "No secure containers on sdcard");
+        } else {
+            // Process list of secure containers and categorize them
+            // as active or stale based on their package internal state.
+            int uidList[] = new int[list.length];
+            int num = 0;
+            // reader
+            synchronized (mPackages) {
+                for (String cid : list) {
+                    if (DEBUG_SD_INSTALL)
+                        Log.i(TAG, "Processing container " + cid);
+                    String pkgName = getAsecPackageName(cid);
+                    if (pkgName == null) {
+                        if (DEBUG_SD_INSTALL)
+                            Log.i(TAG, "Container : " + cid + " stale");
+                        removeCids.add(cid);
+                        continue;
+                    }
+
+                    if (DEBUG_SD_INSTALL)
+                        Log.i(TAG, "Looking for pkg : " + pkgName);
+
+                    final PackageSetting ps = mSettings.mPackages.get(pkgName);
+                    if (ps == null) {
+                        Log.i(TAG, "Deleting container with no matching settings " + cid);
+                        removeCids.add(cid);
+                        continue;
+                    }
+
+                    /*
+                     * Skip packages that are not external if we're unmounting
+                     * external storage.
+                     */
+                    if (!isExternal(ps)) {
+                        continue;
+                    }
+
+                    if (PackageHelper.getSdFilesystem(cid) == null) {
+                        continue;
+                    }
+
+                    final AsecInstallArgs args = new AsecInstallArgs(cid, isForwardLocked(ps));
+                    // The package status is changed only if the code path
+                    // matches between settings and the container id.
+                    if (ps.codePathString != null && ps.codePathString.equals(args.getCodePath())) {
+                        if (DEBUG_SD_INSTALL) {
+                            Log.i(TAG, "Container : " + cid + " corresponds to pkg : " + pkgName
+                                    + " at code path: " + ps.codePathString);
+                        }
+
+                        // We do have a valid package installed on sdcard
+                        processCids.put(args, ps.codePathString);
+                        final int uid = ps.appId;
+                        if (uid != -1) {
+                            uidList[num++] = uid;
+                        }
+                    } else {
+                        Log.i(TAG, "Deleting stale container for " + cid);
+                        removeCids.add(cid);
+                    }
+                }
+            }
+
+            if (num > 0) {
+                // Sort uid list
+                Arrays.sort(uidList, 0, num);
+                // Throw away duplicates
+                uidArr = new int[num];
+                uidArr[0] = uidList[0];
+                int di = 0;
+                for (int i = 1; i < num; i++) {
+                    if (uidList[i - 1] != uidList[i]) {
+                        uidArr[di++] = uidList[i];
+                    }
+                }
+            }
+        }
+
+        sLatestSecureContainerList = null;
+        if (DEBUG_SD_INSTALL) {
+            Log.i(TAG, "Unloading packages");
+        }
+        unloadMediaPackages(processCids, uidArr, false);
+
+    }
+
     /*
      * Collect information of applications on external media, map them against
      * existing containers and update information based on current mount status.
@@ -11066,6 +11203,11 @@ public class PackageManagerService extends IPackageManager.Stub {
         HashMap<AsecInstallArgs, String> processCids = new HashMap<AsecInstallArgs, String>();
         // Get list of secure containers.
         final String list[] = PackageHelper.getSecureContainerList();
+        // save last list of secure containers
+        if (list != null && list.length != 0) {
+            sLatestSecureContainerList = list;
+        }
+
         if (list == null || list.length == 0) {
             Log.i(TAG, "No secure containers on sdcard");
         } else {
@@ -11534,6 +11676,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                                         } else {
                                             pkg.applicationInfo.flags &= ~ApplicationInfo.FLAG_EXTERNAL_STORAGE;
                                         }
+                                        sLatestSecureContainerList = PackageHelper.getSecureContainerList();
                                         ps.setFlags(pkg.applicationInfo.flags);
                                         mAppDirs.remove(oldCodePath);
                                         mAppDirs.put(newCodePath, pkg);
