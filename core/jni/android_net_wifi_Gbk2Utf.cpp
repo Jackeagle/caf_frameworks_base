@@ -470,9 +470,16 @@ jboolean setNetworkVariable(char *buf)
     char value[BUF_SIZE] = {0};
     char interface[BUF_SIZE] = {0};
     char dummy[BUF_SIZE] = {0};
+    char ssid[BUF_SIZE] = {0};
+    size_t utf8_len = 0;
 
     /* parse SET_NETWORK command*/
-    sscanf(buf, "%s %s %d %s \"%s\"", interface, dummy, &netId, name, value);
+    sscanf(buf, "%s %s %d %s %s", interface, dummy, &netId, name, value);
+
+    /* Framework will convert string to HEX */
+    if (0 == strncmp(name, "ssid", 4)) {
+        createFromHex(ssid, BUF_SIZE, value);
+    }
 
     if (DBG)
         ALOGD("parse SET_NETWORK command success, netId = %d, name = %s, value =%s, length=%d",
@@ -485,8 +492,9 @@ jboolean setNetworkVariable(char *buf)
     }
     while (pTmpItemNode) {
         ALOGD("ssid_utf8 = %s, length=%d, value =%s, length=%d",
-               pTmpItemNode->ssid_utf8->string(),strlen(pTmpItemNode->ssid_utf8->string()), value, strlen(value));
-        if (pTmpItemNode->ssid_utf8 && (0 == memcmp(pTmpItemNode->ssid_utf8->string(), value,
+               pTmpItemNode->ssid_utf8->string(),strlen(pTmpItemNode->ssid_utf8->string()), ssid, strlen(ssid));
+
+        if (pTmpItemNode->ssid_utf8 && (0 == memcmp(pTmpItemNode->ssid_utf8->string(), ssid,
             pTmpItemNode->ssid_utf8->length()))) {
             gbk_found = true;
             break;
