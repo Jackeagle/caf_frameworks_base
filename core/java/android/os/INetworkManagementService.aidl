@@ -488,4 +488,10 @@ interface INetworkManagementService
     * address from a custom routing table denoted by routeId
     */
    boolean delSrcRoute(in byte[] ip, int routeId);
+
+   /**
+    * Get SAP Current Operating Channel
+    */
+   int getSapOperatingChannel();
+
 }

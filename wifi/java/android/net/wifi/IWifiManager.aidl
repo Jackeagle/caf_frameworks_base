@@ -132,5 +132,7 @@ interface IWifiManager
     boolean isP2pAutoGoSet();
 
     String getSAPInterfaceName();
+
+    String fetchStaStateNative();
 }
 

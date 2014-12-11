@@ -985,6 +985,58 @@ public class WifiNative {
         return doBooleanCommand("P2P_SERV_DISC_CANCEL_REQ " + id);
     }
 
+    // Fetch Frequency on current connection
+    public int fetchChannelNative() {
+        int newFrequency = -1;
+        String signalPoll = signalPoll();
+
+        if (signalPoll != null) {
+            String[] lines = signalPoll.split("\n");
+            for (String line : lines) {
+                String[] prop = line.split("=");
+                if (prop.length < 2) continue;
+                try {
+                    if (prop[0].equals("FREQUENCY")) {
+                        newFrequency= Integer.parseInt(prop[1]);
+                        return freqToChannel(newFrequency);
+                    }
+                } catch (NumberFormatException e) {
+                }
+            }
+        }
+        return 0;
+    }
+
+    public int freqToChannel(int freq) {
+        int channel = 0;
+        if (freq >= 2412 && freq <= 2472) {
+            if (((freq - 2407) % 5) != 0) {
+                return 0;
+            }
+            channel = (freq - 2407) / 5;
+            return channel;
+        } else if (freq == 2484) {
+            // channel 14
+            channel = 14;
+            return channel;
+        } else if (freq >= 5180 && freq <= 5240) {
+            if (((freq - 5000) % 5) != 0) {
+                return 0;
+            }
+            // 5 GHz, channels 36..48
+            channel = (freq - 5000) / 5;
+            return channel;
+        } else if (freq >= 5745 && freq <= 5805) {
+            if (((freq - 5000) % 5) != 0) {
+                return 0;
+            }
+            // 5 GHz, channels 149..161
+            channel = (freq - 5000) / 5;
+            return channel;
+        }
+        return 0;
+    }
+
     /* Set the current mode of miracast operation.
      *  0 = disabled
      *  1 = operating as source

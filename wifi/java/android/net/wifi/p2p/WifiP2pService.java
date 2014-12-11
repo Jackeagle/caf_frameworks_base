@@ -133,6 +133,9 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     /* Idle time after a peer is gone when the group is torn down */
     private static final int GROUP_IDLE_TIME_S = 10;
 
+    private static final String ACTION_SAFE_WIFI_CHANNELS_CHANGED =
+            "qualcomm.intent.action.SAFE_WIFI_CHANNELS_CHANGED";
+
     private static final int BASE = Protocol.BASE_WIFI_P2P_SERVICE;
 
     /* Delayed message to timeout group creation */
@@ -183,13 +186,21 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
     public static final int DISABLED                        = 0;
 
     private final boolean mP2pSupported;
+    private final boolean mHandleSafeChannelsIntent;
 
     private WifiP2pDevice mThisDevice = new WifiP2pDevice();
+
+    private WifiManager mWifiManager;
 
     /* When a group has been explicitly created by an app, we persist the group
      * even after all clients have been disconnected until an explicit remove
      * is invoked */
     private boolean mAutonomousGroup;
+
+    /**@hide*/
+    public static boolean mIsWifiP2pEnabled = false;
+    private int mStartSafeChannel = 0;
+    private int mEndSafeChannel = 0;
 
     /* Invitation to join an existing p2p group */
     private boolean mJoinExistingGroup;
@@ -320,12 +331,95 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
         mP2pSupported = mContext.getPackageManager().hasSystemFeature(
                 PackageManager.FEATURE_WIFI_DIRECT);
+        mHandleSafeChannelsIntent = mContext.getResources().getBoolean(
+                R.bool.config_wifi_handle_safe_channels_intent);
 
         mThisDevice.primaryDeviceType = mContext.getResources().getString(
                 com.android.internal.R.string.config_wifi_p2p_device_type);
 
         mP2pStateMachine = new P2pStateMachine(TAG, mP2pSupported);
         mP2pStateMachine.start();
+
+        // Register ACTION_SAFE_WIFI_CHANNELS_CHANGED intent
+        // To receive safe channels intent from Android telephony
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_SAFE_WIFI_CHANNELS_CHANGED);
+        mContext.registerReceiver(new WifiStateReceiver(), filter);
+    }
+
+    private class WifiStateReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (intent.getAction().equals(ACTION_SAFE_WIFI_CHANNELS_CHANGED)) {
+                int staOperatingChannel = 0;
+                mStartSafeChannel = intent.getIntExtra("start_safe_channel", -1);
+                mEndSafeChannel = intent.getIntExtra("end_safe_channel", -1);
+                if (DBG) {
+                    Slog.d(TAG, "Received ACTION_SAFE_WIFI_CHANNELS_CHANGED broadcast");
+                    Slog.d(TAG, " mStartSafeChannel=" + mStartSafeChannel +
+                                " mEndSafeChannel=" + mEndSafeChannel +
+                                " mIsWifiP2pEnabled=" + mIsWifiP2pEnabled +
+                                " mHandleSafeChannelsIntent= " +
+                                mHandleSafeChannelsIntent);
+                }
+
+
+                if (mIsWifiP2pEnabled && mHandleSafeChannelsIntent) {
+
+                    if (mWifiManager != null &&
+                        mWifiManager.getConcurrency()) {
+
+                        String StaState = mWifiManager.fetchStaStateNative();
+                        if (StaState == null ||
+                            StaState.equals("ASSOCIATING") ||
+                            StaState.equals("ASSOCIATED") ||
+                            StaState.equals("COMPLETED")) {
+                            staOperatingChannel =
+                            mP2pStateMachine.mWifiNative.fetchChannelNative();
+                        }
+                    }
+                    if (mP2pStateMachine.mWifiP2pInfo.groupFormed) {
+                        int currentChannel = 0;
+                        int currentOperatingFreq =
+                            mP2pStateMachine.mGroup.getGoOperatingFrequency();
+                        currentChannel =
+                        mP2pStateMachine.mWifiNative.freqToChannel(
+                                         currentOperatingFreq);
+
+                        if (DBG) {
+                            Slog.d(TAG, "GO operating frequency=" +
+                                         currentOperatingFreq);
+                            Slog.d(TAG, "current channel of P2P GO=" +
+                                         currentChannel);
+                            Slog.d(TAG, "STA channel=" + staOperatingChannel);
+                        }
+
+                        // if p2p-go is operating in 5GHz then no need
+                        // to restart, since intent only provides channels
+                        // in 2.4GHz band.
+                        // STA channel will be populated only in case of 3 port
+                        // concurrency ignore safe channel event if STA and
+                        // P2P-GO operating in same channel.
+                        if (currentChannel < 1 ||
+                            currentChannel > 14 ||
+                            currentChannel == staOperatingChannel) {
+                            return;
+                        }
+                        if (currentChannel < mStartSafeChannel ||
+                            currentChannel > mEndSafeChannel) {
+                            Slog.d(TAG,
+                                   "P2P GO is operating on unsafe channel!"
+                                   + currentChannel + " Terminate!");
+                            mP2pStateMachine.mWifiNative.p2pSetOperatingFreq(
+                                                         mStartSafeChannel);
+                            mP2pStateMachine.sendMessage(
+                            WifiMonitor.P2P_REMOVE_AND_REFORM_GROUP_EVENT);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public void connectivityServiceReady() {
@@ -784,6 +878,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             if (DBG) logd(getName() + message.toString());
             switch (message.what) {
                 case WifiMonitor.SUP_DISCONNECTION_EVENT:
+                    mIsWifiP2pEnabled = false;
                     if (DBG) logd("p2p socket connection lost");
                     transitionTo(mP2pDisabledState);
                     break;
@@ -848,6 +943,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             if (DBG) logd(getName() + message.toString());
             switch (message.what) {
                 case WifiMonitor.SUP_CONNECTION_EVENT:
+                    mIsWifiP2pEnabled = true;
                     if (DBG) logd("P2p socket connection successful");
                     transitionTo(mInactiveState);
                     break;
@@ -874,6 +970,8 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
             mNetworkInfo.setIsAvailable(true);
             sendP2pConnectionChangedBroadcast();
             initializeP2pSettings();
+            mWifiManager
+                = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
             int AutoGO = getAutoGoState();
             if (AutoGO == 1) {
                 Slog.d(TAG, "Start Auto GO Enabled");
@@ -1243,6 +1341,12 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
                             ret = mWifiNative.p2pGroupAdd(true);
                         }
                     } else {
+                        Slog.d(TAG, "startChannel while creating P2P Group=" +
+                                     mStartSafeChannel);
+                        if (mStartSafeChannel != 0) {
+                            ret = mWifiNative.p2pSetOperatingFreq(
+                                              mStartSafeChannel);
+                        }
                         ret = mWifiNative.p2pGroupAdd(false);
                     }
 
