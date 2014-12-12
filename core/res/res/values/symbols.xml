@@ -2216,4 +2216,7 @@
   <java-symbol type="integer" name="ascrollboost_schedboost" />
   <java-symbol type="integer" name="ascrollboost_cpuboost" />
   <java-symbol type="integer" name="ascrollboost_pcdisbl" />
+
+  <!-- From keyguard for showing am/pm in unlock screen -->
+  <java-symbol type="bool" name="config_show_ampm_in_unlock_screen" />
 </resources>
