@@ -2136,4 +2136,6 @@
     <string-array translatable="false" name="config_sms_convert_destination_number_support">
         <item>false</item>
     </string-array>
+   <!-- Controlling respond call via sms feature via config item -->
+   <bool name="config_reject_call_via_sms_enabled">true</bool>
 </resources>
