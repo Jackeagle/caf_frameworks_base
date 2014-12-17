@@ -5938,6 +5938,13 @@ public final class Settings {
                 "wifi_rssi_threshold";
 
        /**
+        * Setting to Create P2P autonomous group.
+        * @hide
+        */
+       public static final String AUTO_GO =
+                "create_autonomous_p2p_group";
+
+       /**
         * Used to save the Wifi_ON state prior to tethering.
         * This state will be checked to restore Wifi after
         * the user turns off tethering.

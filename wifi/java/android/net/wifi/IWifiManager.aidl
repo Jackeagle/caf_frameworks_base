@@ -154,5 +154,17 @@ interface IWifiManager
     void setAllowScansWithTraffic(int enabled);
 
     WifiConnectionStatistics getConnectionStatistics();
+
+    boolean getConcurrency();
+
+    boolean isP2pAutoGoSet();
+
+    String getSAPInterfaceName();
+
+    String fetchStaStateNative();
+
+    void setP2pAutoGoRestart();
+
+    void setP2pGoChannel();
 }
 
