@@ -430,4 +430,9 @@ interface INetworkManagementService
 
     void addInterfaceToLocalNetwork(String iface, in List<RouteInfo> routes);
     void removeInterfaceFromLocalNetwork(String iface);
+
+   /**
+    * Get SAP Current Operating Channel
+    */
+   int getSapOperatingChannel();
 }
