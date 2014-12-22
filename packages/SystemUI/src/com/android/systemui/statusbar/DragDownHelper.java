@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar;
 
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
@@ -126,7 +127,7 @@ public class DragDownHelper implements Gefingerpoken {
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                /*if (mDraggedFarEnough && mDragDownCallback.onDraggedDown(mStartingChild,
+                if (mDraggedFarEnough && mDragDownCallback.onDraggedDown(mStartingChild,
                         (int) (y - mInitialTouchY))) {
                     if (mStartingChild == null) {
                         mDragDownCallback.setEmptyDragAmount(0f);
@@ -136,7 +137,7 @@ public class DragDownHelper implements Gefingerpoken {
                     stopDragging();
                     return false;
                 }
-                break;*/
+                break;
             case MotionEvent.ACTION_CANCEL:
                 stopDragging();
                 return false;
@@ -222,7 +223,7 @@ public class DragDownHelper implements Gefingerpoken {
         /**
          * @return true if the interaction is accepted, false if it should be cancelled
          */
-        boolean onDraggedDown(View startingChild);
+        boolean onDraggedDown(View startingChild, int dragLengthY);
         void onDragDownReset();
         void onThresholdReached();
         void onTouchSlopExceeded();
