@@ -3463,12 +3463,13 @@ public class TelephonyManager {
     }
 
     /** @hide */
-    @SystemApi
     public void setDataEnabledUsingSubId(long subId, boolean enable) {
         try {
-            AppOpsManager appOps = (AppOpsManager)mContext.getSystemService(Context.APP_OPS_SERVICE);
+            AppOpsManager appOps = (AppOpsManager)mContext.getSystemService(
+                    Context.APP_OPS_SERVICE);
             if (enable) {
-                if (appOps.noteOp(AppOpsManager.OP_DATA_CONNECT_CHANGE) != AppOpsManager.MODE_ALLOWED) {
+                if (appOps.noteOp(AppOpsManager.OP_DATA_CONNECT_CHANGE)
+                        != AppOpsManager.MODE_ALLOWED) {
                     Log.w(TAG, "Permission denied by user.");
                     return;
                 }
