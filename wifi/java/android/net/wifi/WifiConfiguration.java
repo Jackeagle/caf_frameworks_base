@@ -45,6 +45,8 @@ public class WifiConfiguration implements Parcelable {
     public static final String hiddenSSIDVarName = "scan_ssid";
     /** {@hide} */
     public static final int INVALID_NETWORK_ID = -1;
+    /** {@hide} */
+    public static final String SIMNumVarName = "sim_num";
     /**
      * Recognized key management schemes.
      */
@@ -326,6 +328,12 @@ public class WifiConfiguration implements Parcelable {
      */
     public LinkProperties linkProperties;
 
+    /**
+     * @hide
+     * sim number selected
+     */
+    public int SIMNum;
+
     public WifiConfiguration() {
         networkId = INVALID_NETWORK_ID;
         SSID = null;
@@ -346,6 +354,7 @@ public class WifiConfiguration implements Parcelable {
         ipAssignment = IpAssignment.UNASSIGNED;
         proxySettings = ProxySettings.UNASSIGNED;
         linkProperties = new LinkProperties();
+        SIMNum = 1;
     }
 
     /**
@@ -444,7 +453,10 @@ public class WifiConfiguration implements Parcelable {
         if (this.preSharedKey != null) {
             sbuf.append('*');
         }
-
+        sbuf.append('\n').append(" sim_num ");
+        if (this.SIMNum > 0 ) {
+            sbuf.append('*');
+        }
         sbuf.append(enterpriseConfig);
         sbuf.append('\n');
 
@@ -604,6 +616,7 @@ public class WifiConfiguration implements Parcelable {
             ipAssignment = source.ipAssignment;
             proxySettings = source.proxySettings;
             linkProperties = new LinkProperties(source.linkProperties);
+            SIMNum = source.SIMNum;
         }
     }
 
@@ -633,6 +646,7 @@ public class WifiConfiguration implements Parcelable {
         dest.writeString(ipAssignment.name());
         dest.writeString(proxySettings.name());
         dest.writeParcelable(linkProperties, flags);
+        dest.writeInt(SIMNum);
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -663,6 +677,7 @@ public class WifiConfiguration implements Parcelable {
                 config.ipAssignment = IpAssignment.valueOf(in.readString());
                 config.proxySettings = ProxySettings.valueOf(in.readString());
                 config.linkProperties = in.readParcelable(null);
+                config.SIMNum = in.readInt();
 
                 return config;
             }
