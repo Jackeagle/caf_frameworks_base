@@ -435,6 +435,8 @@ public class WifiStateMachine extends StateMachine {
     /* Reload all networks and reconnect */
     static final int CMD_RELOAD_TLS_AND_RECONNECT         = BASE + 142;
 
+    static final int CMD_GET_SIM_INFO                     = BASE + 143;
+
     /* Wifi state machine modes of operation */
     /* CONNECT_MODE - connect to any 'known' AP when it becomes available */
     public static final int CONNECT_MODE                   = 1;
@@ -1449,6 +1451,16 @@ public class WifiStateMachine extends StateMachine {
         boolean result = (resultMsg.arg1 != FAILURE);
         resultMsg.recycle();
         return result;
+    }
+
+    /**
+     * Get sim info  synchronously
+     */
+    public WifiEapSimInfo  syncGetSimInfo(AsyncChannel channel) {
+        Message resultMsg = channel.sendMessageSynchronously(CMD_GET_SIM_INFO);
+        WifiEapSimInfo  mWifiEapSimInfo = (WifiEapSimInfo) resultMsg.obj;
+        resultMsg.recycle();
+        return mWifiEapSimInfo;
     }
 
     /**
@@ -2640,6 +2652,9 @@ public class WifiStateMachine extends StateMachine {
                     replyToMessage(message, WifiManager.RSSI_PKTCNT_FETCH_FAILED,
                             WifiManager.BUSY);
                     break;
+                case CMD_GET_SIM_INFO:
+                    replyToMessage(message,message.what, (WifiEapSimInfo) null);
+                break;
                 case WifiP2pService.P2P_CONNECTION_CHANGED:
                     NetworkInfo info = (NetworkInfo) message.obj;
                     mP2pConnected.set(info.isConnected());
@@ -3170,6 +3185,15 @@ public class WifiStateMachine extends StateMachine {
                         startScanNative(WifiNative.SCAN_WITH_CONNECTION_SETUP);
                     } else {
                         loge("Failed to set frequency band " + band);
+                    }
+                    break;
+                case CMD_GET_SIM_INFO:
+                    String mSimInfo =  mWifiNative.getSimInfoNative();
+                    WifiEapSimInfo mWifiEapSimInfo = new WifiEapSimInfo(mSimInfo);
+                    if (mWifiEapSimInfo != null) {
+                        replyToMessage(message, message.what ,(WifiEapSimInfo) mWifiEapSimInfo);
+                    } else {
+                        replyToMessage(message, message.what ,(WifiEapSimInfo) null);
                     }
                     break;
                 case CMD_BLUETOOTH_ADAPTER_STATE_CHANGE:

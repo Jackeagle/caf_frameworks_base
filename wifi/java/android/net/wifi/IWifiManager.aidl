@@ -21,6 +21,7 @@ import android.net.wifi.BatchedScanSettings;
 import android.net.wifi.PPPOEConfig;
 import android.net.wifi.PPPOEInfo;
 import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiEapSimInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.ScanResult;
 import android.net.DhcpInfo;
@@ -134,5 +135,7 @@ interface IWifiManager
     void stopPPPOE();
 
     PPPOEInfo getPPPOEInfo();
+
+    WifiEapSimInfo getSimInfo();
 }
 
