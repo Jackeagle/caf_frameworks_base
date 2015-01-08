@@ -62,6 +62,6 @@ class Task {
 
     @Override
     public String toString() {
-        return "{taskId=" + taskId + " appTokens=" + mAppTokens + "}";
+        return "{taskId=" + taskId + " appTokens=" + mAppTokens + " mdr=" + mDeferRemoval + "}";
     }
 }
