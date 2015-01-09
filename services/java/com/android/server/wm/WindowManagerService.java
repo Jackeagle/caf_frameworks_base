@@ -6642,7 +6642,7 @@ public class WindowManagerService extends IWindowManager.Stub
         return sw;
     }
 
-    private DisplayContent getDigitalPenOffScreenDisplayContentLocked() {
+    public DisplayContent getDigitalPenOffScreenDisplayContentLocked() {
         Display[] displays = mDisplayManager.getDisplays();
         int displayId = -1;
         for (Display display : displays) {
