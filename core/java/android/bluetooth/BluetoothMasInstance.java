@@ -25,12 +25,14 @@ public final class BluetoothMasInstance implements Parcelable {
     private final String mName;
     private final int mChannel;
     private final int mMsgTypes;
+    private final int mL2capPsm;
 
-    public BluetoothMasInstance(int id, String name, int channel, int msgTypes) {
+    public BluetoothMasInstance(int id, String name, int channel, int msgTypes, int l2capPsm) {
         mId = id;
         mName = name;
         mChannel = channel;
         mMsgTypes = msgTypes;
+        mL2capPsm = l2capPsm;
     }
 
     @Override
@@ -49,7 +51,7 @@ public final class BluetoothMasInstance implements Parcelable {
     @Override
     public String toString() {
         return Integer.toString(mId) + ":" + mName + ":" + mChannel + ":" +
-                Integer.toHexString(mMsgTypes);
+                Integer.toHexString(mMsgTypes) + ":" + Integer.toHexString(mL2capPsm);
     }
 
     public int describeContents() {
@@ -60,7 +62,7 @@ public final class BluetoothMasInstance implements Parcelable {
             new Parcelable.Creator<BluetoothMasInstance>() {
         public BluetoothMasInstance createFromParcel(Parcel in) {
             return new BluetoothMasInstance(in.readInt(), in.readString(),
-                    in.readInt(), in.readInt());
+                    in.readInt(), in.readInt(), in.readInt());
         }
         public BluetoothMasInstance[] newArray(int size) {
             return new BluetoothMasInstance[size];
@@ -72,6 +74,7 @@ public final class BluetoothMasInstance implements Parcelable {
         out.writeString(mName);
         out.writeInt(mChannel);
         out.writeInt(mMsgTypes);
+        out.writeInt(mL2capPsm);
     }
 
     public static final class MessageType {
@@ -95,6 +98,10 @@ public final class BluetoothMasInstance implements Parcelable {
 
     public int getMsgTypes() {
         return mMsgTypes;
+    }
+
+    public int getL2capPsm() {
+        return mL2capPsm;
     }
 
     public boolean msgSupported(int msg) {
