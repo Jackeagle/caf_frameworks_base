@@ -26,9 +26,10 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "android_media_ExtMediaPlayer.h"
-
 #define LOG_TAG "ExtMediaPlayer-JNI"
+
+#include "android_media_ExtMediaPlayer.h"
+#include <dlfcn.h>
 
 using namespace android;
 
@@ -70,16 +71,6 @@ JNIExtMediaPlayerListener::JNIExtMediaPlayerListener(JNIEnv* env, jobject thiz, 
   // We use a weak reference so the MediaPlayer object can be garbage collected.
   // The reference is only used as a proxy for callbacks.
   mObject  = env->NewGlobalRef(weak_thiz);
-  //Set up the event handler as we were able to detect QCMediaPlayer.
-
-  mParcel = env->NewGlobalRef(createJavaParcelObject(env));
-  mParcelCodecConf = env->NewGlobalRef(createJavaParcelObject(env));
-
-  mParcelIndex = 0;
-  for (int i = 0; i < MAX_NUM_PARCELS; i++)
-  {
-    mParcelArray[i] = env->NewGlobalRef(createJavaParcelObject(env));
-  }
 }
 
 JNIExtMediaPlayerListener::~JNIExtMediaPlayerListener()
@@ -88,17 +79,6 @@ JNIExtMediaPlayerListener::~JNIExtMediaPlayerListener()
   JNIEnv *env = AndroidRuntime::getJNIEnv();
   env->DeleteGlobalRef(mObject);
   env->DeleteGlobalRef(mClass);
-  recycleJavaParcelObject(env, mParcel);
-  env->DeleteGlobalRef(mParcel);
-
-  recycleJavaParcelObject(env, mParcelCodecConf);
-  env->DeleteGlobalRef(mParcelCodecConf);
-
-  for (int i = 0; i < MAX_NUM_PARCELS; i++)
-  {
-    recycleJavaParcelObject(env, mParcelArray[i]);
-    env->DeleteGlobalRef(mParcelArray[i]);
-  }
 }
 
 
@@ -107,31 +87,20 @@ void JNIExtMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel
   JNIEnv *env = AndroidRuntime::getJNIEnv();
   if (env && obj && obj->dataSize() > 0)
   {
-    if (mParcel != NULL)
+    jobject jParcel = createJavaParcelObject(env);
+    if (jParcel != NULL)
     {
       if((extfields.ext_post_event != NULL) &&
          ((msg == MEDIA_PREPARED) || (msg == MEDIA_TIMED_TEXT) || (msg == MEDIA_QOE)))
       {
         ALOGE("JNIExtMediaPlayerListener::notify calling ext_post_event");
-        if (ext2 == 1 && (msg == MEDIA_TIMED_TEXT))
-        { // only in case of codec config frame
-          if (mParcelCodecConf != NULL)
-          {
-            Parcel* nativeParcelLocal = parcelForJavaObject(env, mParcelCodecConf);
-            nativeParcelLocal->setData(obj->data(), obj->dataSize());
-            env->CallStaticVoidMethod(mClass, extfields.ext_post_event, mObject,
-                            msg, ext1, ext2, mParcelCodecConf);
-            ALOGD("JNIExtMediaPlayerListener::notify ext_post_event done (Codec Conf)");
-          }
-        }
-        else
+        Parcel* nativeParcel = parcelForJavaObject(env, jParcel);
+        if(nativeParcel != NULL)
         {
-          jobject mTempJParcel = mParcelArray[mParcelIndex];
-          mParcelIndex = (mParcelIndex + 1) % MAX_NUM_PARCELS;
-          Parcel* javaparcel = parcelForJavaObject(env, mTempJParcel);
-          javaparcel->setData(obj->data(), obj->dataSize());
+          nativeParcel->setData(obj->data(), obj->dataSize());
           env->CallStaticVoidMethod(mClass, extfields.ext_post_event, mObject,
-                    msg, ext1, ext2, mTempJParcel);
+                    msg, ext1, ext2, jParcel);
+          env->DeleteLocalRef(jParcel);
           ALOGD("JNIExtMediaPlayerListener::notify ext_post_event done");
         }
       }
@@ -157,5 +126,45 @@ void JNIExtMediaPlayerListener::notify(int msg, int ext1, int ext2, const Parcel
     }
   }
   return;
+}
+
+
+sp<MediaPlayer> JNIExtMediaPlayerListener::createQCMediaPlayer()
+{
+  const char* QCMEDIAPLAYER_LIB = "libqcmediaplayer.so";
+  const char* QCMEDIAPLAYER_CREATE_FN = "CreateQCMediaPlayer";
+  void* pQCMediaPlayerLib = NULL;
+
+  typedef MediaPlayer* (*CreateQCMediaPlayerFn)();
+
+  /* Open library */
+  ALOGI("calling dlopen on QCMEDIAPLAYER_LIB");
+  pQCMediaPlayerLib = ::dlopen(QCMEDIAPLAYER_LIB, RTLD_LAZY);
+
+  if (pQCMediaPlayerLib == NULL)
+  {
+    ALOGE("Failed to open QCMEDIAPLAYER_LIB Error : %s ",::dlerror());
+    return NULL;
+  }
+
+  CreateQCMediaPlayerFn pCreateFnPtr = NULL;
+  ALOGI("calling dlsym on pQCMediaPlayerLib for QCMEDIAPLAYER_CREATE_FN ");
+  pCreateFnPtr = (CreateQCMediaPlayerFn) dlsym(pQCMediaPlayerLib, QCMEDIAPLAYER_CREATE_FN);
+
+  if (pCreateFnPtr == NULL)
+  {
+    ALOGE("Could not locate CreateQCMediaPlayerFn pCreateFnPtr");
+    return NULL;
+  }
+
+  sp<MediaPlayer> pQCMediaPlayer = pCreateFnPtr();
+
+  if(pQCMediaPlayer==NULL)
+  {
+    ALOGE("Failed to invoke CreateQCMediaPlayerFn...");
+    return NULL;
+  }
+
+  return pQCMediaPlayer;
 }
 

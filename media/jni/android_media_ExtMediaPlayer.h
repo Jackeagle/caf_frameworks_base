@@ -47,8 +47,6 @@ struct extfields_t
 };
  static extfields_t extfields;
 
-#define MAX_NUM_PARCELS 30
-
 class JNIExtMediaPlayerListener: public MediaPlayerListener
 {
   public:
@@ -56,14 +54,11 @@ class JNIExtMediaPlayerListener: public MediaPlayerListener
     ~JNIExtMediaPlayerListener();
     virtual void notify(int msg, int ext1, int ext2, const Parcel *obj = NULL);
     static bool checkExtMedia(JNIEnv *env, jobject thiz);
+    static sp<MediaPlayer> createQCMediaPlayer();
   private:
     JNIExtMediaPlayerListener();
     jclass     mClass;	 // Reference to MediaPlayer class
     jobject    mObject;	 // Weak ref to MediaPlayer Java object to call on
-    jobject    mParcel;
-    jobject    mParcelArray[MAX_NUM_PARCELS];
-    int        mParcelIndex;
-    jobject    mParcelCodecConf;
     sp<MediaPlayerListener> mplistener;
 };
 

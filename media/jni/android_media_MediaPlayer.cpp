@@ -687,23 +687,24 @@ static void
 android_media_MediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
 {
     ALOGV("native_setup");
-    sp<MediaPlayer> mp = new MediaPlayer();
+    sp<MediaPlayer> mp = NULL;
+    // create new listener and give it to MediaPlayer
+    sp<MediaPlayerListener> listener = new JNIMediaPlayerListener(env, thiz, weak_this);
+
+    // if QCMediaPlayer instance is being used instead of MediaPlayer, use
+    // qcmediaplayer at native layer instead of default mediaplayer
+    if (JNIExtMediaPlayerListener::checkExtMedia(env, thiz)) {
+        ALOGI("QCMediaPlayer present. Using native qcmediaplayer");
+        mp = JNIExtMediaPlayerListener::createQCMediaPlayer();
+        listener = new JNIExtMediaPlayerListener(env, thiz, weak_this, listener);
+    } else {
+        mp = new MediaPlayer();
+    }
     if (mp == NULL) {
         jniThrowException(env, "java/lang/RuntimeException", "Out of memory");
         return;
     }
-
-    // create new listener and give it to MediaPlayer
-    sp<JNIMediaPlayerListener> listener = new JNIMediaPlayerListener(env, thiz, weak_this);
     mp->setListener(listener);
-    if (JNIExtMediaPlayerListener::checkExtMedia(env, thiz)) {
-      ALOGD("QCMediaPlayer mediaplayer present");
-       sp<JNIExtMediaPlayerListener> extmedialistener = new JNIExtMediaPlayerListener(
-                                                            env, thiz, weak_this, listener);
-       mp->setListener(extmedialistener);
-    } else {
-      ALOGE("QCMediaPlayer mediaplayer NOT present");
-    }
 
     // Stow our new C++ MediaPlayer in an opaque field in the Java object.
     setMediaPlayer(env, thiz, mp);
