@@ -1459,7 +1459,7 @@
     <bool name="config_send_sms1x_on_voice_call">true</bool>
 
     <!-- Should the device show AM/PM in unlock screen -->
-    <bool name="config_show_ampm_in_unlock_screen">false</bool>
+    <bool name="config_show_ampm_in_unlock_screen">true</bool>
 
     <!-- config 2G/3G/4G RAT strings for carriers -->
     <string name="config_rat_2g" translatable="false">2G</string>
