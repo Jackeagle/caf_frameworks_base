@@ -151,6 +151,7 @@ public final class ActivityStackSupervisor implements DisplayListener {
     public int lBoostSchedBoost = 0;
     public int lBoostPcDisblBoost = 0;
     public int lBoostKsmBoost = 0;
+    public int lBoostPreferIdle = 0;
     static final int HANDLE_DISPLAY_ADDED = FIRST_SUPERVISOR_STACK_MSG + 5;
     static final int HANDLE_DISPLAY_CHANGED = FIRST_SUPERVISOR_STACK_MSG + 6;
     static final int HANDLE_DISPLAY_REMOVED = FIRST_SUPERVISOR_STACK_MSG + 7;
@@ -325,6 +326,9 @@ public final class ActivityStackSupervisor implements DisplayListener {
                    com.android.internal.R.integer.launchboost_pcdisbl_param);
            lBoostKsmBoost = mService.mContext.getResources().getInteger(
                    com.android.internal.R.integer.launchboost_ksmboost_param);
+           lBoostPreferIdle = mService.mContext.getResources().getInteger(
+                   com.android.internal.R.integer.launchboost_preferidle_param);
+
        }
     }
 
@@ -2739,7 +2743,7 @@ public final class ActivityStackSupervisor implements DisplayListener {
         }
         if (mPerf != null) {
             mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
-                                  lBoostCpuBoost, lBoostKsmBoost);
+                                  lBoostCpuBoost, lBoostKsmBoost, lBoostPreferIdle);
         }
 
         if (DEBUG_TASKS) Slog.d(TAG, "No task found");
