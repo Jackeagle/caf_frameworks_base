@@ -354,7 +354,7 @@ public class WifiConfiguration implements Parcelable {
         ipAssignment = IpAssignment.UNASSIGNED;
         proxySettings = ProxySettings.UNASSIGNED;
         linkProperties = new LinkProperties();
-        SIMNum = 1;
+        SIMNum = 0;
     }
 
     /**
