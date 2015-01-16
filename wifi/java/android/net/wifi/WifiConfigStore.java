@@ -1201,13 +1201,15 @@ class WifiConfigStore {
                 break setVariables;
             }
 
-            if (!mWifiNative.setNetworkVariable(
-                    netId,
-                    WifiConfiguration.SIMNumVarName,
-                    Integer.toString(config.SIMNum))) {
-                loge(config.SIMNum + ": failed to set sim no: "
-                        +config.SIMNum);
-                break setVariables;
+            if (config.SIMNum != 0) {
+                if (!mWifiNative.setNetworkVariable(
+                        netId,
+                        WifiConfiguration.SIMNumVarName,
+                        Integer.toString(config.SIMNum))) {
+                    loge(config.SIMNum + ": failed to set sim no: "
+                            +config.SIMNum);
+                    break setVariables;
+                }
             }
 
             if (config.SSID != null &&
