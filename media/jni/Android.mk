@@ -42,6 +42,7 @@ LOCAL_SHARED_LIBRARIES := \
     libjhead \
     libexif \
     libstagefright_amrnb_common \
+    libdl \
 
 LOCAL_REQUIRED_MODULES := \
     libjhead_jni
