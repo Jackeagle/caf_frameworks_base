@@ -331,11 +331,18 @@ public class MediaScanner
     /** Whether the database had any entries in it before the scan started */
     private boolean mWasEmptyPriorToScan = false;
     /** Whether the scanner has set a default sound for the ringer ringtone. */
-    private boolean mDefaultRingtoneSet;
-    /** Whether the scanner has set a default sound for the notification ringtone. */
-    private boolean mDefaultNotificationSet;
+    private boolean mDefaultRingtoneSet = false;
     /** Whether the scanner has set a default sound for the alarm ringtone. */
-    private boolean mDefaultAlarmSet;
+    private boolean mDefaultAlarmSet = false;
+    /** Whether the scanner has set a default sound for the ringer ringtone 2. */
+    private boolean mDefaultRingtone2Set = false;
+    /** Whether the scanner has set a default sound for the ringer ringtone 3. */
+    private boolean mDefaultRingtone3Set = false;
+    /** Whether the scanner has set a default sound for the notification ringtone. */
+    private boolean mDefaultNotificationSet = false;
+    /** Whether the scanner has set a default sound for the mms notification ringtone. */
+    private boolean mDefaultMmsNotificationSet = false;
+
     /** The filename for the default sound for the ringer ringtone. */
     private String mDefaultRingtoneFilename;
     /** The filename for the default sound for the ringer ringtone 2. */
@@ -437,15 +444,19 @@ public class MediaScanner
                     + Settings.System.RINGTONE);
         }
 
-        mDefaultRingtone2Filename = mContext.getResources().getString(
-                R.string.def_custom_sys_ringtone2);
-        if (mDefaultRingtone2Filename == null || TextUtils.isEmpty(mDefaultRingtone2Filename)) {
+        if (!TextUtils
+                .isEmpty(mContext.getResources().getString(R.string.def_custom_sys_ringtone2))) {
+            mDefaultRingtone2Filename = mContext.getResources().getString(
+                    R.string.def_custom_sys_ringtone2);
+        } else {
             mDefaultRingtone2Filename = mDefaultRingtoneFilename;
         }
 
-        mDefaultRingtone3Filename = mContext.getResources().getString(
-                R.string.def_custom_sys_ringtone3);
-        if (mDefaultRingtone3Filename == null || TextUtils.isEmpty(mDefaultRingtone3Filename)) {
+        if (!TextUtils
+                .isEmpty(mContext.getResources().getString(R.string.def_custom_sys_ringtone3))) {
+            mDefaultRingtone3Filename = mContext.getResources().getString(
+                    R.string.def_custom_sys_ringtone3);
+        } else {
             mDefaultRingtone3Filename = mDefaultRingtoneFilename;
         }
 
@@ -458,10 +469,10 @@ public class MediaScanner
                     + Settings.System.NOTIFICATION_SOUND);
         }
 
-        mDefaultMmsNotificationFilename = mContext.getResources().getString(
-                R.string.def_custom_sys_mms);
-        if (mDefaultMmsNotificationFilename == null
-                || TextUtils.isEmpty(mDefaultMmsNotificationFilename.trim())) {
+        if (!TextUtils.isEmpty(mContext.getResources().getString(R.string.def_custom_sys_mms))) {
+            mDefaultMmsNotificationFilename = mContext.getResources().getString(
+                    R.string.def_custom_sys_mms);
+        } else {
             mDefaultMmsNotificationFilename = mDefaultNotificationFilename;
         }
 
@@ -986,6 +997,9 @@ public class MediaScanner
             }
             Uri result = null;
             boolean needToSetSettings = false;
+            boolean needToSetMmsNotificationSettings = false;
+            boolean needToSetRingtone2Settings = false;
+            boolean needToSetRingtone3Settings = false;
             if (rowId == 0) {
                 if (mMtpObjectHandle != 0) {
                     values.put(MediaStore.MediaColumns.MEDIA_SCANNER_NEW_OBJECT_ID, mMtpObjectHandle);
@@ -1002,11 +1016,37 @@ public class MediaScanner
                 // needed.
                 if (mWasEmptyPriorToScan) {
                     if (notifications && !mDefaultNotificationSet) {
-                        needToSetSettings = needToSetSettingsForNotification(entry);
+                        if (TextUtils.isEmpty(mDefaultNotificationFilename) ||
+                                doesPathHaveFilename(entry.mPath, mDefaultNotificationFilename)) {
+                            needToSetSettings = true;
+                        }
                     } else if (ringtones && !mDefaultRingtoneSet) {
-                        needToSetSettings = needToSetSettingsForRingtone(entry);
+                        if (TextUtils.isEmpty(mDefaultRingtoneFilename) ||
+                                doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename)) {
+                            needToSetSettings = true;
+                        }
                     } else if (alarms && !mDefaultAlarmSet) {
-                        needToSetSettings = needToSetSettingsForAlarm(entry);
+                        if (TextUtils.isEmpty(mDefaultAlarmAlertFilename) ||
+                                doesPathHaveFilename(entry.mPath, mDefaultAlarmAlertFilename)) {
+                            needToSetSettings = true;
+                        }
+                    }
+                    if (isSoundCustomized()) {
+                        if (notifications && !mDefaultMmsNotificationSet) {
+                            if (TextUtils.isEmpty(mDefaultMmsNotificationFilename) ||
+                                    doesPathHaveFilename(entry.mPath, mDefaultMmsNotificationFilename)) {
+                                needToSetMmsNotificationSettings = true;
+                            }
+                        } else if (ringtones && (!mDefaultRingtone2Set || !mDefaultRingtone3Set)) {
+                            if (TextUtils.isEmpty(mDefaultRingtone2Filename) ||
+                                    doesPathHaveFilename(entry.mPath, mDefaultRingtone2Filename)) {
+                                needToSetRingtone2Settings = true;
+                            }
+                            if (TextUtils.isEmpty(mDefaultRingtone3Filename) ||
+                                    doesPathHaveFilename(entry.mPath, mDefaultRingtone3Filename)) {
+                                needToSetRingtone3Settings = true;
+                            }
+                        }
                     }
                 }
 
@@ -1015,7 +1055,10 @@ public class MediaScanner
                 // get priority when bulk inserting.
                 // If the rowId of the inserted file is needed, it gets inserted immediately,
                 // bypassing the bulk inserter.
-                if (inserter == null || needToSetSettings) {
+                if (inserter == null || needToSetSettings
+                        || needToSetMmsNotificationSettings
+                        || needToSetRingtone2Settings
+                        || needToSetRingtone3Settings) {
                     if (inserter != null) {
                         inserter.flushAll();
                     }
@@ -1057,10 +1100,6 @@ public class MediaScanner
             if(needToSetSettings) {
                 if (notifications) {
                     setSettingIfNotSet(Settings.System.NOTIFICATION_SOUND, tableUri, rowId);
-                    if (isSoundCustomized()) {
-                        setSettingIfNotSet(Settings.System.MMS_NOTIFICATION_SOUND, tableUri, rowId);
-                    }
-
                     mDefaultNotificationSet = true;
                 } else if (ringtones) {
                     // memorize default system ringtone persistently
@@ -1086,34 +1125,34 @@ public class MediaScanner
                 }
             }
 
-            return result;
-        }
-
-        private boolean needToSetSettingsForNotification(FileEntry entry) {
-            boolean result = TextUtils.isEmpty(mDefaultNotificationFilename)
-                    || doesPathHaveFilename(entry.mPath, mDefaultNotificationFilename);
             if (isSoundCustomized()) {
-                result = result || TextUtils.isEmpty(mDefaultMmsNotificationFilename)
-                        || doesPathHaveFilename(entry.mPath, mDefaultMmsNotificationFilename);
+                if (notifications) {
+                    if (needToSetMmsNotificationSettings) {
+                        Settings.System.putString(mContext.getContentResolver(),
+                                Settings.System.MMS_NOTIFICATION_SOUND,
+                                ContentUris.withAppendedId(tableUri, rowId).toString());
+                        mDefaultMmsNotificationSet = true;
+                    }
+                } else if (ringtones) {
+                    int phoneCount = TelephonyManager.getDefault().getPhoneCount();
+                    if (phoneCount >= 2) {
+                        if (needToSetRingtone2Settings) {
+                            Settings.System.putString(mContext.getContentResolver(),
+                                    Settings.System.RINGTONE_2,
+                                    ContentUris.withAppendedId(tableUri, rowId).toString());
+                            mDefaultRingtone2Set = true;
+                        }
+                        if (phoneCount == 3 && needToSetRingtone3Settings) {
+                            Settings.System.putString(mContext.getContentResolver(),
+                                    Settings.System.RINGTONE_3,
+                                    ContentUris.withAppendedId(tableUri, rowId).toString());
+                            mDefaultRingtone3Set = true;
+                        }
+                    }
+                }
             }
-            return result;
-        }
 
-        private boolean needToSetSettingsForRingtone(FileEntry entry) {
-            boolean result = TextUtils.isEmpty(mDefaultRingtoneFilename)
-                    || doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename);
-            if (isSoundCustomized()) {
-                result = result || TextUtils.isEmpty(mDefaultRingtone2Filename)
-                        || doesPathHaveFilename(entry.mPath, mDefaultRingtone2Filename)
-                        || TextUtils.isEmpty(mDefaultRingtone3Filename)
-                        || doesPathHaveFilename(entry.mPath, mDefaultRingtone3Filename);
-            }
             return result;
-        }
-
-        private boolean needToSetSettingsForAlarm(FileEntry entry) {
-            return TextUtils.isEmpty(mDefaultAlarmAlertFilename)
-                    || doesPathHaveFilename(entry.mPath, mDefaultAlarmAlertFilename);
         }
 
         private boolean doesPathHaveFilename(String path, String filename) {
