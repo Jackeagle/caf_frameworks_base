@@ -2461,10 +2461,10 @@ public class Activity extends ContextThemeWrapper
      * @return boolean Return true if this event was consumed.
      */
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        String currentActivity = getPackageName();
-        if(mDragBoostPossible == -1)
-        {
+
+        if(mDragBoostPossible == -1) {
             mDragBoostPossible = 0;
+            String currentActivity = getPackageName();
             String[] activityList = getResources().getStringArray(
                 com.android.internal.R.array.boost_activityList);
             if(activityList != null){
@@ -2476,8 +2476,7 @@ public class Activity extends ContextThemeWrapper
                 }
             }
         }
-        if (mDragBoostPossible == 1)
-        {
+        if (mDragBoostPossible == 1) {
             if (mPerf == null){
                 mPerf = new Performance();
             }
@@ -2496,7 +2495,6 @@ public class Activity extends ContextThemeWrapper
                 mPerfLockDuration,
                 mAsSchedBoost, mAsCpuBoost, mAsPcDisblBoost);
         }
-
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             onUserInteraction();
         }
