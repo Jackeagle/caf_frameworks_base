@@ -621,6 +621,12 @@ public abstract class ConnectionService extends Service {
             Log.d(this, "Adapter set call substate %d", callSubstate);
             mAdapter.setCallSubstate(id, callSubstate);
         }
+
+        @Override
+        public void onCdmaConnectionTimeReset(Connection c) {
+            String id = mIdByConnection.get(c);
+            mAdapter.resetCdmaConnectionTime(id);
+        }
     };
 
     /** {@inheritDoc} */
@@ -694,6 +700,9 @@ public abstract class ConnectionService extends Service {
                         connection.getDisconnectCause(),
                         createIdList(connection.getConferenceables()),
                         connection.getCallSubstate()));
+        if (isUnknown) {
+            triggerConferenceRecalculate();
+        }
     }
 
     /** @hide */
@@ -1070,6 +1079,14 @@ public abstract class ConnectionService extends Service {
             PhoneAccountHandle connectionManagerPhoneAccount,
             ConnectionRequest request) {
         return null;
+    }
+
+    /**
+     * Trigger recalculate functinality for conference calls. This is used when a Telephony
+     * Connection is part of a conference controller but is not yet added to Connection
+     * Service and hence cannot be added to the conference call.
+     */
+    public void triggerConferenceRecalculate() {
     }
 
     /**
