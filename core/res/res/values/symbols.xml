@@ -2241,4 +2241,5 @@
   <!-- Configuration to play sms ringtone during MO/MT call -->
   <java-symbol type="bool" name="config_sms_ringtone_incall" />
   <java-symbol type="array" name="config_sms_convert_destination_number_support" />
+  <java-symbol type="bool" name="config_reject_call_via_sms_enabled"/>
 </resources>
