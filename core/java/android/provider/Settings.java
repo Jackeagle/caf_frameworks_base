@@ -5915,6 +5915,13 @@ public final class Settings {
        public static final String PACKAGE_VERIFIER_INCLUDE_ADB = "verifier_verify_adb_installs";
 
        /**
+        * Time since last fstrim (milliseconds) after which we force one to happen
+        * during device startup.  If unset, the default is 3 days.
+        * @hide
+        */
+       public static final String FSTRIM_MANDATORY_INTERVAL = "fstrim_mandatory_interval";
+
+       /**
         * The interval in milliseconds at which to check packet counts on the
         * mobile data interface when screen is on, to detect possible data
         * connection problems.
@@ -7282,6 +7289,13 @@ public final class Settings {
             return putString(cr, name, Float.toString(value));
         }
 
+
+        /**
+          * Subscription to be used for handling legacy TelephonyManager/other aidl API calls.
+          *  Valid subId values are greater than 0.
+          * @hide
+          */
+        public static final String MULTI_SIM_DEFAULT_SUBSCRIPTION = "multi_sim_default_sub";
 
         /**
           * Subscription to be used for voice call on a multi sim device. The supported values
