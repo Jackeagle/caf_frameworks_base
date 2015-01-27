@@ -264,6 +264,49 @@ public class WifiP2pManager {
         "android.net.wifi.p2p.THIS_DEVICE_CHANGED";
 
     /**
+     * Broadcast intent action indicating the current P2P autonomous GO state
+     * @hide
+     */
+    public static final String WIFI_P2P_AUTONOMOUS_GO_STATE =
+        "org.codeaurora.WIFI_P2P_AUTONOMOUS_GO_STATE";
+
+    /**
+     * The lookup key for an int that indicating the current p2p go state
+     * Retrieve it with {@link android.content.Intent#getIntExtra(String,int)}.
+     *
+     * @hide
+     */
+    public static final String EXTRA_P2P_AUTO_GO_STATE = "wifi_p2p_autogo_state";
+
+    /**
+     * Wi-Fi p2p go is stopped
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_AUTONOMOUS_GO_STOPPED = 1;
+
+    /**
+     * Wi-Fi p2p go is starting
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_AUTONOMOUS_GO_STARTING = 2;
+
+    /**
+     * Wi-Fi p2p go started
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_AUTONOMOUS_GO_STARTED = 3;
+
+    /**
+     * Wi-Fi p2p go stopped and restarting
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_AUTONOMOUS_GO_STOPPED_RESTARTING = 4;
+
+    /**
      * The lookup key for a {@link android.net.wifi.p2p.WifiP2pDevice} object
      * Retrieve with {@link android.content.Intent#getParcelableExtra(String)}.
      */
@@ -1439,5 +1482,41 @@ public class WifiP2pManager {
         bundle.putString(EXTRA_HANDOVER_MESSAGE, handoverRequest);
         c.mAsyncChannel.sendMessage(RESPONDER_REPORT_NFC_HANDOVER, 0,
                 c.putListener(listener), bundle);
+    }
+
+    /**
+     * Get p2p tetherable interface name
+     * @hide
+     */
+    public String getP2pTetherInterface() {
+        try {
+            return mService.getP2pTetherInterface();
+        } catch (RemoteException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Enable tethering on p2p interface
+     * @hide
+     */
+    public void enableP2pTethering() {
+        try {
+            mService.enableP2pTethering();
+        } catch (RemoteException e) {
+            return;
+        }
+    }
+
+    /**
+     * Disable tethering on p2p interface
+     * @hide
+     */
+    public void disableP2pTethering() {
+        try {
+            mService.disableP2pTethering();
+        } catch (RemoteException e) {
+            return;
+        }
     }
 }

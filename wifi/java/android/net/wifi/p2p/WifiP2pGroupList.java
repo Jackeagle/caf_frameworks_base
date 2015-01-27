@@ -202,6 +202,22 @@ public class WifiP2pGroupList implements Parcelable {
         return false;
     }
 
+    /**
+     * Returns the group containing the network id
+     * @param netId network id
+     * @return returns reference to the group containing the network id, else null
+     * @hide
+     */
+    public WifiP2pGroup getGroup(int netId) {
+        final Collection<WifiP2pGroup> groups = mGroups.snapshot().values();
+        for (WifiP2pGroup grp: groups) {
+            if (grp != null && (netId == grp.getNetworkId())) {
+                return grp;
+            }
+        }
+        return null;
+    }
+
     public String toString() {
         StringBuffer sbuf = new StringBuffer();
 
