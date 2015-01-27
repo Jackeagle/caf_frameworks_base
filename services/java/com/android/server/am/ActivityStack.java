@@ -1472,7 +1472,7 @@ final class ActivityStack {
                             ? AppTransition.TRANSIT_ACTIVITY_CLOSE
                             : AppTransition.TRANSIT_TASK_CLOSE, false);
                     if(prev.task != next.task && mPerf != null)
-                        mPerf.perfLockAcquire(600, 0x1E01, 0x20D);
+                        mPerf.perfLockAcquire(600, 0x1E01, 0x20B);
                 }
                 mWindowManager.setAppWillBeHidden(prev.appToken);
                 mWindowManager.setAppVisibility(prev.appToken, false);
@@ -1486,7 +1486,7 @@ final class ActivityStack {
                             ? AppTransition.TRANSIT_ACTIVITY_OPEN
                             : AppTransition.TRANSIT_TASK_OPEN, false);
                     if(prev.task != next.task && mPerf != null)
-                        mPerf.perfLockAcquire(600, 0x1E01, 0x20D);
+                        mPerf.perfLockAcquire(600, 0x1E01, 0x20B);
                 }
             }
             if (false) {
