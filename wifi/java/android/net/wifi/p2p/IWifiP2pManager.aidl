@@ -28,5 +28,8 @@ interface IWifiP2pManager
     Messenger getMessenger();
     Messenger getP2pStateMachineMessenger();
     void setMiracastMode(int mode);
+    String getP2pTetherInterface();
+    void enableP2pTethering();
+    void disableP2pTethering();
 }
 
