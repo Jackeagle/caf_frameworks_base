@@ -1195,12 +1195,33 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     }
 
     @Override
-    public void startTethering(String[] dhcpRange) {
+    public void sapCreateIntf(String wlanIface) {
+        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
+        try {
+            mConnector.execute("softap", "create", wlanIface);
+        } catch (NativeDaemonConnectorException e) {
+            throw e.rethrowAsParcelableException();
+        }
+    }
+
+    @Override
+    public void sapRemoveIntf(String wlanIface) {
+        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
+        try {
+            mConnector.execute("softap", "remove", wlanIface);
+        } catch (NativeDaemonConnectorException e) {
+            throw e.rethrowAsParcelableException();
+        }
+    }
+
+    @Override
+    public void startTethering(String[] dhcpRange, String intf) {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
         // cmd is "tether start first_start first_stop second_start second_stop ..."
         // an odd number of addrs will fail
 
         final Command cmd = new Command("tether", "start");
+        cmd.appendArg(intf);
         for (String d : dhcpRange) {
             cmd.appendArg(d);
         }
@@ -1213,10 +1234,13 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     }
 
     @Override
-    public void stopTethering() {
+    public void stopTethering(String intf) {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
+
+        final Command cmd = new Command("tether", "stop");
+        cmd.appendArg(intf);
         try {
-            mConnector.execute("tether", "stop");
+            mConnector.execute(cmd);
         } catch (NativeDaemonConnectorException e) {
             throw e.rethrowAsParcelableException();
         }
@@ -1277,12 +1301,11 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     }
 
     @Override
-    public void setDnsForwarders(Network network, String[] dns) {
+    public void setDnsForwarders(Network network, String[] dns, String intf) {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
 
         int netId = (network != null) ? network.netId : ConnectivityManager.NETID_UNSET;
-        final Command cmd = new Command("tether", "dns", "set", netId);
-
+        final Command cmd = new Command("tether", "dns", "set", intf, netId);
         for (String s : dns) {
             cmd.appendArg(NetworkUtils.numericToInetAddress(s).getHostAddress());
         }
@@ -1408,7 +1431,8 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                 mConnector.execute("softap", "set", wlanIface);
             } else {
                 mConnector.execute("softap", "set", wlanIface, wifiConfig.SSID,
-                                   "broadcast", "6", getSecurityType(wifiConfig),
+                                   "broadcast", wifiConfig.channel,
+                                   getSecurityType(wifiConfig),
                                    new SensitiveArg(wifiConfig.preSharedKey));
             }
             mConnector.execute("softap", "startap");
