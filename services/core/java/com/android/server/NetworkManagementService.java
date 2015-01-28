@@ -1474,6 +1474,59 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         }
     }
 
+    // Get SAP Operating Channel
+    @Override
+    public int getSapOperatingChannel() throws IllegalStateException {
+        mContext.enforceCallingOrSelfPermission(
+            android.Manifest.permission.CHANGE_NETWORK_STATE,
+            "NetworkManagementService");
+
+        mContext.enforceCallingOrSelfPermission(
+            android.Manifest.permission.CHANGE_WIFI_STATE,
+            "NetworkManagementService");
+
+        int channel = 0;
+        try {
+            final NativeDaemonEvent OperChanResp;
+            OperChanResp = mConnector.execute(
+                           "softap", "qccmd", "get", "channel");
+            if (DBG) {
+                Slog.d(TAG, "getSapOperatingChannel--OperChanResp" +
+                       OperChanResp);
+            }
+
+            // Resp Pattern : 200 8 success channel=6
+            final StringTokenizer tok = new StringTokenizer(
+                                            OperChanResp.getMessage());
+            tok.nextToken();
+            String temp = (tok.hasMoreTokens()) ? tok.nextToken() : null;
+            if (temp != null) {
+                final StringTokenizer tok1 = new StringTokenizer(temp, "=");
+
+                String temp1 = (tok1.hasMoreTokens()) ?
+                                tok1.nextToken() : null;
+                String temp2 = (tok1.hasMoreTokens()) ?
+                                tok1.nextToken() : null;
+
+                if (temp2 != null) {
+                    channel = Integer.parseInt(temp2);
+                } else {
+                    Slog.e(TAG,
+                           "getSapOperatingChannel: Failed to parse channel");
+                }
+            } else {
+                Slog.e(TAG,
+                       "getSapOperatingChannel: Failed to parse resp pattern");
+            }
+            if (DBG) Slog.d(TAG, "softap qccmd get channel =" + channel);
+            return channel;
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException(
+            "Error communicating to native daemon to getSapOperatingChannel",
+            e);
+        }
+    }
+
     @Override
     public void setAccessPoint(WifiConfiguration wifiConfig, String wlanIface) {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
