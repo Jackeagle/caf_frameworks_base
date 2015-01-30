@@ -31,5 +31,6 @@ interface IWifiP2pManager
     String getP2pTetherInterface();
     void enableP2pTethering();
     void disableP2pTethering();
+    boolean getP2pAutoGoStatus();
 }
 
