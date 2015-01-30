@@ -21,6 +21,7 @@ import com.android.ims.ImsCallProfile;
 import com.android.ims.ImsReasonInfo;
 import com.android.ims.ImsConferenceState;
 import com.android.ims.internal.IImsCallSession;
+import com.android.ims.ImsSuppServiceNotification;
 
 /**
  * A listener type for receiving notification on IMS call session events.
@@ -138,4 +139,9 @@ interface IImsCallSessionListener {
      */
     void callSessionRetryErrorReceived(in IImsCallSession session,
             in ImsReasonInfo reasonInfo);
+    /**
+     * Notifies the supplementary service information for the current session.
+     */
+    void callSessionSuppServiceReceived(in IImsCallSession session,
+         in ImsSuppServiceNotification suppSrvNotification);
 }
