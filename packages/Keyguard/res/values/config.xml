@@ -37,6 +37,9 @@
 
     <!-- monitor locale change -->
     <bool name="config_monitor_locale_change">false</bool>
+    <!-- True if we need to hide emergency button when OOS -->
+    <bool name="config_hideEmergencyButtonInOOS">false</bool>
+
     <bool name="config_showEmergencyCallOnlyInLockScreen">false</bool>
 
     <!-- display airplane mode in lock sreen when phone is in APM mode -->
