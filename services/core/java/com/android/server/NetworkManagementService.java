@@ -1215,13 +1215,12 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     }
 
     @Override
-    public void startTethering(String[] dhcpRange, String intf) {
+    public void startTethering(String[] dhcpRange) {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
         // cmd is "tether start first_start first_stop second_start second_stop ..."
         // an odd number of addrs will fail
 
         final Command cmd = new Command("tether", "start");
-        cmd.appendArg(intf);
         for (String d : dhcpRange) {
             cmd.appendArg(d);
         }
@@ -1234,13 +1233,10 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     }
 
     @Override
-    public void stopTethering(String intf) {
+    public void stopTethering() {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
-
-        final Command cmd = new Command("tether", "stop");
-        cmd.appendArg(intf);
         try {
-            mConnector.execute(cmd);
+            mConnector.execute("tether", "stop");
         } catch (NativeDaemonConnectorException e) {
             throw e.rethrowAsParcelableException();
         }
@@ -1301,11 +1297,12 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     }
 
     @Override
-    public void setDnsForwarders(Network network, String[] dns, String intf) {
+    public void setDnsForwarders(Network network, String[] dns) {
         mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
 
         int netId = (network != null) ? network.netId : ConnectivityManager.NETID_UNSET;
-        final Command cmd = new Command("tether", "dns", "set", intf, netId);
+        final Command cmd = new Command("tether", "dns", "set", netId);
+
         for (String s : dns) {
             cmd.appendArg(NetworkUtils.numericToInetAddress(s).getHostAddress());
         }

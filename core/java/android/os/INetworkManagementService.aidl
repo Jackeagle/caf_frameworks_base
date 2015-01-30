@@ -145,12 +145,12 @@ interface INetworkManagementService
      * Start tethering services with the specified dhcp server range
      * arg is a set of start end pairs defining the ranges.
      */
-    void startTethering(in String[] dhcpRanges, String intf);
+    void startTethering(in String[] dhcpRanges);
 
     /**
      * Stop currently running tethering services
      */
-    void stopTethering(String intf);
+    void stopTethering();
 
     /**
      * Returns true if tethering services are started
@@ -161,7 +161,6 @@ interface INetworkManagementService
      * Tethers the specified interface
      */
     void tetherInterface(String iface);
-
     /**
      * Untethers the specified interface
      */
@@ -175,7 +174,7 @@ interface INetworkManagementService
     /**
      * Sets the list of DNS forwarders (in order of priority)
      */
-    void setDnsForwarders(in Network network, in String[] dns, String intf);
+    void setDnsForwarders(in Network network, in String[] dns);
 
     /**
      * Returns the list of DNS forwarders (in order of priority)
