@@ -2127,7 +2127,7 @@ public final class ActivityStackSupervisor {
             mPerf = new Performance();
         }
         if (mPerf != null && mIsPerfLockAcquired == false) {
-            mPerf.perfLockAcquire(2000,0x1E01,0x20B,0x1C00, 0x3E01);
+            mPerf.perfLockAcquire(2000,0x1E01,0x20B,0x1C00,0x400A,0x410A,0x4201,0x3E01);
             mIsPerfLockAcquired = true;
         }
         if (DEBUG_TASKS) Slog.d(TAG, "No task found");
