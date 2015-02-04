@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, 2015, The Linux Foundation. All rights reserved.
 ** Not a Contribution.
 **
 ** Copyright 2012, The Android Open Source Project
@@ -1387,6 +1387,8 @@
   <java-symbol type="id" name="option1" />
   <java-symbol type="id" name="option2" />
   <java-symbol type="id" name="option3" />
+  <java-symbol type="id" name="option4" />
+  <java-symbol type="id" name="optionSpacer" />
   <java-symbol type="id" name="right_icon" />
   <java-symbol type="id" name="seven" />
   <java-symbol type="id" name="six" />
@@ -1887,4 +1889,6 @@
   <java-symbol type="integer" name="ascrollboost_schedboost" />
   <java-symbol type="integer" name="ascrollboost_cpuboost" />
   <java-symbol type="integer" name="ascrollboost_pcdisbl" />
+
+  <java-symbol type="bool" name="config_addVibrateWithRingtoneOption" />
 </resources>
