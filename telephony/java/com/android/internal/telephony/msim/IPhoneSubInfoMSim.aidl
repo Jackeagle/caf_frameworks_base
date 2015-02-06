@@ -78,4 +78,18 @@ interface IPhoneSubInfoMSim {
      */
     String getVoiceMailAlphaTag(int subscription);
 
+    /**
+     * Returns the response of the SIM application on the UICC to authentication
+     * challenge/response algorithm. The data string and challenge response are
+     * Base64 encoded Strings.
+     * Can support EAP-SIM, EAP-AKA with results encoded per 3GPP TS 31.102.
+     *
+     * @param subscription subscription ID to be queried
+     * @param appType ICC application type
+     * (@see com.android.internal.telephony.PhoneConstants#APPTYPE_xxx)
+     * @param data authentication challenge data
+     * @return challenge response
+     */
+    String getIccSimChallengeResponse(int subscription, int appType, String data);
+
 }

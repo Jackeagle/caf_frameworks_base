@@ -944,6 +944,28 @@ public class MSimTelephonyManager {
     }
 
     /**
+     * Returns the response of SIM Authentication through RIL.
+     * Returns null if the Authentication hasn't been successful
+     *
+     * @param subscription subscription ID to be queried
+     * @param appType ICC application type
+     * (@see com.android.internal.telephony.PhoneConstants#APPTYPE_xxx)
+     * @param data authentication challenge data
+     * @return the response of SIM Authentication, or null if not available
+     * @hide
+     */
+    public String getIccSimChallengeResponse(int subscription, int appType, String data) {
+        try {
+            return getMSimSubscriberInfo().getIccSimChallengeResponse(subscription, appType, data);
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            // This could happen before phone starts
+            return null;
+        }
+    }
+
+    /**
      * Returns all observed cell information of the device.
      *
      * @return List of CellInfo or null if info unavailable
