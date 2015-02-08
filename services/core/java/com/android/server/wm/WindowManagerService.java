@@ -475,7 +475,7 @@ public class WindowManagerService extends IWindowManager.Stub
     /** All DisplayContents in the world, kept here */
     SparseArray<DisplayContent> mDisplayContents = new SparseArray<DisplayContent>(2);
 
-    int mRotation = 0;
+    int mRotation = SystemProperties.getInt("persist.panel.orientation", 0) / 90;
     int mForcedAppOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
     boolean mAltOrientation = false;
 
@@ -7089,7 +7089,7 @@ public class WindowManagerService extends IWindowManager.Stub
         return sw;
     }
 
-    private DisplayContent getDigitalPenOffScreenDisplayContentLocked() {
+    public DisplayContent getDigitalPenOffScreenDisplayContentLocked() {
         Display[] displays = mDisplayManager.getDisplays();
         int displayId = -1;
         for (Display display : displays) {
@@ -9458,6 +9458,12 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    private void handlePrivateFlagFullyTransparent(WindowState w) {
+        final WindowManager.LayoutParams attrs = w.mAttrs;
+        final WindowStateAnimator winAnimator = w.mWinAnimator;
+        winAnimator.updateFullyTransparent(attrs);
+    }
+
     private void updateAllDrawnLocked(DisplayContent displayContent) {
         // See if any windows have been drawn, so they (and others
         // associated with them) can now be shown.
@@ -9658,6 +9664,8 @@ public class WindowManagerService extends IWindowManager.Stub
                     if (stack != null && !stack.testDimmingTag()) {
                         handleFlagDimBehind(w);
                     }
+
+                    handlePrivateFlagFullyTransparent(w);
 
                     if (isDefaultDisplay && obscuredChanged && (mWallpaperTarget == w)
                             && w.isVisibleLw()) {

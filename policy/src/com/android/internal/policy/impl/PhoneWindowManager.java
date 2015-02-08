@@ -199,6 +199,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             .build();
 
     /**
+     * Broadcast Action: WiFi Display video is enabled or disabled
+     *
+     * <p>The intent will have the following extra values:
+     * <ul>
+     *   <li><em>state</em> - 0 for disabled, 1 for enabled. </li>
+     * </ul>
+     */
+
+    private static final String ACTION_WIFI_DISPLAY_VIDEO =
+            "org.codeaurora.intent.action.WIFI_DISPLAY_VIDEO";
+
+    /**
      * Keyguard stuff
      */
     private WindowState mKeyguardScrim;
@@ -502,6 +514,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mOverscanTop = 0;
     int mOverscanRight = 0;
     int mOverscanBottom = 0;
+
+    // Panel Orientation default portrait
+    int mPanelOrientation = Surface.ROTATION_0;
 
     // What we do when the user long presses on home
     private int mLongPressOnHomeBehavior;
@@ -1130,8 +1145,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
 
         // register for WIFI Display intents
-        IntentFilter wifiDisplayFilter = new IntentFilter(
-                                                Intent.ACTION_WIFI_DISPLAY_VIDEO);
+        IntentFilter wifiDisplayFilter = new IntentFilter(ACTION_WIFI_DISPLAY_VIDEO);
+
         Intent wifidisplayIntent = context.registerReceiver(
                                       mWifiDisplayReceiver, wifiDisplayFilter);
 
@@ -1193,6 +1208,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return;
         }
         mDisplay = display;
+        mPanelOrientation = SystemProperties.getInt("persist.panel.orientation", 0) / 90;
 
         final Resources res = mContext.getResources();
         int shortSize, longSize;
@@ -1455,10 +1471,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 // XXX right now the app process has complete control over
                 // this...  should introduce a token to let the system
                 // monitor/control what they are doing.
-
-                // Bypass this to allow any activity to show toast even if
-                // it runs in a different process than its package.
-                //outAppOp[0] = AppOpsManager.OP_TOAST_WINDOW;
+                outAppOp[0] = AppOpsManager.OP_TOAST_WINDOW;
                 break;
             case TYPE_DREAM:
             case TYPE_INPUT_METHOD:
@@ -4866,7 +4879,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     BroadcastReceiver mWifiDisplayReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
-            if (action.equals(Intent.ACTION_WIFI_DISPLAY_VIDEO)) {
+            if (action.equals(ACTION_WIFI_DISPLAY_VIDEO)) {
                 int state = intent.getIntExtra("state", 0);
                 if(state == 1) {
                     mWifiDisplayConnected = true;
@@ -5182,7 +5195,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         if (mForceDefaultOrientation) {
-            return Surface.ROTATION_0;
+            return mPanelOrientation;
         }
 
         synchronized (mLock) {
@@ -5322,14 +5335,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         return lastRotation;
                     }
                     return mPortraitRotation;
-
                 default:
                     // For USER, UNSPECIFIED, NOSENSOR, SENSOR and FULL_SENSOR,
                     // just return the preferred orientation we already calculated.
                     if (preferredRotation >= 0) {
                         return preferredRotation;
                     }
-                    return Surface.ROTATION_0;
+                    return mPanelOrientation;
             }
         }
     }
