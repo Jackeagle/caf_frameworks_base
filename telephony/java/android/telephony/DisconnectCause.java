@@ -239,6 +239,12 @@ public class DisconnectCause {
     /** Call failed due to low battery */
     public static final int LOW_BATTERY  = 95;
 
+    /**
+     * An IMS call was disconnected by lower layers and requested for a retry over CS.
+     */
+    public static final int CALL_RETRY_BY_SILENT_REDIAL = 96;
+    public static final int CALL_RETRY_BY_USER_CONSENT = 97;
+
     /** call failed due to LTE to 3G/2G handover not feasible */
     public static final int HO_NOT_FEASIBLE = 98;
 
@@ -369,6 +375,10 @@ public class DisconnectCause {
             return "NON_SELECTED_USER_CLEARING";
         case LOW_BATTERY:
             return "LOW_BATTERY";
+        case CALL_RETRY_BY_SILENT_REDIAL:
+            return "CALL_RETRY_BY_SILENT_REDIAL";
+        case CALL_RETRY_BY_USER_CONSENT:
+            return "CALL_RETRY_BY_USER_CONSENT";
         case HO_NOT_FEASIBLE:
             return "HO_NOT_FEASIBLE";
         default:

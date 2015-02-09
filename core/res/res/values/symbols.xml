@@ -2349,4 +2349,7 @@
   <java-symbol type="bool" name="config_regional_volte_switch_enable" />
   <java-symbol type="bool" name="config_regional_preferred_network_customization" />
   <!-- Regional Specific Symbols/Overlays end -->
+
+  <!-- for IMS to CS retry support -->
+  <java-symbol type="bool"  name="config_carrier_cs_retry_available" />
 </resources>

@@ -7074,6 +7074,14 @@ public final class Settings {
         public static final String ENHANCED_4G_MODE_ENABLED = "volte_vt_enabled";
 
         /**
+         * Whether the IMS to CS retry is enabled
+         * <p>
+         * Type: int (0 for false, 1 for true)
+         * @hide
+         */
+        public static final String IMS_TO_CS_RETRY_ENABLED = "ims_to_cs_retry_enabled";
+
+        /**
          * Global override to disable VoLTE (independent of user setting)
          * <p>
          * Type: int (1 for disable VoLTE, 0 to use user configuration)

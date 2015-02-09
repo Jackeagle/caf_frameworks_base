@@ -69,6 +69,17 @@ public final class DisconnectCause implements Parcelable {
      */
     public static final int CONNECTION_MANAGER_NOT_SUPPORTED = 10;
 
+    /**
+     * Disconnected to silently redail the call on CS.
+     * @hide
+     */
+    public static final int CALL_RETRY_BY_SILENT_REDIAL = 11;
+    /**
+     * Disconnected to seek user permission before retrying the call on CS.
+     * @hide
+     */
+    public static final int CALL_RETRY_BY_USER_CONSENT = 12;
+
     /** Disconnected becuase of low battery
      * @hide
      */
@@ -259,6 +270,12 @@ public final class DisconnectCause implements Parcelable {
                 break;
             case OTHER:
                 code = "OTHER";
+                break;
+            case CALL_RETRY_BY_SILENT_REDIAL:
+                code = "CALL_RETRY_BY_SILENT_REDIAL";
+                break;
+            case CALL_RETRY_BY_USER_CONSENT:
+                code = "CALL_RETRY_BY_USER_CONSENT";
                 break;
             case UNKNOWN:
             default:

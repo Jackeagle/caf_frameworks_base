@@ -2319,4 +2319,8 @@
     <bool name="config_defaultInTouchMode">true</bool>
    <!-- config for FDN contact search. Disabled by default -->
    <bool name="config_fdn_contact_search">false</bool>
+
+    <!-- Flag specifying whether IMS to CS retry should be available for carrier:
+         If false: hard disabled. If true: then depends on user preference. -->
+    <bool name="config_carrier_cs_retry_available">false</bool>
 </resources>

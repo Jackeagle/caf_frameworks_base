@@ -251,4 +251,12 @@ public interface TelephonyProperties
      *     or Earpiece, based on the default audio routing strategy.
      */
     static final String PROPERTY_IMS_AUDIO_OUTPUT = "persist.radio.ims.audio.output";
+
+    /**
+     * Controls dial request route for CS calls.
+     * 0 - Use the default routing strategy.
+     * 1 - Place the call over CS path.
+     */
+    static final String EXTRA_CALL_DOMAIN =
+            "org.codeaurora.extra.CALL_DOMAIN";
 }
