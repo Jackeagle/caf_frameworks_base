@@ -528,11 +528,12 @@ public:
         return reply.readInt32();
     }
 
-    int32_t encryptStorage(const String16& password)
+    int32_t encryptStorage(const String16& password, const bool wipe)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IMountService::getInterfaceDescriptor());
         data.writeString16(password);
+        data.writeInt32(wipe ? 1 : 0);
         if (remote()->transact(TRANSACTION_encryptStorage, data, &reply) != NO_ERROR) {
             ALOGD("encryptStorage could not contact remote\n");
             return -1;
