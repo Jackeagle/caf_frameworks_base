@@ -626,7 +626,7 @@ public interface IMountService extends IInterface {
                 return _result;
             }
 
-            public int encryptStorage(int type, String password) throws RemoteException {
+            public int encryptStorage(int type, String password, boolean wipe) throws RemoteException {
                 Parcel _data = Parcel.obtain();
                 Parcel _reply = Parcel.obtain();
                 int _result;
@@ -634,6 +634,7 @@ public interface IMountService extends IInterface {
                     _data.writeInterfaceToken(DESCRIPTOR);
                     _data.writeInt(type);
                     _data.writeString(password);
+                    _data.writeInt((wipe ? 1 : 0));
                     mRemote.transact(Stub.TRANSACTION_encryptStorage, _data, _reply, 0);
                     _reply.readException();
                     _result = _reply.readInt();
@@ -1275,7 +1276,8 @@ public interface IMountService extends IInterface {
                     data.enforceInterface(DESCRIPTOR);
                     int type = data.readInt();
                     String password = data.readString();
-                    int result = encryptStorage(type, password);
+                    boolean wipe = (0 != data.readInt());
+                    int result = encryptStorage(type, password, wipe);
                     reply.writeNoException();
                     reply.writeInt(result);
                     return true;
@@ -1562,7 +1564,8 @@ public interface IMountService extends IInterface {
      * Returns whether or not the external storage is emulated.
      */
     public boolean isExternalStorageEmulated() throws RemoteException;
-
+    /** The volume has been encrypted succesfully and MDTP state is 'activated'. */
+    static final int ENCRYPTION_STATE_OK_MDTP_ACTIVATED = 2;
     /** The volume is not encrypted. */
     static final int ENCRYPTION_STATE_NONE = 1;
     /** The volume has been encrypted succesfully. */
@@ -1575,6 +1578,8 @@ public interface IMountService extends IInterface {
     static final int ENCRYPTION_STATE_ERROR_INCONSISTENT = -3;
     /** Underlying data is corrupt */
     static final int ENCRYPTION_STATE_ERROR_CORRUPT = -4;
+    /** The volume is in a bad state and MDTP state is 'activated'.*/
+    static final int ENCRYPTION_STATE_ERROR_MDTP_ACTIVATED = -5;
 
     /**
      * Determines the encryption state of the volume.
@@ -1590,7 +1595,7 @@ public interface IMountService extends IInterface {
     /**
      * Encrypts storage.
      */
-    public int encryptStorage(int type, String password) throws RemoteException;
+    public int encryptStorage(int type, String password, boolean wipe) throws RemoteException;
 
     /**
      * Changes the encryption password.
