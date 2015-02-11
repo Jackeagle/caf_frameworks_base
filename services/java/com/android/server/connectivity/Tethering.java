@@ -44,6 +44,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
@@ -764,6 +765,14 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
             Log.e(TAG, "Error listing Interfaces", e);
             return;
         }
+
+        final String usbSysctlKey = "sys.usb.tethering";
+        SystemProperties.set(usbSysctlKey, "false");
+
+        if (enable) {
+            SystemProperties.set(usbSysctlKey, "true");
+        }
+
         for (String iface : ifaces) {
             if (isUsb(iface)) {
                 int result = (enable ? tether(iface) : untether(iface));
@@ -1256,7 +1265,9 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                         String newUpstreamIfaceName = (String)(message.obj);
                         if ((mMyUpstreamIfaceName == null && newUpstreamIfaceName == null) ||
                                 (mMyUpstreamIfaceName != null &&
-                                mMyUpstreamIfaceName.equals(newUpstreamIfaceName))) {
+                                mMyUpstreamIfaceName.equals(newUpstreamIfaceName)) ||
+                                (newUpstreamIfaceName != null &&
+                                newUpstreamIfaceName.equals(mIfaceName))) {
                             if (VDBG) Log.d(TAG, "Connection changed noop - dropping");
                             break;
                         }
