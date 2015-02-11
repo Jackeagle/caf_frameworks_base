@@ -871,6 +871,8 @@ public class MSimNetworkController extends NetworkController {
         }
         StringBuilder str = new StringBuilder();
         boolean something = false;
+        boolean withSamePlmnSpn = showPlmn && plmn != null
+                && showSpn && spn != null && plmn.equals(spn);
         if (showPlmn && plmn != null) {
             if(mContext.getResources().getBoolean(R.bool.config_display_rat) &&
                     mMSimServiceState[subscription] != null) {
@@ -879,7 +881,7 @@ public class MSimNetworkController extends NetworkController {
             str.append(plmn);
             something = true;
         }
-        if (showSpn && spn != null) {
+        if (!withSamePlmnSpn && showSpn && spn != null) {
             if(mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_spn_display_control)
                     && something){
