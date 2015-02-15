@@ -169,7 +169,8 @@ public class MSimKeyguardSimPukView extends KeyguardSimPukView {
                                 mSimUnlockProgressDialog.hide();
                             }
                             if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
-                                KeyguardUpdateMonitor.getInstance(getContext()).reportSimUnlocked();
+                                KeyguardUpdateMonitor.getInstance(getContext())
+                                        .reportSimUnlocked(mSubscription);
                                 mCallback.dismiss(true);
                             } else {
                                 mShowDefaultMessage = false;
