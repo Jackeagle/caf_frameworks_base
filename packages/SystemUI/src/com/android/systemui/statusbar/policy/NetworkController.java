@@ -860,6 +860,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
         }
         StringBuilder str = new StringBuilder();
         boolean something = false;
+        boolean withSamePlmnSpn = showPlmn && plmn != null
+                && showSpn && spn != null && plmn.equals(spn);
         if (showPlmn && plmn != null) {
             if(mContext.getResources().getBoolean(R.bool.config_display_rat) &&
                     mServiceState != null) {
@@ -868,7 +870,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
             str.append(plmn);
             something = true;
         }
-        if (showSpn && spn != null) {
+        if (!withSamePlmnSpn && showSpn && spn != null ) {
             if(mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_spn_display_control)
                     && something){
