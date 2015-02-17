@@ -215,6 +215,20 @@ public class MmsServiceBroker extends SystemService {
         return "unknown";
     }
 
+    /*
+     * Throws a security exception unless the caller has carrier privilege.
+     */
+    private void enforceCarrierPrivilege() {
+        String[] packages = getPackageManager().getPackagesForUid(Binder.getCallingUid());
+        for (String pkg : packages) {
+            if (getTelephonyManager().checkCarrierPrivilegesForPackage(pkg) ==
+                    TelephonyManager.CARRIER_PRIVILEGE_STATUS_HAS_ACCESS) {
+                return;
+            }
+        }
+        throw new SecurityException("No carrier privilege");
+    }
+
     // Service API calls implementation, proxied to the real MmsService in "com.android.mms.service"
     private final class BinderService extends IMms.Stub {
         private static final String PHONE_PACKAGE_NAME = "com.android.phone";
