@@ -17,10 +17,12 @@
 package android.telecom;
 
 import android.annotation.SystemApi;
+import android.telecom.Connection.VideoProvider;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -30,7 +32,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * @hide
  */
 @SystemApi
-public abstract class Conference {
+public abstract class Conference implements IConferenceable {
 
     /** @hide */
     public abstract static class Listener {
@@ -42,6 +44,8 @@ public abstract class Conference {
                 Conference conference, List<Connection> conferenceableConnections) {}
         public void onDestroyed(Conference conference) {}
         public void onCapabilitiesChanged(Conference conference, int capabilities) {}
+        public void onVideoStateChanged(Conference c, int videoState) { }
+        public void onVideoProviderChanged(Conference c, Connection.VideoProvider videoProvider) {}
     }
 
     private final Set<Listener> mListeners = new CopyOnWriteArraySet<>();
@@ -52,7 +56,7 @@ public abstract class Conference {
     private final List<Connection> mUnmodifiableConferenceableConnections =
             Collections.unmodifiableList(mConferenceableConnections);
 
-    private PhoneAccountHandle mPhoneAccount;
+    protected PhoneAccountHandle mPhoneAccount;
     private AudioState mAudioState;
     private int mState = Connection.STATE_NEW;
     private DisconnectCause mDisconnectCause;
@@ -123,6 +127,22 @@ public abstract class Conference {
     }
 
     /**
+     * Returns VideoProvider of the primary call. This can be null.
+     *  @hide
+     */
+    public VideoProvider getVideoProvider() {
+        return null;
+    }
+
+    /**
+     * Returns video state of the primary call.
+     *  @hide
+     */
+    public int getVideoState() {
+        return VideoProfile.VideoState.AUDIO_ONLY;
+    }
+
+    /**
      * Invoked when the Conference and all it's {@link Connection}s should be disconnected.
      */
     public void onDisconnect() {}
@@ -133,6 +153,13 @@ public abstract class Conference {
      * @param connection The connection to separate.
      */
     public void onSeparate(Connection connection) {}
+
+    /**
+     * Invoked when the conference adds a participant to the conference call.
+     *
+     * @param participant The participant to be added with conference call.
+     */
+    public void onAddParticipant(String participant) {}
 
     /**
      * Invoked when the specified {@link Connection} should merged with the conference call.
@@ -183,6 +210,13 @@ public abstract class Conference {
     public void onAudioStateChanged(AudioState state) {}
 
     /**
+     * Notifies this conference that a connection has been added to it.
+     *
+     * @param connection The newly added connection.
+     */
+    public void onConnectionAdded(Connection connection) {}
+
+    /**
      * Sets state to be on hold.
      */
     public final void setOnHold() {
@@ -211,6 +245,13 @@ public abstract class Conference {
     }
 
     /**
+     * @return The {@link DisconnectCause} for this connection.
+     */
+    public final DisconnectCause getDisconnectCause() {
+        return mDisconnectCause;
+    }
+
+    /**
      * Sets the capabilities of a conference. See {@link PhoneCapabilities} for valid values.
      *
      * @param capabilities A bitmask of the {@code PhoneCapabilities} of the conference call.
@@ -232,9 +273,11 @@ public abstract class Conference {
      * @return True if the connection was successfully added.
      */
     public final boolean addConnection(Connection connection) {
+        Log.d(this, "Connection=%s, connection=", connection);
         if (connection != null && !mChildConnections.contains(connection)) {
             if (connection.setConference(this)) {
                 mChildConnections.add(connection);
+                onConnectionAdded(connection);
                 for (Listener l : mListeners) {
                     l.onConnectionAdded(this, connection);
                 }
@@ -275,6 +318,23 @@ public abstract class Conference {
             }
         }
         fireOnConferenceableConnectionsChanged();
+    }
+
+    public final void setVideoState(Connection c, int videoState) {
+        Log.d(this, "setVideoState Conference: %s Connection: %s VideoState: %s",
+                this, c, videoState);
+        for (Listener l : mListeners) {
+            l.onVideoStateChanged(this, videoState);
+        }
+    }
+
+    /** @hide */
+    public final void setVideoProvider(Connection c, Connection.VideoProvider videoProvider) {
+        Log.d(this, "setVideoProvider Conference: %s Connection: %s VideoState: %s",
+                this, c, videoProvider);
+        for (Listener l : mListeners) {
+            l.onVideoProviderChanged(this, videoProvider);
+        }
     }
 
     private final void fireOnConferenceableConnectionsChanged() {
@@ -338,6 +398,19 @@ public abstract class Conference {
     }
 
     /**
+     * Retrieves the primary connection associated with the conference.  The primary connection is
+     * the connection from which the conference will retrieve its current state.
+     *
+     * @return The primary connection.
+     */
+    public Connection getPrimaryConnection() {
+        if (mUnmodifiableChildConnections == null || mUnmodifiableChildConnections.isEmpty()) {
+            return null;
+        }
+        return mUnmodifiableChildConnections.get(0);
+    }
+
+    /**
      * Inform this Conference that the state of its audio output has been changed externally.
      *
      * @param state The new audio state.
@@ -372,5 +445,16 @@ public abstract class Conference {
             c.removeConnectionListener(mConnectionDeathListener);
         }
         mConferenceableConnections.clear();
+    }
+
+    @Override
+    public String toString() {
+        return String.format(Locale.US,
+                "[State: %s,Capabilites: %s, VideoState: %s, VideoProvider: %s, ThisObject %s]",
+                Connection.stateToString(mState),
+                PhoneCapabilities.toString(mCapabilities),
+                getVideoState(),
+                getVideoProvider(),
+                super.toString());
     }
 }

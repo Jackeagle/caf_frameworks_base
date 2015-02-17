@@ -227,14 +227,6 @@ public interface TelephonyProperties
      */
     static final String PROPERTY_SIM_COUNT = "ro.telephony.sim.count";
 
-    /**
-     * Enable VoLTE/VT over IMS: debug option
-     * If 1: use IMS if provisioned/registered etc (i.e. standard operation)
-     * If 0: use CS.
-     * If missing: use 0
-     */
-    static final String PROPERTY_DBG_IMS_VOLTE_ENABLE = "persist.dbg.ims_volte_enable";
-
     static final String EXTRAS_IS_CONFERENCE_URI = "isConferenceUri";
 
     static final String EXTRA_DIAL_CONFERENCE_URI =
@@ -243,4 +235,12 @@ public interface TelephonyProperties
 
     static final String EXTRA_SKIP_SCHEMA_PARSING =
             "org.codeaurora.extra.SKIP_SCHEMA_PARSING";
+
+    /**
+     * Controls audio route for VT calls.
+     * 0 - Use the default audio routing strategy.
+     * 1 - Disable the speaker. Route the audio to Headset or Bluetooth
+     *     or Earpiece, based on the default audio routing strategy.
+     */
+    static final String PROPERTY_IMS_AUDIO_OUTPUT = "persist.radio.ims.audio.output";
 }
