@@ -328,7 +328,7 @@ void parseScanResults(String16& str, const char *reply)
     char    *pos = NULL;
     char    ssid[BUF_SIZE] = {0};
     char    ssid_utf8[BUF_SIZE] = {0};
-    char    ssid_txt[BUF_SIZE] ={0};
+    char    ssid_txt[BUF_SIZE] = {0};
     bool    isUTF8 = false, isCh = false;
     char    buf[BUF_SIZE] = {0};
     String8 line;
@@ -374,7 +374,8 @@ void parseScanResults(String16& str, const char *reply)
                     str += String16("ssid=");
                     str += String16(ssid_txt);
                     str += String16("\n");
-                    strncpy(ssid_utf8, dest, strlen(dest));
+                    strncpy(ssid_utf8, dest, BUF_SIZE);
+                    ssid_utf8[BUF_SIZE] = '\0';
                     memset(dest, 0, CONVERT_LINE_LEN);
                     memset(ssid_txt, 0, BUF_SIZE);
                 } else {
