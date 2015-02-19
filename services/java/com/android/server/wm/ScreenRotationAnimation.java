@@ -36,7 +36,7 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
 import android.os.Handler;
 import android.os.Message;
-
+import android.os.Looper;
 class ScreenRotationAnimation {
     static final String TAG = "ScreenRotationAnimation";
     static final boolean DEBUG_STATE = false;
@@ -132,7 +132,7 @@ class ScreenRotationAnimation {
     private boolean mMoreStartExit;
     private boolean mMoreStartFrame;
     long mHalfwayPoint;
-    final H mHandler = new H();
+    final H mHandler = new H(Looper.getMainLooper());
 
     public void printTo(String prefix, PrintWriter pw) {
         pw.print(prefix); pw.print("mSurface="); pw.print(mSurfaceControl);
@@ -1017,7 +1017,9 @@ class ScreenRotationAnimation {
         //Set the freeze timeout value to 6sec (which is greater than
         //APP_FREEZE_TIMEOUT value in WindowManagerService)
         public static final int FREEZE_TIMEOUT_VAL = 6000;
-
+        public H(Looper looper) {
+          super(looper, null, true /*async*/);
+        }
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
