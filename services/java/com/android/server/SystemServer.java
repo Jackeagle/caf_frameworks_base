@@ -111,6 +111,11 @@ import java.util.TimerTask;
 import dalvik.system.PathClassLoader;
 import java.lang.reflect.Constructor;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 public final class SystemServer {
     private static final String TAG = "SystemServer";
 
@@ -175,6 +180,18 @@ public final class SystemServer {
      * The main entry point from zygote.
      */
     public static void main(String[] args) {
+    try {
+            File f = new File("/proc/bootkpi/marker_entry");
+            if (!f.exists())
+                return; // No file...Dont do anything.
+            FileOutputStream fos = new FileOutputStream(f);
+            byte[] marker_name = "SystemServer Start:".getBytes();
+            fos.write(marker_name);
+            fos.flush();
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         new SystemServer().run();
     }
 
