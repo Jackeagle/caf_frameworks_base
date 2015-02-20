@@ -67,7 +67,9 @@ public class MSimNetworkController extends NetworkController {
     boolean[] mMSimDataConnected;
     IccCardConstants.State[] mMSimState;
     int[] mMSimDataActivity;
+    int[] mMSimDataNetType;
     int[] mMSimDataServiceState;
+    int[] mMSimDataState;
     ServiceState[] mMSimServiceState;
     ServiceState[] mMSimLastServiceState;
     SignalStrength[] mMSimSignalStrength;
@@ -147,6 +149,8 @@ public class MSimNetworkController extends NetworkController {
         mMSimcombinedActivityIconId = new int[numPhones];
         mMSimLastcombinedActivityIconId = new int[numPhones];
         mMSimDataActivity = new int[numPhones];
+        mMSimDataNetType = new int[numPhones];
+        mMSimDataState = new int[numPhones];
         mMSimContentDescriptionCombinedSignal = new String[numPhones];
         mMSimContentDescriptionDataType = new String[numPhones];
         mMSimLastSimIconId = new int[numPhones];
@@ -173,6 +177,8 @@ public class MSimNetworkController extends NetworkController {
             mMSimcombinedActivityIconId[i] = 0;
             mMSimLastcombinedActivityIconId[i] = 0;
             mMSimDataActivity[i] = TelephonyManager.DATA_ACTIVITY_NONE;
+            mMSimDataNetType[i] = TelephonyManager.NETWORK_TYPE_UNKNOWN;
+            mMSimDataState[i] = TelephonyManager.DATA_DISCONNECTED;
             mMSimLastSimIconId[i] = 0;
             mMSimNetworkName[i] = mNetworkNameDefault;
             mMSimDataServiceState[i] = ServiceState.STATE_OUT_OF_SERVICE;
@@ -182,6 +188,8 @@ public class MSimNetworkController extends NetworkController {
         mDataConnected = mMSimDataConnected[mDefaultSubscription];
         mSimState = mMSimState[mDefaultSubscription];
         mDataActivity = mMSimDataActivity[mDefaultSubscription];
+        mDataNetType = mMSimDataNetType[mDefaultSubscription];
+        mDataState = mMSimDataState[mDefaultSubscription];
         mDataServiceState = mMSimDataServiceState[mDefaultSubscription];
         mServiceState = mMSimServiceState[mDefaultSubscription];
         mSignalStrength = mMSimSignalStrength[mDefaultSubscription];
@@ -499,13 +507,10 @@ public class MSimNetworkController extends NetworkController {
                     + mSubscription + "state=" + state + " type=" + networkType);
                 }
 
-                // DSDS case: Data is active only on DDS. Ignore the Data Connection
+                // DSDS case: Dont ignore the Data Connection
                 // State changed notifications of the other NON-DDS.
-                if (mSubscription ==
-                        MSimTelephonyManager.getDefault().getDefaultDataSubscription()) {
-                    mDataState = state;
-                    mDataNetType = networkType;
-                }
+                mMSimDataState[mSubscription] = state;
+                mMSimDataNetType[mSubscription] = networkType;
 
                 updateIconSet(mSubscription);
                 updateDataNetType(mSubscription);
@@ -716,7 +721,7 @@ public class MSimNetworkController extends NetworkController {
             } else {
                 if (DEBUG) {
                     Slog.d(TAG,"updateDataNetType sub = " + subscription
-                            + " mDataNetType = " + mDataNetType);
+                        + " mMSimDataNetType = " + mMSimDataNetType[subscription]);
                 }
                 mMSimDataTypeIconId[subscription] =
                         TelephonyIcons.getDataTypeIcon(subscription);
@@ -817,7 +822,7 @@ public class MSimNetworkController extends NetworkController {
         }
 
         if (DEBUG) Slog.d(TAG,"updateDataIcon  when SimState =" + mMSimState[subscription]);
-        if (mDataNetType == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+        if (mMSimDataNetType[subscription] == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
             // If data network type is unknown do not display data icon
             visible = false;
         } else if (!isCdma(subscription)) {
@@ -827,7 +832,7 @@ public class MSimNetworkController extends NetworkController {
             // GSM case, we have to check also the sim state
             if (mMSimState[subscription] == IccCardConstants.State.READY ||
                 mMSimState[subscription] == IccCardConstants.State.UNKNOWN) {
-                if (mDataState == TelephonyManager.DATA_CONNECTED) {
+                if (mMSimDataState[subscription] == TelephonyManager.DATA_CONNECTED) {
                     iconId = TelephonyIcons.getDataActivity(subscription,
                             mMSimDataActivity[subscription]);
                     mMSimDataDirectionIconId[subscription] = iconId;
@@ -842,7 +847,7 @@ public class MSimNetworkController extends NetworkController {
             }
         } else {
             // CDMA case, mMSimDataActivity can be also DATA_ACTIVITY_DORMANT
-            if (mDataState == TelephonyManager.DATA_CONNECTED) {
+            if (mMSimDataState[subscription] == TelephonyManager.DATA_CONNECTED) {
                 iconId = TelephonyIcons.getDataActivity(subscription,
                         mMSimDataActivity[subscription]);
             } else {
@@ -1306,14 +1311,14 @@ public class MSimNetworkController extends NetworkController {
         pw.println(mMSimState[subscription]);
         pw.print("  mPhoneState=");
         pw.println(mPhoneState);
-        pw.print("  mDataState=");
-        pw.println(mDataState);
+        pw.print("  mMSimDataState=");
+        pw.println(mMSimDataState[subscription]);
         pw.print("  mMSimDataActivity=");
         pw.println(mMSimDataActivity[subscription]);
-        pw.print("  mDataNetType=");
-        pw.print(mDataNetType);
+        pw.print("  mMSimDataNetType=");
+        pw.print(mMSimDataNetType[subscription]);
         pw.print("/");
-        pw.println(TelephonyManager.getNetworkTypeName(mDataNetType));
+        pw.println(TelephonyManager.getNetworkTypeName(mMSimDataNetType[subscription]));
         pw.print("  mMSimServiceState=");
         pw.println(mMSimServiceState[subscription]);
         pw.print("  mMSimSignalStrength=");
