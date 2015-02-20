@@ -2255,4 +2255,5 @@
   <java-symbol type="string" name="service_not_subscribed" />
   <!-- for wifi auto connection -->
   <java-symbol type="bool" name="wifi_autocon" />
+  <java-symbol type="bool" name="config_fdn_contact_search"/>
 </resources>
