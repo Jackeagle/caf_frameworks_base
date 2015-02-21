@@ -1519,4 +1519,16 @@ public class WifiP2pManager {
             return;
         }
     }
+
+    /**
+     * Get current status of p2p go mode
+     * @hide
+     */
+    public boolean getP2pAutoGoStatus() {
+        try {
+            return mService.getP2pAutoGoStatus();
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
 }

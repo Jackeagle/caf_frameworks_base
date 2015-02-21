@@ -38,6 +38,8 @@ import android.net.NetworkInfo;
 import android.net.NetworkUtils;
 import android.net.RouteInfo;
 import android.net.wifi.WifiManager;
+import android.net.wifi.p2p.WifiP2pManager;
+import android.content.Context;
 import android.net.wifi.WifiDevice;
 import android.os.Binder;
 import android.os.IBinder;
@@ -144,6 +146,7 @@ public class Tethering extends BaseNetworkObserver {
     private final INetworkManagementService mNMService;
     private final INetworkStatsService mStatsService;
     private Looper mLooper;
+    private WifiP2pManager mWifiP2pManager;
 
     private HashMap<String, TetherInterfaceSM> mIfaces; // all tethered/tetherable ifaces
 
@@ -166,6 +169,7 @@ public class Tethering extends BaseNetworkObserver {
         "192.168.48.2", "192.168.48.254", "192.168.49.2", "192.168.49.254",
     };
 
+    private boolean dhcpServerStartedByMe = false;
     private String[] mDefaultDnsServers;
     private static final String DNS_DEFAULT_SERVER1 = "8.8.8.8";
     private static final String DNS_DEFAULT_SERVER2 = "8.8.4.4";
@@ -249,9 +253,6 @@ public class Tethering extends BaseNetworkObserver {
                 com.android.internal.R.array.config_tether_usb_regexs);
         String[] tetherableWifiRegexs = mContext.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_wifi_regexs);
-        if (mWifiManager.getConcurrency()) {
-            tetherableWifiRegexs[0] = mWifiManager.getSAPInterfaceName();
-        }
         String[] tetherableBluetoothRegexs = mContext.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_bluetooth_regexs);
 
@@ -1557,13 +1558,26 @@ public class Tethering extends BaseNetworkObserver {
                     return false;
                 }
                 try {
-                    mNMService.startTethering(mDhcpRange,
-                                              mTetherableWifiRegexs[0]);
+                    if(DBG)
+                        Log.d(TAG, "mNMService.isTetheringStarted() = "+
+                            mNMService.isTetheringStarted() +
+                            "dhcpServerStartedByMe = " +dhcpServerStartedByMe);
+                    if(!mNMService.isTetheringStarted() &&
+                            dhcpServerStartedByMe == false) {
+                        mNMService.startTethering(mDhcpRange);
+                        dhcpServerStartedByMe = true;
+                    }
                 } catch (Exception e) {
                     try {
-                        mNMService.stopTethering(mTetherableWifiRegexs[0]);
-                        mNMService.startTethering(mDhcpRange,
-                                                  mTetherableWifiRegexs[0]);
+                        if( dhcpServerStartedByMe ) {
+                            mNMService.stopTethering();
+                            dhcpServerStartedByMe = false;
+                        }
+                        if(!mNMService.isTetheringStarted() &&
+                               dhcpServerStartedByMe == false) {
+                            mNMService.startTethering(mDhcpRange);
+                            dhcpServerStartedByMe = true;
+                        }
                     } catch (Exception ee) {
                         transitionTo(mStartTetheringErrorState);
                         return false;
@@ -1573,7 +1587,14 @@ public class Tethering extends BaseNetworkObserver {
             }
             protected boolean turnOffMasterTetherSettings() {
                 try {
-                    mNMService.stopTethering(mTetherableWifiRegexs[0]);
+                    mWifiP2pManager = (WifiP2pManager)
+                        mContext.getSystemService(Context.WIFI_P2P_SERVICE);
+                    if (mWifiP2pManager != null) {
+                        if( !mWifiP2pManager.getP2pAutoGoStatus()) {
+                            mNMService.stopTethering();
+                            dhcpServerStartedByMe = false;
+                        }
+                    }
                 } catch (Exception e) {
                     transitionTo(mStopTetheringErrorState);
                     return false;
@@ -1885,8 +1906,7 @@ public class Tethering extends BaseNetworkObserver {
                                 Log.d(TAG, "Setting DNS forwarders: Network=" + network +
                                        ", dnsServers=" + Arrays.toString(dnsServers));
                             }
-                            mNMService.setDnsForwarders(network, dnsServers,
-                                                        mTetherableWifiRegexs[0]);
+                            mNMService.setDnsForwarders(network, dnsServers);
                         } catch (Exception e) {
                             Log.e(TAG, "Setting DNS forwarders failed!");
                             transitionTo(mSetDnsForwardersErrorState);
@@ -2083,7 +2103,7 @@ public class Tethering extends BaseNetworkObserver {
                 Log.e(TAG, "Error in setDnsForwarders");
                 notify(TetherInterfaceSM.CMD_SET_DNS_FORWARDERS_ERROR);
                 try {
-                    mNMService.stopTethering(mTetherableWifiRegexs[0]);
+                    mNMService.stopTethering();
                 } catch (Exception e) {}
                 try {
                     mNMService.setIpForwardingEnabled(false);
