@@ -64,6 +64,11 @@ public final class DisconnectCause implements Parcelable {
 
     public static final int CONNECTION_MANAGER_NOT_SUPPORTED = 10;
 
+    /** Disconnected becuase of low battery
+     * @hide
+     */
+    public static final int LOW_BATTERY = 101;
+
     private int mDisconnectCode;
     private CharSequence mDisconnectLabel;
     private CharSequence mDisconnectDescription;
