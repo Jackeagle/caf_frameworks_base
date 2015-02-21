@@ -1435,6 +1435,12 @@ public abstract class Connection implements IConferenceable {
     public void onDisconnect() {}
 
     /**
+     * Notifies this Connection of a request to disconnect with reason.
+     * {@hide}
+     */
+    public void onDisconnectWithReason(int disconnectCause) {}
+
+    /**
      * Notifies this Connection of a request to disconnect a participant of the conference managed
      * by the connection.
      *
@@ -1492,6 +1498,13 @@ public abstract class Connection implements IConferenceable {
      * a request to reject.
      */
     public void onReject() {}
+
+    /**
+     * Notifies this Connection, which is in {@link State#RINGING}, of
+     * a request to reject with reason.
+     * {@hide}
+     */
+    public void onRejectWithReason(int disconnectCause) {}
 
     /**
      * Notifies this Connection whether the user wishes to proceed with the post-dial DTMF codes.

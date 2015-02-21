@@ -24,5 +24,6 @@
     <!-- Configure mobile network MTU. Carrier specific value is set here.
     -->
     <integer name="config_mobile_mtu">1440</integer>
+    <bool name="config_low_battery_video_calling_supported">true</bool>
 
 </resources>
