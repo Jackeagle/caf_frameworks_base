@@ -4823,7 +4823,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             }
 
-            /*case KeyEvent.KEYCODE_POWER: {
+            case KeyEvent.KEYCODE_POWER: {
                 result &= ~ACTION_PASS_TO_USER;
                 if (down) {
                     boolean panic = mImmersiveModeConfirmation.onPowerKeyDown(interactive,
@@ -4898,7 +4898,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 result &= ~ACTION_PASS_TO_USER;
                 isWakeKey = true;
                 break;
-            }*/
+            }
 
             case KeyEvent.KEYCODE_MEDIA_PLAY:
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
