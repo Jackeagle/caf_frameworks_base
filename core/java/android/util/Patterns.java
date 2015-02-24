@@ -120,7 +120,7 @@ public class Patterns {
      *  added.
      */
     public static final Pattern WEB_URL = Pattern.compile(
-        "((?=[^\u0391-\uffe5])(?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/"
+        "((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/"
         + "(?:(?:[a-zA-Z0-9\\$\\-\\_\\.\\+\\!\\*\\'\\(\\)"
         + "\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,64}(?:\\:(?:[a-zA-Z0-9\\$\\-\\_"
         + "\\.\\+\\!\\*\\'\\(\\)\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,25})?\\@)?)?"
