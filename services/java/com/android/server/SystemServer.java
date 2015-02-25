@@ -53,6 +53,8 @@ import android.util.Log;
 import android.util.Slog;
 import android.view.WindowManager;
 import android.webkit.WebViewFactory;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 
 import com.android.internal.R;
 import com.android.internal.os.BinderInternal;
@@ -262,6 +264,9 @@ public final class SystemServer {
             startBootstrapServices();
             startCoreServices();
             startOtherServices();
+            if (null != mSystemContext) {
+               mSystemContext.registerReceiver(mBroadcastReceiver,new IntentFilter(Intent.ACTION_BOOT_COMPLETED));
+            }
         } catch (Throwable ex) {
             Slog.e("System", "******************************************");
             Slog.e("System", "************ Failure starting system services", ex);
@@ -277,6 +282,14 @@ public final class SystemServer {
         Looper.loop();
         throw new RuntimeException("Main thread loop unexpectedly exited");
     }
+       BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+             public void onReceive(final Context context, Intent intent) {
+                   String action = intent.getAction();
+                      if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
+                         startOtherRefServices();
+                      }
+            }
+       };
 
     private void reportWtf(String msg, Throwable e) {
         Slog.w(TAG, "***********************************************");
@@ -387,6 +400,253 @@ public final class SystemServer {
         mSystemServiceManager.startService(WebViewUpdateService.class);
     }
 
+    private void startOtherRefServices() {
+        final Context context = mSystemContext;
+        boolean isEmulator = SystemProperties.get("ro.kernel.qemu").equals("1");
+        boolean disableNonCoreServices = SystemProperties.getBoolean(
+           "config.disable_noncore", false);
+        boolean disableNetwork = SystemProperties.getBoolean(
+           "config.disable_network", false);
+        boolean disableMedia = SystemProperties.getBoolean(
+           "config.disable_media", false);
+        boolean disableLocation = SystemProperties.getBoolean(
+           "config.disable_location", false);
+        boolean disableAtlas = SystemProperties.getBoolean(
+           "config.disable_atlas", false);
+
+        VibratorService vibrator = null;
+        Slog.i(TAG, "Vibrator Service");
+        vibrator = new VibratorService(context);
+        ServiceManager.addService("vibrator", vibrator);
+
+        try {
+            vibrator.systemReady();
+        } catch (Throwable e) {
+            reportWtf("making Vibrator Service ready", e);
+        }
+        ConsumerIrService consumerIr = null;
+        Slog.i(TAG, "Consumer IR Service");
+        consumerIr = new ConsumerIrService(context);
+        ServiceManager.addService(Context.CONSUMER_IR_SERVICE, consumerIr);
+
+        BluetoothManagerService bluetooth = null;
+        boolean disableBluetooth = SystemProperties.getBoolean(
+           "config.disable_bluetooth", false);
+        // Skip Bluetooth if we have an emulator kernel
+        // TODO: Use a more reliable check to see if this product should
+        // support Bluetooth - see bug 988521
+        if (isEmulator) {
+            Slog.i(TAG, "No Bluetooh Service (emulator)");
+        } else if (mFactoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
+            Slog.i(TAG, "No Bluetooth Service (factory test)");
+        } else if (!context.getPackageManager().hasSystemFeature(
+            PackageManager.FEATURE_BLUETOOTH)) {
+            Slog.i(TAG, "No Bluetooth Service (Bluetooth Hardware Not Present)");
+        } else if (disableBluetooth) {
+            Slog.i(TAG, "Bluetooth Service disabled by config");
+        } else {
+            Slog.i(TAG, "Bluetooth Manager Service");
+            bluetooth = new BluetoothManagerService(context);
+                 ServiceManager.addService(
+                 BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE, bluetooth);
+        }
+        if (!disableNonCoreServices) {
+            try {
+                Slog.i(TAG, "Clipboard Service");
+                ServiceManager.addService(Context.CLIPBOARD_SERVICE,new ClipboardService(context));
+            } catch (Throwable e) {
+                reportWtf("starting Clipboard Service", e);
+            }
+        }
+        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_ETHERNET)) {
+            mSystemServiceManager.startService(ETHERNET_SERVICE_CLASS);
+        }
+        mSystemServiceManager.startService(DeviceStorageMonitorService.class);
+        //Starting Location & Country Detector Service.
+        LocationManagerService location = null;
+        CountryDetectorService countryDetector = null;
+
+        if (!disableLocation) {
+            try {
+                Slog.i(TAG, "Location Manager");
+                location = new LocationManagerService(context);
+                ServiceManager.addService(Context.LOCATION_SERVICE, location);
+            } catch (Throwable e) {
+                reportWtf("starting Location Manager", e);
+            }
+
+            try {
+                Slog.i(TAG, "Country Detector");
+                countryDetector = new CountryDetectorService(context);
+                ServiceManager.addService(Context.COUNTRY_DETECTOR,countryDetector);
+            } catch (Throwable e) {
+                    reportWtf("starting Country Detector", e);
+            }
+        }
+        //starting DockObserver Service.
+        if (!disableNonCoreServices) {
+                mSystemServiceManager.startService(DockObserver.class);
+        }
+        //starting USB & Serial  Service.
+        UsbService usb = null;
+        SerialService serial = null;
+        if (!disableNonCoreServices) {
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
+                || mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_ACCESSORY)) {
+                // Manage USB host and device support
+                    mSystemServiceManager.startService(USB_SERVICE_CLASS);
+             }
+            try {
+                Slog.i(TAG, "Serial Service");
+                // Serial port support
+                serial = new SerialService(context);
+                ServiceManager.addService(Context.SERIAL_SERVICE, serial);
+            } catch (Throwable e) {
+                     Slog.e(TAG, "Failure starting SerialService");
+            }
+        }
+        //starting uimode Manager Service.
+        mSystemServiceManager.startService(UiModeManagerService.class);
+        //starting Backup Manager & Voice Recognition Service.
+        if (!disableNonCoreServices) {
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_BACKUP)) {
+                mSystemServiceManager.startService(BACKUP_MANAGER_SERVICE_CLASS);
+            }
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
+                mSystemServiceManager.startService(VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
+            }
+        }
+        //Starting DiskStats service.
+            try {
+                Slog.i(TAG, "DiskStats Service");
+                ServiceManager.addService("diskstats",new DiskStatsService(context));
+            } catch (Throwable e) {
+                reportWtf("starting DiskStats Service", e);
+            }
+        //Starting SamplingProfiler service.
+            try {
+                // need to add this service even if
+                // SamplingProfilerIntegration.isEnabled()
+                // is false, because it is this service that detects system property
+                // change and
+                // turns on SamplingProfilerIntegration. Plus, when sampling
+                // profiler doesn't work,
+                // there is little overhead for running this service.
+                Slog.i(TAG, "SamplingProfiler Service");
+                   ServiceManager.addService("samplingprofiler",new SamplingProfilerService(context));
+                 } catch (Throwable e) {
+                 reportWtf("starting SamplingProfiler Service", e);
+                }
+        //Starting NetworkTimeUpdateService.
+            NetworkTimeUpdateService networkTimeUpdater = null;
+            if (!disableNetwork) {
+                try {
+                    Slog.i(TAG, "NetworkTimeUpdateService");
+                    networkTimeUpdater = new NetworkTimeUpdateService(context);
+                } catch (Throwable e) {
+                          reportWtf("starting NetworkTimeUpdate service", e);
+                }
+            }
+        //Starting CommonTimeManagement Service.
+            CommonTimeManagementService commonTimeMgmtService = null;
+                if (!disableMedia) {
+                    try {
+                        Slog.i(TAG, "CommonTimeManagementService");
+                        commonTimeMgmtService = new CommonTimeManagementService(context);
+                        ServiceManager.addService("commontime_management",commonTimeMgmtService);
+                      } catch (Throwable e) {
+                         reportWtf("starting CommonTimeManagementService service", e);
+                     }
+                }
+        //Starting DreamManager Service.
+            if (!disableNonCoreServices) {
+                    mSystemServiceManager.startService(DreamManagerService.class);
+            }
+        //Starting AssetAtlas Service.
+            AssetAtlasService atlas = null;
+                if (!disableNonCoreServices && !disableAtlas) {
+                    try {
+                        Slog.i(TAG, "Assets Atlas Service");
+                        atlas = new AssetAtlasService(context);
+                        ServiceManager.addService(AssetAtlasService.ASSET_ATLAS_SERVICE, atlas);
+                   } catch (Throwable e) {
+                      reportWtf("starting AssetAtlasService", e);
+                   }
+                }
+        //Starting printManager service.
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
+                mSystemServiceManager.startService(PRINT_MANAGER_SERVICE_CLASS);
+            }
+        //Starting HDMI controller service.
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
+                mSystemServiceManager.startService(HdmiControlService.class);
+            }
+        //Starting TV Input Manager Service.
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
+                mSystemServiceManager.startService(TvInputManagerService.class);
+            }
+        //Starting MMS Service Broker.
+            MmsServiceBroker mmsService = null;
+            mmsService = mSystemServiceManager.startService(MmsServiceBroker.class);
+
+        final LocationManagerService locationF = location;
+        final CountryDetectorService countryDetectorF = countryDetector;
+        final NetworkTimeUpdateService networkTimeUpdaterF = networkTimeUpdater;
+        final CommonTimeManagementService commonTimeMgmtServiceF = commonTimeMgmtService;
+        final AssetAtlasService atlasF = atlas;
+        final MmsServiceBroker mmsServiceF = mmsService;
+
+        // We now tell the activity manager it is okay to run third party
+        // code. It will call back into us once it has gotten to the state
+        // where third party code can really run (but before it has actually
+        // started launching the initial applications), for us to complete our
+        // initialization.
+        mActivityManagerService.systemReady(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (locationF != null)
+                        locationF.systemRunning();
+                } catch (Throwable e) {
+                         reportWtf("Notifying Location Service running", e);
+                }
+                try {
+                    if (countryDetectorF != null)
+                         countryDetectorF.systemRunning();
+                } catch (Throwable e) {
+                         reportWtf("Notifying CountryDetectorService running", e);
+                }
+                try {
+                    if (networkTimeUpdaterF != null) {
+                         networkTimeUpdaterF.systemRunning();
+                }
+                Slog.e(TAG, "Failure starting SerialService");
+                } catch (Throwable e) {
+                                 reportWtf("Notifying NetworkTimeService running", e);
+                }
+                try {
+                    if (commonTimeMgmtServiceF != null) {
+                        commonTimeMgmtServiceF.systemRunning();
+                    }
+                } catch (Throwable e) {
+                    reportWtf("Notifying CommonTimeManagementService running",e);
+                }
+                try {
+                    if (atlasF != null)
+                        atlasF.systemRunning();
+                } catch (Throwable e) {
+                        reportWtf("Notifying AssetAtlasService running", e);
+                }
+                try {
+                    if (mmsServiceF != null)
+                         mmsServiceF.systemRunning();
+                } catch (Throwable e) {
+                    reportWtf("Notifying MmsService running", e);
+                }
+            }
+        });
+
+     }
     /**
      * Starts a miscellaneous grab bag of stuff that has yet to be refactored
      * and organized.
@@ -395,7 +655,7 @@ public final class SystemServer {
         final Context context = mSystemContext;
         AccountManagerService accountManager = null;
         ContentService contentService = null;
-        VibratorService vibrator = null;
+
         IAlarmManager alarm = null;
         MountService mountService = null;
         NetworkManagementService networkManagement = null;
@@ -405,16 +665,11 @@ public final class SystemServer {
         NetworkScoreService networkScore = null;
         NsdService serviceDiscovery= null;
         WindowManagerService wm = null;
-        BluetoothManagerService bluetooth = null;
-        UsbService usb = null;
-        SerialService serial = null;
-        NetworkTimeUpdateService networkTimeUpdater = null;
-        CommonTimeManagementService commonTimeMgmtService = null;
+
         InputManagerService inputManager = null;
         TelephonyRegistry telephonyRegistry = null;
-        ConsumerIrService consumerIr = null;
+
         AudioService audioService = null;
-        MmsServiceBroker mmsService = null;
 
         boolean disableStorage = SystemProperties.getBoolean("config.disable_storage", false);
         boolean disableMedia = SystemProperties.getBoolean("config.disable_media", false);
@@ -462,13 +717,6 @@ public final class SystemServer {
             Slog.i(TAG, "System Content Providers");
             mActivityManagerService.installSystemProviders();
 
-            Slog.i(TAG, "Vibrator Service");
-            vibrator = new VibratorService(context);
-            ServiceManager.addService("vibrator", vibrator);
-
-            Slog.i(TAG, "Consumer IR Service");
-            consumerIr = new ConsumerIrService(context);
-            ServiceManager.addService(Context.CONSUMER_IR_SERVICE, consumerIr);
 
             mAlarmManagerService = mSystemServiceManager.startService(AlarmManagerService.class);
             alarm = IAlarmManager.Stub.asInterface(
@@ -496,23 +744,6 @@ public final class SystemServer {
             // TODO: Use service dependencies instead.
             mDisplayManagerService.windowManagerAndInputReady();
 
-            // Skip Bluetooth if we have an emulator kernel
-            // TODO: Use a more reliable check to see if this product should
-            // support Bluetooth - see bug 988521
-            if (isEmulator) {
-                Slog.i(TAG, "No Bluetooh Service (emulator)");
-            } else if (mFactoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
-                Slog.i(TAG, "No Bluetooth Service (factory test)");
-            } else if (!context.getPackageManager().hasSystemFeature
-                       (PackageManager.FEATURE_BLUETOOTH)) {
-                Slog.i(TAG, "No Bluetooth Service (Bluetooth Hardware Not Present)");
-            } else if (disableBluetooth) {
-                Slog.i(TAG, "Bluetooth Service disabled by config");
-            } else {
-                Slog.i(TAG, "Bluetooth Manager Service");
-                bluetooth = new BluetoothManagerService(context);
-                ServiceManager.addService(BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE, bluetooth);
-            }
         } catch (RuntimeException e) {
             Slog.e("System", "******************************************");
             Slog.e("System", "************ Failure starting core service", e);
@@ -617,15 +848,6 @@ public final class SystemServer {
                 }
             }
 
-            if (!disableNonCoreServices) {
-                try {
-                    Slog.i(TAG, "Clipboard Service");
-                    ServiceManager.addService(Context.CLIPBOARD_SERVICE,
-                            new ClipboardService(context));
-                } catch (Throwable e) {
-                    reportWtf("starting Clipboard Service", e);
-                }
-            }
 
             if (!disableNetwork) {
                 try {
@@ -682,9 +904,6 @@ public final class SystemServer {
 
                 mSystemServiceManager.startService("com.android.server.wifi.RttService");
 
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_ETHERNET)) {
-                    mSystemServiceManager.startService(ETHERNET_SERVICE_CLASS);
-                }
 
                 try {
                     Slog.i(TAG, "Connectivity Service");
@@ -751,25 +970,8 @@ public final class SystemServer {
                     ServiceManager.getService(Context.NOTIFICATION_SERVICE));
             networkPolicy.bindNotificationManager(notification);
 
-            mSystemServiceManager.startService(DeviceStorageMonitorService.class);
 
-            if (!disableLocation) {
-                try {
-                    Slog.i(TAG, "Location Manager");
-                    location = new LocationManagerService(context);
-                    ServiceManager.addService(Context.LOCATION_SERVICE, location);
-                } catch (Throwable e) {
-                    reportWtf("starting Location Manager", e);
-                }
 
-                try {
-                    Slog.i(TAG, "Country Detector");
-                    countryDetector = new CountryDetectorService(context);
-                    ServiceManager.addService(Context.COUNTRY_DETECTOR, countryDetector);
-                } catch (Throwable e) {
-                    reportWtf("starting Country Detector", e);
-                }
-            }
 
             if (!disableNonCoreServices) {
                 try {
@@ -810,9 +1012,6 @@ public final class SystemServer {
                 }
             }
 
-            if (!disableNonCoreServices) {
-                mSystemServiceManager.startService(DockObserver.class);
-            }
 
             if (!disableMedia) {
                 try {
@@ -825,23 +1024,6 @@ public final class SystemServer {
                 }
             }
 
-            if (!disableNonCoreServices) {
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
-                        || mPackageManager.hasSystemFeature(
-                                PackageManager.FEATURE_USB_ACCESSORY)) {
-                    // Manage USB host and device support
-                    mSystemServiceManager.startService(USB_SERVICE_CLASS);
-                }
-
-                try {
-                    Slog.i(TAG, "Serial Service");
-                    // Serial port support
-                    serial = new SerialService(context);
-                    ServiceManager.addService(Context.SERIAL_SERVICE, serial);
-                } catch (Throwable e) {
-                    Slog.e(TAG, "Failure starting SerialService", e);
-                }
-            }
 
             mSystemServiceManager.startService(TwilightService.class);
 
@@ -850,56 +1032,15 @@ public final class SystemServer {
             mSystemServiceManager.startService(JobSchedulerService.class);
 
             if (!disableNonCoreServices) {
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_BACKUP)) {
-                    mSystemServiceManager.startService(BACKUP_MANAGER_SERVICE_CLASS);
-                }
 
                 if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_APP_WIDGETS)) {
                     mSystemServiceManager.startService(APPWIDGET_SERVICE_CLASS);
                 }
 
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
-                    mSystemServiceManager.startService(VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
-                }
             }
 
-            try {
-                Slog.i(TAG, "DiskStats Service");
-                ServiceManager.addService("diskstats", new DiskStatsService(context));
-            } catch (Throwable e) {
-                reportWtf("starting DiskStats Service", e);
-            }
 
-            try {
-                // need to add this service even if SamplingProfilerIntegration.isEnabled()
-                // is false, because it is this service that detects system property change and
-                // turns on SamplingProfilerIntegration. Plus, when sampling profiler doesn't work,
-                // there is little overhead for running this service.
-                Slog.i(TAG, "SamplingProfiler Service");
-                ServiceManager.addService("samplingprofiler",
-                            new SamplingProfilerService(context));
-            } catch (Throwable e) {
-                reportWtf("starting SamplingProfiler Service", e);
-            }
 
-            if (!disableNetwork) {
-                try {
-                    Slog.i(TAG, "NetworkTimeUpdateService");
-                    networkTimeUpdater = new NetworkTimeUpdateService(context);
-                } catch (Throwable e) {
-                    reportWtf("starting NetworkTimeUpdate service", e);
-                }
-            }
-
-            if (!disableMedia) {
-                try {
-                    Slog.i(TAG, "CommonTimeManagementService");
-                    commonTimeMgmtService = new CommonTimeManagementService(context);
-                    ServiceManager.addService("commontime_management", commonTimeMgmtService);
-                } catch (Throwable e) {
-                    reportWtf("starting CommonTimeManagementService service", e);
-                }
-            }
 
             if (!disableNetwork) {
                 try {
@@ -910,36 +1051,13 @@ public final class SystemServer {
                 }
             }
 
-            if (!disableNonCoreServices) {
-                // Dreams (interactive idle-time views, a/k/a screen savers, and doze mode)
-                mSystemServiceManager.startService(DreamManagerService.class);
-            }
 
-            if (!disableNonCoreServices && !disableAtlas) {
-                try {
-                    Slog.i(TAG, "Assets Atlas Service");
-                    atlas = new AssetAtlasService(context);
-                    ServiceManager.addService(AssetAtlasService.ASSET_ATLAS_SERVICE, atlas);
-                } catch (Throwable e) {
-                    reportWtf("starting AssetAtlasService", e);
-                }
-            }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
-                mSystemServiceManager.startService(PRINT_MANAGER_SERVICE_CLASS);
-            }
 
             mSystemServiceManager.startService(RestrictionsManagerService.class);
 
             mSystemServiceManager.startService(MediaSessionService.class);
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
-                mSystemServiceManager.startService(HdmiControlService.class);
-            }
-
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
-                mSystemServiceManager.startService(TvInputManagerService.class);
-            }
 
             if (!disableNonCoreServices) {
                 try {
@@ -1021,16 +1139,8 @@ public final class SystemServer {
             VMRuntime.getRuntime().startJitCompilation();
         }
 
-        // MMS service broker
-        mmsService = mSystemServiceManager.startService(MmsServiceBroker.class);
-
         // It is now time to start up the app processes...
 
-        try {
-            vibrator.systemReady();
-        } catch (Throwable e) {
-            reportWtf("making Vibrator Service ready", e);
-        }
 
         if (lockSettings != null) {
             try {
@@ -1093,18 +1203,12 @@ public final class SystemServer {
         final NetworkScoreService networkScoreF = networkScore;
         final WallpaperManagerService wallpaperF = wallpaper;
         final InputMethodManagerService immF = imm;
-        final LocationManagerService locationF = location;
-        final CountryDetectorService countryDetectorF = countryDetector;
-        final NetworkTimeUpdateService networkTimeUpdaterF = networkTimeUpdater;
-        final CommonTimeManagementService commonTimeMgmtServiceF = commonTimeMgmtService;
         final TextServicesManagerService textServiceManagerServiceF = tsms;
         final StatusBarManagerService statusBarF = statusBar;
-        final AssetAtlasService atlasF = atlas;
         final InputManagerService inputManagerF = inputManager;
         final TelephonyRegistry telephonyRegistryF = telephonyRegistry;
         final MediaRouterService mediaRouterF = mediaRouter;
         final AudioService audioServiceF = audioService;
-        final MmsServiceBroker mmsServiceF = mmsService;
 
         // We now tell the activity manager it is okay to run third party
         // code.  It will call back into us once it has gotten to the state
@@ -1127,11 +1231,11 @@ public final class SystemServer {
                 Slog.i(TAG, "WebViewFactory preparation");
                 WebViewFactory.prepareWebViewInSystemServer();
 
-                try {
+               /* try {
                     startSystemUi(context);
                 } catch (Throwable e) {
                     reportWtf("starting System UI", e);
-                }
+                } */
                 try {
                     if (mountServiceF != null) mountServiceF.systemReady();
                 } catch (Throwable e) {
@@ -1185,37 +1289,10 @@ public final class SystemServer {
                     reportWtf("Notifying InputMethodService running", e);
                 }
                 try {
-                    if (locationF != null) locationF.systemRunning();
-                } catch (Throwable e) {
-                    reportWtf("Notifying Location Service running", e);
-                }
-                try {
-                    if (countryDetectorF != null) countryDetectorF.systemRunning();
-                } catch (Throwable e) {
-                    reportWtf("Notifying CountryDetectorService running", e);
-                }
-                try {
-                    if (networkTimeUpdaterF != null) networkTimeUpdaterF.systemRunning();
-                } catch (Throwable e) {
-                    reportWtf("Notifying NetworkTimeService running", e);
-                }
-                try {
-                    if (commonTimeMgmtServiceF != null) {
-                        commonTimeMgmtServiceF.systemRunning();
-                    }
-                } catch (Throwable e) {
-                    reportWtf("Notifying CommonTimeManagementService running", e);
-                }
-                try {
                     if (textServiceManagerServiceF != null)
                         textServiceManagerServiceF.systemRunning();
                 } catch (Throwable e) {
                     reportWtf("Notifying TextServicesManagerService running", e);
-                }
-                try {
-                    if (atlasF != null) atlasF.systemRunning();
-                } catch (Throwable e) {
-                    reportWtf("Notifying AssetAtlasService running", e);
                 }
                 try {
                     // TODO(BT) Pass parameter to input manager
@@ -1234,11 +1311,6 @@ public final class SystemServer {
                     reportWtf("Notifying MediaRouterService running", e);
                 }
 
-                try {
-                    if (mmsServiceF != null) mmsServiceF.systemRunning();
-                } catch (Throwable e) {
-                    reportWtf("Notifying MmsService running", e);
-                }
             }
         });
     }
