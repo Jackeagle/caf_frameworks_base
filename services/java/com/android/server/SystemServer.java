@@ -398,6 +398,7 @@ public final class SystemServer {
         final Context context = mSystemContext;
         AccountManagerService accountManager = null;
         ContentService contentService = null;
+        PiezoSoundService piezo = null;
         VibratorService vibrator = null;
         IAlarmManager alarm = null;
         MountService mountService = null;
@@ -472,6 +473,13 @@ public final class SystemServer {
             vibrator = new VibratorService(context);
             ServiceManager.addService("vibrator", vibrator);
 
+            try {
+                Slog.i(TAG, "PiezoSound Service");
+                piezo = new PiezoSoundService(context);
+            } catch (Throwable e) {
+                Slog.e(TAG, "Failure starting PiezoSound Service",e);
+            }
+            ServiceManager.addService("PiezoSoundService", piezo);
             Slog.i(TAG, "Consumer IR Service");
             consumerIr = new ConsumerIrService(context);
             ServiceManager.addService(Context.CONSUMER_IR_SERVICE, consumerIr);

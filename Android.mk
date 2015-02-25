@@ -207,6 +207,7 @@ LOCAL_SRC_FILES += \
 	core/java/android/os/IMessenger.aidl \
 	core/java/android/os/INetworkActivityListener.aidl \
 	core/java/android/os/INetworkManagementService.aidl \
+	core/java/android/os/IPiezoSoundService.aidl \
 	core/java/android/os/IPermissionController.aidl \
 	core/java/android/os/IPowerManager.aidl \
 	core/java/android/os/IRemoteCallback.aidl \

@@ -28,6 +28,7 @@ int register_android_server_InputApplicationHandle(JNIEnv* env);
 int register_android_server_InputWindowHandle(JNIEnv* env);
 int register_android_server_InputManager(JNIEnv* env);
 int register_android_server_LightsService(JNIEnv* env);
+int register_android_server_PiezoSoundService(JNIEnv *env);
 int register_android_server_PowerManagerService(JNIEnv* env);
 int register_android_server_SerialService(JNIEnv* env);
 int register_android_server_SystemServer(JNIEnv* env);
@@ -63,6 +64,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved)
     register_android_server_InputWindowHandle(env);
     register_android_server_InputManager(env);
     register_android_server_LightsService(env);
+    register_android_server_PiezoSoundService(env);
     register_android_server_AlarmManagerService(env);
     register_android_server_UsbDeviceManager(env);
     register_android_server_UsbHostManager(env);
