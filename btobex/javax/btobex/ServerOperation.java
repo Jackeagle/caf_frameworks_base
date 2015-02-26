@@ -342,12 +342,33 @@ public final class ServerOperation implements Operation, BaseStream {
                 return false;
             }
         } else {
+            if (VERBOSE) Log.v(TAG, "Get continueOperation ");
             mSrmGetActive = mSrmServerSession.getLocalSrmStatus();
-            requestHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
-                     ObexHelper.OBEX_SRM_PARAM_NONE);
+            Byte rqstSrmpHeader =
+                (Byte)this.requestHeader.getHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+            Log.v(TAG,"SRMP wait :"+ mSingleResponseModeParameter +
+                "rqstSrmpHeader: "+rqstSrmpHeader);
+            if (rqstSrmpHeader != null) {
+                mSingleResponseModeParameter = rqstSrmpHeader;
+                if (mSingleResponseModeParameter ==  ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                    mSrmServerSession.setLocalSrmpWait(true);
+                    //Reset NONE till Next Update
+                    requestHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
+                        ObexHelper.OBEX_SRM_PARAM_NONE);
+                } else {
+                    Log.v(TAG,"Previous Header Include SRMP wait : Reset None");
+                    mSrmServerSession.setLocalSrmpWait(false);
+                }
+            } else {
+                requestHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
+                    ObexHelper.OBEX_SRM_PARAM_NONE);
+                if (mSingleResponseModeParameter == ObexHelper.OBEX_SRM_PARAM_WAIT ) {
+                    Log.v(TAG,"Previous Header may Include SRMP wait : Reset None");
+                    mSingleResponseModeParameter = ObexHelper.OBEX_SRM_PARAM_NONE;
+                    mSrmServerSession.setLocalSrmpWait(false);
+                }
+            }
             sendReply(ResponseCodes.OBEX_HTTP_CONTINUE, mSingleResponseActive, mSrmGetActive);
-
-            if (VERBOSE) Log.v(TAG, "Get continueOperation");
             return true;
         }
     }
