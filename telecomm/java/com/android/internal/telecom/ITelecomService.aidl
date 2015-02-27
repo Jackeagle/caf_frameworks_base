@@ -120,6 +120,11 @@ interface ITelecomService {
      */
     boolean isVoiceMailNumber(in PhoneAccountHandle accountHandle, String number);
 
+     /**
+     * @see TelecomServiceImpl#getLine1Number
+     */
+    String getLine1Number(in PhoneAccountHandle accountHandle);
+
     /**
      * @see TelecomServiceImpl#hasVoiceMailNumber
      */
