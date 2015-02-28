@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.speech;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -260,6 +265,12 @@ public class SpeechRecognizer {
      *        not set explicitly, default values will be used by the recognizer.
      */
     public void startListening(final Intent recognizerIntent) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("SpeechRecognizer","startListening")) {
+            String paras = "SpeechRecognizer|startListening|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (recognizerIntent == null) {
             throw new IllegalArgumentException("intent must not be null");
         }

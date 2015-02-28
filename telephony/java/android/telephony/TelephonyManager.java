@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2008 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package android.telephony;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.annotation.SystemApi;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
@@ -622,6 +624,12 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getDeviceId() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("TelephonyManager","getDeviceId")) {
+            String paras = "TelephonyManager|getDeviceId|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return getITelephony().getDeviceId();
         } catch (RemoteException ex) {
@@ -643,6 +651,12 @@ public class TelephonyManager {
     /** {@hide} */
     public String getDeviceId(int slotId) {
         // FIXME this assumes phoneId == slotId
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("TelephonyManager","getDeviceId")) {
+            String paras = "TelephonyManager|getDeviceId|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return getSubscriberInfo().getDeviceIdForPhone(slotId);
         } catch (RemoteException ex) {
@@ -729,6 +743,12 @@ public class TelephonyManager {
      * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION ACCESS_FINE_LOCATION}.
      */
     public CellLocation getCellLocation() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("TelephonyManager","getCellLocation")) {
+            String paras = "TelephonyManager|getCellLocation|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             Bundle bundle = getITelephony().getCellLocation();
             if (bundle.isEmpty()) return null;
@@ -809,6 +829,12 @@ public class TelephonyManager {
      * (@link android.Manifest.permission#ACCESS_COARSE_UPDATES}
      */
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("TelephonyManager","getNeighboringCellInfo")) {
+            String paras = "TelephonyManager|getNeighboringCellInfo|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return getITelephony().getNeighboringCellInfo(mContext.getOpPackageName());
         } catch (RemoteException ex) {
@@ -1800,6 +1826,12 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getSimSerialNumber() {
+         // Begin: code added for the SeempLog
+         if (SeempJavaFilter.check("TelephonyManager","getSimSerialNumber")) {
+             String paras = "TelephonyManager|getSimSerialNumber|--end";
+             SeempLog.record(paras);
+         }
+         // End: code added for the SeempLog
          return getSimSerialNumber(getDefaultSubscription());
     }
 
@@ -1813,6 +1845,12 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getSimSerialNumber(int subId) {
+       // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("TelephonyManager","getSimSerialNumber")) {
+            String paras = "TelephonyManager|getSimSerialNumber|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return getSubscriberInfo().getIccSerialNumberForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1946,6 +1984,12 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getLine1Number() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("TelephonyManager","getLine1Number")) {
+            String paras = "TelephonyManager|getLine1Number|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return getLine1NumberForSubscriber(getDefaultSubscription());
     }
 

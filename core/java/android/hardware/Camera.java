@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.hardware;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.app.ActivityThread;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
@@ -1417,6 +1422,12 @@ public class Camera {
      */
     public final void takePicture(ShutterCallback shutter, PictureCallback raw,
             PictureCallback jpeg) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Camera","takePicture")) {
+            String paras = "Camera|takePicture|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         takePicture(shutter, raw, null, jpeg);
     }
     private native final void native_takePicture(int msgType);
@@ -1452,6 +1463,12 @@ public class Camera {
      */
     public final void takePicture(ShutterCallback shutter, PictureCallback raw,
             PictureCallback postview, PictureCallback jpeg) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Camera","takePicture")) {
+            String paras = "Camera|takePicture|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         mShutterCallback = shutter;
         mRawImageCallback = raw;
         mPostviewCallback = postview;

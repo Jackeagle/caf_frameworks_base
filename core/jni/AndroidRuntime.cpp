@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,6 +101,8 @@ extern int register_android_media_ToneGenerator(JNIEnv *env);
 extern int register_android_util_FloatMath(JNIEnv* env);
 
 namespace android {
+extern int register_android_util_SeempLog(JNIEnv* env);
+extern int register_android_util_SeempJavaFilter(JNIEnv* env);
 
 /*
  * JNI-based registration functions.  Note these are properly contained in
@@ -1247,6 +1252,8 @@ static void register_jam_procs(const RegJAMProc array[], size_t count)
 }
 
 static const RegJNIRec gRegJNI[] = {
+    REG_JNI(register_android_util_SeempLog),
+    REG_JNI(register_android_util_SeempJavaFilter),
     REG_JNI(register_com_android_internal_os_RuntimeInit),
     REG_JNI(register_android_os_SystemClock),
     REG_JNI(register_android_util_EventLog),

@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package com.android.internal.telephony;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -164,6 +169,13 @@ public class CallerInfo {
      * number. The returned CallerInfo is null if no number is supplied.
      */
     public static CallerInfo getCallerInfo(Context context, Uri contactRef, Cursor cursor) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("CallerInfo","getCallerInfo")) {
+            String paras = "CallerInfo|getCallerInfo|"
+            + "contactRef," + ((contactRef == null) ? "null" : contactRef).toString() + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         CallerInfo info = new CallerInfo();
         info.photoResource = 0;
         info.phoneLabel = null;
@@ -282,6 +294,13 @@ public class CallerInfo {
      * number. The returned CallerInfo is null if no number is supplied.
      */
     public static CallerInfo getCallerInfo(Context context, Uri contactRef) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("CallerInfo","getCallerInfo")) {
+            String paras = "CallerInfo|getCallerInfo|"
+            + "contactRef," + ((contactRef == null) ? "null" : contactRef).toString() + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
 
         return getCallerInfo(context, contactRef,
                 CallerInfoAsyncQuery.getCurrentProfileContentResolver(context)
@@ -299,6 +318,13 @@ public class CallerInfo {
      * with all relevant fields empty or null.
      */
     public static CallerInfo getCallerInfo(Context context, String number) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("CallerInfo","getCallerInfo")) {
+            String paras = "CallerInfo|getCallerInfo|"
+            + "number," + ((number == null) ? "null" : number) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (VDBG) Rlog.v(TAG, "getCallerInfo() based on number...");
 
         int subId = SubscriptionManager.getDefaultSubId();
@@ -317,6 +343,13 @@ public class CallerInfo {
      * with all relevant fields empty or null.
      */
     public static CallerInfo getCallerInfo(Context context, String number, int subId) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("CallerInfo","getCallerInfo")) {
+            String paras = "CallerInfo|getCallerInfo|"
+            + "number," + ((number == null) ? "null" : number) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
 
         if (TextUtils.isEmpty(number)) {
             return null;

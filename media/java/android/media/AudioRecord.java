@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2008 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package android.media;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
@@ -634,6 +636,12 @@ public class AudioRecord
      */
     public void startRecording()
     throws IllegalStateException {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AudioRecord","startRecording")) {
+            String paras = "AudioRecord|startRecording|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (!isAudioRecordAllowed()) {
             Log.e(TAG, "User permission denied!");
             return;
@@ -661,6 +669,12 @@ public class AudioRecord
      */
     public void startRecording(MediaSyncEvent syncEvent)
     throws IllegalStateException {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AudioRecord","startRecording")) {
+            String paras = "AudioRecord|startRecording|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (!isAudioRecordAllowed()) {
             Log.e(TAG, "User permission denied!");
             return;

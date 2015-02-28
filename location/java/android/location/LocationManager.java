@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.location;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import com.android.internal.location.ProviderProperties;
 
 import android.annotation.SystemApi;
@@ -344,6 +349,12 @@ public class LocationManager {
      * @return list of Strings containing names of the providers
      */
     public List<String> getProviders(boolean enabledOnly) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","getProviders")) {
+            String paras = "LocationManager|getProviders|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return mService.getProviders(null, enabledOnly);
         } catch (RemoteException e) {
@@ -364,6 +375,13 @@ public class LocationManager {
      * given provider.
      */
     public LocationProvider getProvider(String name) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","getProvider")) {
+            String paras = "LocationManager|getProvider|"
+            + "name," + ((name == null) ? "null" : name) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkProvider(name);
         try {
             ProviderProperties properties = mService.getProviderProperties(name);
@@ -388,6 +406,12 @@ public class LocationManager {
      * @return list of Strings containing names of the providers
      */
     public List<String> getProviders(Criteria criteria, boolean enabledOnly) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","getProviders")) {
+            String paras = "LocationManager|getProviders|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkCriteria(criteria);
         try {
             return mService.getProviders(criteria, enabledOnly);
@@ -420,6 +444,12 @@ public class LocationManager {
      * @return name of the provider that best matches the requirements
      */
     public String getBestProvider(Criteria criteria, boolean enabledOnly) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","getBestProvider")) {
+            String paras = "LocationManager|getBestProvider|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkCriteria(criteria);
         try {
             return mService.getBestProvider(criteria, enabledOnly);
@@ -451,6 +481,13 @@ public class LocationManager {
      */
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             LocationListener listener) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|"
+            + "provider," + ((provider == null) ? "null" : provider) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkProvider(provider);
         checkListener(listener);
 
@@ -482,6 +519,13 @@ public class LocationManager {
      */
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             LocationListener listener, Looper looper) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|"
+            + "provider," + ((provider == null) ? "null" : provider) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkProvider(provider);
         checkListener(listener);
 
@@ -514,6 +558,12 @@ public class LocationManager {
      */
     public void requestLocationUpdates(long minTime, float minDistance, Criteria criteria,
             LocationListener listener, Looper looper) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkCriteria(criteria);
         checkListener(listener);
 
@@ -541,6 +591,13 @@ public class LocationManager {
      */
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             PendingIntent intent) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|"
+            + "provider," + ((provider == null) ? "null" : provider) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkProvider(provider);
         checkPendingIntent(intent);
 
@@ -642,6 +699,12 @@ public class LocationManager {
      */
     public void requestLocationUpdates(long minTime, float minDistance, Criteria criteria,
             PendingIntent intent) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkCriteria(criteria);
         checkPendingIntent(intent);
 
@@ -812,6 +875,12 @@ public class LocationManager {
     @SystemApi
     public void requestLocationUpdates(LocationRequest request, LocationListener listener,
             Looper looper) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkListener(listener);
         requestLocationUpdates(request, listener, looper, null);
     }
@@ -839,6 +908,12 @@ public class LocationManager {
      */
     @SystemApi
     public void requestLocationUpdates(LocationRequest request, PendingIntent intent) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkPendingIntent(intent);
         requestLocationUpdates(request, null, null, intent);
     }
@@ -857,6 +932,12 @@ public class LocationManager {
 
     private void requestLocationUpdates(LocationRequest request, LocationListener listener,
             Looper looper, PendingIntent intent) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","requestLocationUpdates")) {
+            String paras = "LocationManager|requestLocationUpdates|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
 
         String packageName = mContext.getPackageName();
 
@@ -964,6 +1045,12 @@ public class LocationManager {
      */
     public void addProximityAlert(double latitude, double longitude, float radius, long expiration,
             PendingIntent intent) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","addProximityAlert")) {
+            String paras = "LocationManager|addProximityAlert|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkPendingIntent(intent);
         if (expiration < 0) expiration = Long.MAX_VALUE;
 
@@ -1122,6 +1209,13 @@ public class LocationManager {
      * @throws IllegalArgumentException if provider is null
      */
     public boolean isProviderEnabled(String provider) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","isProviderEnabled")) {
+            String paras = "LocationManager|isProviderEnabled|"
+            + "provider," + ((provider == null) ? "null" : provider) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkProvider(provider);
 
         try {
@@ -1175,6 +1269,13 @@ public class LocationManager {
      * @throws IllegalArgumentException if provider is null or doesn't exist
      */
     public Location getLastKnownLocation(String provider) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","getLastKnownLocation")) {
+            String paras = "LocationManager|getLastKnownLocation|"
+            + "provider," + ((provider == null) ? "null" : provider) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         checkProvider(provider);
         String packageName = mContext.getPackageName();
         LocationRequest request = LocationRequest.createFromDeprecatedProvider(
@@ -1493,6 +1594,12 @@ public class LocationManager {
      * @throws SecurityException if the ACCESS_FINE_LOCATION permission is not present
      */
     public boolean addGpsStatusListener(GpsStatus.Listener listener) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","addGpsStatusListener")) {
+            String paras = "LocationManager|addGpsStatusListener|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         boolean result;
 
         if (mGpsStatusListeners.get(listener) != null) {
@@ -1539,6 +1646,12 @@ public class LocationManager {
      * @throws SecurityException if the ACCESS_FINE_LOCATION permission is not present
      */
     public boolean addNmeaListener(GpsStatus.NmeaListener listener) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","addNmeaListener")) {
+            String paras = "LocationManager|addNmeaListener|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         boolean result;
 
         if (mNmeaListeners.get(listener) != null) {
@@ -1657,6 +1770,14 @@ public class LocationManager {
      * @return true if the command succeeds.
      */
     public boolean sendExtraCommand(String provider, String command, Bundle extras) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("LocationManager","sendExtraCommand")) {
+            String paras = "LocationManager|sendExtraCommand|"
+            + "provider," + ((provider == null) ? "null" : provider) + " "
+            + "command," + ((command == null) ? "null" : command) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return mService.sendExtraCommand(provider, command, extras);
         } catch (RemoteException e) {
