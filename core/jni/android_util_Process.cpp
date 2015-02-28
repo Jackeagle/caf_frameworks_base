@@ -40,6 +40,7 @@
 #include <pwd.h>
 #include <signal.h>
 #include <unistd.h>
+#include <processgroup/processgroup.h>
 
 #define POLICY_DEBUG 0
 #define GUARD_THREAD_PRIORITY 0
@@ -1012,6 +1013,16 @@ jintArray android_os_Process_getPidsForCommands(JNIEnv* env, jobject clazz,
     return pidArray;
 }
 
+jint android_os_Process_killProcessGroup(JNIEnv* env, jobject clazz, jint uid, jint pid)
+{
+    return killProcessGroup(uid, pid, SIGKILL);
+}
+
+void android_os_Process_removeAllProcessGroups(JNIEnv* env, jobject clazz)
+{
+    return removeAllProcessGroups();
+}
+
 static const JNINativeMethod methods[] = {
     {"getUidForName",       "(Ljava/lang/String;)I", (void*)android_os_Process_getUidForName},
     {"getGidForName",       "(Ljava/lang/String;)I", (void*)android_os_Process_getGidForName},
@@ -1039,6 +1050,8 @@ static const JNINativeMethod methods[] = {
     {"getElapsedCpuTime", "()J", (void*)android_os_Process_getElapsedCpuTime},
     {"getPss", "(I)J", (void*)android_os_Process_getPss},
     {"getPidsForCommands", "([Ljava/lang/String;)[I", (void*)android_os_Process_getPidsForCommands},
+    {"killProcessGroup", "(II)I", (void*)android_os_Process_killProcessGroup},
+    {"removeAllProcessGroups", "()V", (void*)android_os_Process_removeAllProcessGroups},
     //{"setApplicationObject", "(Landroid/os/IBinder;)V", (void*)android_os_Process_setApplicationObject},
 };
 
