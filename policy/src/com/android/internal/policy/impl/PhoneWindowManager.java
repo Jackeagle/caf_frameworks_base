@@ -4851,8 +4851,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             hungUp = telecomManager.endCall();
                         }
                     }
-                    interceptPowerKeyDown(!interactive || hungUp
-                            || mVolumeDownKeyTriggered || mVolumeUpKeyTriggered);
                     interceptPowerKeyDown(event, interactive);
                 } else {
                     interceptPowerKeyUp(event, interactive, canceled);

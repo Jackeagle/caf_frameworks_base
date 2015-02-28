@@ -586,6 +586,15 @@ public class MediaFocusControl implements OnFinished {
         return true;
     }
 
+    private boolean canReassignAudioFocus() {
+        // focus requests are rejected during a phone call or when the phone is ringing
+	// this is equivalent to IN_VOICE_COMM_FOCUS_ID having the focus
+        if (!mFocusStack.isEmpty() && isLockedFocusOwner(mFocusStack.peek())) {
+            return false;
+        }
+        return true;
+    }
+
     private boolean isLockedFocusOwner(FocusRequester fr) {
         return (fr.hasSameClient(IN_VOICE_COMM_FOCUS_ID) || fr.isLockedFocusOwner());
     }
@@ -750,7 +759,7 @@ public class MediaFocusControl implements OnFinished {
         }
 
         synchronized(mAudioFocusLock) {
-            if (!canReassignAudioFocus) {
+            if (!canReassignAudioFocus(clientId)) {
                 return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
             }
 

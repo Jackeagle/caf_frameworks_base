@@ -61,6 +61,8 @@ struct fields_t {
     jmethodID   post_event;
     jmethodID   rect_constructor;
     jmethodID   face_constructor;
+    jfieldID    face_leftEye;
+    jfieldID    face_rightEye;
     jfieldID    face_sm_degree;
     jfieldID    face_sm_score;
     jfieldID    face_blink_detected;
@@ -422,6 +424,7 @@ void JNICameraContext::postMetadata(JNIEnv *env, int32_t msgType, camera_frame_m
             env->SetIntField(face, fields.face_reye_blink, metadata->faces[i].reye_blink);
             env->SetIntField(face, fields.face_left_right_gaze, metadata->faces[i].left_right_gaze);
             env->SetIntField(face, fields.face_top_bottom_gaze, metadata->faces[i].top_bottom_gaze);
+        }
         bool optionalFields = metadata->faces[i].id != 0
             && metadata->faces[i].left_eye[0] != -2000 && metadata->faces[i].left_eye[1] != -2000
             && metadata->faces[i].right_eye[0] != -2000 && metadata->faces[i].right_eye[1] != -2000

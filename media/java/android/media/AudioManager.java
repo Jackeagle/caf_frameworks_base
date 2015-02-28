@@ -69,6 +69,7 @@ public class AudioManager {
     private static String TAG = "AudioManager";
     private static final AudioPortEventHandler sAudioPortEventHandler = new AudioPortEventHandler();
 
+    private static ArrayList<MediaPlayerInfo> mMediaPlayers;
     /**
      * Broadcast intent, a hint for applications that audio is about to become
      * 'noisy' due to a change in audio outputs. For example, this intent may
@@ -694,7 +695,6 @@ public class AudioManager {
                 com.android.internal.R.bool.config_useVolumeKeySounds);
         mUseFixedVolume = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_useFixedVolume);
-
         sAudioPortEventHandler.init();
     }
 
@@ -2723,6 +2723,7 @@ public class AudioManager {
                     "receiver and context package names don't match");
             return;
         }
+
         if (mMediaPlayers.size() > 0) {
             final Iterator<MediaPlayerInfo> rccIterator = mMediaPlayers.iterator();
             while (rccIterator.hasNext()) {

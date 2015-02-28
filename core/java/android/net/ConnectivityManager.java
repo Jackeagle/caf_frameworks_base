@@ -74,6 +74,7 @@ import libcore.net.event.NetworkEventDispatcher;
  */
 public class ConnectivityManager {
     private static final String TAG = "ConnectivityManager";
+    private static final boolean LEGACY_DBG = true; // STOPSHIP
 
     /**
      * A change in network connectivity has occurred. A default connection has either
@@ -1001,8 +1002,10 @@ public class ConnectivityManager {
             return -1;
         }
 
-        if (removeRequestForFeature(netCap)) {
+        NetworkCallback networkCallback = removeRequestForFeature(netCap);
+        if (networkCallback != null) {
             Log.d(TAG, "stopUsingNetworkFeature for " + networkType + ", " + feature);
+            unregisterNetworkCallback(networkCallback);
         }
         return 1;
     }
@@ -1280,15 +1283,12 @@ public class ConnectivityManager {
         }
     }
 
-    private boolean removeRequestForFeature(NetworkCapabilities netCap) {
-        final LegacyRequest l;
+    private NetworkCallback removeRequestForFeature(NetworkCapabilities netCap) {
         synchronized (sLegacyRequests) {
-            l = sLegacyRequests.remove(netCap);
+            LegacyRequest l = sLegacyRequests.remove(netCap);
+            if (l == null) return null;
+            return l.networkCallback;
         }
-        if (l == null) return false;
-        unregisterNetworkCallback(l.networkCallback);
-        l.clearDnsBinding();
-        return true;
     }
 
     /**

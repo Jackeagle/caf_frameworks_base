@@ -3315,9 +3315,13 @@ public class TelephonyManager {
     /**
      * Values used to return status for hasCarrierPrivileges call.
      */
+    /** @hide */
     public static final int CARRIER_PRIVILEGE_STATUS_HAS_ACCESS = 1;
+    /** @hide */
     public static final int CARRIER_PRIVILEGE_STATUS_NO_ACCESS = 0;
+    /** @hide */
     public static final int CARRIER_PRIVILEGE_STATUS_RULES_NOT_LOADED = -1;
+    /** @hide */
     public static final int CARRIER_PRIVILEGE_STATUS_ERROR_LOADING_RULES = -2;
 
     /**
@@ -3335,15 +3339,16 @@ public class TelephonyManager {
      *         CARRIER_PRIVILEGE_STATUS_ERROR_LOADING_RULES if there was an error loading carrier
      *             rules (or if there are no rules).
      */
-    public int hasCarrierPrivileges() {
+    public boolean hasCarrierPrivileges() {
         try {
-            return getITelephony().getCarrierPrivilegeStatus();
+            return getITelephony().getCarrierPrivilegeStatus() ==
+                CARRIER_PRIVILEGE_STATUS_HAS_ACCESS;
         } catch (RemoteException ex) {
             Rlog.e(TAG, "hasCarrierPrivileges RemoteException", ex);
         } catch (NullPointerException ex) {
             Rlog.e(TAG, "hasCarrierPrivileges NPE", ex);
         }
-        return CARRIER_PRIVILEGE_STATUS_NO_ACCESS;
+        return false;
     }
 
     /**

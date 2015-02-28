@@ -709,8 +709,7 @@ public abstract class ConnectionService extends Service {
         Log.v(this, "createConnection, number: %s, state: %s, capabilities: %s",
                 Connection.toLogSafePhoneNumber(number),
                 Connection.stateToString(connection.getState()),
-                Connection.capabilitiesToString(connection.getConnectionCapabilities()),
-                connection.getCallProperties());
+                Connection.capabilitiesToString(connection.getConnectionCapabilities()));
 
         Log.d(this, "createConnection, calling handleCreateConnectionSuccessful %s", callId);
         mAdapter.handleCreateConnectionComplete(
@@ -720,7 +719,6 @@ public abstract class ConnectionService extends Service {
                         getAccountHandle(request, connection),
                         connection.getState(),
                         connection.getConnectionCapabilities(),
-                        connection.getCallProperties(),
                         connection.getAddress(),
                         connection.getAddressPresentation(),
                         connection.getCallerDisplayName(),
@@ -1083,7 +1081,6 @@ public abstract class ConnectionService extends Service {
                     phoneAccountHandle,
                     connection.getState(),
                     connection.getConnectionCapabilities(),
-                    connection.getCallProperties(),
                     connection.getAddress(),
                     connection.getAddressPresentation(),
                     connection.getCallerDisplayName(),
