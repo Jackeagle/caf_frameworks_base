@@ -286,7 +286,8 @@ public class KeyguardTestActivity extends Activity implements OnClickListener {
         super.onPause();
         try {
             if (mService != null) {
-                mService.setHidden(true);
+                //FIXME: LMR1_INTERNAL
+                //mService.setHidden(true);
             }
         } catch (RemoteException e) {
             Log.e(TAG, "Remote service died");
@@ -298,7 +299,8 @@ public class KeyguardTestActivity extends Activity implements OnClickListener {
         super.onResume();
         try {
             if (mService != null) {
-                mService.setHidden(false);
+                //FIXME: LMR1_INTERNAL
+                //mService.setHidden(false);
             }
         } catch (RemoteException e) {
             Log.e(TAG, "Remote service died");

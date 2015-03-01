@@ -25,6 +25,7 @@ import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 import static android.app.StatusBarManager.windowStateToString;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_LIGHTS_OUT;
+import static com.android.systemui.statusbar.phone.BarTransitions.MODE_LIGHTS_OUT_TRANSPARENT;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_OPAQUE;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_SEMI_TRANSPARENT;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_TRANSLUCENT;
@@ -41,6 +42,7 @@ import android.app.IActivityManager;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.StatusBarManager;
+import android.content.ComponentCallbacks2;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -53,6 +55,7 @@ import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
@@ -69,9 +72,11 @@ import android.media.session.PlaybackState;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -99,6 +104,7 @@ import android.view.ViewPropertyAnimator;
 import android.view.ViewStub;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
@@ -128,6 +134,7 @@ import com.android.systemui.doze.DozeHost;
 import com.android.systemui.doze.DozeLog;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.qs.QSPanel;
+import com.android.systemui.recent.ScreenPinningRequest;
 import com.android.systemui.statusbar.ActivatableNotificationView;
 import com.android.systemui.statusbar.BackDropView;
 import com.android.systemui.statusbar.BaseStatusBar;
@@ -1014,8 +1021,6 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         mHeader.setBatteryController(mBatteryController);
         ((BatteryMeterView) mStatusBarView.findViewById(R.id.battery)).setBatteryController(
                 mBatteryController);
-        ((BatteryLevelTextView) mStatusBarView.findViewById(R.id.battery_level_text))
-                .setBatteryController(mBatteryController);
         mKeyguardStatusBar.setBatteryController(mBatteryController);
         mHeader.setNextAlarmController(mNextAlarmController);
 
@@ -2279,8 +2284,8 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
 
     public boolean isFalsingThresholdNeeded() {
         boolean onKeyguard = getBarState() == StatusBarState.KEYGUARD;
-        boolean isMethodInsecure = mUnlockMethodCache.isMethodInsecure();
-        return onKeyguard && (isMethodInsecure || mDozing || mScreenOnComingFromTouch);
+        boolean isCurrentlyInsecure = mUnlockMethodCache.isCurrentlyInsecure();
+        return onKeyguard && (isCurrentlyInsecure || mDozing || mScreenOnComingFromTouch);
     }
 
     public boolean isDozing() {
@@ -3806,6 +3811,32 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
     }
 
     /**
+     * Starts the timeout when we try to start the affordances on Keyguard. We usually rely that
+     * Keyguard goes away via fadeKeyguardAfterLaunchTransition, however, that might not happen
+     * because the launched app crashed or something else went wrong.
+     */
+    public void startLaunchTransitionTimeout() {
+        mHandler.sendEmptyMessageDelayed(MSG_LAUNCH_TRANSITION_TIMEOUT,
+                LAUNCH_TRANSITION_TIMEOUT_MS);
+    }
+
+    private void onLaunchTransitionTimeout() {
+        Log.w(TAG, "Launch transition: Timeout!");
+        mNotificationPanel.resetViews();
+    }
+
+    private void runLaunchTransitionEndRunnable() {
+        if (mLaunchTransitionEndRunnable != null) {
+            Runnable r = mLaunchTransitionEndRunnable;
+
+            // mLaunchTransitionEndRunnable might call showKeyguard, which would execute it again,
+            // which would lead to infinite recursion. Protect against it.
+            mLaunchTransitionEndRunnable = null;
+            r.run();
+        }
+    }
+
+    /**
      * @return true if we would like to stay in the shade, false if it should go away entirely
      */
     public boolean hideKeyguard() {
@@ -4275,6 +4306,20 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
             mSystemUiVisibility &= ~View.RECENT_APPS_VISIBLE;
         }
         notifyUiVisibilityChanged(mSystemUiVisibility);
+    }
+
+    @Override
+    public void showScreenPinningRequest() {
+        if (mKeyguardMonitor.isShowing()) {
+            // Don't allow apps to trigger this from keyguard.
+            return;
+        }
+        // Show screen pinning request, since this comes from an app, show 'no thanks', button.
+        showScreenPinningRequest(true);
+    }
+
+    public void showScreenPinningRequest(boolean allowCancel) {
+        mScreenPinningRequest.showPrompt(allowCancel);
     }
 
     public boolean hasActiveNotifications() {

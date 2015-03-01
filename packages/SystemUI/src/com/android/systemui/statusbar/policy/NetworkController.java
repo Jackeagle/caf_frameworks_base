@@ -54,6 +54,7 @@ public interface NetworkController {
 
         public interface AccessPointCallback {
             void onAccessPointsChanged(AccessPoint[] accessPoints);
+            void onSettingsActivityTriggered(Intent settingsIntent);
         }
 
         public static class AccessPoint {

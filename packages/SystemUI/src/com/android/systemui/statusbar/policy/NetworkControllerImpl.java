@@ -79,6 +79,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
     int mDataState = TelephonyManager.DATA_DISCONNECTED;
     int mDataActivity = TelephonyManager.DATA_ACTIVITY_NONE;
     ServiceState mServiceState;
+    ServiceState mLastServiceState = null;
     SignalStrength mSignalStrength;
     int[] mDataIconList = TelephonyIcons.DATA_G[0];
     String mNetworkName;
@@ -192,6 +193,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
     boolean mDataAndWifiStacked = false;
 
     protected static boolean mAppopsStrictEnabled = false;
+    // The current user ID.
+    private int mCurrentUserId;
 
     public interface SignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon,
@@ -280,6 +283,16 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 notifyMobileDataEnabled(enabled);
             }
         });
+    }
+
+    public int getConnectedWifiLevel() {
+        //return mWifiSignalController.getState().level;
+        return mWifiLevel;
+    }
+
+    @Override
+    public AccessPointController getAccessPointController() {
+        return mAccessPoints;
     }
 
     private void notifyMobileDataEnabled(boolean enabled) {
@@ -397,6 +410,14 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 return null;
             }
         }.execute();
+    }
+
+    @Override
+    public void onUserSwitched(int newUserId) {
+        mCurrentUserId = newUserId;
+        mAccessPoints.onUserSwitched(newUserId);
+        //updateConnectivity();
+        //refreshCarrierLabel();
     }
 
     @Override
@@ -1202,6 +1223,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
     }
 
     protected void updateWimaxIcons() {
+        /* 
         if (mIsWimaxEnabled) {
             if (mWimaxConnected) {
                 int inetCondition = inetConditionForNetwork(ConnectivityManager.TYPE_WIMAX);
@@ -1218,6 +1240,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
         } else {
             mWimaxIconId = 0;
         }
+     */
     }
 
     // ===== Full or limited Internet connectivity ==================================
@@ -1489,7 +1512,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
          || mLastLocale                     != mLocale
          || mLastConnectedNetworkType       != mConnectedNetworkType
          || mLastSimIconId                  != mNoSimIconId
-         || mLastMobileActivityIconId       != mMobileActivityIconId)
+         || mLastMobileActivityIconId       != mMobileActivityIconId
+         || getLastVoiceNetworkType() != getVoiceNetworkType())
         {
             // NB: the mLast*s will be updated later
             for (SignalCluster cluster : mSignalClusters) {
@@ -1626,6 +1650,11 @@ public class NetworkControllerImpl extends BroadcastReceiver
             }
         }
 
+        // the service state
+        if (mLastServiceState != mServiceState) {
+            mLastServiceState = mServiceState;
+        }
+
         // the combinedLabel in the notification panel
         if (!mLastCombinedLabel.equals(combinedLabel)) {
             mLastCombinedLabel = combinedLabel;
@@ -1675,6 +1704,13 @@ public class NetworkControllerImpl extends BroadcastReceiver
             return TelephonyManager.NETWORK_TYPE_UNKNOWN;
         }
         return mServiceState.getVoiceNetworkType();
+    }
+
+    public int getLastVoiceNetworkType() {
+        if (mLastServiceState == null) {
+            return TelephonyManager.NETWORK_TYPE_UNKNOWN;
+        }
+        return mLastServiceState.getVoiceNetworkType();
     }
 
     public int getDataNetworkType() {

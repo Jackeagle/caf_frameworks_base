@@ -464,6 +464,29 @@ public class VolumePanel extends Handler implements DemoMode {
 
     }
 
+    private void setupVolumePanelBlur(boolean blurEnabled) {
+        /*if (mDialog == null || mDialog.getWindow() == null) return;
+
+        Window window = mDialog.getWindow();
+        if (blurEnabled) {
+            window.addPrivateFlags(WindowManager.LayoutParams.PRIVATE_FLAG_BLUR_WITH_MASKING);
+            window.setBlurMaskAlphaThreshold(0.48f);
+        } else {
+            window.clearPrivateFlags(WindowManager.LayoutParams.PRIVATE_FLAG_BLUR_WITH_MASKING);
+        }
+
+        View mainContainer = window.findViewById(com.android.systemui.R.id.volume_dialog_bg_container);
+        mainContainer.setBackgroundResource(blurEnabled ?
+                com.android.systemui.R.drawable.volume_dialog_bg_translucent :
+                com.android.systemui.R.drawable.qs_background_primary);*/
+
+        View v1 = mSliderPanel;
+        v1.setBackground(null);
+        //TODO: Hack to fix compilation for L-MR1
+        //View v2 = window.findViewById(com.android.systemui.R.id.zen_mode_panel_bg_container);
+        //v2.setBackground(null);
+    }
+
     public VolumePanel(Context context, ZenModeController zenController) {
         this(context, null, zenController);
     }
