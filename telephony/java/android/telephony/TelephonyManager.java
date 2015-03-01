@@ -4191,4 +4191,16 @@ public class TelephonyManager {
                     ServiceState.rilRadioTechnologyToString(type));
         }
     }
+
+//FIXME L-MR1-INTERNAL
+     /** @hide */
+    @SystemApi
+    public void enableVideoCalling(boolean enable) {
+    }
+
+    /** @hide */
+    @SystemApi
+    public boolean isVideoCallingEnabled() {
+        return false;
+    }
 }

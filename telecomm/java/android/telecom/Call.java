@@ -676,11 +676,22 @@ public final class Call {
         mInCallAdapter.postDialContinue(mTelecomCallId, proceed);
     }
 
+//FIXME L-MR1-INTERNAL
+    /**
+     * Notifies this {@code Call} that an account has been selected and to proceed with placing
+     * an outgoing call. Optionally sets this account as the default account.
+     */
+    public void phoneAccountSelected(PhoneAccountHandle accountHandle, boolean setDefault) {
+        //mInCallAdapter.phoneAccountSelected(mTelecomCallId, accountHandle, setDefault);
+
+    }
+
+
+
     /**
      * Notifies this {@code Call} that an account has been selected and to proceed with placing
      * an outgoing call.
      */
-    /** @ hide */
     public void phoneAccountSelected(PhoneAccountHandle accountHandle) {
         mInCallAdapter.phoneAccountSelected(mTelecomCallId, accountHandle);
 
