@@ -71,20 +71,26 @@ public abstract class Connection implements IConferenceable {
      */
 
     /* Default case */
+    /** @hide */
     public static final int CALL_SUBSTATE_NONE = 0;
 
+    /** @hide */
     /* Indicates that the call is connected but audio attribute is suspended */
     public static final int CALL_SUBSTATE_AUDIO_CONNECTED_SUSPENDED = 0x1;
 
+    /** @hide */
     /* Indicates that the call is connected but video attribute is suspended */
     public static final int CALL_SUBSTATE_VIDEO_CONNECTED_SUSPENDED = 0x2;
 
+    /** @hide */
     /* Indicates that the call is established but media retry is needed */
     public static final int CALL_SUBSTATE_AVP_RETRY = 0x4;
 
+    /** @hide */
     /* Indicates that the call is multitasking */
     public static final int CALL_SUBSTATE_MEDIA_PAUSED = 0x8;
 
+    /** @hide */
     /* Mask containing all the call substate bits set */
     public static final int CALL_SUBSTATE_ALL = CALL_SUBSTATE_AUDIO_CONNECTED_SUSPENDED |
         CALL_SUBSTATE_VIDEO_CONNECTED_SUSPENDED | CALL_SUBSTATE_AVP_RETRY |
@@ -998,6 +1004,7 @@ public abstract class Connection implements IConferenceable {
     /**
      * Updates the call extras for the connection.
      */
+    /** @hide */
     public final void setExtras(Bundle extras) {
         if (DBG) {
             Log.d(this, "setExtras extras size= " + extras.size());
@@ -1428,11 +1435,13 @@ public abstract class Connection implements IConferenceable {
      *
      * @param otherConnection The connection with which this connection should be conferenced.
      */
+    /** @hide */
     public void onConferenceWith(Connection otherConnection) {}
 
     /**
      * Notifies this Connection that the conference which is set on it has changed.
      */
+    /** @hide */
     public void onConferenceChanged() {}
 
     static String toLogSafePhoneNumber(String number) {

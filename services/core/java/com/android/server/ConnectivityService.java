@@ -302,6 +302,12 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private static final int EVENT_SEND_STICKY_BROADCAST_INTENT = 11;
 
     /**
+     * Used internally to
+     * {@link NetworkStateTracker#setPolicyDataEnable(boolean)}.
+     */
+    private static final int EVENT_SET_POLICY_DATA_ENABLE = 12;
+
+    /**
      * Used internally to disable fail fast of mobile data
      */
     private static final int EVENT_ENABLE_FAIL_FAST_MOBILE_DATA = 14;
@@ -1436,6 +1442,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     };
 
+    @Override
+    public void setPolicyDataEnable(int networkType, boolean enabled) {
+        // only someone like NPMS should only be calling us
+        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+
+        mHandler.sendMessage(mHandler.obtainMessage(
+                EVENT_SET_POLICY_DATA_ENABLE, networkType, (enabled ? ENABLED : DISABLED)));
+    }
+
     private void enforceInternetPermission() {
         mContext.enforceCallingOrSelfPermission(
                 android.Manifest.permission.INTERNET,
@@ -2268,6 +2283,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     private void handleRegisterNetworkRequest(Message msg) {
         final NetworkRequestInfo nri = (NetworkRequestInfo) (msg.obj);
+        int score = 0;
 
         mNetworkRequests.put(nri.request, nri);
 
@@ -4446,8 +4462,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 // TODO: support proxy per network.
             }
             // Consider network even though it is not yet validated.
-<<<<<<< HEAD
-            rematchNetworkAndRequests(networkAgent, false);
+            //FIXME: L-MR1 fix
+            //rematchNetworkAndRequests(networkAgent, false);
             int val = SystemProperties.getInt("persist.cne.feature", 0);
             boolean isPropFeatureEnabled = (val == 3) ? true : false;
             if (isPropFeatureEnabled) {
@@ -4459,10 +4475,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
                   sendNetworkInfoUpdateBroadcast(newInfo.getType(), networkAgent.network.netId);
                }
             }
-=======
             rematchNetworkAndRequests(networkAgent, NascentState.NOT_JUST_VALIDATED,
                     ReapUnvalidatedNetworks.REAP);
->>>>>>> android-5.1.0_r1
         } else if (state == NetworkInfo.State.DISCONNECTED ||
                 state == NetworkInfo.State.SUSPENDED) {
             networkAgent.asyncChannel.disconnect();

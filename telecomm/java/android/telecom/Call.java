@@ -373,6 +373,7 @@ public final class Call {
         /**
          * @return The substate of the {@code Call}.
          */
+        /** @ hide */
         public int getCallSubstate() {
             return mCallSubstate;
         }
@@ -679,6 +680,7 @@ public final class Call {
      * Notifies this {@code Call} that an account has been selected and to proceed with placing
      * an outgoing call.
      */
+    /** @ hide */
     public void phoneAccountSelected(PhoneAccountHandle accountHandle) {
         mInCallAdapter.phoneAccountSelected(mTelecomCallId, accountHandle);
 

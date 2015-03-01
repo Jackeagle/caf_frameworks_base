@@ -203,8 +203,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
         void setIsAirplaneMode(boolean is, int airplaneIcon);
     }
 
-    private final WifiAccessPointController mAccessPoints;
-    private final MobileDataController mMobileDataController;
+    private final AccessPointControllerImpl mAccessPoints;
+    private final MobileDataControllerImpl mMobileDataController;
 
     /**
      * Construct this controller object and register for updates.
@@ -271,9 +271,10 @@ public class NetworkControllerImpl extends BroadcastReceiver
         updateAirplaneMode();
 
         mLastLocale = mContext.getResources().getConfiguration().locale;
-        mAccessPoints = new WifiAccessPointController(mContext);
-        mMobileDataController = new MobileDataController(mContext);
-        mMobileDataController.setCallback(new MobileDataController.Callback() {
+        mAccessPoints = new AccessPointControllerImpl(mContext);
+        mAccessPoints.setNetworkController(this);
+        mMobileDataController = new MobileDataControllerImpl(mContext);
+        mMobileDataController.setCallback(new MobileDataControllerImpl.Callback() {
             @Override
             public void onMobileDataEnabled(boolean enabled) {
                 notifyMobileDataEnabled(enabled);
@@ -378,26 +379,6 @@ public class NetworkControllerImpl extends BroadcastReceiver
 
     public void removeNetworkSignalChangedCallback(NetworkSignalChangedCallback cb) {
         mSignalsChangedCallbacks.remove(cb);
-    }
-
-    @Override
-    public void addAccessPointCallback(AccessPointCallback callback) {
-        mAccessPoints.addCallback(callback);
-    }
-
-    @Override
-    public void removeAccessPointCallback(AccessPointCallback callback) {
-        mAccessPoints.removeCallback(callback);
-    }
-
-    @Override
-    public void scanForAccessPoints() {
-        mAccessPoints.scan();
-    }
-
-    @Override
-    public void connect(AccessPoint ap) {
-        mAccessPoints.connect(ap);
     }
 
     @Override

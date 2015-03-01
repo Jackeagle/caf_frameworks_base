@@ -1547,6 +1547,14 @@ public class AppOpsService extends IAppOpsService.Stub {
         }
     }
 
+    private void scheduleWriteNowLocked() {
+        if (!mWriteScheduled) {
+            mWriteScheduled = true;
+        }
+        mHandler.removeCallbacks(mWriteRunner);
+        mHandler.post(mWriteRunner);
+    }
+
     private void readPolicy() {
         if (mStrictEnable) {
             mPolicy = new AppOpsPolicy(new File(DEFAULT_POLICY_FILE), mContext);
