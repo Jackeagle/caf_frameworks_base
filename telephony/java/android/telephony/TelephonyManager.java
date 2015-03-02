@@ -1598,6 +1598,27 @@ public class TelephonyManager {
                 com.android.internal.R.string.config_mms_user_agent_profile_url);
     }
 
+    /**
+     * Returns the response of SIM Authentication through RIL for the default subscription.
+     * Returns null if the Authentication hasn't been successful
+     *
+     * @param appType ICC application type
+     * (@see com.android.internal.telephony.PhoneConstants#APPTYPE_xxx)
+     * @param data authentication challenge data
+     * @return the response of SIM Authentication, or null if not available
+     * @hide
+     */
+    public String getIccSimChallengeResponse(int appType, String data) {
+        try {
+            return getSubscriberInfo().getIccSimChallengeResponse(appType, data);
+        } catch (RemoteException ex) {
+            return null;
+        } catch (NullPointerException ex) {
+            // This could happen before phone starts
+            return null;
+        }
+    }
+
     /** @hide */
     @PrivateApi
     public void dial(String number) {
