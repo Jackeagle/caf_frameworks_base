@@ -381,6 +381,13 @@ public abstract class InCallService extends Service {
              */
             public abstract void onCameraCapabilitiesChanged(
                     CameraCapabilities cameraCapabilities);
+
+            /**
+             * Handles a change in orientation mode.
+             *
+             * @param orientationMode The changed orientation mode.
+             */
+            public abstract void onOrientationModeChanged(int orientationMode);
         }
     }
 }
