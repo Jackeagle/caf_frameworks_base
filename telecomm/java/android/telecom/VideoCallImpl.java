@@ -43,6 +43,7 @@ public class VideoCallImpl extends VideoCall {
     private static final int MSG_CHANGE_CALL_DATA_USAGE = 5;
     private static final int MSG_CHANGE_CAMERA_CAPABILITIES = 6;
     private static final int MSG_CHANGE_VIDEO_QUALITY = 7;
+    private static final int MSG_CHANGE_ORIENTATION_MODE = 8;
 
     private final IVideoProvider mVideoProvider;
     private final VideoCallListenerBinder mBinder;
@@ -103,6 +104,12 @@ public class VideoCallImpl extends VideoCall {
             mHandler.obtainMessage(MSG_CHANGE_CAMERA_CAPABILITIES,
                     cameraCapabilities).sendToTarget();
         }
+
+        @Override
+        public void changeOrientationMode(int orientationMode) {
+            mHandler.obtainMessage(MSG_CHANGE_ORIENTATION_MODE, orientationMode, 0).sendToTarget();
+        }
+
     }
 
     /** Default handler used to consolidate binder method calls onto a single thread. */
@@ -153,6 +160,9 @@ public class VideoCallImpl extends VideoCall {
                     break;
                 case MSG_CHANGE_VIDEO_QUALITY:
                     mVideoCallListener.onVideoQualityChanged(msg.arg1);
+                    break;
+                case MSG_CHANGE_ORIENTATION_MODE:
+                    mVideoCallListener.onOrientationModeChanged(msg.arg1);
                     break;
                 default:
                     break;

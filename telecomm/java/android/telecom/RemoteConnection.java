@@ -256,6 +256,9 @@ public final class RemoteConnection {
                     CameraCapabilities cameraCapabilities) {}
 
             public void onVideoQualityChanged(VideoProvider videoProvider, int videoQuality) {}
+
+            public void onOrientationModeChanged(VideoProvider videoProvider,
+                    int orientationMode) {}
         }
 
         private final IVideoCallback mVideoCallbackDelegate = new IVideoCallback() {
@@ -310,6 +313,13 @@ public final class RemoteConnection {
             public void changeVideoQuality(int videoQuality) {
                 for (Listener l : mListeners) {
                     l.onVideoQualityChanged(VideoProvider.this, videoQuality);
+                }
+            }
+
+            @Override
+            public void changeOrientationMode(int orientationMode) {
+                for (Listener l : mListeners) {
+                    l.onOrientationModeChanged(VideoProvider.this, orientationMode);
                 }
             }
 
