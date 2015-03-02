@@ -373,7 +373,7 @@ public final class Call {
         /**
          * @return The substate of the {@code Call}.
          */
-        /** @ hide */
+        /** @hide */
         public int getCallSubstate() {
             return mCallSubstate;
         }
@@ -676,7 +676,6 @@ public final class Call {
         mInCallAdapter.postDialContinue(mTelecomCallId, proceed);
     }
 
-//FIXME L-MR1-INTERNAL
     /**
      * Notifies this {@code Call} that an account has been selected and to proceed with placing
      * an outgoing call. Optionally sets this account as the default account.
@@ -691,7 +690,9 @@ public final class Call {
     /**
      * Notifies this {@code Call} that an account has been selected and to proceed with placing
      * an outgoing call.
+     * @hide
      */
+    //FIXME L-MR1-INTERNAL
     public void phoneAccountSelected(PhoneAccountHandle accountHandle) {
         mInCallAdapter.phoneAccountSelected(mTelecomCallId, accountHandle);
 

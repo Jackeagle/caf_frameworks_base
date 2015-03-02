@@ -689,6 +689,7 @@ public class AudioManager {
      */
     public AudioManager(Context context) {
         mContext = context;
+        mMediaPlayers = new ArrayList<MediaPlayerInfo>(1); 
         mUseMasterVolume = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_useMasterVolume);
         mUseVolumeKeySounds = mContext.getResources().getBoolean(

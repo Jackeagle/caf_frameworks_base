@@ -3724,7 +3724,6 @@ public class TelephonyManager {
     }
 
     /** @hide */
-    @SystemApi
     public boolean isDataPossibleForSubscription(int subId, String apnType) {
         try {
             return getITelephony().isDataPossibleForSubscription(subId, apnType);

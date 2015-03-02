@@ -23299,11 +23299,14 @@ package android.os {
     method public static java.lang.String getExternalStorageState();
     method public static java.lang.String getExternalStorageState(java.io.File);
     method public static java.io.File getRootDirectory();
+    method public static java.io.File getSecondaryStorageDirectory();
+    method public static java.lang.String getSecondaryStorageState();
     method public static deprecated java.lang.String getStorageState(java.io.File);
     method public static boolean isExternalStorageEmulated();
     method public static boolean isExternalStorageEmulated(java.io.File);
     method public static boolean isExternalStorageRemovable();
     method public static boolean isExternalStorageRemovable(java.io.File);
+    method public static boolean isNoEmulatedStorageExist();
     field public static java.lang.String DIRECTORY_ALARMS;
     field public static java.lang.String DIRECTORY_DCIM;
     field public static java.lang.String DIRECTORY_DOCUMENTS;
@@ -30039,7 +30042,6 @@ package android.telecom {
     method public final int getState();
     method public final android.telecom.StatusHints getStatusHints();
     method public final boolean isRingbackRequested();
-    method protected void notifyConferenceStarted();
     method public void onAbort();
     method public void onAnswer();
     method public void onAudioStateChanged(android.telecom.AudioState);
