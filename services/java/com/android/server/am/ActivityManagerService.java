@@ -15659,7 +15659,7 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
             if (DEBUG_OOM_ADJ && selectedAppRecord != null) {
                 Slog.d(TAG,"Identified app.processName = "+selectedAppRecord.processName+" app.pid = "+selectedAppRecord.pid);
             }
-            if (!app.killedByAm && app.thread != null) {
+            if ((!app.killedByAm && app.thread != null) || app.curAdj >= ProcessList.UNKNOWN_ADJ) {
                 app.procStateChanged = false;
                 final boolean wasKeeping = app.keeping;
                 computeOomAdjLocked(app, ProcessList.UNKNOWN_ADJ, TOP_APP, true, now);
