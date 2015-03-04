@@ -46,7 +46,7 @@ import java.util.Date;
 import java.util.Locale;
 
 public class MobileDataControllerImpl {
-    private static final String TAG = "MobileDataControllerImpl";
+    private static final String TAG = "MobileDataController";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private static final long DEFAULT_WARNING_LEVEL = 2L * 1024 * 1024 * 1024;
