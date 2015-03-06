@@ -1044,6 +1044,10 @@ public final class ActivityStackSupervisor {
             mService.startSetupActivityLocked();
         }
 
+        // Update any services we are bound to that might care about whether
+        // their client may have activities.
+        mService.mServices.updateServiceConnectionActivitiesLocked(r.app);
+
         return true;
     }
 
