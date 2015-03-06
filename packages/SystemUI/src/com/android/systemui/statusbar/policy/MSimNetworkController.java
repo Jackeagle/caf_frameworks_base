@@ -1124,13 +1124,23 @@ public class MSimNetworkController extends NetworkController {
                         + " for subscription: " + subscription);
             }
             mMSimDataTypeIconId[subscription] = 0;
+            int dataSub = MSimTelephonyManager.getDefault().getDefaultDataSubscription();
+            if (subscription == dataSub) {
+                mQSDataTypeIconId = 0;
+            }
+            boolean setQSDataTypeIcon = false;
             if (isCdma(subscription)) {
                 if (isCdmaEri(subscription)) {
                     mMSimDataTypeIconId[subscription] =
                             R.drawable.stat_sys_data_fully_connected_roam;
+                    setQSDataTypeIcon = true;
                 }
             } else if (mPhone.isNetworkRoaming(subscription)) {
                 mMSimDataTypeIconId[subscription] = R.drawable.stat_sys_data_fully_connected_roam;
+                setQSDataTypeIcon = true;
+            }
+            if (setQSDataTypeIcon && subscription == dataSub) {
+                mQSDataTypeIconId = TelephonyIcons.QS_DATA_R[mInetCondition];
             }
         }
         if (DEBUG) {
