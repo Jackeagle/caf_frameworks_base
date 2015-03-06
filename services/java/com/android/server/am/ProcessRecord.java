@@ -17,6 +17,8 @@
 package com.android.server.am;
 
 import android.util.ArraySet;
+import android.util.EventLog;
+import android.util.Slog;
 import com.android.internal.app.ProcessStats;
 import com.android.internal.os.BatteryStatsImpl;
 
@@ -96,6 +98,7 @@ final class ProcessRecord {
     boolean hasAboveClient;     // Bound using BIND_ABOVE_CLIENT, so want to be lower
     boolean bad;                // True if disabled in the bad process list
     boolean killedByAm;         // True when proc has been killed by activity manager, not for RAM
+    boolean killed;             // True once we know the process has been killed
     boolean procStateChanged;   // Keep track of whether we changed 'setAdj'.
     String waitingToKill;       // Process is waiting to be killed when in the bg, and reason
     IBinder forcingToForeground;// Token that is forcing this process to be foreground
@@ -290,8 +293,9 @@ final class ProcessRecord {
                 pw.print(" lastLowMemory=");
                 TimeUtils.formatDuration(lastLowMemory, now, pw);
                 pw.print(" reportLowMemory="); pw.println(reportLowMemory);
-        if (killedByAm || waitingToKill != null) {
-            pw.print(prefix); pw.print("killedByAm="); pw.print(killedByAm);
+        if (killed || killedByAm || waitingToKill != null) {
+            pw.print(prefix); pw.print("killed="); pw.print(killed);
+                    pw.print(" killedByAm="); pw.print(killedByAm);
                     pw.print(" waitingToKill="); pw.println(waitingToKill);
         }
         if (debugging || crashing || crashDialog != null || notResponding
@@ -489,6 +493,22 @@ final class ProcessRecord {
             }
         }
         return adj;
+    }
+
+    void kill(String reason, boolean noisy) {
+        if (!killedByAm) {
+            if (noisy) {
+                Slog.i(ActivityManagerService.TAG, "Killing " + toShortString() + " (adj " + setAdj
+                        + "): " + reason);
+            }
+            EventLog.writeEvent(EventLogTags.AM_KILL, userId, pid, processName, setAdj, reason);
+            Process.killProcessQuiet(pid);
+            Process.killProcessGroup(info.uid, pid);
+            if (!persistent) {
+                killed = true;
+                killedByAm = true;
+            }
+        }
     }
 
     public String toShortString() {
