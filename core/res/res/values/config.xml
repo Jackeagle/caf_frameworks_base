@@ -2147,4 +2147,6 @@
    <integer name="data_retry_delay">0</integer>
    <!-- pdp data reject idle timeout delay-->
    <integer name="data_retry_idle_delay">0</integer>
+   <!-- config for FDN contact search. Disabled by default -->
+   <bool name="config_fdn_contact_search">false</bool>
 </resources>
