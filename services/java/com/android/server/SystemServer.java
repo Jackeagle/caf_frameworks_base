@@ -766,12 +766,16 @@ class ServerThread {
             }
 
             if (!disableNonCoreServices) {
-                try {
-                    Slog.i(TAG, "Backup Service");
-                    ServiceManager.addService(Context.BACKUP_SERVICE,
-                            new BackupManagerService(context));
-                } catch (Throwable e) {
-                    Slog.e(TAG, "Failure starting Backup Service", e);
+                if (ENCRYPTING_STATE.equals(SystemProperties.get("vold.decrypt"))) {
+                    Slog.w(TAG, "Detected encryption in progress - skipping Backup service");
+                } else if (!disableNonCoreServices) {
+                    try {
+                        Slog.i(TAG, "Backup Service");
+                        ServiceManager.addService(Context.BACKUP_SERVICE,
+                                new BackupManagerService(context));
+                    } catch (Throwable e) {
+                        Slog.e(TAG, "Failure starting Backup Service", e);
+                    }
                 }
 
                 try {
