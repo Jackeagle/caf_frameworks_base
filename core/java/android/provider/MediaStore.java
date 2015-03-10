@@ -638,7 +638,6 @@ public final class MediaStore {
         static Bitmap getThumbnail(ContentResolver cr, long origId, long groupId, int kind,
                 BitmapFactory.Options options, Uri baseUri, boolean isVideo) {
             Bitmap bitmap = null;
-            String filePath = null;
             // Log.v(TAG, "getThumbnail: origId="+origId+", kind="+kind+", isVideo="+isVideo);
             // If the magic is non-zero, we simply return thumbnail if it does exist.
             // querying MediaProvider and simply return thumbnail.
@@ -710,6 +709,7 @@ public final class MediaStore {
                     Uri uri = Uri.parse(
                             baseUri.buildUpon().appendPath(String.valueOf(origId))
                                     .toString().replaceFirst("thumbnails", "media"));
+
                     if (filePath == null) {
                         if (c != null) c.close();
                         c = cr.query(uri, PROJECTION, null, null, null);
@@ -723,10 +723,13 @@ public final class MediaStore {
                             return null;
                         }
                     }
-                    if (isVideo) {
-                        bitmap = ThumbnailUtils.createVideoThumbnail(filePath, kind);
-                    } else {
-                        bitmap = ThumbnailUtils.createImageThumbnail(filePath, kind);
+                    String filePath = c.getString(1);
+                    if (filePath != null) {
+                        if (isVideo) {
+                            bitmap = ThumbnailUtils.createVideoThumbnail(filePath, kind);
+                        } else {
+                            bitmap = ThumbnailUtils.createImageThumbnail(filePath, kind);
+                        }
                     }
                 }
             } catch (SQLiteException ex) {
