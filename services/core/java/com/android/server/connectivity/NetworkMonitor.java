@@ -402,10 +402,12 @@ public class NetworkMonitor extends StateMachine {
 
     // BroadcastReceiver that waits for a particular Intent and then posts a message.
     private class CustomIntentReceiver extends BroadcastReceiver {
-        private final Message mMessage;
+        private final int mToken;
+        private final int mMessage;
         private final String mAction;
         CustomIntentReceiver(String action, int token, int message) {
-            mMessage = obtainMessage(message, token);
+            mToken = token;
+            mMessage = message;
             mAction = action + "_" + mNetworkAgentInfo.network.netId + "_" + token;
             mContext.registerReceiver(this, new IntentFilter(mAction));
         }
@@ -414,7 +416,7 @@ public class NetworkMonitor extends StateMachine {
         }
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(mAction)) sendMessage(mMessage);
+            if (intent.getAction().equals(mAction)) sendMessage(obtainMessage(mMessage, mToken));
         }
     }
 
