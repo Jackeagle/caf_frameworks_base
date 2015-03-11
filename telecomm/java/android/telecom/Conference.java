@@ -285,6 +285,7 @@ public abstract class Conference implements IConferenceable {
 
     /**
      * Sets state to be dialing.
+     * @hide
      */
     public final void setDialing() {
         setState(Connection.STATE_DIALING);

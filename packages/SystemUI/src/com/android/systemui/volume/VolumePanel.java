@@ -52,6 +52,7 @@ import android.os.Debug;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.KeyEvent;
@@ -88,6 +89,8 @@ import java.io.PrintWriter;
 public class VolumePanel extends Handler implements DemoMode {
     private static final String TAG = "VolumePanel";
     private static boolean LOGD = Log.isLoggable(TAG, Log.DEBUG);
+
+    private static final boolean BLUR_UI_ENABLED = true;
 
     private static final int PLAY_SOUND_DELAY = AudioService.PLAY_SOUND_DELAY;
 
@@ -281,6 +284,8 @@ public class VolumePanel extends Handler implements DemoMode {
     private static AlertDialog sSafetyWarning;
     private static Object sSafetyWarningLock = new Object();
 
+    private boolean mBlurUiEnabled;
+
     private static class SafetyWarning extends SystemUIDialog
             implements DialogInterface.OnDismissListener, DialogInterface.OnClickListener {
         private final Context mContext;
@@ -385,7 +390,6 @@ public class VolumePanel extends Handler implements DemoMode {
             arr.recycle();
         }
 
-        if (parent == null) {
             mDialog = new Dialog(context) {
                 @Override
                 public boolean onTouchEvent(MotionEvent event) {
@@ -413,18 +417,18 @@ public class VolumePanel extends Handler implements DemoMode {
                 }
             });
 
-        mDialog.create();
+            mDialog.create();
 
-        final LayoutParams lp = window.getAttributes();
-        lp.token = null;
-        lp.y = res.getDimensionPixelOffset(com.android.systemui.R.dimen.volume_panel_top);
-        lp.type = LayoutParams.TYPE_STATUS_BAR_PANEL;
-        lp.format = PixelFormat.TRANSLUCENT;
-        lp.windowAnimations = com.android.systemui.R.style.VolumePanelAnimation;
-        lp.setTitle(TAG);
-        window.setAttributes(lp);
+            final LayoutParams lp = window.getAttributes();
+            lp.token = null;
+            lp.y = res.getDimensionPixelOffset(com.android.systemui.R.dimen.volume_panel_top);
+            lp.type = LayoutParams.TYPE_STATUS_BAR_PANEL;
+            lp.format = PixelFormat.TRANSLUCENT;
+            lp.windowAnimations = com.android.systemui.R.style.VolumePanelAnimation;
+            lp.setTitle(TAG);
+            window.setAttributes(lp);
 
-        updateWidth();
+            updateWidth();
 
             window.setBackgroundDrawable(new ColorDrawable(0x00000000));
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
@@ -962,7 +966,7 @@ public class VolumePanel extends Handler implements DemoMode {
         }
     }
 
-    private void updateStates() {
+    public void updateStates() {
         final int count = mSliderPanel.getChildCount();
         for (int i = 0; i < count; i++) {
             StreamControl sc = (StreamControl) mSliderPanel.getChildAt(i).getTag();

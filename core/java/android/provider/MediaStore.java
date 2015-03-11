@@ -637,6 +637,7 @@ public final class MediaStore {
          */
         static Bitmap getThumbnail(ContentResolver cr, long origId, long groupId, int kind,
                 BitmapFactory.Options options, Uri baseUri, boolean isVideo) {
+            String filePath = null;
             Bitmap bitmap = null;
             // Log.v(TAG, "getThumbnail: origId="+origId+", kind="+kind+", isVideo="+isVideo);
             // If the magic is non-zero, we simply return thumbnail if it does exist.
@@ -723,7 +724,7 @@ public final class MediaStore {
                             return null;
                         }
                     }
-                    String filePath = c.getString(1);
+                    filePath = c.getString(1);
                     if (filePath != null) {
                         if (isVideo) {
                             bitmap = ThumbnailUtils.createVideoThumbnail(filePath, kind);
