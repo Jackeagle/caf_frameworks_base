@@ -374,7 +374,7 @@ void parseScanResults(String16& str, const char *reply)
                     str += String16("ssid=");
                     str += String16(ssid_txt);
                     str += String16("\n");
-                    strncpy(ssid_utf8, dest, strlen(dest));
+                    strlcpy(ssid_utf8, dest, BUF_SIZE);
                     memset(dest, 0, CONVERT_LINE_LEN);
                     memset(ssid_txt, 0, BUF_SIZE);
                 } else {
@@ -487,12 +487,16 @@ jboolean setNetworkVariable(char *buf)
         ALOGE("g_pItemList is NULL");
     }
     while (pTmpItemNode) {
-        ALOGD("ssid_utf8 = %s, length=%d, value =%s, length=%d",
-               pTmpItemNode->ssid_utf8->string(),strlen(pTmpItemNode->ssid_utf8->string()), value, strlen(value));
-        if (pTmpItemNode->ssid_utf8 && (0 == memcmp(pTmpItemNode->ssid_utf8->string(), value,
-            pTmpItemNode->ssid_utf8->length()))) {
-            gbk_found = true;
-            break;
+        if (pTmpItemNode->ssid_utf8) {
+            ALOGD("ssid_utf8 = %s, length=%d, value =%s, length=%d",
+                   pTmpItemNode->ssid_utf8->string(), strlen(pTmpItemNode->ssid_utf8->string()),
+                   value, strlen(value));
+
+            if (0 == memcmp(pTmpItemNode->ssid_utf8->string(), value,
+                             pTmpItemNode->ssid_utf8->length())) {
+                gbk_found = true;
+                break;
+            }
         }
         pTmpItemNode = pTmpItemNode->pNext;
     }
