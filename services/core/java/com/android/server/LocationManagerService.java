@@ -123,6 +123,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 
 /**
  * The service class that manages LocationProviders and issues location
@@ -256,6 +260,18 @@ public class LocationManagerService extends ILocationManager.Stub {
     public void systemRunning() {
         synchronized (mLock) {
             if (D) Log.d(TAG, "systemReady()");
+            try {
+                 File f = new File("/proc/bootkpi/marker_entry");
+                 if (!f.exists())
+                     return; // No file...Dont do anything.
+                 FileOutputStream fos = new FileOutputStream(f);
+                 byte[] marker_name = "LocationManager".getBytes();
+                 fos.write(marker_name);
+                 fos.flush();
+                 fos.close();
+             } catch (IOException e) {
+                 e.printStackTrace();
+             }
 
             // fetch package manager
             mPackageManager = mContext.getPackageManager();
