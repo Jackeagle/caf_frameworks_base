@@ -663,14 +663,28 @@ public final class ClientOperation implements Operation, BaseStream {
                     mSrmClientSession.setRemoteSrmStatus(ObexHelper.SRM_CAPABLE);
                     if (VERBOSE) Log.v(TAG, "Remote SRM status: Enabled by Server response");
                 }
-
-               // Turn on SRM only if supported by both Client and Server.
-               // Otherwise, don't turn on SRM.
+                // Turn on SRM only if supported by both Client and Server.
+                // Otherwise, don't turn on SRM.
                 if (mSrmClientSession.getRemoteSrmStatus()) {
-                    if (VERBOSE)  Log.v(TAG, "continueOperation: Remote SRM Enabled");
+                    if (VERBOSE) Log.v(TAG, "continueOperation: Remote SRM Enabled");
                     mSrmGetActiveClient = mSrmClientSession.getLocalSrmStatus();
+                    if (mSrmGetActiveClient == ObexHelper.LOCAL_SRM_ENABLED) {
+                        if (VERBOSE) Log.v(TAG, "continueOperation: Client SRM enabled");
+                        Byte srmp = (Byte) mReplyHeader.getHeader(
+                                HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
+                        if (VERBOSE) Log.v(TAG, "SRMP header (CONTINUE): " + srmp);
+                        if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                            if (VERBOSE) Log.v(TAG, "Client SRMP WAIT requested by Server");
+                            mSrmClientSession.setLocalSrmpWait(true);
+                            mSrmGetActiveClient = ObexHelper.LOCAL_SRM_DISABLED;
+                        } else {
+                            if (VERBOSE) Log.v(TAG, "continueOperation: Client SRMP NONE");
+                            mSrmClientSession.setLocalSrmpWait(false);
+                        }
+                        mReplyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
+                                ObexHelper.OBEX_SRM_PARAM_NONE);
+                    }
                 }
-
                 mParent.sendRequest(0x83, null, mReplyHeader, mPrivateInput, false,
                     mSrmGetActiveClient);
 
