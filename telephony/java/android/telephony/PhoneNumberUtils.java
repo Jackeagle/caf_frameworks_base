@@ -27,6 +27,7 @@ import com.android.i18n.phonenumbers.ShortNumberUtil;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.location.Country;
 import android.location.CountryDetector;
 import android.net.Uri;
 import android.os.SystemProperties;
@@ -88,6 +89,7 @@ public class PhoneNumberUtils
      */
     private static final String IP_CALL_PREFIX = "ip_call_prefix_sub";
 
+    private static Country sCountryDetector = null;
     /*
      * global-phone-number = ["+"] 1*( DIGIT / written-sep )
      * written-sep         = ("-"/".")
@@ -1851,18 +1853,37 @@ public class PhoneNumberUtils
     private static boolean isLocalEmergencyNumberInternal(String number,
                                                           Context context,
                                                           boolean useExactMatch) {
-        String countryIso;
-        CountryDetector detector = (CountryDetector) context.getSystemService(
-                Context.COUNTRY_DETECTOR);
-        if (detector != null && detector.detectCountry() != null) {
-            countryIso = detector.detectCountry().getCountryIso();
-        } else {
+        String countryIso = getCountryIso(context);
+        Rlog.w(LOG_TAG, "isLocalEmergencyNumberInternal" + countryIso);
+        if (countryIso == null) {
             Locale locale = context.getResources().getConfiguration().locale;
             countryIso = locale.getCountry();
             Rlog.w(LOG_TAG, "No CountryDetector; falling back to countryIso based on locale: "
                     + countryIso);
         }
         return isEmergencyNumberInternal(number, countryIso, useExactMatch);
+    }
+
+    private static String getCountryIso(Context context) {
+        Rlog.w(LOG_TAG, "getCountryIso " + sCountryDetector);
+        if (sCountryDetector == null) {
+            CountryDetector detector = (CountryDetector) context.getSystemService(
+                Context.COUNTRY_DETECTOR);
+            if (detector != null) {
+                sCountryDetector = detector.detectCountry();
+            }
+        }
+
+        if (sCountryDetector == null) {
+            return null;
+        } else {
+            return sCountryDetector.getCountryIso();
+        }
+    }
+
+    /** @hide */
+    public static void resetCountryDetectorInfo() {
+        sCountryDetector = null;
     }
 
     /**
