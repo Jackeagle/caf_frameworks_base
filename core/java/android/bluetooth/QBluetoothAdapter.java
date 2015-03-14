@@ -151,6 +151,21 @@ public final class QBluetoothAdapter {
         }
     }
 
+    /** @hide */
+    public boolean sendSmpPairOnBredr(BluetoothDevice device)
+    {
+        if (mAdapter.getState() != BluetoothAdapter.STATE_ON)
+            return false;
+        Log.v(TAG,"SendSmpPairOnBredr, dev addr:" + device.getAddress());
+        try{
+               synchronized(mManagerCallback) {
+                   if (mService!=null && mQService != null)
+                       return  mQService.sendSmpPairOnBredr(device);
+               }
+        }catch (RemoteException e) {Log.e(TAG, "sendSmpPairOnBredr", e);}
+        return false;
+    }
+
    /**
      * Write the rssi threshold for a connected remote device.
      *
