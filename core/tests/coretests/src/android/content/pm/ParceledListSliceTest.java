@@ -71,7 +71,11 @@ public class ParceledListSliceTest extends TestCase {
 
         Parcel parcel = Parcel.obtain();
         try {
+<<<<<<< HEAD
             parcel.writeParcelable(new ParceledListSlice<>(list), 0);
+=======
+            parcel.writeParcelable(new ParceledListSlice<LargeObject>(list), 0);
+>>>>>>> 9f5e789d06d0621d464879909e0f0ab03a20028e
             parcel.setDataPosition(0);
             slice = parcel.readParcelable(getClass().getClassLoader());
         } finally {
@@ -95,7 +99,11 @@ public class ParceledListSliceTest extends TestCase {
      * Test that only homogeneous elements may be unparceled.
      */
     public void testHomogeneousElements() throws Exception {
+<<<<<<< HEAD
         List<BaseObject> list = new ArrayList<>();
+=======
+        List<BaseObject> list = new ArrayList<BaseObject>();
+>>>>>>> 9f5e789d06d0621d464879909e0f0ab03a20028e
         list.add(new LargeObject(0, 1, 2, 3, 4));
         list.add(new SmallObject(5, 6));
         list.add(new SmallObject(7, 8));
