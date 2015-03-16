@@ -352,10 +352,9 @@ public class WifiConfiguration implements Parcelable {
 
     /**
      * @hide
-     * last time we connected, this configuration had no internet access
+     * last time we connected, this configuration had validated internet access
      */
-    public boolean noInternetAccess;
-
+    public boolean validatedInternetAccess;
     /**
      * @hide
      * Uid of app creating the configuration
@@ -642,6 +641,22 @@ public class WifiConfiguration implements Parcelable {
 
     /**
      * @hide
+     * Number of reports indicating no Internet Access
+     */
+    public int numNoInternetAccessReports;
+
+    /**
+     * @hide
+     * The WiFi configuration is considered to have no internet access for purpose of autojoining
+     * if there has been a report of it having no internet access, and, it never have had
+     * internet access in the past.
+     */
+    public boolean hasNoInternetAccess() {
+        return numNoInternetAccessReports > 0 && !validatedInternetAccess;
+    }
+
+    /**
+     * @hide
      * Last time we blacklisted the configuration
      */
     public long blackListTimestamp;
@@ -833,7 +848,7 @@ public class WifiConfiguration implements Parcelable {
         selfAdded = false;
         didSelfAdd = false;
         ephemeral = false;
-        noInternetAccess = false;
+        validatedInternetAccess = false;
         mIpConfiguration = new IpConfiguration();
         duplicateNetwork = false;
     }
@@ -981,10 +996,14 @@ public class WifiConfiguration implements Parcelable {
         if (this.numAssociation > 0) {
             sbuf.append(" numAssociation ").append(this.numAssociation).append("\n");
         }
+        if (this.numNoInternetAccessReports > 0) {
+            sbuf.append(" numNoInternetAccessReports ");
+            sbuf.append(this.numNoInternetAccessReports).append("\n");
+        }
         if (this.didSelfAdd) sbuf.append(" didSelfAdd");
         if (this.selfAdded) sbuf.append(" selfAdded");
-        if (this.noInternetAccess) sbuf.append(" noInternetAccess");
-        if (this.didSelfAdd || this.selfAdded || this.noInternetAccess) {
+        if (this.validatedInternetAccess) sbuf.append(" validatedInternetAccess");
+        if (this.didSelfAdd || this.selfAdded || this.validatedInternetAccess) {
             sbuf.append("\n");
         }
         sbuf.append(" KeyMgmt:");
@@ -1440,7 +1459,7 @@ public class WifiConfiguration implements Parcelable {
             mCachedConfigKey = null; //force null configKey
             autoJoinStatus = source.autoJoinStatus;
             selfAdded = source.selfAdded;
-            noInternetAccess = source.noInternetAccess;
+            validatedInternetAccess = source.validatedInternetAccess;
             if (source.visibility != null) {
                 visibility = new Visibility(source.visibility);
             }
@@ -1473,6 +1492,7 @@ public class WifiConfiguration implements Parcelable {
                     = source.autoJoinUseAggressiveJoinAttemptThreshold;
             autoJoinBailedDueToLowRssi = source.autoJoinBailedDueToLowRssi;
             dirty = source.dirty;
+            numNoInternetAccessReports = source.numNoInternetAccessReports;
             duplicateNetwork = source.duplicateNetwork;
         }
     }
@@ -1517,7 +1537,7 @@ public class WifiConfiguration implements Parcelable {
         dest.writeInt(autoJoinStatus);
         dest.writeInt(selfAdded ? 1 : 0);
         dest.writeInt(didSelfAdd ? 1 : 0);
-        dest.writeInt(noInternetAccess ? 1 : 0);
+        dest.writeInt(validatedInternetAccess ? 1 : 0);
         dest.writeInt(creatorUid);
         dest.writeInt(lastConnectUid);
         dest.writeInt(lastUpdateUid);
@@ -1538,6 +1558,7 @@ public class WifiConfiguration implements Parcelable {
         dest.writeInt(numUserTriggeredJoinAttempts);
         dest.writeInt(autoJoinUseAggressiveJoinAttemptThreshold);
         dest.writeInt(autoJoinBailedDueToLowRssi ? 1 : 0);
+        dest.writeInt(numNoInternetAccessReports);
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -1577,7 +1598,7 @@ public class WifiConfiguration implements Parcelable {
                 config.autoJoinStatus = in.readInt();
                 config.selfAdded = in.readInt() != 0;
                 config.didSelfAdd = in.readInt() != 0;
-                config.noInternetAccess = in.readInt() != 0;
+                config.validatedInternetAccess = in.readInt() != 0;
                 config.creatorUid = in.readInt();
                 config.lastConnectUid = in.readInt();
                 config.lastUpdateUid = in.readInt();
@@ -1598,6 +1619,7 @@ public class WifiConfiguration implements Parcelable {
                 config.numUserTriggeredJoinAttempts = in.readInt();
                 config.autoJoinUseAggressiveJoinAttemptThreshold = in.readInt();
                 config.autoJoinBailedDueToLowRssi = in.readInt() != 0;
+                config.numNoInternetAccessReports = in.readInt();
                 return config;
             }
 
