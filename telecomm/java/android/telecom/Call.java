@@ -699,21 +699,7 @@ public final class Call {
      * an outgoing call. Optionally sets this account as the default account.
      */
     public void phoneAccountSelected(PhoneAccountHandle accountHandle, boolean setDefault) {
-        //mInCallAdapter.phoneAccountSelected(mTelecomCallId, accountHandle, setDefault);
-
-    }
-
-
-
-    /**
-     * Notifies this {@code Call} that an account has been selected and to proceed with placing
-     * an outgoing call.
-     * @hide
-     */
-    //FIXME L-MR1-INTERNAL
-    public void phoneAccountSelected(PhoneAccountHandle accountHandle) {
         mInCallAdapter.phoneAccountSelected(mTelecomCallId, accountHandle);
-
     }
 
     /**
