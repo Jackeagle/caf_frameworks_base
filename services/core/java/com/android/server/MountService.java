@@ -778,6 +778,10 @@ class MountService extends IMountService.Stub
                     OBB_FLUSH_MOUNT_STATE, path));
         } else if (Environment.MEDIA_MOUNTED.equals(state)) {
             mPms.updateExternalMediaStatus(true, false);
+        } else if (Environment.MEDIA_BAD_REMOVAL.equals(state)
+                   || Environment.MEDIA_REMOVED.equals(state)){
+            Slog.d(TAG, "Disk/Partition bad remove call PMS");
+            mPms.unloadInstalledExternalPackages(path);
         }
 
         synchronized (mListeners) {
