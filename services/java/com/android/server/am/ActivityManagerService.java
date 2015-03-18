@@ -2058,7 +2058,6 @@ public final class ActivityManagerService extends ActivityManagerNative
                 }
             }
         };
-        Process.removeAllProcessGroups();
         mProcessCpuThread.start();
     }
 
@@ -2342,11 +2341,6 @@ public final class ActivityManagerService extends ActivityManagerNative
     final void removeLruProcessLocked(ProcessRecord app) {
         int lrui = mLruProcesses.lastIndexOf(app);
         if (lrui >= 0) {
-            if (!app.killed) {
-                Slog.wtf(TAG, "Removing process that hasn't been killed: " + app);
-                Process.killProcessQuiet(app.pid);
-                Process.killProcessGroup(app.info.uid, app.pid);
-            }
             if (lrui <= mLruProcessActivityStart) {
                 mLruProcessActivityStart--;
             }
@@ -2641,7 +2635,6 @@ public final class ActivityManagerService extends ActivityManagerNative
             // An application record is attached to a previous process,
             // clean it up now.
             if (DEBUG_PROCESSES || DEBUG_CLEANUP) Slog.v(TAG, "App died: " + app);
-            Process.killProcessGroup(app.info.uid, app.pid);
             handleAppDiedLocked(app, true, true);
         }
 
@@ -2848,7 +2841,6 @@ public final class ActivityManagerService extends ActivityManagerNative
             app.setPid(startResult.pid);
             app.usingWrapper = startResult.usingWrapper;
             app.removed = false;
-            app.killed = false;
             synchronized (mPidsSelfLocked) {
                 this.mPidsSelfLocked.put(startResult.pid, app);
                 Message msg = mHandler.obtainMessage(PROC_START_TIMEOUT_MSG);
@@ -3757,16 +3749,14 @@ public final class ActivityManagerService extends ActivityManagerNative
         }
     }
 
-final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) {
+    final void appDiedLocked(ProcessRecord app, int pid,
+            IApplicationThread thread) {
 
         BatteryStatsImpl stats = mBatteryStatsService.getActiveStatistics();
         synchronized (stats) {
             stats.noteProcessDiedLocked(app.info.uid, pid);
         }
 
-        Process.killProcessQuiet(pid);
-        Process.killProcessGroup(app.info.uid, pid);
-        app.killed = true;
         // Clean up already done if the process has been re-started.
         if (app.pid == pid && app.thread != null &&
                 app.thread.asBinder() == thread.asBinder()) {
@@ -4005,10 +3995,7 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
             try {
                 // 0 == continue, -1 = kill process immediately
                 int res = mController.appEarlyNotResponding(app.processName, app.pid, annotation);
-                if (res < 0 && app.pid != MY_PID) {
-                    Process.killProcess(app.pid);
-                    Process.killProcessGroup(app.info.uid, app.pid);
-                }
+                if (res < 0 && app.pid != MY_PID) Process.killProcess(app.pid);
             } catch (RemoteException e) {
                 mController = null;
                 Watchdog.getInstance().setActivityController(null);
@@ -4114,7 +4101,6 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
                 if (res != 0) {
                     if (res < 0 && app.pid != MY_PID) {
                         Process.killProcess(app.pid);
-                        Process.killProcessGroup(app.info.uid, app.pid);
                     } else {
                         synchronized (this) {
                             mServices.scheduleServiceTimeoutLocked(app);
@@ -4837,7 +4823,6 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
                 mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
             }
             killUnneededProcessLocked(app, reason);
-            Process.killProcessGroup(app.info.uid, app.pid);
             handleAppDiedLocked(app, true, allowRestart);
             removeLruProcessLocked(app);
 
@@ -6987,7 +6972,6 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
                     pr.processName, pr.setAdj, reason);
             pr.killedByAm = true;
             Process.killProcessQuiet(pr.pid);
-            Process.killProcessGroup(pr.info.uid, pr.pid);
         }
     }
 
@@ -10151,15 +10135,11 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
                 try {
                     String name = r != null ? r.processName : null;
                     int pid = r != null ? r.pid : Binder.getCallingPid();
-                    int uid = r != null ? r.info.uid : Binder.getCallingUid();
                     if (!mController.appCrashed(name, pid,
                             shortMsg, longMsg, timeMillis, crashInfo.stackTrace)) {
                         Slog.w(TAG, "Force-killing crashed app " + name
                                 + " at watcher's request");
                         Process.killProcess(pid);
-                        if (r != null) {
-                            Process.killProcessGroup(uid, pid);
-                        }
                         return;
                     }
                 } catch (RemoteException e) {
@@ -15999,7 +15979,6 @@ final void appDiedLocked(ProcessRecord app, int pid, IApplicationThread thread) 
                                 app.processName, app.setAdj, "empty");
                         app.killedByAm = true;
                         Process.killProcessQuiet(app.pid);
-                        Process.killProcessGroup(app.info.uid, app.pid);
                     } else {
                         try {
                             app.thread.scheduleExit();

@@ -28,7 +28,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemProperties;
 import android.util.ArrayMap;
-import android.util.ArraySet;
 import com.android.internal.app.ProcessStats;
 import com.android.internal.os.BatteryStatsImpl;
 import com.android.internal.os.TransferPipe;
@@ -622,7 +621,7 @@ public final class ActiveServices {
             if (proc == null || proc == clientProc) {
                 continue;
             } else if (updatedProcesses == null) {
-                updatedProcesses = new ArraySet<ProcessRecord>();
+                updatedProcesses = new ArraySet<>();
             } else if (updatedProcesses.contains(proc)) {
                 continue;
             }
