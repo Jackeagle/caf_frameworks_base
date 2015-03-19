@@ -165,7 +165,7 @@ final class ProcessList {
             return (MAX_CACHED_APPS-MAX_EMPTY_APPS)*2/3;
         }
     }
-    static final int TRIM_CACHED_APPS = (MAX_CACHED_APPS-MAX_EMPTY_APPS)/3;
+    static final int TRIM_CACHED_APPS = computeTrimCachedApps();
 
     // Threshold of number of cached+empty where we consider memory critical.
     static final int TRIM_CRITICAL_THRESHOLD = 3;
@@ -323,7 +323,11 @@ final class ProcessList {
     }
 
     public static int computeEmptyProcessLimit(int totalProcessLimit) {
-        return totalProcessLimit/2;
+        if(allowTrim()) {
+            return totalProcessLimit*EMPTY_APP_PERCENT/100;
+        } else {
+            return totalProcessLimit*2/3;
+        }
     }
 
     private static String buildOomTag(String prefix, String space, int val, int base) {
