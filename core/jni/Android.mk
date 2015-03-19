@@ -216,8 +216,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libjpeg \
 	libusbhost \
 	libharfbuzz_ng \
-	libz \
-	libprocessgroup \
+	libz
 
 ifeq ($(USE_OPENGL_RENDERER),true)
 	LOCAL_SHARED_LIBRARIES += libhwui
