@@ -59,6 +59,9 @@ public final class Geocoder {
     public static boolean isPresent() {
         IBinder b = ServiceManager.getService(Context.LOCATION_SERVICE);
         ILocationManager lm = ILocationManager.Stub.asInterface(b);
+        if (lm == null) {
+            return false;
+        }
         try {
             return lm.geocoderIsPresent();
         } catch (RemoteException e) {
