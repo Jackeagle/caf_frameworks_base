@@ -52,6 +52,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+
 
 /**
  * Startup class for the zygote process.
@@ -662,6 +667,18 @@ public class ZygoteInit {
 
             if (abiList == null) {
                 throw new RuntimeException("No ABI list supplied.");
+            }
+            try {
+                 File f = new File("/proc/bootkpi/marker_entry");
+                 if (!f.exists())
+                     return; // No file...Dont do anything.
+                 FileOutputStream fos = new FileOutputStream(f);
+                 byte[] marker_name = "Zygote Start:".getBytes();
+                 fos.write(marker_name);
+                 fos.flush();
+                 fos.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
             registerZygoteSocket(socketName);
