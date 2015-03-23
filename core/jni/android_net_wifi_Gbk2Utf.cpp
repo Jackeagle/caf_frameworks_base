@@ -374,6 +374,7 @@ void parseScanResults(String16& str, const char *reply)
                     str += String16("ssid=");
                     str += String16(ssid_txt);
                     str += String16("\n");
+                    memset(ssid_utf8, 0, BUF_SIZE);
                     strlcpy(ssid_utf8, dest, BUF_SIZE);
                     memset(dest, 0, CONVERT_LINE_LEN);
                     memset(ssid_txt, 0, BUF_SIZE);
@@ -496,8 +497,7 @@ jboolean setNetworkVariable(char *buf)
                    pTmpItemNode->ssid_utf8->string(), strlen(pTmpItemNode->ssid_utf8->string()),
                    ssid, strlen(ssid));
 
-            if (0 == memcmp(pTmpItemNode->ssid_utf8->string(), ssid,
-                             pTmpItemNode->ssid_utf8->length())) {
+            if (0 == strcmp(pTmpItemNode->ssid_utf8->string(), ssid)) {
                 gbk_found = true;
                 break;
             }
