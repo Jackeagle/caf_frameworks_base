@@ -401,6 +401,9 @@ final public class MediaCodec {
 
                 case CB_OUTPUT_FORMAT_CHANGE:
                 {
+                    synchronized(mBufferLock) {
+                        cacheBuffers(false /* input */);
+                    }
                     mCallback.onOutputFormatChanged(mCodec,
                             new MediaFormat((Map<String, Object>) msg.obj));
                     break;
@@ -1778,21 +1781,17 @@ final public class MediaCodec {
             mIsValid = true;
             mIsReadOnly = buffer.isReadOnly();
             mBuffer = buffer.duplicate();
-            if (cropRect != null) {
-                cropRect.offset(-xOffset, -yOffset);
-            }
-            super.setCropRect(cropRect);
 
             // save offsets and info
             mXOffset = xOffset;
             mYOffset = yOffset;
             mInfo = info;
 
-            // read media-info.  the size of media info can be 80 or 156 depending on
+            // read media-info.  the size of media info can be 80 or 156/160 depending on
             // whether it was created on a 32- or 64-bit process.  See MediaImage
-            if (info.remaining() == 80 || info.remaining() == 156) {
-                boolean sizeIsLong = info.remaining() == 156;
-                int type = info.getInt();
+            if (info.remaining() == 80 || info.remaining() == 156 || info.remaining() == 160) {
+                boolean sizeIsLong = info.remaining() != 80;
+                int type = readInt(info, info.remaining() == 160);
                 if (type != TYPE_YUV) {
                     throw new UnsupportedOperationException("unsupported type: " + type);
                 }
@@ -1833,6 +1832,12 @@ final public class MediaCodec {
                 throw new UnsupportedOperationException(
                         "unsupported info length: " + info.remaining());
             }
+
+            if (cropRect == null) {
+                cropRect = new Rect(0, 0, mWidth, mHeight);
+            }
+            cropRect.offset(-xOffset, -yOffset);
+            super.setCropRect(cropRect);
         }
 
         private class MediaPlane extends Plane {

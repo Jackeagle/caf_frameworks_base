@@ -331,17 +331,17 @@ public class MediaScanner
     /** Whether the database had any entries in it before the scan started */
     private boolean mWasEmptyPriorToScan = false;
     /** Whether the scanner has set a default sound for the ringer ringtone. */
-    private boolean mDefaultRingtoneSet = false;
-    /** Whether the scanner has set a default sound for the alarm ringtone. */
-    private boolean mDefaultAlarmSet = false;
-    /** Whether the scanner has set a default sound for the ringer ringtone 2. */
-    private boolean mDefaultRingtone2Set = false;
-    /** Whether the scanner has set a default sound for the ringer ringtone 3. */
-    private boolean mDefaultRingtone3Set = false;
+    private boolean mDefaultRingtoneSet;
     /** Whether the scanner has set a default sound for the notification ringtone. */
-    private boolean mDefaultNotificationSet = false;
+    private boolean mDefaultNotificationSet;
+    /** Whether the scanner has set a default sound for the alarm ringtone. */
+    private boolean mDefaultAlarmSet;
+    /** Whether the scanner has set a default sound for the ringer ringtone 2. */
+    private boolean mDefaultRingtone2Set;
+    /** Whether the scanner has set a default sound for the ringer ringtone 3. */
+    private boolean mDefaultRingtone3Set;
     /** Whether the scanner has set a default sound for the mms notification ringtone. */
-    private boolean mDefaultMmsNotificationSet = false;
+    private boolean mDefaultMmsNotificationSet;
 
     /** The filename for the default sound for the ringer ringtone. */
     private String mDefaultRingtoneFilename;
@@ -544,7 +544,7 @@ public class MediaScanner
                     }
                 }
 
-                if (isDrmEnabled() && MediaFile.isDrmFileType(mFileType)) {
+                if (isDrmEnabled() && path != null && (path.endsWith(".dcf") || path.endsWith(".dm"))) {
                     mFileType = getFileTypeFromDrm(path);
                 }
             }
@@ -810,7 +810,7 @@ public class MediaScanner
             try {
                 mBitmapOptions.outWidth = 0;
                 mBitmapOptions.outHeight = 0;
-                BitmapFactory.decodeFile(path, mBitmapOptions);
+                BitmapFactory.decodeFile(path, mBitmapOptions, false);
                 mWidth = mBitmapOptions.outWidth;
                 mHeight = mBitmapOptions.outHeight;
             } catch (Throwable th) {
@@ -997,9 +997,9 @@ public class MediaScanner
             }
             Uri result = null;
             boolean needToSetSettings = false;
-            boolean needToSetMmsNotificationSettings = false;
-            boolean needToSetRingtone2Settings = false;
-            boolean needToSetRingtone3Settings = false;
+            boolean needToCustomizeMmsNotification = false;
+            boolean needToCustomizeRingtone2 = false;
+            boolean needToCustomizeRingtone3 = false;
             if (rowId == 0) {
                 if (mMtpObjectHandle != 0) {
                     values.put(MediaStore.MediaColumns.MEDIA_SCANNER_NEW_OBJECT_ID, mMtpObjectHandle);
@@ -1016,35 +1016,24 @@ public class MediaScanner
                 // needed.
                 if (mWasEmptyPriorToScan) {
                     if (notifications && !mDefaultNotificationSet) {
-                        if (TextUtils.isEmpty(mDefaultNotificationFilename) ||
-                                doesPathHaveFilename(entry.mPath, mDefaultNotificationFilename)) {
-                            needToSetSettings = true;
-                        }
+                        needToSetSettings = toSetSettings(entry.mPath, mDefaultNotificationFilename);
                     } else if (ringtones && !mDefaultRingtoneSet) {
-                        if (TextUtils.isEmpty(mDefaultRingtoneFilename) ||
-                                doesPathHaveFilename(entry.mPath, mDefaultRingtoneFilename)) {
-                            needToSetSettings = true;
-                        }
+                        needToSetSettings = toSetSettings(entry.mPath, mDefaultRingtoneFilename);
                     } else if (alarms && !mDefaultAlarmSet) {
-                        if (TextUtils.isEmpty(mDefaultAlarmAlertFilename) ||
-                                doesPathHaveFilename(entry.mPath, mDefaultAlarmAlertFilename)) {
-                            needToSetSettings = true;
-                        }
+                        needToSetSettings = toSetSettings(entry.mPath, mDefaultAlarmAlertFilename);
                     }
                     if (isSoundCustomized()) {
                         if (notifications && !mDefaultMmsNotificationSet) {
-                            if (TextUtils.isEmpty(mDefaultMmsNotificationFilename) ||
-                                    doesPathHaveFilename(entry.mPath, mDefaultMmsNotificationFilename)) {
-                                needToSetMmsNotificationSettings = true;
+                            needToCustomizeMmsNotification = toSetSettings(entry.mPath,
+                                    mDefaultMmsNotificationFilename);
+                        } else if (ringtones) {
+                            if (!mDefaultRingtone2Set) {
+                                needToCustomizeRingtone2 = toSetSettings(entry.mPath,
+                                        mDefaultRingtone2Filename);
                             }
-                        } else if (ringtones && (!mDefaultRingtone2Set || !mDefaultRingtone3Set)) {
-                            if (TextUtils.isEmpty(mDefaultRingtone2Filename) ||
-                                    doesPathHaveFilename(entry.mPath, mDefaultRingtone2Filename)) {
-                                needToSetRingtone2Settings = true;
-                            }
-                            if (TextUtils.isEmpty(mDefaultRingtone3Filename) ||
-                                    doesPathHaveFilename(entry.mPath, mDefaultRingtone3Filename)) {
-                                needToSetRingtone3Settings = true;
+                            if (!mDefaultRingtone3Set) {
+                                needToCustomizeRingtone3 = toSetSettings(entry.mPath,
+                                        mDefaultRingtone3Filename);
                             }
                         }
                     }
@@ -1056,9 +1045,9 @@ public class MediaScanner
                 // If the rowId of the inserted file is needed, it gets inserted immediately,
                 // bypassing the bulk inserter.
                 if (inserter == null || needToSetSettings
-                        || needToSetMmsNotificationSettings
-                        || needToSetRingtone2Settings
-                        || needToSetRingtone3Settings) {
+                        || needToCustomizeMmsNotification
+                        || needToCustomizeRingtone2
+                        || needToCustomizeRingtone3) {
                     if (inserter != null) {
                         inserter.flushAll();
                     }
@@ -1126,26 +1115,22 @@ public class MediaScanner
             }
 
             if (isSoundCustomized()) {
-                if (notifications) {
-                    if (needToSetMmsNotificationSettings) {
-                        Settings.System.putString(mContext.getContentResolver(),
-                                Settings.System.MMS_NOTIFICATION_SOUND,
-                                ContentUris.withAppendedId(tableUri, rowId).toString());
-                        mDefaultMmsNotificationSet = true;
-                    }
+                if (notifications && needToCustomizeMmsNotification) {
+                    overrideSetting(Settings.System.MMS_NOTIFICATION_SOUND, tableUri, rowId);
+                    mDefaultMmsNotificationSet = true;
                 } else if (ringtones) {
                     int phoneCount = TelephonyManager.getDefault().getPhoneCount();
-                    if (phoneCount >= 2) {
-                        if (needToSetRingtone2Settings) {
-                            Settings.System.putString(mContext.getContentResolver(),
-                                    Settings.System.RINGTONE_2,
-                                    ContentUris.withAppendedId(tableUri, rowId).toString());
+                    if (phoneCount == 2 && needToCustomizeRingtone2) {
+                        overrideSetting(Settings.System.RINGTONE_2, tableUri, rowId);
+                        mDefaultRingtone2Set = true;
+                    }
+                    if (phoneCount == 3) {
+                        if (needToCustomizeRingtone2) {
+                            overrideSetting(Settings.System.RINGTONE_2, tableUri, rowId);
                             mDefaultRingtone2Set = true;
                         }
-                        if (phoneCount == 3 && needToSetRingtone3Settings) {
-                            Settings.System.putString(mContext.getContentResolver(),
-                                    Settings.System.RINGTONE_3,
-                                    ContentUris.withAppendedId(tableUri, rowId).toString());
+                        if (needToCustomizeRingtone3) {
+                            overrideSetting(Settings.System.RINGTONE_3, tableUri, rowId);
                             mDefaultRingtone3Set = true;
                         }
                     }
@@ -1153,6 +1138,11 @@ public class MediaScanner
             }
 
             return result;
+        }
+
+        private boolean toSetSettings(String path, String filename) {
+            return TextUtils.isEmpty(filename) ||
+                    doesPathHaveFilename(path, filename);
         }
 
         private boolean doesPathHaveFilename(String path, String filename) {
@@ -1174,6 +1164,11 @@ public class MediaScanner
             }
         }
 
+        private void overrideSetting(String settingName, Uri uri, long rowId) {
+            Settings.System.putString(mContext.getContentResolver(), settingName,
+                    ContentUris.withAppendedId(uri, rowId).toString());
+        }
+
         private int getFileTypeFromDrm(String path) {
             if (!isDrmEnabled()) {
                 return 0;
@@ -1185,9 +1180,10 @@ public class MediaScanner
                 mDrmManagerClient = new DrmManagerClient(mContext);
             }
 
-            if (mDrmManagerClient.canHandle(path, null)) {
+            String realpath = path.replace("/storage/emulated/0", "/storage/emulated/legacy");
+            if (mDrmManagerClient.canHandle(realpath, null)) {
                 mIsDrm = true;
-                String drmMimetype = mDrmManagerClient.getOriginalMimeType(path);
+                String drmMimetype = mDrmManagerClient.getOriginalMimeType(realpath);
                 if (drmMimetype != null) {
                     mMimeType = drmMimetype;
                     resultFileType = MediaFile.getFileTypeForMimeType(drmMimetype);

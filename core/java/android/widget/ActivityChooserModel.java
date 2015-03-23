@@ -948,19 +948,6 @@ public class ActivityChooserModel extends DataSetObservable {
             componentNameToActivityMap.clear();
 
             final int activityCount = activities.size();
-            ComponentName highPriComponentName = null;
-
-            if (!TextUtils.isEmpty(mContext.getString(com.android.internal.R.
-                    string.def_hipri_share_component_pkg))
-                    && !TextUtils.isEmpty(mContext.getString(com.android.internal.R.
-                    string.def_hipri_share_component_class))) {
-                highPriComponentName = new ComponentName(
-                        mContext.getString(com.android.internal.R.
-                                string.def_hipri_share_component_pkg),
-                        mContext.getString(com.android.internal.R.
-                        string.def_hipri_share_component_class));
-            }
-
             for (int i = 0; i < activityCount; i++) {
                 ActivityResolveInfo activity = activities.get(i);
                 activity.weight = 0.0f;
@@ -968,9 +955,6 @@ public class ActivityChooserModel extends DataSetObservable {
                         activity.resolveInfo.activityInfo.packageName,
                         activity.resolveInfo.activityInfo.name);
 
-                if ((highPriComponentName != null) && highPriComponentName.equals(componentName)) {
-                    activity.weight = Float.MAX_VALUE;
-                }
                 componentNameToActivityMap.put(componentName, activity);
             }
 
@@ -980,13 +964,9 @@ public class ActivityChooserModel extends DataSetObservable {
                 HistoricalRecord historicalRecord = historicalRecords.get(i);
                 ComponentName componentName = historicalRecord.activity;
                 ActivityResolveInfo activity = componentNameToActivityMap.get(componentName);
-                if ((highPriComponentName != null) && highPriComponentName.equals(componentName)) {
-                    continue;
-                } else {
-                    if (activity != null) {
-                        activity.weight += historicalRecord.weight * nextRecordWeight;
-                        nextRecordWeight = nextRecordWeight * WEIGHT_DECAY_COEFFICIENT;
-                    }
+                if (activity != null) {
+                    activity.weight += historicalRecord.weight * nextRecordWeight;
+                    nextRecordWeight = nextRecordWeight * WEIGHT_DECAY_COEFFICIENT;
                 }
             }
 
