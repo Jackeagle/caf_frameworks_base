@@ -80,15 +80,8 @@ public class DataTile extends QSTile<QSTile.BooleanState> {
                 Settings.Global.AIRPLANE_MODE_ON, 0) != 0 || !hasIccCard()) {
             return;
         }
-        int phoneCount = mTelephonyManager.getPhoneCount();
-        for (int i = 0; i < phoneCount; i++) {
-            Settings.Global.putInt(mContext.getContentResolver(),
-                    Settings.Global.MOBILE_DATA + i, (enabled) ? 1 : 0);
-            long[] subId = SubscriptionManager.getSubId(i);
-            mTelephonyManager.setDataEnabledUsingSubId(subId[0], enabled);
-        }
-        mTelephonyManager.setDataEnabledUsingSubId(
-                SubscriptionManager.getDefaultDataSubId(), enabled);
+        mTelephonyManager.setDataEnabled(
+                SubscriptionManager.from(mContext).getDefaultDataSubId(), enabled);
     }
 
     @Override
@@ -111,7 +104,8 @@ public class DataTile extends QSTile<QSTile.BooleanState> {
 
     private boolean isDefaultDataEnabled() {
         return Settings.Global.getInt(mContext.getContentResolver(),
-                Settings.Global.MOBILE_DATA + SubscriptionManager.getDefaultDataPhoneId(), 0) != 0;
+                Settings.Global.MOBILE_DATA +
+                SubscriptionManager.from(mContext).getDefaultDataPhoneId(), 0) != 0;
     }
 
     public void setListening(boolean listening) {

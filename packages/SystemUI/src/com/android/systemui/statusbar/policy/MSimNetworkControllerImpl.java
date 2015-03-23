@@ -43,7 +43,6 @@ import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.SubscriptionManager;
-import android.telephony.SubInfoRecord;
 import android.telephony.TelephonyManager;
 import android.telephony.VoLteServiceState;
 
@@ -72,7 +71,9 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     boolean[] mMSimDataConnected;
     IccCardConstants.State[] mMSimState;
     int[] mMSimDataActivity;
+    int[] mMSimDataNetType;
     int[] mMSimDataServiceState;
+    int[] mMSimDataState;
     ServiceState[] mMSimServiceState;
     ServiceState[] mMSimLastServiceState;
     SignalStrength[] mMSimSignalStrength;
@@ -110,7 +111,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     int mPhoneCount = 0;
     int PHONE_ID1 = PhoneConstants.PHONE_ID1;
     int PHONE_ID2 = PhoneConstants.PHONE_ID2;
-    private HashMap<Long, Integer> mSubIdPhoneIdMap;
+    private HashMap<Integer, Integer> mSubIdPhoneIdMap;
     ArrayList<MSimSignalCluster> mSimSignalClusters = new ArrayList<MSimSignalCluster>();
     ArrayList<TextView> mSubsLabelViews = new ArrayList<TextView>();
 
@@ -155,6 +156,8 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         mMSimcombinedActivityIconId = new int[numPhones];
         mMSimLastcombinedActivityIconId = new int[numPhones];
         mMSimDataActivity = new int[numPhones];
+        mMSimDataNetType = new int[numPhones];
+        mMSimDataState = new int[numPhones];
         mMSimContentDescriptionCombinedSignal = new String[numPhones];
         mMSimContentDescriptionDataType = new String[numPhones];
         mMSimLastSimIconId = new int[numPhones];
@@ -182,6 +185,8 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             mMSimcombinedActivityIconId[i] = 0;
             mMSimLastcombinedActivityIconId[i] = 0;
             mMSimDataActivity[i] = TelephonyManager.DATA_ACTIVITY_NONE;
+            mMSimDataNetType[i] = TelephonyManager.NETWORK_TYPE_UNKNOWN;
+            mMSimDataState[i] = TelephonyManager.DATA_DISCONNECTED;
             mMSimLastSimIconId[i] = 0;
             mMSimNetworkName[i] = mNetworkNameDefault;
             mMSimDataServiceState[i] = ServiceState.STATE_OUT_OF_SERVICE;
@@ -191,6 +196,8 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         mDataConnected = mMSimDataConnected[mDefaultPhoneId];
         mSimState = mMSimState[mDefaultPhoneId];
         mDataActivity = mMSimDataActivity[mDefaultPhoneId];
+        mDataNetType = mMSimDataNetType[mDefaultPhoneId];
+        mDataState = mMSimDataState[mDefaultPhoneId];
         mDataServiceState = mMSimDataServiceState[mDefaultPhoneId];
         mServiceState = mMSimServiceState[mDefaultPhoneId];
         mSignalStrength = mMSimSignalStrength[mDefaultPhoneId];
@@ -235,14 +242,14 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         //List<SubInfoRecord> subInfoList = SubscriptionManager.getActivatedSubInfoList(context);
         //if (subInfoList != null) {
             //int subCount = subInfoList.size();
-            mSubIdPhoneIdMap = new HashMap<Long, Integer>();
+            mSubIdPhoneIdMap = new HashMap<Integer, Integer>();
             mPhoneCount = TelephonyManager.getDefault().getPhoneCount();
              Slog.d(TAG, "registerPhoneStateListener: " + mPhoneCount);
             mMSimPhoneStateListener = new PhoneStateListener[mPhoneCount];
             for (int i=0; i < mPhoneCount; i++) {
-                long[] subIdtemp = SubscriptionManager.getSubId(i);
+                int[] subIdtemp = SubscriptionManager.getSubId(i);
                 if (subIdtemp != null) {
-                    long subId = subIdtemp[0];
+                    int subId = subIdtemp[0];
                     Slog.d(TAG, "registerPhoneStateListener subId: "+ subId);
                     Slog.d(TAG, "registerPhoneStateListener slotId: "+ i);
                     //if (subInfoList.get(i).mSubId >= 0) {
@@ -276,7 +283,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     }
 
 
-    private int getPhoneId(long subId) {
+    private int getPhoneId(int subId) {
         int phoneId;
         phoneId = SubscriptionManager.getPhoneId(subId);
         Slog.d(TAG, "getPhoneId phoneId: " +phoneId);
@@ -367,7 +374,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                 refreshViews(sub);
             }
         } else if (action.equals(TelephonyIntents.SPN_STRINGS_UPDATED_ACTION)) {
-            final long subId = intent.getLongExtra(PhoneConstants.SUBSCRIPTION_KEY, 0);
+            final int subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY, 0);
             Slog.d(TAG, "Received SPN update on subId :" + subId);
             Integer phoneId = getPhoneId(subId);
             Slog.d(TAG, "Received SPN update on phoneId :" + phoneId);
@@ -490,8 +497,10 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
 
     private void setCarrierText() {
         String carrierName = mCarrierTextSub[PHONE_ID1];
-        for (int i = 1; i < mPhoneCount; i++) {
-            carrierName = carrierName + "    " + mCarrierTextSub[i];
+        if (!mAirplaneMode) {
+            for (int i = 1; i < mPhoneCount; i++) {
+                carrierName = carrierName + "    " + mCarrierTextSub[i];
+            }
         }
 
         if (mContext.getResources().getBoolean(R.bool.config_showDataConnectionView)) {
@@ -511,7 +520,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
 
     // ===== Telephony ==============================================================
 
-    private PhoneStateListener getPhoneStateListener(long subId, int slotId) {
+    private PhoneStateListener getPhoneStateListener(int subId, int slotId) {
         PhoneStateListener mMSimPhoneStateListener = new PhoneStateListener(subId) {
             @Override
             public void onSignalStrengthsChanged(SignalStrength signalStrength) {
@@ -580,15 +589,12 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                     + phoneId + " subid: " + mSubId+ "state=" + state + " type=" + networkType);
                 }
 
-                // DSDS case: Data is active only on DDS. Ignore the Data Connection
+                // DSDS case: Consider the Data Connection
                 // State changed notifications of the other NON-DDS.
                 Slog.d(TAG, "onDataConnectionStateChanged getDefaultDataSubId :" +
                         SubscriptionManager.getDefaultDataSubId());
-                if ( mSubId ==
-                        SubscriptionManager.getDefaultDataSubId()) {
-                    mDataState = state;
-                    mDataNetType = networkType;
-                }
+                mMSimDataState[phoneId] = state;
+                mMSimDataNetType[phoneId] = networkType;
 
                 updateIconSet(phoneId);
                 updateDataNetType(phoneId);
@@ -653,7 +659,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         IccCardConstants.State simState;
         String stateExtra = intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
         // Obtain the phoneId info from intent.
-        //long subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY, 0);
+        //int subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY, 0);
         int phoneId = intent.getIntExtra(PhoneConstants.SLOT_KEY, 0);
         //Integer sub = mSubIdPhoneIdMap.get(subId);
         Slog.d(TAG, "updateSimState for phoneId :" + phoneId);
@@ -814,7 +820,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                         R.string.accessibility_data_connection_4g);
             } else {
                 Slog.d(TAG,"updateDataNetType sub = " + phoneId
-                        + " mDataNetType = " + mDataNetType);
+                        + " mMSimDataNetType = " + mMSimDataNetType[phoneId]);
                 mMSimDataTypeIconId[phoneId] =
                         TelephonyIcons.getDataTypeIcon(phoneId);
                 mMSimContentDescriptionDataType[phoneId] =
@@ -909,7 +915,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         }
 
         Slog.d(TAG,"updateDataIcon  when SimState =" + mMSimState[phoneId]);
-        if (mDataNetType == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+        if (mMSimDataNetType[phoneId] == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
             // If data network type is unknown do not display data icon
             visible = false;
         } else {
@@ -917,7 +923,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             if (mMSimState[phoneId] == IccCardConstants.State.READY ||
                 mMSimState[phoneId] == IccCardConstants.State.UNKNOWN) {
                 mNoSim = false;
-                if (mDataState == TelephonyManager.DATA_CONNECTED) {
+                if (mMSimDataState[phoneId] == TelephonyManager.DATA_CONNECTED) {
                     iconId = TelephonyIcons.getDataActivity(phoneId, mDataActivity);
                     mMSimDataDirectionIconId[phoneId] = iconId;
                 } else {
@@ -1397,14 +1403,14 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         pw.println(mMSimState[phoneId]);
         pw.print("  mPhoneState=");
         pw.println(mPhoneState);
-        pw.print("  mDataState=");
-        pw.println(mDataState);
+        pw.print("  mMSimDataState=");
+        pw.println(mMSimDataState[phoneId]);
         pw.print("  mMSimDataActivity=");
         pw.println(mMSimDataActivity[phoneId]);
-        pw.print("  mDataNetType=");
-        pw.print(mDataNetType);
+        pw.print("  mMSimDataNetType=");
+        pw.print(mMSimDataNetType[phoneId]);
         pw.print("/");
-        pw.println(TelephonyManager.getNetworkTypeName(mDataNetType));
+        pw.println(TelephonyManager.getNetworkTypeName(mMSimDataNetType[phoneId]));
         pw.print("  mMSimServiceState=");
         pw.println(mMSimServiceState[phoneId]);
         pw.print("  mMSimSignalStrength=");
