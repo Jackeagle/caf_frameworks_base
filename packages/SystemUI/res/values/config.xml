@@ -289,5 +289,10 @@
     <integer name="zen_toast_visible_duration">500</integer>
     <!-- Whether to enable data switch or not -->
     <bool name="config_enableDataSwitch">false</bool>
+
+    <bool name="config_enablePerfBoostForShutterAnimation">false</bool>
+    <integer name="shutteranimationboost_timeout_param">0</integer>
+    <integer name="shutteranimationboost_schedboost_param">0</integer>
+    <integer name="shutteranimationboost_cpuboost_param">0</integer>
 </resources>
 
