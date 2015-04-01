@@ -268,10 +268,11 @@ final class DisplayMagnifier {
 
         public MagnifiedViewport() {
             mWindowManager = (WindowManager) mContext.getSystemService(Service.WINDOW_SERVICE);
-            mBorderWidth = (int) TypedValue.applyDimension(
+            float borderWidth = TypedValue.applyDimension(
                     TypedValue.COMPLEX_UNIT_DIP, DEFAUTLT_BORDER_WIDTH_DIP,
                             mContext.getResources().getDisplayMetrics());
-            mHalfBorderWidth = (int) (mBorderWidth + 0.5) / 2;
+            mBorderWidth = (int) borderWidth;
+            mHalfBorderWidth = (int) ((borderWidth + 0.5) / 2);
             mWindow = new ViewportWindow(mContext);
             recomputeBoundsLocked();
         }
