@@ -292,13 +292,14 @@ void ResourceCache::destructorLocked(Res_png_9patch* resource) {
     ssize_t index = mCache->indexOfKey(resource);
     ResourceReference* ref = index >= 0 ? mCache->valueAt(index) : NULL;
     if (ref == NULL) {
+        // If we're not tracking this resource, just delete it
         if (Caches::hasInstance()) {
             Caches::getInstance().patchCache.removeDeferred(resource);
+        } else {
+            // A Res_png_9patch is actually an array of byte that's larger
+            // than sizeof(Res_png_9patch). It must be freed as an array.
+            delete[] (int8_t*) resource;
         }
-        // If we're not tracking this resource, just delete it
-        // A Res_png_9patch is actually an array of byte that's larger
-        // than sizeof(Res_png_9patch). It must be freed as an array.
-        delete[] (int8_t*) resource;
         return;
     }
     ref->destroyed = true;
@@ -380,11 +381,12 @@ void ResourceCache::deleteResourceReferenceLocked(void* resource, ResourceRefere
             case kNinePatch: {
                 if (Caches::hasInstance()) {
                     Caches::getInstance().patchCache.removeDeferred((Res_png_9patch*) resource);
+                } else {
+                    // A Res_png_9patch is actually an array of byte that's larger
+                    // than sizeof(Res_png_9patch). It must be freed as an array.
+                    int8_t* patch = (int8_t*) resource;
+                    delete[] patch;
                 }
-                // A Res_png_9patch is actually an array of byte that's larger
-                // than sizeof(Res_png_9patch). It must be freed as an array.
-                int8_t* patch = (int8_t*) resource;
-                delete[] patch;
             }
             break;
             case kLayer: {
