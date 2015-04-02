@@ -175,6 +175,7 @@ public class Environment {
             return mExternalDirsForApp[0];
         }
 
+        /** @hide */
         public File getSecondaryStorageDirectory() {
             return mExternalDirsForApp[1];
         }
@@ -425,6 +426,7 @@ public class Environment {
         return sCurrentUser.getExternalDirsForApp()[0];
     }
 
+    /** @hide */
     public static File getSecondaryStorageDirectory() {
         throwIfUserRequired();
         return sCurrentUser.getExternalDirsForApp()[1];
@@ -720,6 +722,13 @@ public class Environment {
      */
     public static final String MEDIA_UNMOUNTABLE = "unmountable";
 
+     /**
+     * Storage state if the media is present and in formatting state.
+     *
+     * @hide
+     */
+    public static final String MEDIA_FORMATTING = "formatting";
+
     /**
      * Returns the current state of the primary "external" storage device.
      * 
@@ -743,6 +752,7 @@ public class Environment {
         return getExternalStorageState(path);
     }
 
+    /** @hide */
     public static String getSecondaryStorageState() {
         final File externalDir = sCurrentUser.getExternalDirsForApp()[1];
         return getStorageState(externalDir);
@@ -785,6 +795,7 @@ public class Environment {
         return isExternalStorageRemovable(externalDir);
     }
 
+    /** @hide */
     public static boolean isNoEmulatedStorageExist() {
         final StorageVolume volume = getNoEmulatedVolume();
         return (volume != null);
