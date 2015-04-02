@@ -2341,4 +2341,6 @@
   <java-symbol type="bool" name="config_fdn_contact_search"/>
   <!-- for IMS to CS retry support -->
   <java-symbol type="bool"  name="config_carrier_cs_retry_available" />
+  <java-symbol type="string" name="card_string" />
+
 </resources>
