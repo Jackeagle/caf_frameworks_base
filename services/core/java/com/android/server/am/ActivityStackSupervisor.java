@@ -116,7 +116,6 @@ import java.util.List;
 
 /* Perf */
 import org.codeaurora.Performance;
-import android.os.Trace;
 
 public final class ActivityStackSupervisor implements DisplayListener {
     static final boolean DEBUG = ActivityManagerService.DEBUG || false;
@@ -150,7 +149,6 @@ public final class ActivityStackSupervisor implements DisplayListener {
     public boolean mIsPerfBoostEnabled = false;
     public int lBoostTimeOut = 0;
     public int lBoostCpuBoost = 0;
-    public int lBoostCpuOffline = 0;
     public int lBoostSchedBoost = 0;
     public int lBoostPcDisblBoost = 0;
     public int lBoostKsmBoost = 0;
@@ -324,8 +322,6 @@ public final class ActivityStackSupervisor implements DisplayListener {
                    com.android.internal.R.integer.launchboost_timeout_param);
            lBoostCpuBoost = mService.mContext.getResources().getInteger(
                    com.android.internal.R.integer.launchboost_cpuboost_param);
-           lBoostCpuOffline = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_cpu_6_7_offline_param);
            lBoostPcDisblBoost = mService.mContext.getResources().getInteger(
                    com.android.internal.R.integer.launchboost_pcdisbl_param);
            lBoostKsmBoost = mService.mContext.getResources().getInteger(
@@ -1355,18 +1351,6 @@ public final class ActivityStackSupervisor implements DisplayListener {
                             Display.DEFAULT_DISPLAY : mFocusedStack.mDisplayId) :
                             (container.mActivityDisplay == null ? Display.DEFAULT_DISPLAY :
                                     container.mActivityDisplay.mDisplayId)));
-            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER , "startActivityLocked");
-            /* Acquire perf lock during new app launch */
-            if (mIsPerfBoostEnabled == true && mPerf == null) {
-                mPerf = new Performance();
-            }
-            if (mPerf != null) {
-                mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost,
-                                      lBoostSchedBoost, lBoostCpuBoost,
-                                      lBoostCpuOffline,
-                                      lBoostKsmBoost);
-            }
-            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
 
         ActivityRecord sourceRecord = null;
