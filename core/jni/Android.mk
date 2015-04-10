@@ -22,6 +22,8 @@ endif
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 
 LOCAL_SRC_FILES:= \
+	android_util_SeempLog.cpp \
+	android_util_SeempJavaFilter.cpp \
 	AndroidRuntime.cpp \
 	com_android_internal_content_NativeLibraryHelper.cpp \
 	com_google_android_gles_jni_EGLImpl.cpp \

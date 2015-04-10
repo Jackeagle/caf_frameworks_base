@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.accounts;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -313,6 +318,12 @@ public class AccountManager {
      * @return The account's password, null if none or if the account doesn't exist
      */
     public String getPassword(final Account account) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","getPassword")) {
+            String paras = "AccountManager|getPassword|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             return mService.getPassword(account);
@@ -338,6 +349,13 @@ public class AccountManager {
      * @return The user data, null if the account or key doesn't exist
      */
     public String getUserData(final Account account, final String key) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","getUserData")) {
+            String paras = "AccountManager|getUserData|"
+            + "key," + ((key == null) ? "null" : key) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         if (key == null) throw new IllegalArgumentException("key is null");
         try {
@@ -533,6 +551,12 @@ public class AccountManager {
         if (authTokenType == null) throw new IllegalArgumentException("authTokenType is null");
         return new Future2Task<String>(handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.getAuthTokenLabel(mResponse, accountType, authTokenType);
             }
 
@@ -576,6 +600,12 @@ public class AccountManager {
         if (features == null) throw new IllegalArgumentException("features is null");
         return new Future2Task<Boolean>(handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.hasFeatures(mResponse, account, features);
             }
             public Boolean bundleToResult(Bundle bundle) throws AuthenticatorException {
@@ -620,6 +650,12 @@ public class AccountManager {
         if (type == null) throw new IllegalArgumentException("type is null");
         return new Future2Task<Account[]>(handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.getAccountsByFeatures(mResponse, type, features);
             }
             public Account[] bundleToResult(Bundle bundle) throws AuthenticatorException {
@@ -653,6 +689,13 @@ public class AccountManager {
      *     already exists, the account is null, or another error occurs.
      */
     public boolean addAccountExplicitly(Account account, String password, Bundle userdata) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","addAccountExplicitly")) {
+            String paras = "AccountManager|addAccountExplicitly|"
+            + "password," + ((password == null) ? "null" : password) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             return mService.addAccountExplicitly(account, password, userdata);
@@ -695,6 +738,12 @@ public class AccountManager {
         return new Future2Task<Account>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.renameAccount(mResponse, account, newName);
             }
             @Override
@@ -754,9 +803,21 @@ public class AccountManager {
     @Deprecated
     public AccountManagerFuture<Boolean> removeAccount(final Account account,
             AccountManagerCallback<Boolean> callback, Handler handler) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","removeAccount")) {
+            String paras = "AccountManager|removeAccount|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         return new Future2Task<Boolean>(handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.removeAccount(mResponse, account, false);
             }
             public Boolean bundleToResult(Bundle bundle) throws AuthenticatorException {
@@ -830,6 +891,12 @@ public class AccountManager {
         if (userHandle == null) throw new IllegalArgumentException("userHandle is null");
         return new Future2Task<Boolean>(handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.removeAccountAsUser(mResponse, account, false, userHandle.getIdentifier());
             }
             public Boolean bundleToResult(Bundle bundle) throws AuthenticatorException {
@@ -904,6 +971,14 @@ public class AccountManager {
      * @param authToken The auth token to invalidate, may be null
      */
     public void invalidateAuthToken(final String accountType, final String authToken) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","invalidateAuthToken")) {
+            String paras = "AccountManager|invalidateAuthToken|"
+            + "accountType," + ((accountType == null) ? "null" : accountType) + " "
+            + "authToken," + ((authToken == null) ? "null" : authToken) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (accountType == null) throw new IllegalArgumentException("accountType is null");
         try {
             if (authToken != null) {
@@ -933,6 +1008,13 @@ public class AccountManager {
      *     no auth token is cached or the account does not exist.
      */
     public String peekAuthToken(final Account account, final String authTokenType) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","peekAuthToken")) {
+            String paras = "AccountManager|peekAuthToken|"
+            + "authTokenType," + ((authTokenType == null) ? "null" : authTokenType) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         if (authTokenType == null) throw new IllegalArgumentException("authTokenType is null");
         try {
@@ -959,6 +1041,13 @@ public class AccountManager {
      * @param password The password to set, null to clear the password
      */
     public void setPassword(final Account account, final String password) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","setPassword")) {
+            String paras = "AccountManager|setPassword|"
+            + "password," + ((password == null) ? "null" : password) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             mService.setPassword(account, password);
@@ -983,6 +1072,12 @@ public class AccountManager {
      * @param account The account whose password to clear
      */
     public void clearPassword(final Account account) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","clearPassword")) {
+            String paras = "AccountManager|clearPassword|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             mService.clearPassword(account);
@@ -1008,6 +1103,14 @@ public class AccountManager {
      * @param value The value to set, null to clear this userdata key
      */
     public void setUserData(final Account account, final String key, final String value) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","setUserData")) {
+            String paras = "AccountManager|setUserData|"
+            + "key," + ((key == null) ? "null" : key) + " "
+            + "value," + ((value == null) ? "null" : value) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         if (key == null) throw new IllegalArgumentException("key is null");
         try {
@@ -1035,6 +1138,14 @@ public class AccountManager {
      * @param authToken The auth token to add to the cache
      */
     public void setAuthToken(Account account, final String authTokenType, final String authToken) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","setAuthToken")) {
+            String paras = "AccountManager|setAuthToken|"
+            + "authTokenType," + ((authTokenType == null) ? "null" : authTokenType) + " "
+            + "authToken," + ((authToken == null) ? "null" : authToken) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         if (authTokenType == null) throw new IllegalArgumentException("authTokenType is null");
         try {
@@ -1154,6 +1265,12 @@ public class AccountManager {
         optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
         return new AmsTask(activity, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.getAuthToken(mResponse, account, authTokenType,
                         false /* notifyOnAuthFailure */, true /* expectActivityLaunch */,
                         optionsIn);
@@ -1324,6 +1441,12 @@ public class AccountManager {
         optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
         return new AmsTask(null, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.getAuthToken(mResponse, account, authTokenType,
                         notifyAuthFailure, false /* expectActivityLaunch */, optionsIn);
             }
@@ -1383,6 +1506,14 @@ public class AccountManager {
             final String authTokenType, final String[] requiredFeatures,
             final Bundle addAccountOptions,
             final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","addAccount")) {
+            String paras = "AccountManager|addAccount|"
+            + "accountType," + ((accountType == null) ? "null" : accountType) + " "
+            + "authTokenType," + ((authTokenType == null) ? "null" : authTokenType) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (accountType == null) throw new IllegalArgumentException("accountType is null");
         final Bundle optionsIn = new Bundle();
         if (addAccountOptions != null) {
@@ -1392,6 +1523,12 @@ public class AccountManager {
 
         return new AmsTask(activity, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.addAccount(mResponse, accountType, authTokenType,
                         requiredFeatures, activity != null, optionsIn);
             }
@@ -1416,6 +1553,12 @@ public class AccountManager {
 
         return new AmsTask(activity, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.addAccountAsUser(mResponse, accountType, authTokenType,
                         requiredFeatures, activity != null, optionsIn, userHandle.getIdentifier());
             }
@@ -1566,6 +1709,12 @@ public class AccountManager {
             final Activity activity,
             final AccountManagerCallback<Bundle> callback,
             final Handler handler) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","confirmCredentials")) {
+            String paras = "AccountManager|confirmCredentials|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return confirmCredentialsAsUser(account, options, activity, callback, handler,
                 Process.myUserHandle());
     }
@@ -1584,6 +1733,12 @@ public class AccountManager {
         final int userId = userHandle.getIdentifier();
         return new AmsTask(activity, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.confirmCredentialsAsUser(mResponse, account, options, activity != null,
                         userId);
             }
@@ -1642,9 +1797,22 @@ public class AccountManager {
             final Bundle options, final Activity activity,
             final AccountManagerCallback<Bundle> callback,
             final Handler handler) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","updateCredentials")) {
+            String paras = "AccountManager|updateCredentials|"
+            + "authTokenType," + ((authTokenType == null) ? "null" : authTokenType) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (account == null) throw new IllegalArgumentException("account is null");
         return new AmsTask(activity, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.updateCredentials(mResponse, account, authTokenType, activity != null,
                         options);
             }
@@ -1691,9 +1859,22 @@ public class AccountManager {
     public AccountManagerFuture<Bundle> editProperties(final String accountType,
             final Activity activity, final AccountManagerCallback<Bundle> callback,
             final Handler handler) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManager","editProperties")) {
+            String paras = "AccountManager|editProperties|"
+            + "accountType," + ((accountType == null) ? "null" : accountType) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (accountType == null) throw new IllegalArgumentException("accountType is null");
         return new AmsTask(activity, handler, callback) {
             public void doWork() throws RemoteException {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("AccountManager","doWork")) {
+                    String paras = "AccountManager|doWork|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
                 mService.editProperties(mResponse, accountType, activity != null);
             }
         }.start();
@@ -2049,6 +2230,12 @@ public class AccountManager {
         private volatile int mNumAccounts = 0;
 
         public void doWork() throws RemoteException {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("AccountManager","doWork")) {
+                String paras = "AccountManager|doWork|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             getAccountsByTypeAndFeatures(mAccountType, mFeatures,
                     new AccountManagerCallback<Account[]>() {
                         public void run(AccountManagerFuture<Account[]> future) {

@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.telephony;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import com.android.i18n.phonenumbers.NumberParseException;
 import com.android.i18n.phonenumbers.PhoneNumberUtil;
 import com.android.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
@@ -150,6 +155,12 @@ public class PhoneNumberUtils
      *         <code>null</code> if the number cannot be found.
      */
     public static String getNumberFromIntent(Intent intent, Context context) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("PhoneNumberUtils","getNumberFromIntent")) {
+            String paras = "PhoneNumberUtils|getNumberFromIntent|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         String number = null;
 
         Uri uri = intent.getData();

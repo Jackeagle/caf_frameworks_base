@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.content;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.accounts.Account;
 import android.app.ActivityManagerNative;
 import android.app.ActivityThread;
@@ -419,6 +424,15 @@ public abstract class ContentResolver {
      */
     public final Cursor query(Uri uri, String[] projection,
             String selection, String[] selectionArgs, String sortOrder) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("ContentResolver","query")) {
+            String paras = "ContentResolver|query|"
+            + "uri," + ((uri == null) ? "null" : uri).toString() + " "
+            + "selection," + ((selection == null) ? "null" : selection) + " "
+            + "sortOrder," + ((sortOrder == null) ? "null" : sortOrder) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return query(uri, projection, selection, selectionArgs, sortOrder, null);
     }
 
@@ -459,6 +473,15 @@ public abstract class ContentResolver {
     public final Cursor query(final Uri uri, String[] projection,
             String selection, String[] selectionArgs, String sortOrder,
             CancellationSignal cancellationSignal) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("ContentResolver","query")) {
+            String paras = "ContentResolver|query|"
+            + "uri," + ((uri == null) ? "null" : uri).toString() + " "
+            + "selection," + ((selection == null) ? "null" : selection) + " "
+            + "sortOrder," + ((sortOrder == null) ? "null" : sortOrder) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         IContentProvider unstableProvider = acquireUnstableProvider(uri);
         if (unstableProvider == null) {
             return null;
@@ -1198,6 +1221,13 @@ public abstract class ContentResolver {
      */
     public final Uri insert(Uri url, ContentValues values)
     {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("ContentResolver","insert")) {
+            String paras = "ContentResolver|insert|"
+            + "url," + ((url == null) ? "null" : url).toString() + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         IContentProvider provider = acquireProvider(url);
         if (provider == null) {
             throw new IllegalArgumentException("Unknown URL " + url);

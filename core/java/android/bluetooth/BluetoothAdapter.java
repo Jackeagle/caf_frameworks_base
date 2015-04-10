@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2009-2014 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package android.bluetooth;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.app.ActivityThread;
@@ -435,6 +437,13 @@ public final class BluetoothAdapter {
      * @throws IllegalArgumentException if address is invalid
      */
     public BluetoothDevice getRemoteDevice(String address) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","getRemoteDevice")) {
+            String paras = "android.bluetooth.BluetoothAdapter|getRemoteDevice|"
+            + "address," + ((address == null) ? "null" : address) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return new BluetoothDevice(address);
     }
 
@@ -450,6 +459,12 @@ public final class BluetoothAdapter {
      * @throws IllegalArgumentException if address is invalid
      */
     public BluetoothDevice getRemoteDevice(byte[] address) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","getRemoteDevice")) {
+            String paras = "android.bluetooth.BluetoothAdapter|getRemoteDevice|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (address == null || address.length != 6) {
             throw new IllegalArgumentException("Bluetooth address must have 6 bytes");
         }
@@ -526,6 +541,12 @@ public final class BluetoothAdapter {
      * @return current state of Bluetooth adapter
      */
     public int getState() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","getState")) {
+            String paras = "android.bluetooth.BluetoothAdapter|getState|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             synchronized(mManagerCallback) {
                 if (mService != null)
@@ -570,6 +591,12 @@ public final class BluetoothAdapter {
      *         immediate error
      */
     public boolean enable() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","enable")) {
+            String paras = "android.bluetooth.BluetoothAdapter|enable|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (isEnabled() == true){
             if (DBG) Log.d(TAG, "enable(): BT is already enabled..!");
             return true;
@@ -605,6 +632,12 @@ public final class BluetoothAdapter {
      *         immediate error
      */
     public boolean disable() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","disable")) {
+            String paras = "android.bluetooth.BluetoothAdapter|disable|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         try {
             return mManagerService.disable(true);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
@@ -622,6 +655,12 @@ public final class BluetoothAdapter {
      * @hide
      */
     public boolean disable(boolean persist) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","disable")) {
+            String paras = "android.bluetooth.BluetoothAdapter|disable|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
 
         try {
             return mManagerService.disable(persist);
@@ -842,6 +881,12 @@ public final class BluetoothAdapter {
      * @return true on success, false on error
      */
     public boolean startDiscovery() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","startDiscovery")) {
+            String paras = "android.bluetooth.BluetoothAdapter|startDiscovery|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (getState() != STATE_ON) return false;
         try {
             synchronized(mManagerCallback) {
@@ -1016,6 +1061,12 @@ public final class BluetoothAdapter {
      * @return unmodifiable set of {@link BluetoothDevice}, or null on error
      */
     public Set<BluetoothDevice> getBondedDevices() {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","getBondedDevices")) {
+            String paras = "android.bluetooth.BluetoothAdapter|getBondedDevices|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (getState() != STATE_ON) {
             return toDeviceSet(new BluetoothDevice[0]);
         }
@@ -1067,6 +1118,12 @@ public final class BluetoothAdapter {
      * {@link BluetoothProfile#STATE_DISCONNECTING}
      */
     public int getProfileConnectionState(int profile) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","getProfileConnectionState")) {
+            String paras = "android.bluetooth.BluetoothAdapter|getProfileConnectionState|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (getState() != STATE_ON) return BluetoothProfile.STATE_DISCONNECTED;
         try {
             synchronized(mManagerCallback) {
@@ -1188,6 +1245,13 @@ public final class BluetoothAdapter {
      */
     public BluetoothServerSocket listenUsingInsecureRfcommWithServiceRecord(String name, UUID uuid)
             throws IOException {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("android.bluetooth.BluetoothAdapter","listenUsingInsecureRfcommWithServiceRecord")) {
+            String paras = "android.bluetooth.BluetoothAdapter|listenUsingInsecureRfcommWithServiceRecord|"
+            + "name," + ((name == null) ? "null" : name) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return createNewRfcommSocketAndRecord(name, uuid, false, false);
     }
 

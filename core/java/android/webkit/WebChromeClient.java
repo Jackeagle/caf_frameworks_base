@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +20,8 @@
 package android.webkit;
 
 import android.annotation.SystemApi;
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
@@ -287,7 +292,15 @@ public class WebChromeClient {
      *                 origin.
      */
     public void onGeolocationPermissionsShowPrompt(String origin,
-            GeolocationPermissions.Callback callback) {}
+            GeolocationPermissions.Callback callback) {
+                // Begin: code added for the SeempLog
+                if (SeempJavaFilter.check("WebChromeClient","onGeolocationPermissionsShowPrompt")) {
+                    String paras = "WebChromeClient|onGeolocationPermissionsShowPrompt|"
+                    + "origin," + ((origin == null) ? "null" : origin) + "|--end";
+                    SeempLog.record(paras);
+                }
+                // End: code added for the SeempLog
+            }
 
     /**
      * Notify the host application that a request for Geolocation permissions,

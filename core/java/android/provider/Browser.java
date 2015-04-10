@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.provider;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -236,6 +241,12 @@ public class Browser {
      */
     public static final Cursor getAllBookmarks(ContentResolver cr) throws
             IllegalStateException {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","getAllBookmarks")) {
+            String paras = "Browser|getAllBookmarks|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return cr.query(Bookmarks.CONTENT_URI,
                 new String[] { Bookmarks.URL },
                 Bookmarks.IS_FOLDER + " = 0", null, null);
@@ -251,6 +262,12 @@ public class Browser {
      */
     public static final Cursor getAllVisitedUrls(ContentResolver cr) throws
             IllegalStateException {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","getAllVisitedUrls")) {
+            String paras = "Browser|getAllVisitedUrls|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         return cr.query(Combined.CONTENT_URI,
                 new String[] { Combined.URL }, null, null,
                 Combined.DATE_CREATED + " ASC");
@@ -261,6 +278,13 @@ public class Browser {
     }
 
     private static final Cursor getVisitedLike(ContentResolver cr, String url) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","getVisitedLike")) {
+            String paras = "Browser|getVisitedLike|"
+            + "url," + ((url == null) ? "null" : url) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         boolean secure = false;
         String compareString = url;
         if (compareString.startsWith("http://")) {
@@ -311,6 +335,13 @@ public class Browser {
      */
     public static final void updateVisitedHistory(ContentResolver cr,
                                                   String url, boolean real) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","updateVisitedHistory")) {
+            String paras = "Browser|updateVisitedHistory|"
+            + "url," + ((url == null) ? "null" : url) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         long now = System.currentTimeMillis();
         Cursor c = null;
         try {
@@ -360,6 +391,12 @@ public class Browser {
      *  @hide pending API council approval
      */
     public static final String[] getVisitedHistory(ContentResolver cr) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","getVisitedHistory")) {
+            String paras = "Browser|getVisitedHistory|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         Cursor c = null;
         String[] str = null;
         try {
@@ -395,6 +432,12 @@ public class Browser {
      * @param cr The ContentResolver used to access the database.
      */
     public static final void truncateHistory(ContentResolver cr) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","truncateHistory")) {
+            String paras = "Browser|truncateHistory|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         // TODO make a single request to the provider to do this in a single transaction
         Cursor cursor = null;
         try {
@@ -426,6 +469,12 @@ public class Browser {
      * @return boolean  True if the history can be cleared.
      */
     public static final boolean canClearHistory(ContentResolver cr) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","canClearHistory")) {
+            String paras = "Browser|canClearHistory|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         Cursor cursor = null;
         boolean ret = false;
         try {
@@ -463,6 +512,13 @@ public class Browser {
      *                      null means all items.
      */
     private static final void deleteHistoryWhere(ContentResolver cr, String whereClause) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","deleteHistoryWhere")) {
+            String paras = "Browser|deleteHistoryWhere|"
+            + "whereClause," + ((whereClause == null) ? "null" : whereClause) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         Cursor cursor = null;
         try {
             cursor = cr.query(History.CONTENT_URI, new String[] { History.URL }, whereClause,
@@ -489,6 +545,12 @@ public class Browser {
      */
     public static final void deleteHistoryTimeFrame(ContentResolver cr,
             long begin, long end) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","deleteHistoryTimeFrame")) {
+            String paras = "Browser|deleteHistoryTimeFrame|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         String whereClause;
         String date = BookmarkColumns.DATE;
         if (-1 == begin) {
@@ -514,6 +576,13 @@ public class Browser {
      */
     public static final void deleteFromHistory(ContentResolver cr,
                                                String url) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","deleteFromHistory")) {
+            String paras = "Browser|deleteFromHistory|"
+            + "url," + ((url == null) ? "null" : url) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         cr.delete(History.CONTENT_URI, History.URL + "=?", new String[] { url });
     }
 
@@ -525,6 +594,13 @@ public class Browser {
      * @param search    The string to add to the searches database.
      */
     public static final void addSearchUrl(ContentResolver cr, String search) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","addSearchUrl")) {
+            String paras = "Browser|addSearchUrl|"
+            + "search," + ((search == null) ? "null" : search) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         // The content provider will take care of updating existing searches instead of duplicating
         ContentValues values = new ContentValues();
         values.put(Searches.SEARCH, search);
@@ -538,6 +614,12 @@ public class Browser {
      * @param cr   The ContentResolver used to access the database.
      */
     public static final void clearSearches(ContentResolver cr) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","clearSearches")) {
+            String paras = "Browser|clearSearches|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         // FIXME: Should this clear the urls to which these searches lead?
         // (i.e. remove google.com/query= blah blah blah)
         try {
@@ -560,6 +642,13 @@ public class Browser {
      */
     public static final void requestAllIcons(ContentResolver cr, String where,
             WebIconDatabase.IconListener listener) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("Browser","requestAllIcons")) {
+            String paras = "Browser|requestAllIcons|"
+            + "where," + ((where == null) ? "null" : where) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         // Do nothing: this is no longer used.
     }
 

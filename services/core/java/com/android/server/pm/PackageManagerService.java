@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2006 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package com.android.server.pm;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import static android.Manifest.permission.GRANT_REVOKE_PERMISSIONS;
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
@@ -8073,6 +8075,15 @@ public class PackageManagerService extends IPackageManager.Stub {
     public void installPackage(String originPath, IPackageInstallObserver2 observer,
             int installFlags, String installerPackageName, VerificationParams verificationParams,
             String packageAbiOverride) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("PackageManagerService","installPackage")) {
+            String paras = "PackageManagerService|installPackage|"
+            + "originPath," + ((originPath == null) ? "null" : originPath) + " "
+            + "installerPackageName," + ((installerPackageName == null) ? "null" : installerPackageName) + " "
+            + "packageAbiOverride," + ((packageAbiOverride == null) ? "null" : packageAbiOverride) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         installPackageAsUser(originPath, observer, installFlags, installerPackageName, verificationParams,
                 packageAbiOverride, UserHandle.getCallingUserId());
     }

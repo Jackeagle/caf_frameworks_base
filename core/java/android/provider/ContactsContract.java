@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.provider;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.accounts.Account;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -1489,6 +1494,13 @@ public final class ContactsContract {
          *            {@link #CONTENT_LOOKUP_URI} to attempt refreshing.
          */
         public static Uri getLookupUri(ContentResolver resolver, Uri contactUri) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","getLookupUri")) {
+                String paras = "ContactsContract|getLookupUri|"
+                + "contactUri," + ((contactUri == null) ? "null" : contactUri).toString() + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             final Cursor c = resolver.query(contactUri, new String[] {
                     Contacts.LOOKUP_KEY, Contacts._ID
             }, null, null, null);
@@ -1513,6 +1525,13 @@ public final class ContactsContract {
          * given {@link ContactsContract.Contacts#_ID} and {@link #LOOKUP_KEY}.
          */
         public static Uri getLookupUri(long contactId, String lookupKey) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","getLookupUri")) {
+                String paras = "ContactsContract|getLookupUri|"
+                + "lookupKey," + ((lookupKey == null) ? "null" : lookupKey) + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             return ContentUris.withAppendedId(Uri.withAppendedPath(Contacts.CONTENT_LOOKUP_URI,
                     lookupKey), contactId);
         }
@@ -1523,6 +1542,13 @@ public final class ContactsContract {
          * Returns null if the contact cannot be found.
          */
         public static Uri lookupContact(ContentResolver resolver, Uri lookupUri) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","lookupContact")) {
+                String paras = "ContactsContract|lookupContact|"
+                + "lookupUri," + ((lookupUri == null) ? "null" : lookupUri).toString() + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             if (lookupUri == null) {
                 return null;
             }
@@ -1997,6 +2023,13 @@ public final class ContactsContract {
          */
         public static InputStream openContactPhotoInputStream(ContentResolver cr, Uri contactUri,
                 boolean preferHighres) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","openContactPhotoInputStream")) {
+                String paras = "ContactsContract|openContactPhotoInputStream|"
+                + "contactUri," + ((contactUri == null) ? "null" : contactUri).toString() + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             if (preferHighres) {
                 final Uri displayPhotoUri = Uri.withAppendedPath(contactUri,
                         Contacts.Photo.DISPLAY_PHOTO);
@@ -2044,6 +2077,13 @@ public final class ContactsContract {
          * of the thumbnail the high-res picture is preferred
          */
         public static InputStream openContactPhotoInputStream(ContentResolver cr, Uri contactUri) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","openContactPhotoInputStream")) {
+                String paras = "ContactsContract|openContactPhotoInputStream|"
+                + "contactUri," + ((contactUri == null) ? "null" : contactUri).toString() + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             return openContactPhotoInputStream(cr, contactUri, false);
         }
     }
@@ -2754,6 +2794,13 @@ public final class ContactsContract {
          * entry of the given {@link RawContacts} entry.
          */
         public static Uri getContactLookupUri(ContentResolver resolver, Uri rawContactUri) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","getContactLookupUri")) {
+                String paras = "ContactsContract|getContactLookupUri|"
+                + "rawContactUri," + ((rawContactUri == null) ? "null" : rawContactUri).toString() + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             // TODO: use a lighter query by joining rawcontacts with contacts in provider
             final Uri dataUri = Uri.withAppendedPath(rawContactUri, Data.CONTENT_DIRECTORY);
             final Cursor cursor = resolver.query(dataUri, new String[] {
@@ -4653,6 +4700,13 @@ public final class ContactsContract {
          * </p>
          */
         public static Uri getContactLookupUri(ContentResolver resolver, Uri dataUri) {
+            // Begin: code added for the SeempLog
+            if (SeempJavaFilter.check("ContactsContract","getContactLookupUri")) {
+                String paras = "ContactsContract|getContactLookupUri|"
+                + "dataUri," + ((dataUri == null) ? "null" : dataUri).toString() + "|--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             final Cursor cursor = resolver.query(dataUri, new String[] {
                     RawContacts.CONTACT_ID, Contacts.LOOKUP_KEY
             }, null, null, null);

@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package android.provider;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
@@ -1322,6 +1327,13 @@ public final class Settings {
         /** @hide */
         public static String getStringForUser(ContentResolver resolver, String name,
                 int userHandle) {
+            // Begin: code added for the SeempLog
+            String logName = getFieldNameFromValue(name);
+            if (SeempJavaFilter.check("android.provider.Settings", "get<" + logName + ">")) {
+                String paras = "android.provider.Settings|get<" + logName + ">||--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -1349,6 +1361,13 @@ public final class Settings {
         /** @hide */
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
                 int userHandle) {
+            // Begin: code added for the SeempLog
+            String logName = getFieldNameFromValue(name);
+            if (SeempJavaFilter.check("android.provider.Settings", "put<" + logName + ">")) {
+                String paras = "android.provider.Settings|put<" + logName + ">||--end";
+                SeempLog.record(paras);
+            }
+            // End: code added for the SeempLog
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -7378,5 +7397,227 @@ public final class Settings {
      */
     public static String getGTalkDeviceId(long androidId) {
         return "android-" + Long.toHexString(androidId);
+    }
+
+    /**
+     * Hashmap data structure for settings values
+     */
+    private final static java.util.Map<String,String> stringMap;
+    static {
+        stringMap = new java.util.HashMap<String,String>(208);
+        stringMap.put(System.NOTIFICATION_SOUND,
+                "NOTIFICATION_SOUND");
+        stringMap.put(System.DTMF_TONE_WHEN_DIALING,
+                "DTMF_TONE_WHEN_DIALING");
+        stringMap.put(System.LOCK_PATTERN_ENABLED,
+                "LOCK_PATTERN_ENABLED");
+        stringMap.put(System.WIFI_MAX_DHCP_RETRY_COUNT,
+                "WIFI_MAX_DHCP_RETRY_COUNT");
+        stringMap.put(System.AUTO_TIME,
+                "AUTO_TIME");
+        stringMap.put(System.SETUP_WIZARD_HAS_RUN,
+                "SETUP_WIZARD_HAS_RUN");
+        stringMap.put(System.SYS_PROP_SETTING_VERSION,
+                "SYS_PROP_SETTING_VERSION");
+        stringMap.put(System.WIFI_WATCHDOG_BACKGROUND_CHECK_TIMEOUT_MS,
+                "WIFI_WATCHDOG_BACKGROUND_CHECK_TIMEOUT_MS");
+        stringMap.put(System.LOCATION_PROVIDERS_ALLOWED,
+                "LOCATION_PROVIDERS_ALLOWED");
+        stringMap.put(System.ALARM_ALERT,
+                "ALARM_ALERT");
+        stringMap.put(System.VIBRATE_ON,
+                "VIBRATE_ON");
+        stringMap.put(System.USB_MASS_STORAGE_ENABLED,
+                "USB_MASS_STORAGE_ENABLED");
+        stringMap.put(System.WIFI_WATCHDOG_PING_DELAY_MS,
+                "WIFI_WATCHDOG_PING_DELAY_MS");
+        stringMap.put(System.FONT_SCALE,
+                "FONT_SCALE");
+        stringMap.put(System.WIFI_WATCHDOG_AP_COUNT,
+                "WIFI_WATCHDOG_AP_COUNT");
+        stringMap.put(System.ALWAYS_FINISH_ACTIVITIES,
+                "ALWAYS_FINISH_ACTIVITIES");
+        stringMap.put(System.ACCELEROMETER_ROTATION,
+                "ACCELEROMETER_ROTATION");
+        stringMap.put(System.WIFI_WATCHDOG_PING_TIMEOUT_MS,
+                "WIFI_WATCHDOG_PING_TIMEOUT_MS");
+        stringMap.put(System.VOLUME_NOTIFICATION,
+                "VOLUME_NOTIFICATION");
+        stringMap.put(System.AIRPLANE_MODE_ON,
+                "AIRPLANE_MODE_ON");
+        stringMap.put(System.WIFI_WATCHDOG_BACKGROUND_CHECK_DELAY_MS,
+                "WIFI_WATCHDOG_BACKGROUND_CHECK_DELAY_MS");
+        stringMap.put(System.WIFI_STATIC_IP,
+                "WIFI_STATIC_IP");
+        stringMap.put(System.RADIO_BLUETOOTH,
+                "RADIO_BLUETOOTH");
+        stringMap.put(System.BLUETOOTH_DISCOVERABILITY_TIMEOUT,
+                "BLUETOOTH_DISCOVERABILITY_TIMEOUT");
+        stringMap.put(System.VOLUME_RING,
+                "VOLUME_RING");
+        stringMap.put(System.MODE_RINGER_STREAMS_AFFECTED,
+                "MODE_RINGER_STREAMS_AFFECTED");
+        stringMap.put(System.VOLUME_SYSTEM,
+                "VOLUME_SYSTEM");
+        stringMap.put(System.SCREEN_OFF_TIMEOUT,
+                "SCREEN_OFF_TIMEOUT");
+        stringMap.put(System.RADIO_WIFI,
+                "RADIO_WIFI");
+        stringMap.put(System.AUTO_TIME_ZONE,
+                "AUTO_TIME_ZONE");
+        stringMap.put(System.TEXT_AUTO_CAPS,
+                "TEXT_AUTO_CAPS");
+        stringMap.put(System.WALLPAPER_ACTIVITY,
+                "WALLPAPER_ACTIVITY");
+        stringMap.put(System.ANIMATOR_DURATION_SCALE,
+                "ANIMATOR_DURATION_SCALE");
+        stringMap.put(System.WIFI_NUM_OPEN_NETWORKS_KEPT,
+                "WIFI_NUM_OPEN_NETWORKS_KEPT");
+        stringMap.put(System.LOCK_PATTERN_VISIBLE,
+                "LOCK_PATTERN_VISIBLE");
+        stringMap.put(System.VOLUME_VOICE,
+                "VOLUME_VOICE");
+        stringMap.put(System.DEBUG_APP,
+                "DEBUG_APP");
+        stringMap.put(System.WIFI_ON,
+                "WIFI_ON");
+        stringMap.put(System.TEXT_SHOW_PASSWORD,
+                "TEXT_SHOW_PASSWORD");
+        stringMap.put(System.WIFI_NETWORKS_AVAILABLE_REPEAT_DELAY,
+                "WIFI_NETWORKS_AVAILABLE_REPEAT_DELAY");
+        stringMap.put(System.WIFI_SLEEP_POLICY,
+                "WIFI_SLEEP_POLICY");
+        stringMap.put(System.VOLUME_MUSIC,
+                "VOLUME_MUSIC");
+        stringMap.put(System.PARENTAL_CONTROL_LAST_UPDATE,
+                "PARENTAL_CONTROL_LAST_UPDATE");
+        stringMap.put(System.DEVICE_PROVISIONED,
+                "DEVICE_PROVISIONED");
+        stringMap.put(System.HTTP_PROXY,
+                "HTTP_PROXY");
+        stringMap.put(System.ANDROID_ID,
+                "ANDROID_ID");
+        stringMap.put(System.WIFI_WATCHDOG_MAX_AP_CHECKS,
+                "WIFI_WATCHDOG_MAX_AP_CHECKS");
+        stringMap.put(System.END_BUTTON_BEHAVIOR,
+                "END_BUTTON_BEHAVIOR");
+        stringMap.put(System.NEXT_ALARM_FORMATTED,
+                "NEXT_ALARM_FORMATTED");
+        stringMap.put(System.RADIO_CELL,
+                "RADIO_CELL");
+        stringMap.put(System.PARENTAL_CONTROL_ENABLED,
+                "PARENTAL_CONTROL_ENABLED");
+        stringMap.put(System.BLUETOOTH_ON,
+                "BLUETOOTH_ON");
+        stringMap.put(System.WINDOW_ANIMATION_SCALE,
+                "WINDOW_ANIMATION_SCALE");
+        stringMap.put(System.WIFI_WATCHDOG_BACKGROUND_CHECK_ENABLED,
+                "WIFI_WATCHDOG_BACKGROUND_CHECK_ENABLED");
+        stringMap.put(System.BLUETOOTH_DISCOVERABILITY,
+                "BLUETOOTH_DISCOVERABILITY");
+        stringMap.put(System.WIFI_STATIC_DNS1,
+                "WIFI_STATIC_DNS1");
+        stringMap.put(System.WIFI_STATIC_DNS2,
+                "WIFI_STATIC_DNS2");
+        stringMap.put(System.HAPTIC_FEEDBACK_ENABLED,
+                "HAPTIC_FEEDBACK_ENABLED");
+        stringMap.put(System.SHOW_WEB_SUGGESTIONS,
+                "SHOW_WEB_SUGGESTIONS");
+        stringMap.put(System.PARENTAL_CONTROL_REDIRECT_URL,
+                "PARENTAL_CONTROL_REDIRECT_URL");
+        stringMap.put(System.DATE_FORMAT,
+                "DATE_FORMAT");
+        stringMap.put(System.RADIO_NFC,
+                "RADIO_NFC");
+        stringMap.put(System.AIRPLANE_MODE_RADIOS,
+                "AIRPLANE_MODE_RADIOS");
+        stringMap.put(System.LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED,
+                "LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED");
+        stringMap.put(System.TIME_12_24,
+                "TIME_12_24");
+        stringMap.put(System.WIFI_WATCHDOG_INITIAL_IGNORED_PING_COUNT,
+                "WIFI_WATCHDOG_INITIAL_IGNORED_PING_COUNT");
+        stringMap.put(System.VOLUME_BLUETOOTH_SCO,
+                "VOLUME_BLUETOOTH_SCO");
+        stringMap.put(System.USER_ROTATION,
+                "USER_ROTATION");
+        stringMap.put(System.WIFI_STATIC_GATEWAY,
+                "WIFI_STATIC_GATEWAY");
+        stringMap.put(System.STAY_ON_WHILE_PLUGGED_IN,
+                "STAY_ON_WHILE_PLUGGED_IN");
+        stringMap.put(System.SOUND_EFFECTS_ENABLED,
+                "SOUND_EFFECTS_ENABLED");
+        stringMap.put(System.WIFI_WATCHDOG_PING_COUNT,
+                "WIFI_WATCHDOG_PING_COUNT");
+        stringMap.put(System.DATA_ROAMING,
+                "DATA_ROAMING");
+        stringMap.put(System.SETTINGS_CLASSNAME,
+                "SETTINGS_CLASSNAME");
+        stringMap.put(System.TRANSITION_ANIMATION_SCALE,
+                "TRANSITION_ANIMATION_SCALE");
+        stringMap.put(System.WAIT_FOR_DEBUGGER,
+                "WAIT_FOR_DEBUGGER");
+        stringMap.put(System.INSTALL_NON_MARKET_APPS,
+                "INSTALL_NON_MARKET_APPS");
+        stringMap.put(System.ADB_ENABLED,
+                "ADB_ENABLED");
+        stringMap.put(System.WIFI_USE_STATIC_IP,
+                "WIFI_USE_STATIC_IP");
+        stringMap.put(System.DIM_SCREEN,
+                "DIM_SCREEN");
+        stringMap.put(System.VOLUME_ALARM,
+                "VOLUME_ALARM");
+        stringMap.put(System.WIFI_WATCHDOG_ON,
+                "WIFI_WATCHDOG_ON");
+        stringMap.put(System.WIFI_STATIC_NETMASK,
+                "WIFI_STATIC_NETMASK");
+        stringMap.put(System.NETWORK_PREFERENCE,
+                "NETWORK_PREFERENCE");
+        stringMap.put(System.SHOW_PROCESSES,
+                "SHOW_PROCESSES");
+        stringMap.put(System.TEXT_AUTO_REPLACE,
+                "TEXT_AUTO_REPLACE");
+        stringMap.put(System.WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
+                "WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON");
+        stringMap.put(System.APPEND_FOR_LAST_AUDIBLE,
+                "APPEND_FOR_LAST_AUDIBLE");
+        stringMap.put(System.SHOW_GTALK_SERVICE_STATUS,
+                "SHOW_GTALK_SERVICE_STATUS");
+        stringMap.put(System.SCREEN_BRIGHTNESS,
+                "SCREEN_BRIGHTNESS");
+        stringMap.put(System.USE_GOOGLE_MAIL,
+                "USE_GOOGLE_MAIL");
+        stringMap.put(System.RINGTONE,
+                "RINGTONE");
+        stringMap.put(System.LOGGING_ID,
+                "LOGGING_ID");
+        stringMap.put(System.MODE_RINGER,
+                "MODE_RINGER");
+        stringMap.put(System.MUTE_STREAMS_AFFECTED,
+                "MUTE_STREAMS_AFFECTED");
+        stringMap.put(System.WIFI_WATCHDOG_ACCEPTABLE_PACKET_LOSS_PERCENTAGE,
+                "WIFI_WATCHDOG_ACCEPTABLE_PACKET_LOSS_PERCENTAGE");
+        stringMap.put(System.TEXT_AUTO_PUNCTUATE,
+                "TEXT_AUTO_PUNCTUATE");
+        stringMap.put(System.WIFI_MOBILE_DATA_TRANSITION_WAKELOCK_TIMEOUT_MS,
+                "WIFI_MOBILE_DATA_TRANSITION_WAKELOCK_TIMEOUT_MS");
+        stringMap.put(System.SCREEN_BRIGHTNESS_MODE,
+                "SCREEN_BRIGHTNESS_MODE");
+    }
+
+    /**
+     * Returns the field name for a string value.
+     *
+     * @param v The string setting value.
+     * @return The corresponding field name for the input string.
+     */
+    private static String getFieldNameFromValue( String value )
+    {
+        String result = stringMap.get( value );
+        if (result == null)
+        {
+            result = "UNKNOWN";
+        }
+        return result;
     }
 }

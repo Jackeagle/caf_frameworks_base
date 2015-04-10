@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
+ *
  * Copyright (C) 2009 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +19,8 @@
 
 package com.android.server.accounts;
 
+import android.util.SeempLog;
+import android.util.SeempJavaFilter;
 import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountAndUser;
@@ -497,6 +502,12 @@ public class AccountManagerService
 
     @Override
     public String getPassword(Account account) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","getPassword")) {
+            String paras = "AccountManagerService|getPassword|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "getPassword: " + account
                     + ", caller's uid " + Binder.getCallingUid()
@@ -588,6 +599,13 @@ public class AccountManagerService
 
     @Override
     public String getUserData(Account account, String key) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","getUserData")) {
+            String paras = "AccountManagerService|getUserData|"
+            + "key," + ((key == null) ? "null" : key) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "getUserData: " + account
                     + ", key " + key
@@ -1049,6 +1067,12 @@ public class AccountManagerService
     @Override
     public void removeAccount(IAccountManagerResponse response, Account account,
             boolean expectActivityLaunch) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","removeAccount")) {
+            String paras = "AccountManagerService|removeAccount|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "removeAccount: " + account
                     + ", response " + response
@@ -1393,6 +1417,13 @@ public class AccountManagerService
 
     @Override
     public void setPassword(Account account, String password) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","setPassword")) {
+            String paras = "AccountManagerService|setPassword|"
+            + "password," + ((password == null) ? "null" : password) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "setAuthToken: " + account
                     + ", caller's uid " + Binder.getCallingUid()
@@ -1442,6 +1473,12 @@ public class AccountManagerService
 
     @Override
     public void clearPassword(Account account) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","clearPassword")) {
+            String paras = "AccountManagerService|clearPassword|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "clearPassword: " + account
                     + ", caller's uid " + Binder.getCallingUid()
@@ -1460,6 +1497,14 @@ public class AccountManagerService
 
     @Override
     public void setUserData(Account account, String key, String value) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","setUserData")) {
+            String paras = "AccountManagerService|setUserData|"
+            + "key," + ((key == null) ? "null" : key) + " "
+            + "value," + ((value == null) ? "null" : value) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "setUserData: " + account
                     + ", key " + key
@@ -1797,6 +1842,14 @@ public class AccountManagerService
     public void addAccount(final IAccountManagerResponse response, final String accountType,
             final String authTokenType, final String[] requiredFeatures,
             final boolean expectActivityLaunch, final Bundle optionsIn) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","addAccount")) {
+            String paras = "AccountManagerService|addAccount|"
+            + "accountType," + ((accountType == null) ? "null" : accountType) + " "
+            + "authTokenType," + ((authTokenType == null) ? "null" : authTokenType) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "addAccount: accountType " + accountType
                     + ", response " + response
@@ -2031,6 +2084,13 @@ public class AccountManagerService
     @Override
     public void editProperties(IAccountManagerResponse response, final String accountType,
             final boolean expectActivityLaunch) {
+        // Begin: code added for the SeempLog
+        if (SeempJavaFilter.check("AccountManagerService","editProperties")) {
+            String paras = "AccountManagerService|editProperties|"
+            + "accountType," + ((accountType == null) ? "null" : accountType) + "|--end";
+            SeempLog.record(paras);
+        }
+        // End: code added for the SeempLog
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "editProperties: accountType " + accountType
                     + ", response " + response
