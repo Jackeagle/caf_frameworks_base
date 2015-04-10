@@ -723,8 +723,13 @@ public class MediaSessionService extends SystemService implements Monitor {
                 synchronized (mLock) {
                     // If we don't have a media button receiver to fall back on
                     // include non-playing sessions for dispatching
-                    boolean useNotPlayingSessions = mUserRecords.get(
-                            ActivityManager.getCurrentUser()).mLastMediaButtonReceiver == null;
+                    boolean useNotPlayingSessions = true;
+                    //handle null pointer exception if mUserRecords.get returns null
+                    //use non-playing sessions by default for dispatching MediaKey events
+                    UserRecord user = mUserRecords.get(ActivityManager.getCurrentUser());
+                    if (user != null){
+                        useNotPlayingSessions = user.mLastMediaButtonReceiver == null;
+                    }
                     MediaSessionRecord session = mPriorityStack
                             .getDefaultMediaButtonSession(mCurrentUserId, useNotPlayingSessions);
                     if (isVoiceKey(keyEvent.getKeyCode())) {
