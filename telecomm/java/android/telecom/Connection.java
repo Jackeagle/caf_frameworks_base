@@ -377,6 +377,11 @@ public abstract class Connection implements IConferenceable {
          */
         public static final int SESSION_MODIFY_REQUEST_TIMED_OUT = 4;
 
+        /**
+         * Session modify request ignored due to invalid parameters.
+         */
+        public static final int SESSION_MODIFY_REQUEST_REJECTED_BY_REMOTE = 5;
+
         private static final int MSG_SET_VIDEO_CALLBACK = 1;
         private static final int MSG_SET_CAMERA = 2;
         private static final int MSG_SET_PREVIEW_SURFACE = 3;
@@ -657,7 +662,7 @@ public abstract class Connection implements IConferenceable {
          *
          * @param dataUsage The updated data usage.
          */
-        public void changeCallDataUsage(long dataUsage) {
+        public void changeCallDataUsage(int dataUsage) {
             if (mVideoCallback != null) {
                 try {
                     mVideoCallback.changeCallDataUsage(dataUsage);
@@ -1429,6 +1434,12 @@ public abstract class Connection implements IConferenceable {
     public void onDisconnect() {}
 
     /**
+     * Notifies this Connection of a request to disconnect with reason.
+     * {@hide}
+     */
+    public void onDisconnectWithReason(int disconnectCause) {}
+
+    /**
      * Notifies this Connection of a request to disconnect a participant of the conference managed
      * by the connection.
      *
@@ -1486,6 +1497,13 @@ public abstract class Connection implements IConferenceable {
      * a request to reject.
      */
     public void onReject() {}
+
+    /**
+     * Notifies this Connection, which is in {@link State#RINGING}, of
+     * a request to reject with reason.
+     * {@hide}
+     */
+    public void onRejectWithReason(int disconnectCause) {}
 
     /**
      * Notifies this Connection whether the user wishes to proceed with the post-dial DTMF codes.
