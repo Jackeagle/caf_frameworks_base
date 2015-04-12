@@ -828,11 +828,6 @@ static void android_view_GLES20Canvas_drawLayer(JNIEnv* env, jobject clazz,
 static jboolean android_view_GLES20Canvas_isAvailable(JNIEnv* env, jobject clazz) {
 #ifdef USE_OPENGL_RENDERER
     char prop[PROPERTY_VALUE_MAX];
-    property_get("persist.sys.force_sw_gles", prop, "0");
-    if (atoi(prop) == 1) {
-        return JNI_FALSE;
-    }
-
     if (property_get("ro.kernel.qemu", prop, NULL) == 0) {
         // not in the emulator
         return JNI_TRUE;
