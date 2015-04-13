@@ -1861,8 +1861,8 @@ com.android.okhttp.CacheControl
 com.android.okhttp.ConfigAwareConnectionPool
 com.android.okhttp.ConfigAwareConnectionPool$1
 com.android.okhttp.Connection
-#com.android.okhttp.ConnectionPool
-#com.android.okhttp.ConnectionPool$1
+com.android.okhttp.ConnectionPool
+com.android.okhttp.ConnectionPool$1
 com.android.okhttp.Dispatcher
 com.android.okhttp.Handshake
 com.android.okhttp.Headers
