@@ -929,7 +929,7 @@ public class TelecomManager {
      * Returns current active subscription.
      * @hide
      */
-    public long getActiveSubscription() {
+    public int getActiveSubscription() {
         try {
             if (isServiceConnected()) {
                 return getTelecomService().getActiveSubscription();
@@ -944,7 +944,7 @@ public class TelecomManager {
      * switches to other active subscription.
      * @hide
      */
-    public void switchToOtherActiveSub(long subId) {
+    public void switchToOtherActiveSub(int subId) {
         try {
             if (isServiceConnected()) {
                 getTelecomService().switchToOtherActiveSub(subId);
