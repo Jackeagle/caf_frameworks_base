@@ -2732,6 +2732,25 @@ public final class ActivityStackSupervisor implements DisplayListener {
                 }
                 final ActivityRecord ar = stack.findTaskLocked(r);
                 if (ar != null) {
+                    /**
+                     * We have found an activity record from a previous launch.
+                     * We check if the process record ar.app is present, meaning
+                     * that we have already launched the app before, and we
+                     * dont need to enable sched_boost.
+                     * If it doesn't exist, its because the app was killed by LMK
+                     * or AM activity limit. Sched_boost is required for such a
+                     * full launch.
+                     */
+                    if (ar.app == null) {
+                        /* Acquire perf lock during new app launch */
+                        if (mIsPerfBoostEnabled == true && mPerf == null) {
+                            mPerf = new Performance();
+                        }
+                        if (mPerf != null) {
+                            mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
+                                                  lBoostCpuBoost, lBoostKsmBoost);
+                        }
+                    }
                     return ar;
                 }
             }
