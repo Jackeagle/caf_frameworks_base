@@ -2639,6 +2639,8 @@ public final class ActivityStackSupervisor implements DisplayListener {
 
     ActivityRecord findTaskLocked(ActivityRecord r) {
         if (DEBUG_TASKS) Slog.d(TAG, "Looking for task of " + r);
+        /* Delay Binder Explicit GC during application launch */
+        BinderInternal.modifyDelayedGcParams();
         for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
             final ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks;
             for (int stackNdx = stacks.size() - 1; stackNdx >= 0; --stackNdx) {
@@ -2654,6 +2656,25 @@ public final class ActivityStackSupervisor implements DisplayListener {
                 }
                 final ActivityRecord ar = stack.findTaskLocked(r);
                 if (ar != null) {
+                    /**
+                     * We have found an activity record from a previous launch.
+                     * We check if the process record ar.app is present, meaning
+                     * that we have already launched the app before, and we
+                     * dont need to enable sched_boost.
+                     * If it doesn't exist, its because the app was killed by LMK
+                     * or AM activity limit. Sched_boost is required for such a
+                     * full launch.
+                     */
+                    if (ar.app == null) {
+                        /* Acquire perf lock during new app launch */
+                        if (mIsPerfBoostEnabled == true && mPerf == null) {
+                            mPerf = new Performance();
+                        }
+                        if (mPerf != null) {
+                            mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
+                                                  lBoostCpuBoost, lBoostKsmBoost);
+                        }
+                    }
                     return ar;
                 }
             }
@@ -2666,8 +2687,6 @@ public final class ActivityStackSupervisor implements DisplayListener {
             mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
                                   lBoostCpuBoost, lBoostKsmBoost);
         }
-        /* Delay Binder Explicit GC during application launch */
-        BinderInternal.modifyDelayedGcParams();
 
         if (DEBUG_TASKS) Slog.d(TAG, "No task found");
         return null;
