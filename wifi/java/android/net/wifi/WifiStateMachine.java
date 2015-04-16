@@ -3576,7 +3576,11 @@ public class WifiStateMachine extends StateMachine {
                         NetworkUpdateResult result = mWifiConfigStore.saveNetwork(config);
                         netId = result.getNetworkId();
                     }
-
+                    if (mInDelayedStop) {
+                        replyToMessage(message, WifiManager.CONNECT_NETWORK_FAILED,
+                               WifiManager.ERROR);
+                        break;
+                    }
                     if (mWifiConfigStore.selectNetwork(netId) &&
                             mWifiNative.reconnect()) {
                         /* The state tracker handles enabling networks upon completion/failure */
