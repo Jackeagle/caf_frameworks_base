@@ -1,4 +1,32 @@
 /*
+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of The Linux Foundation nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
  * Copyright 2014 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,18 +116,30 @@ private:
     tv_input_device_t* mDevice;
     int mDeviceId;
     tv_stream_t mStream;
-    sp<ANativeWindowBuffer_t> mBuffer;
-    enum {
-        CAPTURING,
-        CAPTURED,
-        RELEASED,
-    } mBufferState;
+    int mHoldBufCount;
+
+    enum  BufferState {
+           CAPTURE,
+           RELEASED,
+       };
+
+    struct BufferEntry {
+       sp<ANativeWindowBuffer_t> buffer;
+       enum BufferState bufferState;
+       uint32_t seqNum;
+    };
+
+    struct BufferEntry* mBuffers;
+    uint32_t mReleasedBufCnt;
+    bool mStartUp;
     uint32_t mSeq;
     bool mShutdown;
 
     virtual bool threadLoop();
 
     void setSurfaceLocked(const sp<Surface>& surface);
+    int findBufferIndex(uint32_t seq);
+    int findBufferIndex(buffer_handle_t buffer);
 };
 
 BufferProducerThread::BufferProducerThread(
@@ -107,8 +147,10 @@ BufferProducerThread::BufferProducerThread(
     : Thread(false),
       mDevice(device),
       mDeviceId(deviceId),
-      mBuffer(NULL),
-      mBufferState(RELEASED),
+      mHoldBufCount(0),
+      mBuffers(NULL),
+      mReleasedBufCnt(0),
+      mStartUp(true),
       mSeq(0u),
       mShutdown(false) {
     memcpy(&mStream, stream, sizeof(mStream));
@@ -125,9 +167,37 @@ status_t BufferProducerThread::readyToRun() {
     if (err != NO_ERROR) {
         return err;
     }
+    err = native_window_set_scaling_mode(anw.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_CROP);
+    if (err != NO_ERROR) {
+        return err;
+    }
     err = native_window_set_buffers_format(anw.get(), mStream.buffer_producer.format);
     if (err != NO_ERROR) {
         return err;
+    }
+    err = native_window_set_buffer_count(anw.get(), mStream.buffer_producer.buffer_count);
+    if (err != NO_ERROR) {
+        return err;
+    }
+    err = anw->query(anw.get(), NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &mHoldBufCount);
+    if (err != NO_ERROR) {
+        return err;
+    }
+
+    for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
+    {
+        ANativeWindowBuffer_t* buffer = NULL;
+        err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
+        if (err != NO_ERROR) {
+            ALOGE("error %d while dequeueing buffer to surface", err);
+            break;
+        }
+        mSeq++;
+        mBuffers[k].buffer = buffer;
+        mBuffers[k].bufferState = CAPTURE;
+        mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
+                                    mBuffers[k].buffer->handle, mSeq);
+        mBuffers[k].seqNum = mSeq;
     }
     return NO_ERROR;
 }
@@ -142,18 +212,38 @@ void BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
         return;
     }
 
-    if (mBufferState == CAPTURING) {
-        mDevice->cancel_capture(mDevice, mDeviceId, mStream.stream_id, mSeq);
-    }
-    while (mBufferState == CAPTURING) {
-        status_t err = mCondition.waitRelative(mLock, s2ns(1));
-        if (err != NO_ERROR) {
-            ALOGE("error %d while wating for buffer state to change.", err);
-            break;
+    if (NULL != surface.get()) {
+        mBuffers = new struct BufferEntry[mStream.buffer_producer.buffer_count];
+        if (!mBuffers){
+            ALOGE("Buffers malloc failed");
+            return;
+        }
+        else
+        {
+            for (uint32_t idx = 0; idx < mStream.buffer_producer.buffer_count; idx++)
+            {
+                mBuffers[idx].bufferState = RELEASED;
+            }
         }
     }
-    mBuffer.clear();
-    mBufferState = RELEASED;
+    for (uint32_t idx = 0; idx < mStream.buffer_producer.buffer_count; idx++)
+    {
+       if (CAPTURE == mBuffers[idx].bufferState)
+       {
+           mDevice->cancel_capture(mDevice, mDeviceId, mStream.stream_id, mBuffers[idx].seqNum);
+
+           while (CAPTURE == mBuffers[idx].bufferState)
+           {
+              status_t err = mCondition.waitRelative(mLock, s2ns(1));
+              if (err != NO_ERROR) {
+                  ALOGE("error %d while wating for buffer state to change.", err);
+                  break;
+              }
+           }
+           mBuffers[idx].bufferState = RELEASED;
+           mBuffers[idx].buffer.clear();
+       }
+    }
 
     mSurface = surface;
     mCondition.broadcast();
@@ -161,17 +251,33 @@ void BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
 
 void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
     Mutex::Autolock autoLock(&mLock);
-    if (seq != mSeq) {
-        ALOGW("Incorrect sequence value: expected %u actual %u", mSeq, seq);
+    sp<ANativeWindow> anw(mSurface);
+
+    sp<ANativeWindowBuffer_t> nwBuffer = NULL;
+    int idx = findBufferIndex(seq);
+    if (-1 == idx)
+    {
+       ALOGE("cannot find buffer with seq num = 0x%x in buffer list", seq);
+       return;
     }
-    if (mBufferState != CAPTURING) {
-        ALOGW("mBufferState != CAPTURING : instead %d", mBufferState);
+    if (mBuffers[idx].bufferState == CAPTURE)
+    {
+        mBuffers[idx].bufferState = RELEASED;
+        if (succeeded) {
+            nwBuffer = mBuffers[idx].buffer;
+            status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
+            if (err != NO_ERROR) {
+                ALOGE("error %d while queueing buffer to surface", err);
+            }
+            else
+            {
+                mReleasedBufCnt++;
+            }
+        }
     }
-    if (succeeded) {
-        mBufferState = CAPTURED;
-    } else {
-        mBuffer.clear();
-        mBufferState = RELEASED;
+    else
+    {
+       ALOGE("incorrect buffer state for buffer = 0x%x", nwBuffer->handle);
     }
     mCondition.broadcast();
 }
@@ -179,51 +285,137 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
 void BufferProducerThread::shutdown() {
     Mutex::Autolock autoLock(&mLock);
     mShutdown = true;
-    setSurfaceLocked(NULL);
+    {
+        Mutex::Autolock autoLock(&mLock);
+        setSurfaceLocked(NULL);
+        mCondition.broadcast();
+    }
     requestExitAndWait();
+    if (mBuffers)
+    {
+        Mutex::Autolock autoLock(&mLock);
+
+        for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
+        {
+           if (mBuffers[k].buffer.get())
+           {
+              mBuffers[k].buffer.clear();
+           }
+        }
+        delete mBuffers;
+        mBuffers = NULL;
+    }
+}
+
+int BufferProducerThread::findBufferIndex(uint32_t seq)
+{
+   int index = -1;
+
+   for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
+   {
+      if (mBuffers[k].seqNum == seq)
+      {
+         index = k;
+         break;
+      }
+   }
+   return index;
+}
+
+int BufferProducerThread::findBufferIndex(buffer_handle_t buffer)
+{
+   int index = -1;
+   native_handle_t *h = (native_handle_t *)buffer;
+
+   for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
+   {
+      if (((native_handle_t *)mBuffers[k].buffer->handle)->data[0] == h->data[0])
+      {
+         index = k;
+         break;
+      }
+   }
+   return index;
 }
 
 bool BufferProducerThread::threadLoop() {
-    Mutex::Autolock autoLock(&mLock);
 
     status_t err = NO_ERROR;
-    if (mSurface == NULL) {
-        err = mCondition.waitRelative(mLock, s2ns(1));
-        // It's OK to time out here.
-        if (err != NO_ERROR && err != TIMED_OUT) {
-            ALOGE("error %d while wating for non-null surface to be set", err);
-            return false;
-        }
+
+    if (mShutdown)
+    {
+        usleep(1000);
         return true;
     }
-    sp<ANativeWindow> anw(mSurface);
-    while (mBufferState == CAPTURING) {
-        err = mCondition.waitRelative(mLock, s2ns(1));
-        if (err != NO_ERROR) {
-            ALOGE("error %d while wating for buffer state to change.", err);
+    else
+    {
+        Mutex::Autolock autoLock(&mLock);
+
+        if (mSurface == NULL) {
+            err = mCondition.waitRelative(mLock, s2ns(1));
+            // It's OK to time out here.
+            if (err != NO_ERROR && err != TIMED_OUT) {
+                ALOGE("error %d while wating for non-null surface to be set", err);
+                return false;
+            }
+            return true;
+        }
+
+        if (err != NO_ERROR)
+        {
             return false;
         }
-    }
-    if (mBufferState == CAPTURED && anw != NULL) {
-        err = anw->queueBuffer(anw.get(), mBuffer.get(), -1);
-        if (err != NO_ERROR) {
-            ALOGE("error %d while queueing buffer to surface", err);
-            return false;
+
+        if ((mReleasedBufCnt > (uint32_t)mHoldBufCount) && (!mShutdown))
+        {
+           ANativeWindowBuffer_t* buffer = NULL;
+           sp<ANativeWindow> anw(mSurface);
+           int idx = -1;
+
+           err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
+           if (err != NO_ERROR) {
+                ALOGE("error %d while dequeueing buffer to surface", err);
+                usleep(1000);
+                return true;
+           }
+
+           if (!mShutdown)
+           {
+               mReleasedBufCnt--;
+
+               idx = findBufferIndex(buffer->handle);
+               if (-1 == idx)
+               {
+                  ALOGE("error can not find buffer handle 0x%x in buffer list", buffer->handle);
+                  return false;
+               }
+
+               if (RELEASED == mBuffers[idx].bufferState)
+               {
+                  mBuffers[idx].buffer = buffer;
+                  mBuffers[idx].bufferState = CAPTURE;
+                  mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
+                                            buffer->handle, ++mSeq);
+                  mBuffers[idx].seqNum = mSeq;
+               }
+               else
+               {
+                  ALOGE("error buffer state = 0x%x, but expected buffer state = 0x%x", mBuffers[idx].bufferState, RELEASED);
+                  return false;
+               }
+           }
+           else
+           {
+              // queue buffer back to native window (Note : it will be displayed which is not desired)
+              sp<ANativeWindowBuffer_t> nwBuffer = NULL;
+              idx = findBufferIndex(buffer->handle);
+              nwBuffer = mBuffers[idx].buffer;
+              status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
+              if (err != NO_ERROR) {
+                ALOGE("error in buffer queue");
+              }
+           }
         }
-        mBuffer.clear();
-        mBufferState = RELEASED;
-    }
-    if (mBuffer == NULL && !mShutdown && anw != NULL) {
-        ANativeWindowBuffer_t* buffer = NULL;
-        err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
-        if (err != NO_ERROR) {
-            ALOGE("error %d while dequeueing buffer to surface", err);
-            return false;
-        }
-        mBuffer = buffer;
-        mBufferState = CAPTURING;
-        mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
-                                 buffer->handle, ++mSeq);
     }
 
     return true;
@@ -391,7 +583,6 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
                 connection.mThread->shutdown();
             }
             connection.mThread = new BufferProducerThread(mDevice, deviceId, &stream);
-            connection.mThread->run();
         }
     }
     connection.mSurface = surface;
@@ -399,6 +590,7 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
         connection.mSurface->setSidebandStream(connection.mSourceHandle);
     } else if (connection.mStreamType == TV_STREAM_TYPE_BUFFER_PRODUCER) {
         connection.mThread->setSurface(surface);
+        connection.mThread->run();
     }
     return NO_ERROR;
 }
