@@ -308,6 +308,7 @@ public class WindowManagerService extends IWindowManager.Stub
     private static final String SIZE_OVERRIDE = "ro.config.size_override";
 
     private static final int MAX_SCREENSHOT_RETRIES = 3;
+    private static final int WINDOW_EXITING_TIME_OUT = 6000;
 
     // The flag describing a full screen app window (where the app takes care of drawing under the
     // SystemUI bars)
@@ -485,7 +486,7 @@ public class WindowManagerService extends IWindowManager.Stub
     /** All DisplayContents in the world, kept here */
     SparseArray<DisplayContent> mDisplayContents = new SparseArray<DisplayContent>(2);
 
-    int mRotation = 0;
+    int mRotation = SystemProperties.getInt("persist.panel.orientation", 0) / 90;
     int mForcedAppOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
     boolean mAltOrientation = false;
 
@@ -9825,6 +9826,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 final int N = windows.size();
                 for (i=N-1; i>=0; i--) {
                     WindowState w = windows.get(i);
+		    if(w.mExiting && (w.mLastFreezeDuration > WINDOW_EXITING_TIME_OUT)
+                        && w.mInputChannel == null) {
+                        removeWindowInnerLocked(w.mSession, w);
+                    }
+
                     final TaskStack stack = w.getStack();
                     if (stack == null && w.getAttrs().type != TYPE_PRIVATE_PRESENTATION) {
                         continue;
