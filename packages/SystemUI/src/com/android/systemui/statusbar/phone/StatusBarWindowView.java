@@ -68,7 +68,7 @@ public class StatusBarWindowView extends FrameLayout {
                     || insets.right != getPaddingRight()
                     || insets.bottom != getPaddingBottom();
             if (changed) {
-                setPadding(insets.left, insets.top, insets.right, 0);
+                setPadding(insets.left, 0, insets.right, 0);
             }
             insets.left = 0;
             insets.top = 0;
