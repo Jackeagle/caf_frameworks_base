@@ -18,10 +18,14 @@ package android.view;
 
 import com.android.internal.view.BaseIWindow;
 
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.CompatibilityInfo.Translator;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
@@ -31,6 +35,7 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.ParcelFileDescriptor;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.util.Log;
 
@@ -86,6 +91,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class SurfaceView extends View {
     static private final String TAG = "SurfaceView";
     static private final boolean DEBUG = false;
+    static private final String RES_OVERRIDE = "persist.debug.app_res_override";
 
     final ArrayList<SurfaceHolder.Callback> mCallbacks
             = new ArrayList<SurfaceHolder.Callback>();
@@ -161,6 +167,9 @@ public class SurfaceView extends View {
     int mWidth = -1;
     int mHeight = -1;
     int mFormat = -1;
+    boolean mOverrideResolution = false;
+    int mOverrideXres = -1;
+    int mOverrideYres = -1;
     final Rect mSurfaceFrame = new Rect();
     int mLastSurfaceWidth = -1, mLastSurfaceHeight = -1;
     boolean mUpdateWindowNeeded;
@@ -201,6 +210,46 @@ public class SurfaceView extends View {
 
     private void init() {
         setWillNotDraw(true);
+
+        String resStr = SystemProperties.get(RES_OVERRIDE, null);
+        if (resStr != null && resStr.length() > 0) {
+            final int pos = resStr.indexOf('X');
+            if (pos > 0 && resStr.lastIndexOf('X') == pos) {
+                try {
+                    mOverrideXres = Integer.parseInt(resStr.substring(0, pos));
+                    mOverrideYres = Integer.parseInt(resStr.substring(pos+1));
+                } catch (NumberFormatException ex) {
+                    Log.e(TAG, "Error in extracting the overriding xres and yres");
+                }
+            }
+        }
+
+        if(mOverrideXres > 0 && mOverrideYres > 0 &&
+           (getContext().getApplicationInfo().canOverrideRes() == 1))
+            mOverrideResolution = true;
+
+        int orient = getResources().getConfiguration().orientation;
+        if(mOverrideResolution) {
+            switch (orient) {
+                case Configuration.ORIENTATION_PORTRAIT: {
+                    if (DEBUG) Log.i(TAG, "Overriding resolution to"
+                                     + " xres: " + mOverrideXres
+                                     + " yres: " + mOverrideYres);
+                    getHolder().setFixedSize(mOverrideXres, mOverrideYres);
+                } break;
+                case Configuration.ORIENTATION_LANDSCAPE: {
+                    if (DEBUG) Log.i(TAG, "Overriding resolution to"
+                                     + " xres: " + mOverrideYres
+                                     + " yres: " + mOverrideXres);
+                    getHolder().setFixedSize(mOverrideYres, mOverrideXres);
+                } break;
+                case Configuration.ORIENTATION_UNDEFINED:
+                case Configuration.ORIENTATION_SQUARE: {
+                    mOverrideResolution = false;
+                } break;
+            }
+        }
+
     }
 
     /**
@@ -291,6 +340,35 @@ public class SurfaceView extends View {
                 ? resolveSizeAndState(mRequestedHeight, heightMeasureSpec, 0)
                 : getDefaultSize(0, heightMeasureSpec);
         setMeasuredDimension(width, height);
+    }
+
+    /**
+     * Transforms the touch events to the new resolution coordinate system
+     * if the resolution has changed
+     */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if(mOverrideResolution) {
+            Matrix matrix = new Matrix();
+            float xscale = 1.0f;
+            float yscale = 1.0f;
+            if (DEBUG) Log.i(TAG, "Before overriding the touch event x/y : " + ev);
+
+            int orient = getResources().getConfiguration().orientation;
+            if(orient == Configuration.ORIENTATION_PORTRAIT) {
+                xscale = (mOverrideXres * 1.0f)/(getWidth());
+                yscale = (mOverrideYres * 1.0f)/(getHeight());
+            } else if(orient == Configuration.ORIENTATION_LANDSCAPE) {
+                xscale = (mOverrideYres * 1.0f)/(getWidth());
+                yscale = (mOverrideXres * 1.0f)/(getHeight());
+            }
+
+            matrix.postScale(xscale, yscale);
+            ev.transform(matrix);
+
+            if (DEBUG) Log.i(TAG, "After overriding the touch event x/y : " + ev);
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     /** @hide */
@@ -656,11 +734,33 @@ public class SurfaceView extends View {
         public void resized(Rect frame, Rect overscanInsets, Rect contentInsets,
                 Rect visibleInsets, Rect stableInsets, boolean reportDraw,
                 Configuration newConfig) {
-            SurfaceView surfaceView = mSurfaceView.get();
+            final SurfaceView surfaceView = mSurfaceView.get();
             if (surfaceView != null) {
                 if (DEBUG) Log.v(
                         "SurfaceView", surfaceView + " got resized: w=" + frame.width()
                         + " h=" + frame.height() + ", cur w=" + mCurWidth + " h=" + mCurHeight);
+
+                /** Change the visibility to GONE and back to VISIBLE and post it
+                  * on the main thread for the touch events to be effective on the
+                  * changed SurfaceView with the new dimensions
+                  */
+
+                if(surfaceView.mOverrideResolution) {
+                    surfaceView.post(new Runnable() {
+                                     @Override
+                                     public void run() {
+                                           surfaceView.setVisibility(View.GONE);
+                                     }
+                                     });
+
+                    surfaceView.postDelayed(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                   surfaceView.setVisibility(View.VISIBLE);
+                                            }
+                                            }, 100);
+                }
+
                 surfaceView.mSurfaceLock.lock();
                 try {
                     if (reportDraw) {
