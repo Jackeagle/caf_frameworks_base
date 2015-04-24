@@ -148,6 +148,8 @@ public final class SystemServer {
             "com.android.server.job.JobSchedulerService";
     private static final String PERSISTENT_DATA_BLOCK_PROP = "ro.frp.pst";
 
+    private static final int DPM_ENABLE_PROPERTY_MASK = 15;
+
     private final int mFactoryTestMode;
     private Timer mProfilerSnapshotTimer;
 
@@ -1271,7 +1273,7 @@ public final class SystemServer {
     private static final void startDpmService(Context context) {
         try {
             Object dpmObj = null;
-            int dpmFeature = SystemProperties.getInt("persist.dpm.feature", 0);
+            int dpmFeature = SystemProperties.getInt("persist.dpm.feature", DPM_ENABLE_PROPERTY_MASK);
             Slog.i(TAG, "DPM configuration set to " + dpmFeature);
 
             if (dpmFeature > 0 && dpmFeature < 16) {
