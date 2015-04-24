@@ -443,6 +443,7 @@ interface IPackageManager {
 
     /** Reflects current DeviceStorageMonitorService state */
     boolean isStorageLow();
+    void laterScanApp();
 
     boolean setApplicationHiddenSettingAsUser(String packageName, boolean hidden, int userId);
     boolean getApplicationHiddenSettingAsUser(String packageName, int userId);
