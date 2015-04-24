@@ -153,6 +153,7 @@ public final class PowerManagerService extends SystemService
 
     // Config value for NSRM
     private static final int DPM_CONFIG_FEATURE_MASK_NSRM = 0x00000004;
+    private static final int DPM_ENABLE_PROPERTY_MASK = 15;
 
     private final Context mContext;
     private final ServiceThread mHandlerThread;
@@ -872,7 +873,7 @@ public final class PowerManagerService extends SystemService
             int callingUid) {
         synchronized (mLock) {
             int index = findWakeLockIndexLocked(lock);
-            int value = SystemProperties.getInt("persist.dpm.feature", 0);
+            int value = SystemProperties.getInt("persist.dpm.feature", DPM_ENABLE_PROPERTY_MASK);
             boolean isNsrmEnabled = false;
 
             if ((value & DPM_CONFIG_FEATURE_MASK_NSRM) == DPM_CONFIG_FEATURE_MASK_NSRM)
