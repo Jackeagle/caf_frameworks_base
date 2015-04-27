@@ -239,6 +239,12 @@ public class DisconnectCause {
     /** Call failed due to low battery */
     public static final int LOW_BATTERY  = 95;
 
+    /**
+     * An IMS call was disconnected by lower layers and requested for a retry over CS.
+     */
+    public static final int CALL_RETRY_BY_SILENT_REDIAL = 96;
+    public static final int CALL_RETRY_BY_USER_CONSENT = 97;
+
     //*********************************************************************************************
     // When adding a disconnect type:
     // 1) Please assign the new type the next id value below.
@@ -247,14 +253,14 @@ public class DisconnectCause {
     // 4) Update toString() with the newly added disconnect type.
     // 5) Update android.telecom.DisconnectCauseUtil with any mappings to a telecom.DisconnectCause.
     //
-    // NextId: 96
+    // NextId: 98
     //*********************************************************************************************
 
     /** Smallest valid value for call disconnect codes. */
     public static final int MINIMUM_VALID_VALUE = NOT_DISCONNECTED;
 
     /** Largest valid value for call disconnect codes. */
-    public static final int MAXIMUM_VALID_VALUE = LOW_BATTERY;
+    public static final int MAXIMUM_VALID_VALUE = CALL_RETRY_BY_USER_CONSENT;
 
     /** Private constructor to avoid class instantiation. */
     private DisconnectCause() {
@@ -366,6 +372,10 @@ public class DisconnectCause {
             return "NON_SELECTED_USER_CLEARING";
         case LOW_BATTERY:
             return "LOW_BATTERY";
+        case CALL_RETRY_BY_SILENT_REDIAL:
+            return "CALL_RETRY_BY_SILENT_REDIAL";
+        case CALL_RETRY_BY_USER_CONSENT:
+            return "CALL_RETRY_BY_USER_CONSENT";
         default:
             return "INVALID: " + cause;
         }

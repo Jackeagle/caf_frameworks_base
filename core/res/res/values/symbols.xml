@@ -2270,6 +2270,7 @@
 
   <!-- cpu boost for AppLaunch -->
   <java-symbol type="bool" name="config_enableCpuBoostForAppLaunch" />
+  <java-symbol type="integer" name="disablepacking_timeout_param" />
   <java-symbol type="integer" name="launchboost_timeout_param" />
   <java-symbol type="integer" name="launchboost_schedboost_param" />
   <java-symbol type="integer" name="launchboost_cpuboost_param" />
@@ -2338,4 +2339,6 @@
   <java-symbol type="bool" name="config_LTE_eri_for_network_name" />
   <java-symbol type="bool" name="config_defaultInTouchMode" />
   <java-symbol type="bool" name="config_fdn_contact_search"/>
+  <!-- for IMS to CS retry support -->
+  <java-symbol type="bool"  name="config_carrier_cs_retry_available" />
 </resources>
