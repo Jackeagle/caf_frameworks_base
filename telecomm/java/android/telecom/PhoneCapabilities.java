@@ -146,6 +146,18 @@ public final class PhoneCapabilities {
      */
     public static final int FDN_ENABLED = 0x00040000;
 
+   /**
+     * Local device supports voice telephony.
+     * @hide
+     */
+    public static final int SUPPORTS_DOWNGRADE_TO_VOICE_LOCAL = 0x00080000;
+
+    /**
+     * Remote device supports voice telephony.
+     * @hide
+     */
+    public static final int SUPPORTS_DOWNGRADE_TO_VOICE_REMOTE = 0x00100000;
+
     /**
      * Whether this set of capabilities supports the specified capability.
      * @param capabilities The set of capabilities.
@@ -198,6 +210,12 @@ public final class PhoneCapabilities {
         }
         if (can(capabilities, SUPPORTS_VT_REMOTE)) {
             builder.append(" SUPPORTS_VT_REMOTE");
+        }
+        if (can(capabilities, SUPPORTS_DOWNGRADE_TO_VOICE_LOCAL)) {
+            builder.append(" SUPPORTS_DOWNGRADE_TO_VOICE_LOCAL");
+        }
+        if (can(capabilities, SUPPORTS_DOWNGRADE_TO_VOICE_REMOTE)) {
+            builder.append(" SUPPORTS_DOWNGRADE_TO_VOICE_REMOTE");
         }
         if (can(capabilities, VoLTE)) {
             builder.append(" VoLTE");

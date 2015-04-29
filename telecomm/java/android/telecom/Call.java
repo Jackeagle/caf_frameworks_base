@@ -199,6 +199,18 @@ public final class Call {
          */
         public static final int FDN_ENABLED = 0x00040000;
 
+       /**
+         * Local device supports voice telephony.
+         * @hide
+         */
+        public static final int CAPABILITY_SUPPORTS_DOWNGRADE_TO_VOICE_LOCAL = 0x00080000;
+
+        /**
+         * Remote device supports voice telephony.
+         * @hide
+         */
+        public static final int CAPABILITY_SUPPORTS_DOWNGRADE_TO_VOICE_REMOTE = 0x00100000;
+
         private final Uri mHandle;
         private final int mHandlePresentation;
         private final String mCallerDisplayName;
@@ -272,6 +284,12 @@ public final class Call {
             }
             if (can(capabilities, CAPABILITY_SUPPORTS_VT_REMOTE)) {
                 builder.append(" CAPABILITY_SUPPORTS_VT_REMOTE");
+            }
+            if (can(capabilities, CAPABILITY_SUPPORTS_DOWNGRADE_TO_VOICE_LOCAL)) {
+                builder.append(" CAPABILITY_SUPPORTS_DOWNGRADE_TO_VOICE_LOCAL");
+            }
+            if (can(capabilities, CAPABILITY_SUPPORTS_DOWNGRADE_TO_VOICE_REMOTE)) {
+                builder.append(" CAPABILITY_SUPPORTS_DOWNGRADE_TO_VOICE_REMOTE");
             }
             if (can(capabilities, CAPABILITY_HIGH_DEF_AUDIO)) {
                 builder.append(" CAPABILITY_HIGH_DEF_AUDIO");
