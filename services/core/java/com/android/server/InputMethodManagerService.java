@@ -387,7 +387,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
     boolean mScreenOn = true;
 
     class KeyboardDetect {
-        private final int GPU_DEFAULT_PWRLVL = 0x4705; /* GPU default power level to 5 */
+        private final int GPU_DEFAULT_PWRLVL = 0x4C05; /* GPU default power level to 5 */
         private Performance mPerf = new Performance();
         private int keyboardState = 0;
 
