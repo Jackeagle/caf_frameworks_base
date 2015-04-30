@@ -147,7 +147,7 @@ public class WipowerDynamicParam {
             return res;
         }
 
-        void resetValues() {
+        public void resetValues() {
             mOptValidity = 0x00;
             mRectVoltage = 0x00;
             mRectCurrent = 0x00;
