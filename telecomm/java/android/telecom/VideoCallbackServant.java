@@ -39,6 +39,7 @@ final class VideoCallbackServant {
     private static final int MSG_CHANGE_CALL_DATA_USAGE = 4;
     private static final int MSG_CHANGE_CAMERA_CAPABILITIES = 5;
     private static final int MSG_CHANGE_VIDEO_QUALITY = 6;
+    private static final int MSG_CHANGE_ORIENTATION_MODE = 7;
 
     private final IVideoCallback mDelegate;
 
@@ -105,6 +106,10 @@ final class VideoCallbackServant {
                     mDelegate.changeVideoQuality(msg.arg1);
                     break;
                 }
+                case MSG_CHANGE_ORIENTATION_MODE: {
+                    mDelegate.changeOrientationMode(msg.arg1);
+                    break;
+                }
             }
         }
     };
@@ -157,6 +162,11 @@ final class VideoCallbackServant {
         @Override
         public void changeVideoQuality(int videoQuality) throws RemoteException {
             mHandler.obtainMessage(MSG_CHANGE_VIDEO_QUALITY, videoQuality, 0).sendToTarget();
+        }
+
+        @Override
+        public void changeOrientationMode(int orientationMode) throws RemoteException {
+            mHandler.obtainMessage(MSG_CHANGE_ORIENTATION_MODE, orientationMode, 0).sendToTarget();
         }
     };
 
