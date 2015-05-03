@@ -161,6 +161,7 @@ public final class BatteryService extends SystemService {
     private final int mWeakChgMaxShutdownIntervalMsecs = 300000;
     private boolean mInitiateShutdown = false;
     private File mVoltageNowFile = null;
+    private File mChargerTypeFile = null;
     private Runnable runnable = new Runnable() {
         public void run() {
             synchronized (mLock) {
@@ -189,6 +190,8 @@ public final class BatteryService extends SystemService {
          /* 2700mV UVLO voltage */
         if (mWeakChgCutoffVoltageMv > 2700)
            mVoltageNowFile = new File("/sys/class/power_supply/battery/voltage_now");
+
+        mChargerTypeFile = new File("/sys/class/power_supply/usb/type");
 
         mCriticalBatteryLevel = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_criticalBatteryWarningLevel);
@@ -840,6 +843,24 @@ public final class BatteryService extends SystemService {
         public void updateLightsLocked() {
             final int level = mBatteryProps.batteryLevel;
             final int status = mBatteryProps.batteryStatus;
+            FileReader fileReader;
+            BufferedReader br;
+            String type;
+
+            try {
+                fileReader = new FileReader(mChargerTypeFile);
+                br = new BufferedReader(fileReader);
+                type =  br.readLine();
+                br.close();
+                fileReader.close();
+            } catch (FileNotFoundException e) {
+                type= "Unknown";
+                Slog.e(TAG, "Failure in reading charger type", e);
+            } catch (IOException e) {
+                type= "Unknown";
+                Slog.e(TAG, "Failure in reading charger type", e);
+            }
+
             if (level < mLowBatteryWarningLevel) {
                 if (status == BatteryManager.BATTERY_STATUS_CHARGING) {
                     // Solid red when battery is charging
@@ -855,8 +876,14 @@ public final class BatteryService extends SystemService {
                     // Solid green when full or charging and nearly full
                     mBatteryLight.setColor(mBatteryFullARGB);
                 } else {
-                    // Solid orange when charging and halfway full
-                    mBatteryLight.setColor(mBatteryMediumARGB);
+                    if (type.compareTo("USB_HVDCP") == 0) {
+                       // Blinking orange if HVDCP charger
+                       mBatteryLight.setFlashing(mBatteryMediumARGB, Light.LIGHT_FLASH_TIMED,
+                               mBatteryLedOn, mBatteryLedOn);
+		    } else {
+                       // Solid orange when charging and halfway full
+                       mBatteryLight.setColor(mBatteryMediumARGB);
+		    }
                 }
             } else {
                 // No lights if not charging and not low
