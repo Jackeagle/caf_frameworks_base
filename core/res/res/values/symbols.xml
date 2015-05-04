@@ -2341,4 +2341,7 @@
   <java-symbol type="string" name="def_hipri_share_component_class"/>
   <java-symbol type="string" name="card_string" />
 
+  <!-- Regional Specific Symbols/Overlays start from here -->
+
+  <!-- Regional Specific Symbols/Overlays end -->
 </resources>
