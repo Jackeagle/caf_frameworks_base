@@ -292,6 +292,14 @@ public class ExternalStorageFormatter extends Service
                                     physicalVol = physicalVols.get(0);
                                     extStoragePath = mStorageVolume == null ?
                                         physicalVol.getPath() : mStorageVolume.getPath();
+                                    // To avoid cases where volume state still be in "formating"
+                                    // while calling mountVolume()
+                                    while (physicalVol.getIsFormatting()) {
+                                        try {
+                                            Log.w(TAG, "Storage is still in formatting state");
+                                            Thread.sleep(100);
+                                        } catch (InterruptedException ex) { }
+                                    }
                                     mountService.mountVolume(extStoragePath);
                                 }
                             } catch (RemoteException e) {
