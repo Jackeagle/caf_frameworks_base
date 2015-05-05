@@ -34,4 +34,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     -->
     <bool name="config_regional_hspap_display_4g_icon">false</bool>
     <string name="config_regional_carrier_operator">000000</string>
+    <bool name="config_regional_uicc_capability_check">false</bool>
 </resources>

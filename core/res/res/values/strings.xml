@@ -5223,4 +5223,11 @@
     <string name="def_hipri_share_component_class"></string>
 
     <string name="card_string">CARD <xliff:g id="slot_id">%1$s</xliff:g></string>
+
+    <!-- UICC capability check dialog string -->
+    <string name="uicc_cap_title">UICC capability check</string>
+    <string name="uicc_cap_msg">The inserted SIM does not support all of the features of this device. Please see T-Mobile.com/SIM for information about replacing your SIM.</string>
+    <string name="uicc_cap_checkbox_text">Display the message next time?</string>
+    <string name="uicc_cap_button">OK</string>
+
 </resources>

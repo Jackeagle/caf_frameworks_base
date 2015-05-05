@@ -2344,6 +2344,13 @@
   <!-- Regional Specific Symbols/Overlays start from here -->
   <java-symbol type="bool" name="config_regional_hspap_display_4g_icon"/>
   <java-symbol type="string" name="config_regional_carrier_operator"/>
+  <java-symbol type="bool" name="config_regional_uicc_capability_check"/>
+  <java-symbol type="string" name="uicc_cap_title"/>
+  <java-symbol type="string" name="uicc_cap_msg"/>
+  <java-symbol type="string" name="uicc_cap_button"/>
+  <java-symbol type="string" name="uicc_cap_checkbox_text"/>
+  <java-symbol type="id" name="uicc_cap_checkbox"/>
+  <java-symbol type="layout" name="uicc_cap_checkbox"/>
 
   <!-- Regional Specific Symbols/Overlays end -->
 </resources>
