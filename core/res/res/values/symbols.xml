@@ -2351,6 +2351,6 @@
   <java-symbol type="string" name="uicc_cap_checkbox_text"/>
   <java-symbol type="id" name="uicc_cap_checkbox"/>
   <java-symbol type="layout" name="uicc_cap_checkbox"/>
-
+  <java-symbol type="bool" name="config_regional_volte_switch_enable" />
   <!-- Regional Specific Symbols/Overlays end -->
 </resources>
