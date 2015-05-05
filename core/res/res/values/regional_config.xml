@@ -32,5 +32,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <!--
     customize the default value as false, true is for regional package.
     -->
-
+    <bool name="config_regional_hspap_display_4g_icon">false</bool>
+    <string name="config_regional_carrier_operator">000000</string>
 </resources>
