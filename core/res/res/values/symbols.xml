@@ -2344,6 +2344,7 @@
   <java-symbol type="string" name="card_string" />
 
   <!-- Regional Specific Symbols/Overlays start from here -->
-
+  <java-symbol type="bool" name="config_regional_hspap_display_4g_icon"/>
+  <java-symbol type="string" name="config_regional_carrier_operator"/>
   <!-- Regional Specific Symbols/Overlays end -->
 </resources>
