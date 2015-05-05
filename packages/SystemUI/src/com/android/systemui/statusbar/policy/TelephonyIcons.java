@@ -250,6 +250,11 @@ class TelephonyIcons {
     private static Resources mRes;
     private static boolean isInitiated = false;
 
+    private static boolean mRegionalOverlayEnable = false;
+    private static String mRegionalCarrierOperator = "";
+    private static String mSimOperator = "";
+    private static TelephonyManager mTelephonyManager;
+
     static void initAll(Context context) {
         if (isInitiated) {
             log(TAG, "initAll, already initiated!");
@@ -278,6 +283,17 @@ class TelephonyIcons {
                     R.array.multi_no_sim);
             mSignalStrengthDesc = mRes.getStringArray(
                     R.array.signal_strength_description);
+            if (mRes.getBoolean(
+                    com.android.internal.R.bool.config_regional_hspap_display_4g_icon)) {
+                mRegionalOverlayEnable = true;
+                mTelephonyManager =
+                        (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+                mRegionalCarrierOperator = mRes.getString(
+                        com.android.internal.R.string.config_regional_carrier_operator);
+                mSimOperator = mTelephonyManager.getSimOperator();
+                log(TAG, "Carrier Operator Number = " + mRegionalCarrierOperator +
+                        " SIM Operator Number = " + mSimOperator);
+            }
         } catch (android.content.res.Resources.NotFoundException e) {
             isInitiated = false;
             log(TAG, "initAll, exception happened: " + e);
@@ -421,13 +437,22 @@ class TelephonyIcons {
                     mSelectedDataTypeDesc[sub] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[sub] = SIGNAL_STRENGTH_TYPE_HP;
                 } else {
-                    mSelectedDataActivityIndex[sub] = DATA_TYPE_3G;
-                    mSelectedDataTypeIcon[sub] = mRes.getIdentifier(
-                            mDataTypeGenerationArray[0], null, NS);
-                    mSelectedQSDataTypeIcon[sub] = QS_DATA_3G[inetCondition];
-                    mSelectedDataTypeDesc[sub] = mDataTypeGenerationDescArray[0];
-                    mSelectedSignalStreagthIndex[sub] = SIGNAL_STRENGTH_TYPE_3G;
-
+                    if (mRegionalOverlayEnable &&
+                            (mRegionalCarrierOperator.indexOf(mSimOperator) >= 0)) {
+                        mSelectedDataActivityIndex[sub] = DATA_TYPE_4G;
+                        mSelectedDataTypeIcon[sub] = mRes.getIdentifier(
+                                mDataTypeGenerationArray[1], null, NS);
+                        mSelectedQSDataTypeIcon[sub] = QS_DATA_4G[inetCondition];
+                        mSelectedDataTypeDesc[sub] = mDataTypeGenerationDescArray[1];
+                        mSelectedSignalStreagthIndex[sub] = SIGNAL_STRENGTH_TYPE_4G;
+                    } else {
+                        mSelectedDataActivityIndex[sub] = DATA_TYPE_3G;
+                        mSelectedDataTypeIcon[sub] = mRes.getIdentifier(
+                                mDataTypeGenerationArray[0], null, NS);
+                        mSelectedQSDataTypeIcon[sub] = QS_DATA_3G[inetCondition];
+                        mSelectedDataTypeDesc[sub] = mDataTypeGenerationDescArray[0];
+                        mSelectedSignalStreagthIndex[sub] = SIGNAL_STRENGTH_TYPE_3G;
+                    }
                 }
                 break;
             case TelephonyManager.NETWORK_TYPE_CDMA:
