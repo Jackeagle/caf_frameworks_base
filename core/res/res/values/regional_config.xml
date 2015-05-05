@@ -36,5 +36,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <string name="config_regional_carrier_operator">000000</string>
     <bool name="config_regional_uicc_capability_check">false</bool>
     <bool name="config_regional_volte_switch_enable">false</bool>
+    <bool name="config_regional_preferred_network_customization">false</bool>
 
 </resources>

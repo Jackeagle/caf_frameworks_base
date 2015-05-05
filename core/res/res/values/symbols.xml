@@ -2352,5 +2352,6 @@
   <java-symbol type="id" name="uicc_cap_checkbox"/>
   <java-symbol type="layout" name="uicc_cap_checkbox"/>
   <java-symbol type="bool" name="config_regional_volte_switch_enable" />
+  <java-symbol type="bool" name="config_regional_preferred_network_customization" />
   <!-- Regional Specific Symbols/Overlays end -->
 </resources>
