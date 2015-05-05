@@ -2346,5 +2346,6 @@
   <!-- Regional Specific Symbols/Overlays start from here -->
   <java-symbol type="bool" name="config_regional_hspap_display_4g_icon"/>
   <java-symbol type="string" name="config_regional_carrier_operator"/>
+  <java-symbol type="bool" name="config_regional_volte_switch_enable" />
   <!-- Regional Specific Symbols/Overlays end -->
 </resources>
