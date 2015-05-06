@@ -2350,6 +2350,7 @@
   <java-symbol type="bool" name="config_regional_preferred_network_customization" />
   <!-- Regional Specific Symbols/Overlays end -->
 
+  <java-symbol type="bool" name="config_regional_wifi_calling_menu_enable" />
   <!-- for IMS to CS retry support -->
   <java-symbol type="bool"  name="config_carrier_cs_retry_available" />
   <!-- Symbols/Overlays for Network settings start -->
