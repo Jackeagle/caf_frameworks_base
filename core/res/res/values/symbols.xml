@@ -2352,6 +2352,8 @@
 
   <java-symbol type="bool" name="config_regional_wifi_calling_menu_enable" />
   <java-symbol type="bool" name="config_regional_wifi_calling_registration_errorcode" />
+  <java-symbol type="string" name="config_regional_alerts_for_drop_call_toast"/>
+  <java-symbol type="bool" name="config_regional_alerts_for_drop_call"/>
   <!-- for IMS to CS retry support -->
   <java-symbol type="bool"  name="config_carrier_cs_retry_available" />
   <!-- Symbols/Overlays for Network settings start -->
