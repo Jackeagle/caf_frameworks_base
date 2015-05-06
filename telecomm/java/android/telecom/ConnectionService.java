@@ -108,6 +108,8 @@ public abstract class ConnectionService extends Service {
     private static final int MSG_SET_ACTIVE_SUB = 21;
     private static final int MSG_DEFLECT = 22;
     private static final int MSG_ADD_PARTICIPANT_WITH_CONFERENCE = 23;
+    private static final int MSG_DISCONNECT_REASON = 24;
+    private static final int MSG_REJECT_REASON = 25;
 
     private static Connection sNullConnection;
 
@@ -184,8 +186,24 @@ public abstract class ConnectionService extends Service {
         }
 
         @Override
+        public void rejectWithReason(String callId, int disconnectCause) {
+            SomeArgs args = SomeArgs.obtain();
+            args.arg1 = callId;
+            args.argi1 = disconnectCause;
+            mHandler.obtainMessage(MSG_REJECT_REASON, args).sendToTarget();
+        }
+
+        @Override
         public void disconnect(String callId) {
             mHandler.obtainMessage(MSG_DISCONNECT, callId).sendToTarget();
+        }
+
+        @Override
+        public void disconnectWithReason(String callId, int disconnectCause) {
+            SomeArgs args = SomeArgs.obtain();
+            args.arg1 = callId;
+            args.argi1 = disconnectCause;
+            mHandler.obtainMessage(MSG_DISCONNECT_REASON, args).sendToTarget();
         }
 
         @Override
@@ -336,9 +354,31 @@ public abstract class ConnectionService extends Service {
                 case MSG_REJECT:
                     reject((String) msg.obj);
                     break;
+                case MSG_REJECT_REASON: {
+                    SomeArgs args = (SomeArgs) msg.obj;
+                    try {
+                        String callId = (String) args.arg1;
+                        int disconnectCause = args.argi1;
+                        rejectWithReason(callId, disconnectCause);
+                    } finally {
+                        args.recycle();
+                    }
+                    break;
+                }
                 case MSG_DISCONNECT:
                     disconnect((String) msg.obj);
                     break;
+                case MSG_DISCONNECT_REASON: {
+                    SomeArgs args = (SomeArgs) msg.obj;
+                    try {
+                        String callId = (String) args.arg1;
+                        int disconnectCause = args.argi1;
+                        disconnectWithReason(callId, disconnectCause);
+                    } finally {
+                        args.recycle();
+                    }
+                    break;
+                }
                 case MSG_HOLD:
                     hold((String) msg.obj);
                     break;
@@ -783,12 +823,26 @@ public abstract class ConnectionService extends Service {
         findConnectionForAction(callId, "reject").onReject();
     }
 
+    private void rejectWithReason(String callId, int disconnectCause) {
+        Log.d(this, "rejectWithReason %s %d DisconnectCause", callId, disconnectCause);
+        findConnectionForAction(callId, "reject").onRejectWithReason(disconnectCause);
+    }
+
     private void disconnect(String callId) {
         Log.d(this, "disconnect %s", callId);
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "disconnect").onDisconnect();
         } else {
             findConferenceForAction(callId, "disconnect").onDisconnect();
+        }
+    }
+
+    private void disconnectWithReason(String callId, int disconnectCause) {
+        Log.d(this, "disconnectWithReason %s %d DisconnectCause", callId, disconnectCause);
+        if (mConnectionById.containsKey(callId)) {
+            findConnectionForAction(callId, "disconnect").onDisconnectWithReason(disconnectCause);
+        } else {
+            findConferenceForAction(callId, "disconnect").onDisconnectWithReason(disconnectCause);
         }
     }
 

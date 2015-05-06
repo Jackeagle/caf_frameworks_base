@@ -229,6 +229,9 @@ public class DisconnectCause {
     /** EMERGENCY call failed with permanent fail cause */
     public static final int EMERGENCY_PERM_FAILURE         = 93;
 
+    /** Call failed due to low battery */
+    public static final int LOW_BATTERY  = 94;
+
     //*********************************************************************************************
     // When adding a disconnect type:
     // 1) Please assign the new type the next id value below.
@@ -237,14 +240,14 @@ public class DisconnectCause {
     // 4) Update toString() with the newly added disconnect type.
     // 5) Update android.telecom.DisconnectCauseUtil with any mappings to a telecom.DisconnectCause.
     //
-    // NextId: 92
+    // NextId: 95
     //*********************************************************************************************
 
     /** Smallest valid value for call disconnect codes. */
     public static final int MINIMUM_VALID_VALUE = NOT_DISCONNECTED;
 
     /** Largest valid value for call disconnect codes. */
-    public static final int MAXIMUM_VALID_VALUE = IMS_MERGED_SUCCESSFULLY;
+    public static final int MAXIMUM_VALID_VALUE = LOW_BATTERY;
 
     /** Private constructor to avoid class instantiation. */
     private DisconnectCause() {
@@ -350,6 +353,8 @@ public class DisconnectCause {
             return "OUTGOING_CANCELED";
         case IMS_MERGED_SUCCESSFULLY:
             return "IMS_MERGED_SUCCESSFULLY";
+        case LOW_BATTERY:
+            return "LOW_BATTERY";
         default:
             return "INVALID: " + cause;
         }

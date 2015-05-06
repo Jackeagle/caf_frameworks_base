@@ -52,7 +52,11 @@ oneway interface IConnectionService {
 
     void reject(String callId);
 
+    void rejectWithReason(String callId, int disconnectCause);
+
     void disconnect(String callId);
+
+    void disconnectWithReason(String callId, int disconnectCause);
 
     void hold(String callId);
 

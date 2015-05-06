@@ -200,6 +200,13 @@ public abstract class Conference implements IConferenceable {
     public void onDisconnect() {}
 
     /**
+     * Invoked when the Conference and all it's {@link Connection}s should be
+     * disconnected with reason.
+     * @hide
+     */
+    public void onDisconnectWithReason(int disconnectCause) {}
+
+    /**
      * Invoked when the specified {@link Connection} should be separated from the conference call.
      *
      * @param connection The connection to separate.
