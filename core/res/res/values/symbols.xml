@@ -2344,6 +2344,7 @@
   <!-- Symbols/Overlays for Net work settings start -->
   <java-symbol type="bool" name="config_regional_smsc_editable" />
   <java-symbol type="bool" name="config_regional_voicemail_address_editable" />
+  <java-symbol type="bool" name="config_regional_show_change_dataroaming_message" />
   <!-- Symbols/Overlays for Net work settings end -->
 
 </resources>
