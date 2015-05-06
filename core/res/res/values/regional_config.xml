@@ -44,6 +44,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_show_change_dataroaming_message">false</bool>
 
     <bool name="config_regional_wifi_calling_menu_enable">false</bool>
+    <bool name="config_regional_wifi_calling_registration_errorcode">false</bool>
 
     <!-- Whether to hide IMS and DUN Apns -->
     <bool name="config_regional_hide_ims_and_dun_apns">false</bool>
