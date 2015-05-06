@@ -310,7 +310,9 @@ public final class SystemServer {
              public void onReceive(final Context context, Intent intent) {
                    String action = intent.getAction();
                       if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-                         startOtherRefServices();
+                          startOtherRefServices();
+                          mSystemServiceManager.startBootPhase(SystemService.
+                                  PHASE_SERVICES_DEFER_COMPLETED);
                       }
             }
        };
