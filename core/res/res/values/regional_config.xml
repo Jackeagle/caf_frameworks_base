@@ -80,4 +80,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <bool name="config_regional_wifi_calling_menu_enable">false</bool>
 
+    <bool name="config_regional_wifi_calling_registration_errorcode">false</bool>
 </resources>
