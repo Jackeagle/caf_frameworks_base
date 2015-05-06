@@ -38,5 +38,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_preferred_network_customization">false</bool>
     <!-- Whether to set smsc editable-->
     <bool name="config_regional_smsc_editable">false</bool>
+    <!-- Whether to set voicemail address editable-->
+    <bool name="config_regional_voicemail_address_editable">false</bool>
 
 </resources>
