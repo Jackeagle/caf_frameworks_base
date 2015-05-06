@@ -42,5 +42,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_voicemail_address_editable">false</bool>
     <!-- Whether to show turn on/off dataroaming change message-->
     <bool name="config_regional_show_change_dataroaming_message">false</bool>
+    <!-- Whether to hide IMS and DUN Apns -->
+    <bool name="config_regional_hide_ims_and_dun_apns">false</bool>
 
 </resources>
