@@ -3113,18 +3113,25 @@ public class AudioService extends IAudioService.Stub {
                         if (mConnectedDevices.containsKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP)) {
                             Log.d(TAG, "A2dp service disconnects, pause music player: "
                                 + mConnectedDevicesList.size());
-                            //Clean up all connected device list here
+                            // Clean up all connected device list here
                             BluetoothDevice btDevice;
-                            for (int i = 0; i < mConnectedDevicesList.size(); i++) {
-                                btDevice = mConnectedDevicesList.get(i);
+                            while (!mConnectedDevicesList.isEmpty()) {
+                                btDevice = mConnectedDevicesList.get(0);
                                 int delay = checkSendBecomingNoisyIntent(
                                             AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, 0);
-                                queueMsgUnderWakeLock(mAudioHandler,
-                                                    MSG_SET_A2DP_SINK_CONNECTION_STATE,
-                                                    BluetoothA2dp.STATE_DISCONNECTED,
-                                                    0,
-                                                    btDevice,
-                                                    delay);
+                                Log.d(TAG, "onServiceDisconnected: Remove connected device");
+                                mConnectedDevicesList.remove(btDevice);
+                                /* Update connection state after all the
+                                 * devices are removed.
+                                 */
+                                if(mConnectedDevicesList.isEmpty()) {
+                                    queueMsgUnderWakeLock(mAudioHandler,
+                                                        MSG_SET_A2DP_SINK_CONNECTION_STATE,
+                                                        BluetoothA2dp.STATE_DISCONNECTED,
+                                                        0,
+                                                        btDevice,
+                                                        delay);
+                                }
                             }
                         }
                     }
@@ -3618,7 +3625,7 @@ public class AudioService extends IAudioService.Stub {
             }
         } else if ((state == BluetoothA2dp.STATE_DISCONNECTED) ||
             (state == BluetoothA2dp.STATE_DISCONNECTING)) {
-            Log.d(TAG, "Deice is getting disconnected: " + device);
+            Log.d(TAG, "Device is getting disconnected: " + device);
             if (mConnectedDevicesList.contains(device)) {
                 Log.d(TAG, "Remove the BT device ");
                 mConnectedDevicesList.remove(device);
