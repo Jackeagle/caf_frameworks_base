@@ -686,6 +686,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     mSimState.put(subInfo.subId, mSimState.get(subId));
                     mPlmn.put(subInfo.subId, mPlmn.get(subId));
                     mSpn.put(subInfo.subId, mSpn.get(subId));
+                    mServiceState.put(subInfo.subId, mServiceState.get(subId));
 
                     final int count = mCallbacks.size();
                     for (int i = 0; i < count; i++) {
