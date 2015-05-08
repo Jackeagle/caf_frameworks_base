@@ -2341,4 +2341,8 @@
   <java-symbol type="string" name="def_hipri_share_component_class"/>
   <java-symbol type="string" name="card_string" />
 
+  <!-- Symbols/Overlays for Net work settings start -->
+  <java-symbol type="bool" name="config_regional_smsc_editable" />
+  <!-- Symbols/Overlays for Net work settings end -->
+
 </resources>
