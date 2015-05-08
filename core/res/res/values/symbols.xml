@@ -2350,4 +2350,9 @@
   <java-symbol type="bool" name="config_regional_volte_switch_enable" />
   <java-symbol type="bool" name="config_regional_preferred_network_customization" />
   <!-- Regional Specific Symbols/Overlays end -->
+
+  <!-- Symbols/Overlays for Network settings start -->
+  <java-symbol type="bool" name="config_regional_smsc_editable" />
+  <!-- Symbols/Overlays for Network settings end -->
+
 </resources>
