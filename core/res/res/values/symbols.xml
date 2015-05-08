@@ -2393,4 +2393,5 @@
   <java-symbol type="bool" name="config_regional_wifi_calling_registration_errorcode" />
   <java-symbol type="string" name="config_regional_alerts_for_drop_call_toast"/>
   <java-symbol type="bool" name="config_regional_alerts_for_drop_call"/>
+  <java-symbol type="bool" name="config_regional_wifi_calling_wizard"/>
 </resources>

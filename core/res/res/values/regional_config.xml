@@ -84,4 +84,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <string name="config_regional_alerts_for_drop_call_toast"></string>
     <bool name="config_regional_alerts_for_drop_call">false</bool>
+
+    <bool name="config_regional_wifi_calling_wizard">false</bool>
 </resources>
