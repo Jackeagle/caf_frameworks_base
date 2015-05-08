@@ -2352,4 +2352,8 @@
 
   <!-- for IMS to CS retry support -->
   <java-symbol type="bool"  name="config_carrier_cs_retry_available" />
+  <!-- Symbols/Overlays for Network settings start -->
+  <java-symbol type="bool" name="config_regional_smsc_editable" />
+  <!-- Symbols/Overlays for Network settings end -->
+
 </resources>
