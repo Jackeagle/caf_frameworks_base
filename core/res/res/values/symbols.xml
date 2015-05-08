@@ -2366,4 +2366,5 @@
   <java-symbol type="bool" name="config_regional_umts_singnal_threshold" />
   <!-- Symbols/Overlays for Network settings end -->
 
+  <java-symbol type="bool" name="config_regional_wifi_calling_wizard"/>
 </resources>
