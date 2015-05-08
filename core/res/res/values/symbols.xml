@@ -2342,4 +2342,5 @@
   <java-symbol type="string" name="def_hipri_share_component_class"/>
   <java-symbol type="string" name="card_string" />
 
+  <java-symbol type="string" name="authentication_failure" />
 </resources>
