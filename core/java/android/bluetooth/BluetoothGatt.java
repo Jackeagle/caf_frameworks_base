@@ -730,16 +730,17 @@ public final class BluetoothGatt implements BluetoothProfile {
             }
             mConnState = CONN_STATE_CONNECTING;
         }
+        mAutoConnect = autoConnect;
         if (!registerApp(callback)) {
             synchronized(mStateLock) {
                 mConnState = CONN_STATE_IDLE;
             }
             Log.e(TAG, "Failed to register callback");
+            mAutoConnect = false;
             return false;
         }
 
         // the connection will continue after successful callback registration
-        mAutoConnect = autoConnect;
         return true;
     }
 
