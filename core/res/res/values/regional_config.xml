@@ -58,4 +58,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_umts_singnal_threshold">false</bool>
 
     <bool name="config_regional_wifi_calling_wizard">false</bool>
+    <bool name="config_regional_wifi_calling_notificaion_enable">false</bool>
 </resources>

@@ -2367,4 +2367,5 @@
   <!-- Symbols/Overlays for Network settings end -->
 
   <java-symbol type="bool" name="config_regional_wifi_calling_wizard"/>
+  <java-symbol type="bool" name="config_regional_wifi_calling_notificaion_enable"/>
 </resources>
