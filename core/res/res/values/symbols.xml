@@ -2361,4 +2361,8 @@
   <java-symbol type="bool" name="config_regional_umts_singnal_threshold" />
   <!-- Symbols/Overlays for Network settings end -->
 
+  <java-symbol type="string" name="international_roaming_warning" />
+  <java-symbol type="string" name="turn_on_info" />
+  <java-symbol type="string" name="turn_off_info" />
+
 </resources>
