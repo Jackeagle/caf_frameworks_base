@@ -194,16 +194,16 @@ public abstract class Connection implements IConferenceable {
     public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
     /**
-     * Orientation mode Portrait
-     * @hide
-     */
-    public static final int ORIENTATION_MODE_PORTRAIT = 1;
-
-    /**
      * Orientation mode Landscape
      * @hide
      */
-    public static final int ORIENTATION_MODE_LANDSCAPE = 2;
+    public static final int ORIENTATION_MODE_LANDSCAPE = 1;
+
+    /**
+     * Orientation mode Portrait
+     * @hide
+     */
+    public static final int ORIENTATION_MODE_PORTRAIT = 2;
 
     /**
      * Orientation mode Dynamic
