@@ -79,6 +79,7 @@ import com.android.internal.os.SomeArgs;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.server.IoThread;
 import com.android.server.SystemService;
+import android.content.res.Resources;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -114,6 +115,8 @@ public final class TvInputManagerService extends SystemService {
     private final SparseArray<UserState> mUserStates = new SparseArray<UserState>();
 
     private final WatchLogHandler mWatchLogHandler;
+    private boolean mIsBootOpt = Resources.getSystem().
+            getBoolean(com.android.internal.R.bool.config_boot_opt);
 
     public TvInputManagerService(Context context) {
         super(context);
@@ -139,6 +142,13 @@ public final class TvInputManagerService extends SystemService {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             registerBroadcastReceivers();
         } else if (phase == SystemService.PHASE_THIRD_PARTY_APPS_CAN_START) {
+            synchronized (mLock) {
+                buildTvInputListLocked(mCurrentUserId, null);
+                buildTvContentRatingSystemListLocked(mCurrentUserId);
+            }
+        } else if (mIsBootOpt == true && phase ==
+                SystemService.PHASE_SERVICES_DEFER_COMPLETED) {
+            registerBroadcastReceivers();
             synchronized (mLock) {
                 buildTvInputListLocked(mCurrentUserId, null);
                 buildTvContentRatingSystemListLocked(mCurrentUserId);
