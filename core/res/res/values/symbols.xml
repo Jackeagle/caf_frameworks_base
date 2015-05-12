@@ -2252,11 +2252,17 @@
 
   <!-- cpu boost for AppLaunch -->
   <java-symbol type="bool" name="config_enableCpuBoostForAppLaunch" />
+  <java-symbol type="integer" name="disablepacking_timeout_param" />
   <java-symbol type="integer" name="launchboost_timeout_param" />
   <java-symbol type="integer" name="launchboost_schedboost_param" />
   <java-symbol type="integer" name="launchboost_cpuboost_param" />
+  <java-symbol type="integer" name="launchboost_cpunumboost_param" />
   <java-symbol type="integer" name="launchboost_pcdisbl_param" />
   <java-symbol type="integer" name="launchboost_ksmboost_param" />
+  <java-symbol type="integer" name="launchboost_smtaskboost_param" />
+  <java-symbol type="integer" name="launchboost_idleloadboost_param" />
+  <java-symbol type="integer" name="launchboost_idlenrrunboost_param" />
+  <java-symbol type="integer" name="launchboost_preferidle_param" />
 
   <!-- cpu boost for Animationboost -->
   <java-symbol type="bool" name="config_enablePerfBoostForAnimation" />
