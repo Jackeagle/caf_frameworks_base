@@ -1080,7 +1080,7 @@ public class SignalStrength implements Parcelable {
     private static void log(String s) {
         Rlog.w(LOG_TAG, s);
     }
-    public int getGsmDbmLevel() {
+    private int getGsmDbmLevel() {
         int level;
         int dbm = getGsmDbm();
         if (dbm == -1) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
