@@ -121,4 +121,21 @@ interface IImsCallSessionListener {
      */
     void callSessionDeflected(in IImsCallSession session);
     void callSessionDeflectFailed(in IImsCallSession session, in ImsReasonInfo reasonInfo);
+
+    /**
+     * Notifies the retry error information for the current session.
+     * @param reasonInfo.mcode is a one of the following:
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_FORBIDDEN}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_REQUEST_TIMEOUT}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_TEMPRARILY_UNAVAILABLE}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVER_INTERNAL_ERROR}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVER_NOT_IMPLEMENTED}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVER_BAD_GATEWAY}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVICE_UNAVAILABLE}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVER_VERSION_UNSUPPORTED}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVER_MESSAGE_TOOLARGE}
+     * - {@link com.android.ims.ImsReasonInfo#CODE_SIP_SERVER_PRECONDITION_FAILURE}
+     */
+    void callSessionRetryErrorReceived(in IImsCallSession session,
+            in ImsReasonInfo reasonInfo);
 }
