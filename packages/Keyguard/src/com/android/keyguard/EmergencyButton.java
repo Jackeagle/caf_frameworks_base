@@ -61,8 +61,15 @@ public class EmergencyButton extends Button {
             updateEmergencyCallButton(phoneState);
         }
 
+        @Override
         void onServiceStateChanged(ServiceState state, long sub) {
             mServiceState.put(sub, state);
+            int phoneState = KeyguardUpdateMonitor.getInstance(mContext).getPhoneState();
+            updateEmergencyCallButton(phoneState);
+        }
+
+        @Override
+        public void onSubIdUpdated(long oldSubId, long newSubId) {
             int phoneState = KeyguardUpdateMonitor.getInstance(mContext).getPhoneState();
             updateEmergencyCallButton(phoneState);
         }
