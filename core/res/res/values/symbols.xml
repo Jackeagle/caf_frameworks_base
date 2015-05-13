@@ -2363,4 +2363,5 @@
   <!-- Symbols/Overlays for Network settings end -->
 
   <java-symbol type="bool" name="config_regional_noti_move_away_lte_video_call" />
+  <java-symbol type="bool" name="config_regional_number_patterns_video_call" />
 </resources>

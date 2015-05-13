@@ -52,4 +52,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_umts_singnal_threshold">false</bool>
 
     <bool name="config_regional_noti_move_away_lte_video_call">false</bool>
+    <bool name="config_regional_number_patterns_video_call">false</bool>
 </resources>
