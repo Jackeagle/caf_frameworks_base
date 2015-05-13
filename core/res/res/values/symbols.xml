@@ -2378,4 +2378,5 @@
   <java-symbol type="string" name="config_regional_hotspot_accout_up_sell_url"/>
   <java-symbol type="array" name="config_regional_carrier_operator_list" />
   <java-symbol type="bool" name="config_regional_wea_duplicated_check_database" />
+  <java-symbol type="bool" name="config_regional_wea_duplicated_check_deleted_records" />
 </resources>
