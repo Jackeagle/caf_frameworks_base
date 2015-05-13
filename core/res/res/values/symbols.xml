@@ -2342,4 +2342,5 @@
   <java-symbol type="string" name="card_string" />
 
   <java-symbol type="bool" name="config_regional_wea_duplicated_check_database" />
+  <java-symbol type="bool" name="config_regional_wea_duplicated_check_deleted_records" />
 </resources>

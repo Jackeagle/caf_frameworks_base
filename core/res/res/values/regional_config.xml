@@ -33,4 +33,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     customize the default value as false, true is for regional package.
     -->
     <bool name="config_regional_wea_duplicated_check_database">false</bool>
+    <bool name="config_regional_wea_duplicated_check_deleted_records">false</bool>
 </resources>
