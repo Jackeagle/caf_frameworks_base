@@ -258,7 +258,10 @@ status_t SampleTable::setTimeToSampleParams(
     }
 
     mTimeToSampleCount = U32_AT(&header[4]);
-    mTimeToSample = new uint32_t[mTimeToSampleCount * 2];
+    uint64_t allocSize = mTimeToSampleCount * 2 * sizeof(uint32_t);
+    if (allocSize > SIZE_MAX) {
+        return ERROR_OUT_OF_RANGE;
+    }
 
     size_t size = sizeof(uint32_t) * mTimeToSampleCount * 2;
     if (mDataSource->readAt(
