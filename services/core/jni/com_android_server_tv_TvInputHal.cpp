@@ -283,7 +283,6 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
 }
 
 void BufferProducerThread::shutdown() {
-    Mutex::Autolock autoLock(&mLock);
     mShutdown = true;
     {
         Mutex::Autolock autoLock(&mLock);
