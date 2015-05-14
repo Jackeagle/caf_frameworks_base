@@ -72,4 +72,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_wea_duplicated_check_deleted_records">false</bool>
 
     <bool name="config_regional_both_display_roaming_network">false</bool>
+    
+    <bool name="config_regional_noti_move_away_lte_video_call">false</bool>
 </resources>

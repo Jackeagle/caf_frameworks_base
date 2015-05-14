@@ -2383,4 +2383,5 @@
   <java-symbol type="bool" name="config_regional_both_display_roaming_network"/>
 
   <java-symbol type="bool" name="config_regional_ussd_hide_error_from_network_enable" />
+  <java-symbol type="bool" name="config_regional_noti_move_away_lte_video_call" />
 </resources>
