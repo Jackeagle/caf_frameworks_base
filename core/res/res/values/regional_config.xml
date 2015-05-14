@@ -52,6 +52,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_lte_singnal_threshold">false</bool>
     <!-- Whether to use UMTS singnal strength threshold -->
     <bool name="config_regional_umts_singnal_threshold">false</bool>
+    <bool name="config_regional_search_use_clientid">false</bool>
 
     <bool name="config_regional_show_password_enable">false</bool>
     <bool name="config_regional_call_data_usage_enable">false</bool>
