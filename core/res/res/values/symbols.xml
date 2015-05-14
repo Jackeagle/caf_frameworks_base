@@ -2345,6 +2345,7 @@
   <java-symbol type="bool" name="config_regional_hotspot_show_help" />
   <java-symbol type="bool" name="config_regional_hotspot_show_maximum_connection_enable" />
   <java-symbol type="bool" name="config_regional_hotspot_accout_check_enable" />
+  <java-symbol type="bool" name="config_regional_hotspot_show_broadcast_ssid_checkbox" />
   <java-symbol type="bool" name="config_regional_hotspot_show_open_security_dialog" />
   <java-symbol type="string" name="config_regional_hotspot_accout_check_server_url"/>
   <java-symbol type="string" name="config_regional_hotspot_accout_up_sell_url"/>
