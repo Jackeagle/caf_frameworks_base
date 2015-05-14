@@ -220,7 +220,7 @@ final class ProcessList {
     // 1280x800 or larger screen with around 1GB RAM.  Values are in KB.
     private final int[] mOomMinFreeHigh = new int[] {
             73728, 92160, 110592,
-            129024, 225000, 325000
+            129024, 147456, 184320
     };
     // The actual OOM killer memory levels we are using.
     private final int[] mOomMinFree = new int[mOomAdj.length];
@@ -283,11 +283,6 @@ final class ProcessList {
         // memory than just for 64 bit.  This should probably have some more
         // tuning done, so not deleting it quite yet...
         final boolean is64bit = Build.SUPPORTED_64_BIT_ABIS.length > 0;
-        if (is64bit) {
-            // Increase the high min-free levels for cached processes for 64-bit
-            mOomMinFreeHigh[4] = 225000;
-            mOomMinFreeHigh[5] = 325000;
-        }
 
         for (int i=0; i<mOomAdj.length; i++) {
             int low = mOomMinFreeLow[i];
