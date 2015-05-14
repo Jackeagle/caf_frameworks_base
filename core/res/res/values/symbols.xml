@@ -2366,6 +2366,9 @@
   <java-symbol type="bool" name="config_regional_show_password_enable"/>
   <java-symbol type="bool" name="config_regional_call_data_usage_enable"/>
   <java-symbol type="bool" name="config_regional_use_empty_password_default"/>
+  <!-- Symbols/Overlays for USB tethering settings start -->
+  <java-symbol type="bool" name="config_regional_usb_tethering_quick_start_enable" />
+  <!-- Symbols/Overlays for USB tethering settings end -->
   <java-symbol type="bool" name="config_regional_dataUsage_enable_default"/>
   <java-symbol type="bool" name="config_regional_security_show_password_enable"/>
   <java-symbol type="bool" name="config_regional_customized_email_signature"/>

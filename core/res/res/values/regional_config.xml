@@ -53,6 +53,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <!-- Whether to use UMTS singnal strength threshold -->
     <bool name="config_regional_umts_singnal_threshold">false</bool>
     <bool name="config_regional_search_use_clientid">false</bool>
+    <!-- Whether to show USB tethering in USB settings -->
+    <bool name="config_regional_usb_tethering_quick_start_enable">false</bool>
 
     <bool name="config_regional_show_password_enable">false</bool>
     <bool name="config_regional_call_data_usage_enable">false</bool>
