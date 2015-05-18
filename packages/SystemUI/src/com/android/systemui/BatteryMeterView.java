@@ -241,6 +241,12 @@ public class BatteryMeterView extends View implements DemoMode,
         mBoltPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mBoltPaint.setColor(res.getColor(R.color.batterymeter_bolt_color));
         mBoltPoints = loadBoltPoints(res);
+
+        // Setting visibility to GONE if it is AUTO product
+        boolean isBootOpt = getResources().getBoolean(com.android.internal.R.bool.config_boot_opt);
+        if (isBootOpt) {
+            setVisibility(GONE);
+        }
     }
 
     public void setBatteryController(BatteryController batteryController) {

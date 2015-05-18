@@ -337,6 +337,12 @@ public class StatusBarHeaderView extends RelativeLayout implements View.OnClickL
         }
         mEmergencyCallsOnly.setVisibility(mExpanded && mShowEmergencyCallsOnly ? VISIBLE : GONE);
         mBatteryLevel.setVisibility(mExpanded ? View.VISIBLE : View.GONE);
+
+        // Setting visibility to GONE if it is AUTO product
+        boolean isBootOpt = getResources().getBoolean(com.android.internal.R.bool.config_boot_opt);
+        if (isBootOpt) {
+            mBatteryLevel.setVisibility(View.GONE);
+        }
     }
 
     private void updateSignalClusterDetachment() {
