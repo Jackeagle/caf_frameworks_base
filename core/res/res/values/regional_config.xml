@@ -37,6 +37,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_volte_switch_enable">false</bool>
     <bool name="config_regional_preferred_network_customization">false</bool>
     <bool name="config_regional_mms_via_wifi_enable">false</bool>
+    <bool name="config_regional_sms_notification_from_911_disable">false</bool>
     <!-- Whether to set smsc editable-->
     <bool name="config_regional_smsc_editable">false</bool>
     <!-- Whether to set voicemail address editable-->
