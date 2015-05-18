@@ -2348,6 +2348,7 @@
   <java-symbol type="string" name="config_regional_carrier_operator"/>
   <java-symbol type="bool" name="config_regional_volte_switch_enable" />
   <java-symbol type="bool" name="config_regional_preferred_network_customization" />
+  <java-symbol type="bool" name="config_regional_mms_via_wifi_enable" />
   <!-- Regional Specific Symbols/Overlays end -->
 
   <!-- for IMS to CS retry support -->
