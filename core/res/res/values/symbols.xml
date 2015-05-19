@@ -2348,6 +2348,7 @@
   <java-symbol type="bool" name="config_regional_hotspot_show_broadcast_ssid_checkbox" />
   <java-symbol type="bool" name="config_regional_hotspot_show_open_security_dialog" />
   <java-symbol type="bool" name="config_regional_hotspot_default_ssid_with_imei_enable" />
+  <java-symbol type="bool" name="config_regional_hotspot_show_notification_when_turn_on" />
   <java-symbol type="string" name="config_regional_hotspot_accout_check_server_url"/>
   <java-symbol type="string" name="config_regional_hotspot_accout_up_sell_url"/>
   <java-symbol type="array" name="config_regional_carrier_operator_list" />
