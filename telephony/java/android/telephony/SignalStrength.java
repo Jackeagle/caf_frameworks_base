@@ -1084,10 +1084,10 @@ public class SignalStrength implements Parcelable {
         int level;
         int dbm = getGsmDbm();
         if (dbm == -1) level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
-        else if (dbm < 89) level = SIGNAL_STRENGTH_GREAT;
-        else if (dbm < 97) level = SIGNAL_STRENGTH_GOOD;
-        else if (dbm < 103) level = SIGNAL_STRENGTH_MODERATE;
-        else if (dbm < 113) level = SIGNAL_STRENGTH_POOR;
+        else if (dbm <= 89) level = SIGNAL_STRENGTH_GREAT;
+        else if (dbm <= 97) level = SIGNAL_STRENGTH_GOOD;
+        else if (dbm <= 103) level = SIGNAL_STRENGTH_MODERATE;
+        else if (dbm <= 113) level = SIGNAL_STRENGTH_POOR;
         else level = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
         return level;
     }
