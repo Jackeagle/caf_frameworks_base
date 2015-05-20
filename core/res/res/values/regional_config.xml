@@ -44,6 +44,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_show_change_dataroaming_message">false</bool>
     <!-- Whether to hide IMS and DUN Apns -->
     <bool name="config_regional_hide_ims_and_dun_apns">false</bool>
+    <bool name="config_regional_display_icc_id_enable">false</bool>
+    <string name="config_regional_connection_menu_option" translatable="false"></string>
     <!-- Whether to use MCC MNC roaming setting -->
     <bool name="config_regional_mcc_mnc_roaming_setting">false</bool>
     <!-- Whether to use LTE singnal strength threshold -->
@@ -51,4 +53,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <!-- Whether to use UMTS singnal strength threshold -->
     <bool name="config_regional_umts_singnal_threshold">false</bool>
 
+    <bool name="config_regional_show_password_enable">false</bool>
+    <bool name="config_regional_use_empty_password_default">false</bool>
+    <bool name="config_regional_dataUsage_enable_default">false</bool>
+    <bool name="config_regional_security_show_password_enable">false</bool>
 </resources>
