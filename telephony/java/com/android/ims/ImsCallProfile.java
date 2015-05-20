@@ -188,6 +188,7 @@ public class ImsCallProfile implements Parcelable {
     // Extra string for internal use only. OEMs should not use
     // this for packing extras.
     public static final String EXTRA_OEM_EXTRAS = "OemCallExtras";
+    public static final String KEY_SESSION_MODIFICATION_CAUSE = "SessionModificationCause";
 
     public int mServiceType;
     public int mCallType;
@@ -264,6 +265,12 @@ public class ImsCallProfile implements Parcelable {
     public void setCallExtraInt(String name, int value) {
         if (mCallExtras != null) {
             mCallExtras.putInt(name, value);
+        }
+    }
+
+    public void removeCallExtra(String name) {
+        if (mCallExtras != null) {
+            mCallExtras.remove(name);
         }
     }
 

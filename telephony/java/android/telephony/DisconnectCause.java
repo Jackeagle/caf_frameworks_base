@@ -245,6 +245,9 @@ public class DisconnectCause {
     public static final int CALL_RETRY_BY_SILENT_REDIAL = 96;
     public static final int CALL_RETRY_BY_USER_CONSENT = 97;
 
+    /** call failed due to LTE to 3G/2G handover not feasible */
+    public static final int HO_NOT_FEASIBLE = 98;
+
     //*********************************************************************************************
     // When adding a disconnect type:
     // 1) Please assign the new type the next id value below.
@@ -253,14 +256,14 @@ public class DisconnectCause {
     // 4) Update toString() with the newly added disconnect type.
     // 5) Update android.telecom.DisconnectCauseUtil with any mappings to a telecom.DisconnectCause.
     //
-    // NextId: 98
+    // NextId: 99
     //*********************************************************************************************
 
     /** Smallest valid value for call disconnect codes. */
     public static final int MINIMUM_VALID_VALUE = NOT_DISCONNECTED;
 
     /** Largest valid value for call disconnect codes. */
-    public static final int MAXIMUM_VALID_VALUE = CALL_RETRY_BY_USER_CONSENT;
+    public static final int MAXIMUM_VALID_VALUE = HO_NOT_FEASIBLE;
 
     /** Private constructor to avoid class instantiation. */
     private DisconnectCause() {
@@ -376,6 +379,8 @@ public class DisconnectCause {
             return "CALL_RETRY_BY_SILENT_REDIAL";
         case CALL_RETRY_BY_USER_CONSENT:
             return "CALL_RETRY_BY_USER_CONSENT";
+        case HO_NOT_FEASIBLE:
+            return "HO_NOT_FEASIBLE";
         default:
             return "INVALID: " + cause;
         }

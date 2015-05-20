@@ -194,22 +194,100 @@ public abstract class Connection implements IConferenceable {
     public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
     /**
-     * Orientation mode Portrait
-     * @hide
-     */
-    public static final int ORIENTATION_MODE_PORTRAIT = 1;
-
-    /**
      * Orientation mode Landscape
      * @hide
      */
-    public static final int ORIENTATION_MODE_LANDSCAPE = 2;
+    public static final int ORIENTATION_MODE_LANDSCAPE = 1;
+
+    /**
+     * Orientation mode Portrait
+     * @hide
+     */
+    public static final int ORIENTATION_MODE_PORTRAIT = 2;
 
     /**
      * Orientation mode Dynamic
      * @hide
      */
     public static final int ORIENTATION_MODE_DYNAMIC = 3;
+
+    /**
+     * Upgrade/downgrade of a volte/vt call due to unknown reason.
+     * @hide
+     */
+    public static final int CAUSE_CODE_UNSPECIFIED = 0;
+
+    /**
+     * Upgrade of a volte call on request from local end
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_UPGRADE_LOCAL_REQ = 1;
+
+    /**
+     * Upgrade of a volte call on request from remote end
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_UPGRADE_REMOTE_REQ = 2;
+
+    /**
+     * Downgrade of a vt call on request from local end
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_LOCAL_REQ = 3;
+
+    /**
+     * Downgrade of a vt call on request from remote end
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_REMOTE_REQ = 4;
+
+    /**
+     * Downgrade of a vt call due to RTP/RTCP Timeout for Video stream
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_RTP_TIMEOUT = 5;
+
+    /**
+     * Downgrade of a vt call due to QOS for Video stream
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_QOS = 6;
+
+    /**
+     * Downgrade of a vt call due to PACKET LOSS for Video stream
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_PACKET_LOSS = 7;
+
+    /**
+     * Downgrade of a vt call due to Low throughput for Video stream
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_LOW_THRPUT = 8;
+
+    /**
+     * Downgrade of a vt call due to Thermal Mitigation
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_THERM_MITIGATION = 9;
+
+    /**
+     * Downgrade of a vt call due to Lip-sync
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_LIPSYNC = 10;
+
+    /**
+     * Downgrade of a vt call due to generic error
+     * @hide
+     */
+    public static final int CAUSE_CODE_SESSION_MODIFY_DOWNGRADE_GENERIC_ERROR = 11;
+
+    /**
+     * Session modification cause extras key
+     * @hide
+     */
+    public static final String KEY_SESSION_MODIFICATION_CAUSE = "SessionModificationCause";
 
     // Flag controlling whether PII is emitted into the logs
     private static final boolean PII_DEBUG = Log.isLoggable(android.util.Log.DEBUG);
