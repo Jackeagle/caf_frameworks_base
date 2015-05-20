@@ -161,7 +161,7 @@ public final class SystemServer {
     private Context mSystemContext;
     private SystemServiceManager mSystemServiceManager;
     private boolean mIsBootOpt = Resources.getSystem().
-                    getBoolean(com.android.internal.R.bool.config_boot_opt);
+            getBoolean(com.android.internal.R.bool.config_boot_opt);
 
     // TODO: remove all of these references by improving dependency resolution and boot phases
     private PowerManagerService mPowerManagerService;
@@ -172,6 +172,10 @@ public final class SystemServer {
     private PackageManager mPackageManager;
     private ContentResolver mContentResolver;
 
+    private NetworkManagementService mNetworkManagement;
+    private NetworkStatsService mNetworkStats;
+    private NetworkPolicyManagerService mNetworkPolicy;
+    private NetworkScoreService mNetworkScore;
     private boolean mOnlyCore;
     private boolean mFirstBoot;
 
@@ -283,12 +287,12 @@ public final class SystemServer {
             startBootstrapServices();
             startCoreServices();
             startOtherServices();
-            Slog.e(TAG," ProductConfig Value is:"+mIsBootOpt);
-            if ( true == mIsBootOpt) {
+            Slog.e(TAG," ProductConfig Value is:" + mIsBootOpt);
+            if (mIsBootOpt == true) {
                 Slog.i(TAG,"*****  Start other ref services for automotive *****");
                 if (null != mSystemContext) {
-                   mSystemContext.registerReceiver(mBroadcastReceiver,
-                       new IntentFilter(Intent.ACTION_BOOT_COMPLETED));
+                    mSystemContext.registerReceiver(mBroadcastReceiver,
+                            new IntentFilter(Intent.ACTION_BOOT_COMPLETED));
                 }
             }
         } catch (Throwable ex) {
@@ -425,8 +429,11 @@ public final class SystemServer {
         // Update after UsageStatsService is available, needed before performBootDexOpt.
         mPackageManagerService.getUsageStatsIfNoPackageUsageInfo();
 
-        // Tracks whether the updatable WebView is in a ready state and watches for update installs.
-        mSystemServiceManager.startService(WebViewUpdateService.class);
+        if (mIsBootOpt == false) {
+            // Tracks whether the updatable WebView is in a ready state and
+            // watches for update installs.
+            mSystemServiceManager.startService(WebViewUpdateService.class);
+        }
     }
 
     private void startOtherRefServices() {
@@ -442,6 +449,10 @@ public final class SystemServer {
            "config.disable_location", false);
         boolean disableAtlas = SystemProperties.getBoolean(
            "config.disable_atlas", false);
+
+        mSystemServiceManager.startService(WebViewUpdateService.class);
+        Slog.i(TAG, "WebViewFactory preparation");
+        WebViewFactory.prepareWebViewInSystemServer();
 
         VibratorService vibrator = null;
         Slog.i(TAG, "Vibrator Service");
@@ -592,6 +603,10 @@ public final class SystemServer {
         final AssetAtlasService atlasF = atlas;
         final MmsServiceBroker mmsServiceF = mmsService;
 
+        final NetworkManagementService networkManagementF = mNetworkManagement;
+        final NetworkStatsService networkStatsF = mNetworkStats;
+        final NetworkPolicyManagerService networkPolicyF = mNetworkPolicy;
+        final NetworkScoreService networkScoreF = mNetworkScore;
         // We now tell the activity manager it is okay to run third party
         // code. It will call back into us once it has gotten to the state
         // where third party code can really run (but before it has actually
@@ -600,6 +615,26 @@ public final class SystemServer {
         mActivityManagerService.systemReady(new Runnable() {
             @Override
             public void run() {
+                try {
+                    if (networkScoreF != null) networkScoreF.systemReady();
+                } catch (Throwable e) {
+                    reportWtf("making Network Score Service ready", e);
+                }
+                try {
+                    if (networkManagementF != null) networkManagementF.systemReady();
+                } catch (Throwable e) {
+                    reportWtf("making Network Managment Service ready", e);
+                }
+                try {
+                    if (networkStatsF != null) networkStatsF.systemReady();
+                } catch (Throwable e) {
+                    reportWtf("making Network Stats Service ready", e);
+                }
+                try {
+                    if (networkPolicyF != null) networkPolicyF.systemReady();
+                } catch (Throwable e) {
+                    reportWtf("making Network Policy Service ready", e);
+                }
                 try {
                     if (countryDetectorF != null)
                          countryDetectorF.systemRunning();
@@ -647,11 +682,7 @@ public final class SystemServer {
         VibratorService vibrator = null;
         IAlarmManager alarm = null;
         MountService mountService = null;
-        NetworkManagementService networkManagement = null;
-        NetworkStatsService networkStats = null;
-        NetworkPolicyManagerService networkPolicy = null;
         ConnectivityService connectivity = null;
-        NetworkScoreService networkScore = null;
         NsdService serviceDiscovery= null;
         WindowManagerService wm = null;
         BluetoothManagerService bluetooth = null;
@@ -714,7 +745,7 @@ public final class SystemServer {
             Slog.i(TAG, "System Content Providers");
             mActivityManagerService.installSystemProviders();
 
-            if (false == mIsBootOpt) {
+            if (mIsBootOpt == false) {
                 Slog.i(TAG, "Vibrator Service");
                 vibrator = new VibratorService(context);
                 ServiceManager.addService("vibrator", vibrator);
@@ -870,12 +901,12 @@ public final class SystemServer {
                     reportWtf("starting StatusBarManagerService", e);
                 }
             }
-            if (false == mIsBootOpt) {
+            if (mIsBootOpt == false) {
                 if (!disableNonCoreServices) {
                     try {
                         Slog.i(TAG, "Clipboard Service");
                         ServiceManager.addService(Context.CLIPBOARD_SERVICE,
-                            new ClipboardService(context));
+                                new ClipboardService(context));
                     } catch (Throwable e) {
                         reportWtf("starting Clipboard Service", e);
                     }
@@ -885,8 +916,8 @@ public final class SystemServer {
             if (!disableNetwork) {
                 try {
                     Slog.i(TAG, "NetworkManagement Service");
-                    networkManagement = NetworkManagementService.create(context);
-                    ServiceManager.addService(Context.NETWORKMANAGEMENT_SERVICE, networkManagement);
+                    mNetworkManagement = NetworkManagementService.create(context);
+                    ServiceManager.addService(Context.NETWORKMANAGEMENT_SERVICE, mNetworkManagement);
                 } catch (Throwable e) {
                     reportWtf("starting NetworkManagement Service", e);
                 }
@@ -905,27 +936,27 @@ public final class SystemServer {
             if (!disableNetwork) {
                 try {
                     Slog.i(TAG, "Network Score Service");
-                    networkScore = new NetworkScoreService(context);
-                    ServiceManager.addService(Context.NETWORK_SCORE_SERVICE, networkScore);
+                    mNetworkScore = new NetworkScoreService(context);
+                    ServiceManager.addService(Context.NETWORK_SCORE_SERVICE, mNetworkScore);
                 } catch (Throwable e) {
                     reportWtf("starting Network Score Service", e);
                 }
 
                 try {
                     Slog.i(TAG, "NetworkStats Service");
-                    networkStats = new NetworkStatsService(context, networkManagement, alarm);
-                    ServiceManager.addService(Context.NETWORK_STATS_SERVICE, networkStats);
+                    mNetworkStats = new NetworkStatsService(context, mNetworkManagement, alarm);
+                    ServiceManager.addService(Context.NETWORK_STATS_SERVICE, mNetworkStats);
                 } catch (Throwable e) {
                     reportWtf("starting NetworkStats Service", e);
                 }
 
                 try {
                     Slog.i(TAG, "NetworkPolicy Service");
-                    networkPolicy = new NetworkPolicyManagerService(
+                    mNetworkPolicy = new NetworkPolicyManagerService(
                             context, mActivityManagerService,
                             (IPowerManager)ServiceManager.getService(Context.POWER_SERVICE),
-                            networkStats, networkManagement);
-                    ServiceManager.addService(Context.NETWORK_POLICY_SERVICE, networkPolicy);
+                            mNetworkStats, mNetworkManagement);
+                    ServiceManager.addService(Context.NETWORK_POLICY_SERVICE, mNetworkPolicy);
                 } catch (Throwable e) {
                     reportWtf("starting NetworkPolicy Service", e);
                 }
@@ -936,7 +967,7 @@ public final class SystemServer {
                             "com.android.server.wifi.WifiScanningService");
 
                 mSystemServiceManager.startService("com.android.server.wifi.RttService");
-                if (false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
                     if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_ETHERNET)) {
                         mSystemServiceManager.startService(ETHERNET_SERVICE_CLASS);
                     }
@@ -945,14 +976,13 @@ public final class SystemServer {
                 try {
                     Slog.i(TAG, "Connectivity Service");
                     connectivity = new ConnectivityService(
-                            context, networkManagement, networkStats, networkPolicy);
+                            context, mNetworkManagement, mNetworkStats, mNetworkPolicy);
                     ServiceManager.addService(Context.CONNECTIVITY_SERVICE, connectivity);
-                    networkStats.bindConnectivityManager(connectivity);
-                    networkPolicy.bindConnectivityManager(connectivity);
+                    mNetworkStats.bindConnectivityManager(connectivity);
+                    mNetworkPolicy.bindConnectivityManager(connectivity);
                 } catch (Throwable e) {
                     reportWtf("starting Connectivity Service", e);
                 }
-
                 try {
                     Slog.i(TAG, "Network Service Discovery Service");
                     serviceDiscovery = NsdService.create(context);
@@ -1005,8 +1035,8 @@ public final class SystemServer {
             mSystemServiceManager.startService(NotificationManagerService.class);
             notification = INotificationManager.Stub.asInterface(
                     ServiceManager.getService(Context.NOTIFICATION_SERVICE));
-            networkPolicy.bindNotificationManager(notification);
-            if (false == mIsBootOpt)
+            mNetworkPolicy.bindNotificationManager(notification);
+            if (mIsBootOpt == false)
                 mSystemServiceManager.startService(DeviceStorageMonitorService.class);
             if (!disableLocation) {
                 try {
@@ -1016,7 +1046,7 @@ public final class SystemServer {
                 } catch (Throwable e) {
                     reportWtf("starting Location Manager", e);
                 }
-                if (false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
                     try {
                         Slog.i(TAG, "Country Detector");
                         countryDetector = new CountryDetectorService(context);
@@ -1065,9 +1095,9 @@ public final class SystemServer {
                     reportWtf("starting Audio Service", e);
                 }
             }
-            if (false == mIsBootOpt) {
+            if (mIsBootOpt == false) {
                 if (!disableNonCoreServices) {
-                mSystemServiceManager.startService(DockObserver.class);
+                    mSystemServiceManager.startService(DockObserver.class);
                 }
             }
             if (!disableMedia) {
@@ -1080,15 +1110,14 @@ public final class SystemServer {
                     reportWtf("starting WiredAccessoryManager", e);
                 }
             }
-            if (false == mIsBootOpt) {
+            if (mIsBootOpt == false) {
                 if (!disableNonCoreServices) {
                     if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
-                        || mPackageManager.hasSystemFeature(
-                                PackageManager.FEATURE_USB_ACCESSORY)) {
-                    // Manage USB host and device support
-                    mSystemServiceManager.startService(USB_SERVICE_CLASS);
+                            || mPackageManager.hasSystemFeature(
+                            PackageManager.FEATURE_USB_ACCESSORY)) {
+                        // Manage USB host and device support
+                        mSystemServiceManager.startService(USB_SERVICE_CLASS);
                 }
-
                     try {
                         Slog.i(TAG, "Serial Service");
                         // Serial port support
@@ -1107,18 +1136,19 @@ public final class SystemServer {
             mSystemServiceManager.startService(JobSchedulerService.class);
 
             if (!disableNonCoreServices) {
-                if ( false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
                     if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_BACKUP)) {
                         mSystemServiceManager.startService(BACKUP_MANAGER_SERVICE_CLASS);
                     }
-                    if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
-                        mSystemServiceManager.startService(VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
+                    if (mPackageManager.hasSystemFeature(PackageManager
+                            .FEATURE_VOICE_RECOGNIZERS)) {
+                        mSystemServiceManager.startService(
+                                VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
                     }
                 }
-
-                    if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_APP_WIDGETS)) {
-                        mSystemServiceManager.startService(APPWIDGET_SERVICE_CLASS);
-                    }
+                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_APP_WIDGETS)) {
+                    mSystemServiceManager.startService(APPWIDGET_SERVICE_CLASS);
+                }
             }
 
             if (!disableNetwork && !disableNetworkTime) {
@@ -1140,13 +1170,14 @@ public final class SystemServer {
                 } catch (Throwable e) {
                     reportWtf("starting SamplingProfiler Service", e);
                 }
-
-                if (!disableNetwork) {
-                    try {
-                        Slog.i(TAG, "NetworkTimeUpdateService");
-                        networkTimeUpdater = new NetworkTimeUpdateService(context);
-                    } catch (Throwable e) {
-                        reportWtf("starting NetworkTimeUpdate service", e);
+                if (mIsBootOpt == false) {
+                    if (!disableNetwork) {
+                        try {
+                            Slog.i(TAG, "NetworkTimeUpdateService");
+                            networkTimeUpdater = new NetworkTimeUpdateService(context);
+                        } catch (Throwable e) {
+                            reportWtf("starting NetworkTimeUpdate service", e);
+                        }
                     }
                 }
 
@@ -1169,7 +1200,7 @@ public final class SystemServer {
                     reportWtf("starting CertBlacklister", e);
                 }
             }
-            if (false == mIsBootOpt) {
+            if (mIsBootOpt == false) {
                 if (!disableNonCoreServices) {
                     // Dreams (interactive idle-time views, a/k/a screen savers, and doze mode)
                     mSystemServiceManager.startService(DreamManagerService.class);
@@ -1192,7 +1223,7 @@ public final class SystemServer {
             mSystemServiceManager.startService(RestrictionsManagerService.class);
 
             mSystemServiceManager.startService(MediaSessionService.class);
-            if (false == mIsBootOpt) {
+            if (mIsBootOpt == false) {
                 if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
                     mSystemServiceManager.startService(HdmiControlService.class);
                 }
@@ -1281,7 +1312,7 @@ public final class SystemServer {
             // Enable the JIT for the system_server process
             VMRuntime.getRuntime().startJitCompilation();
         }
-        if (false == mIsBootOpt) {
+        if (mIsBootOpt == false) {
             // MMS service broker
             mmsService = mSystemServiceManager.startService(MmsServiceBroker.class);
 
@@ -1317,6 +1348,7 @@ public final class SystemServer {
             mActivityManagerService.showSafeModeOverlay();
         }
 
+
         // Update the configuration for this context by hand, because we're going
         // to start using it before the config change done in wm.systemReady() will
         // propagate to it.
@@ -1348,11 +1380,11 @@ public final class SystemServer {
 
         // These are needed to propagate to the runnable below.
         final MountService mountServiceF = mountService;
-        final NetworkManagementService networkManagementF = networkManagement;
-        final NetworkStatsService networkStatsF = networkStats;
-        final NetworkPolicyManagerService networkPolicyF = networkPolicy;
+        final NetworkManagementService networkManagementF = mNetworkManagement;
+        final NetworkStatsService networkStatsF = mNetworkStats;
+        final NetworkPolicyManagerService networkPolicyF = mNetworkPolicy;
+        final NetworkScoreService networkScoreF = mNetworkScore;
         final ConnectivityService connectivityF = connectivity;
-        final NetworkScoreService networkScoreF = networkScore;
         final WallpaperManagerService wallpaperF = wallpaper;
         final InputMethodManagerService immF = imm;
         final LocationManagerService locationF = location;
@@ -1385,10 +1417,9 @@ public final class SystemServer {
                 } catch (Throwable e) {
                     reportWtf("observing native crashes", e);
                 }
-
-                Slog.i(TAG, "WebViewFactory preparation");
-                WebViewFactory.prepareWebViewInSystemServer();
-                if (false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
+                    Slog.i(TAG, "WebViewFactory preparation");
+                    WebViewFactory.prepareWebViewInSystemServer();
                     try {
                         startSystemUi(context);
                     } catch (Throwable e) {
@@ -1400,25 +1431,27 @@ public final class SystemServer {
                 } catch (Throwable e) {
                     reportWtf("making Mount Service ready", e);
                 }
-                try {
-                    if (networkScoreF != null) networkScoreF.systemReady();
-                } catch (Throwable e) {
-                    reportWtf("making Network Score Service ready", e);
-                }
-                try {
-                    if (networkManagementF != null) networkManagementF.systemReady();
-                } catch (Throwable e) {
-                    reportWtf("making Network Managment Service ready", e);
-                }
-                try {
-                    if (networkStatsF != null) networkStatsF.systemReady();
-                } catch (Throwable e) {
-                    reportWtf("making Network Stats Service ready", e);
-                }
-                try {
-                    if (networkPolicyF != null) networkPolicyF.systemReady();
-                } catch (Throwable e) {
-                    reportWtf("making Network Policy Service ready", e);
+                if (mIsBootOpt == false) {
+                    try {
+                        if (networkScoreF != null) networkScoreF.systemReady();
+                    } catch (Throwable e) {
+                        reportWtf("making Network Score Service ready", e);
+                    }
+                    try {
+                        if (networkManagementF != null) networkManagementF.systemReady();
+                    } catch (Throwable e) {
+                        reportWtf("making Network Managment Service ready", e);
+                    }
+                    try {
+                        if (networkStatsF != null) networkStatsF.systemReady();
+                    } catch (Throwable e) {
+                        reportWtf("making Network Stats Service ready", e);
+                    }
+                    try {
+                        if (networkPolicyF != null) networkPolicyF.systemReady();
+                    } catch (Throwable e) {
+                        reportWtf("making Network Policy Service ready", e);
+                    }
                 }
                 try {
                     if (connectivityF != null) connectivityF.systemReady();
@@ -1453,7 +1486,7 @@ public final class SystemServer {
                 } catch (Throwable e) {
                          reportWtf("Notifying Location Service running", e);
                 }
-                if (false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
                     try {
                         if (countryDetectorF != null) countryDetectorF.systemRunning();
                     } catch (Throwable e) {
@@ -1478,7 +1511,7 @@ public final class SystemServer {
                 } catch (Throwable e) {
                     reportWtf("Notifying TextServicesManagerService running", e);
                 }
-                if (false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
                     try {
                         if (atlasF != null) atlasF.systemRunning();
                     } catch (Throwable e) {
@@ -1501,7 +1534,7 @@ public final class SystemServer {
                 } catch (Throwable e) {
                     reportWtf("Notifying MediaRouterService running", e);
                 }
-                if (false == mIsBootOpt) {
+                if (mIsBootOpt == false) {
                     try {
                         if (mmsServiceF != null) mmsServiceF.systemRunning();
                     } catch (Throwable e) {
