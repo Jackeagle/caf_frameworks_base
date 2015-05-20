@@ -1471,6 +1471,11 @@ public class Activity extends ContextThemeWrapper
     @CallSuper
     protected void onPause() {
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onPause " + this);
+        onPauseBase();
+    }
+
+    private void onPauseBase() {
+        if (DEBUG_LIFECYCLE) Slog.v(TAG, "onPauseBase " + this);
         getApplication().dispatchActivityPaused(this);
         mCalled = true;
     }
@@ -1614,6 +1619,11 @@ public class Activity extends ContextThemeWrapper
     @CallSuper
     protected void onStop() {
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onStop " + this);
+        onStopBase();
+    }
+
+    private void onStopBase() {
+        if (DEBUG_LIFECYCLE) Slog.v(TAG, "onStopBase " + this);
         if (mActionBar != null) mActionBar.setShowHideAnimationEnabled(false);
         mActivityTransitionState.onStop();
         getApplication().dispatchActivityStopped(this);
@@ -6378,8 +6388,23 @@ public class Activity extends ContextThemeWrapper
     final void performPause() {
         mDoReportFullyDrawn = false;
         mFragments.dispatchPause();
+
+        boolean ignore = false;
+        try {
+            ignore = WindowManagerGlobal.getInstance()
+                        .getWindowManagerService().hasExternalDisplayWindow(mToken);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to call Window Manager Service!" + e);
+        }
+
         mCalled = false;
-        onPause();
+        if (ignore) {
+            // To support multiple apps running in multiple displays,
+            // ignore onPause() so that Presentations in external displays can be retained
+            onPauseBase();
+        } else {
+            onPause();
+        }
         mResumed = false;
         if (!mCalled && getApplicationInfo().targetSdkVersion
                 >= android.os.Build.VERSION_CODES.GINGERBREAD) {
@@ -6410,8 +6435,22 @@ public class Activity extends ContextThemeWrapper
 
             mFragments.dispatchStop();
 
+            boolean ignore = false;
+            try {
+                ignore = WindowManagerGlobal.getInstance()
+                            .getWindowManagerService().hasExternalDisplayWindow(mToken);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Failed to call Window Manager Service!" + e);
+            }
+
             mCalled = false;
-            mInstrumentation.callActivityOnStop(this);
+            if (ignore) {
+                // To support multiple apps running in multiple displays,
+                // ignore onStop() so that Presentations in external displays can be retained
+                onStopBase();
+            } else {
+                mInstrumentation.callActivityOnStop(this);
+            }
             if (!mCalled) {
                 throw new SuperNotCalledException(
                     "Activity " + mComponent.toShortString() +

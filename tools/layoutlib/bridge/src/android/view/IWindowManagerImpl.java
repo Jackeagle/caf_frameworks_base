@@ -325,6 +325,11 @@ public class IWindowManagerImpl implements IWindowManager {
     }
 
     @Override
+    public boolean hasExternalDisplayWindow(IBinder arg0) throws RemoteException {
+        // TODO Auto-generated method stub
+    }
+
+    @Override
     public void setAppVisibility(IBinder arg0, boolean arg1) throws RemoteException {
         // TODO Auto-generated method stub
 
