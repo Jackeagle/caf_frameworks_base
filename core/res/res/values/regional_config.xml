@@ -45,4 +45,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <string name="config_regional_hotspot_accout_check_server_url" translatable="false"></string>
     <string name="config_regional_hotspot_accout_up_sell_url" translatable="false"></string>
     <string-array translatable="false" name="config_regional_carrier_operator_list"></string-array>
+    <bool name="config_regional_show_password_enable">false</bool>
+    <bool name="config_regional_use_empty_password_default">false</bool>
 </resources>

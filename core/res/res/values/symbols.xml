@@ -2354,4 +2354,6 @@
   <java-symbol type="string" name="config_regional_hotspot_accout_check_server_url"/>
   <java-symbol type="string" name="config_regional_hotspot_accout_up_sell_url"/>
   <java-symbol type="array" name="config_regional_carrier_operator_list" />
+  <java-symbol type="bool" name="config_regional_show_password_enable"/>
+  <java-symbol type="bool" name="config_regional_use_empty_password_default"/>
 </resources>
