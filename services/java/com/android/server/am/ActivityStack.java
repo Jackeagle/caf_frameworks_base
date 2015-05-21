@@ -1670,6 +1670,11 @@ final class ActivityStack {
         ActivityStack lastStack = mStackSupervisor.getLastStack();
         final boolean fromHome = lastStack == null ? true : lastStack.isHomeStack();
         if (!isHomeStack() && (fromHome || topTask() != task)) {
+            if (!fromHome && task.mOnTopOfHome) {
+                int taskNdx = mTaskHistory.indexOf(task);
+                if ((taskNdx + 1) < mTaskHistory.size())
+                    mTaskHistory.get(taskNdx + 1).mOnTopOfHome = true;
+            }
             task.mOnTopOfHome = fromHome;
         }
 
