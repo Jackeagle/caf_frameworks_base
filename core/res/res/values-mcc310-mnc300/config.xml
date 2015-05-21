@@ -32,4 +32,7 @@
 
     <!-- Flag specifying whether VoLTE TTY is supported -->
     <bool name="config_carrier_volte_tty_supported">false</bool>
+    <string-array translatable="false" name="config_tether_apndata">
+       <item>pcweb.tmobile.com,pcweb.tmobile.com,,,,,,,,,310,300,,DUN</item>
+    </string-array>
 </resources>
