@@ -33,4 +33,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     customize the default value as false, true is for regional package.
     -->
     <bool name="config_regional_hotspot_show_allowed_devices_enable">false</bool>
+    <bool name="config_regional_hotspot_show_maximum_connection_enable">false</bool>
 </resources>

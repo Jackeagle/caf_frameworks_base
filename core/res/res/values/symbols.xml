@@ -2342,4 +2342,5 @@
   <java-symbol type="string" name="card_string" />
 
   <java-symbol type="bool" name="config_regional_hotspot_show_allowed_devices_enable" />
+  <java-symbol type="bool" name="config_regional_hotspot_show_maximum_connection_enable" />
 </resources>
