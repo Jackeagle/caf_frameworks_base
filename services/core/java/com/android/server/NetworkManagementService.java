@@ -1418,9 +1418,20 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             if (wifiConfig == null) {
                 mConnector.execute("softap", "set", wlanIface);
             } else {
-                mConnector.execute("softap", "set", wlanIface, wifiConfig.SSID,
+                if (mContext.getResources().getBoolean(
+                        com.android.internal.R.bool
+                        .config_regional_hotspot_show_maximum_connection_enable)) {
+                    int clientNum = Settings.System.getInt(mContext.getContentResolver(),
+                            "WIFI_HOTSPOT_MAX_CLIENT_NUM",8);
+                    Slog.d(TAG, "clientNum :"+clientNum);
+                    mConnector.execute("softap", "set", wlanIface, wifiConfig.SSID,
+                                   "broadcast", "6", getSecurityType(wifiConfig),
+                                   new SensitiveArg(wifiConfig.preSharedKey),clientNum);
+                } else {
+                    mConnector.execute("softap", "set", wlanIface, wifiConfig.SSID,
                                    "broadcast", "6", getSecurityType(wifiConfig),
                                    new SensitiveArg(wifiConfig.preSharedKey));
+                }
             }
             mConnector.execute("softap", "startap");
         } catch (NativeDaemonConnectorException e) {
