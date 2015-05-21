@@ -1418,6 +1418,12 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             if (wifiConfig == null) {
                 mConnector.execute("softap", "set", wlanIface);
             } else {
+                String strBroadcast = "broadcast";
+                if (mContext.getResources().getBoolean(
+                    com.android.internal.R.bool
+                    .config_regional_hotspot_show_broadcast_ssid_checkbox)) {
+                    strBroadcast = wifiConfig.hiddenSSID?"hidden":"broadcast";
+                }
                 if (mContext.getResources().getBoolean(
                         com.android.internal.R.bool
                         .config_regional_hotspot_show_maximum_connection_enable)) {
@@ -1425,11 +1431,11 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                             "WIFI_HOTSPOT_MAX_CLIENT_NUM",8);
                     Slog.d(TAG, "clientNum :"+clientNum);
                     mConnector.execute("softap", "set", wlanIface, wifiConfig.SSID,
-                                   "broadcast", "6", getSecurityType(wifiConfig),
+                                   strBroadcast, "6", getSecurityType(wifiConfig),
                                    new SensitiveArg(wifiConfig.preSharedKey),clientNum);
                 } else {
                     mConnector.execute("softap", "set", wlanIface, wifiConfig.SSID,
-                                   "broadcast", "6", getSecurityType(wifiConfig),
+                                   strBroadcast, "6", getSecurityType(wifiConfig),
                                    new SensitiveArg(wifiConfig.preSharedKey));
                 }
             }
