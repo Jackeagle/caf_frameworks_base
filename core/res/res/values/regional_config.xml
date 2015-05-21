@@ -38,6 +38,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_hotspot_accout_check_enable">false</bool>
     <string name="config_regional_hotspot_accout_check_server_url" translatable="false"></string>
     <string name="config_regional_hotspot_accout_up_sell_url" translatable="false"></string>
+    <string-array translatable="false" name="config_regional_carrier_operator_list"></string-array>
     <bool name="config_regional_hspap_display_4g_icon">false</bool>
     <string name="config_regional_carrier_operator">000000</string>
     <bool name="config_regional_volte_switch_enable">false</bool>
