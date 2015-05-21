@@ -2366,4 +2366,5 @@
   <java-symbol type="string" name="turn_off_info" />
 
   <java-symbol type="bool" name="config_regional_hotspot_show_allowed_devices_enable" />
+  <java-symbol type="bool" name="config_regional_hotspot_show_maximum_connection_enable" />
 </resources>
