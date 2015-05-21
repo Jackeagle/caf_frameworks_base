@@ -60,6 +60,11 @@
 #include <utils/NativeHandle.h>
 #include <hardware/tv_input.h>
 
+#define ATRACE_TAG ATRACE_TAG_VIDEO
+
+#include <cutils/trace.h>
+#include <utils/Trace.h>
+
 namespace android {
 
 static struct {
@@ -265,7 +270,13 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
         mBuffers[idx].bufferState = RELEASED;
         if (succeeded) {
             nwBuffer = mBuffers[idx].buffer;
+
+            ATRACE_INT("renderer enqueue buffer", 1);
+
             status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
+
+            ATRACE_INT("renderer enqueue buffer", 0);
+
             if (err != NO_ERROR) {
                 ALOGE("error %d while queueing buffer to surface", err);
             }
@@ -348,21 +359,23 @@ bool BufferProducerThread::threadLoop() {
     }
     else
     {
-        Mutex::Autolock autoLock(&mLock);
+        {
+            Mutex::Autolock autoLock(&mLock);
 
-        if (mSurface == NULL) {
-            err = mCondition.waitRelative(mLock, s2ns(1));
-            // It's OK to time out here.
-            if (err != NO_ERROR && err != TIMED_OUT) {
-                ALOGE("error %d while wating for non-null surface to be set", err);
+            if (mSurface == NULL) {
+                err = mCondition.waitRelative(mLock, s2ns(1));
+                // It's OK to time out here.
+                if (err != NO_ERROR && err != TIMED_OUT) {
+                    ALOGE("error %d while wating for non-null surface to be set", err);
+                    return false;
+                }
+                return true;
+            }
+
+            if (err != NO_ERROR)
+            {
                 return false;
             }
-            return true;
-        }
-
-        if (err != NO_ERROR)
-        {
-            return false;
         }
 
         if ((mReleasedBufCnt > (uint32_t)mHoldBufCount) && (!mShutdown))
@@ -371,49 +384,61 @@ bool BufferProducerThread::threadLoop() {
            sp<ANativeWindow> anw(mSurface);
            int idx = -1;
 
+           ATRACE_INT("renderer dequeue buffer", 1);
+
            err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
            if (err != NO_ERROR) {
+                ATRACE_INT("renderer dequeue buffer", 0);
                 ALOGE("error %d while dequeueing buffer to surface", err);
                 usleep(1000);
                 return true;
            }
-
-           if (!mShutdown)
+           else
            {
-               mReleasedBufCnt--;
+               Mutex::Autolock autoLock(&mLock);
 
-               idx = findBufferIndex(buffer->handle);
-               if (-1 == idx)
+               if (!mShutdown)
                {
-                  ALOGE("error can not find buffer handle 0x%x in buffer list", buffer->handle);
-                  return false;
-               }
+                   ATRACE_INT("renderer dequeue buffer", 0);
 
-               if (RELEASED == mBuffers[idx].bufferState)
-               {
-                  mBuffers[idx].buffer = buffer;
-                  mBuffers[idx].bufferState = CAPTURE;
-                  mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
-                                            buffer->handle, ++mSeq);
-                  mBuffers[idx].seqNum = mSeq;
+                   mReleasedBufCnt--;
+
+                   idx = findBufferIndex(buffer->handle);
+                   if (-1 == idx)
+                   {
+                      ALOGE("error can not find buffer handle 0x%x in buffer list", buffer->handle);
+                      return false;
+                   }
+
+                   if (RELEASED == mBuffers[idx].bufferState)
+                   {
+                      mBuffers[idx].buffer = buffer;
+                      mBuffers[idx].bufferState = CAPTURE;
+
+                      mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
+                                                buffer->handle, ++mSeq);
+                      mBuffers[idx].seqNum = mSeq;
+                   }
+                   else
+                   {
+                      ALOGE("error buffer state = 0x%x, but expected buffer state = 0x%x", mBuffers[idx].bufferState, RELEASED);
+                      return false;
+                   }
                }
                else
                {
-                  ALOGE("error buffer state = 0x%x, but expected buffer state = 0x%x", mBuffers[idx].bufferState, RELEASED);
-                  return false;
+                  sp<ANativeWindowBuffer_t> nwBuffer = NULL;
+
+                  ATRACE_INT("renderer dequeue buffer", 0);
+
+                  idx = findBufferIndex(buffer->handle);
+                  nwBuffer = mBuffers[idx].buffer;
+                  status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
+                  if (err != NO_ERROR) {
+                    ALOGE("error in buffer queue");
+                  }
                }
-           }
-           else
-           {
-              // queue buffer back to native window (Note : it will be displayed which is not desired)
-              sp<ANativeWindowBuffer_t> nwBuffer = NULL;
-              idx = findBufferIndex(buffer->handle);
-              nwBuffer = mBuffers[idx].buffer;
-              status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
-              if (err != NO_ERROR) {
-                ALOGE("error in buffer queue");
-              }
-           }
+            }
         }
     }
 
