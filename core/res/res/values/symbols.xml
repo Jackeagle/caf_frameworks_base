@@ -2368,6 +2368,8 @@
   <java-symbol type="bool" name="config_regional_dataUsage_enable_default"/>
   <java-symbol type="bool" name="config_regional_security_show_password_enable"/>
   <java-symbol type="bool" name="config_regional_customized_email_signature"/>
+  <java-symbol type="bool" name="config_regional_customize_default_browser_icon"/>
+  <java-symbol type="string" name="config_regional_customize_default_browser_title"/>
   <java-symbol type="bool" name="config_regional_display_icc_id_enable"/>
   <java-symbol type="string" name="config_regional_connection_menu_option"/>
 </resources>

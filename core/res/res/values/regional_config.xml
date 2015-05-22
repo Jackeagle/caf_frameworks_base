@@ -59,4 +59,6 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_dataUsage_enable_default">false</bool>
     <bool name="config_regional_security_show_password_enable">false</bool>
     <bool name="config_regional_customized_email_signature">false</bool>
+    <bool name="config_regional_customize_default_browser_icon">false</bool>
+    <string name="config_regional_customize_default_browser_title" translatable="false"></string>
 </resources>
