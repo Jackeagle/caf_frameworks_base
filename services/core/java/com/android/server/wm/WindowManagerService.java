@@ -4558,6 +4558,34 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
+    public boolean hasExternalDisplayWindow(IBinder token)
+    {
+
+        AppWindowToken wtoken;
+        wtoken = findAppWindowToken(token);
+        if (wtoken == null) {
+            Slog.e(TAG, "Non-existing app token: " + token);
+            return false;
+        }
+
+        if (!SystemProperties.getBoolean("wm.multiapp_coexist.enable", true))
+            return false;
+
+        synchronized(mWindowMap) {
+            final int n = wtoken.allAppWindows.size();
+            for (int i = 0; i < n; i++) {
+                WindowState w = wtoken.allAppWindows.get(i);
+                if (!w.isDefaultDisplay()) {
+                    if (DEBUG_APP_TRANSITIONS || DEBUG_VISIBILITY)
+                        Slog.d(TAG, w + " belongs to external display Id=" + w.getDisplayId());
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    @Override
     public void setAppVisibility(IBinder token, boolean visible) {
         if (!checkCallingPermission(android.Manifest.permission.MANAGE_APP_TOKENS,
                 "setAppVisibility()")) {
@@ -4570,6 +4598,12 @@ public class WindowManagerService extends IWindowManager.Stub
             wtoken = findAppWindowToken(token);
             if (wtoken == null) {
                 Slog.w(TAG, "Attempted to set visibility of non-existing app token: " + token);
+                return;
+            }
+
+            if (hasExternalDisplayWindow(token)) {
+                if (DEBUG_APP_TRANSITIONS || DEBUG_VISIBILITY)
+                    Slog.i(TAG, token + " DO NOT set visibility " + visible);
                 return;
             }
 
@@ -5110,7 +5144,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 if (mAppTransition.isTransitionSet()) {
                     task.setSendingToBottom(false);
                 }
-                moveStackWindowsLocked(displayContent);
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
