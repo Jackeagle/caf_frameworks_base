@@ -31,6 +31,7 @@ import com.android.systemui.qs.SignalTileView;
 import com.android.systemui.statusbar.policy.NetworkController;
 import com.android.systemui.statusbar.policy.NetworkController.DataUsageInfo;
 import com.android.systemui.statusbar.policy.NetworkController.NetworkSignalChangedCallback;
+import com.android.systemui.statusbar.policy.NetworkControllerImpl;
 
 /** Quick settings tile: Cellular **/
 public class CellularTile extends QSTile<QSTile.SignalState> {
@@ -113,6 +114,10 @@ public class CellularTile extends QSTile<QSTile.SignalState> {
                 R.string.accessibility_quick_settings_mobile,
                 signalContentDesc, dataContentDesc,
                 state.label);
+        if (mController instanceof NetworkControllerImpl) {
+            NetworkControllerImpl netImpl = (NetworkControllerImpl) mController;
+            state.isRoaming = netImpl.isRoaming();
+        }
     }
 
     // Remove the period from the network name

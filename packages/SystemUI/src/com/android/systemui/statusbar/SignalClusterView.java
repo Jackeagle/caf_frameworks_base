@@ -20,6 +20,7 @@
 package com.android.systemui.statusbar;
 
 import android.content.Context;
+
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
@@ -228,6 +229,10 @@ public class SignalClusterView
         mRoaming = roaming;
         mIsMobileTypeIconWide = isTypeIconWide;
         mNoSimIconId = noSimIcon;
+        if(getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_both_display_roaming_network)){
+            mRoaming = isRoaming();
+        }
 
         if (showMobileActivity()) {
             mDataActivityId = 0;
@@ -420,6 +425,14 @@ public class SignalClusterView
 
     private void updateMobile() {
         mMobile.setImageResource(mMobileStrengthId);
+        ImageView roamingImage = (ImageView)findViewById(R.id.mobile_roaming);
+        if(getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_both_display_roaming_network)
+                && mNC != null && mNC.isRoaming()) {
+            roamingImage.setVisibility(View.VISIBLE);
+        } else {
+            roamingImage.setVisibility(View.GONE);
+        }
         mMobileType.setImageResource(mMobileTypeId);
         mMobileActivity.setImageResource(mMobileActivityId);
         mNoSimSlot.setImageResource(mNoSimIconId);
@@ -547,6 +560,11 @@ public class SignalClusterView
     }
 
     private boolean isRoaming() {
+        if (getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_both_display_roaming_network)
+                && mNC != null) {
+            return mNC.isRoaming();
+        }
         return mMobileTypeId == R.drawable.stat_sys_data_fully_connected_roam;
     }
 

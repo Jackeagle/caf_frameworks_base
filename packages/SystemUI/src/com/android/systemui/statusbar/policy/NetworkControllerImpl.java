@@ -941,7 +941,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 mDataTypeIconId = TelephonyIcons.ROAMING_ICON;
                 mQSDataTypeIconId = TelephonyIcons.QS_DATA_R[mInetCondition];
             }
-        } else if (mPhone.isNetworkRoaming()) {
+        } else if (mPhone.isNetworkRoaming() &&
+                !mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_both_display_roaming_network)) {
             mDataTypeIconId = TelephonyIcons.ROAMING_ICON;
             mQSDataTypeIconId = TelephonyIcons.QS_DATA_R[mInetCondition];
         }
@@ -968,7 +970,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
         return false;
     }
 
-    private boolean isRoaming() {
+    public boolean isRoaming() {
         if (isCdma()) {
             return isCdmaEri();
         } else {
@@ -1434,7 +1436,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
             Log.d(TAG, "refreshViews: Data not connected!! Set no data type icon / Roaming");
             mDataTypeIconId = 0;
             mQSDataTypeIconId = 0;
-            if (isRoaming()) {
+            if (isRoaming() &&
+                    !mContext.getResources().getBoolean(
+                    com.android.internal.R.bool.config_regional_both_display_roaming_network)) {
                 mDataTypeIconId = TelephonyIcons.ROAMING_ICON;
                 mQSDataTypeIconId = TelephonyIcons.QS_DATA_R[mInetCondition];
             }
