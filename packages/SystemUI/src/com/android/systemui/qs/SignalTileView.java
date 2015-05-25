@@ -22,6 +22,7 @@ import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import com.android.systemui.R;
 import com.android.systemui.qs.QSTile.SignalState;
@@ -36,6 +37,7 @@ public final class SignalTileView extends QSTileView {
     private ImageView mOverlay;
     private ImageView mIn;
     private ImageView mOut;
+    private ImageView mRoaming;
 
     private int mWideOverlayIconStartPadding;
 
@@ -63,7 +65,18 @@ public final class SignalTileView extends QSTileView {
         mSignal = new ImageView(mContext);
         mIconFrame.addView(mSignal);
         mOverlay = new ImageView(mContext);
-        mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        if (getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_both_display_roaming_network)) {
+            mRoaming = new ImageView(mContext);
+            mRoaming.setImageResource(R.drawable.ic_qs_signal_r);
+            mRoaming.setVisibility(View.GONE);
+            LinearLayout iconLin = new LinearLayout(mContext);
+            iconLin.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            iconLin.addView(mRoaming, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            mIconFrame.addView(iconLin, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        } else {
+            mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        }
         return mIconFrame;
     }
 
@@ -123,6 +136,10 @@ public final class SignalTileView extends QSTileView {
         final boolean shown = isShown();
         setVisibility(mIn, shown, s.activityIn);
         setVisibility(mOut, shown, s.activityOut);
+        if (getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_both_display_roaming_network)) {
+            mRoaming.setVisibility(s.isRoaming ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void setVisibility(View view, boolean shown, boolean visible) {
