@@ -306,6 +306,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
 
     // [+>
     View mMoreIcon;
+    View mCarrierText;
 
     // expanded notifications
     NotificationPanelView mNotificationPanel; // the sliding/resizing panel within the notification window
@@ -618,7 +619,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         addNavigationBar();
 
         // Lastly, call to the icon policy to install/update all the icons.
-        mIconPolicy = new PhoneStatusBarPolicy(mContext, mCastController);
+        mIconPolicy = new PhoneStatusBarPolicy(mContext, mCastController, mHotspotController);
         mSettingsObserver.onChange(false); // set up
 
         mHeadsUpObserver.onChange(true); // set up
@@ -761,6 +762,10 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         mMoreIcon = mStatusBarView.findViewById(R.id.moreIcon);
         mNotificationIcons.setOverflowIndicator(mMoreIcon);
         mStatusBarContents = (LinearLayout)mStatusBarView.findViewById(R.id.status_bar_contents);
+
+        if (mContext.getResources().getBoolean(R.bool.enable_operator_name)) {
+            mCarrierText = mStatusBarView.findViewById(R.id.status_carrier_text);
+        }
 
         mStackScroller = (NotificationStackScrollLayout) mStatusBarWindow.findViewById(
                 R.id.notification_stack_scroller);
@@ -1693,6 +1698,19 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
 
         updateNotificationShade();
         updateNotificationIcons();
+
+        if (mContext.getResources().getBoolean(R.bool.enable_operator_name)) {
+            if (mState == StatusBarState.KEYGUARD || mState == StatusBarState.SHADE_LOCKED) {
+                  mCarrierText.setVisibility(View.GONE);
+            } else {
+                final int N = ((LinearLayout)mNotificationIcons).getChildCount();
+                if (N>0) {
+                    mCarrierText.setVisibility(View.GONE);
+                } else {
+                    mCarrierText.setVisibility(View.VISIBLE);
+                }
+            }
+        }
     }
 
     private void updateNotificationIcons() {
