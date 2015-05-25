@@ -2384,4 +2384,6 @@
   <java-symbol type="bool" name="config_regional_wea_duplicated_check_deleted_records" />
 
   <java-symbol type="bool" name="config_regional_both_display_roaming_network"/>
+
+  <java-symbol type="bool" name="config_regional_ussd_hide_error_from_network_enable" />
 </resources>
