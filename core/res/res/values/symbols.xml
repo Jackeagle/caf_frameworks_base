@@ -2364,4 +2364,5 @@
 
   <java-symbol type="bool" name="config_regional_noti_move_away_lte_video_call" />
   <java-symbol type="bool" name="config_regional_number_patterns_video_call" />
+  <java-symbol type="bool" name="config_regional_display_contact_photo_video_call_off"/>
 </resources>
