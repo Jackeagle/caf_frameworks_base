@@ -38,4 +38,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_volte_switch_enable">false</bool>
     <bool name="config_regional_preferred_network_customization">false</bool>
 
+    <bool name="config_regional_both_display_roaming_network">false</bool>
 </resources>
