@@ -16,6 +16,8 @@
 
 package android.hardware;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.app.ActivityThread;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
@@ -791,6 +793,7 @@ public class Camera {
      * @see android.media.MediaActionSound
      */
     public final void setPreviewCallback(PreviewCallback cb) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Camera__setPreviewCallback, "");
         mPreviewCallback = cb;
         mOneShot = false;
         mWithBuffer = false;
@@ -817,6 +820,7 @@ public class Camera {
      * @see android.media.MediaActionSound
      */
     public final void setOneShotPreviewCallback(PreviewCallback cb) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Camera__setOneShotPreviewCallback, "");
         mPreviewCallback = cb;
         mOneShot = true;
         mWithBuffer = false;
@@ -855,6 +859,7 @@ public class Camera {
      * @see android.media.MediaActionSound
      */
     public final void setPreviewCallbackWithBuffer(PreviewCallback cb) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Camera__setPreviewCallbackWithBuffer, "");
         mPreviewCallback = cb;
         mOneShot = false;
         mWithBuffer = true;
@@ -1417,6 +1422,7 @@ public class Camera {
      */
     public final void takePicture(ShutterCallback shutter, PictureCallback raw,
             PictureCallback jpeg) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Camera__takePicture, "");
         takePicture(shutter, raw, null, jpeg);
     }
     private native final void native_takePicture(int msgType);
@@ -1452,6 +1458,7 @@ public class Camera {
      */
     public final void takePicture(ShutterCallback shutter, PictureCallback raw,
             PictureCallback postview, PictureCallback jpeg) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Camera__takePicture, "");
         mShutterCallback = shutter;
         mRawImageCallback = raw;
         mPostviewCallback = postview;

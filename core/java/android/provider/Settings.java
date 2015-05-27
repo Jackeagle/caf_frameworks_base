@@ -16,6 +16,8 @@
 
 package android.provider;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
@@ -1325,6 +1327,8 @@ public final class Settings {
         /** @hide */
         public static String getStringForUser(ContentResolver resolver, String name,
                 int userHandle) {
+            SeempLog.record(SeempLog.getSeempGetApiIdFromValue(name), "");
+
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -1352,6 +1356,8 @@ public final class Settings {
         /** @hide */
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
                 int userHandle) {
+            SeempLog.record(SeempLog.getSeempPutApiIdFromValue(name), "");
+
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");

@@ -16,6 +16,8 @@
 
 package android.view;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.animation.AnimatorInflater;
 import android.animation.StateListAnimator;
 import android.annotation.IntDef;
@@ -8456,6 +8458,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         final int actionMasked = event.getActionMasked();
         if (actionMasked == MotionEvent.ACTION_DOWN) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_View__onTouchEvent, "");
             // Defensive cleanup for new gesture
             stopNestedScroll();
         }
@@ -8967,6 +8970,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event   The KeyEvent object that defines the button action.
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_View__onKeyDown, "");
         boolean result = false;
 
         if (KeyEvent.isConfirmKey(keyCode)) {
@@ -9011,6 +9015,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event   The KeyEvent object that defines the button action.
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_View__onKeyUp, "");
         if (KeyEvent.isConfirmKey(keyCode)) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -9407,6 +9412,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return True if the event was handled, false otherwise.
      */
     public boolean onTouchEvent(MotionEvent event) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_View__onTouchEvent, "");
         final float x = event.getX();
         final float y = event.getY();
         final int viewFlags = mViewFlags;

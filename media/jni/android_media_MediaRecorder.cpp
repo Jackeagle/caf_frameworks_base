@@ -31,6 +31,14 @@
 #include <media/mediarecorder.h>
 #include <utils/threads.h>
 
+#include "seemp_api.h"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <dlfcn.h>
+#include <dirent.h>
+static void (*seemp_log_record_func)(int type, const char* msg) = NULL;
+static void *libhandle = NULL;
+
 #include "jni.h"
 #include "JNIHelp.h"
 #include "android_runtime/AndroidRuntime.h"
@@ -375,6 +383,16 @@ static void
 android_media_MediaRecorder_start(JNIEnv *env, jobject thiz)
 {
     ALOGV("start");
+    if (libhandle == NULL) {
+        libhandle = dlopen("libSeemplog.so", RTLD_NOW);
+        if (libhandle != NULL) {
+            *(void **)(&seemp_log_record_func) =
+                           dlsym(libhandle,"seemp_log_record");
+        }
+    }
+    if (seemp_log_record_func)
+        seemp_log_record_func(SEEMP_API_MediaRecorder__start, "");
+
     sp<MediaRecorder> mr = getMediaRecorder(env, thiz);
     process_media_recorder_call(env, mr->start(), "java/lang/RuntimeException", "start failed.");
 }

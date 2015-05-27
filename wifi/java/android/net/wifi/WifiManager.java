@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2008 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package android.net.wifi;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
@@ -1190,6 +1192,7 @@ public class WifiManager {
      * @return the list of access points found in the most recent scan.
      */
     public List<ScanResult> getScanResults() {
+        SeempLog.record(SeempApiEnum.SEEMP_API_WifiManager__getScanResults, "");
         try {
             return mService.getScanResults(mContext.getOpPackageName());
         } catch (RemoteException e) {
