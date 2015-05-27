@@ -296,6 +296,11 @@ status_t SampleTable::setCompositionTimeToSampleParams(
     }
 
     mCompositionTimeToSampleCount = U32_AT(&header[4]);
+    uint64_t allocSize = mCompositionTimeToSampleCount * 2 * sizeof(uint64_t);
+    if (allocSize > SIZE_MAX) {
+        return ERROR_OUT_OF_RANGE;
+    }
+
     mCompositionTimeToSample = new int32_t[mCompositionTimeToSampleCount * 2];
 
     size_t size = sizeof(uint32_t) * mCompositionTimeToSampleCount * 2;
