@@ -16,6 +16,8 @@
 
 package com.android.internal.telephony;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -164,6 +166,8 @@ public class CallerInfo {
      * number. The returned CallerInfo is null if no number is supplied.
      */
     public static CallerInfo getCallerInfo(Context context, Uri contactRef, Cursor cursor) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_CallerInfo__getCallerInfo,
+                "contactRef, " + ((contactRef == null) ? "null":contactRef).toString());
         CallerInfo info = new CallerInfo();
         info.photoResource = 0;
         info.phoneLabel = null;
@@ -282,6 +286,8 @@ public class CallerInfo {
      * number. The returned CallerInfo is null if no number is supplied.
      */
     public static CallerInfo getCallerInfo(Context context, Uri contactRef) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_CallerInfo__getCallerInfo,
+                "contactRef, " + ((contactRef == null) ? "null":contactRef).toString());
 
         return getCallerInfo(context, contactRef,
                 CallerInfoAsyncQuery.getCurrentProfileContentResolver(context)
@@ -299,6 +305,8 @@ public class CallerInfo {
      * with all relevant fields empty or null.
      */
     public static CallerInfo getCallerInfo(Context context, String number) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_CallerInfo__getCallerInfo,
+                "number, " + ((number == null) ? "null":number));
         if (VDBG) Rlog.v(TAG, "getCallerInfo() based on number...");
 
         int subId = SubscriptionManager.getDefaultSubId();
@@ -317,6 +325,8 @@ public class CallerInfo {
      * with all relevant fields empty or null.
      */
     public static CallerInfo getCallerInfo(Context context, String number, int subId) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_CallerInfo__getCallerInfo,
+                "number, " + ((number == null) ? "null":number));
 
         if (TextUtils.isEmpty(number)) {
             return null;

@@ -30,6 +30,15 @@
 
 #include <poll.h>
 
+#include "seemp_api.h"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <dlfcn.h>
+#include <dirent.h>
+#include <fcntl.h>
+static void (*seemp_log_record_func)(int type, const char* msg) = NULL;
+static void *libhandle = NULL;
+
 using android::sp;
 using android::Sensor;
 using android::SensorManager;
@@ -98,6 +107,17 @@ int ASensorManager_destroyEventQueue(ASensorManager* manager,
 
 int ASensorEventQueue_enableSensor(ASensorEventQueue* queue, ASensor const* sensor)
 {
+    if (libhandle == NULL) {
+        libhandle = dlopen("libSeemplog.so", RTLD_NOW);
+        if (libhandle != NULL) {
+            *(void **)(&seemp_log_record_func) =
+                           dlsym(libhandle,"seemp_log_record");
+        }
+    }
+    if (seemp_log_record_func)
+        seemp_log_record_func(SEEMP_API_ASensorEventQueue__enableSensor,
+              static_cast<Sensor const*>(sensor)->getStringType().string());
+
     return static_cast<SensorEventQueue*>(queue)->enableSensor(
             static_cast<Sensor const*>(sensor));
 }

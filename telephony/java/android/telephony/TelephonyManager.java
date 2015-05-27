@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2008 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package android.telephony;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.annotation.SystemApi;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
@@ -627,6 +629,7 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getDeviceId() {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getDeviceId, "");
         try {
             return getITelephony().getDeviceId();
         } catch (RemoteException ex) {
@@ -647,6 +650,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getDeviceId(int slotId) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getDeviceId, "");
         // FIXME this assumes phoneId == slotId
         try {
             return getSubscriberInfo().getDeviceIdForPhone(slotId);
@@ -734,6 +738,7 @@ public class TelephonyManager {
      * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION ACCESS_FINE_LOCATION}.
      */
     public CellLocation getCellLocation() {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getCellLocation, "");
         try {
             Bundle bundle = getITelephony().getCellLocation();
             if (bundle.isEmpty()) return null;
@@ -814,6 +819,7 @@ public class TelephonyManager {
      * (@link android.Manifest.permission#ACCESS_COARSE_UPDATES}
      */
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getNeighboringCellInfo, "");
         try {
             return getITelephony().getNeighboringCellInfo(mContext.getOpPackageName());
         } catch (RemoteException ex) {
@@ -1804,6 +1810,7 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getSimSerialNumber() {
+         SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getSimSerialNumber, "");
          return getSimSerialNumber(getDefaultSubscription());
     }
 
@@ -1817,6 +1824,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getSimSerialNumber(int subId) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getSimSerialNumber, "");
         try {
             return getSubscriberInfo().getIccSerialNumberForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1878,6 +1886,7 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getSubscriberId() {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getSubscriberId, "");
         return getSubscriberId(getDefaultSubscription());
     }
 
@@ -1893,6 +1902,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getSubscriberId(int subId) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getSubscriberId, "");
         try {
             return getSubscriberInfo().getSubscriberIdForSubscriber(subId);
         } catch (RemoteException ex) {
@@ -1950,6 +1960,7 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getLine1Number() {
+        SeempLog.record(SeempApiEnum.SEEMP_API_TelephonyManager__getLine1Number, "");
         return getLine1NumberForSubscriber(getDefaultSubscription());
     }
 
