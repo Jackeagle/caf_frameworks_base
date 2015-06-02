@@ -5223,4 +5223,9 @@
     <string name="def_hipri_share_component_class"></string>
 
     <string name="card_string">CARD <xliff:g id="slot_id">%1$s</xliff:g></string>
+    <!-- show turn on/off dataroaming message -->
+    <string name="international_roaming_warning">Do you want to turn on data while roaming?\nInternational roaming charges may apply.</string>
+    <string name="turn_on_info">You can go to Settings-> Data roaming  to turn data on anytime.</string>
+    <string name="turn_off_info">You can go to Settings-> Data roaming  to turn data off anytime.</string>
+
 </resources>

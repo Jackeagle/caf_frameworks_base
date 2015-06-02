@@ -193,6 +193,11 @@ public final class Call {
          */
         public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
+        /**
+         * This capability indicates that FDN is enabled.
+         * @hide
+         */
+        public static final int FDN_ENABLED = 0x00040000;
 
         private final Uri mHandle;
         private final int mHandlePresentation;

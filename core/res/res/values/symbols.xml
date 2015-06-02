@@ -2350,4 +2350,19 @@
   <java-symbol type="bool" name="config_regional_volte_switch_enable" />
   <java-symbol type="bool" name="config_regional_preferred_network_customization" />
   <!-- Regional Specific Symbols/Overlays end -->
+
+  <!-- Symbols/Overlays for Network settings start -->
+  <java-symbol type="bool" name="config_regional_smsc_editable" />
+  <java-symbol type="bool" name="config_regional_voicemail_address_editable" />
+  <java-symbol type="bool" name="config_regional_show_change_dataroaming_message" />
+  <java-symbol type="bool" name="config_regional_hide_ims_and_dun_apns" />
+  <java-symbol type="bool" name="config_regional_mcc_mnc_roaming_setting" />
+  <java-symbol type="bool" name="config_regional_lte_singnal_threshold" />
+  <java-symbol type="bool" name="config_regional_umts_singnal_threshold" />
+  <!-- Symbols/Overlays for Network settings end -->
+
+  <java-symbol type="string" name="international_roaming_warning" />
+  <java-symbol type="string" name="turn_on_info" />
+  <java-symbol type="string" name="turn_off_info" />
+
 </resources>

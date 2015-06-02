@@ -36,5 +36,19 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <string name="config_regional_carrier_operator">000000</string>
     <bool name="config_regional_volte_switch_enable">false</bool>
     <bool name="config_regional_preferred_network_customization">false</bool>
+    <!-- Whether to set smsc editable-->
+    <bool name="config_regional_smsc_editable">false</bool>
+    <!-- Whether to set voicemail address editable-->
+    <bool name="config_regional_voicemail_address_editable">false</bool>
+    <!-- Whether to show turn on/off dataroaming change message-->
+    <bool name="config_regional_show_change_dataroaming_message">false</bool>
+    <!-- Whether to hide IMS and DUN Apns -->
+    <bool name="config_regional_hide_ims_and_dun_apns">false</bool>
+    <!-- Whether to use MCC MNC roaming setting -->
+    <bool name="config_regional_mcc_mnc_roaming_setting">false</bool>
+    <!-- Whether to use LTE singnal strength threshold -->
+    <bool name="config_regional_lte_singnal_threshold">false</bool>
+    <!-- Whether to use UMTS singnal strength threshold -->
+    <bool name="config_regional_umts_singnal_threshold">false</bool>
 
 </resources>
