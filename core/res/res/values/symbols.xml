@@ -2343,4 +2343,5 @@
 
   <java-symbol type="bool" name="config_regional_wea_duplicated_check_database" />
   <java-symbol type="bool" name="config_regional_wea_duplicated_check_deleted_records" />
+  <java-symbol type="bool" name="config_regional_wea_alert_reminder_interval" />
 </resources>
