@@ -2407,4 +2407,5 @@
   <java-symbol type="bool" name="config_regional_customize_default_browser_icon"/>
   <java-symbol type="string" name="config_regional_customize_default_browser_title"/>
   <java-symbol type="bool" name="config_regional_search_use_clientid" />
+  <java-symbol type="bool" name="config_regional_wea_alert_reminder_interval" />
 </resources>

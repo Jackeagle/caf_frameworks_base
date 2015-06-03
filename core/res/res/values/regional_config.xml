@@ -98,4 +98,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_use_empty_password_default">false</bool>
     <bool name="config_regional_dataUsage_enable_default">false</bool>
     <bool name="config_regional_security_show_password_enable">false</bool>
+    <bool name="config_regional_wea_alert_reminder_interval">false</bool>
 </resources>
