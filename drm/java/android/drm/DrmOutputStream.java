@@ -20,6 +20,7 @@ import static android.drm.DrmConvertedStatus.STATUS_OK;
 import static android.drm.DrmManagerClient.INVALID_SESSION;
 import static android.system.OsConstants.SEEK_SET;
 
+import android.drm.OmaDrmHelper;
 import android.os.ParcelFileDescriptor;
 import android.system.ErrnoException;
 import android.system.Os;
@@ -73,6 +74,13 @@ public class DrmOutputStream extends OutputStream {
             } catch (ErrnoException e) {
                 e.rethrowAsIOException();
             }
+            if (OmaDrmHelper.isOmaDrmEnabled()) {
+                if (!OmaDrmHelper.copyData(mClient, status.convertedData, mFd)) {
+                    throw new IOException("Unexpected OmaDrmEngine! Cannot copy data into destination.");
+                }
+                return;
+            }
+
             IoBridge.write(mFd, status.convertedData, 0, status.convertedData.length);
             mSessionId = INVALID_SESSION;
         } else {
