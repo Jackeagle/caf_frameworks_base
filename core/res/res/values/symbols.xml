@@ -2407,4 +2407,5 @@
   <java-symbol type="bool" name="config_regional_search_use_clientid" />
   <java-symbol type="bool" name="config_regional_wea_alert_reminder_interval" />
   <java-symbol type="bool" name="config_regional_pup_no_available_network"/>
+  <java-symbol type="bool" name="config_regional_wea_alert_tone_enable" />
 </resources>

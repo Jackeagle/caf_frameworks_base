@@ -102,4 +102,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_security_show_password_enable">false</bool>
     <bool name="config_regional_wea_alert_reminder_interval">false</bool>
     <bool name="config_regional_pup_no_available_network">false</bool>
+    <bool name="config_regional_wea_alert_tone_enable">false</bool>
 </resources>
