@@ -55,4 +55,6 @@
     <string name="toast_no_application" msgid="1339885974067891667">"No se puede abrir el archivo."</string>
     <string name="toast_failed_delete" msgid="2180678019407244069">"No es posible eliminar algunos documentos."</string>
     <string name="share_via" msgid="8966594246261344259">"Compartir mediante"</string>
+    <string name="no_permission_for_drm">"Los archivos DRM no pueden compartirse."</string>
+    <string name="drm_license_info">"Información de licencia Drm"</string>
 </resources>
