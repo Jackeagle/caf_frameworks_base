@@ -42,6 +42,7 @@ import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.database.Cursor;
+import android.drm.OmaDrmHelper;
 import android.graphics.Point;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -993,7 +994,11 @@ public class DocumentsActivity extends Activity {
             onCurrentDirectoryChanged(ANIM_DOWN);
         } else if (mState.action == ACTION_OPEN || mState.action == ACTION_GET_CONTENT) {
             // Explicit file picked, return
-            new ExistingFinishTask(doc.derivedUri).executeOnExecutor(getCurrentExecutor());
+            if (OmaDrmHelper.isDrmFile(doc.displayName) && mState.action == ACTION_GET_CONTENT) {
+                Toast.makeText(this, R.string.no_permission_for_drm, Toast.LENGTH_SHORT).show();
+            } else {
+                new ExistingFinishTask(doc.derivedUri).executeOnExecutor(getCurrentExecutor());
+            }
         } else if (mState.action == ACTION_CREATE) {
             // Replace selected file
             SaveFragment.get(fm).setReplaceTarget(doc);
