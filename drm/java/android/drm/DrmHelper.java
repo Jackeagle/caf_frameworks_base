@@ -47,6 +47,8 @@ import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 
+import java.io.File;
+
 /**
  * Utility APIs for OMA DRM v1 supports.
  *
@@ -471,6 +473,13 @@ public class DrmHelper {
             String mimeType) {
         boolean result = true;
         DrmManagerClientWrapper drmClient = null;
+        File f = new File(path);
+        if (!f.exists()) {
+            Log.w(TAG,
+                "Cannot validateLicense! Drm file does not exist in the location : " + path);
+            return false;
+        }
+
         try {
             drmClient = new DrmManagerClientWrapper(context);
             int status = checkRightsStatus(drmClient, path, mimeType);
