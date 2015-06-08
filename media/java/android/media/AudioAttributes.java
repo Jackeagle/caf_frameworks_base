@@ -167,6 +167,12 @@ public final class AudioAttributes implements Parcelable {
      * source, such as audio capture devices.
      */
     public final static int USAGE_VIRTUAL_SOURCE = 15;
+    /**
+     * @hide
+     * Usage value to use when the usage is for audio intended for the rear
+     * entertainment system in an automotive environment.
+     */
+    public final static int USAGE_REAR_ENTERTAINMENT_SYSTEM = 16;
 
     /**
      * Flag defining a behavior where the audibility of the sound will be ensured by the system.
@@ -381,6 +387,7 @@ public final class AudioAttributes implements Parcelable {
                 case USAGE_ASSISTANCE_SONIFICATION:
                 case USAGE_GAME:
                 case USAGE_VIRTUAL_SOURCE:
+                case USAGE_REAR_ENTERTAINMENT_SYSTEM:
                      mUsage = usage;
                      break;
                 default:
@@ -725,6 +732,7 @@ public final class AudioAttributes implements Parcelable {
             case USAGE_GAME:
             case USAGE_ASSISTANCE_ACCESSIBILITY:
             case USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
+            case USAGE_REAR_ENTERTAINMENT_SYSTEM:
                 return AudioSystem.STREAM_MUSIC;
             case USAGE_ASSISTANCE_SONIFICATION:
                 return AudioSystem.STREAM_SYSTEM;
