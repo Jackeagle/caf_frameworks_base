@@ -404,7 +404,11 @@ public class StatusBarKeyguardViewManager {
     }
 
     public boolean onMenuPressed() {
-        return mBouncer.onMenuPressed();
+        if (mBouncer.onMenuPressed()) {
+            updateStates();
+            return true;
+        }
+        return false;
     }
 
     public boolean interceptMediaKey(KeyEvent event) {
