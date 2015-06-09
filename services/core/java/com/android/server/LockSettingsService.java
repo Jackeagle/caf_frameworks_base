@@ -51,6 +51,8 @@ import com.android.internal.widget.LockPatternUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Keeps the lock pattern/password data and related settings for each user.
@@ -70,6 +72,9 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private LockPatternUtils mLockPatternUtils;
     private boolean mFirstCallToVold;
+    private static String mSavePassword = "default_password";
+    private static final long CLEAR_PASSWORD_INTERVAL = 60 * 1000; // 1m
+    protected Timer mClearPasswordTimer;
 
     public LockSettingsService(Context context) {
         mContext = context;
@@ -265,6 +270,21 @@ public class LockSettingsService extends ILockSettings.Stub {
         return mStorage.hasPattern(userId);
     }
 
+    public void retainPassword(String password) {
+        mSavePassword = password;
+        mClearPasswordTimer = new Timer();
+        mClearPasswordTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                mSavePassword = "default_password";
+            }
+        }, CLEAR_PASSWORD_INTERVAL);
+    }
+
+    public String getPassword() {
+        return mSavePassword;
+    }
+
     private void maybeUpdateKeystore(String password, int userHandle) {
         final UserManager um = (UserManager) mContext.getSystemService(USER_SERVICE);
         final KeyStore ks = KeyStore.getInstance();
@@ -322,6 +342,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
         boolean matched = Arrays.equals(hash, storedHash);
         if (matched && !TextUtils.isEmpty(pattern)) {
+            retainPassword(pattern);
             maybeUpdateKeystore(pattern, userId);
         }
         return matched;
@@ -340,6 +361,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
         boolean matched = Arrays.equals(hash, storedHash);
         if (matched && !TextUtils.isEmpty(password)) {
+            retainPassword(password);
             maybeUpdateKeystore(password, userId);
         }
         return matched;
