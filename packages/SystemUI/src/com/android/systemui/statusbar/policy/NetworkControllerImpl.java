@@ -1303,6 +1303,12 @@ public class NetworkControllerImpl extends BroadcastReceiver
         String wifiLabel = "";
         String mobileLabel = "";
         int N;
+        if (mContext.getResources().getBoolean(R.bool.hide_nosim_signal_icon) &&
+                mSimState == IccCardConstants.State.ABSENT) {
+            mPhoneSignalIconId = 0;
+            mDataSignalIconId = 0;
+            mNoSimIconId = 0;
+        }
         final boolean emergencyOnly = isEmergencyOnly();
 
         if (!mHasMobileDataFeature) {
