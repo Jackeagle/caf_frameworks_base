@@ -330,6 +330,20 @@ public class WifiP2pManager {
     public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_RADAR_DETECTED = 2;
 
     /**
+     * Wi-Fi p2p go state change due to cac completed
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_CAC_COMPLETED = 3;
+
+    /**
+     * Wi-Fi p2p go state change due to cac completed
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_CSA_FINISHED = 4;
+
+    /**
      * The lookup key for a {@link android.net.wifi.p2p.WifiP2pDevice} object
      * Retrieve with {@link android.content.Intent#getParcelableExtra(String)}.
      */
