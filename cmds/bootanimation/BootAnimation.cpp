@@ -703,16 +703,21 @@ bool BootAnimation::movie()
         const size_t fcount = part.frames.size();
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        /*calculate if we need to runtime save memory
-        * condition: runtime free memory is less than the textures that will used.
-        * needSaveMem default to be false
-        */
-        GLint mMaxTextureSize;
+        /* calculate if we need to runtime save memory
+         * There is two conditions to use save memory method:
+         * condition 1:
+         *     part.count == 1 means this part is only showed for once,
+         *     so it is no need to generate so much textures.
+         * condition 2:
+         *     if free memory is less than the textures that will used.
+         *
+         * needSaveMem default value is false.
+         */
         bool needSaveMem = false;
         GLuint mTextureid;
-        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &mMaxTextureSize);
-        //ALOGD("freemem:%ld, %d", getFreeMemory(), mMaxTextureSize);
-        if(getFreeMemory() < mMaxTextureSize * mMaxTextureSize * fcount / 1024) {
+
+        int max_color_size = 4; /* used up to GL_UNSIGNED_BYTE for color type */
+        if(part.count == 1 || (unsigned long long)getFreeMemory() <  (unsigned long long)animation.width * animation.height * max_color_size * fcount / 1024) {
             ALOGD("Use save memory method, maybe small fps in actual.");
             needSaveMem = true;
             glGenTextures(1, &mTextureid);
