@@ -59,6 +59,9 @@ import android.util.Log;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -751,6 +754,21 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private void sendBluetoothStateCallback(boolean isUp) {
         int n = mStateChangeCallbacks.beginBroadcast();
         if (DBG) Log.d(TAG,"Broadcasting onBluetoothStateChange("+isUp+") to " + n + " receivers.");
+        if (isUp) {
+            try {
+                File f = new File("/proc/bootkpi/marker_entry");
+                if (f != null && f.exists()) {
+                    FileOutputStream fos = new FileOutputStream(f);
+                    byte[] marker_name = "BT Enable:".getBytes();
+                    fos.write(marker_name);
+                    fos.flush();
+                    fos.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         for (int i=0; i <n;i++) {
             try {
                 mStateChangeCallbacks.getBroadcastItem(i).onBluetoothStateChange(isUp);
