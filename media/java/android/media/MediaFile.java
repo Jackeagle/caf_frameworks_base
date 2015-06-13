@@ -64,6 +64,7 @@ public class MediaFile {
     private static final int LAST_MIDI_FILE_TYPE = FILE_TYPE_IMY;
    
     // Video file types
+    public static final int FILE_TYPE_FLV     = 20;
     public static final int FILE_TYPE_MP4     = 21;
     public static final int FILE_TYPE_M4V     = 22;
     public static final int FILE_TYPE_3GPP    = 23;
@@ -74,7 +75,7 @@ public class MediaFile {
     public static final int FILE_TYPE_MP2TS   = 28;
     public static final int FILE_TYPE_AVI     = 29;
     public static final int FILE_TYPE_WEBM    = 30;
-    private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_MP4;
+    private static final int FIRST_VIDEO_FILE_TYPE = FILE_TYPE_FLV;
     private static final int LAST_VIDEO_FILE_TYPE = FILE_TYPE_WEBM;
     
     // More video file types
@@ -180,9 +181,13 @@ public class MediaFile {
 
     static {
         addFileType("MP3", FILE_TYPE_MP3, "audio/mpeg", MtpConstants.FORMAT_MP3);
+        addFileType("MP3D", FILE_TYPE_MP3, "audio/mp3d", MtpConstants.FORMAT_MP3);
         addFileType("MPGA", FILE_TYPE_MP3, "audio/mpeg", MtpConstants.FORMAT_MP3);
         addFileType("M4A", FILE_TYPE_M4A, "audio/mp4", MtpConstants.FORMAT_MPEG);
+        addFileType("M4A", FILE_TYPE_M4A, "audio/m4a", MtpConstants.FORMAT_MPEG);
+        addFileType("M4A", FILE_TYPE_M4A, "audio/mp4a-latm", MtpConstants.FORMAT_MPEG);
         addFileType("WAV", FILE_TYPE_WAV, "audio/x-wav", MtpConstants.FORMAT_WAV);
+        addFileType("WAV", FILE_TYPE_WAV, "audio/wav", MtpConstants.FORMAT_WAV);
         addFileType("AMR", FILE_TYPE_AMR, "audio/amr");
         addFileType("AWB", FILE_TYPE_AWB, "audio/amr-wb");
         if (isWMAEnabled()) {
@@ -194,6 +199,7 @@ public class MediaFile {
         addFileType("AAC", FILE_TYPE_AAC, "audio/aac", MtpConstants.FORMAT_AAC);
         addFileType("AAC", FILE_TYPE_AAC, "audio/aac-adts", MtpConstants.FORMAT_AAC);
         addFileType("MKA", FILE_TYPE_MKA, "audio/x-matroska");
+        addFileType("3G2", FILE_TYPE_3GPP2, "audio/3gpp2", MtpConstants.FORMAT_3GP_CONTAINER);
  
         addFileType("MID", FILE_TYPE_MID, "audio/midi");
         addFileType("MIDI", FILE_TYPE_MID, "audio/midi");
@@ -217,6 +223,7 @@ public class MediaFile {
         addFileType("WEBM", FILE_TYPE_WEBM, "video/webm");
         addFileType("TS", FILE_TYPE_MP2TS, "video/mp2ts");
         addFileType("AVI", FILE_TYPE_AVI, "video/avi");
+        addFileType("FLV", FILE_TYPE_FLV, "video/flv");
 
         if (isWMVEnabled()) {
             addFileType("WMV", FILE_TYPE_WMV, "video/x-ms-wmv", MtpConstants.FORMAT_WMV);
@@ -227,7 +234,9 @@ public class MediaFile {
         addFileType("JPEG", FILE_TYPE_JPEG, "image/jpeg", MtpConstants.FORMAT_EXIF_JPEG);
         addFileType("GIF", FILE_TYPE_GIF, "image/gif", MtpConstants.FORMAT_GIF);
         addFileType("PNG", FILE_TYPE_PNG, "image/png", MtpConstants.FORMAT_PNG);
+        addFileType("BMP", FILE_TYPE_BMP, "image/bmp", MtpConstants.FORMAT_BMP);
         addFileType("BMP", FILE_TYPE_BMP, "image/x-ms-bmp", MtpConstants.FORMAT_BMP);
+        addFileType("BMP", FILE_TYPE_BMP, "image/x-MS-bmp", MtpConstants.FORMAT_BMP);
         addFileType("WBMP", FILE_TYPE_WBMP, "image/vnd.wap.wbmp");
         addFileType("WEBP", FILE_TYPE_WEBP, "image/webp");
  

@@ -23,6 +23,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -693,6 +694,93 @@ public class BitmapFactory {
     }
 
     /**
+     * @hide
+     * Internal Drm API
+     */
+    public static Bitmap decodeDrmFile(String path, Options opts) {
+        FileInputStream is = null;
+        Bitmap bitmap = null;
+        try {
+            FileDescriptor fd = null;
+            File file = new File(path);
+            if (file.exists()) {
+                is = new FileInputStream(file);
+                fd = is.getFD();
+            }
+            bitmap = nativeDecodeDrmFileDescriptor(fd, opts);
+        } catch (IOException ioe) {
+            Log.e("BitmapFactory", "Unable to decode drm file: " + ioe);
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    Log.e("BitmapFactory", "Unable to close drm file: " + e);
+                }
+            }
+        }
+        return bitmap;
+    }
+
+    /**
+     * @hide
+     * Internal Drm API
+     */
+    public static boolean consumeDrmImageRights(String path) {
+        FileInputStream is = null;
+        boolean result = false;
+        try {
+            FileDescriptor fd = null;
+            File file = new File(path);
+            if (file.exists()) {
+                is = new FileInputStream(file);
+                fd = is.getFD();
+            }
+            result = nativeConsumeDrmImageRights(fd);
+        } catch (IOException ioe) {
+            Log.e("BitmapFactory", "Unable to decode drm file: " + ioe);
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    Log.e("BitmapFactory", "Unable to close drm file: " + e);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @hide
+     * Internal Drm API
+     */
+    public static byte[] getDrmImageBytes(String path) {
+        FileInputStream is = null;
+        byte[] result = null;
+        try {
+            FileDescriptor fd = null;
+            File file = new File(path);
+            if (file.exists()) {
+                is = new FileInputStream(file);
+                fd = is.getFD();
+            }
+            result = nativeGetDrmImageBytes(fd);
+        } catch (IOException ioe) {
+            Log.e("BitmapFactory", "Unable to decode drm file: " + ioe);
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    Log.e("BitmapFactory", "Unable to close drm file: " + e);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
      * Decode a bitmap from the file descriptor. If the bitmap cannot be decoded
      * return null. The position within the descriptor will not be changed when
      * this returns, so the descriptor can be used again as is.
@@ -712,4 +800,7 @@ public class BitmapFactory {
     private static native Bitmap nativeDecodeByteArray(byte[] data, int offset,
             int length, Options opts);
     private static native boolean nativeIsSeekable(FileDescriptor fd);
+    private static native Bitmap nativeDecodeDrmFileDescriptor(FileDescriptor fd, Options opts);
+    private static native boolean nativeConsumeDrmImageRights(FileDescriptor fd);
+    private static native byte[] nativeGetDrmImageBytes(FileDescriptor fd);
 }

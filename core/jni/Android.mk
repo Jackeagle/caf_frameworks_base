@@ -250,6 +250,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libstlport \
 	libprocessgroup \
 	libnativebridge \
+	libdrmframework \
 
 ifeq ($(USE_OPENGL_RENDERER),true)
 	LOCAL_SHARED_LIBRARIES += libhwui
