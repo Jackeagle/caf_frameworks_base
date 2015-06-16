@@ -21,7 +21,7 @@ import android.content.ContentProviderClient;
 import android.content.Context;
 import android.content.Intent;
 
-public class MountReceiver extends BroadcastReceiver {
+public class LocaleReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         final ContentProviderClient client = context.getContentResolver()
