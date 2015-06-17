@@ -335,6 +335,7 @@ public abstract class Connection implements IConferenceable {
         /** @hide */
         public void onConferenceParticipantsChanged(Connection c,
                 List<ConferenceParticipant> participants) {}
+        public void onConferenceStarted() {}
     }
 
     /** @hide */
@@ -394,6 +395,11 @@ public abstract class Connection implements IConferenceable {
          * Session modify request ignored due to invalid parameters.
          */
         public static final int SESSION_MODIFY_REQUEST_TIMED_OUT = 4;
+
+        /**
+         * Session modify request ignored due to invalid parameters.
+         */
+        public static final int SESSION_MODIFY_REQUEST_REJECTED_BY_REMOTE = 5;
 
         private static final int MSG_SET_VIDEO_CALLBACK = 1;
         private static final int MSG_SET_CAMERA = 2;
@@ -1652,6 +1658,15 @@ public abstract class Connection implements IConferenceable {
             List<ConferenceParticipant> conferenceParticipants) {
         for (Listener l : mListeners) {
             l.onConferenceParticipantsChanged(this, conferenceParticipants);
+        }
+    }
+
+    /**
+     * Notifies listeners that a conference call has been started.
+     */
+    protected void notifyConferenceStarted() {
+        for (Listener l : mListeners) {
+            l.onConferenceStarted();
         }
     }
 }

@@ -1834,6 +1834,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 db.endTransaction();
                 if (stmt != null) stmt.close();
             }
+
+            if (mUserHandle == UserHandle.USER_OWNER &&
+                    !TelephonyManager.getDefault().isMultiSimEnabled()){
+                //Restore values from KK
+                db.beginTransaction();
+                stmt = null;
+                try {
+                    stmt = db.compileStatement("INSERT OR REPLACE INTO global(name,value)"
+                            + " VALUES(?,?);");
+                    int dataEnabled = getIntValueFromTable(db, TABLE_GLOBAL,
+                            Settings.Global.MOBILE_DATA, 0);
+                    int dataRoamingEnabled = getIntValueFromTable(db, TABLE_GLOBAL,
+                            Settings.Global.DATA_ROAMING, 0);
+                    loadSetting(stmt, Settings.Global.MOBILE_DATA + "0",
+                            dataEnabled == 1 ? "1" : "0");
+                    loadSetting(stmt, Settings.Global.DATA_ROAMING + "0",
+                            dataRoamingEnabled == 1 ? "1" : "0");
+                    db.setTransactionSuccessful();
+                } finally{
+                    db.endTransaction();
+                    if (stmt != null) stmt.close();
+                }
+            }
             upgradeVersion = 113;
         }
 
