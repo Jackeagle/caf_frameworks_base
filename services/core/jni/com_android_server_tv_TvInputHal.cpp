@@ -220,7 +220,7 @@ void BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
     if (NULL != surface.get()) {
         mBuffers = new struct BufferEntry[mStream.buffer_producer.buffer_count];
         if (!mBuffers){
-            ALOGE("Buffers malloc failed");
+            ALOGE("Buffers allocation failed");
             return;
         }
         else
@@ -233,21 +233,21 @@ void BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
     }
     for (uint32_t idx = 0; idx < mStream.buffer_producer.buffer_count; idx++)
     {
-       if (CAPTURE == mBuffers[idx].bufferState)
-       {
-           mDevice->cancel_capture(mDevice, mDeviceId, mStream.stream_id, mBuffers[idx].seqNum);
+        if (CAPTURE == mBuffers[idx].bufferState)
+        {
+            mDevice->cancel_capture(mDevice, mDeviceId, mStream.stream_id, mBuffers[idx].seqNum);
 
-           while (CAPTURE == mBuffers[idx].bufferState)
-           {
-              status_t err = mCondition.waitRelative(mLock, s2ns(1));
-              if (err != NO_ERROR) {
-                  ALOGE("error %d while wating for buffer state to change.", err);
-                  break;
-              }
-           }
-           mBuffers[idx].bufferState = RELEASED;
-           mBuffers[idx].buffer.clear();
-       }
+            while (CAPTURE == mBuffers[idx].bufferState)
+            {
+                status_t err = mCondition.waitRelative(mLock, s2ns(1));
+                if (err != NO_ERROR) {
+                    ALOGE("error %d while wating for buffer state to change.", err);
+                    break;
+                }
+            }
+            mBuffers[idx].bufferState = RELEASED;
+            mBuffers[idx].buffer.clear();
+        }
     }
 
     mSurface = surface;
@@ -295,11 +295,7 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
 
 void BufferProducerThread::shutdown() {
     mShutdown = true;
-    {
-        Mutex::Autolock autoLock(&mLock);
-        setSurfaceLocked(NULL);
-        mCondition.broadcast();
-    }
+    setSurface(NULL);
     requestExitAndWait();
     if (mBuffers)
     {
@@ -312,7 +308,7 @@ void BufferProducerThread::shutdown() {
               mBuffers[k].buffer.clear();
            }
         }
-        delete mBuffers;
+        delete [] mBuffers;
         mBuffers = NULL;
     }
 }
@@ -334,18 +330,21 @@ int BufferProducerThread::findBufferIndex(uint32_t seq)
 
 int BufferProducerThread::findBufferIndex(buffer_handle_t buffer)
 {
-   int index = -1;
-   native_handle_t *h = (native_handle_t *)buffer;
+    int index = -1;
+    native_handle_t *h = (native_handle_t *)buffer;
 
-   for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
-   {
-      if (((native_handle_t *)mBuffers[k].buffer->handle)->data[0] == h->data[0])
-      {
-         index = k;
-         break;
-      }
-   }
-   return index;
+    for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
+    {
+        if (mBuffers[k].buffer.get())
+        {
+            if (((native_handle_t *)mBuffers[k].buffer->handle)->data[0] == h->data[0])
+            {
+                index = k;
+                break;
+            }
+        }
+    }
+    return index;
 }
 
 bool BufferProducerThread::threadLoop() {
@@ -380,64 +379,64 @@ bool BufferProducerThread::threadLoop() {
 
         if ((mReleasedBufCnt > (uint32_t)mHoldBufCount) && (!mShutdown))
         {
-           ANativeWindowBuffer_t* buffer = NULL;
-           sp<ANativeWindow> anw(mSurface);
-           int idx = -1;
+            ANativeWindowBuffer_t* buffer = NULL;
+            sp<ANativeWindow> anw(mSurface);
+            int idx = -1;
 
-           ATRACE_INT("renderer dequeue buffer", 1);
+            ATRACE_INT("renderer dequeue buffer", 1);
 
-           err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
-           if (err != NO_ERROR) {
+            err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
+            if (err != NO_ERROR) {
                 ATRACE_INT("renderer dequeue buffer", 0);
                 ALOGE("error %d while dequeueing buffer to surface", err);
                 usleep(1000);
                 return true;
-           }
-           else
-           {
-               Mutex::Autolock autoLock(&mLock);
+            }
+            else
+            {
+                Mutex::Autolock autoLock(&mLock);
 
-               if (!mShutdown)
-               {
-                   ATRACE_INT("renderer dequeue buffer", 0);
+                if (!mShutdown)
+                {
+                    ATRACE_INT("renderer dequeue buffer", 0);
 
-                   mReleasedBufCnt--;
+                    mReleasedBufCnt--;
 
-                   idx = findBufferIndex(buffer->handle);
-                   if (-1 == idx)
-                   {
-                      ALOGE("error can not find buffer handle 0x%x in buffer list", buffer->handle);
-                      return false;
-                   }
+                    idx = findBufferIndex(buffer->handle);
+                    if (-1 == idx)
+                    {
+                        ALOGE("error can not find buffer handle 0x%x in buffer list", buffer->handle);
+                        return false;
+                    }
 
-                   if (RELEASED == mBuffers[idx].bufferState)
-                   {
-                      mBuffers[idx].buffer = buffer;
-                      mBuffers[idx].bufferState = CAPTURE;
+                    if (RELEASED == mBuffers[idx].bufferState)
+                    {
+                        mBuffers[idx].buffer = buffer;
+                        mBuffers[idx].bufferState = CAPTURE;
 
-                      mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
+                        mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
                                                 buffer->handle, ++mSeq);
-                      mBuffers[idx].seqNum = mSeq;
-                   }
-                   else
-                   {
-                      ALOGE("error buffer state = 0x%x, but expected buffer state = 0x%x", mBuffers[idx].bufferState, RELEASED);
-                      return false;
-                   }
-               }
-               else
-               {
-                  sp<ANativeWindowBuffer_t> nwBuffer = NULL;
+                        mBuffers[idx].seqNum = mSeq;
+                    }
+                    else
+                    {
+                        ALOGE("error buffer state = 0x%x, but expected buffer state = 0x%x", mBuffers[idx].bufferState, RELEASED);
+                        return false;
+                    }
+                }
+                else
+                {
+                    sp<ANativeWindowBuffer_t> nwBuffer = NULL;
 
-                  ATRACE_INT("renderer dequeue buffer", 0);
+                    ATRACE_INT("renderer dequeue buffer", 0);
 
-                  idx = findBufferIndex(buffer->handle);
-                  nwBuffer = mBuffers[idx].buffer;
-                  status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
-                  if (err != NO_ERROR) {
-                    ALOGE("error in buffer queue");
-                  }
-               }
+                    idx = findBufferIndex(buffer->handle);
+                    nwBuffer = mBuffers[idx].buffer;
+                    status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
+                    if (err != NO_ERROR) {
+                        ALOGE("error in buffer queue");
+                    }
+                }
             }
         }
     }
@@ -629,13 +628,6 @@ int JTvInputHal::removeStream(int deviceId, int streamId) {
         // Nothing to do
         return NO_ERROR;
     }
-    if (Surface::isValid(connection.mSurface)) {
-        connection.mSurface.clear();
-    }
-    if (connection.mSurface != NULL) {
-        connection.mSurface->setSidebandStream(NULL);
-        connection.mSurface.clear();
-    }
     if (connection.mThread != NULL) {
         connection.mThread->shutdown();
         connection.mThread.clear();
@@ -646,6 +638,13 @@ int JTvInputHal::removeStream(int deviceId, int streamId) {
     }
     if (connection.mSourceHandle != NULL) {
         connection.mSourceHandle.clear();
+    }
+    if (Surface::isValid(connection.mSurface)) {
+        connection.mSurface.clear();
+    }
+    if (connection.mSurface != NULL) {
+        connection.mSurface->setSidebandStream(NULL);
+        connection.mSurface.clear();
     }
     return NO_ERROR;
 }
