@@ -450,9 +450,12 @@ public final class ClientOperation implements Operation, BaseStream {
          * length, but it is a waste of resources if we can't send much of
          * the body.
          */
+        if (VERBOSE) Log.v(TAG, "SendRquest  mMaxPckSize:" + mMaxPacketSize+" header.len"
+            + headerArray.length);
         if ((ObexHelper.BASE_PACKET_LENGTH + headerArray.length) > mMaxPacketSize) {
             int end = 0;
             int start = 0;
+            int processedLen = 0;
             // split & send the headerArray in multiple packets.
 
             while (end != headerArray.length) {
@@ -478,15 +481,29 @@ public final class ClientOperation implements Operation, BaseStream {
 
                 byte[] sendHeader = new byte[end - start];
                 System.arraycopy(headerArray, start, sendHeader, 0, sendHeader.length);
+                //Set GET FINAL (0x83) for Last Request Header packet as per GOEP2.1
+                processedLen += sendHeader.length;
+                if (processedLen == headerArray.length) {
+                    opCode = ObexHelper.OBEX_OPCODE_GET_FINAL;
+                } else {
+                    opCode = ObexHelper.OBEX_OPCODE_GET;
+                }
                 if (!mParent.sendRequest(opCode, sendHeader, mReplyHeader,
                         mPrivateInput, mSingleResponseActiveClient, mSrmGetActiveClient)) {
                     return false;
                 }
 
+                if (VERBOSE) Log.v(TAG, "sendRequest opCode : "+opCode + " respnsCde: "
+                    +mReplyHeader.responseCode);
+                if (mReplyHeader.responseCode == ResponseCodes.OBEX_HTTP_OK) {
+                    return true;
+                }
                 if (mReplyHeader.responseCode != ResponseCodes.OBEX_HTTP_CONTINUE) {
                     return false;
                 }
 
+                if(VERBOSE) Log.v(TAG, "SendRquest end: "+end +" start :"+start + " sendHeader.len"
+                    + sendHeader.length + " procssdLen: "+processedLen);
                 start = end;
             }
 
@@ -709,10 +726,9 @@ public final class ClientOperation implements Operation, BaseStream {
                     sendRequest(0x03);
                 } else {
                     sendRequest(0x83);
-
-                    if (mReplyHeader.responseCode != ResponseCodes.OBEX_HTTP_CONTINUE) {
-                        mOperationDone = true;
-                    }
+                }
+                if (mReplyHeader.responseCode != ResponseCodes.OBEX_HTTP_CONTINUE) {
+                    mOperationDone = true;
                 }
                 return true;
 

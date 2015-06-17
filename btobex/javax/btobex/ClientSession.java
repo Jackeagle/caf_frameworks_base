@@ -475,6 +475,7 @@ public final class ClientSession extends ObexSession {
 
         if (VERBOSE) Log.v(TAG, "sendRequest ignore: " + ignoreResponse
                                    + ", SRMP WAIT: " + mSrmClient.getLocalSrmpWait()
+                                   + ", maxPckSize: " + maxPacketSize
                                    + " supressSend : "+supressSend);
 
         //check header length with local max size
@@ -487,7 +488,6 @@ public final class ClientSession extends ObexSession {
         int bytesReceived;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write((byte)opCode);
-        if (VERBOSE) Log.v(TAG, "sendRequest opCode = "+opCode);
 
         // Determine if there are any headers to send
         if (head == null) {
@@ -497,9 +497,10 @@ public final class ClientSession extends ObexSession {
             out.write((byte)((head.length + 3) >> 8));
             out.write((byte)(head.length + 3));
             out.write(head);
-            if (VERBOSE) Log.v(TAG, "sendRequest head.length = "+head.length);
         }
 
+        if (VERBOSE) Log.v(TAG, "sendRequest opCode: " + opCode
+                +" head.length = " + head.length);
         if(!supressSend) {
             // Write the request to the output stream and flush the stream
             mOutput.write(out.toByteArray());
