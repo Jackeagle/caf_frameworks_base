@@ -361,6 +361,8 @@
     <!-- Instructions telling the user that the operation to unlock the keyguard
          with SIM PIN failed. Displayed in one line in a large font.  -->
     <string name="kg_password_pin_failed">SIM PIN operation failed!</string>
+    <!-- Instructions telling the user that the SIM PIN operation requested is not supported.  -->
+    <string name="kg_pin_request_not_supported">Request is not supported currently.Please try again later.</string>
     <!-- Instructions telling the user that the operation to unlock the keyguard
          with PUK failed. Displayed in one line in a large font.  -->
     <string name="kg_password_puk_failed">SIM PUK operation failed!</string>
