@@ -2195,20 +2195,12 @@
     <!-- Whether cpu boost is enabled for overscroller fling. -->
     <bool name="config_enableCpuBoostForOverScrollerFling">false</bool>
     <integer name="flingboost_timeout_param">0</integer>
-    <integer name="flingboost_schedboost_param">0</integer>
-    <integer name="flingboost_cpuboost_param">0</integer>
-    <integer name="flingboost_pcdisbl_param">0</integer>
-    <integer name="flingboost_ksmboost_param">0</integer>
-    <integer name="flingboost_preferidle_param">0</integer>
+    <integer-array name="flingboost_param_value"/>
 
     <!-- Whether cpu boost is enabled for horizontal scroll. -->
     <bool name="config_enableCpuBoostForScroller">false</bool>
     <integer name="scrollboost_timeout_param">0</integer>
-    <integer name="scrollboost_schedboost_param">0</integer>
-    <integer name="scrollboost_cpuboost_param">0</integer>
-    <integer name="scrollboost_pcdisbl_param">0</integer>
-    <integer name="scrollboost_ksmboost_param">0</integer>
-    <integer name="scrollboost_preferidle_param">0</integer>
+    <integer-array name="scrollboost_param_value"/>
 
     <!-- Configuration to enable non-default PDP during IWLAN -->
     <bool name="config_feature_iwlan_enabled">false</bool>
@@ -2219,23 +2211,17 @@
     <!-- Whether cpu boost is enabled for AppLaunch -->
     <bool name="config_enableCpuBoostForAppLaunch">false</bool>
     <integer name="disablepacking_timeout_param">0</integer>
+    <integer-array name="launchboost_param_value"/>
     <integer name="launchboost_timeout_param">0</integer>
-    <integer name="launchboost_schedboost_param">0</integer>
-    <integer name="launchboost_cpuboost_param">0</integer>
-    <integer name="launchboost_cpunumboost_param">0</integer>
-    <integer name="launchboost_pcdisbl_param">0</integer>
-    <integer name="launchboost_ksmboost_param">0</integer>
-    <integer name="launchboost_smtaskboost_param">0</integer>
-    <integer name="launchboost_idleloadboost_param">0</integer>
-    <integer name="launchboost_idlenrrunboost_param">0</integer>
-    <integer name="launchboost_preferidle_param">0</integer>
+    <integer-array name="launchboost_packing_param_value"/>
     <!-- Support for disabling to fetch APN from OMH card
          for some cdma carriers -->
-    <bool name="config_fetch_apn_from_omh_card">true</bool>
+   <bool name="config_fetch_apn_from_omh_card">true</bool>
+
+   <!-- Whether cpu boost is enabled for animation. -->
    <bool name="config_enablePerfBoostForAnimation">false</bool>
    <integer name="animationboost_timeout_param">0</integer>
-   <integer name="animationboost_schedboost_param">0</integer>
-   <integer name="animationboost_cpuboost_param">0</integer>
+   <integer-array name="animationboost_param_value"/>
 
    <!-- Activities list for boost -->
    <string-array translatable="false" name="boost_activityList">
@@ -2243,9 +2229,7 @@
 
    <!-- Activity scroll boost params -->
    <integer name="ascrollboost_timeout">0</integer>
-   <integer name="ascrollboost_schedboost">0</integer>
-   <integer name="ascrollboost_cpuboost">0</integer>
-   <integer name="ascrollboost_pcdisbl">0</integer>
+   <integer-array name="ascrollboost_param_value"/>
 
    <!-- Controlling respond call via sms feature via config item -->
    <bool name="config_reject_call_via_sms_enabled">true</bool>

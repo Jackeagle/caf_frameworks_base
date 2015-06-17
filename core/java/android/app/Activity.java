@@ -667,9 +667,7 @@ public class Activity extends ContextThemeWrapper
     private static Performance mPerf = null;
     private static int mDragBoostPossible = -1;
     private static int mPerfLockDuration = -1;
-    private static int mAsCpuBoost = -1;
-    private static int mAsSchedBoost = -1;
-    private static int mAsPcDisblBoost = -1;
+    private static int mAsParamVal[];
     private static final String TAG = "Activity";
 
     private static final boolean DEBUG_LIFECYCLE = false;
@@ -2767,17 +2765,12 @@ public class Activity extends ContextThemeWrapper
             if(mPerfLockDuration == -1){
                 mPerfLockDuration = getResources().getInteger(
                     com.android.internal.R.integer.ascrollboost_timeout);
-                mAsCpuBoost = getResources().getInteger(
-                    com.android.internal.R.integer.ascrollboost_cpuboost);
-                mAsSchedBoost = getResources().getInteger(
-                    com.android.internal.R.integer.ascrollboost_schedboost);
-                mAsPcDisblBoost = getResources().getInteger(
-                    com.android.internal.R.integer.ascrollboost_pcdisbl);
+                mAsParamVal = getResources().getIntArray(
+                    com.android.internal.R.array.ascrollboost_param_value);
             }
             mPerf.perfLockAcquireTouch(ev,
                 getResources().getDisplayMetrics(),
-                mPerfLockDuration,
-                mAsSchedBoost, mAsCpuBoost, mAsPcDisblBoost);
+                mPerfLockDuration, mAsParamVal);
         }
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             onUserInteraction();

@@ -153,8 +153,7 @@ final class ActivityStack {
     public Performance mPerf = null;
     public boolean mIsAnimationBoostEnabled = false;
     public int aBoostTimeOut = 0;
-    public int aBoostCpuBoost = 0;
-    public int aBoostSchedBoost = 0;
+    public int aBoostParamVal[];
     /**
      * The back history of all previous (and possibly still
      * running) activities.  It contains #TaskRecord objects.
@@ -358,12 +357,10 @@ final class ActivityStack {
         mIsAnimationBoostEnabled = mService.mContext.getResources().getBoolean(
                    com.android.internal.R.bool.config_enablePerfBoostForAnimation);
         if(mIsAnimationBoostEnabled) {
-           aBoostSchedBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.animationboost_schedboost_param);
            aBoostTimeOut = mService.mContext.getResources().getInteger(
                    com.android.internal.R.integer.animationboost_timeout_param);
-           aBoostCpuBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.animationboost_cpuboost_param);
+           aBoostParamVal = mService.mContext.getResources().getIntArray(
+                   com.android.internal.R.array.animationboost_param_value);
        }
     }
 
@@ -1731,7 +1728,7 @@ final class ActivityStack {
                             ? AppTransition.TRANSIT_ACTIVITY_CLOSE
                             : AppTransition.TRANSIT_TASK_CLOSE, false);
                     if(prev.task != next.task && mPerf != null) {
-                       mPerf.perfLockAcquire(aBoostTimeOut, aBoostSchedBoost, aBoostCpuBoost);
+                       mPerf.perfLockAcquire(aBoostTimeOut, aBoostParamVal);
 		    }
                 }
                 mWindowManager.setAppWillBeHidden(prev.appToken);
@@ -1748,7 +1745,7 @@ final class ActivityStack {
                                     ? AppTransition.TRANSIT_TASK_OPEN_BEHIND
                                     : AppTransition.TRANSIT_TASK_OPEN, false);
                     if(prev.task != next.task && mPerf != null) {
-                        mPerf.perfLockAcquire(aBoostTimeOut, aBoostSchedBoost, aBoostCpuBoost);
+                        mPerf.perfLockAcquire(aBoostTimeOut, aBoostParamVal);
                     }
                 }
             }

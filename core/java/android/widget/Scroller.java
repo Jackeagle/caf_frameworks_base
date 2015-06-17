@@ -116,13 +116,8 @@ public class Scroller  {
     */
     private Performance mPerf = null;
     boolean bIsPerfBoostEnabled = false;
-    private int lBoostTimeOut = 0;
-    private int lBoostCpuBoost = 0;
-    private int lBoostSchedBoost = 0;
-    private int lBoostPcDisblBoost = 0;
-    private int lBoostKsmBoost = 0;
-    private int lBoostPreferIdle =0;
-
+    private int sBoostTimeOut = 0;
+    private int sBoostParamVal[];
 
     // A context-specific coefficient adjusted to physical values.
     private float mPhysicalCoeff;
@@ -198,21 +193,11 @@ public class Scroller  {
         bIsPerfBoostEnabled = context.getResources().getBoolean(
              com.android.internal.R.bool.config_enableCpuBoostForScroller);
         if (bIsPerfBoostEnabled) {
-        lBoostSchedBoost = context.getResources().getInteger(
-               com.android.internal.R.integer.scrollboost_schedboost_param);
-        lBoostTimeOut = context.getResources().getInteger(
+        sBoostTimeOut = context.getResources().getInteger(
                com.android.internal.R.integer.scrollboost_timeout_param);
-        lBoostCpuBoost = context.getResources().getInteger(
-               com.android.internal.R.integer.scrollboost_cpuboost_param);
-        lBoostPcDisblBoost = context.getResources().getInteger(
-               com.android.internal.R.integer.scrollboost_pcdisbl_param);
-        lBoostKsmBoost = context.getResources().getInteger(
-               com.android.internal.R.integer.scrollboost_ksmboost_param);
-        lBoostPreferIdle = context.getResources().getInteger(
-               com.android.internal.R.integer.scrollboost_preferidle_param);
+        sBoostParamVal = context.getResources().getIntArray(
+               com.android.internal.R.array.scrollboost_param_value);
         }
-
-
         if (mPerf == null && bIsPerfBoostEnabled) {
             mPerf = new Performance();
         }
@@ -436,11 +421,10 @@ public class Scroller  {
         mDurationReciprocal = 1.0f / (float) mDuration;
 
         if ((mPerf != null) && (duration != 0)) {
-            if (0 == lBoostTimeOut) {
-                lBoostTimeOut = mDuration;
+            if (0 == sBoostTimeOut) {
+                sBoostTimeOut = mDuration;
             }
-            mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
-                                          lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
+            mPerf.perfLockAcquire(sBoostTimeOut, sBoostParamVal);
         }
     }
 
