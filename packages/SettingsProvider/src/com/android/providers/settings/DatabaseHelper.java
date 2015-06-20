@@ -1077,8 +1077,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 if (c == null || c.getCount() == 0) {
                     stmt = db.compileStatement("INSERT INTO system(name,value)"
                             + " VALUES(?,?);");
-                    loadBooleanSetting(stmt, Settings.System.LOCKSCREEN_DISABLED,
+                    // For automotive products, make  lock screen setting none.
+                    if (mContext != null && mContext.getResources().getBoolean(
+                            com.android.internal.R.bool.config_boot_opt) == true) {
+                        loadSetting(stmt,Settings.System.LOCKSCREEN_DISABLED,1);
+                    } else {
+                        loadBooleanSetting(stmt, Settings.System.LOCKSCREEN_DISABLED,
                             R.bool.def_lockscreen_disabled);
+                    }
                 }
                 db.setTransactionSuccessful();
             } finally {
@@ -2493,8 +2499,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             if (SystemProperties.getBoolean("ro.lockscreen.disable.default", false) == true) {
                 loadSetting(stmt, Settings.System.LOCKSCREEN_DISABLED, "1");
             } else {
-                loadBooleanSetting(stmt, Settings.System.LOCKSCREEN_DISABLED,
-                        R.bool.def_lockscreen_disabled);
+                // For automotive product, make lock screen setting none.
+                if (mContext != null && mContext.getResources().getBoolean(
+                            com.android.internal.R.bool.config_boot_opt) == true) {
+                    loadSetting(stmt,Settings.System.LOCKSCREEN_DISABLED,1);
+                } else {
+                    loadBooleanSetting(stmt, Settings.System.LOCKSCREEN_DISABLED,
+                            R.bool.def_lockscreen_disabled);
+                }
             }
 
             loadBooleanSetting(stmt, Settings.Secure.SCREENSAVER_ENABLED,
