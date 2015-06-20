@@ -51,8 +51,11 @@ int main(int argc, char** argv)
         sp<ProcessState> proc(ProcessState::self());
         ProcessState::self()->startThreadPool();
 
-        // create the boot animation object
-        sp<BootAnimation> boot = new BootAnimation();
+        // create the boot animation object for non automotive.
+        property_get("AUTOPLATFORM_BOOT", value, "false");
+        if (!(strcmp(value, "true") == 0)) {
+            sp<BootAnimation> boot = new BootAnimation();
+        }
 
         IPCThreadState::self()->joinThreadPool();
 
