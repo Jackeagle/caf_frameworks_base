@@ -35,7 +35,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
+#include <dlfcn.h>
 
 #define APK_LIB "lib/"
 #define APK_LIB_LEN (sizeof(APK_LIB) - 1)
@@ -55,6 +55,10 @@
 #define TMP_FILE_PATTERN "/tmp.XXXXXX"
 #define TMP_FILE_PATTERN_LEN (sizeof(TMP_FILE_PATTERN) - 1)
 
+#define LIB_UNINIT             0
+#define LIB_INITED_AND_FAIL    -1
+#define LIB_INITED_AND_SUCCESS 1
+
 namespace android {
 
 // These match PackageManager.java install codes
@@ -69,6 +73,24 @@ enum install_status_t {
 };
 
 typedef install_status_t (*iterFunc)(JNIEnv*, void*, ZipFileRO*, ZipEntryRO, const char*);
+
+typedef int (*PGetAssetsStatusFunc) (ZipFileRO*, Vector<ScopedUtfChars*>, const int);
+static PGetAssetsStatusFunc GetAssetsStatusFunc = NULL;
+static int g_assetLibInit = LIB_UNINIT;
+
+static int initAssetsVerifierLib() {
+    if (g_assetLibInit != LIB_UNINIT) return g_assetLibInit;
+    void* handle = dlopen("libassetsverifier.so", RTLD_NOW);
+    if (handle != NULL) {
+        GetAssetsStatusFunc = (PGetAssetsStatusFunc)dlsym(handle, "getAssetsStatus");
+        if (GetAssetsStatusFunc != NULL) {
+            g_assetLibInit = LIB_INITED_AND_SUCCESS;
+        } else {
+            g_assetLibInit = LIB_INITED_AND_FAIL;
+        }
+    }
+    return g_assetLibInit;
+}
 
 // Equivalent to android.os.FileUtils.isFilenameSafe
 static bool
@@ -454,6 +476,15 @@ static int findSupportedAbi(JNIEnv *env, jlong apkHandle, jobjectArray supported
                     status = i;
                 }
             }
+        }
+    }
+
+    if (status == NO_NATIVE_LIBRARIES) {
+        int rc = initAssetsVerifierLib();
+        if (rc == LIB_INITED_AND_SUCCESS) {
+           status = GetAssetsStatusFunc(zipFile, supportedAbis, numAbis);
+        } else {
+            ALOGE("Failed to load assets verifier: %d", rc);
         }
     }
 
