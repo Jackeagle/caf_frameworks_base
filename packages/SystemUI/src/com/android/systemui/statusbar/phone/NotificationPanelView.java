@@ -40,6 +40,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.android.keyguard.KeyguardStatusView;
+import com.android.systemui.EventLogTags;
+import com.android.systemui.EventLogConstants;
 import com.android.systemui.R;
 import com.android.systemui.qs.QSContainer;
 import com.android.systemui.qs.QSPanel;
@@ -148,7 +150,8 @@ public class NotificationPanelView extends PanelView implements
 
     private boolean mBlockTouches;
     private int mNotificationScrimWaitDistance;
-    private boolean mTwoFingerQsExpand;
+    // Used for two finger gesture as well as accessibility shortcut to QS.
+    private boolean mQsExpandImmediate;
     private boolean mTwoFingerQsExpandPossible;
 
     /**
@@ -468,6 +471,13 @@ public class NotificationPanelView extends PanelView implements
         }
     }
 
+    public void expandWithQs() {
+        if (mQsExpansionEnabled) {
+            mQsExpandImmediate = true;
+        }
+        expand();
+    }
+
     @Override
     public void fling(float vel, boolean expand) {
         GestureRecorder gr = ((PhoneStatusBarView) mBar).mBar.getGestureRecorder();
@@ -651,7 +661,7 @@ public class NotificationPanelView extends PanelView implements
         if (mExpandedHeight != 0) {
             handleQsDown(event);
         }
-        if (!mTwoFingerQsExpand && mQsTracking) {
+        if (!mQsExpandImmediate && mQsTracking) {
             onQsTouch(event);
             if (!mConflictingQsExpansionGesture) {
                 return true;
@@ -668,7 +678,7 @@ public class NotificationPanelView extends PanelView implements
         if (mTwoFingerQsExpandPossible && event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN
                 && event.getPointerCount() == 2
                 && event.getY(event.getActionIndex()) < mStatusBarMinHeight) {
-            mTwoFingerQsExpand = true;
+            mQsExpandImmediate = true;
             requestPanelHeightUpdate();
 
             // Normally, we start listening when the panel is expanded, but here we need to start
@@ -1161,7 +1171,7 @@ public class NotificationPanelView extends PanelView implements
 
     private float calculateQsTopPadding() {
         if (mKeyguardShowing
-                && (mTwoFingerQsExpand || mIsExpanding && mQsExpandedWhenExpandingStarted)) {
+                && (mQsExpandImmediate || mIsExpanding && mQsExpandedWhenExpandingStarted)) {
 
             // Either QS pushes the notifications down when fully expanded, or QS is fully above the
             // notifications (mostly on tablets). maxNotifications denotes the normal top padding
@@ -1195,7 +1205,7 @@ public class NotificationPanelView extends PanelView implements
                 mScrollView.getScrollY(),
                 mAnimateNextTopPaddingChange || animate,
                 mKeyguardShowing
-                        && (mTwoFingerQsExpand || mIsExpanding && mQsExpandedWhenExpandingStarted));
+                        && (mQsExpandImmediate || mIsExpanding && mQsExpandedWhenExpandingStarted));
         mAnimateNextTopPaddingChange = false;
     }
 
@@ -1319,7 +1329,7 @@ public class NotificationPanelView extends PanelView implements
             min = Math.max(min, minHeight);
         }
         int maxHeight;
-        if (mTwoFingerQsExpand || mQsExpanded || mIsExpanding && mQsExpandedWhenExpandingStarted) {
+        if (mQsExpandImmediate || mQsExpanded || mIsExpanding && mQsExpandedWhenExpandingStarted) {
             maxHeight = calculatePanelHeightQsExpanded();
         } else {
             maxHeight = calculatePanelHeightShade();
@@ -1334,10 +1344,10 @@ public class NotificationPanelView extends PanelView implements
 
     @Override
     protected void onHeightUpdated(float expandedHeight) {
-        if (!mQsExpanded || mTwoFingerQsExpand || mIsExpanding && mQsExpandedWhenExpandingStarted) {
+        if (!mQsExpanded || mQsExpandImmediate || mIsExpanding && mQsExpandedWhenExpandingStarted) {
             positionClockAndNotifications();
         }
-        if (mTwoFingerQsExpand || mQsExpanded && !mQsTracking && mQsExpansionAnimator == null
+        if (mQsExpandImmediate || mQsExpanded && !mQsTracking && mQsExpansionAnimator == null
                 && !mQsExpansionFromOverscroll) {
             float t;
             if (mKeyguardShowing) {
@@ -1561,7 +1571,7 @@ public class NotificationPanelView extends PanelView implements
         } else {
             setListening(true);
         }
-        mTwoFingerQsExpand = false;
+        mQsExpandImmediate = false;
         mTwoFingerQsExpandPossible = false;
     }
 
@@ -1579,7 +1589,7 @@ public class NotificationPanelView extends PanelView implements
 
     @Override
     protected void setOverExpansion(float overExpansion, boolean isPixels) {
-        if (mConflictingQsExpansionGesture || mTwoFingerQsExpand) {
+        if (mConflictingQsExpansionGesture || mQsExpandImmediate) {
             return;
         }
         if (mStatusBar.getBarState() != StatusBarState.KEYGUARD) {
@@ -1599,7 +1609,7 @@ public class NotificationPanelView extends PanelView implements
     protected void onTrackingStarted() {
         super.onTrackingStarted();
         if (mQsFullyExpanded) {
-            mTwoFingerQsExpand = true;
+            mQsExpandImmediate = true;
         }
         if (mStatusBar.getBarState() == StatusBarState.KEYGUARD
                 || mStatusBar.getBarState() == StatusBarState.SHADE_LOCKED) {
@@ -1677,13 +1687,21 @@ public class NotificationPanelView extends PanelView implements
         }
     }
 
+    @Override
     public void onAnimationToSideStarted(boolean rightPage, float translation, float vel) {
         boolean start = getLayoutDirection() == LAYOUT_DIRECTION_RTL ? rightPage : !rightPage;
         mIsLaunchTransitionRunning = true;
         mLaunchAnimationEndRunnable = null;
+        float displayDensity = mStatusBar.getDisplayDensity();
+        int lengthDp = Math.abs((int) (translation / displayDensity));
+        int velocityDp = Math.abs((int) (vel / displayDensity));
         if (start) {
+            EventLogTags.writeSysuiLockscreenGesture(
+                    EventLogConstants.SYSUI_LOCKSCREEN_GESTURE_SWIPE_DIALER, lengthDp, velocityDp);
             mKeyguardBottomArea.launchPhone();
         } else {
+            EventLogTags.writeSysuiLockscreenGesture(
+                    EventLogConstants.SYSUI_LOCKSCREEN_GESTURE_SWIPE_CAMERA, lengthDp, velocityDp);
             mSecureCameraLaunchManager.startSecureCameraLaunch();
         }
         mStatusBar.startLaunchTransitionTimeout();
@@ -1815,7 +1833,7 @@ public class NotificationPanelView extends PanelView implements
     @Override
     protected boolean fullyExpandedClearAllVisible() {
         return mNotificationStackScroller.isDismissViewNotGone()
-                && mNotificationStackScroller.isScrolledToBottom() && !mTwoFingerQsExpand;
+                && mNotificationStackScroller.isScrolledToBottom() && !mQsExpandImmediate;
     }
 
     @Override
