@@ -83,7 +83,7 @@ public class PackageHelper {
     public static String createSdDir(long sizeBytes, String cid, String sdEncKey, int uid,
             boolean isExternal) {
         // Round up to nearest MB, plus another MB for filesystem overhead
-        final int sizeMb = (int) ((sizeBytes + MB_IN_BYTES) / MB_IN_BYTES) + 1;
+        final int sizeMb = (int) ((sizeBytes + MB_IN_BYTES) / MB_IN_BYTES) + 6;
         try {
             IMountService mountService = getMountService();
 

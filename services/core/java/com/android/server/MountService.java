@@ -2362,9 +2362,12 @@ class MountService extends IMountService.Stub
             Slog.i(TAG, "changing encryption password...");
         }
 
+        LockSettingsService lockSettings = new LockSettingsService(mContext);
+        String currentPassword = lockSettings.getPassword();
+
         try {
             NativeDaemonEvent event = mConnector.execute("cryptfs", "changepw", CRYPTO_TYPES[type],
-                        new SensitiveArg(toHex(password)));
+                        new SensitiveArg(toHex(currentPassword)), new SensitiveArg(toHex(password)));
             return Integer.parseInt(event.getMessage());
         } catch (NativeDaemonConnectorException e) {
             // Encryption failed
