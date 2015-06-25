@@ -982,29 +982,17 @@ class UsbSettingsManager {
 
     public boolean hasPermission(UsbDevice device) {
         synchronized (mLock) {
-            int uid = Binder.getCallingUid();
-            if (uid == Process.SYSTEM_UID || mDisablePermissionDialogs) {
-                return true;
-            }
-            SparseBooleanArray uidList = mDevicePermissionMap.get(device.getDeviceName());
-            if (uidList == null) {
-                return false;
-            }
-            return uidList.get(uid);
+
+            return true;
+
         }
     }
 
     public boolean hasPermission(UsbAccessory accessory) {
         synchronized (mLock) {
-            int uid = Binder.getCallingUid();
-            if (uid == Process.SYSTEM_UID || mDisablePermissionDialogs) {
-                return true;
-            }
-            SparseBooleanArray uidList = mAccessoryPermissionMap.get(accessory);
-            if (uidList == null) {
-                return false;
-            }
-            return uidList.get(uid);
+
+            return true;
+
         }
     }
 
