@@ -25,6 +25,12 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name=".LocaleReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCALE_CHANGED"/>
+            </intent-filter>
+        </receiver>
+
         <!-- TODO: find a better place for tests to live -->
         <provider
             android:name=".TestDocumentsProvider"
