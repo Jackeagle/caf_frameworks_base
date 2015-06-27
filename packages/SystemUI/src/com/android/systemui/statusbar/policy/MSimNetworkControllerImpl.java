@@ -761,8 +761,9 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                 } else {
                     mLastSignalLevel = iconLevel = mMSimSignalStrength[phoneId].getLevel();
                     if (mShowRsrpSignalLevelforLTE) {
-                        if (mMSimServiceState[phoneId].getDataNetworkType() ==
-                                TelephonyManager.NETWORK_TYPE_LTE) {
+                        int dataNetType = mMSimServiceState[phoneId].getDataNetworkType();
+                        if (dataNetType == TelephonyManager.NETWORK_TYPE_LTE ||
+                                dataNetType == TelephonyManager.NETWORK_TYPE_LTE_CA) {
                             int level = mMSimSignalStrength[phoneId].getAlternateLteLevel();
                             mLastSignalLevel = iconLevel = (level == -1 ? 0 : level);
                             Slog.d(TAG, "updateTelephonySignalStrength, data type is lte, level = "

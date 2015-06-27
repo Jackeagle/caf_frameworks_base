@@ -546,7 +546,8 @@ public class MSimSignalClusterView
         int dataType = mMSimNC.getDataNetworkType(phoneId);
         int voiceType = mMSimNC.getVoiceNetworkType(phoneId);
         if ((dataType == TelephonyManager.NETWORK_TYPE_TD_SCDMA
-                || dataType == TelephonyManager.NETWORK_TYPE_LTE)
+                || dataType == TelephonyManager.NETWORK_TYPE_LTE
+                || dataType == TelephonyManager.NETWORK_TYPE_LTE_CA)
             && voiceType == TelephonyManager.NETWORK_TYPE_GSM) {
             ret = true;
         }
@@ -563,6 +564,7 @@ public class MSimSignalClusterView
         int dataType = mMSimNC.getDataNetworkType(phoneId);
         int voiceType = mMSimNC.getVoiceNetworkType(phoneId);
         return ((dataType == TelephonyManager.NETWORK_TYPE_LTE)
+                || (dataType == TelephonyManager.NETWORK_TYPE_LTE_CA)
                 || (dataType == TelephonyManager.NETWORK_TYPE_EVDO_0)
                 || (dataType == TelephonyManager.NETWORK_TYPE_EVDO_A))
                 && voiceType == TelephonyManager.NETWORK_TYPE_UNKNOWN;
@@ -583,7 +585,8 @@ public class MSimSignalClusterView
                 || dataType == TelephonyManager.NETWORK_TYPE_EVDO_A
                 || dataType == TelephonyManager.NETWORK_TYPE_EVDO_B
                 || dataType == TelephonyManager.NETWORK_TYPE_EHRPD
-                || dataType == TelephonyManager.NETWORK_TYPE_LTE)
+                || dataType == TelephonyManager.NETWORK_TYPE_LTE
+                || dataType == TelephonyManager.NETWORK_TYPE_LTE_CA)
                 && (voiceType == TelephonyManager.NETWORK_TYPE_GSM
                     || voiceType == TelephonyManager.NETWORK_TYPE_1xRTT)) {
             ret = true;
