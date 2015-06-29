@@ -2316,4 +2316,12 @@
     <bool name="config_defaultInTouchMode">true</bool>
    <!-- config for FDN contact search. Disabled by default -->
    <bool name="config_fdn_contact_search">false</bool>
+
+   <!-- Zero Balance redirect URL config -->
+   <string name="operator_config_url" translatable="false"></string>
+   <!-- Zero Balance ping URL config -->
+   <string name="operator_ping_url" translatable="false"></string>
+   <!-- Zero Balance feature enable config -->
+   <bool name="config_zero_balance_operator">false</bool>
+
 </resources>
