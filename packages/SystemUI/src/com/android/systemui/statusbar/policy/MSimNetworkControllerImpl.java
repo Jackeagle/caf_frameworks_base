@@ -1052,6 +1052,12 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         Slog.d(TAG,"refreshViews phoneId =" + phoneId + "mMSimDataConnected ="
                 + mMSimDataConnected[phoneId]);
         Slog.d(TAG,"refreshViews mMSimDataActivity =" + mMSimDataActivity[phoneId]);
+        if (mContext.getResources().getBoolean(R.bool.hide_nosim_signal_icon) &&
+                mMSimState[phoneId] == IccCardConstants.State.ABSENT) {
+            mMSimPhoneSignalIconId[phoneId] = 0;
+            mMSimDataSignalIconId[phoneId] = 0;
+            mNoMSimIconId[phoneId] = 0;
+        }
         int dataSub = SubscriptionManager.getPhoneId(
                 SubscriptionManager.getDefaultDataSubId());
         if (!mHasMobileDataFeature) {

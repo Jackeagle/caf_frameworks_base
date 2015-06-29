@@ -347,5 +347,8 @@
 
     <!-- Enable operator name on status bar -->
     <bool name="enable_operator_name">false</bool>
+
+    <!-- Hide the no-sim signal icon -->
+    <bool name="hide_nosim_signal_icon">false</bool>
 </resources>
 
