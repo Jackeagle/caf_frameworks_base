@@ -118,7 +118,7 @@
 
     <application
         android:name=".SystemUIApplication"
-        android:persistent="true"
+        android:persistent="false"
         android:allowClearUserData="false"
         android:allowBackup="false"
         android:hardwareAccelerated="true"
