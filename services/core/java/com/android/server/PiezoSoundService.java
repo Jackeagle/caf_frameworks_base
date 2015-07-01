@@ -36,7 +36,6 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 
 import android.content.Context;
-import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Message;
@@ -104,10 +103,6 @@ public class PiezoSoundService extends IPiezoSoundService.Stub {
         mNativePointer = init_module();
         Slog.i(TAG, "init module called " + mNativePointer);
         mContext = context;
-
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        context.registerReceiver(mIntentReceiver, filter);
 
         mListSounder= new LinkedList<PiezoSounder>();
     };
@@ -237,29 +232,6 @@ public class PiezoSoundService extends IPiezoSoundService.Stub {
         finalize_module(mNativePointer);
         super.finalize();
     }
-
-     BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
-
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
-                synchronized (mListSounder) {
-                    if (mCurrentSounder != null) {
-                        if (DEBUG) Slog.v(TAG,
-                            "cancelPiezo due to screen off id:" + mCurrentSounder.mId);
-                        cancelPiezoLocked(mCurrentSounder.mId);
-                        mCurrentSounder = null;
-                    }
-
-                    int size = mListSounder.size();
-                    if (size > 0) {
-                        if (DEBUG) Slog.v(TAG,
-                            "clearing all req in queue " + size);
-                        mListSounder.clear();
-                    }
-                }
-            }
-        }
-    };
 
     private native int init_module();
     private static native void finalize_module(int ptr);
