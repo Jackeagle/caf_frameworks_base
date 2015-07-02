@@ -264,6 +264,10 @@ public class SubscriptionManager implements BaseColumns {
 
     private static final int[] sSimBackgroundDarkRes = setSimResource(RES_TYPE_BACKGROUND_DARK);
 
+    /** {@hide} */
+    public static final String ACTION_SET_UICC_REQUEST_FAILED =
+            "android.intent.action.ACTION_SET_UICC_REQUEST_FAILED";
+
     /**
      * Broadcast Action: The user has changed one of the default subs related to
      * data, phone calls, or sms</p>
