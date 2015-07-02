@@ -497,10 +497,10 @@ public final class ClientSession extends ObexSession {
             out.write((byte)((head.length + 3) >> 8));
             out.write((byte)(head.length + 3));
             out.write(head);
+            if (VERBOSE) Log.v(TAG, " head.length = " + head.length);
         }
+        if (VERBOSE) Log.v(TAG, "sendRequest opCode: " + opCode);
 
-        if (VERBOSE) Log.v(TAG, "sendRequest opCode: " + opCode
-                +" head.length = " + head.length);
         if(!supressSend) {
             // Write the request to the output stream and flush the stream
             mOutput.write(out.toByteArray());
