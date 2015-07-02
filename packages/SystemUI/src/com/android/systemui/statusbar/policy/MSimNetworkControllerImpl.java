@@ -991,6 +991,11 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         } else {
             mMSimNetworkName[phoneId] = mNetworkNameDefault;
         }
+        // Update mNetworkName for quick settings.
+        int dataSub = SubscriptionManager.getPhoneId(SubscriptionManager.getDefaultDataSubId());
+        if (phoneId == dataSub) {
+            mNetworkName = mMSimNetworkName[phoneId];
+        }
         Slog.d(TAG, "mMSimNetworkName[phoneId] " + mMSimNetworkName[phoneId]
                                                       + "phoneId " + phoneId);
     }
