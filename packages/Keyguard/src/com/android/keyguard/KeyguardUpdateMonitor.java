@@ -746,6 +746,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     int subId = mSubIdForSlot[subInfo.getSimSlotIndex()];
                     mPlmn.put(subInfo.getSubscriptionId(), mPlmn.get(subId));
                     mSpn.put(subInfo.getSubscriptionId(), mSpn.get(subId));
+                    mServiceState.put(subInfo.getSubscriptionId(), mServiceState.get(subId));
 
                     final int count = mCallbacks.size();
                     for (int i = 0; i < count; i++) {
@@ -1326,7 +1327,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         return null;
     }
 
-    private boolean canMakeEmergencyCall() {
+    public boolean canMakeEmergencyCall() {
         for (int i = 0; i < getNumPhones(); i++) {
             ServiceState state = mServiceState.get(getSubIdByPhoneId(i));
             if ((state != null) && (state.isEmergencyOnly() ||
