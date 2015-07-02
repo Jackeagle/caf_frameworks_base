@@ -2389,4 +2389,23 @@
   <java-symbol type="bool" name="config_regional_noti_move_away_lte_video_call" />
   <java-symbol type="bool" name="config_regional_number_patterns_video_call" />
   <java-symbol type="bool" name="config_regional_display_contact_photo_video_call_off"/>
+  <java-symbol type="bool" name="config_regional_wifi_calling_menu_enable" />
+  <java-symbol type="bool" name="config_regional_wifi_calling_registration_errorcode" />
+  <java-symbol type="string" name="config_regional_alerts_for_drop_call_toast"/>
+  <java-symbol type="bool" name="config_regional_alerts_for_drop_call"/>
+  <java-symbol type="bool" name="config_regional_wifi_calling_wizard"/>
+  <java-symbol type="bool" name="config_regional_wifi_calling_notificaion_enable"/>
+
+  <java-symbol type="bool" name="config_regional_show_password_enable"/>
+  <java-symbol type="bool" name="config_regional_use_empty_password_default"/>
+  <java-symbol type="bool" name="config_regional_dataUsage_enable_default"/>
+  <java-symbol type="bool" name="config_regional_security_show_password_enable"/>
+  <java-symbol type="bool" name="config_regional_display_icc_id_enable"/>
+  <java-symbol type="string" name="config_regional_connection_menu_option"/>
+  <java-symbol type="bool" name="config_regional_customized_email_signature"/>
+  <java-symbol type="bool" name="config_regional_call_data_usage_enable"/>
+  <java-symbol type="bool" name="config_regional_customize_default_browser_icon"/>
+  <java-symbol type="string" name="config_regional_customize_default_browser_title"/>
+  <java-symbol type="bool" name="config_regional_search_use_clientid" />
+  <java-symbol type="bool" name="config_regional_wea_alert_reminder_interval" />
 </resources>

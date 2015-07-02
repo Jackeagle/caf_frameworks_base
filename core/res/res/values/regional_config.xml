@@ -77,4 +77,26 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_number_patterns_video_call">true</bool>
 
     <bool name="config_regional_noti_move_away_lte_video_call">true</bool>
+
+    <bool name="config_regional_wifi_calling_menu_enable">false</bool>
+
+    <bool name="config_regional_wifi_calling_registration_errorcode">false</bool>
+
+    <string name="config_regional_alerts_for_drop_call_toast"></string>
+    <bool name="config_regional_alerts_for_drop_call">false</bool>
+
+    <bool name="config_regional_wifi_calling_wizard">false</bool>
+    <bool name="config_regional_wifi_calling_notificaion_enable">false</bool>
+    <bool name="config_regional_display_icc_id_enable">false</bool>
+    <string name="config_regional_connection_menu_option" translatable="false"></string>
+    <bool name="config_regional_customized_email_signature">false</bool>
+    <bool name="config_regional_call_data_usage_enable">false</bool>
+    <bool name="config_regional_customize_default_browser_icon">false</bool>
+    <string name="config_regional_customize_default_browser_title" translatable="false"></string>
+    <bool name="config_regional_search_use_clientid">false</bool>
+    <bool name="config_regional_show_password_enable">false</bool>
+    <bool name="config_regional_use_empty_password_default">false</bool>
+    <bool name="config_regional_dataUsage_enable_default">false</bool>
+    <bool name="config_regional_security_show_password_enable">false</bool>
+    <bool name="config_regional_wea_alert_reminder_interval">false</bool>
 </resources>
