@@ -308,6 +308,11 @@ public class KeyguardSimPinView extends KeyguardPinBasedInputView {
                                                 getPinPasswordErrorMessage(
                                                 attemptsRemaining, false), true);
                                     }
+                                } else if (result == PhoneConstants.PIN_ERROR_CROSS_MAPPING) {
+                                    // "PIN request not supported now" - a case where cross binding
+                                    // operation is in progress.
+                                    mSecurityMessageDisplay.setMessage(getContext().getString(
+                                            R.string.kg_pin_request_not_supported), true);
                                 } else {
                                     // "PIN operation failed!" - no idea what this was and no way to
                                     // find out. :/
