@@ -1420,11 +1420,11 @@ public final class SystemServer {
                 if (mIsBootOpt == false) {
                     Slog.i(TAG, "WebViewFactory preparation");
                     WebViewFactory.prepareWebViewInSystemServer();
-                    try {
-                        startSystemUi(context);
-                    } catch (Throwable e) {
-                        reportWtf("starting System UI", e);
-                    }
+                }
+                try {
+                    startSystemUi(context);
+                } catch (Throwable e) {
+                    reportWtf("starting System UI", e);
                 }
                 try {
                     if (mountServiceF != null) mountServiceF.systemReady();
