@@ -65,6 +65,10 @@ import java.util.Map;
 import java.util.List;
 import java.util.Vector;
 
+import com.android.server.SystemService;
+import com.android.server.lights.Light;
+import com.android.server.lights.LightsManager;
+
 class BluetoothManagerService extends IBluetoothManager.Stub {
     private static final String TAG = "BluetoothManagerService";
     private static final boolean DBG = true;
@@ -155,6 +159,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private int mErrorRecoveryRetryCounter;
     private final int mSystemUiUid;
     private boolean mIsBluetoothServiceConnected = false;
+    private Led mLed;
 
     // Save a ProfileServiceConnections object for each of the bound
     // bluetooth profile services
@@ -250,6 +255,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         mQCallbacks = new RemoteCallbackList<IQBluetoothManagerCallback>();
         mStateChangeCallbacks = new RemoteCallbackList<IBluetoothStateChangeCallback>();
         IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+        mLed = new Led(context, LocalServices.getService(LightsManager.class));
         filter.addAction(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
         filter.addAction(Intent.ACTION_USER_SWITCHED);
         registerForAirplaneMode(filter);
@@ -885,6 +891,23 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         return mName;
     }
 
+    private final class Led {
+
+        private final Light mBluetoothLight;
+
+        public Led(Context context, LightsManager lights) {
+            mBluetoothLight = lights.getLight(LightsManager.LIGHT_ID_BLUETOOTH);
+        }
+
+        public void updateLights(boolean isOn) {
+            if (isOn) {
+                mBluetoothLight.setBrightness(0xFF);
+            } else {
+                mBluetoothLight.setBrightness(0);
+            }
+        }
+    }
+
     private class BluetoothServiceConnection implements ServiceConnection {
 
         private boolean mGetNameAddressOnly;
@@ -1500,10 +1523,11 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     }
 
     private void bluetoothStateChangeHandler(int prevState, int newState) {
+        boolean isUp = false;
         if (prevState != newState) {
             //Notify all proxy objects first of adapter state change
             if (newState == BluetoothAdapter.STATE_ON || newState == BluetoothAdapter.STATE_OFF) {
-                boolean isUp = (newState==BluetoothAdapter.STATE_ON);
+                isUp = (newState == BluetoothAdapter.STATE_ON);
                 sendBluetoothStateCallback(isUp);
 
                 if (isUp) {
@@ -1538,6 +1562,9 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             if (DBG) Log.d(TAG,"Bluetooth State Change Intent: " + prevState + " -> " + newState);
             mContext.sendBroadcastAsUser(intent, UserHandle.ALL,
                     BLUETOOTH_PERM);
+
+            //Update bluetooth LED
+            mLed.updateLights(isUp);
         }
     }
 
