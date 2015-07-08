@@ -761,8 +761,9 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                 } else {
                     mLastSignalLevel = iconLevel = mMSimSignalStrength[phoneId].getLevel();
                     if (mShowRsrpSignalLevelforLTE) {
-                        if (mMSimServiceState[phoneId].getDataNetworkType() ==
-                                TelephonyManager.NETWORK_TYPE_LTE) {
+                        int dataNetType = mMSimServiceState[phoneId].getDataNetworkType();
+                        if (dataNetType == TelephonyManager.NETWORK_TYPE_LTE ||
+                                dataNetType == TelephonyManager.NETWORK_TYPE_LTE_CA) {
                             int level = mMSimSignalStrength[phoneId].getAlternateLteLevel();
                             mLastSignalLevel = iconLevel = (level == -1 ? 0 : level);
                             Slog.d(TAG, "updateTelephonySignalStrength, data type is lte, level = "
@@ -1051,6 +1052,12 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         Slog.d(TAG,"refreshViews phoneId =" + phoneId + "mMSimDataConnected ="
                 + mMSimDataConnected[phoneId]);
         Slog.d(TAG,"refreshViews mMSimDataActivity =" + mMSimDataActivity[phoneId]);
+        if (mContext.getResources().getBoolean(R.bool.hide_nosim_signal_icon) &&
+                mMSimState[phoneId] == IccCardConstants.State.ABSENT) {
+            mMSimPhoneSignalIconId[phoneId] = 0;
+            mMSimDataSignalIconId[phoneId] = 0;
+            mNoMSimIconId[phoneId] = 0;
+        }
         int dataSub = SubscriptionManager.getPhoneId(
                 SubscriptionManager.getDefaultDataSubId());
         if (!mHasMobileDataFeature) {
