@@ -24,10 +24,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <string.h>
-#include <log.h>
-
-#define LOG_TAG "libdrm:drm_file"
-#define LOG_NDEBUG 0
 
 /**
  * Fails on zaurus?
@@ -70,7 +66,7 @@ convertFilename(const uint16_t *strData, int32_t strLength, char *buffer)
 
     if (strLength >= (MAXPATHLEN-1))
     {
-        ALOGD("convertFilename '%.*S' too long", strLength, strData);
+        Trace("convertFilename '%.*S' too long", strLength, strData);
         return -1;
     }
 
@@ -93,16 +89,15 @@ convertFilename(const uint16_t *strData, int32_t strLength, char *buffer)
 static int32_t
 getFileStat(const uint16_t *name, int32_t nameLen, struct stat *sbuf)
 {
-    ALOGD("getFileStat: %.*S", nameLen, name);
-#if 0
+    Trace("getFileStat: %.*S", nameLen, name);
+
     if (convertFilename(name, nameLen, tmpPathBuf1) <= 0)
     {
-        ALOGD("getFileStat: bad filename");
+        Trace("getFileStat: bad filename");
     }
-#endif
-    if (stat(name, sbuf) != 0)
+    else if (stat(tmpPathBuf1, sbuf) != 0)
     {
-        ALOGD("getFileStat %s: stat() errno=%d", tmpPathBuf1, errno);
+        Trace("getFileStat %s: stat() errno=%d", tmpPathBuf1, errno);
     }
     else /* Successful */
     {
@@ -211,7 +206,7 @@ static int calcDirSize(char *path, int len, uint8_t includeSubdirs)
 /* see drm_file.h */
 int32_t DRM_file_startup(void)
 {
-    ALOGD("DRM_file_startup");
+    Trace("DRM_file_startup");
 
 #ifndef DEVICE_FILESYSTEM
     availableSize = -1;
@@ -229,29 +224,28 @@ DRM_file_listOpen(const uint16_t *prefix,
                     int32_t* session,
                     int32_t* iteration)
 {
-    ALOGD("DRM_file_listOpen: %.*S", prefixLen, prefix);
+    Trace("DRM_file_listOpen: %.*S", prefixLen, prefix);
 
-#if 0
     if (convertFilename(prefix, prefixLen, tmpPathBuf1) <= 0)
     {
-        ALOGD("DRM_file_listOpen: bad filename");
+        Trace("DRM_file_listOpen: bad filename");
     }
     else
     {
-#endif
         DIR *dir;
 
         /* find the last /, and store the offset to the leaf prefix in
          * *iteration
          */
-        char *sep = strrchr(prefix, '/');
+
+        char *sep = strrchr(tmpPathBuf1, '/');
         /* Root "/" is a leaf */
         if (sep == NULL || ((sep != NULL) && (sep == tmpPathBuf1)))
         {
             *iteration = prefixLen;
 
-#ifdef ALOGD_ON
-            sep = " <empty>"; /* ALOGD will show sep+1 */
+#ifdef TRACE_ON
+            sep = " <empty>"; /* trace will show sep+1 */
 #endif
         }
         else
@@ -259,18 +253,21 @@ DRM_file_listOpen(const uint16_t *prefix,
             *iteration = sep - tmpPathBuf1 + 1;
             *sep = 0;
         }
-        dir = opendir(prefix);
+
+        dir = opendir(tmpPathBuf1);
 
         if (dir == NULL)
         {
-            ALOGD("DRM_file_listOpen: opendir %s: errno=%d", prefix, errno);
+            Trace("DRM_file_listOpen: opendir %s: errno=%d", tmpPathBuf1, errno);
         }
         else
         {
-            ALOGD("DRM_file_listOpen: dir %s, filter %s", prefix, sep+1);
-            *session = (int32_t)(long)dir;
+            Trace("DRM_file_listOpen: dir %s, filter %s", tmpPathBuf1, sep+1);
+            *session = (int32_t)dir;
             return DRM_FILE_SUCCESS;
         }
+    }
+
     return DRM_FILE_FAILURE;
 }
 
@@ -297,13 +294,13 @@ DRM_file_listNextEntry(const uint16_t *prefix, int32_t prefixLen,
      * leaf name.
      */
 
-    while ( (ent = readdir((DIR *)(long)*session)) != NULL)
+    while ( (ent = readdir((DIR *)*session)) != NULL)
     {
         int len = strlen(ent->d_name);
 
         if ( (len + *iteration) > entrySize)
         {
-            ALOGD("DRM_file_listNextEntry: %s too long", ent->d_name);
+            Trace("DRM_file_listNextEntry: %s too long", ent->d_name);
         }
         else if (strcmp(ent->d_name, ".") != 0 &&
                  strcmp(ent->d_name, "..") != 0)
@@ -319,7 +316,7 @@ DRM_file_listNextEntry(const uint16_t *prefix, int32_t prefixLen,
                     goto next_name;
             }
 
-            ALOGD("DRM_file_listNextEntry: matched %s", ent->d_name);
+            Trace("DRM_file_listNextEntry: matched %s", ent->d_name);
 
             /* Now generate the fully-qualified name */
 
@@ -339,19 +336,19 @@ DRM_file_listNextEntry(const uint16_t *prefix, int32_t prefixLen,
             }
             else
             {
-                ALOGD("DRM_file_listNextEntry: stat FAILURE on %.*S",
+                Trace("DRM_file_listNextEntry: stat FAILURE on %.*S",
                       idx + *iteration, entry);
             }
-            ALOGD("DRM_file_listNextEntry: got %.*S", idx + *iteration, entry);
+            Trace("DRM_file_listNextEntry: got %.*S", idx + *iteration, entry);
 
             return idx + *iteration;
         }
 
     next_name:
-        ALOGD("DRM_file_listNextEntry: rejected %s", ent->d_name);
+        Trace("DRM_file_listNextEntry: rejected %s", ent->d_name);
     }
 
-    ALOGD("DRM_file_listNextEntry: end of list");
+    Trace("DRM_file_listNextEntry: end of list");
     return 0;
 }
 
@@ -359,7 +356,7 @@ DRM_file_listNextEntry(const uint16_t *prefix, int32_t prefixLen,
 int32_t
 DRM_file_listClose(int32_t session, int32_t iteration)
 {
-    closedir( (DIR *)(long)session);
+    closedir( (DIR *)session);
     return DRM_FILE_SUCCESS;
 }
 
@@ -373,11 +370,11 @@ DRM_file_getFileLength(const uint16_t *name, int32_t nameLen)
     {
         if (sbuf.st_size >= INT32_MAX)
         {
-            ALOGD("DRM_file_getFileLength: file too big");
+            Trace("DRM_file_getFileLength: file too big");
         }
         else /* Successful */
         {
-            ALOGD("DRM_file_getFileLength: %.*S -> %d",
+            Trace("DRM_file_getFileLength: %.*S -> %d",
                                          nameLen, name, (int32_t)sbuf.st_size);
             return (int32_t)sbuf.st_size;
         }
@@ -390,27 +387,25 @@ DRM_file_getFileLength(const uint16_t *name, int32_t nameLen)
 int32_t
 DRM_file_delete(const uint16_t *name, int32_t nameLen)
 {
-    ALOGD("DRM_file_delete: %.*S", nameLen, name);
+    Trace("DRM_file_delete: %.*S", nameLen, name);
 
-#if 0
     if (convertFilename(name, nameLen, tmpPathBuf1) <= 0)
     {
-        ALOGD("DRM_file_delete: bad filename");
+        Trace("DRM_file_delete: bad filename");
         return DRM_FILE_FAILURE;
     }
     else
     {
-#endif
        struct stat sinfo;
-       if (stat(name, &sinfo) != 0) {
-           ALOGD("DRM_file_delete: stat failed, errno=%d", errno);
+       if (stat(tmpPathBuf1, &sinfo) != 0){
+           Trace("DRM_file_delete: stat failed, errno=%d", errno);
            return DRM_FILE_FAILURE;
        }
 #ifndef DEVICE_FILESYSTEM
        if (S_ISDIR(sinfo.st_mode)){
             /* it's a dir */
-            if (rmdir(name) != 0) {
-                ALOGD("DRM_file_delete: dir remove failed, errno=%d", errno);
+            if (rmdir(tmpPathBuf1) != 0){
+                Trace("DRM_file_delete: dir remove failed, errno=%d", errno);
                 return DRM_FILE_FAILURE;
             }
             else
@@ -420,9 +415,9 @@ DRM_file_delete(const uint16_t *name, int32_t nameLen)
         }
 #endif
         /* it's a file */
-        if (unlink(name) != 0)
+        if (unlink(tmpPathBuf1) != 0)
         {
-            ALOGD("DRM_file_delete: file remove failed, errno=%d", errno);
+            Trace("DRM_file_delete: file remove failed, errno=%d", errno);
             return DRM_FILE_FAILURE;
         }
         else
@@ -432,6 +427,7 @@ DRM_file_delete(const uint16_t *name, int32_t nameLen)
 #endif
             return DRM_FILE_SUCCESS;
         }
+    }
     return DRM_FILE_FAILURE;
 }
 
@@ -440,26 +436,22 @@ int32_t
 DRM_file_rename(const uint16_t *oldName, int32_t oldNameLen,
                 const uint16_t *newName, int32_t newNameLen)
 {
-    ALOGD("DRM_file_rename %.*S -> %.*S",
+    Trace("DRM_file_rename %.*S -> %.*S",
                                     oldNameLen, oldName, newNameLen, newName);
     if (DRM_file_exists(newName, newNameLen) != DRM_FILE_FAILURE)
     {
-        ALOGD("DRM_file_rename: filename:%s exist",newName);
+        Trace("DRM_file_rename: filename:%s exist",newName);
         return DRM_FILE_FAILURE;
     }
 
-#if 0
     if (convertFilename(oldName, oldNameLen, tmpPathBuf1) <= 0 ||
         convertFilename(newName, newNameLen, tmpPathBuf2) <= 0)
     {
-        ALOGD("DRM_file_rename: bad filename");
+        Trace("DRM_file_rename: bad filename");
     }
     else if (rename(tmpPathBuf1, tmpPathBuf2) != 0)
-#else
-    if (rename(oldName, newName) != 0)
-#endif
     {
-         ALOGD("DRM_file_rename: failed errno=%d", errno);
+         Trace("DRM_file_rename: failed errno=%d", errno);
     }
     else /* Success */
     {
@@ -475,7 +467,7 @@ DRM_file_exists(const uint16_t *name, int32_t nameLen)
 {
     struct stat sbuf;
 
-    ALOGD("DRM_file_exists: %.*S", nameLen, name);
+    Trace("DRM_file_exists: %.*S", nameLen, name);
 
     /*remove trailing "/" separators, except the first "/" standing for root*/
     while ((nameLen > 1) && (name[nameLen -1] == '/'))
@@ -483,7 +475,7 @@ DRM_file_exists(const uint16_t *name, int32_t nameLen)
 
     if (getFileStat(name, nameLen, &sbuf))
     {
-        ALOGD("DRM_file_exists: stat returns mode 0x%x", sbuf.st_mode);
+        Trace("DRM_file_exists: stat returns mode 0x%x", sbuf.st_mode);
 
         if (S_ISDIR(sbuf.st_mode))
             return DRM_FILE_ISDIR;
@@ -497,7 +489,7 @@ DRM_file_exists(const uint16_t *name, int32_t nameLen)
 /* see drm_file.h */
 int32_t
 DRM_file_open(const uint16_t *name, int32_t nameLen, int32_t mode,
-                      int64_t* handle)
+                      int32_t* handle)
 {
     int res;
 
@@ -513,24 +505,23 @@ DRM_file_open(const uint16_t *name, int32_t nameLen, int32_t mode,
       O_RDWR | O_CREAT
     };
 
-    ALOGD("DRM_file_open %d, name= %s, mode 0x%x", nameLen, name, mode);
+    Trace("DRM_file_open %.*S mode 0x%x", nameLen, name, mode);
 
     assert((mode & ~(DRM_FILE_MODE_READ|DRM_FILE_MODE_WRITE)) == 0);
 
-#if 0
     if (convertFilename(name, nameLen, tmpPathBuf1) <= 0)
     {
-        ALOGD("DRM_file_open: bad filename");
+        Trace("DRM_file_open: bad filename");
         return DRM_FILE_FAILURE;
     }
-#endif
 
-    if ((res = open(name, modes[mode], 0777)) == -1)
+    if ((res = open(tmpPathBuf1, modes[mode], 0777)) == -1)
     {
-        ALOGD("DRM_file_open: open failed errno=%s", strerror(errno));
+        Trace("DRM_file_open: open failed errno=%d", errno);
         return DRM_FILE_FAILURE;
     }
-    ALOGD("DRM_file_open: open '%s; returned %d", name, res);
+
+    Trace("DRM_file_open: open '%s; returned %d", tmpPathBuf1, res);
     *handle = res;
 
     return DRM_FILE_SUCCESS;
@@ -538,7 +529,7 @@ DRM_file_open(const uint16_t *name, int32_t nameLen, int32_t mode,
 
 /* see drm_file.h */
 int32_t
-DRM_file_read(int64_t handle, uint8_t* dst, int32_t length)
+DRM_file_read(int32_t handle, uint8_t* dst, int32_t length)
 {
     int n;
 
@@ -549,24 +540,24 @@ DRM_file_read(int64_t handle, uint8_t* dst, int32_t length)
     n = read((int)handle, dst, (size_t)length);
     if (n > 0)
     {
-        // ALOGD("DRM_file_read handle=%d read %d bytes", handle, n);
+        Trace("DRM_file_read handle=%d read %d bytes", handle, n);
         return n;
     }
     else if (n == 0)
     {
-        // ALOGD("DRM_file_read read EOF: handle=%d", handle);
+        Trace("DRM_file_read read EOF: handle=%d", handle);
         return DRM_FILE_EOF;
     }
     else
     {
-        // ALOGD("DRM_file_read failed handle=%d, errno=%d", handle, errno);
+        Trace("DRM_file_read failed handle=%d, errno=%d", handle, errno);
         return DRM_FILE_FAILURE;
     }
 }
 
 /* see drm_file.h */
 int32_t
-DRM_file_write(int64_t handle, const uint8_t* src, int32_t length)
+DRM_file_write(int32_t handle, const uint8_t* src, int32_t length)
 {
     /* TODO: Make dst a void *? */
     int n;
@@ -576,34 +567,33 @@ DRM_file_write(int64_t handle, const uint8_t* src, int32_t length)
     struct stat sbuf;
     int prevFileSize;
 #endif
-    ALOGD("Enter to DRM_file_write, handle = %d, length=%d", handle, length );
+
     assert(length >= 0);
 
 #ifndef DEVICE_FILESYSTEM
-    // ALOGI("DEVICE_FILESYSTEM not defined 1");
     if ( -1 == fstat((int)handle, &sbuf) )
     {
-        ALOGD("DRM_file_write: fstat error %d, cause =%s ", errno, strerror(errno));
+        Trace("DRM_file_write: fstat error %d", errno);
         return DRM_FILE_FAILURE;
     }
     prevFileSize = (int)(sbuf.st_size);
     prevPos = lseek( (int)handle, 0, SEEK_CUR);
     if ( (off_t)-1 == prevPos )
     {
-        ALOGD("DRM_file_write: get current pos error %d", errno);
+        Trace("DRM_file_write: get current pos error %d", errno);
         return DRM_FILE_FAILURE;
     }
     delta = (int)prevPos + length - prevFileSize;
     if (delta > availableSize)
     {
-        ALOGD("DRM_file_write: not enough size!");
+        Trace("DRM_file_write: not enough size!");
         return DRM_FILE_FAILURE;
     }
 #endif
     n = write((int)handle, src, (size_t)length);
     if (n < 0)
     {
-        ALOGD("DRM_file_write failed errno=%d", errno);
+        Trace("DRM_file_write failed errno=%d", errno);
         return DRM_FILE_FAILURE;
     }
 #ifndef DEVICE_FILESYSTEM
@@ -614,27 +604,27 @@ DRM_file_write(int64_t handle, const uint8_t* src, int32_t length)
         availableSize -= delta;
     }
 #endif
-    ALOGI("DRM_file_write handle=%d wrote %d/%d bytes", handle, n, length);
+    Trace("DRM_file_write handle=%d wrote %d/%d bytes", handle, n, length);
 
     return n;
 }
 
 /* see drm_file.h */
-int32_t DRM_file_close(int64_t handle)
+int32_t DRM_file_close(int32_t handle)
 {
     if (close((int)handle) == 0)
     {
-        ALOGD("DRM_file_close handle=%d success", handle);
+        Trace("DRM_file_close handle=%d success", handle);
         return DRM_FILE_SUCCESS;
     }
 
-    ALOGD("DRM_file_close handle=%d failed", handle);
+    Trace("DRM_file_close handle=%d failed", handle);
     return DRM_FILE_FAILURE;
 }
 
 /* see drm_file.h */
 int32_t
-DRM_file_setPosition(int64_t handle, int32_t value)
+DRM_file_setPosition(int32_t handle, int32_t value)
 {
 #ifndef DEVICE_FILESYSTEM
     struct stat sbuf;
@@ -643,7 +633,7 @@ DRM_file_setPosition(int64_t handle, int32_t value)
 
     if (value < 0)
     {
-        ALOGD("DRM_file_setPosition: handle=%d negative value (%d)",
+        Trace("DRM_file_setPosition: handle=%d negative value (%d)",
             handle, value);
         return DRM_FILE_FAILURE;
     }
@@ -651,14 +641,14 @@ DRM_file_setPosition(int64_t handle, int32_t value)
 #ifndef DEVICE_FILESYSTEM
     if ( fstat((int)handle, &sbuf) == -1 )
     {
-        ALOGD("DRM_file_setPosition: fstat fail errno=%d", errno);
+        Trace("DRM_file_setPosition: fstat fail errno=%d", errno);
         return DRM_FILE_FAILURE;
     }
 
     if ( ((off_t)value > sbuf.st_size) &&
          (availableSize < (value - (int)(sbuf.st_size))) )
     {
-        ALOGD("DRM_file_setPosition: not enough space");
+        Trace("DRM_file_setPosition: not enough space");
         return DRM_FILE_FAILURE;
     }
 #endif
@@ -666,7 +656,7 @@ DRM_file_setPosition(int64_t handle, int32_t value)
     newPos = lseek( (int)handle, (off_t)value, SEEK_SET);
     if ( newPos == (off_t)-1 )
     {
-        ALOGD("DRM_file_setPosition: seek failed: errno=%d", errno);
+        Trace("DRM_file_setPosition: seek failed: errno=%d", errno);
     }
     else
     {
@@ -686,122 +676,19 @@ DRM_file_setPosition(int64_t handle, int32_t value)
 int32_t
 DRM_file_mkdir(const uint16_t* name, int32_t nameChars)
 {
-    ALOGD("DRM_file_mkdir started!..");
-#if 0
+    Trace("DRM_file_mkdir started!..");
+
     if (convertFilename(name, nameChars, tmpPathBuf1) <= 0)
     {
-        ALOGD("DRM_file_mkdir: bad filename");
+        Trace("DRM_file_mkdir: bad filename");
         return DRM_FILE_FAILURE;
     }
-#endif
 
-    if (mkdir(name,0777) != 0)
+    if (mkdir(tmpPathBuf1,0777) != 0)
     {
-        ALOGD("DRM_file_mkdir failed!errno=%d",errno);
+        Trace("DRM_file_mkdir failed!errno=%d",errno);
         return DRM_FILE_FAILURE;
     }
 
     return DRM_FILE_SUCCESS;
-}
-
-int32_t
-DRM_file_copy (int64_t sourceHandle, int64_t targetHandle)
-{
-#define    DRM_READFILE_BUF_MAXLEN     256
-    uint8_t   buf[DRM_READFILE_BUF_MAXLEN];
-    uint32_t  bufLen = 0;
-//  ALOGD ("Source file handle [%d], target file handle [%d]\n", sourceHandle, targetHandle);
-
-    ftruncate (targetHandle, 0);
-
-    lseek (sourceHandle, 0, SEEK_SET);
-    lseek (targetHandle, 0, SEEK_SET);
-
-    do {
-        bufLen = read (sourceHandle, buf, DRM_READFILE_BUF_MAXLEN);
-        if (bufLen == -1) {
-            ALOGE ("read buf from file error, errno [%d], errinfo [%s]\n", errno, strerror(errno));
-            return -1;
-        }
-
-        if (bufLen == 0) {
-            ALOGD ("close to end-of-file \n");
-            break;
-        }
-
-        if (write (targetHandle, buf, bufLen) != bufLen) {
-            ALOGE ("write buf to file error, errno [%d], errinfo [%s]\n", errno, strerror(errno));
-            return -1;
-        }
-    } while (1);
-
-    return 0;
-}
-
-#define    DRM_FILE_POS_END  -2
-#define    DRM_FILE_MAX_BUF  1024
-int32_t
-DRM_file_truncate (uint64_t handle, uint32_t  start, int32_t end)
-{
-    uint32_t  curReadPos;
-    uint32_t  curWritePos;
-    uint8_t   fileData[DRM_FILE_MAX_BUF];
-    uint32_t  toReadLen = 0;
-    uint32_t  readedLen = 0;
-    uint32_t  wroteLen = 0;
-    uint32_t  remainDataLen = 0;
-    struct stat   statBuf;
-
-    ALOGD ("In DRM_file_truncate, start [%d], end [%d]", start, end);
-
-    if (fstat (handle, &statBuf) != 0) {
-        ALOGE ("fstat error, handle [%d], errinfo [%s]", handle, strerror (errno));
-        return -1;
-    }
-
-    if ((statBuf.st_size <= start) || (start >= end)) {
-        ALOGD ("No need to truncate file\n");
-        return 0;
-    }
-
-    ALOGD ("file size [%d]", statBuf.st_size);
-
-    if ((end == DRM_FILE_POS_END) || (end > statBuf.st_size))
-        remainDataLen = statBuf.st_size - start;
-    else
-        remainDataLen = end - start;
-
-    ALOGD ("data length [%d] need to move", remainDataLen);
-
-    curReadPos = start;
-    curWritePos = 0;
-    do {
-        toReadLen = (remainDataLen > DRM_FILE_MAX_BUF) ? DRM_FILE_MAX_BUF : remainDataLen;
-
-        lseek (handle, curReadPos, SEEK_SET);
-        readedLen = read (handle, fileData, toReadLen);
-        if (readedLen != toReadLen) {
-            ALOGE ("read file error, readedLen [%d], errinfo [%s]", readedLen, strerror (errno));
-            return -1;
-        }
-        curReadPos += readedLen;
-
-        lseek (handle, curWritePos, SEEK_SET);
-        wroteLen= write (handle, fileData, readedLen);
-        if (wroteLen != readedLen) {
-            ALOGE ("write file error, wroteLen [%d], errinfo [%s]", wroteLen, strerror (errno));
-            return -1;
-        }
-        curWritePos += wroteLen;
-
-        remainDataLen -= wroteLen;
-    } while(remainDataLen > 0);
-
-    curWritePos = lseek (handle, 0, SEEK_CUR);
-
-    ALOGD ("curWritePos [%d]", curWritePos);
-
-    ftruncate (handle, curWritePos);
-
-    return 0;
 }

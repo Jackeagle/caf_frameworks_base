@@ -37,8 +37,7 @@ extern "C" {
 #endif
 
 #define Trace(...)
-#define DRMV1_D(fmt, xxx...) /*LOGE("(%s:%s:%d)"fmt, __FILE__, __FUNCTION__, __LINE__, ##xxx)*/
-#define DRMV1_E(fmt, xxx...) /*LOGE("(%s:%s:%d)"fmt, __FILE__, __FUNCTION__, __LINE__, ##xxx)*/
+
 #ifdef __cplusplus
 }
 #endif
