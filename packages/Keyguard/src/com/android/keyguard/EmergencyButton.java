@@ -46,7 +46,6 @@ public class EmergencyButton extends Button {
 
     private static final int EMERGENCY_CALL_TIMEOUT = 10000; // screen timeout after starting e.d.
     private static final String ACTION_EMERGENCY_DIAL = "com.android.phone.EmergencyDialer.DIAL";
-    private HashMap<Integer, ServiceState> mServiceState = new HashMap<Integer, ServiceState>();
 
     KeyguardUpdateMonitorCallback mInfoCallback = new KeyguardUpdateMonitorCallback() {
 
@@ -61,8 +60,14 @@ public class EmergencyButton extends Button {
             updateEmergencyCallButton(phoneState);
         }
 
+        @Override
         void onServiceStateChanged(ServiceState state, int sub) {
-            mServiceState.put(sub, state);
+            int phoneState = KeyguardUpdateMonitor.getInstance(mContext).getPhoneState();
+            updateEmergencyCallButton(phoneState);
+        }
+
+        @Override
+        public void onSubIdUpdated(int oldSubId, int newSubId) {
             int phoneState = KeyguardUpdateMonitor.getInstance(mContext).getPhoneState();
             updateEmergencyCallButton(phoneState);
         }
@@ -101,20 +106,7 @@ public class EmergencyButton extends Button {
             }
         });
         int phoneState = KeyguardUpdateMonitor.getInstance(mContext).getPhoneState();
-        mServiceState = KeyguardUpdateMonitor.getInstance(mContext).getServiceStates();
         updateEmergencyCallButton(phoneState);
-    }
-
-    private boolean canMakeEmergencyCall() {
-        KeyguardUpdateMonitor monitor = KeyguardUpdateMonitor.getInstance(mContext);
-        for (int i = 0; i < monitor.getNumPhones(); i++) {
-            ServiceState state = mServiceState.get(monitor.getSubIdByPhoneId(i));
-            if ((state != null) && (state.isEmergencyOnly() ||
-                    state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -154,7 +146,8 @@ public class EmergencyButton extends Button {
             }
         }
         if (mContext.getResources().getBoolean(R.bool.config_hideEmergencyButtonInOOS)) {
-            enabled = enabled && canMakeEmergencyCall();
+            enabled = enabled &&
+                    KeyguardUpdateMonitor.getInstance(mContext).canMakeEmergencyCall();
         }
         mLockPatternUtils.updateEmergencyCallButtonState(this, enabled, false);
     }
