@@ -2365,4 +2365,5 @@
   <java-symbol type="string" name="turn_on_info" />
   <java-symbol type="string" name="turn_off_info" />
 
+  <java-symbol type="string" name="authentication_failure" />
 </resources>
