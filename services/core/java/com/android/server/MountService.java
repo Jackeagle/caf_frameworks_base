@@ -2326,7 +2326,7 @@ class MountService extends IMountService.Stub
         }
     }
 
-    public int encryptStorage(int type, String password) {
+    public int encryptStorage(int type, String password, boolean wipe) {
         if (TextUtils.isEmpty(password) && type != StorageManager.CRYPT_TYPE_DEFAULT) {
             throw new IllegalArgumentException("password cannot be empty");
         }
@@ -2341,7 +2341,7 @@ class MountService extends IMountService.Stub
         }
 
         try {
-            mConnector.execute("cryptfs", "enablecrypto", "inplace", CRYPTO_TYPES[type],
+            mConnector.execute("cryptfs", "enablecrypto", wipe? "wipe" : "inplace", CRYPTO_TYPES[type],
                                new SensitiveArg(toHex(password)));
         } catch (NativeDaemonConnectorException e) {
             // Encryption failed
