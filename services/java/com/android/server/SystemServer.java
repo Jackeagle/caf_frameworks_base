@@ -495,15 +495,9 @@ public final class SystemServer {
         if (!disableNonCoreServices) {
                 mSystemServiceManager.startService(DockObserver.class);
         }
-        //starting USB & Serial  Service.
-        UsbService usb = null;
+        //starting Serial  Service.
         SerialService serial = null;
         if (!disableNonCoreServices) {
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
-                || mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_ACCESSORY)) {
-                // Manage USB host and device support
-                    mSystemServiceManager.startService(USB_SERVICE_CLASS);
-             }
             try {
                 Slog.i(TAG, "Serial Service");
                 // Serial port support
@@ -1110,14 +1104,16 @@ public final class SystemServer {
                     reportWtf("starting WiredAccessoryManager", e);
                 }
             }
-            if (mIsBootOpt == false) {
-                if (!disableNonCoreServices) {
-                    if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
-                            || mPackageManager.hasSystemFeature(
-                            PackageManager.FEATURE_USB_ACCESSORY)) {
+            if (!disableNonCoreServices) {
+                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
+                        || mPackageManager.hasSystemFeature(
+                                PackageManager.FEATURE_USB_ACCESSORY)) {
                         // Manage USB host and device support
                         mSystemServiceManager.startService(USB_SERVICE_CLASS);
                 }
+            }
+            if (mIsBootOpt == false) {
+                if (!disableNonCoreServices) {
                     try {
                         Slog.i(TAG, "Serial Service");
                         // Serial port support
