@@ -742,8 +742,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                 if (subInfo.getSimSlotIndex() > getNumPhones() - 1) {
                     continue;
                 }
-                if (mSubIdForSlot[subInfo.getSimSlotIndex()] != subInfo.getSubscriptionId()) {
-                    int subId = mSubIdForSlot[subInfo.getSimSlotIndex()];
+                int subId = mSubIdForSlot[subInfo.getSimSlotIndex()];
+                mSubIdForSlot[subInfo.getSimSlotIndex()] = subInfo.getSubscriptionId();
+                if (subId != subInfo.getSubscriptionId()) {
                     mPlmn.put(subInfo.getSubscriptionId(), mPlmn.get(subId));
                     mSpn.put(subInfo.getSubscriptionId(), mSpn.get(subId));
                     mServiceState.put(subInfo.getSubscriptionId(), mServiceState.get(subId));
@@ -756,7 +757,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                         }
                     }
                 }
-                mSubIdForSlot[subInfo.getSimSlotIndex()] = subInfo.getSubscriptionId();
                 if (DEBUG) {
                     Log.d(TAG, "handleSubInfoRecordUpdate mSubIdForSlot["
                         + subInfo.getSimSlotIndex() + "] = " + subInfo.getSubscriptionId());
