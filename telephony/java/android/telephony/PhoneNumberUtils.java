@@ -1488,6 +1488,25 @@ public class PhoneNumberUtils
     }
 
     /**
+     * Checks if the number is valid for videoCall
+     *
+     * @param number the number to call.
+     * @return true if the number is valid
+     *
+     * @hide
+     */
+    public static boolean isVideoCallNumValid(String number){
+        String norNumber = normalizeNumber(number);
+        if (norNumber == null || "".equals(norNumber) ||
+                ((norNumber.startsWith("+") ? norNumber.length() < 8 : norNumber.length() < 7))
+                || number.contains("#") || number.contains("*")) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
      * Normalize a phone number by removing the characters other than digits. If
      * the given number has keypad letters, the letters will be converted to
      * digits first.
