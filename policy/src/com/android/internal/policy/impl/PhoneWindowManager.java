@@ -1309,9 +1309,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void launchCameraAction() {
         sendCloseSystemWindows();
-        Intent intent = new Intent(Intent.ACTION_CAMERA_BUTTON, null);
-        mContext.sendOrderedBroadcastAsUser(intent, UserHandle.CURRENT_OR_SELF,
-                null, null, null, 0, null, null);
+        Intent intent = new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA);
+        mContext.startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
     }
 
     private void performKeyAction(int behavior) {
@@ -4550,8 +4549,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     /** {@inheritDoc} */
     @Override
     public int finishPostLayoutPolicyLw() {
-        if (mWinShowWhenLocked != null &&
-                mWinShowWhenLocked != mTopFullscreenOpaqueWindowState) {
+        if (mWinShowWhenLocked != null && mTopFullscreenOpaqueWindowState != null &&
+                mWinShowWhenLocked.getAppToken() != mTopFullscreenOpaqueWindowState.getAppToken()
+                && isKeyguardLocked()) {
             // A dialog is dismissing the keyguard. Put the wallpaper behind it and hide the
             // fullscreen window.
             // TODO: Make sure FLAG_SHOW_WALLPAPER is restored when dialog is dismissed. Or not.
