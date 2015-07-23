@@ -291,6 +291,28 @@ public class NativeLibraryHelper {
          */
         int abi = findSupportedAbi(handle, abiList);
         if (abi >= 0) {
+            if (abi < abiList.length-1 && abiList[abi].compareTo("armeabi-v7a") == 0) {
+                String[] secondAbiList = new String[abiList.length-1-abi];
+                System.arraycopy(abiList,abi+1,secondAbiList,0,abiList.length-1-abi);
+                int secondAbi = findSupportedAbi(handle, secondAbiList);
+                if (secondAbi >= 0 && secondAbiList[secondAbi].compareTo("armeabi") == 0) {
+                    /*
+                     * try the second abi like armeabi for armeabi-v7a
+                     */
+                    final String instructionSet = VMRuntime.getInstructionSet(secondAbiList[secondAbi]);
+                    final File subDir;
+                    if (useIsaSubdir) {
+                        final File isaSubdir = new File(libraryRoot, instructionSet);
+                        createNativeLibrarySubdir(isaSubdir);
+                        subDir = isaSubdir;
+                    } else {
+                        subDir = libraryRoot;
+                    }
+
+                    int copyRet = copyNativeBinaries(handle, subDir, secondAbiList[secondAbi]);
+                }
+            }
+
             /*
              * If we have a matching instruction set, construct a subdir under the native
              * library root that corresponds to this instruction set.
