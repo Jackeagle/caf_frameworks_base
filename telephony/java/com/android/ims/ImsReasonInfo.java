@@ -98,6 +98,7 @@ public class ImsReasonInfo implements Parcelable {
     public static final int CODE_LOCAL_CALL_EXCEEDED = 141;
     // IMS <- Telephony
     // Call busy
+    // Currently this code is used by CSVT
     public static final int CODE_LOCAL_CALL_BUSY = 142;
     // Call decline
     public static final int CODE_LOCAL_CALL_DECLINE = 143;
@@ -264,6 +265,11 @@ public class ImsReasonInfo implements Parcelable {
      * because the call was answered elsewhere
      */
     public static final int CODE_ANSWERED_ELSEWHERE = 1014;
+    /**
+     * Added for CSVT case
+     * CSVT call is rejected due to incompatible destination
+     */
+    public static final int CODE_INCOMPATIBLE_DESTINATION = 1015;
 
     /**
      * CALL DROP error codes (Call could drop because of many reasons like Network not available,
