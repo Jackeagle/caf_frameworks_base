@@ -384,15 +384,11 @@ public class BitmapFactory {
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
     public static Bitmap decodeFile(String pathName, Options opts) {
-        return decodeFile(pathName, opts, true);
-    }
-
-    public static Bitmap decodeFile(String pathName, Options opts, boolean consumeRights) {
         Bitmap bm = null;
         InputStream stream = null;
         try {
             stream = new FileInputStream(pathName);
-            bm = decodeStream(stream, null, opts, consumeRights);
+            bm = decodeStream(stream, null, opts);
         } catch (Exception e) {
             /*  do nothing.
                 If the exception happened on open, bm will be null.
@@ -427,11 +423,7 @@ public class BitmapFactory {
      */
     public static Bitmap decodeResourceStream(Resources res, TypedValue value,
             InputStream is, Rect pad, Options opts) {
-        return decodeResourceStream(res, value, is, pad, opts, true);
-    }
 
-    public static Bitmap decodeResourceStream(Resources res, TypedValue value,
-            InputStream is, Rect pad, Options opts, boolean consumeRights) {
         if (opts == null) {
             opts = new Options();
         }
@@ -449,7 +441,7 @@ public class BitmapFactory {
             opts.inTargetDensity = res.getDisplayMetrics().densityDpi;
         }
         
-        return decodeStream(is, pad, opts, consumeRights);
+        return decodeStream(is, pad, opts);
     }
 
     /**
@@ -465,11 +457,6 @@ public class BitmapFactory {
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
     public static Bitmap decodeResource(Resources res, int id, Options opts) {
-        return decodeResource(res, id, opts, true);
-    }
-
-    public static Bitmap decodeResource(Resources res, int id, Options opts,
-            boolean consumeRights) {
         Bitmap bm = null;
         InputStream is = null; 
         
@@ -477,7 +464,7 @@ public class BitmapFactory {
             final TypedValue value = new TypedValue();
             is = res.openRawResource(id, value);
 
-            bm = decodeResourceStream(res, value, is, null, opts, consumeRights);
+            bm = decodeResourceStream(res, value, is, null, opts);
         } catch (Exception e) {
             /*  do nothing.
                 If the exception happened on open, bm will be null.
@@ -507,11 +494,7 @@ public class BitmapFactory {
      * @return The decoded bitmap, or null if the image could not be decoded.
      */
     public static Bitmap decodeResource(Resources res, int id) {
-        return decodeResource(res, id, null, true);
-    }
-
-    public static Bitmap decodeResource(Resources res, int id, boolean consumeRights) {
-        return decodeResource(res, id, null, consumeRights);
+        return decodeResource(res, id, null);
     }
 
     /**
@@ -528,11 +511,6 @@ public class BitmapFactory {
      *         size be returned (in opts.outWidth and opts.outHeight)
      */
     public static Bitmap decodeByteArray(byte[] data, int offset, int length, Options opts) {
-        return decodeByteArray(data, offset, length, opts, true);
-    }
-
-    public static Bitmap decodeByteArray(byte[] data, int offset, int length, Options opts,
-            boolean consumeRights) {
         if ((offset | length) < 0 || data.length < offset + length) {
             throw new ArrayIndexOutOfBoundsException();
         }
@@ -541,7 +519,7 @@ public class BitmapFactory {
 
         Trace.traceBegin(Trace.TRACE_TAG_GRAPHICS, "decodeBitmap");
         try {
-            bm = nativeDecodeByteArray(data, offset, length, opts, consumeRights);
+            bm = nativeDecodeByteArray(data, offset, length, opts);
 
             if (bm == null && opts != null && opts.inBitmap != null) {
                 throw new IllegalArgumentException("Problem decoding into existing bitmap");
@@ -564,12 +542,9 @@ public class BitmapFactory {
      * @return The decoded bitmap, or null if the image could not be decoded.
      */
     public static Bitmap decodeByteArray(byte[] data, int offset, int length) {
-        return decodeByteArray(data, offset, length, null, true);
+        return decodeByteArray(data, offset, length, null);
     }
-    public static Bitmap decodeByteArray(byte[] data, int offset, int length,
-            boolean consumeRights) {
-        return decodeByteArray(data, offset, length, null, consumeRights);
-    }
+
     /**
      * Set the newly decoded bitmap's density based on the Options.
      */
@@ -619,11 +594,6 @@ public class BitmapFactory {
      * {@link android.os.Build.VERSION_CODES#KITKAT}, this is no longer the case.</p>
      */
     public static Bitmap decodeStream(InputStream is, Rect outPadding, Options opts) {
-        return decodeStream(is, outPadding, opts, true);
-    }
-
-    public static Bitmap decodeStream(InputStream is, Rect outPadding, Options opts,
-            boolean consumeRights) {
         // we don't throw in this case, thus allowing the caller to only check
         // the cache, and not force the image to be decoded.
         if (is == null) {
@@ -636,9 +606,9 @@ public class BitmapFactory {
         try {
             if (is instanceof AssetManager.AssetInputStream) {
                 final long asset = ((AssetManager.AssetInputStream) is).getNativeAsset();
-                bm = nativeDecodeAsset(asset, outPadding, opts, true);
+                bm = nativeDecodeAsset(asset, outPadding, opts);
             } else {
-                bm = decodeStreamInternal(is, outPadding, opts, consumeRights);
+                bm = decodeStreamInternal(is, outPadding, opts);
             }
 
             if (bm == null && opts != null && opts.inBitmap != null) {
@@ -657,12 +627,12 @@ public class BitmapFactory {
      * Private helper function for decoding an InputStream natively. Buffers the input enough to
      * do a rewind as needed, and supplies temporary storage if necessary. is MUST NOT be null.
      */
-    private static Bitmap decodeStreamInternal(InputStream is, Rect outPadding, Options opts, boolean consumeRights) {
+    private static Bitmap decodeStreamInternal(InputStream is, Rect outPadding, Options opts) {
         // ASSERT(is != null);
         byte [] tempStorage = null;
         if (opts != null) tempStorage = opts.inTempStorage;
         if (tempStorage == null) tempStorage = new byte[DECODE_BUFFER_SIZE];
-        return nativeDecodeStream(is, tempStorage, outPadding, opts, consumeRights);
+        return nativeDecodeStream(is, tempStorage, outPadding, opts);
     }
 
     /**
@@ -694,21 +664,16 @@ public class BitmapFactory {
      * @return the decoded bitmap, or null
      */
     public static Bitmap decodeFileDescriptor(FileDescriptor fd, Rect outPadding, Options opts) {
-        return decodeFileDescriptor(fd, outPadding, opts, true);
-    }
-
-    public static Bitmap decodeFileDescriptor(FileDescriptor fd, Rect outPadding, Options opts,
-            boolean consumeRights) {
         Bitmap bm;
 
         Trace.traceBegin(Trace.TRACE_TAG_GRAPHICS, "decodeFileDescriptor");
         try {
             if (nativeIsSeekable(fd)) {
-                bm = nativeDecodeFileDescriptor(fd, outPadding, opts, consumeRights);
+                bm = nativeDecodeFileDescriptor(fd, outPadding, opts);
             } else {
                 FileInputStream fis = new FileInputStream(fd);
                 try {
-                    bm = decodeStreamInternal(fis, outPadding, opts, consumeRights);
+                    bm = decodeStreamInternal(fis, outPadding, opts);
                 } finally {
                     try {
                         fis.close();
@@ -740,11 +705,11 @@ public class BitmapFactory {
     }
 
     private static native Bitmap nativeDecodeStream(InputStream is, byte[] storage,
-            Rect padding, Options opts, boolean consumeRights);
+            Rect padding, Options opts);
     private static native Bitmap nativeDecodeFileDescriptor(FileDescriptor fd,
-            Rect padding, Options opts, boolean consumeRights);
-    private static native Bitmap nativeDecodeAsset(long asset, Rect padding, Options opts, boolean consumeRights);
+            Rect padding, Options opts);
+    private static native Bitmap nativeDecodeAsset(long nativeAsset, Rect padding, Options opts);
     private static native Bitmap nativeDecodeByteArray(byte[] data, int offset,
-            int length, Options opts, boolean consumeRights);
+            int length, Options opts);
     private static native boolean nativeIsSeekable(FileDescriptor fd);
 }
