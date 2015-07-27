@@ -626,7 +626,7 @@ public class MSimSignalClusterView
         }
 
         int retValue = 0;
-        int level = mMSimNC.getGsmSignalLevel(phoneId);
+        int level = mMSimNC.getVoiceSignalLevel(phoneId);
         switch(level){
             case SignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN:
                 retValue = R.drawable.stat_sys_signal_0_gsm;
@@ -723,7 +723,7 @@ public class MSimSignalClusterView
             return 0;
         }
         int retValue = 0;
-        int level = mMSimNC.getGsmSignalLevel(0);
+        int level = mMSimNC.getVoiceSignalLevel(0);
         switch(level){
             case SignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN:
                 retValue = R.drawable.stat_sys_signal_0_2g;
