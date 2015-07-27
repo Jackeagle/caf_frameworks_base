@@ -64,6 +64,13 @@ public class CarrierText extends LinearLayout {
         }
 
         @Override
+        public void onSubIdUpdated(int oldSubId, int newSubId) {
+            updateCarrierText(mUpdateMonitor.getSimState(newSubId),
+                    mUpdateMonitor.getTelephonyPlmn(newSubId),
+                    mUpdateMonitor.getTelephonySpn(newSubId), newSubId);
+        }
+
+        @Override
         void onAirplaneModeChanged(boolean on) {
             if (on && mShowAPM) {
                 for (int i = 0; i < mNumPhones; i++) {
