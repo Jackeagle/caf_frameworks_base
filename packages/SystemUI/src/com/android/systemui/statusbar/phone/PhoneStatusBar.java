@@ -4271,6 +4271,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
                 // If we recently long-pressed the other button then they were
                 // long-pressed 'together'
                 if ((time - mLastLockToAppLongPress) < LOCK_TO_APP_GESTURE_TOLERENCE) {
+                    activityManager.stopLockTaskModeOnCurrent();
                     // When exiting refresh disabled flags.
                     mNavigationBarView.setDisabledFlags(mDisabled, true);
                 } else if ((v.getId() == R.id.back)
