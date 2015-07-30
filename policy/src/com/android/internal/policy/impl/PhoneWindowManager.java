@@ -1570,7 +1570,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final ContentResolver resolver = mContext.getContentResolver();
 
         // Initialize all assignments to sane defaults.
-        mPressOnMenuBehavior = KEY_ACTION_MENU;
+        mPressOnMenuBehavior = KEY_ACTION_APP_SWITCH;
 
         mLongPressOnMenuBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_longPressOnMenuBehavior);
