@@ -64,7 +64,9 @@ public final class ServerSession extends ObexSession implements Runnable {
     private boolean mClosed;
 
     public ObexHelper mSrmServer;
-    /**
+
+    private boolean setMTU = false;
+    /*
      * Creates new ServerSession.
      * @param trans the connection to the client
      * @param handler the event listener that will process requests
@@ -93,6 +95,10 @@ public final class ServerSession extends ObexSession implements Runnable {
 
     public int getMaxPacketSize() {
         return mMaxPacketLength;
+    }
+
+    public void reduceMTU(boolean enable) {
+        setMTU = enable;
     }
 
     /**
@@ -656,7 +662,10 @@ public final class ServerSession extends ObexSession implements Runnable {
         mMaxPacketLength = (mMaxPacketLength << 8) + mInput.read();
 
         // should we check it?
-        if (mMaxPacketLength > ObexHelper.MAX_PACKET_SIZE_INT) {
+        if (setMTU) {
+            mMaxPacketLength = ObexHelper.A2DP_SCO_OBEX_MAX_CLIENT_PACKET_SIZE;
+            setMTU = false;
+        } else if (mMaxPacketLength > ObexHelper.MAX_PACKET_SIZE_INT) {
             mMaxPacketLength = ObexHelper.MAX_PACKET_SIZE_INT;
         }
 
