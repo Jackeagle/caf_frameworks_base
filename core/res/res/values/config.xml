@@ -2229,6 +2229,12 @@
     <integer name="launchboost_idleloadboost_param">0</integer>
     <integer name="launchboost_idlenrrunboost_param">0</integer>
     <integer name="launchboost_preferidle_param">0</integer>
+
+    <!-- Whether cpu boost is enabled for PanelView fling -->
+    <bool name="config_enableCpuBoostForPanelViewFling">false</bool>
+    <integer name="panelview_flingboost_schedboost_param">0</integer>
+    <integer name="panelview_flingboost_cpuboost_param">0</integer>
+
     <!-- Support for disabling to fetch APN from OMH card
          for some cdma carriers -->
     <bool name="config_fetch_apn_from_omh_card">true</bool>
