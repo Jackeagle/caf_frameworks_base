@@ -1396,11 +1396,15 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         return mMSimServiceState[sub].getDataNetworkType();
     }
 
-    public int getGsmSignalLevel(int sub) {
-        if (mMSimSignalStrength[sub] == null) {
-            return mMSimSignalStrength[sub].SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
+    public int getVoiceSignalLevel(int phoneId) {
+        if (mMSimSignalStrength[phoneId] == null) {
+            return mMSimSignalStrength[phoneId].SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
         }
-        return mMSimSignalStrength[sub].getGsmLevel();
+        int subId = SubscriptionManager.getSubId(phoneId)[0];
+        boolean isCdma = TelephonyManager.PHONE_TYPE_CDMA
+                == TelephonyManager.getDefault().getCurrentPhoneType(subId);
+        return isCdma ? mMSimSignalStrength[phoneId].getCdmaLevel()
+                : mMSimSignalStrength[phoneId].getGsmLevel();
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args, int phoneId) {

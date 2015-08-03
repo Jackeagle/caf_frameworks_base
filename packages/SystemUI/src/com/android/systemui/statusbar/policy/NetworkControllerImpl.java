@@ -1731,11 +1731,13 @@ public class NetworkControllerImpl extends BroadcastReceiver
         return mServiceState.getDataNetworkType();
     }
 
-    public int getGsmSignalLevel() {
+    public int getVoiceSignalLevel() {
         if (mSignalStrength == null) {
             return SignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
         }
-        return mSignalStrength.getGsmLevel();
+        boolean isCdma =TelephonyManager.PHONE_TYPE_CDMA
+                == TelephonyManager.getDefault().getPhoneType();
+        return isCdma ? mSignalStrength.getCdmaLevel() : mSignalStrength.getGsmLevel();
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
