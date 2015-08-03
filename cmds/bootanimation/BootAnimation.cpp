@@ -415,9 +415,14 @@ status_t BootAnimation::readyToRun() {
 bool BootAnimation::threadLoop()
 {
     bool r;
+    char value[PROPERTY_VALUE_MAX];
+    property_get("sys.start.circularAnimation", value, "0");
     // We have no bootanimation file, so we use the stock android logo
     // animation.
-    if (mZip == NULL) {
+
+    if (atoi(value)) {
+        r = circular();
+    } else if (mZip == NULL) {
         r = android();
     } else {
         r = movie();
@@ -431,6 +436,158 @@ bool BootAnimation::threadLoop()
     eglTerminate(mDisplay);
     IPCThreadState::self()->stopProcess();
     return r;
+}
+
+bool BootAnimation::circular()
+{
+    initTexture(&mAndroid[0], mAssets, "images/circular.png");
+
+    // clear screen
+    glShadeModel(GL_FLAT);
+    glDisable(GL_DITHER);
+    glDisable(GL_SCISSOR_TEST);
+    glClearColor(0,0,0,0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    eglSwapBuffers(mDisplay, mSurface);
+
+    glEnable(GL_TEXTURE_2D);
+    glTexEnvx(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+    const GLint xc = (mWidth  - mAndroid[0].w) / 2;
+    const GLint yc = (mHeight - mAndroid[0].h) / 2;
+
+    // Blend state
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glTexEnvx(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+
+    const nsecs_t startTime = systemTime();
+    GLint x = 0;
+    GLint y = 0;
+    GLint x0 = xc + mAndroid[0].w/2;
+    GLint y0 = yc + mAndroid[0].h/2;
+    GLint x1 = 0;
+    GLint y1 = 0;
+    GLint x2 = 0;
+    GLint y2 = 0;
+    GLint gw = 0;
+    GLint gh = 0;
+    GLint r = mAndroid[0].w/2;
+    GLint n = 0;
+    GLint angleInit = 0;
+    GLint angle1 = angleInit;
+    GLint angle2;
+    GLint angleShow = 10;
+    GLint angle1Delta = 10;
+    GLint angleShowDelta = 5;
+
+    glBindTexture(GL_TEXTURE_2D, mAndroid[0].name);
+
+    do {
+        nsecs_t now = systemTime();
+
+        glDisable(GL_SCISSOR_TEST);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glEnable(GL_SCISSOR_TEST);
+
+        angle2 = (angle1 + angleShow + 360) % 360;
+
+        x1 = x0 + (GLint)(sin(angle1 * M_PI / 180) * r);
+        y1 = y0 + (GLint)(cos(angle1 * M_PI / 180) * r);
+
+        x2 = x0 + (GLint)(sin(angle2 * M_PI / 180) * r);
+        y2 = y0 + (GLint)(cos(angle2 * M_PI / 180) * r);
+
+        if (angle1 < 90 && angle1 >=0) {
+            if (angle2 < 90 && angle2 >=0) {
+                x = x1;
+                y = y0;
+                gw = x2 - x1;
+                gh = r;
+            } else if (angle2 >=90 && angle2 < 180){
+                x = x0;
+                y = y2;
+                gw = r;
+                gh = y1 - y2;
+            } else {
+                x = x2;
+                y = y0 - r;
+                gw = x0 - x2 + r;
+                gh = y1 - y;
+            }
+        } else if (angle1 < 180 && angle1 >= 90) {
+
+            if (angle2 < 270 && angle2 >= 90) {
+                x = x2;
+                y = y0 - r;
+                gw = x1 - x2;
+                gh = r;
+            } else {
+                x = x0 - r;
+                y = y0 - r;
+                gw = x1 - x0 + r;
+                gh = y2 - y;
+            }
+        } else if (angle1 < 270 && angle1 >= 180) {
+
+            if(angle2 < 360 && angle2 >= 180) {
+                x = x0 - r;
+                y = y1;
+                gw = r;
+                gh = y2 - y1;
+            } else {
+                x = x0 - r;
+                y = y1;
+                gw = x2 - x;
+                gh = y0 + r -y1;
+            }
+
+        } else if (angle1 < 360 && angle1 >= 270) {
+
+            if((angle2 >= 0 && angle2 < 90) || (angle2 >= 270 && angle2 < 360))
+            {
+                x = x1;
+                y = y0;
+                gw = x2 - x1;
+                gh = r;
+            } else {
+                x = x1;
+                y = y2;
+                gw = x0 + r - x1;
+                gh = y0 + r - y2;
+            }
+        }
+
+        glScissor(x, y, gw, gh);
+
+        glDrawTexiOES(xc, yc, 0, mAndroid[0].w, mAndroid[0].h);
+
+        EGLBoolean res = eglSwapBuffers(mDisplay, mSurface);
+        if (res == EGL_FALSE)
+            break;
+        // 32fps: don't animate too fast to preserve CPU
+        const nsecs_t sleepTime = 31250 - ns2us(systemTime() - now);
+        if (sleepTime > 0)
+            usleep(sleepTime);
+
+        if ((angleShow + angleShowDelta) >= 170)
+        {
+            angleShowDelta = -5;
+            angle1Delta = 16;
+
+        } else if((angleShow + angleShowDelta) <=10) {
+            angle1Delta = 10;
+            angleShowDelta = 5;
+        }
+
+        angle1 = (angle1 + angle1Delta + 360) % 360;
+        angleShow = angleShow + angleShowDelta;
+
+    } while (!exitPending());
+
+    glDeleteTextures(1, &mAndroid[0].name);
+    return false;
 }
 
 bool BootAnimation::android()
