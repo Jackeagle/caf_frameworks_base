@@ -22,6 +22,11 @@ import com.android.internal.util.FastPrintWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.UnknownHostException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 /**
  * API for sending log output.
@@ -106,6 +111,32 @@ public final class Log {
         };
 
     private Log() {
+    }
+
+    /**
+     * API to Place Marker for boot time identification
+     *
+     * @hide
+     */
+    public static int printMarker(String markerTAG) {
+        try {
+                File f = new File("/sys/bootkpi/marker_entry");
+                if (!f.exists())
+                    return -1; // No file...Dont do anything.
+                FileOutputStream fos = new FileOutputStream(f);
+                if (null == markerTAG) {
+                    markerTAG = "DefaultMarker";
+                    fos.write(markerTAG.getBytes());
+                } else {
+                    fos.write(markerTAG.getBytes());
+                }
+                fos.flush();
+                fos.close();
+                return 0;
+        } catch (IOException e) {
+                e.printStackTrace();
+                return 1;
+        }
     }
 
     /**
