@@ -117,7 +117,7 @@ public final class ActiveServices {
 
     // Enable this flag to reschedule the services during app launch.
     private static final boolean SERVICE_RESCHEDULE
-            = SystemProperties.getBoolean("ro.am.reschedule_service", true);
+            = SystemProperties.getBoolean("ro.am.reschedule_service", false);
 
     final SparseArray<ServiceMap> mServiceMap = new SparseArray<ServiceMap>();
 
