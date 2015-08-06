@@ -399,7 +399,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                     mPlmn[phoneId], phoneId);
             updateCarrierText(phoneId);
             refreshViews(phoneId);
-        } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION) ||
+        } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION_IMMEDIATE) ||
                  action.equals(ConnectivityManager.INET_CONDITION_ACTION)) {
             updateConnectivity(intent);
             refreshViews(mDefaultPhoneId);
