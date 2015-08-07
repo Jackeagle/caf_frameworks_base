@@ -414,7 +414,11 @@ public class Tethering extends BaseNetworkObserver {
 
         mContext.sendStickyBroadcastAsUser(broadcast, UserHandle.ALL);
 
-        showTetheredNotification(com.android.internal.R.drawable.stat_sys_tether_wifi);
+        if (!mContext.getResources().getBoolean(
+                com.android.internal.R.bool
+                .config_regional_hotspot_show_notification_when_turn_on)) {
+            showTetheredNotification(com.android.internal.R.drawable.stat_sys_tether_wifi);
+        }
     }
 
     private boolean readDeviceInfoFromDnsmasq(WifiDevice device) {
@@ -657,11 +661,10 @@ public class Tethering extends BaseNetworkObserver {
                 showTetheredNotification(com.android.internal.R.drawable.stat_sys_tether_general);
             } else {
                 /* We now have a status bar icon for WifiTethering, so drop the notification */
-                if (!mContext.getResources().getBoolean(
+                clearTetheredNotification();
+                if (mContext.getResources().getBoolean(
                         com.android.internal.R.bool
                         .config_regional_hotspot_show_notification_when_turn_on)) {
-                    clearTetheredNotification();
-                } else {
                     showTetheredNotification(com.android.internal.R.drawable.stat_sys_tether_wifi);
                 }
             }

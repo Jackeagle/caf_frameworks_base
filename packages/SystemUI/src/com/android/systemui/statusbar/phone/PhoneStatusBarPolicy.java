@@ -199,9 +199,13 @@ public class PhoneStatusBarPolicy {
                 false, mAlarmIconObserver);
 
         // hotspot
-        mService.setIcon(SLOT_HOTSPOT, R.drawable.stat_sys_hotspot, 0, null);
-        mService.setIconVisibility(SLOT_HOTSPOT, mHotspot.isHotspotEnabled());
-        mHotspot.addCallback(mHotspotCallback);
+        if (!mContext.getResources().getBoolean(
+                com.android.internal.R.bool
+                .config_regional_hotspot_show_notification_when_turn_on)) {
+            mService.setIcon(SLOT_HOTSPOT, R.drawable.stat_sys_hotspot, 0, null);
+            mService.setIconVisibility(SLOT_HOTSPOT, mHotspot.isHotspotEnabled());
+            mHotspot.addCallback(mHotspotCallback);
+        }
     }
 
     private ContentObserver mAlarmIconObserver = new ContentObserver(null) {
