@@ -75,9 +75,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_both_display_roaming_network">false</bool>
     <bool name="config_regional_display_contact_photo_video_call_off">false</bool>
 
-    <bool name="config_regional_number_patterns_video_call">true</bool>
+    <bool name="config_regional_number_patterns_video_call">false</bool>
 
-    <bool name="config_regional_noti_move_away_lte_video_call">true</bool>
+    <bool name="config_regional_noti_move_away_lte_video_call">false</bool>
 
     <bool name="config_regional_wifi_calling_menu_enable">false</bool>
 
