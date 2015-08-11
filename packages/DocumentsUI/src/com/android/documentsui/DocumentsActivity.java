@@ -42,6 +42,7 @@ import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.database.Cursor;
+import android.drm.OmaDrmHelper;
 import android.graphics.Point;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -121,8 +122,6 @@ public class DocumentsActivity extends Activity {
 
     private RootsCache mRoots;
     private State mState;
-
-    private boolean mIsContactPhoto = false;
 
     @Override
     public void onCreate(Bundle icicle) {
@@ -205,7 +204,6 @@ public class DocumentsActivity extends Activity {
             moreApps.setComponent(null);
             moreApps.setPackage(null);
             RootsFragment.show(getFragmentManager(), moreApps);
-            mIsContactPhoto = getIntent().getBooleanExtra("isContactPhoto", false);
         } else if (mState.action == ACTION_OPEN || mState.action == ACTION_CREATE
                 || mState.action == ACTION_OPEN_TREE) {
             RootsFragment.show(getFragmentManager(), null);
@@ -996,7 +994,7 @@ public class DocumentsActivity extends Activity {
             onCurrentDirectoryChanged(ANIM_DOWN);
         } else if (mState.action == ACTION_OPEN || mState.action == ACTION_GET_CONTENT) {
             // Explicit file picked, return
-            if (!mIsContactPhoto && doc.displayName.endsWith(".dm") && mState.action == ACTION_GET_CONTENT) {
+            if (OmaDrmHelper.isDrmFile(doc.displayName) && mState.action == ACTION_GET_CONTENT) {
                 Toast.makeText(this, R.string.no_permission_for_drm, Toast.LENGTH_SHORT).show();
             } else {
                 new ExistingFinishTask(doc.derivedUri).executeOnExecutor(getCurrentExecutor());

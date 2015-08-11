@@ -114,4 +114,5 @@
     <string name="rights_expired">Rights expired for the song</string>
 
     <string name="toast_not_show_thumbnail">Can not show thumbnail on low ram device.</string>
+
 </resources>

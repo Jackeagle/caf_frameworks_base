@@ -40,6 +40,7 @@ import android.content.Intent;
 import android.content.Loader;
 import android.content.res.Resources;
 import android.database.Cursor;
+import android.drm.OmaDrmHelper;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.drawable.Drawable;
@@ -85,13 +86,6 @@ import com.google.android.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.List;
-
-
-import android.content.ContentValues;
-import android.drm.DrmManagerClient;
-import android.drm.DrmStore.DrmDeliveryType;
-import android.drm.DrmStore.RightsStatus;
-import android.drm.DrmStore.Action;
 
 /**
  * Display the documents inside a single directory.
@@ -198,6 +192,7 @@ public class DirectoryFragment extends Fragment {
         final View view = inflater.inflate(R.layout.fragment_directory, container, false);
 
         mEmptyView = view.findViewById(android.R.id.empty);
+
         mListView = (ListView) view.findViewById(R.id.list);
         mListView.setOnItemClickListener(mItemListener);
         mListView.setMultiChoiceModeListener(mMultiListener);
@@ -568,8 +563,8 @@ public class DirectoryFragment extends Fragment {
             intent.addCategory(Intent.CATEGORY_DEFAULT);
             intent.setType(doc.mimeType);
             intent.putExtra(Intent.EXTRA_STREAM, doc.derivedUri);
-            if(doc.displayName.endsWith(".dm")){
-               allfowd = false;
+            if (OmaDrmHelper.isDrmFile(doc.displayName)) {
+                allfowd = false;
             }
         } else if (docs.size() > 1) {
             intent = new Intent(Intent.ACTION_SEND_MULTIPLE);
@@ -581,10 +576,11 @@ public class DirectoryFragment extends Fragment {
             for (DocumentInfo doc : docs) {
                 mimeTypes.add(doc.mimeType);
                 uris.add(doc.derivedUri);
-                if(doc.displayName.endsWith(".dm")){
-                   allfowd = false;
+                if (OmaDrmHelper.isDrmFile(doc.displayName)) {
+                    allfowd = false;
                 }
             }
+
             intent.setType(findCommonMimeType(mimeTypes));
             intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
 
