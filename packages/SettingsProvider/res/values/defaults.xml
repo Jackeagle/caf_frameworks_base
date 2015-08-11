@@ -36,7 +36,7 @@
     <bool name="def_haptic_feedback">true</bool>
 
     <!-- Default battery status text toggle -->
-    <bool name="def_status_bar_show_battery_percent">false</bool>
+    <bool name="def_status_bar_show_battery_percent">true</bool>
 
     <bool name="def_bluetooth_on">false</bool>
     <bool name="def_wifi_display_on">false</bool>
