@@ -2410,4 +2410,7 @@
   <java-symbol type="bool" name="config_regional_wea_alert_tone_enable" />
   <java-symbol type="bool" name="config_regional_usb_tethering_quick_start_enable" />
   <java-symbol type="string" name="authentication_failure" />
+  <java-symbol type="string" name="operator_config_url" />
+  <java-symbol type="string" name="operator_ping_url" />
+  <java-symbol type="bool" name="config_zero_balance_operator"/>
 </resources>
