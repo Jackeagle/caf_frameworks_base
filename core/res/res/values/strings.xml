@@ -5224,4 +5224,5 @@
 
     <string name="card_string">CARD <xliff:g id="slot_id">%1$s</xliff:g></string>
     <string name="authentication_failure"></string>
+    <string name="transport_destination_string">Backing up to debug-only private cache</string>
 </resources>
