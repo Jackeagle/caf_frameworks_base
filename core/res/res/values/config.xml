@@ -2214,6 +2214,9 @@
     <integer-array name="launchboost_param_value"/>
     <integer name="launchboost_timeout_param">0</integer>
     <integer-array name="launchboost_packing_param_value"/>
+    <!-- Whether cpu boost is enabled for PanelView fling -->
+    <bool name="config_enableCpuBoostForPanelViewFling">false</bool>
+    <integer-array name="panelview_flingboost_param_value"/>
     <!-- Support for disabling to fetch APN from OMH card
          for some cdma carriers -->
    <bool name="config_fetch_apn_from_omh_card">true</bool>
