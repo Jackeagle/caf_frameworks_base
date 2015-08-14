@@ -2282,6 +2282,10 @@
   <java-symbol type="integer" name="launchboost_idlenrrunboost_param" />
   <java-symbol type="integer" name="launchboost_preferidle_param" />
 
+  <!-- cpu boost for PanelView fling-->
+  <java-symbol type="bool" name="config_enableCpuBoostForPanelViewFling" />
+  <java-symbol type="array" name="panelview_flingboost_param_value"/>
+
   <java-symbol type="bool" name="config_fetch_apn_from_omh_card" />
   <!-- cpu boost for Animationboost -->
   <java-symbol type="bool" name="config_enablePerfBoostForAnimation" />
