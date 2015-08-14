@@ -1099,7 +1099,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
         Log.d(TAG, "updateIMSRegistrationForNewtorkName " + hdTag
                 + ";" + registered);
         if (registered) {
-            mNetworkName = mNetworkName + hdTag;
+            if (!mNetworkName.contains(hdTag)) {
+                mNetworkName = mNetworkName + hdTag;
+            }
         } else {
             if (mNetworkName.contains(hdTag)) {
                 mNetworkName = mNetworkName.replace(hdTag, "");
