@@ -611,12 +611,8 @@ public class OverScroller {
         private Performance mPerf = null;
         private boolean mIsPerfLockAcquired = false;
         private boolean mIsPerfBoostEnabled = false;
-        private int lBoostTimeOut = 0;
-        private int lBoostCpuBoost = 0;
-        private int lBoostSchedBoost = 0;
-        private int lBoostPcDisblBoost = 0;
-        private int lBoostKsmBoost = 0;
-        private int lBoostPreferIdle = 0;
+        private int fBoostTimeOut = 0;
+        private int fBoostParamVal[];
 
         static {
             float x_min = 0.0f;
@@ -666,18 +662,10 @@ public class OverScroller {
             mIsPerfBoostEnabled = context.getResources().getBoolean(
                    com.android.internal.R.bool.config_enableCpuBoostForOverScrollerFling);
             if (mIsPerfBoostEnabled) {
-            lBoostSchedBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_schedboost_param);
-            lBoostTimeOut = context.getResources().getInteger(
+            fBoostTimeOut = context.getResources().getInteger(
                    com.android.internal.R.integer.flingboost_timeout_param);
-            lBoostCpuBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_cpuboost_param);
-            lBoostPcDisblBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_pcdisbl_param);
-            lBoostKsmBoost = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_ksmboost_param);
-            lBoostPreferIdle = context.getResources().getInteger(
-                   com.android.internal.R.integer.flingboost_preferidle_param);
+            fBoostParamVal = context.getResources().getIntArray(
+                        com.android.internal.R.array.flingboost_param_value);
             }
         }
 
@@ -807,12 +795,10 @@ public class OverScroller {
 
                 if (mPerf != null) {
                     mIsPerfLockAcquired = true;
-                    if (0 == lBoostTimeOut) {
-                        lBoostTimeOut = mDuration;
+                    if (0 == fBoostTimeOut) {
+                        fBoostTimeOut = mDuration;
                     }
-                    mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
-                                          lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
-
+                    mPerf.perfLockAcquire(fBoostTimeOut, fBoostParamVal);
                 }
             }
 

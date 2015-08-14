@@ -2245,20 +2245,12 @@
   <!-- cpu boost for overscroller fling -->
   <java-symbol type="bool" name="config_enableCpuBoostForOverScrollerFling" />
   <java-symbol type="integer" name="flingboost_timeout_param" />
-  <java-symbol type="integer" name="flingboost_schedboost_param" />
-  <java-symbol type="integer" name="flingboost_cpuboost_param" />
-  <java-symbol type="integer" name="flingboost_pcdisbl_param" />
-  <java-symbol type="integer" name="flingboost_ksmboost_param" />
-  <java-symbol type="integer" name="flingboost_preferidle_param" />
+  <java-symbol type="array" name="flingboost_param_value" />
 
   <!-- cpu boost for horizontal scroll -->
   <java-symbol type="bool" name="config_enableCpuBoostForScroller" />
   <java-symbol type="integer" name="scrollboost_timeout_param" />
-  <java-symbol type="integer" name="scrollboost_schedboost_param" />
-  <java-symbol type="integer" name="scrollboost_cpuboost_param" />
-  <java-symbol type="integer" name="scrollboost_pcdisbl_param" />
-  <java-symbol type="integer" name="scrollboost_ksmboost_param" />
-  <java-symbol type="integer" name="scrollboost_preferidle_param" />
+  <java-symbol type="array" name="scrollboost_param_value" />
 
   <!-- Data Connectivity Error Configurations -->
   <java-symbol type="bool" name="config_reject_ggsn_perm_failure" />
@@ -2271,32 +2263,21 @@
   <!-- cpu boost for AppLaunch -->
   <java-symbol type="bool" name="config_enableCpuBoostForAppLaunch" />
   <java-symbol type="integer" name="disablepacking_timeout_param" />
+  <java-symbol type="array" name="launchboost_packing_param_value"/>
   <java-symbol type="integer" name="launchboost_timeout_param" />
-  <java-symbol type="integer" name="launchboost_schedboost_param" />
-  <java-symbol type="integer" name="launchboost_cpuboost_param" />
-  <java-symbol type="integer" name="launchboost_cpunumboost_param" />
-  <java-symbol type="integer" name="launchboost_pcdisbl_param" />
-  <java-symbol type="integer" name="launchboost_ksmboost_param" />
-  <java-symbol type="integer" name="launchboost_smtaskboost_param" />
-  <java-symbol type="integer" name="launchboost_idleloadboost_param" />
-  <java-symbol type="integer" name="launchboost_idlenrrunboost_param" />
-  <java-symbol type="integer" name="launchboost_preferidle_param" />
+  <java-symbol type="array" name="launchboost_param_value" />
 
   <java-symbol type="bool" name="config_fetch_apn_from_omh_card" />
   <!-- cpu boost for Animationboost -->
   <java-symbol type="bool" name="config_enablePerfBoostForAnimation" />
   <java-symbol type="integer" name="animationboost_timeout_param" />
-  <java-symbol type="integer" name="animationboost_schedboost_param" />
-  <java-symbol type="integer" name="animationboost_cpuboost_param" />
-
+  <java-symbol type="array" name="animationboost_param_value" />
   <!-- Activities list for boost -->
   <java-symbol type="array"  name="boost_activityList" />
 
   <!-- Activity scroll boost params -->
   <java-symbol type="integer" name="ascrollboost_timeout" />
-  <java-symbol type="integer" name="ascrollboost_schedboost" />
-  <java-symbol type="integer" name="ascrollboost_cpuboost" />
-  <java-symbol type="integer" name="ascrollboost_pcdisbl" />
+  <java-symbol type="array" name="ascrollboost_param_value" />
   <java-symbol type="bool" name="config_reject_call_via_sms_enabled"/>
 
   <!-- From keyguard for showing am/pm in unlock screen -->

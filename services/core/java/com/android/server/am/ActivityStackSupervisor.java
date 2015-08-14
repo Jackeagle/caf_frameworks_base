@@ -149,15 +149,8 @@ public final class ActivityStackSupervisor implements DisplayListener {
     public boolean mIsPerfBoostEnabled = false;
     public int lBoostTimeOut = 0;
     public int lDisPackTimeOut = 0;
-    public int lBoostCpuBoost = 0;
-    public int lBoostSchedBoost = 0;
-    public int lBoostPcDisblBoost = 0;
-    public int lBoostKsmBoost = 0;
-    public int lBoostSmTaskBoost = 0;
-    public int lBoostIdleLoadBoost = 0;
-    public int lBoostIdleNrRunBoost = 0;
-    public int lBoostPreferIdle = 0;
-    public int lBoostCpuNumBoost = 0;
+    public int lBoostCpuParamVal[];
+    public int lBoostPackParamVal[];
     static final int HANDLE_DISPLAY_ADDED = FIRST_SUPERVISOR_STACK_MSG + 5;
     static final int HANDLE_DISPLAY_CHANGED = FIRST_SUPERVISOR_STACK_MSG + 6;
     static final int HANDLE_DISPLAY_REMOVED = FIRST_SUPERVISOR_STACK_MSG + 7;
@@ -322,28 +315,14 @@ public final class ActivityStackSupervisor implements DisplayListener {
         mIsPerfBoostEnabled = mService.mContext.getResources().getBoolean(
                    com.android.internal.R.bool.config_enableCpuBoostForAppLaunch);
         if(mIsPerfBoostEnabled) {
-           lBoostSchedBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_schedboost_param);
            lBoostTimeOut = mService.mContext.getResources().getInteger(
                    com.android.internal.R.integer.launchboost_timeout_param);
            lDisPackTimeOut = mService.mContext.getResources().getInteger(
                    com.android.internal.R.integer.disablepacking_timeout_param);
-           lBoostCpuBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_cpuboost_param);
-           lBoostPcDisblBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_pcdisbl_param);
-           lBoostKsmBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_ksmboost_param);
-           lBoostSmTaskBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_smtaskboost_param);
-           lBoostIdleLoadBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_idleloadboost_param);
-           lBoostIdleNrRunBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_idlenrrunboost_param);
-           lBoostPreferIdle = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_preferidle_param);
-           lBoostCpuNumBoost = mService.mContext.getResources().getInteger(
-                   com.android.internal.R.integer.launchboost_cpunumboost_param);
+	   lBoostCpuParamVal = mService.mContext.getResources().getIntArray(
+			com.android.internal.R.array.launchboost_param_value);
+	   lBoostPackParamVal = mService.mContext.getResources().getIntArray(
+                        com.android.internal.R.array.launchboost_packing_param_value);
        }
     }
 
@@ -2745,11 +2724,8 @@ public final class ActivityStackSupervisor implements DisplayListener {
            mPerf = new Performance();
        }
        if (mPerf != null) {
-           if (DEBUG) Slog.d(TAG, "Acquiring perf lock Enter : ");
-           mPerf.perfLockAcquire(lDisPackTimeOut,lBoostSmTaskBoost, lBoostIdleLoadBoost,
-                                  lBoostIdleNrRunBoost, lBoostPreferIdle);
-           mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
-                                  lBoostCpuBoost, lBoostCpuNumBoost, lBoostKsmBoost);
+	     mPerf.perfLockAcquire(lDisPackTimeOut, lBoostPackParamVal);
+	     mPerf.perfLockAcquire(lBoostTimeOut, lBoostCpuParamVal);
        }
     }
 
