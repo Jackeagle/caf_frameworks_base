@@ -121,6 +121,24 @@ enum install_status_t {
 
 typedef install_status_t (*iterFunc)(JNIEnv*, void*, ZipFileRO*, ZipEntryRO, const char*);
 
+typedef int (*PGetAssetsStatusFunc) (ZipFileRO*, Vector<ScopedUtfChars*>, const int);
+static PGetAssetsStatusFunc GetAssetsStatusFunc = NULL;
+static int g_assetLibInit = LIB_UNINIT;
+
+static int initAssetsVerifierLib() {
+    if (g_assetLibInit != LIB_UNINIT) return g_assetLibInit;
+    void* handle = dlopen("libassetsverifier.so", RTLD_NOW);
+    if (handle != NULL) {
+        GetAssetsStatusFunc = (PGetAssetsStatusFunc)dlsym(handle, "getAssetsStatus");
+        if (GetAssetsStatusFunc != NULL) {
+            g_assetLibInit = LIB_INITED_AND_SUCCESS;
+        } else {
+            g_assetLibInit = LIB_INITED_AND_FAIL;
+        }
+    }
+    return g_assetLibInit;
+}
+
 // Equivalent to android.os.FileUtils.isFilenameSafe
 static bool
 isFilenameSafe(const char* filename)
@@ -567,6 +585,7 @@ static int findSupportedAbi(JNIEnv *env, jlong apkHandle, jobjectArray supported
     }
 
     int status = NO_NATIVE_LIBRARIES;
+    bool isFilterLib = false;
     if (initApkScanLib() == LIB_INITED_AND_SUCCESS) {
         PFilterObject filter = GetFilterObjectFunc(zipFile->getFileDescriptor());
         if (filter != NULL) {
@@ -576,6 +595,15 @@ static int findSupportedAbi(JNIEnv *env, jlong apkHandle, jobjectArray supported
             param.supportedAbis = &supportedAbis;
             if (0 == FilterLibraryFunc(filter, dealLibAbiFile, &param)) {
                 status = param.status;
+                isFilterLib = true;
+                if (status == NO_NATIVE_LIBRARIES) {
+                    int rc = initAssetsVerifierLib();
+                    if (rc == LIB_INITED_AND_SUCCESS) {
+                        status = GetAssetsStatusFunc(zipFile, supportedAbis, numAbis);
+                    } else {
+                        ALOGE("Failed to load assets verifier: %d", rc);
+                    }
+                }
                 for (int i = 0; i < numAbis; ++i) {
                     delete supportedAbis[i];
                 }
@@ -613,6 +641,19 @@ static int findSupportedAbi(JNIEnv *env, jlong apkHandle, jobjectArray supported
                 }
             }
         }
+    }
+    int asset_status = NO_NATIVE_LIBRARIES;
+
+    if (status >= 0 && !isFilterLib) {
+        int rc = initAssetsVerifierLib();
+        if (rc == LIB_INITED_AND_SUCCESS) {
+            asset_status = GetAssetsStatusFunc(zipFile, supportedAbis, numAbis);
+        } else {
+            ALOGE("Failed to load assets verifier: %d", rc);
+        }
+    }
+    if (asset_status != NO_NATIVE_LIBRARIES) {
+        status = asset_status;
     }
 
     for (int i = 0; i < numAbis; ++i) {
