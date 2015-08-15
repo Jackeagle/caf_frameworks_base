@@ -131,6 +131,11 @@ public final class PhoneCapabilities {
     public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
     /**
+     * @hide
+     */
+    public static final int SHOW_MERGE_CONFERENCE = 0x00040000;
+
+    /**
      * Whether this set of capabilities supports the specified capability.
      * @param capabilities The set of capabilities.
      * @param capability The capability to check capabilities for.
@@ -199,6 +204,9 @@ public final class PhoneCapabilities {
         }
         if (can(capabilities, GENERIC_CONFERENCE)) {
             builder.append(" GENERIC_CONFERENCE");
+        }
+        if (can(capabilities, SHOW_MERGE_CONFERENCE)) {
+            builder.append(" SHOW_MERGE_CONFERENCE");
         }
 
         builder.append("]");

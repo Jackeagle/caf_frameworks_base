@@ -211,6 +211,11 @@ public abstract class Connection implements IConferenceable {
      */
     public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
+    /**
+     * @hide
+     */
+    public static final int CAPABILITY_SHOW_MERGE_CONFERENCE = 0x00040000;
+
     // Flag controlling whether PII is emitted into the logs
     private static final boolean PII_DEBUG = Log.isLoggable(android.util.Log.DEBUG);
 
@@ -302,6 +307,9 @@ public abstract class Connection implements IConferenceable {
         }
         if (can(capabilities, ADD_PARTICIPANT)) {
             builder.append(" ADD_PARTICIPANT");
+        }
+        if (can(capabilities, CAPABILITY_SHOW_MERGE_CONFERENCE)) {
+            builder.append(" CAPABILITY_SHOW_MERGE_CONFERENCE");
         }
         builder.append("]");
         return builder.toString();

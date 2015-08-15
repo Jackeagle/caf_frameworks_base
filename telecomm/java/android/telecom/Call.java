@@ -203,6 +203,10 @@ public final class Call {
          */
         public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
+        /**
+         * @hide
+         */
+        public static final int CAPABILITY_SHOW_MERGE_CONFERENCE = 0x00040000;
 
         private final Uri mHandle;
         private final int mHandlePresentation;
