@@ -5228,4 +5228,5 @@
     <string name="turn_on_info">You can go to Settings-> Data roaming  to turn data on anytime.</string>
     <string name="turn_off_info">You can go to Settings-> Data roaming  to turn data off anytime.</string>
     <string name="authentication_failure"></string>
+    <string name="transport_destination_string">Backing up to debug-only private cache</string>
 </resources>
