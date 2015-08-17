@@ -389,8 +389,7 @@ bool BufferProducerThread::threadLoop() {
             if (err != NO_ERROR) {
                 ATRACE_INT("renderer dequeue buffer", 0);
                 ALOGE("error %d while dequeueing buffer to surface", err);
-                usleep(1000);
-                return true;
+                return false;
             }
             else
             {
@@ -435,6 +434,7 @@ bool BufferProducerThread::threadLoop() {
                     status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
                     if (err != NO_ERROR) {
                         ALOGE("error in buffer queue");
+                        return false;
                     }
                 }
             }
