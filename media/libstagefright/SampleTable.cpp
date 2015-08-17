@@ -258,6 +258,10 @@ status_t SampleTable::setTimeToSampleParams(
     }
 
     mTimeToSampleCount = U32_AT(&header[4]);
+    uint64_t allocSize = mTimeToSampleCount * 2 * (uint64_t)sizeof(uint32_t);
+    if (allocSize > SIZE_MAX) {
+        return ERROR_OUT_OF_RANGE;
+    }
     mTimeToSample = new uint32_t[mTimeToSampleCount * 2];
 
     size_t size = sizeof(uint32_t) * mTimeToSampleCount * 2;
@@ -330,6 +334,11 @@ status_t SampleTable::setSyncSampleParams(off64_t data_offset, size_t data_size)
 
     if (mNumSyncSamples < 2) {
         LOGW("Table of sync samples is empty or has only a single entry!");
+    }
+
+    uint64_t allocSize = mNumSyncSamples * (uint64_t)sizeof(uint32_t);
+    if (allocSize > SIZE_MAX) {
+       return ERROR_OUT_OF_RANGE;
     }
 
     mSyncSamples = new uint32_t[mNumSyncSamples];
