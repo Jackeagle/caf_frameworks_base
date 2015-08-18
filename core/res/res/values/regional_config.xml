@@ -104,4 +104,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <bool name="config_regional_wea_alert_tone_enable">false</bool>
     <!-- Whether to show USB tethering in USB settings -->
     <bool name="config_regional_usb_tethering_quick_start_enable">false</bool>
+    <bool name="config_regional_hide_cast_screen">false</bool>
 </resources>
