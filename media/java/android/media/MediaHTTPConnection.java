@@ -33,6 +33,7 @@ import java.net.MalformedURLException;
 import java.net.NoRouteToHostException;
 import java.net.ProtocolException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import java.net.InetSocketAddress;
@@ -55,6 +56,8 @@ public class MediaHTTPConnection extends IMediaHTTPConnection.Stub {
     private HttpURLConnection mConnection = null;
     private long mTotalSize = -1;
     private InputStream mInputStream = null;
+    private List<String> mCookies = null;
+    private boolean mIsCookieUpdated = false;
 
     private boolean mAllowCrossDomainRedirect = true;
     private boolean mAllowCrossProtocolRedirect = true;
@@ -113,6 +116,8 @@ public class MediaHTTPConnection extends IMediaHTTPConnection.Stub {
                 mProxyPort = Integer.parseInt(val.substring(colonPos + 1));
                 Log.d(TAG, "sta-proxy-ip " + mProxyIP + " port " + mProxyPort);
             }
+        } else if ("Cookie".equalsIgnoreCase(key) && mIsCookieUpdated) {
+            Log.d(TAG, "filterOutInternalHeaders: Cookie");
         } else {
             return false;
         }
@@ -217,6 +222,13 @@ public class MediaHTTPConnection extends IMediaHTTPConnection.Stub {
                     }
                 }
 
+                if (mIsCookieUpdated) {
+                    if (VERBOSE)
+                        Log.d(TAG, "add Cookie in the request");
+                    for (String cookie : mCookies)
+                        mConnection.addRequestProperty("Cookie", cookie.split(";", 2)[0]);
+                }
+
                 if (offset > 0) {
                     mConnection.setRequestProperty(
                             "Range", "bytes=" + offset + "-");
@@ -303,6 +315,14 @@ public class MediaHTTPConnection extends IMediaHTTPConnection.Stub {
                 throw new IOException();
             } else {
                 mTotalSize = mConnection.getContentLength();
+                if (mConnection.getHeaderFields().containsKey("Set-Cookie")) {
+                    mIsCookieUpdated = true;
+                    mCookies = mConnection.getHeaderFields().get("Set-Cookie");
+                    if (VERBOSE) {
+                        for (String cookie : mCookies)
+                            Log.d(TAG, "get Cookie" + cookie);
+                    }
+                 }
             }
 
             if (offset > 0 && response != HttpURLConnection.HTTP_PARTIAL) {
