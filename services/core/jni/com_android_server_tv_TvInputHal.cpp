@@ -265,11 +265,11 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
        ALOGE("cannot find buffer with seq num = 0x%x in buffer list", seq);
        return;
     }
+    nwBuffer = mBuffers[idx].buffer;
     if (mBuffers[idx].bufferState == CAPTURE)
     {
         mBuffers[idx].bufferState = RELEASED;
         if (succeeded) {
-            nwBuffer = mBuffers[idx].buffer;
 
             ATRACE_INT("renderer enqueue buffer", 1);
 
@@ -606,6 +606,10 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
                 connection.mThread->shutdown();
             }
             connection.mThread = new BufferProducerThread(mDevice, deviceId, &stream);
+            if (connection.mThread == NULL) {
+                ALOGE("No memory for BufferProducerThread");
+                return NO_MEMORY;
+            }
         }
     }
     connection.mSurface = surface;
