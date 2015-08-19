@@ -85,6 +85,11 @@ public final class ClientOperation implements Operation, BaseStream {
     private boolean mSrmGetActiveClient;
 
     private ObexHelper mSrmClientSession;
+
+     // To handle the case where the SRMP header is misplaced
+     // on recieving continue operation.
+    private boolean mIgnoreSrmpWaitFromRemote;
+
     /**
      * Creates new OperationImpl to read and write data to a server
      * @param maxSize the maximum packet size
@@ -106,6 +111,7 @@ public final class ClientOperation implements Operation, BaseStream {
         mMaxPacketSize = maxSize;
         mGetOperation = type;
         mGetFinalFlag = false;
+        mIgnoreSrmpWaitFromRemote = false;
 
         mPrivateInputOpen = false;
         mPrivateOutputOpen = false;
@@ -690,12 +696,21 @@ public final class ClientOperation implements Operation, BaseStream {
                         Byte srmp = (Byte) mReplyHeader.getHeader(
                                 HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER);
                         if (VERBOSE) Log.v(TAG, "SRMP header (CONTINUE): " + srmp);
-                        if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT) {
+                        if (srmp == ObexHelper.OBEX_SRM_PARAM_WAIT
+                            && mIgnoreSrmpWaitFromRemote == false) {
                             if (VERBOSE) Log.v(TAG, "Client SRMP WAIT requested by Server");
                             mSrmClientSession.setLocalSrmpWait(true);
                             mSrmGetActiveClient = ObexHelper.LOCAL_SRM_DISABLED;
                         } else {
                             if (VERBOSE) Log.v(TAG, "continueOperation: Client SRMP NONE");
+                            // As per the GOEP2.0 spec, the SRMP header shall be received in the
+                            // first GET response, and may be received in consecutive GET response
+                            // packets to cause the Client to continue its wait. however, once the
+                            // SRMP header is not received in a GET response, the SRMP header
+                            // shall not be received in  another GET response for the duration of
+                            // the operation, hence ignore srmp wait header, If it's received in
+                            // middle of operation.
+                            mIgnoreSrmpWaitFromRemote = true;
                             mSrmClientSession.setLocalSrmpWait(false);
                         }
                         mReplyHeader.setHeader(HeaderSet.SINGLE_RESPONSE_MODE_PARAMETER,
