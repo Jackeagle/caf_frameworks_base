@@ -2424,4 +2424,5 @@
   <!-- From backup&reset -->
   <java-symbol type="string" name="transport_destination_string" />
   <java-symbol type="bool" name="config_regional_hide_cast_screen" />
+  <java-symbol type="bool" name="config_regional_nfc_menu_disable" />
 </resources>
