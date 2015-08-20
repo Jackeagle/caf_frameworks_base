@@ -816,4 +816,28 @@ public class MockPackageManager extends PackageManager {
     public Drawable loadUnbadgedItemIcon(PackageItemInfo itemInfo, ApplicationInfo appInfo) {
         throw new UnsupportedOperationException();
     }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean setPackageRestrictState(String packageName, boolean restrict) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean isRestrictedAvailable(String packageName) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean isPackageRestricted(String packageName) {
+        throw new UnsupportedOperationException();
+    }
 }

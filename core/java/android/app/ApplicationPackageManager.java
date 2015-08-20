@@ -1684,6 +1684,43 @@ final class ApplicationPackageManager extends PackageManager {
     /**
      * @hide
      */
+    @Override
+    public boolean setPackageRestrictState(String packageName, boolean restrict) {
+        try {
+            return mPM.setPackageRestrictState(packageName, restrict, mContext.getUserId());
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to set restrict", e);
+        }
+        return false;
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean isRestrictedAvailable(String packageName) {
+        try {
+            return mPM.isRestrictedAvailable(packageName);
+        } catch (RemoteException e) {
+            throw new RuntimeException("Package manager has died", e);
+        }
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean isPackageRestricted(String packageName) {
+        try {
+            return mPM.isPackageRestricted(packageName, mContext.getUserId());
+        } catch (RemoteException e) {
+            throw new RuntimeException("Package manager has died", e);
+        }
+    }
+
+    /**
+     * @hide
+     */
     public Drawable loadItemIcon(PackageItemInfo itemInfo, ApplicationInfo appInfo) {
         Drawable dr = loadUnbadgedItemIcon(itemInfo, appInfo);
         if (itemInfo.showUserIcon != UserHandle.USER_NULL) {

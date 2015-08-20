@@ -1792,6 +1792,7 @@ public class PackageManagerService extends IPackageManager.Stub {
             // we need to initialize the default preferred apps.
             if (!mRestoredSettings && !onlyCore) {
                 mSettings.readDefaultPreferredAppsLPw(this, 0);
+                mSettings.initRestrictions();
             }
 
             // If this is first boot after an OTA, and a normal boot, then
@@ -11338,6 +11339,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                         COMPONENT_ENABLED_STATE_DEFAULT,
                         false, //installed
                         true,  //stopped
+                        mSettings.mRestrictPackages.contains(packageName),  //restricted
                         true,  //notLaunched
                         false, //hidden
                         null, null, null,
@@ -13744,6 +13746,27 @@ public class PackageManagerService extends IPackageManager.Stub {
         }
     }
 
+    @Override
+    public boolean setPackageRestrictState(String packageName, boolean restrict, int userId) {
+        if (!sUserManager.exists(userId))
+            throw new IllegalArgumentException("Invalid userId " + userId);
+        final int uid = Binder.getCallingUid();
+        final int permission = mContext.checkCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_COMPONENT_ENABLED_STATE);
+        final boolean allowedByPermission = (permission == PackageManager.PERMISSION_GRANTED);
+        enforceCrossUserPermission(uid, userId, true, true, "restrict package");
+        // writer
+        synchronized (mPackages) {
+            if (isRestrictedAvailable(packageName) && mSettings.setPackageRestrictStateLPw(
+                    packageName, restrict, allowedByPermission, uid, userId)) {
+                scheduleWritePackageRestrictionsLocked(userId);
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
     /**
      * Check and throw if the given before/after packages would be considered a
      * downgrade.
@@ -13775,6 +13798,48 @@ public class PackageManagerService extends IPackageManager.Stub {
                     }
                 }
             }
+        }
+    }
+
+    @Override
+    public boolean isRestrictedAvailable(String packageName) {
+        synchronized (mPackages) {
+            PackageParser.Package p = mPackages.get(packageName);
+            return p != null && !(p.mCoreApp && isSystemApp(p));
+        }
+    }
+
+    @Override
+    public boolean isPackageRestricted(String packageName, int userId) {
+        if (!sUserManager.exists(userId))
+            throw new IllegalArgumentException("Invalid userId " + userId);
+        synchronized (mPackages) {
+            return mSettings.isPackageRestrictedLPr(packageName, userId);
+        }
+    }
+
+    @Override
+    public void setPackageAliveState(String packageName, String procName, boolean alive,
+            int userId) {
+        if (!sUserManager.exists(userId)) return;
+        final int uid = Binder.getCallingUid();
+        final int permission = mContext.checkCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_COMPONENT_ENABLED_STATE);
+        final boolean allowedByPermission = (permission == PackageManager.PERMISSION_GRANTED);
+        enforceCrossUserPermission(uid, userId, true, true, "restrict package");
+        // writer
+        synchronized (mPackages) {
+            mSettings.setPackageAliveState(packageName, procName, alive, allowedByPermission, uid,
+                    userId);
+        }
+    }
+
+    @Override
+    public boolean isPackageAlive(String packageName, int userId) {
+        if (!sUserManager.exists(userId))
+            throw new IllegalArgumentException("Invalid userId " + userId);
+        synchronized (mPackages) {
+            return mSettings.isPackageAlive(packageName, userId);
         }
     }
 }

@@ -3958,6 +3958,15 @@ public abstract class PackageManager {
     public abstract boolean isPackageAvailable(String packageName);
 
     /** {@hide} */
+    public abstract boolean setPackageRestrictState(String packageName, boolean restrict);
+
+    /** {@hide} */
+    public abstract boolean isRestrictedAvailable(String packageName);
+
+    /** {@hide} */
+    public abstract boolean isPackageRestricted(String packageName);
+
+    /** {@hide} */
     public static String installStatusToString(int status, String msg) {
         final String str = installStatusToString(status);
         if (msg != null) {

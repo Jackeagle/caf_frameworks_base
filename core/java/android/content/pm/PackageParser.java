@@ -805,6 +805,7 @@ public class PackageParser {
                 }
             }
 
+            pkg.mCoreApp = lite.coreApp;
             pkg.codePath = packageDir.getAbsolutePath();
             return pkg;
         } finally {
@@ -824,8 +825,8 @@ public class PackageParser {
      */
     @Deprecated
     public Package parseMonolithicPackage(File apkFile, int flags) throws PackageParserException {
+        final PackageLite lite = parseMonolithicPackageLite(apkFile, flags);
         if (mOnlyCoreApps) {
-            final PackageLite lite = parseMonolithicPackageLite(apkFile, flags);
             if (!lite.coreApp) {
                 throw new PackageParserException(INSTALL_PARSE_FAILED_MANIFEST_MALFORMED,
                         "Not a coreApp: " + apkFile);
@@ -836,6 +837,7 @@ public class PackageParser {
         try {
             final Package pkg = parseBaseApk(apkFile, assets, flags);
             pkg.codePath = apkFile.getAbsolutePath();
+            pkg.mCoreApp = lite.coreApp;
             return pkg;
         } finally {
             IoUtils.closeQuietly(assets);
@@ -4281,6 +4283,8 @@ public class PackageParser {
 
         // Whether an operation is currently pending on this package
         public boolean mOperationPending;
+
+        public boolean mCoreApp;
 
         // Applications hardware preferences
         public ArrayList<ConfigurationInfo> configPreferences = null;
