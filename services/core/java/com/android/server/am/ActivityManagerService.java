@@ -2937,6 +2937,11 @@ public final class ActivityManagerService extends ActivityManagerNative
         checkTime(startTime, "startProcess: done updating cpu stats");
 
         try {
+            AppGlobals.getPackageManager().setPackageAliveState(app.info.packageName,
+                    app.processName, true, UserHandle.getUserId(app.uid));
+        } catch (RemoteException e) {
+        }
+        try {
             int uid = app.uid;
 
             int[] gids = null;
@@ -5857,13 +5862,27 @@ public final class ActivityManagerService extends ActivityManagerNative
             handleAppDiedLocked(app, willRestart, allowRestart);
             if (willRestart) {
                 removeLruProcessLocked(app);
-                addAppLocked(app.info, false, null /* ABI override */);
+                if (validNewProc(app.info.packageName, UserHandle.getUserId(app.info.uid))) {
+                    addAppLocked(app.info, false, null /* ABI override */);
+                }
             }
         } else {
             mRemovedProcesses.add(app);
         }
 
         return needRestart;
+    }
+
+    public final boolean validNewProc(String packageName, int userId) {
+        try {
+            boolean restrict = AppGlobals.getPackageManager().isPackageRestricted(packageName,
+                    userId);
+            boolean alive = AppGlobals.getPackageManager().isPackageAlive(packageName, userId);
+            return alive || !restrict;
+        } catch (RemoteException e) {
+            Slog.d(TAG, "failed to get restrict state of " + packageName, e);
+        }
+        return true;
     }
 
     private final void processStartTimedOutLocked(ProcessRecord app) {
@@ -9453,6 +9472,12 @@ public final class ActivityManagerService extends ActivityManagerNative
                 // If the provider is not already being launched, then get it
                 // started.
                 if (i >= N) {
+                    if (!validNewProc(cpr.appInfo.packageName, userId)) {
+                        Slog.w(TAG, "Unable to launch app "
+                                + cpi.applicationInfo.packageName + "/"
+                                + cpi.applicationInfo.uid + " for provider, it's restricted");
+                        return null;
+                    }
                     final long origId = Binder.clearCallingIdentity();
 
                     try {
@@ -11391,8 +11416,9 @@ public final class ActivityManagerService extends ActivityManagerNative
                         for (i=0; i<N; i++) {
                             ApplicationInfo info
                                 = (ApplicationInfo)apps.get(i);
-                            if (info != null &&
-                                    !info.packageName.equals("android")) {
+                            if (info != null && validNewProc(info.packageName,
+                                    UserHandle.getUserId(info.uid)) && !info.packageName.equals(
+                                            "android")) {
                                 addAppLocked(info, false, null /* ABI override */);
                             }
                         }
@@ -15069,6 +15095,11 @@ public final class ActivityManagerService extends ActivityManagerNative
             }
         }
         mHandler.obtainMessage(DISPATCH_PROCESS_DIED, app.pid, app.info.uid, null).sendToTarget();
+        try {
+            AppGlobals.getPackageManager().setPackageAliveState(app.info.packageName,
+                    app.processName, false, UserHandle.getUserId(app.info.uid));
+        } catch (RemoteException e) {
+        }
 
         // If the caller is restarting this app, then leave it in its
         // current lists and let the caller take care of it.
@@ -15473,6 +15504,10 @@ public final class ActivityManagerService extends ActivityManagerNative
         enforceCallingPermission("android.permission.CONFIRM_FULL_BACKUP", "bindBackupAgent");
 
         synchronized(this) {
+            if (!validNewProc(app.packageName, UserHandle.getUserId(app.uid))) {
+                Slog.e(TAG, "Unable to start backup agent proc, restricted! " + app.packageName);
+                return false;
+            }
             // !!! TODO: currently no check here that we're already bound
             BatteryStatsImpl.Uid.Pkg.Serv ss = null;
             BatteryStatsImpl stats = mBatteryStatsService.getActiveStatistics();
@@ -18707,7 +18742,8 @@ public final class ActivityManagerService extends ActivityManagerNative
                     cleanUpApplicationRecordLocked(app, false, true, -1);
                     mRemovedProcesses.remove(i);
 
-                    if (app.persistent) {
+                    if (app.persistent && validNewProc(app.info.packageName,
+                            UserHandle.getUserId(app.info.uid))) {
                         addAppLocked(app.info, false, null /* ABI override */);
                     }
                 }

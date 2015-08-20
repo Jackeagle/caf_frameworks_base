@@ -26,6 +26,7 @@ import android.util.ArraySet;
  * @hide
  */
 public class PackageUserState {
+    public boolean restricted;
     public boolean stopped;
     public boolean notLaunched;
     public boolean installed;
@@ -39,6 +40,7 @@ public class PackageUserState {
     public ArraySet<String> enabledComponents;
     public ArraySet<String> protectedComponents;
     public ArraySet<String> visibleComponents;
+    public ArraySet<String> aliveProcesses;
 
     public PackageUserState() {
         installed = true;
@@ -47,6 +49,7 @@ public class PackageUserState {
     }
 
     public PackageUserState(PackageUserState o) {
+        restricted = o.restricted;
         installed = o.installed;
         stopped = o.stopped;
         notLaunched = o.notLaunched;
@@ -62,5 +65,7 @@ public class PackageUserState {
                 ? new ArraySet<String>(o.protectedComponents) : null;
         visibleComponents = o.visibleComponents != null
                 ? new ArraySet<String>(o.visibleComponents) : null;
+        aliveProcesses = o.aliveProcesses != null
+                ? new ArraySet<String>(o.aliveProcesses) : null;
     }
 }

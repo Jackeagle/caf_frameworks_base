@@ -853,6 +853,18 @@ public final class BroadcastQueue {
                 }
             }
 
+            if (!skip) {
+                if (!mService.validNewProc(info.activityInfo.packageName,
+                        UserHandle.getUserId(info.activityInfo.applicationInfo.uid))) {
+                    if (DEBUG_BROADCAST){
+                        Slog.v(TAG, "Skipping delivery to " + info.activityInfo.packageName
+                                + " / " + info.activityInfo.applicationInfo.uid
+                                + " : package is restricted");
+                    }
+                    skip = true;
+                }
+            }
+
             if (skip) {
                 if (DEBUG_BROADCAST)  Slog.v(TAG,
                         "Skipping delivery of ordered ["

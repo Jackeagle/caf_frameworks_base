@@ -289,6 +289,35 @@ class PackageSettingBase extends GrantedPermissions {
         return res;
     }
 
+    boolean isAlive(String procName, int userId) {
+        return readUserState(userId).aliveProcesses != null &&
+                readUserState(userId).aliveProcesses.contains(procName);
+    }
+
+    boolean isAlive(int userId) {
+        return readUserState(userId).aliveProcesses != null &&
+                !readUserState(userId).aliveProcesses.isEmpty();
+    }
+
+    void setAlive(String procName, boolean alive, int userId) {
+        if (readUserState(userId).aliveProcesses == null){
+            modifyUserState(userId).aliveProcesses = new ArraySet<String>();
+        }
+        if (alive) {
+            modifyUserState(userId).aliveProcesses.add(procName);
+        } else {
+            modifyUserState(userId).aliveProcesses.remove(procName);
+        }
+    }
+
+    boolean getRestrict(int userId) {
+        return readUserState(userId).restricted;
+    }
+
+    void setRestrict(boolean restrict, int userId) {
+        modifyUserState(userId).restricted = restrict;
+    }
+
     boolean getStopped(int userId) {
         return readUserState(userId).stopped;
     }
@@ -322,7 +351,7 @@ class PackageSettingBase extends GrantedPermissions {
     }
 
     void setUserState(int userId, int enabled, boolean installed, boolean stopped,
-            boolean notLaunched, boolean hidden,
+            boolean restricted, boolean notLaunched, boolean hidden,
             String lastDisableAppCaller, ArraySet<String> enabledComponents,
             ArraySet<String> disabledComponents, boolean blockUninstall,
             ArraySet<String> protectedComponents, ArraySet<String> visibleComponents) {
@@ -330,6 +359,7 @@ class PackageSettingBase extends GrantedPermissions {
         state.enabled = enabled;
         state.installed = installed;
         state.stopped = stopped;
+        state.restricted = restricted;
         state.notLaunched = notLaunched;
         state.hidden = hidden;
         state.lastDisableAppCaller = lastDisableAppCaller;

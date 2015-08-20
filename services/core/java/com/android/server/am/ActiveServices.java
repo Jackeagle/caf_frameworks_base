@@ -1414,6 +1414,16 @@ public final class ActiveServices {
             return msg;
         }
 
+        if (!mAm.validNewProc(r.packageName, r.userId)) {
+            String msg = "Unable to launch app "
+                    + r.appInfo.packageName + "/"
+                    + r.appInfo.uid + " for service "
+                    + r.intent.getIntent() + ": " + r.packageName + " is restricted";
+            Slog.w(TAG, msg);
+            bringDownServiceLocked(r);
+            return msg;
+        }
+
         // Service is now being launched, its package can't be stopped.
         try {
             AppGlobals.getPackageManager().setPackageStoppedState(

@@ -132,6 +132,7 @@ final class Settings {
     }
 
     private static final boolean DEBUG_STOPPED = false;
+    private static final boolean DEBUG_RESTRICT = false;
     private static final boolean DEBUG_MU = false;
 
     private static final String TAG_READ_EXTERNAL_STORAGE = "read-external-storage";
@@ -157,6 +158,7 @@ final class Settings {
     private static final String ATTR_ENABLED = "enabled";
     private static final String ATTR_ENABLED_CALLER = "enabledCaller";
     private static final String ATTR_STOPPED = "stopped";
+    private static final String ATTR_RESTRICTED = "restricted";
     // Legacy, here for reading older versions of the package-restrictions.
     private static final String ATTR_BLOCKED = "blocked";
     // New name for the above attribute.
@@ -256,6 +258,8 @@ final class Settings {
      */
     private final ArrayList<PendingPackage> mPendingPackages = new ArrayList<PendingPackage>();
 
+    final ArrayList<String> mRestrictPackages = new ArrayList<String>();
+
     private final File mSystemDir;
 
     public final KeySetManagerService mKeySetManagerService = new KeySetManagerService(mPackages);
@@ -279,6 +283,104 @@ final class Settings {
         // Deprecated: Needed for migration
         mStoppedPackagesFilename = new File(mSystemDir, "packages-stopped.xml");
         mBackupStoppedPackagesFilename = new File(mSystemDir, "packages-stopped-backup.xml");
+        initializeRestrictionConf();
+    }
+
+    private void initializeRestrictionConf() {
+        mRestrictPackages.clear();
+        File restrictionConfFile = getRestrictionsConfigFile();
+        if (!restrictionConfFile.exists()) {
+            Slog.d(PackageManagerService.TAG, "no restriction config found!");
+            return;
+        }
+        FileInputStream str = null;
+        try {
+            str = new FileInputStream(restrictionConfFile);
+            XmlPullParser parser = Xml.newPullParser();
+            parser.setInput(str, null);
+
+            int type;
+            while ((type = parser.next()) != XmlPullParser.START_TAG
+                    && type != XmlPullParser.END_DOCUMENT) {
+                ;
+            }
+
+            if (type != XmlPullParser.START_TAG) {
+                mReadMessages.append("No start tag found in "+ restrictionConfFile.getPath() +
+                        " file\n");
+                PackageManagerService.reportSettingsProblem(Log.WARN,
+                        "No start tag found in " + restrictionConfFile.getPath());
+                Log.wtf(PackageManagerService.TAG,
+                        "No start tag found in " + restrictionConfFile.getPath());
+                return;
+            }
+
+            int outerDepth = parser.getDepth();
+            while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
+                    && (type != XmlPullParser.END_TAG || parser.getDepth() > outerDepth)) {
+                if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
+                    continue;
+                }
+
+                String tagName = parser.getName();
+                if (tagName.equals(TAG_PACKAGE)) {
+                    readRestrictionConfgLPw(parser);
+                }
+            }
+            if (DEBUG_RESTRICT) {
+                Slog.i(TAG, "restriction config: " + mRestrictPackages);
+            }
+        } catch (XmlPullParserException e) {
+            mReadMessages.append("Error reading: " + e.toString());
+            PackageManagerService.reportSettingsProblem(Log.ERROR,
+                    "Error reading settings: " + e);
+            Log.wtf(PackageManagerService.TAG, "Error reading " +
+                    restrictionConfFile.getPath(), e);
+        } catch (java.io.IOException e) {
+            mReadMessages.append("Error reading: " + e.toString());
+            PackageManagerService.reportSettingsProblem(Log.ERROR,
+                    "Error reading settings: " + e);
+            Log.wtf(PackageManagerService.TAG, "Error reading" +
+                    restrictionConfFile.getPath(), e);
+        } finally {
+            if (str != null) {
+                try{
+                    str.close();
+                } catch (Exception e) {
+                }
+            }
+        }
+    }
+
+    private void readRestrictionConfgLPw(XmlPullParser parser)
+            throws XmlPullParserException, IOException {
+        String packageName = parser.getAttributeValue(null, ATTR_NAME);
+        if (packageName == null) {
+            Slog.w(PackageManagerService.TAG, "No package known for restriction config package: "
+                    + packageName);
+        } else {
+            mRestrictPackages.add(packageName);
+        }
+    }
+
+    void initRestrictions() {
+        for (String pkgName : mRestrictPackages) {
+            if (!mPackages.containsKey(pkgName)) {
+                continue;
+            }
+            List<UserInfo> users = getAllUsers();
+            if (users != null) {
+                if (DEBUG_RESTRICT) {
+                    RuntimeException e = new RuntimeException("here");
+                    e.fillInStackTrace();
+                    Slog.i(TAG, "config restriction: " + pkgName, e);
+                }
+                for (UserInfo user : users) {
+                    mPackages.get(pkgName).setRestrict(true, user.id);
+                    writePackageRestrictionsLPr(user.id);
+                }
+            }
+        }
     }
 
     PackageSetting getPackageLPw(PackageParser.Package pkg, PackageSetting origPackage,
@@ -569,6 +671,7 @@ final class Settings {
                             p.setUserState(user.id, COMPONENT_ENABLED_STATE_DEFAULT,
                                     installed,
                                     true, // stopped,
+                                    mRestrictPackages.contains(name), // restricted,
                                     true, // notLaunched
                                     false, // hidden
                                     null, null, null,
@@ -900,6 +1003,10 @@ final class Settings {
         return cpir;
     }
 
+    private File getRestrictionsConfigFile() {
+        return new File(Environment.getRootDirectory(), "etc/restrictions-conf.xml");
+    }
+
     private File getUserPackagesStateFile(int userId) {
         return new File(Environment.getUserSystemDirectory(userId), "package-restrictions.xml");
     }
@@ -1078,6 +1185,7 @@ final class Settings {
                         pkg.setUserState(userId, COMPONENT_ENABLED_STATE_DEFAULT,
                                 true,   // installed
                                 false,  // stopped
+                                mRestrictPackages.contains(pkg.name),  // restricted
                                 false,  // notLaunched
                                 false,  // hidden
                                 null, null, null,
@@ -1137,6 +1245,9 @@ final class Settings {
                     final String stoppedStr = parser.getAttributeValue(null, ATTR_STOPPED);
                     final boolean stopped = stoppedStr == null
                             ? false : Boolean.parseBoolean(stoppedStr);
+                    final String restrictedStr = parser.getAttributeValue(null, ATTR_RESTRICTED);
+                    final boolean restricted = restrictedStr == null
+                            ? false : Boolean.parseBoolean(restrictedStr);
                     // For backwards compatibility with the previous name of "blocked", which
                     // now means hidden, read the old attribute as well.
                     final String blockedStr = parser.getAttributeValue(null, ATTR_BLOCKED);
@@ -1178,9 +1289,9 @@ final class Settings {
                         }
                     }
 
-                    ps.setUserState(userId, enabled, installed, stopped, notLaunched, hidden,
-                            enabledCaller, enabledComponents, disabledComponents, blockUninstall,
-                            protectedComponents, visibleComponents);
+                    ps.setUserState(userId, enabled, installed, stopped, restricted, notLaunched,
+                            hidden, enabledCaller, enabledComponents, disabledComponents,
+                            blockUninstall, protectedComponents, visibleComponents);
                 } else if (tagName.equals("preferred-activities")) {
                     readPreferredActivitiesLPw(parser, userId);
                 } else if (tagName.equals(TAG_PERSISTENT_PREFERRED_ACTIVITIES)) {
@@ -1320,7 +1431,7 @@ final class Settings {
 
             for (final PackageSetting pkg : mPackages.values()) {
                 PackageUserState ustate = pkg.readUserState(userId);
-                if (ustate.stopped || ustate.notLaunched || !ustate.installed
+                if (ustate.stopped || ustate.restricted || ustate.notLaunched || !ustate.installed
                         || ustate.enabled != COMPONENT_ENABLED_STATE_DEFAULT
                         || ustate.hidden
                         || (ustate.enabledComponents != null
@@ -1341,6 +1452,9 @@ final class Settings {
                     }
                     if (ustate.stopped) {
                         serializer.attribute(null, ATTR_STOPPED, "true");
+                    }
+                    if (ustate.restricted) {
+                        serializer.attribute(null, ATTR_RESTRICTED, "true");
                     }
                     if (ustate.notLaunched) {
                         serializer.attribute(null, ATTR_NOT_LAUNCHED, "true");
@@ -3719,5 +3833,81 @@ final class Settings {
             }
             pw.print("]");
         }
+    }
+
+    boolean setPackageRestrictStateLPw(String packageName, boolean restrict,
+            boolean allowedByPermission, int uid, int userId) {
+        int appId = UserHandle.getAppId(uid);
+        final PackageSetting pkgSetting = mPackages.get(packageName);
+        if (pkgSetting == null) {
+            throw new IllegalArgumentException("Unknown package: " + packageName);
+        }
+        if (!allowedByPermission && (appId != pkgSetting.appId)) {
+            throw new SecurityException(
+                    "Permission Denial: attempt to change restrict state from pid="
+                    + Binder.getCallingPid()
+                    + ", uid=" + uid + ", package uid=" + pkgSetting.appId);
+        }
+        if (pkgSetting.getRestrict(userId) != restrict) {
+            pkgSetting.setRestrict(restrict, userId);
+            if (DEBUG_RESTRICT) {
+                RuntimeException e = new RuntimeException("here");
+                e.fillInStackTrace();
+                Slog.i(TAG, "restricting package " + packageName + ": " + restrict, e);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    boolean isPackageRestrictedLPr(String packageName, int userId) {
+        final PackageSetting pkgSetting = mPackages.get(packageName);
+        if (pkgSetting == null) {
+            return false;
+        }
+        return pkgSetting.getRestrict(userId);
+    }
+
+    boolean setPackageAliveState(String packageName, String procName, boolean alive,
+            boolean allowedByPermission, int uid, int userId) {
+        int appId = UserHandle.getAppId(uid);
+        final PackageSetting pkgSetting = mPackages.get(packageName);
+        if (pkgSetting == null) {
+            throw new IllegalArgumentException("Unknown package: " + packageName);
+        }
+        if (!allowedByPermission && (appId != pkgSetting.appId)) {
+            throw new SecurityException(
+                    "Permission Denial: attempt to change alive state from pid="
+                    + Binder.getCallingPid()
+                    + ", uid=" + uid + ", package uid=" + pkgSetting.appId);
+        }
+        if (pkgSetting.isAlive(procName, userId) != alive) {
+            pkgSetting.setAlive(procName, alive, userId);
+            if (DEBUG_RESTRICT) {
+                RuntimeException e = new RuntimeException("here");
+                e.fillInStackTrace();
+                String processes = String.valueOf(pkgSetting.readUserState(userId).aliveProcesses);
+                Slog.i(TAG, packageName + " alive state changed: " + processes, e);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    boolean isPackageAlive(String packageName, int userId) {
+        final PackageSetting pkgSetting = mPackages.get(packageName);
+        if (DEBUG_RESTRICT) {
+            RuntimeException e = new RuntimeException("here");
+            e.fillInStackTrace();
+            String processes = null;
+            if (pkgSetting != null) {
+                processes = String.valueOf(pkgSetting.readUserState(userId).aliveProcesses);
+            }
+            Slog.i(TAG, packageName + " alive? " + processes, e);
+        }
+        if (pkgSetting == null) {
+            return false;
+        }
+        return pkgSetting.isAlive(userId);
     }
 }
