@@ -76,6 +76,10 @@
          is disableable for products for which it is irrelevant. -->
     <bool name="config_useVolumeKeySounds">true</bool>
 
+    <!-- Flag specifying whether CS retry toast should be displayed when VoLTE call is
+         retried over CS due to SIP Error -->
+    <bool name="config_carrier_display_csretry_toast">false</bool>
+
     <!-- Array of integer pairs controlling the rate at which the master volume changes
          in response to volume up and down key events.
          The first integer of each pair is compared against the current master volume

@@ -25,4 +25,8 @@
     -->
     <integer name="config_mobile_mtu">1440</integer>
 
+    <!-- Flag specifying whether CS retry toast should be displayed when VoLTE call is
+         retried over CS due to SIP Error -->
+    <bool name="config_carrier_display_csretry_toast">true</bool>
+
 </resources>
