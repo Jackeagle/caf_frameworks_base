@@ -30,4 +30,8 @@
          If false: hard disabled. If true: then depends on user preference. -->
     <bool name="config_carrier_cs_retry_available">true</bool>
 
+    <!-- Flag specifying whether CS retry toast should be displayed when VoLTE call is
+         retried over CS due to SIP Error -->
+    <bool name="config_carrier_display_csretry_toast">true</bool>
+
 </resources>
