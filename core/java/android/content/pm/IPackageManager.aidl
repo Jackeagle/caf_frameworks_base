@@ -460,4 +460,10 @@ interface IPackageManager {
     /** Protected Apps */
     void setComponentProtectedSetting(in ComponentName componentName,
     in boolean newState, int userId);
+
+    boolean setPackageRestrictState(String packageName, boolean restrict, int userId);
+    boolean isPackageRestricted(String packageName, int userId);
+    void setPackageAliveState(String packageName, String procName, boolean alive, int userId);
+    boolean isRestrictedAvailable(String packageName);
+    boolean isPackageAlive(String packageName, int userId);
 }
