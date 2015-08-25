@@ -64,6 +64,24 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String ACTION_CONNECTION_STATE_CHANGED =
         "android.bluetooth.acrcp-controller.profile.action.CONNECTION_STATE_CHANGED";
 
+    /* KeyCodes for Pass Through Commands */
+    public static final int AVRC_ID_PLAY = 0x44;
+    public static final int AVRC_ID_PAUSE = 0x46;
+    public static final int AVRC_ID_VOL_UP = 0x41;
+    public static final int AVRC_ID_VOL_DOWN = 0x42;
+    public static final int AVRC_ID_STOP = 0x45;
+    public static final int AVRC_ID_FF = 0x49;
+    public static final int AVRC_ID_REWIND = 0x48;
+    public static final int AVRC_ID_FORWARD = 0x4B;
+    public static final int AVRC_ID_BACKWARD = 0x4C;
+    /* Key State Variables */
+    public static final int KEY_STATE_PRESSED = 0;
+    public static final int KEY_STATE_RELEASED = 1;
+    /* Group Navigation Key Codes */
+    public static final int AVRC_ID_NEXT_GRP = 0x00;
+    public static final int AVRC_ID_PREV_GRP = 0x01;
+
+
     private Context mContext;
     private ServiceListener mServiceListener;
     private IBluetoothAvrcpController mService;
@@ -208,6 +226,21 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
         }
         if (mService == null) Log.w(TAG, "Proxy not attached to service");
         return BluetoothProfile.STATE_DISCONNECTED;
+    }
+
+    public void sendGroupNavigationCmd(BluetoothDevice device, int keyCode, int keyState) {
+        if (DBG) Log.d(TAG, "sendGroupNavigationCmd dev = " + device + " key " + keyCode +
+                                                                   " State = " + keyState);
+        if (mService != null && isEnabled()) {
+            try {
+                mService.sendGroupNavigationCmd(device, keyCode, keyState);
+                return;
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in sendGroupNavigationCmd()", e);
+                return;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
     }
 
     public void sendPassThroughCmd(BluetoothDevice device, int keyCode, int keyState) {
