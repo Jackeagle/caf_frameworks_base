@@ -24,6 +24,7 @@ import android.content.ContentUris;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.Resources.NotFoundException;
+import android.drm.OmaDrmHelper;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Binder;
@@ -34,6 +35,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
+import java.io.File;
 import java.io.IOException;
 
 import com.android.internal.R;
@@ -240,6 +242,21 @@ public class Ringtone {
         // try opening uri locally before delegating to remote player
         mLocalPlayer = new MediaPlayer();
         try {
+            // check whether DRM MIDI Ringtone set
+            if (OmaDrmHelper.isOmaDrmEnabled()) {
+                String path = OmaDrmHelper.getFilePath(mContext, mUri);
+                if (OmaDrmHelper.isDrmFile(path)) {
+                    // Special treatment to play midi drm ringtone
+                    String mime = OmaDrmHelper.getOriginalMimeType(mContext, path);
+                    if (OmaDrmHelper.isDrmMidiFile(mContext, path, mime)) {
+                        path = OmaDrmHelper.getDrmMidiFilePath(mContext, path, mUri,
+                                mime, mContext.getFilesDir().getAbsolutePath(),
+                                OmaDrmHelper.MIDI_FILE_CACHE_RINGTONE, true);
+                        mUri = Uri.fromFile(new File(path));
+                    }
+                }
+            }
+
             mLocalPlayer.setDataSource(mContext, mUri);
             mLocalPlayer.setAudioAttributes(mAudioAttributes);
             mLocalPlayer.prepare();

@@ -554,7 +554,7 @@ public class DirectoryFragment extends Fragment {
 
     private void onShareDocuments(List<DocumentInfo> docs) {
         Intent intent;
-        boolean allfowd = true;
+        boolean allfowd = false;
         if (docs.size() == 1) {
             final DocumentInfo doc = docs.get(0);
 
@@ -563,8 +563,8 @@ public class DirectoryFragment extends Fragment {
             intent.addCategory(Intent.CATEGORY_DEFAULT);
             intent.setType(doc.mimeType);
             intent.putExtra(Intent.EXTRA_STREAM, doc.derivedUri);
-            if (OmaDrmHelper.isDrmFile(doc.displayName)) {
-                allfowd = false;
+            if (OmaDrmHelper.isShareableDrmFile(doc.displayName)) {
+                allfowd = true;
             }
         } else if (docs.size() > 1) {
             intent = new Intent(Intent.ACTION_SEND_MULTIPLE);
@@ -576,8 +576,8 @@ public class DirectoryFragment extends Fragment {
             for (DocumentInfo doc : docs) {
                 mimeTypes.add(doc.mimeType);
                 uris.add(doc.derivedUri);
-                if (OmaDrmHelper.isDrmFile(doc.displayName)) {
-                    allfowd = false;
+                if (OmaDrmHelper.isShareableDrmFile(doc.displayName)) {
+                    allfowd = true;
                 }
             }
 
