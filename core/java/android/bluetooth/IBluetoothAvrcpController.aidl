@@ -30,6 +30,7 @@ interface IBluetoothAvrcpController {
     List<BluetoothDevice> getDevicesMatchingConnectionStates(in int[] states);
     int getConnectionState(in BluetoothDevice device);
     void sendPassThroughCmd(in BluetoothDevice device, int keyCode, int keyState);
+    void sendGroupNavigationCmd(in BluetoothDevice device, int keyCode, int keyState);
     void getMetaData(in int[] attributeIds);
     void getPlayStatus(in int[] playStatusIds);
     void getPlayerApplicationSetting();
