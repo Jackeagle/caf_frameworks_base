@@ -2940,6 +2940,8 @@ public final class ActivityManagerService extends ActivityManagerNative
             AppGlobals.getPackageManager().setPackageAliveState(app.info.packageName,
                     app.processName, true, UserHandle.getUserId(app.uid));
         } catch (RemoteException e) {
+        } catch (IllegalArgumentException e) {
+            Slog.w(TAG, "Unable to set alive state", e);
         }
         try {
             int uid = app.uid;
@@ -15099,6 +15101,8 @@ public final class ActivityManagerService extends ActivityManagerNative
             AppGlobals.getPackageManager().setPackageAliveState(app.info.packageName,
                     app.processName, false, UserHandle.getUserId(app.info.uid));
         } catch (RemoteException e) {
+        } catch (IllegalArgumentException e) {
+            Slog.w(TAG, "Unable to set alive state", e);
         }
 
         // If the caller is restarting this app, then leave it in its
