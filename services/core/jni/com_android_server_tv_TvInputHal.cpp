@@ -110,7 +110,7 @@ public:
 
     virtual status_t readyToRun();
 
-    void setSurface(const sp<Surface>& surface);
+    int setSurface(const sp<Surface>& surface);
     void onCaptured(uint32_t seq, bool succeeded);
     void shutdown();
 
@@ -142,7 +142,7 @@ private:
 
     virtual bool threadLoop();
 
-    void setSurfaceLocked(const sp<Surface>& surface);
+    int setSurfaceLocked(const sp<Surface>& surface);
     int findBufferIndex(uint32_t seq);
     int findBufferIndex(buffer_handle_t buffer);
 };
@@ -207,21 +207,21 @@ status_t BufferProducerThread::readyToRun() {
     return NO_ERROR;
 }
 
-void BufferProducerThread::setSurface(const sp<Surface>& surface) {
+int BufferProducerThread::setSurface(const sp<Surface>& surface) {
     Mutex::Autolock autoLock(&mLock);
-    setSurfaceLocked(surface);
+    return setSurfaceLocked(surface);
 }
 
-void BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
+int BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
     if (surface == mSurface) {
-        return;
+        return NO_ERROR;
     }
 
     if (NULL != surface.get()) {
         mBuffers = new struct BufferEntry[mStream.buffer_producer.buffer_count];
         if (!mBuffers){
             ALOGE("Buffers allocation failed");
-            return;
+            return NO_MEMORY;
         }
         else
         {
@@ -252,6 +252,7 @@ void BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
 
     mSurface = surface;
     mCondition.broadcast();
+    return NO_ERROR;
 }
 
 void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
@@ -608,6 +609,10 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
             connection.mThread = new BufferProducerThread(mDevice, deviceId, &stream);
             if (connection.mThread == NULL) {
                 ALOGE("No memory for BufferProducerThread");
+                // clean up
+                if (mDevice->close_stream(mDevice, deviceId, streamId) != 0) {
+                    ALOGE("Couldn't remove stream");
+                }
                 return NO_MEMORY;
             }
         }
@@ -616,7 +621,19 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
     if (connection.mStreamType == TV_STREAM_TYPE_INDEPENDENT_VIDEO_SOURCE) {
         connection.mSurface->setSidebandStream(connection.mSourceHandle);
     } else if (connection.mStreamType == TV_STREAM_TYPE_BUFFER_PRODUCER) {
-        connection.mThread->setSurface(surface);
+        if (NO_ERROR != connection.mThread->setSurface(surface))
+        {
+            ALOGE("failed to setSurface");
+            // clean up
+            connection.mThread.clear();
+            if (mDevice->close_stream(mDevice, deviceId, streamId) != 0) {
+                ALOGE("Couldn't remove stream");
+            }
+            if (connection.mSurface != NULL) {
+                connection.mSurface.clear();
+            }
+            return UNKNOWN_ERROR;
+        }
         connection.mThread->run();
     }
     return NO_ERROR;
