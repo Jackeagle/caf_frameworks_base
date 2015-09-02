@@ -63,9 +63,6 @@ public class LocalTransport extends BackupTransport {
     private static final String TRANSPORT_DIR_NAME
             = "com.android.internal.backup.LocalTransport";
 
-    private static final String TRANSPORT_DESTINATION_STRING
-            = "Backing up to debug-only private cache";
-
     private static final String TRANSPORT_DATA_MANAGEMENT_LABEL
             = "";
 
@@ -125,7 +122,7 @@ public class LocalTransport extends BackupTransport {
 
     @Override
     public String currentDestinationString() {
-        return TRANSPORT_DESTINATION_STRING;
+        return mContext.getString(com.android.internal.R.string.transport_destination_string);
     }
 
     public Intent dataManagementIntent() {
