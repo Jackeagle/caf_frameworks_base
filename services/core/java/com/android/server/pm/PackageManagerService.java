@@ -1297,7 +1297,11 @@ public class PackageManagerService extends IPackageManager.Stub {
     private static void getDefaultDisplayMetrics(Context context, DisplayMetrics metrics) {
         DisplayManager displayManager = (DisplayManager) context.getSystemService(
                 Context.DISPLAY_SERVICE);
-        displayManager.getDisplay(Display.DEFAULT_DISPLAY).getMetrics(metrics);
+        Display display = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+        if (display != null)
+                display.getMetrics(metrics);
+        else
+                Slog.w(TAG, "getDisplay(Display.DEFAULT_DISPLAY) returns null!");
     }
 
     public PackageManagerService(Context context, Installer installer,
