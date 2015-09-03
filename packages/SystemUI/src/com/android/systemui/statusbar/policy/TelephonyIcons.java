@@ -480,6 +480,9 @@ class TelephonyIcons {
                     mSelectedDataTypeDesc[sub] = mDataTypeGenerationDescArray[1];
                     mSelectedSignalStreagthIndex[sub] = SIGNAL_STRENGTH_TYPE_4G;
                 } else {
+                    if (type == TelephonyManager.NETWORK_TYPE_LTE_CA) {
+                        type = TelephonyManager.NETWORK_TYPE_LTE;
+                    }
                     mSelectedDataActivityIndex[sub] = DATA_TYPE_LTE;
                     mSelectedDataTypeIcon[sub] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
