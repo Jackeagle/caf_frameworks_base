@@ -505,6 +505,10 @@ public final class NfcAdapter {
             throw new IllegalArgumentException(
                     "context not associated with any application (using a mock context?)");
         }
+        if (context.getResources().getBoolean(
+                com.android.internal.R.bool.config_regional_nfc_menu_disable)) {
+            return null;
+        }
         /* use getSystemService() for consistency */
         NfcManager manager = (NfcManager) context.getSystemService(Context.NFC_SERVICE);
         if (manager == null) {
