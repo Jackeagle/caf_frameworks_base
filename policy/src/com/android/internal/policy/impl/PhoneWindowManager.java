@@ -4723,6 +4723,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (wasOccluded && !isOccluded && !showing) {
                 mKeyguardOccluded = false;
                 mKeyguardDelegate.setOccluded(false);
+            } else if (!wasOccluded && isOccluded && !showing) {
+                mKeyguardOccluded = true;
+                mKeyguardDelegate.setOccluded(true);
             }
             return false;
         }
