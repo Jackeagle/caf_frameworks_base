@@ -42,6 +42,8 @@ import com.android.internal.widget.LockPatternUtils;
 
 import java.util.Locale;
 
+import libcore.icu.LocaleData;
+
 public class KeyguardStatusView extends GridLayout {
     private static final boolean DEBUG = KeyguardConstants.DEBUG;
     private static final String TAG = "KeyguardStatusView";
@@ -225,9 +227,11 @@ public class KeyguardStatusView extends GridLayout {
         static String clockView12;
         static String clockView24;
         static String cacheKey;
+        static final int MAX_LENGTH_OF_AM_PM = 4;
 
         static void update(Context context, boolean hasAlarm) {
             final Locale locale = Locale.getDefault();
+            final LocaleData localeData = LocaleData.get(locale);
             final Resources res = context.getResources();
             final String dateViewSkel = res.getString(hasAlarm
                     ? R.string.abbrev_wday_month_day_no_year_alarm
@@ -252,6 +256,11 @@ public class KeyguardStatusView extends GridLayout {
             clockView12 = DateFormat.getBestDateTimePattern(locale, clockView12Skel);
             boolean showAmPm = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_show_ampm_in_unlock_screen);
+            // Remove AM/PM for 12 hour format if it's narrow to show.
+            if (showAmPm && localeData != null) {
+                showAmPm = localeData.amPm[0].length() <= MAX_LENGTH_OF_AM_PM &&
+                        localeData.amPm[1].length() <= MAX_LENGTH_OF_AM_PM;
+            }
 
             if (showAmPm == false) {
                 // CLDR insists on adding an AM/PM indicator even though it wasn't in the skeleton
