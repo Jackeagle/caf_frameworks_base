@@ -193,6 +193,24 @@ public abstract class Connection implements IConferenceable {
      */
     public static final int CALL_TYPE_MODIFIABLE = 0x00020000;
 
+    /**
+     * Orientation mode Portrait
+     * @hide
+     */
+    public static final int ORIENTATION_MODE_PORTRAIT = 1;
+
+    /**
+     * Orientation mode Landscape
+     * @hide
+     */
+    public static final int ORIENTATION_MODE_LANDSCAPE = 2;
+
+    /**
+     * Orientation mode Dynamic
+     * @hide
+     */
+    public static final int ORIENTATION_MODE_DYNAMIC = 3;
+
     // Flag controlling whether PII is emitted into the logs
     private static final boolean PII_DEBUG = Log.isLoggable(android.util.Log.DEBUG);
 
@@ -699,6 +717,21 @@ public abstract class Connection implements IConferenceable {
                 }
             }
         }
+
+        /**
+         * Invokes callback method defined in In-Call UI.
+         *
+         * @param orientationMode The updated orientation mode.
+         */
+        public void changeOrientationMode(int orientationMode) {
+            if (mVideoCallback != null) {
+                try {
+                    mVideoCallback.changeOrientationMode(orientationMode);
+                } catch (RemoteException ignored) {
+                }
+            }
+        }
+
     }
 
     private final Listener mConnectionDeathListener = new Listener() {
