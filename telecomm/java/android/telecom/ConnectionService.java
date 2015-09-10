@@ -1003,8 +1003,7 @@ public abstract class ConnectionService extends Service {
                     connectionIds,
                     conference.getVideoProvider() == null ?
                             null : conference.getVideoProvider().getInterface(),
-                    conference.getVideoState(),
-                    conference.getConnectTimeMillis()
+                    conference.getVideoState()
                     );
             mAdapter.addConferenceCall(id, parcelableConference);
             mAdapter.setVideoProvider(id, conference.getVideoProvider());
