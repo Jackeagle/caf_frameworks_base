@@ -101,6 +101,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <!-- Default for Settings.Global.MOBILE_DATA -->
     <bool name="def_enable_mobile_data">true</bool>
 
+    <!-- Default for Settings.Global.VSIM_FEATURE -->
+    <bool name="def_enable_vsim_feature">false</bool>
+
     <!--
         Default Enable InputMethods, its value is from inputmethod's package name and main class name
               such as "com.android.inputmethod.pinyin/.PinyinIME" ;This is a string

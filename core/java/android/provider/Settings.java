@@ -3207,6 +3207,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.DEFAULT_DNS_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.PREFERRED_NETWORK_MODE);
             MOVED_TO_GLOBAL.add(Settings.Global.WEBVIEW_DATA_REDUCTION_PROXY_KEY);
+            MOVED_TO_GLOBAL.add(Settings.Global.VSIM_FEATURE);
         }
 
         /** @hide */
@@ -5597,6 +5598,9 @@ public final class Settings {
         * @hide
         */
        public static final String MOBILE_DATA = "mobile_data";
+
+       /** {@hide} */
+       public static final String VSIM_FEATURE = "vsim_feature";
 
        /** {@hide} */
        public static final String NETSTATS_ENABLED = "netstats_enabled";
