@@ -611,12 +611,13 @@ public class OverScroller {
         private Performance mPerf = null;
         private boolean mIsPerfLockAcquired = false;
         private boolean mIsPerfBoostEnabled = false;
-        private int lBoostTimeOut = 0;
         private int lBoostCpuBoost = 0;
         private int lBoostSchedBoost = 0;
         private int lBoostPcDisblBoost = 0;
         private int lBoostKsmBoost = 0;
         private int lBoostPreferIdle = 0;
+        private int fBoostTimeOut = 0;
+        private int flingBoostTimeOut = 0;
 
         static {
             float x_min = 0.0f;
@@ -668,7 +669,7 @@ public class OverScroller {
             if (mIsPerfBoostEnabled) {
             lBoostSchedBoost = context.getResources().getInteger(
                    com.android.internal.R.integer.flingboost_schedboost_param);
-            lBoostTimeOut = context.getResources().getInteger(
+            fBoostTimeOut = context.getResources().getInteger(
                    com.android.internal.R.integer.flingboost_timeout_param);
             lBoostCpuBoost = context.getResources().getInteger(
                    com.android.internal.R.integer.flingboost_cpuboost_param);
@@ -807,12 +808,16 @@ public class OverScroller {
 
                 if (mPerf != null) {
                     mIsPerfLockAcquired = true;
-                    if (0 == lBoostTimeOut) {
-                        lBoostTimeOut = mDuration;
-                    }
-                    mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
-                                          lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
 
+                    if (0 == fBoostTimeOut) {
+                        //config value is not defined
+                        flingBoostTimeOut = mDuration;
+                    } else {
+                        //config value is present
+                        flingBoostTimeOut = fBoostTimeOut;
+                    }
+                    mPerf.perfLockAcquire(flingBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
+                                          lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
                 }
             }
 
