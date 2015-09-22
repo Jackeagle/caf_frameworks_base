@@ -86,11 +86,18 @@ public final class ShutdownThread extends Thread {
     private static boolean mRebootSafeMode;
     private static String mRebootReason;
 
+    private static String cirAni;
+    // Indicate whether set circular shutdown animation during shutdown process
+    private static final boolean SET_CIRANI_PROP = false;
+
     // Provides shutdown assurance in case the system_server is killed
     public static final String SHUTDOWN_ACTION_PROPERTY = "sys.shutdown.requested";
 
     // Indicates whether we are rebooting into safe mode
     public static final String REBOOT_SAFEMODE_PROPERTY = "persist.sys.safemode";
+
+    // Indicates whether circular shutdown animation is able to run
+    public static final String CIRCULAR_ANIMATION_PROPERITY = "sys.start.circularAnimation";
 
     // static instance of this thread
     private static final ShutdownThread sInstance = new ShutdownThread();
@@ -135,6 +142,9 @@ public final class ShutdownThread extends Thread {
     public static void shutdown(final Context context, boolean confirm) {
         mReboot = false;
         mRebootSafeMode = false;
+        if (SET_CIRANI_PROP) {
+            SystemProperties.set(CIRCULAR_ANIMATION_PROPERITY, "1");
+        }
         shutdownInner(context, confirm);
     }
 
@@ -285,7 +295,9 @@ public final class ShutdownThread extends Thread {
         mAudioManager.requestAudioFocus(null,
                 AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 
-        if (!checkAnimationFileExist()) {
+        cirAni = SystemProperties.get(CIRCULAR_ANIMATION_PROPERITY,"0");
+
+        if (!checkAnimationFileExist() && !cirAni.equals("1")) {
             // throw up an indeterminate system dialog to indicate radio is
             // shutting down.
             ProgressDialog pd = new ProgressDialog(context);
@@ -417,7 +429,7 @@ public final class ShutdownThread extends Thread {
 
         //showShutdownAnimation() is called from here to sync
         //music and animation properly
-        if(checkAnimationFileExist()) {
+        if(checkAnimationFileExist() || cirAni.equals("1")) {
             lockDevice();
             showShutdownAnimation();
 
