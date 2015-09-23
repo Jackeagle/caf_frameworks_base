@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
 ** Not a Contribution.
 **
 ** Copyright 2012, The Android Open Source Project
@@ -2342,4 +2342,7 @@
   <java-symbol type="string" name="def_hipri_share_component_class"/>
   <java-symbol type="string" name="card_string" />
 
+  <!-- configuration to show/hide toast for video calls -->
+  <java-symbol type="bool" name="config_display_video_quality_toast" />
+  <java-symbol type="bool" name="config_call_session_event_toast" />
 </resources>
