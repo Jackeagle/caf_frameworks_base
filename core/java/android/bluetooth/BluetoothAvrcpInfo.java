@@ -49,9 +49,10 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
 
     private byte[] supportedPlayerAttributes;// attributes supported
     private byte[] numSupportedPlayerAttribValues; // number of values of each attribute
+    private byte[] currentPlayerAttribValues; // current values of attribute Ids
     private String TAG = "BluetoothAvrcpInfo";
     /*
-     * This would a list of values of all AttributeIds
+     * This would a list of possible values of all AttributeIds
      */
     private byte[] supportedPlayerAtribValues; // actual values lies here.
 
@@ -59,17 +60,21 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
     public BluetoothAvrcpInfo() {
         supportedPlayerAttributes = null;
         numSupportedPlayerAttribValues = null;
+        currentPlayerAttribValues =  null;
         supportedPlayerAtribValues = null;
     }
-    public BluetoothAvrcpInfo(byte[] attribIds, byte[] numValueSupported, byte[] valuesSupported) {
+    public BluetoothAvrcpInfo(byte[] attribIds, byte[] numValueSupported, byte[] valuesSupported,
+                              byte[] currentVals) {
         int numAttributes = attribIds.length;
         int zz = 0;
         supportedPlayerAttributes = new byte[numAttributes];
         numSupportedPlayerAttribValues = new byte[numAttributes];
+        currentPlayerAttribValues = new byte[numAttributes];
         supportedPlayerAtribValues = new byte[valuesSupported.length];
         for (zz = 0; zz < numAttributes; zz++) {
             supportedPlayerAttributes[zz] = attribIds[zz];
             numSupportedPlayerAttribValues[zz] = numValueSupported[zz];
+            currentPlayerAttribValues[zz] = currentVals[zz];
         }
         for (zz = 0; zz < supportedPlayerAtribValues.length; zz++)
             supportedPlayerAtribValues[zz] = valuesSupported[zz];
@@ -80,6 +85,7 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
     public BluetoothAvrcpInfo(Parcel source){
         ArrayList<Byte> attribs =  new ArrayList<Byte>();
         ArrayList<Byte> numAttribVal =  new ArrayList<Byte>();
+        ArrayList<Byte> currAttribVal =  new ArrayList<Byte>();
         ArrayList<Byte> attribVals =  new ArrayList<Byte>();
         Byte numAttributes = source.readByte();
         /*
@@ -88,6 +94,7 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
         for(int xx = 0; xx < numAttributes ; xx++) {
             attribs.add(source.readByte());
             numAttribVal.add(source.readByte());
+            currAttribVal.add(source.readByte());
             for (int zz = 0; zz < numAttribVal.get(xx); zz++) {
                 attribVals.add(source.readByte());
             }
@@ -102,8 +109,10 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
         }
 
         numSupportedPlayerAttribValues =  new byte[numAttribVal.size()];
+        currentPlayerAttribValues = new byte[numAttribVal.size()];
         for (int zz = 0; zz< numAttribVal.size(); zz++) {
             numSupportedPlayerAttribValues[zz] = numAttribVal.get(zz);
+            currentPlayerAttribValues[zz] = currAttribVal.get(zz);
         }
 
         supportedPlayerAtribValues =  new byte[attribVals.size()];
@@ -117,7 +126,7 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
     }
 
     /* While flatenning the structure we would use the follwing way
-     * NumAttributes,ID, numValues, Values
+     * NumAttributes,(ID, numValues, currentVals, Values)<n>
      */
     public void writeToParcel(Parcel out, int flags) {
         byte numSuppAttributes = (byte)supportedPlayerAttributes.length;
@@ -125,6 +134,7 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
         for (int xx = 0; xx < numSuppAttributes; xx++) {
             out.writeByte(supportedPlayerAttributes[xx]);
             out.writeByte(numSupportedPlayerAttribValues[xx]);
+            out.writeByte(currentPlayerAttribValues[xx]);
             for (int zz = 0; zz < numSupportedPlayerAttribValues[xx]; zz++) {
                 out.writeByte(supportedPlayerAtribValues[zz]);
             }
@@ -144,6 +154,14 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
         return 0;
     }
 
+    public byte getCurrentPlayerAttributeVal( byte playerAttributeId) {
+        for (int zz = 0; zz < supportedPlayerAttributes.length; zz++) {
+            if (playerAttributeId == supportedPlayerAttributes[zz]) {
+                return currentPlayerAttribValues[zz];
+            }
+        }
+        return 0;
+    }
     public byte[] getSupportedPlayerAttributeVlaues (byte playerAttributeId) {
         int index = 0;
         int zz = 0;
@@ -165,15 +183,18 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
         else
             return new byte[0];
     }
-    public void putPlayerSettingAttributes(byte[] attribIds, byte[] numValueSupported, byte[] valuesSupported) {
+    public void putPlayerSettingAttributes(byte[] attribIds, byte[] numValueSupported,
+            byte[] valuesSupported, byte[] currentVals) {
         int numAttributes = attribIds.length;
         int zz = 0;
         supportedPlayerAttributes = new byte[numAttributes];
         numSupportedPlayerAttribValues = new byte[numAttributes];
+        currentPlayerAttribValues = new byte[numAttributes];
         supportedPlayerAtribValues = new byte[valuesSupported.length];
         for (zz = 0; zz < numAttributes; zz++) {
             supportedPlayerAttributes[zz] = attribIds[zz];
             numSupportedPlayerAttribValues[zz] = numValueSupported[zz];
+            currentPlayerAttribValues[zz] = currentVals[zz];
         }
         for (zz = 0; zz < supportedPlayerAtribValues.length; zz++)
             supportedPlayerAtribValues[zz] = valuesSupported[zz];
@@ -223,6 +244,15 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
      *
      * EQUALIZER_STATUS: String describing EQUALIZER mode status on remote Media Player
      *                   Possible values "NOT SUPPORTED", "OFF","ON"
+     *
+     * BATTERY_STATUS  : Text Feild representing the Battery Status. Possible values are
+     *                   NOT_SUPPORTED, BATTERY_LEVEL_NORMAL, BATTERY_LEVEL_WARNING,
+     *                   BATTERY_LEVEL_CRITICAL, BATTERY_LEVEL_EXTERNAL,
+     *                   BATTERY_LEVEL_FULL_CHARGE
+     *
+     * SYSTEM_STATUS   : Text Feild representing System Status. Possible values are
+     *                   NOT_SUPPORTED, SYSTEM_STATUS_POWER_ON, SYSTEM_STATUS_POWER_OFF,
+     *                   SYSTEM_STATUS_UNPLUGGED
      */
     public static final String TRACK_NUM = "track_num";
     public static final String TITLE = "title";
@@ -237,6 +267,8 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
     public static final String SHUFFLE_STATUS = "shuffle_status";
     public static final String SCAN_STATUS = "scan_status";
     public static final String EQUALIZER_STATUS = "equalizer_status";
+    public static final String BATTERY_STATUS = "battery_status";
+    public static final String SYSETEM_STATUS = "system_status";
 
     /*
      * Default values for each of the items
@@ -254,6 +286,8 @@ public final class BluetoothAvrcpInfo implements Parcelable, BaseColumns{
     public static final String SHUFFLE_STATUS_INVALID = "NOT_SUPPORTED";
     public static final String SCAN_STATUS_INVALID = "NOT_SUPPORTED";
     public static final String EQUALIZER_STATUS_INVALID = "NOT_SUPPORTED";
+    public static final String BATTERY_STATUS_INVALID = "NOT_SUPPORTED";
+    public static final String SYSTEM_STATUS_INVALID = "NOT_SUPPORTED";
 
     /*
      *Element Id Values for GetMetaData
