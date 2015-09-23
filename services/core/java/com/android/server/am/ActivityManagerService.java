@@ -6242,7 +6242,7 @@ public final class ActivityManagerService extends ActivityManagerNative
                     getBoolean(com.android.internal.R.bool.config_boot_opt) == true) {
                     IPackageManager pm = AppGlobals.getPackageManager();
                     try {
-                        pm.laterScanApp();
+                        if (pm.isFirstBoot() == false) pm.startLaterScanApkThread();
                     } catch (RemoteException e) {
                         throw new SecurityException(e);
                     }
