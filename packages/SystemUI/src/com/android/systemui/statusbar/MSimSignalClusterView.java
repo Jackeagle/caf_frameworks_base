@@ -79,13 +79,15 @@ public class MSimSignalClusterView
     ImageView[] mMobileType;
 
     //cdma and 1x
-    private boolean mMobileCdmaVisible = false;
-    private boolean mMobileCdma1xOnlyVisible = false;
-    private int mMobileCdma3gId = 0;
-    private int mMobileCdma1xId = 0;
-    private int mMobileCdma1xOnlyId = 0;
-    private ViewGroup mMobileCdmaGroup;
-    private ImageView mMobileCdma3g, mMobileCdma1x, mMobileCdma1xOnly;
+    private boolean[] mMobileCdmaVisible;
+    private boolean[] mMobileCdma1xOnlyVisible;
+    private int[] mMobileCdma3gId;
+    private int[] mMobileCdma1xId;
+    private int[] mMobileCdma1xOnlyId;
+    private ViewGroup[] mMobileCdmaGroup;
+    private ImageView[] mMobileCdma3g;
+    private ImageView[] mMobileCdma1x;
+    private ImageView[] mMobileCdma1xOnly;
 
     //data & voice
     private boolean[] mMobileDataVoiceVisible;
@@ -154,6 +156,15 @@ public class MSimSignalClusterView
         mMobileDataVoiceGroup = new ViewGroup[mNumPhones];
         mMobileSignalData = new ImageView[mNumPhones];
         mMobileSignalVoice = new ImageView[mNumPhones];
+        mMobileCdmaVisible = new boolean[mNumPhones];
+        mMobileCdma1xOnlyVisible = new boolean[mNumPhones];
+        mMobileCdma3gId = new int[mNumPhones];
+        mMobileCdma1xId = new int[mNumPhones];
+        mMobileCdma1xOnlyId = new int[mNumPhones];
+        mMobileCdmaGroup = new ViewGroup[mNumPhones];
+        mMobileCdma3g = new ImageView[mNumPhones];
+        mMobileCdma1x = new ImageView[mNumPhones];
+        mMobileCdma1xOnly = new ImageView[mNumPhones];
         for (int i=0; i < mNumPhones; i++) {
             mMobileStrengthId[i] = 0;
             mMobileTypeId[i] = 0;
@@ -165,6 +176,11 @@ public class MSimSignalClusterView
             mDataActivityId[i] = 0;
             mMobileSignalDataId[i] = 0;
             mMobileSignalVoiceId[i] = 0;
+            mMobileCdmaVisible[i] = false;
+            mMobileCdma1xOnlyVisible[i] = false;
+            mMobileCdma3gId[i] = 0;
+            mMobileCdma1xId[i] = 0;
+            mMobileCdma1xOnlyId[i] = 0;
         }
 
         mStyle = context.getResources().getInteger(R.integer.status_bar_style);
@@ -205,10 +221,14 @@ public class MSimSignalClusterView
                     (ImageView) findViewById(mMobileSignalVoiceResourceId[i]);
         }
 
-        mMobileCdmaGroup    = (ViewGroup) findViewById(R.id.mobile_signal_cdma);
-        mMobileCdma3g       = (ImageView) findViewById(R.id.mobile_signal_3g);
-        mMobileCdma1x       = (ImageView) findViewById(R.id.mobile_signal_1x);
-        mMobileCdma1xOnly   = (ImageView) findViewById(R.id.mobile_signal_1x_only);
+        mMobileCdmaGroup[0]    = (ViewGroup) findViewById(R.id.mobile_signal_cdma);
+        mMobileCdma3g[0]       = (ImageView) findViewById(R.id.mobile_signal_3g);
+        mMobileCdma1x[0]       = (ImageView) findViewById(R.id.mobile_signal_1x);
+        mMobileCdma1xOnly[0]   = (ImageView) findViewById(R.id.mobile_signal_1x_only);
+        mMobileCdmaGroup[1]    = (ViewGroup) findViewById(R.id.mobile_signal_cdma_2);
+        mMobileCdma3g[1]       = (ImageView) findViewById(R.id.mobile_signal_3g_2);
+        mMobileCdma1x[1]       = (ImageView) findViewById(R.id.mobile_signal_1x_2);
+        mMobileCdma1xOnly[1]   = (ImageView) findViewById(R.id.mobile_signal_1x_only_2);
 
         for (int i = 0; i < mNumPhones; i++) {
             apply(i);
@@ -233,11 +253,11 @@ public class MSimSignalClusterView
             mMobileDataVoiceGroup[i] = null;
             mMobileSignalData[i] = null;
             mMobileSignalVoice[i] = null;
+            mMobileCdmaGroup[i] = null;
+            mMobileCdma3g[i] = null;
+            mMobileCdma1x[i] = null;
+            mMobileCdma1xOnly[i] = null;
         }
-        mMobileCdmaGroup    = null;
-        mMobileCdma3g       = null;
-        mMobileCdma1x       = null;
-        mMobileCdma1xOnly   = null;
 
         super.onDetachedFromWindow();
     }
@@ -275,43 +295,35 @@ public class MSimSignalClusterView
             mDataVisible[phoneId] = (activityIcon != 0) ? true : false;
         }
         if (mStyle == STATUS_BAR_STYLE_CDMA_1X_COMBINED) {
-            if (phoneId == PhoneConstants.PHONE_ID1) {
-                if (!isRoaming() && showDataAndVoice() && (mNoSimIconId[phoneId] == 0)) {
-                    mMobileCdmaVisible = true;
-                    mMobileCdma1xOnlyVisible = false;
-                    mMobileStrengthId[0] = 0;
+            if (!isRoaming(phoneId) && showDataAndVoice(phoneId) && (mNoSimIconId[phoneId] == 0)) {
+                mMobileCdmaVisible[phoneId] = true;
+                mMobileCdma1xOnlyVisible[phoneId] = false;
+                mMobileStrengthId[phoneId] = 0;
 
-                    mMobileCdma3gId = strengthIcon;
-                    mMobileCdma1xId = getCdma2gId(mMobileCdma3gId);
+                mMobileCdma3gId[phoneId] = strengthIcon;
+                mMobileCdma1xId[phoneId] = getCdma2gId(mMobileCdma3gId[phoneId], phoneId);
 
-                    if (isCdmaDataOnlyMode(phoneId)) {
-                        mMobileCdmaVisible = false;
-                        mMobileCdma1xOnlyVisible = false;
-                        mMobileStrengthId[phoneId] = convertMobileStrengthIcon(strengthIcon);
-                    }
-                } else if ((show1xOnly() || isRoaming()) && (mNoSimIconId[phoneId] == 0)) {
-                    //when it is roaming, just show one icon, rather than two icons for CT.
-                    mMobileCdmaVisible = false;
-                    mMobileCdma1xOnlyVisible = true;
-                    mMobileStrengthId[0] = 0;
-
-                    if (mDataVisible[0] && getCdmaRoamId(strengthIcon) != 0) {
-                        mMobileCdma1xOnlyId = getCdmaRoamId(strengthIcon);
-                    } else {
-                        mMobileCdma1xOnlyId = strengthIcon;
-                    }
-                } else {
-                    mMobileCdmaVisible = false;
-                    mMobileCdma1xOnlyVisible = false;
-
+                if (isCdmaDataOnlyMode(phoneId)) {
+                    mMobileCdmaVisible[phoneId] = false;
+                    mMobileCdma1xOnlyVisible[phoneId] = false;
                     mMobileStrengthId[phoneId] = convertMobileStrengthIcon(strengthIcon);
                 }
-            } else {
-                if (mDataVisible[phoneId]
-                        && getCdmaRoamId(mMobileStrengthId[phoneId]) != 0) {
-                    mMobileStrengthId[phoneId] =
-                            getCdmaRoamId(mMobileStrengthId[phoneId]);
+            } else if ((show1xOnly(phoneId) || isRoaming(phoneId)) && (mNoSimIconId[phoneId] == 0)) {
+                //when it is roaming, just show one icon, rather than two icons for CT.
+                mMobileCdmaVisible[phoneId] = false;
+                mMobileCdma1xOnlyVisible[phoneId] = true;
+                mMobileStrengthId[phoneId] = 0;
+
+                if (mDataVisible[phoneId] && getCdmaRoamId(strengthIcon) != 0) {
+                    mMobileCdma1xOnlyId[phoneId] = getCdmaRoamId(strengthIcon);
+                } else {
+                    mMobileCdma1xOnlyId[phoneId] = strengthIcon;
                 }
+            } else {
+                mMobileCdmaVisible[phoneId] = false;
+                mMobileCdma1xOnlyVisible[phoneId] = false;
+
+                mMobileStrengthId[phoneId] = convertMobileStrengthIcon(strengthIcon);
             }
         } else if (mStyle == STATUS_BAR_STYLE_DATA_VOICE) {
             if (showBothDataAndVoice(phoneId)
@@ -326,8 +338,8 @@ public class MSimSignalClusterView
                 mMobileDataVoiceVisible[phoneId] = false;
             }
         } else {
-            mMobileCdmaVisible = false;
-            mMobileCdma1xOnlyVisible = false;
+            mMobileCdmaVisible[phoneId] = false;
+            mMobileCdma1xOnlyVisible[phoneId] = false;
 
             mMobileDataVoiceVisible[phoneId] = false;
         }
@@ -433,14 +445,14 @@ public class MSimSignalClusterView
 
         if (mMobileVisible && !mIsAirplaneMode) {
             updateMobile(phoneId);
-            updateCdma();
+            updateCdma(phoneId);
             updateData(phoneId);
             updateDataVoice(phoneId);
             mMobileGroup[phoneId].setVisibility(View.VISIBLE);
         } else {
             mMobileGroup[phoneId].setVisibility(View.GONE);
-            mMobileCdmaGroup.setVisibility(View.GONE);
-            mMobileCdma1xOnly.setVisibility(View.GONE);
+            mMobileCdmaGroup[phoneId].setVisibility(View.GONE);
+            mMobileCdma1xOnly[phoneId].setVisibility(View.GONE);
             mDataGroup[phoneId].setVisibility(View.GONE);
         }
 
@@ -493,20 +505,20 @@ public class MSimSignalClusterView
         mNoSimSlot[phoneId].setImageResource(mNoSimIconId[phoneId]);
     }
 
-    private void updateCdma() {
-        if (mMobileCdmaVisible) {
-            mMobileCdma3g.setImageResource(mMobileCdma3gId);
-            mMobileCdma1x.setImageResource(mMobileCdma1xId);
-            mMobileCdmaGroup.setVisibility(View.VISIBLE);
+    private void updateCdma(int phoneId) {
+        if (mMobileCdmaVisible[phoneId]) {
+            mMobileCdma3g[phoneId].setImageResource(mMobileCdma3gId[phoneId]);
+            mMobileCdma1x[phoneId].setImageResource(mMobileCdma1xId[phoneId]);
+            mMobileCdmaGroup[phoneId].setVisibility(View.VISIBLE);
         } else {
-            mMobileCdmaGroup.setVisibility(View.GONE);
+            mMobileCdmaGroup[phoneId].setVisibility(View.GONE);
         }
 
-        if (mMobileCdma1xOnlyVisible) {
-            mMobileCdma1xOnly.setImageResource(mMobileCdma1xOnlyId);
-            mMobileCdma1xOnly.setVisibility(View.VISIBLE);
+        if (mMobileCdma1xOnlyVisible[phoneId]) {
+            mMobileCdma1xOnly[phoneId].setImageResource(mMobileCdma1xOnlyId[phoneId]);
+            mMobileCdma1xOnly[phoneId].setVisibility(View.VISIBLE);
         } else {
-            mMobileCdma1xOnly.setVisibility(View.GONE);
+            mMobileCdma1xOnly[phoneId].setVisibility(View.GONE);
         }
     }
 
@@ -570,15 +582,15 @@ public class MSimSignalClusterView
                 && voiceType == TelephonyManager.NETWORK_TYPE_UNKNOWN;
     }
 
-    private boolean showDataAndVoice() {
+    private boolean showDataAndVoice(int phoneId) {
         if (mStyle != STATUS_BAR_STYLE_CDMA_1X_COMBINED) {
             return false;
         }
         if (mMSimNC == null) {
             return false;
         }
-        int dataType = mMSimNC.getDataNetworkType(0);
-        int voiceType = mMSimNC.getVoiceNetworkType(0);
+        int dataType = mMSimNC.getDataNetworkType(phoneId);
+        int voiceType = mMSimNC.getVoiceNetworkType(phoneId);
         boolean ret = false;
         if ((dataType == TelephonyManager.NETWORK_TYPE_EVDO_0
                 || dataType == TelephonyManager.NETWORK_TYPE_EVDO_0
@@ -594,15 +606,15 @@ public class MSimSignalClusterView
         return ret;
     }
 
-    private boolean show1xOnly() {
+    private boolean show1xOnly(int phoneId) {
         if (mStyle != STATUS_BAR_STYLE_CDMA_1X_COMBINED) {
             return false;
         }
         if (mMSimNC == null) {
             return false;
         }
-        int dataType = mMSimNC.getDataNetworkType(0);
-        int voiceType = mMSimNC.getVoiceNetworkType(0);
+        int dataType = mMSimNC.getDataNetworkType(phoneId);
+        int voiceType = mMSimNC.getVoiceNetworkType(phoneId);
         boolean ret = false;
         if (dataType == TelephonyManager.NETWORK_TYPE_1xRTT
                 || dataType == TelephonyManager.NETWORK_TYPE_CDMA) {
@@ -616,8 +628,8 @@ public class MSimSignalClusterView
                 || (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT);
     }
 
-    private boolean isRoaming() {
-        return mMobileTypeId[0] == R.drawable.stat_sys_data_fully_connected_roam;
+    private boolean isRoaming(int phoneId) {
+        return mMobileTypeId[phoneId] == R.drawable.stat_sys_data_fully_connected_roam;
     }
 
     private int getMobileVoiceId(int phoneId) {
@@ -718,12 +730,12 @@ public class MSimSignalClusterView
         return returnVal;
     }
 
-    private int getCdma2gId(int icon) {
+    private int getCdma2gId(int icon, int phoneId) {
         if (mMSimNC == null) {
             return 0;
         }
         int retValue = 0;
-        int level = mMSimNC.getVoiceSignalLevel(0);
+        int level = mMSimNC.getVoiceSignalLevel(phoneId);
         switch(level){
             case SignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN:
                 retValue = R.drawable.stat_sys_signal_0_2g;
