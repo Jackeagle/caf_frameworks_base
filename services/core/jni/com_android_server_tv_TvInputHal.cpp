@@ -44,7 +44,7 @@
 
 #define LOG_TAG "TvInputHal"
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include "android_os_MessageQueue.h"
 #include "android_runtime/AndroidRuntime.h"
@@ -163,29 +163,37 @@ BufferProducerThread::BufferProducerThread(
 
 status_t BufferProducerThread::readyToRun() {
     sp<ANativeWindow> anw(mSurface);
+    ALOGV("Enter readyToRun anw.get() = %p, usage %d", anw.get(), mStream.buffer_producer.usage);
     status_t err = native_window_set_usage(anw.get(), mStream.buffer_producer.usage);
     if (err != NO_ERROR) {
+        ALOGE("Error: %d returned by set usage", err);
         return err;
     }
     err = native_window_set_buffers_dimensions(
             anw.get(), mStream.buffer_producer.width, mStream.buffer_producer.height);
     if (err != NO_ERROR) {
+        ALOGE("Error: %d returned by set buffers dimensions w x h: %d x %d",
+              err, mStream.buffer_producer.width, mStream.buffer_producer.height);
         return err;
     }
     err = native_window_set_scaling_mode(anw.get(), NATIVE_WINDOW_SCALING_MODE_SCALE_CROP);
     if (err != NO_ERROR) {
+        ALOGE("Error: %d returned by set scaling mode", err);
         return err;
     }
     err = native_window_set_buffers_format(anw.get(), mStream.buffer_producer.format);
     if (err != NO_ERROR) {
+        ALOGE("Error: %d returned by set buffers format: %d", err, mStream.buffer_producer.format);
         return err;
     }
     err = native_window_set_buffer_count(anw.get(), mStream.buffer_producer.buffer_count);
     if (err != NO_ERROR) {
+        ALOGE("Error: %d returned by set buffer count: %d", err, mStream.buffer_producer.buffer_count);
         return err;
     }
     err = anw->query(anw.get(), NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &mHoldBufCount);
     if (err != NO_ERROR) {
+        ALOGE("Error: %d returned by query: for mHoldBufCount %d", err, mHoldBufCount);
         return err;
     }
 
@@ -193,8 +201,9 @@ status_t BufferProducerThread::readyToRun() {
     {
         ANativeWindowBuffer_t* buffer = NULL;
         err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
+        ALOGV("Dequeueing buffer: %p", buffer);
         if (err != NO_ERROR) {
-            ALOGE("error %d while dequeueing buffer to surface", err);
+            ALOGE("Error: %d while dequeueing buffer to surface", err);
             break;
         }
         mSeq++;
@@ -203,7 +212,9 @@ status_t BufferProducerThread::readyToRun() {
         mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
                                     mBuffers[k].buffer->handle, mSeq);
         mBuffers[k].seqNum = mSeq;
+        ALOGV("Send buffer = %p for capture", buffer->handle);
     }
+    ALOGV("Exit %s NO_ERROR", __func__);
     return NO_ERROR;
 }
 
@@ -213,7 +224,9 @@ int BufferProducerThread::setSurface(const sp<Surface>& surface) {
 }
 
 int BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
+    ALOGV("Enter %s", __func__);
     if (surface == mSurface) {
+        ALOGW("%s: Same surface! Exit", __func__);
         return NO_ERROR;
     }
 
@@ -233,6 +246,7 @@ int BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
     }
     for (uint32_t idx = 0; idx < mStream.buffer_producer.buffer_count; idx++)
     {
+        ALOGV("%s: buffer index %d, state %d", __func__, idx, mBuffers[idx].bufferState);
         if (CAPTURE == mBuffers[idx].bufferState)
         {
             mDevice->cancel_capture(mDevice, mDeviceId, mStream.stream_id, mBuffers[idx].seqNum);
@@ -241,7 +255,7 @@ int BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
             {
                 status_t err = mCondition.waitRelative(mLock, s2ns(1));
                 if (err != NO_ERROR) {
-                    ALOGE("error %d while wating for buffer state to change.", err);
+                    ALOGE("Error: %d while waiting for buffer state to change.", err);
                     break;
                 }
             }
@@ -252,6 +266,7 @@ int BufferProducerThread::setSurfaceLocked(const sp<Surface>& surface) {
 
     mSurface = surface;
     mCondition.broadcast();
+    ALOGV("Exit %s: NO_ERROR", __func__);
     return NO_ERROR;
 }
 
@@ -260,6 +275,7 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
     sp<ANativeWindow> anw(mSurface);
 
     sp<ANativeWindowBuffer_t> nwBuffer = NULL;
+    ALOGV("Enter onCaptured seq = %d", seq);
     int idx = findBufferIndex(seq);
     if (-1 == idx)
     {
@@ -271,6 +287,7 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
     {
         mBuffers[idx].bufferState = RELEASED;
         if (succeeded) {
+            ALOGV("Queueing buffer");
 
             ATRACE_INT("renderer enqueue buffer", 1);
 
@@ -284,6 +301,7 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
             else
             {
                 mReleasedBufCnt++;
+                ALOGV("Released buffer count = %d", mReleasedBufCnt);
             }
         }
     }
@@ -295,6 +313,7 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
 }
 
 void BufferProducerThread::shutdown() {
+    ALOGV("Enter %s", __func__);
     mShutdown = true;
     setSurface(NULL);
     requestExitAndWait();
@@ -309,15 +328,18 @@ void BufferProducerThread::shutdown() {
               mBuffers[k].buffer.clear();
            }
         }
+        ALOGV("Delete buffers");
         delete [] mBuffers;
         mBuffers = NULL;
     }
+    ALOGE("Exit %s", __func__);
 }
 
 int BufferProducerThread::findBufferIndex(uint32_t seq)
 {
    int index = -1;
 
+   ALOGV("Enter %s(%d)", __func__, __LINE__);
    for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
    {
       if (mBuffers[k].seqNum == seq)
@@ -334,6 +356,7 @@ int BufferProducerThread::findBufferIndex(buffer_handle_t buffer)
     int index = -1;
     native_handle_t *h = (native_handle_t *)buffer;
 
+    ALOGV("Enter %s(%d) buffer %p,data 0x%x",  __func__, __LINE__, buffer, h->data[0]);
     for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
     {
         if (mBuffers[k].buffer.get())
@@ -384,12 +407,13 @@ bool BufferProducerThread::threadLoop() {
             sp<ANativeWindow> anw(mSurface);
             int idx = -1;
 
+            ALOGV("Dequeueing buffer");
             ATRACE_INT("renderer dequeue buffer", 1);
 
             err = native_window_dequeue_buffer_and_wait(anw.get(), &buffer);
             if (err != NO_ERROR) {
                 ATRACE_INT("renderer dequeue buffer", 0);
-                ALOGE("error %d while dequeueing buffer to surface", err);
+                ALOGE("Error: %d while dequeueing buffer to surface", err);
                 return false;
             }
             else
@@ -401,6 +425,8 @@ bool BufferProducerThread::threadLoop() {
                     ATRACE_INT("renderer dequeue buffer", 0);
 
                     mReleasedBufCnt--;
+
+                    ALOGV("Successfully dequeued buffer count: %d", mReleasedBufCnt);
 
                     idx = findBufferIndex(buffer->handle);
                     if (-1 == idx)
@@ -430,11 +456,13 @@ bool BufferProducerThread::threadLoop() {
 
                     ATRACE_INT("renderer dequeue buffer", 0);
 
+                    ALOGV("Successfully dequeued buffer: %p", buffer->handle);
+
                     idx = findBufferIndex(buffer->handle);
                     nwBuffer = mBuffers[idx].buffer;
                     status_t err = anw->queueBuffer(anw.get(), nwBuffer.get(), -1);
                     if (err != NO_ERROR) {
-                        ALOGE("error in buffer queue");
+                        ALOGE("Error: %d in buffer queue", err);
                         return false;
                     }
                 }
@@ -576,6 +604,7 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
             ALOGE("Couldn't get stream configs");
             return UNKNOWN_ERROR;
         }
+        ALOGV("Stream type = %d, max vid width = %d", configs->type, configs->max_video_width);
         int configIndex = -1;
         for (int i = 0; i < numConfigs; ++i) {
             if (configs[i].stream_id == streamId) {
@@ -640,6 +669,7 @@ int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>
 }
 
 int JTvInputHal::removeStream(int deviceId, int streamId) {
+    ALOGV("Enter %s: deviceId: %d, streamId: %d", __func__, deviceId, streamId);
     KeyedVector<int, Connection>& connections = mConnections.editValueFor(deviceId);
     if (connections.indexOfKey(streamId) < 0) {
         return BAD_VALUE;
@@ -647,6 +677,7 @@ int JTvInputHal::removeStream(int deviceId, int streamId) {
     Connection& connection = connections.editValueFor(streamId);
     if (connection.mSurface == NULL) {
         // Nothing to do
+        ALOGW("Connection surface null, Nothing to do");
         return NO_ERROR;
     }
     if (connection.mThread != NULL) {
@@ -677,6 +708,7 @@ const tv_stream_config_t* JTvInputHal::getStreamConfigs(int deviceId, int* numCo
         ALOGE("Couldn't get stream configs");
         return NULL;
     }
+    ALOGV("Get stream type = %d, max vid width = %d, num configs = %d", configs->type, configs->max_video_width, *numConfigs);
     return configs;
 }
 
@@ -685,6 +717,7 @@ void JTvInputHal::notify(
         tv_input_device_t* dev, tv_input_event_t* event, void* data) {
     JTvInputHal* thiz = (JTvInputHal*)data;
     thiz->mLooper->sendMessage(new NotifyHandler(thiz, event), event->type);
+    ALOGV("JTvInputHal::notify event: %p, id = %d, data: %p", event, event->type , data);
 }
 
 // static
@@ -703,6 +736,7 @@ void JTvInputHal::cloneTvInputEvent(
 
 void JTvInputHal::onDeviceAvailable(const tv_input_device_info_t& info) {
     {
+        ALOGV("Enter onDeviceAvailable");
         Mutex::Autolock autoLock(&mLock);
         mConnections.add(info.device_id, KeyedVector<int, Connection>());
     }
@@ -741,6 +775,7 @@ void JTvInputHal::onDeviceAvailable(const tv_input_device_info_t& info) {
 
 void JTvInputHal::onDeviceUnavailable(int deviceId) {
     {
+        ALOGV("Enter onDeviceUnavailable");
         Mutex::Autolock autoLock(&mLock);
         KeyedVector<int, Connection>& connections = mConnections.editValueFor(deviceId);
         for (size_t i = 0; i < connections.size(); ++i) {
@@ -775,6 +810,7 @@ void JTvInputHal::onStreamConfigurationsChanged(int deviceId) {
 void JTvInputHal::onCaptured(int deviceId, int streamId, uint32_t seq, bool succeeded) {
     sp<BufferProducerThread> thread;
     {
+        ALOGV("Enter onCaptured deviceId: %d, streamId: %d", deviceId, streamId);
         Mutex::Autolock autoLock(&mLock);
         KeyedVector<int, Connection>& connections = mConnections.editValueFor(deviceId);
         Connection& connection = connections.editValueFor(streamId);
@@ -793,6 +829,7 @@ void JTvInputHal::onCaptured(int deviceId, int streamId, uint32_t seq, bool succ
                 deviceId,
                 streamId);
     }
+    ALOGV("Exit onCaptured");
 }
 
 JTvInputHal::NotifyHandler::NotifyHandler(JTvInputHal* hal, const tv_input_event_t* event) {
@@ -858,6 +895,7 @@ static int nativeAddOrUpdateStream(JNIEnv* env, jclass clazz,
 static int nativeRemoveStream(JNIEnv* env, jclass clazz,
         jlong ptr, jint deviceId, jint streamId) {
     JTvInputHal* tvInputHal = (JTvInputHal*)ptr;
+    ALOGV("Enter nativeRemoveStream");
     return tvInputHal->removeStream(deviceId, streamId);
 }
 
