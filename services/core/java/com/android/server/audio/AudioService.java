@@ -3977,7 +3977,10 @@ public class AudioService extends IAudioService.Stub {
                         index = mIndexMax;
                     }
                 }
-                mIndexMap.put(device, index);
+
+                synchronized (this) {
+                    mIndexMap.put(device, index);
+                }
 
                 changed = oldIndex != index;
                 if (changed) {
