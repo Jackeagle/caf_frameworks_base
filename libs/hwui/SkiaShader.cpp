@@ -246,6 +246,8 @@ static bool bitmapShaderHelper(Caches* caches, ProgramDescription* description,
         shaderInfo->wrapS = wrapS;
         shaderInfo->wrapT = wrapT;
         shaderInfo->texture = texture;
+    } else {
+        const AutoTexture autoCleanup(texture);
     }
     return true;
 }
