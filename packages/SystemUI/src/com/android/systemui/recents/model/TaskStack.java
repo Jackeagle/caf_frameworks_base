@@ -163,6 +163,8 @@ public class TaskStack {
     public interface TaskStackCallbacks {
         /* Notifies when a task has been added to the stack */
         public void onStackTaskAdded(TaskStack stack, Task t);
+        /* Notify when a list of task have been removed from the stack */
+        public void onStackAllTaskRemoved(TaskStack stack, ArrayList<Task> removedTasks);
         /* Notifies when a task has been removed from the stack */
         public void onStackTaskRemoved(TaskStack stack, Task removedTask, Task newFrontMostTask);
         /** Notifies when the stack was filtered */
@@ -235,6 +237,30 @@ public class TaskStack {
                 // Notify that a task has been removed
                 mCb.onStackTaskRemoved(this, t, newFrontMostTask);
             }
+        }
+    }
+
+    /** Remove a list of tasks */
+    public void removeAllTasks(ArrayList<Task> tasks) {
+        int taskCount = tasks.size();
+        for (int i = 0; i < taskCount; i++) {
+            Task t = tasks.get(i);
+            if (mTaskList.contains(t)) {
+                // Remove the task from the list
+                mTaskList.remove(t);
+                // Remove it from the group as well, and if it is empty, remove the group
+                TaskGrouping group = t.group;
+                group.removeTask(t);
+                if (group.getTaskCount() == 0) {
+                    removeGroup(group);
+                }
+                // Update the lock-to-app state
+                t.lockToThisTask = false;
+            }
+        }
+        if (mCb != null) {
+            // Notify that tasks have been removed
+            mCb.onStackAllTaskRemoved(this, tasks);
         }
     }
 

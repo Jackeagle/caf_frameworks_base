@@ -54,7 +54,7 @@ public class TaskStackView extends FrameLayout implements TaskStack.TaskStackCal
                                       boolean lockToTask);
         public void onTaskViewAppInfoClicked(Task t);
         public void onTaskViewDismissed(Task t);
-        public void onAllTaskViewsDismissed();
+        public void onAllTaskViewsDismissed(ArrayList<Task> tasks);
         public void onTaskStackFilterTriggered();
         public void onTaskStackUnfilterTriggered();
     }
@@ -528,31 +528,19 @@ public class TaskStackView extends FrameLayout implements TaskStack.TaskStackCal
         tv.dismissTask();
     }
 
+    /** Dismisses all the tasks */
     public void dismissAllTasks() {
-        post(new Runnable() {
-            @Override
-            public void run() {
-                ArrayList<Task> tasks = new ArrayList<Task>();
-                tasks.addAll(mStack.getTasks());
+        ArrayList<Task> tasks = new ArrayList<Task>();
+        tasks.addAll(mStack.getTasks());
 
-                // Remove visible TaskViews
-                int childCount = getChildCount();
-                for (int i = 0; i < childCount; i++) {
-                    TaskView tv = (TaskView) getChildAt(i);
-                    tasks.remove(tv.getTask());
-                    tv.dismissTask();
-                }
-
-                int size = tasks.size();
-                // Remove any other Tasks
-                for (int i = 0; i < size; i++) {
-                    Task t = tasks.get(i);
-                    if (mStack.getTasks().contains(t)) {
-                        mStack.removeTask(t);
-                    }
-                }
-            }
-        });
+        // Remove visible TaskViews
+        int childCount = getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            TaskView tv = (TaskView) getChildAt(i);
+            tasks.remove(tv.getTask());
+            tv.dismissTask();
+        }
+        mStack.removeAllTasks(tasks);
     }
 
     /** Resets the focused task. */
@@ -882,6 +870,19 @@ public class TaskStackView extends FrameLayout implements TaskStack.TaskStackCal
     }
 
     @Override
+    public void onStackAllTaskRemoved(TaskStack stack, ArrayList<Task> removedTasks) {
+        int size = removedTasks.size();
+        for (int i = 0; i < size; i++) {
+            TaskView tv = getChildViewForTask(removedTasks.get(i));
+            if (tv != null) {
+                mViewPool.returnViewToPool(tv);
+            }
+        }
+
+        mCb.onAllTaskViewsDismissed(removedTasks);
+    }
+
+    @Override
     public void onStackTaskRemoved(TaskStack stack, Task removedTask, Task newFrontMostTask) {
         // Remove the view associated with this task, we can't rely on updateTransforms
         // to work here because the task is no longer in the list
@@ -935,7 +936,7 @@ public class TaskStackView extends FrameLayout implements TaskStack.TaskStackCal
                 shouldFinishActivity = (mStack.getTaskCount() == 0);
             }
             if (shouldFinishActivity) {
-                mCb.onAllTaskViewsDismissed();
+                mCb.onAllTaskViewsDismissed(null);
             }
         }
     }
