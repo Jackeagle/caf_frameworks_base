@@ -209,8 +209,12 @@ status_t BufferProducerThread::readyToRun() {
         mSeq++;
         mBuffers[k].buffer = buffer;
         mBuffers[k].bufferState = CAPTURE;
-        mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
+        err = mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
                                     mBuffers[k].buffer->handle, mSeq);
+        if (err != NO_ERROR) {
+            ALOGE("Error: %d request capture (no frames)", err);
+            return err;
+        }
         mBuffers[k].seqNum = mSeq;
         ALOGV("Send buffer = %p for capture", buffer->handle);
     }
@@ -440,8 +444,12 @@ bool BufferProducerThread::threadLoop() {
                         mBuffers[idx].buffer = buffer;
                         mBuffers[idx].bufferState = CAPTURE;
 
-                        mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
+                        err = mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
                                                 buffer->handle, ++mSeq);
+                        if (err != NO_ERROR) {
+                            ALOGE("Error: %d request capture in buffer released", err);
+                            return false;
+                        }
                         mBuffers[idx].seqNum = mSeq;
                     }
                     else
