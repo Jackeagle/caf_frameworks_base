@@ -591,8 +591,8 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
 
                 // DSDS case: Consider the Data Connection
                 // State changed notifications of the other NON-DDS.
-                Slog.d(TAG, "onDataConnectionStateChanged getDefaultDataSubId :" +
-                        SubscriptionManager.getDefaultDataSubId());
+                Slog.d(TAG, "onDataConnectionStateChanged getOnDemandDataSubId :" +
+                        SubscriptionManager.getOnDemandDataSubId());
                 mMSimDataState[phoneId] = state;
                 mMSimDataNetType[phoneId] = networkType;
 
@@ -640,7 +640,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                     if (msg.arg1 != mWifiActivity) {
                         mWifiActivity = msg.arg1;
                         int dataSub = SubscriptionManager.getPhoneId(
-                                SubscriptionManager.getDefaultDataSubId());
+                                SubscriptionManager.getOnDemandDataSubId());
                         if (!SubscriptionManager.isValidPhoneId(dataSub)) {
                             dataSub = 0;
                         }
@@ -723,7 +723,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     private final void updateTelephonySignalStrength(int phoneId) {
         Slog.d(TAG, "updateTelephonySignalStrength: phoneId =" + phoneId);
         int dataSub = SubscriptionManager.getPhoneId(
-                SubscriptionManager.getDefaultDataSubId());
+                SubscriptionManager.getOnDemandDataSubId());
         if ((!hasService(phoneId) &&
                 (mMSimDataServiceState[phoneId] != ServiceState.STATE_IN_SERVICE))
                 || mMSimState[phoneId] == IccCardConstants.State.ABSENT) {
@@ -806,7 +806,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     private final void updateDataNetType(int phoneId) {
         // DSDS case: Data is active only on DDS. Clear the icon for NON-DDS
         int dataSub = SubscriptionManager.getPhoneId(
-                SubscriptionManager.getDefaultDataSubId());
+                SubscriptionManager.getOnDemandDataSubId());
         if (phoneId != dataSub) {
             Slog.d(TAG,"updateDataNetType: phoneId" + phoneId
                     + " is not DDS(=SUB" + dataSub + ")!");
@@ -904,7 +904,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         int iconId = 0;
         boolean visible = true;
         int dataSub = SubscriptionManager.getPhoneId(
-                SubscriptionManager.getDefaultDataSubId());
+                SubscriptionManager.getOnDemandDataSubId());
 
         Slog.d(TAG,"updateDataIcon dataSub =" + dataSub);
         // DSDS case: Data is active only on DDS. Clear the icon for NON-DDS
@@ -992,7 +992,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             mMSimNetworkName[phoneId] = mNetworkNameDefault;
         }
         // Update mNetworkName for quick settings.
-        int dataSub = SubscriptionManager.getPhoneId(SubscriptionManager.getDefaultDataSubId());
+        int dataSub = SubscriptionManager.getPhoneId(SubscriptionManager.getOnDemandDataSubId());
         if (phoneId == dataSub) {
             mNetworkName = mMSimNetworkName[phoneId];
         }
@@ -1064,7 +1064,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             mNoMSimIconId[phoneId] = 0;
         }
         int dataSub = SubscriptionManager.getPhoneId(
-                SubscriptionManager.getDefaultDataSubId());
+                SubscriptionManager.getOnDemandDataSubId());
         if (!mHasMobileDataFeature) {
             mMSimDataSignalIconId[phoneId] = mMSimPhoneSignalIconId[phoneId] = 0;
             mobileLabel = "";
