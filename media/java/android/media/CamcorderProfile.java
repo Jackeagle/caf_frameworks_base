@@ -123,11 +123,21 @@ public class CamcorderProfile
     /** @hide
      * Quality level corresponding to 4K DCI resolution
      */
-    public static final int QUALITY_HVGA = 18;
+    public static final int QUALITY_HVGA = 19;
+
+    /** @hide
+     * Quality level corresponding to QHD resolution
+     */
+    public static final int QUALITY_QHD = 20;
+
+    /** @hide
+     * Quality level corresponding to 2K resolution
+     */
+    public static final int QUALITY_2k = 21;
 
     // Start and end of quality list
     private static final int QUALITY_LIST_START = QUALITY_LOW;
-    private static final int QUALITY_LIST_END = QUALITY_HVGA;
+    private static final int QUALITY_LIST_END = QUALITY_2k;
 
     /**
      * Time lapse quality level corresponding to the lowest available resolution.
@@ -199,9 +209,19 @@ public class CamcorderProfile
      */
     public static final int QUALITY_TIME_LAPSE_4kDCI = 1014;
 
+    /** @hide
+     * Time lapse quality level corresponding to the QHD resolution.
+     */
+     public static final int QUALITY_TIME_LAPSE_QHD = 1020;
+
+    /** @hide
+     * Time lapse quality level corresponding to the 2K resolution.
+     */
+     public static final int QUALITY_TIME_LAPSE_2k = 1021;
+
     // Start and end of timelapse quality list
     private static final int QUALITY_TIME_LAPSE_LIST_START = QUALITY_TIME_LAPSE_LOW;
-    private static final int QUALITY_TIME_LAPSE_LIST_END = QUALITY_TIME_LAPSE_4kDCI;
+    private static final int QUALITY_TIME_LAPSE_LIST_END = QUALITY_TIME_LAPSE_2k;
 
     /**
      * High speed ( >= 100fps) quality level corresponding to the lowest available resolution.
