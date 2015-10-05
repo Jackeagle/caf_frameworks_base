@@ -612,6 +612,7 @@ public class OverScroller {
         private boolean mIsPerfLockAcquired = false;
         private boolean mIsPerfBoostEnabled = false;
         private int lBoostTimeOut = 0;
+        private int flingBoostTimeOut = 0;
         private int lBoostCpuBoost = 0;
         private int lBoostSchedBoost = 0;
         private int lBoostPcDisblBoost = 0;
@@ -808,11 +809,14 @@ public class OverScroller {
                 if (mPerf != null) {
                     mIsPerfLockAcquired = true;
                     if (0 == lBoostTimeOut) {
-                        lBoostTimeOut = mDuration;
+                        //config value is not defined
+                        flingBoostTimeOut = mDuration;
+                    } else {
+                        //config value is present
+                        flingBoostTimeOut = lBoostTimeOut;
                     }
-                    mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
+                    mPerf.perfLockAcquire(flingBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
                                           lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
-
                 }
             }
 

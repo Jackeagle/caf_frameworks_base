@@ -117,6 +117,7 @@ public class Scroller  {
     private Performance mPerf = null;
     boolean bIsPerfBoostEnabled = false;
     private int lBoostTimeOut = 0;
+    private int scrollBoostTimeOut = 0;
     private int lBoostCpuBoost = 0;
     private int lBoostSchedBoost = 0;
     private int lBoostPcDisblBoost = 0;
@@ -437,9 +438,13 @@ public class Scroller  {
 
         if ((mPerf != null) && (duration != 0)) {
             if (0 == lBoostTimeOut) {
-                lBoostTimeOut = mDuration;
+                //config value is not defined
+                scrollBoostTimeOut = mDuration;
+            } else {
+                //config value is present
+                scrollBoostTimeOut = lBoostTimeOut;
             }
-            mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
+            mPerf.perfLockAcquire(scrollBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
                                           lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
         }
     }
