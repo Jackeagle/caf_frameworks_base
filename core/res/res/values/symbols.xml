@@ -2417,5 +2417,6 @@
   <java-symbol type="string" name="transport_destination_string" />
   <java-symbol type="bool" name="config_regional_play_low_battery_sound_for_call" />
   <java-symbol type="bool" name="config_regional_hide_cast_screen" />
+  <java-symbol type="bool" name="config_regional_presidential_wea_with_tone_vibrate" />
   <java-symbol type="bool" name="config_regional_nfc_menu_disable" />
 </resources>
