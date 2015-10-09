@@ -2520,17 +2520,10 @@ public final class ViewRootImpl implements ViewParent,
                 }
                 mResizeAlpha = resizeAlpha;
 
-                // sometimes we get the dirty rect as null
-                // and also its better to check the surface
-                // validity to avoid any crash.
-                if(mSurface.isValid() && dirty != null) {
-                    mSurface.setDirtyRegion(dirty);
-                }
                 if (invalidateRoot) {
                     mAttachInfo.mHardwareRenderer.invalidateRoot();
                 }
 
-                dirty.setEmpty();
 
                 mBlockResizeBuffer = false;
                 mAttachInfo.mHardwareRenderer.draw(mView, mAttachInfo, this);
