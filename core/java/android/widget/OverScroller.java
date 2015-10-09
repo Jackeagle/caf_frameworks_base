@@ -612,6 +612,7 @@ public class OverScroller {
         private boolean mIsPerfLockAcquired = false;
         private boolean mIsPerfBoostEnabled = false;
         private int fBoostTimeOut = 0;
+        private int flingBoostTimeOut = 0;
         private int fBoostParamVal[];
 
         static {
@@ -796,9 +797,13 @@ public class OverScroller {
                 if (mPerf != null) {
                     mIsPerfLockAcquired = true;
                     if (0 == fBoostTimeOut) {
-                        fBoostTimeOut = mDuration;
+                        //config value is not defined
+                        flingBoostTimeOut = mDuration;
+                    } else {
+                        //config value is present
+                        flingBoostTimeOut = fBoostTimeOut;
                     }
-                    mPerf.perfLockAcquire(fBoostTimeOut, fBoostParamVal);
+                    mPerf.perfLockAcquire(flingBoostTimeOut, fBoostParamVal);
                 }
             }
 
