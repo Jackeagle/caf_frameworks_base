@@ -28,18 +28,23 @@
  */
 package android.drm;
 
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Date;
+
 import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.database.Cursor;
-import android.drm.DrmManagerClient;
-import android.drm.DrmRights;
 import android.drm.DrmStore.Action;
 import android.drm.DrmStore.RightsStatus;
 import android.graphics.Bitmap;
@@ -53,15 +58,6 @@ import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
-
-import com.android.internal.R;
-
-import java.io.File;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Date;
 
 /**
  * Utility APIs for OMA DRM v1 supports.
@@ -87,12 +83,29 @@ public class OmaDrmHelper {
     public static final String EXTENSION_FL = ".fl";
     public static final String EXTENSION_DCF = ".dcf";
 
+    public static final String MIDI_FILE_CACHE_AUDIOPREVIEW = "drm_audio_preview_midi.cache";
+    public static final String MIDI_FILE_CACHE_PLAYBACK = "drm_playback_midi.cache";
+    public static final String MIDI_FILE_CACHE_RINGTONE = "drm_ringtone_midi.cache";
+
     /**
      * Package name of the OmaDrmEngineApp which is basically used for manage
      * resources like strings
      */
     private static String OMA_DRM_ENGINE_APP = "com.oma.drm";
 
+    /**
+     * List of supported MIDI mimetype. Handle separatley by the OMA DRM engine
+     * <ul>
+     * <li>audio/mid</li>
+     * <li>audio/midi</li>
+     * <li>audio/x-mid</li>
+     * <li>audio/x-midi</li>
+     * <li>audio/sp-mid</li>
+     * <li>audio/sp-midi</li>
+     * <li>audio/imy</li>
+     * <li>audio/imelody</li>
+     * </ul>
+     */
     public static final String MIDI_MIME_TYPES[] = { "audio/mid", "audio/midi",
             "audio/x-mid", "audio/x-midi", "audio/sp-mid", "audio/sp-midi",
             "audio/imy", "audio/imelody" };
@@ -100,6 +113,7 @@ public class OmaDrmHelper {
     private static boolean sIsOmaDrmEnabled = false;
 
     static {
+        //
         File file1 = new File("/vendor/lib/drm/libomadrmengine.so");
         File file2 = new File("/vendor/lib64/drm/libomadrmengine.so");
         File file3 = new File("/system/lib/drm/libomadrmengine.so");
@@ -178,6 +192,8 @@ public class OmaDrmHelper {
 
         public static final String SHARE_NOT_ALLOWED = "share_not_allowed";
 
+        public static final String BUY_LICENSE = "buy_license";
+
         public static String getString(Context context, String stringResource) {
             final String packageName = OMA_DRM_ENGINE_APP;
             CharSequence drmString = null;
@@ -220,7 +236,7 @@ public class OmaDrmHelper {
     }
 
     /**
-     * @hide Wrapper to interact with OmaDrmEngine.
+     * Wrapper to interact with OmaDrmEngine.
      */
     public static class DrmManagerClientWrapper extends DrmManagerClient {
         private static final String TAG = "DrmManagerClientWrapper";
@@ -230,125 +246,110 @@ public class OmaDrmHelper {
         private static final String ACTION_STRING_CONSTRAINTS = "constraints";
         private static final String FAKE_ACTION = "0";
 
+        private Context mContext;
+
         public DrmManagerClientWrapper(Context context) {
             super(context);
+            mContext = context;
+        }
+
+        public Context getContext() {
+            return mContext;
         }
 
         @Override
         public ContentValues getConstraints(String path, int action) {
-            Log.i(TAG, "getConstraints of " + path);
+            return getConstraints(path, null, action);
+        }
+
+        public ContentValues getConstraints(Uri uri, int action) {
+            return getConstraints(convertUriToPath(mContext, uri), uri, action);
+        }
+
+        public ContentValues getConstraints(String path, Uri uri, int action) {
+            Log.i(TAG, "getConstraints of " + path + ", uri " + uri);
             String actionPath = OMA_DRM_SCHEMA + ACTION_STRING_CONSTRAINTS
                     + action + ":" + path;
-
-            if (null == path || path.equals("")) {
-                throw new IllegalArgumentException(
-                        "Given path should be non null");
-            }
-
-            String info = null;
-
-            FileInputStream is = null;
-            try {
-                FileDescriptor fd = null;
-                File file = new File(path);
-                if (file.exists()) {
-                    is = new FileInputStream(file);
-                    fd = is.getFD();
-                }
-                info = getInternalInfo(actionPath, fd);
-            } catch (IOException ioe) {
-                Log.e(TAG, "getConstraints failed! Exception : " + ioe);
-            } finally {
-                if (is != null) {
-                    try {
-                        is.close();
-                    } catch (IOException e) {
-                        Log.e(TAG,
-                                "getConstraints failed to close stream! Exception : "
-                                        + e);
-                    }
-                }
-            }
+            String info = getDrmInfo(path, uri, actionPath);
             Log.i(TAG, "Got Constraints info! info = " + info);
             return parseConstraints(info);
         }
 
         @Override
         public int checkRightsStatus(String path, int action) {
-            Log.i(TAG, "checkRightsStatus of " + path);
+            return checkRightsStatus(path, null, action);
+        }
+
+        public int checkRightsStatus(Uri uri, int action) {
+            return checkRightsStatus(convertUriToPath(mContext, uri), uri,
+                    action);
+        }
+
+        public int checkRightsStatus(String path, Uri uri, int action) {
+            Log.i(TAG, "checkRightsStatus of " + path + ", uri " + uri);
             String actionPath = OMA_DRM_SCHEMA + ACTION_STRING_RIGHTS + action
                     + ":" + path;
-
-            if (null == path || path.equals("")) {
-                throw new IllegalArgumentException(
-                        "Given path should be non null");
-            }
-
-            String info = null;
-
-            FileInputStream is = null;
-            try {
-                FileDescriptor fd = null;
-                File file = new File(path);
-                if (file.exists()) {
-                    is = new FileInputStream(file);
-                    fd = is.getFD();
-                }
-                info = getInternalInfo(actionPath, fd);
-            } catch (IOException ioe) {
-                Log.e(TAG, "checkRightsStatus failed! Exception : " + ioe);
-            } finally {
-                if (is != null) {
-                    try {
-                        is.close();
-                    } catch (IOException e) {
-                        Log.e(TAG,
-                                "checkRightsStatus failed to close stream! Exception : "
-                                        + e);
-                    }
-                }
-            }
+            String info = getDrmInfo(path, uri, actionPath);
             Log.i(TAG, "Got RightsStatus info! info = " + info);
             return parseRightsStatus(info);
         }
 
         @Override
         public ContentValues getMetadata(String path) {
-            Log.i(TAG, "getMetadata of " + path);
+            return getMetadata(path, null);
+        }
+
+        public ContentValues getMetadata(Uri uri) {
+            return getMetadata(convertUriToPath(mContext, uri), uri);
+        }
+
+        public ContentValues getMetadata(String path, Uri uri) {
+            Log.i(TAG, "getMetadata of " + path + ", uri " + uri);
             String actionPath = OMA_DRM_SCHEMA + ACTION_STRING_METADATA
                     + FAKE_ACTION + ":" + path;
+            String info = getDrmInfo(path, uri, actionPath);
+            Log.i(TAG, "Got Metadata info! info = " + info);
+            return parseMetadata(info);
+        }
 
-            if (null == path || path.equals("")) {
+        private String getDrmInfo(String path, Uri uri, String actionablePath) {
+            if (TextUtils.isEmpty(path)) {
                 throw new IllegalArgumentException(
                         "Given path should be non null");
             }
 
             String info = null;
-
             FileInputStream is = null;
+            FileDescriptor fd = null;
             try {
-                FileDescriptor fd = null;
-                File file = new File(path);
-                if (file.exists()) {
-                    is = new FileInputStream(file);
-                    fd = is.getFD();
-                }
-                info = getInternalInfo(actionPath, fd);
-            } catch (IOException ioe) {
-                Log.e(TAG, "getMetadata failed! IOException : " + ioe);
-            } finally {
-                if (is != null) {
-                    try {
-                        is.close();
-                    } catch (IOException e) {
-                        Log.e(TAG,
-                                "getMetadata failed to close stream! Exception : "
-                                        + e);
+                if (OmaDrmHelper.isSupportedUri(uri)) {
+                    ContentResolver resolver = mContext.getContentResolver();
+                    fd = resolver.openAssetFileDescriptor(uri, "r")
+                            .getFileDescriptor();
+                } else {
+                    File file = new File(path);
+                    if (file.exists()) {
+                        is = new FileInputStream(file);
+                        fd = is.getFD();
                     }
                 }
+                if (fd != null) {
+                    info = getInternalInfo(actionablePath, fd);
+                }
+            } catch (IOException ioe) {
+                Log.e(TAG, "getDrmInfo failed! IOException : " + ioe);
+            } finally {
+                try {
+                    if (is != null) {
+                        is.close();
+                    }
+                } catch (IOException e) {
+                    Log.e(TAG,
+                            "getDrmInfo failed to close stream! Exception : "
+                                    + e);
+                }
             }
-            Log.i(TAG, "Got Metadata info! info = " + info);
-            return parseMetadata(info);
+            return info;
         }
 
         private ContentValues parseConstraints(String constraints) {
@@ -393,17 +394,26 @@ public class OmaDrmHelper {
         }
     }
 
-    /**
-     * @hide Internal DRM api
-     */
     public static final int checkRightsStatus(Context context, String path,
             String mimeType) {
+        return checkRightsStatus(context, path, null, mimeType);
+    }
+
+    public static final int checkRightsStatus(Context context, Uri uri,
+            String mimeType) {
+        return checkRightsStatus(context, convertUriToPath(context, uri), uri,
+                mimeType);
+    }
+
+    public static final int checkRightsStatus(Context context, String path,
+            Uri uri, String mimeType) {
         int status = -1;
         if (isDrmFile(path)) {
             DrmManagerClientWrapper drmClient = null;
             try {
                 drmClient = new DrmManagerClientWrapper(context);
                 status = checkRightsStatus(drmClient, path, mimeType);
+
             } catch (Exception e) {
                 Log.e(TAG, "Exception while checking rights. Exception : " + e);
             } finally {
@@ -415,27 +425,39 @@ public class OmaDrmHelper {
         return status;
     }
 
-    /**
-     * @hide Internal DRM api
-     */
     public static final int checkRightsStatus(
             DrmManagerClientWrapper drmClient, String path, String mimeType) {
+        return checkRightsStatus(drmClient, path, null, mimeType);
+    }
+
+    public static final int checkRightsStatus(
+            DrmManagerClientWrapper drmClient, Uri uri, String mimeType) {
+        return checkRightsStatus(drmClient,
+                convertUriToPath(drmClient.getContext(), uri), uri, mimeType);
+    }
+
+    public static final int checkRightsStatus(
+            DrmManagerClientWrapper drmClient, String path, Uri uri,
+            String mimeType) {
         int status = -1;
         if (isDrmFile(path)) {
             if (!TextUtils.isEmpty(mimeType) && isSupportedMimeType(mimeType)) {
                 if (mimeType.startsWith("image")) {
-                    status = drmClient.checkRightsStatus(path, Action.DISPLAY);
+                    status = drmClient.checkRightsStatus(path, uri,
+                            Action.DISPLAY);
                 } else {
-                    status = drmClient.checkRightsStatus(path, Action.PLAY);
+                    status = drmClient
+                            .checkRightsStatus(path, uri, Action.PLAY);
                 }
             } else {
                 mimeType = drmClient.getOriginalMimeType(path);
                 if (isSupportedMimeType(mimeType)) {
                     if (mimeType.startsWith("image")) {
-                        status = drmClient.checkRightsStatus(path,
+                        status = drmClient.checkRightsStatus(path, uri,
                                 Action.DISPLAY);
                     } else {
-                        status = drmClient.checkRightsStatus(path, Action.PLAY);
+                        status = drmClient.checkRightsStatus(path, uri,
+                                Action.PLAY);
                     }
                 }
             }
@@ -444,31 +466,31 @@ public class OmaDrmHelper {
         return status;
     }
 
-    /**
-     * @hide Internal DRM api
-     */
-    public static boolean consumeDrmRights(String path, String mimeType) {
-        if (!isDrmFile(path)) {
-            Log.e(TAG, "Could not consume rights from non-drm file. path = "
-                    + path);
-            return false;
-        }
-
-        return consumeDrmRights(path);
-    }
-
-    /**
-     * @hide Internal DRM api
-     */
     public static BitmapRegionDecoder createBitmapRegionDecoder(String path,
             boolean isShareable) {
+        return createBitmapRegionDecoder(null, path, null, isShareable);
+    }
+
+    public static BitmapRegionDecoder createBitmapRegionDecoder(
+            Context context, String path, boolean isShareable) {
+        return createBitmapRegionDecoder(context, path, null, isShareable);
+    }
+
+    public static BitmapRegionDecoder createBitmapRegionDecoder(
+            Context context, Uri uri, boolean isShareable) {
+        return createBitmapRegionDecoder(context,
+                convertUriToPath(context, uri), uri, isShareable);
+    }
+
+    public static BitmapRegionDecoder createBitmapRegionDecoder(
+            Context context, String path, Uri uri, boolean isShareable) {
         if (!isDrmFile(path)) {
             Log.e(TAG, "Could not decode non-drm file. path = " + path);
             return null;
         }
 
         try {
-            byte[] data = getDrmDecryptedData(path);
+            byte[] data = getDrmDecryptedData(context, path, uri);
             if (data != null) {
                 return BitmapRegionDecoder.newInstance(data, 0, data.length,
                         isShareable);
@@ -480,17 +502,20 @@ public class OmaDrmHelper {
         return null;
     }
 
-    /**
-     * @hide Internal DRM api
-     */
-    public static Bitmap getBitmap(String path) {
-        return getBitmap(path, null);
+    public static Bitmap getBitmap(String path, BitmapFactory.Options options) {
+        return getBitmap(null, path, null, options);
     }
 
-    /**
-     * @hide Internal DRM api
-     */
-    public static Bitmap getBitmap(String path, BitmapFactory.Options options) {
+    public static Bitmap getBitmap(Context context, String path) {
+        return getBitmap(context, path, null, null);
+    }
+
+    public static Bitmap getBitmap(Context context, Uri uri) {
+        return getBitmap(context, convertUriToPath(context, uri), uri, null);
+    }
+
+    public static Bitmap getBitmap(Context context, String path, Uri uri,
+            BitmapFactory.Options options) {
         if (!isDrmFile(path)) {
             Log.e(TAG, "Could not decode non-drm file. path = " + path);
             return null;
@@ -500,7 +525,7 @@ public class OmaDrmHelper {
             options.inPreferredConfig = Config.ARGB_8888;
         }
 
-        byte[] data = getDrmDecryptedData(path);
+        byte[] data = getDrmDecryptedData(context, path, uri);
         try {
             if (data != null) {
                 return BitmapFactory.decodeByteArray(data, 0, data.length);
@@ -512,26 +537,41 @@ public class OmaDrmHelper {
         return null;
     }
 
-    /**
-     * @hide Internal DRM api
-     */
     public static byte[] getDrmImageBytes(String path) {
+        return getDrmImageBytes(null, path, null);
+    }
+
+    public static byte[] getDrmImageBytes(Context context, String path) {
+        return getDrmImageBytes(context, path, null);
+    }
+
+    public static byte[] getDrmImageBytes(Context context, Uri uri) {
+        return getDrmImageBytes(context, convertUriToPath(context, uri), uri);
+    }
+
+    public static byte[] getDrmImageBytes(Context context, String path, Uri uri) {
+        return getDrmImageBytes(context, path, uri, false);
+    }
+
+    public static byte[] getDrmImageBytes(Context context, String path,
+            Uri uri, boolean consumeRights) {
         if (!isDrmFile(path)) {
             Log.e(TAG, "Could not decode non-drm file. path = " + path);
             return null;
         }
 
         try {
-            return getDrmDecryptedData(path);
+            return getDrmDecryptedData(context, path, uri, consumeRights);
         } catch (Exception e) {
             Log.w(TAG, "Could not decode non-drm file. Exception : " + e);
             return null;
         }
     }
 
-    /**
-     * @hide Internal DRM api
-     */
+    public static final String convertUriToPath(Context context, Uri uri) {
+        return getFilePath(context, uri);
+    }
+
     public static final String getFilePath(Context context, Uri uri) {
         String path = null;
         Cursor cursor = null;
@@ -577,20 +617,30 @@ public class OmaDrmHelper {
         return path;
     }
 
-    /**
-     * @hide Internal DRM api
-     */
-    public static final String getDrmMidiFilePath(Context context, String path,
-            String cachePath, String mimeType) {
-        if (isDrmFile(path) && context != null) {
-            if (isDrmMidiFile(context, path, mimeType)) {
-                byte[] data = getDrmDecryptedData(path);
+    public static final String getDrmMidiFilePath(Context context,
+            String sourcePath, String mimeType, String cachePath,
+            String cacheFileName) {
+        return getDrmMidiFilePath(context, sourcePath, null, mimeType,
+                cachePath, cacheFileName, true);
+    }
+
+    public static final String getDrmMidiFilePath(Context context,
+            String sourcePath, Uri uri, String mimeType, String cachePath,
+            String cacheFileName, boolean consumeRights) {
+        if (isDrmFile(sourcePath) && context != null) {
+            if (isDrmMidiFile(context, sourcePath, mimeType)) {
+                byte[] data = getDrmDecryptedData(context, sourcePath, uri,
+                        consumeRights);
                 FileOutputStream out = null;
                 if (data != null) {
                     // CheckHere
                     // consumeDrmRightsNonBlocking(path, mimeType);
                     try {
-                        File cacheFile = new File(cachePath, "drmmidifile.dm");
+                        if (TextUtils.isEmpty(cacheFileName)) {
+                            cacheFileName = "music_midi.cache";
+                        }
+
+                        File cacheFile = new File(cachePath, cacheFileName);
                         if (cacheFile.exists()) {
                             cacheFile.delete();
                         }
@@ -615,11 +665,11 @@ public class OmaDrmHelper {
                 }
             }
         }
-        return path;
+        return sourcePath;
     }
 
     /**
-     * @hide Internal DRM api
+     * Get the original mimetype of a DRM content.
      */
     public static final String getOriginalMimeType(Context context, String path) {
         String mime = "";
@@ -640,7 +690,7 @@ public class OmaDrmHelper {
     }
 
     /**
-     * @hide Internal DRM api
+     * Check the given mimetype is according to OMA DRM spec.
      */
     public static final boolean isDrmMimeType(String mimeType) {
         if (!TextUtils.isEmpty(mimeType)) {
@@ -653,7 +703,7 @@ public class OmaDrmHelper {
     }
 
     /**
-     * @hide Internal DRM api
+     * Check whether the given file path and mimetype was was a MIDI type.
      */
     public static final boolean isDrmMidiFile(Context context, String path,
             String mimeType) {
@@ -674,7 +724,12 @@ public class OmaDrmHelper {
     }
 
     /**
-     * @hide Internal DRM api
+     * Check whether the given file file path is DRM Message File. It will
+     * decided by the extension of the path. (.dm)
+     *
+     * @param path
+     *            : Drm file path
+     * @return true : when the file path ends with .dm extension
      */
     public static final boolean isDrmCD(String path) {
         if (isDrmFile(path)) {
@@ -838,23 +893,28 @@ public class OmaDrmHelper {
         return false;
     }
 
-    /**
-     * @hide Internal DRM api
-     */
     public static final void manageDrmLicense(Context context, String path,
             String mimeType) {
+        manageDrmLicense(context, path, null, mimeType);
+    }
+
+    public static final void manageDrmLicense(Context context, String path,
+            Uri uri, String mimeType) {
         if (isDrmFile(path)) {
-            if (validateLicense(context, path, mimeType)) {
-                consumeDrmRights(path, mimeType);
+            if (validateLicense(context, path, uri, mimeType)) {
+                consumeDrmRights(context, path, uri);
             }
         }
     }
 
-    /**
-     * @hide Internal DRM api
-     */
     public static final void manageDrmLicense(final Context context,
             Handler handler, final String path, final String mimeType) {
+        manageDrmLicense(context, handler, path, null, mimeType);
+    }
+
+    public static final void manageDrmLicense(final Context context,
+            Handler handler, final String path, final Uri uri,
+            final String mimeType) {
         if (isDrmFile(path)) {
             if (handler != null) {
                 // Start consume right thread 1s delayed,
@@ -865,8 +925,8 @@ public class OmaDrmHelper {
                     @Override
                     public void run() {
                         if (isDrmFile(path)) {
-                            if (validateLicense(context, path, mimeType)) {
-                                consumeDrmRights(path, mimeType);
+                            if (validateLicense(context, path, uri, mimeType)) {
+                                consumeDrmRights(context, path, uri);
                             }
                         }
                     }
@@ -877,20 +937,25 @@ public class OmaDrmHelper {
         }
     }
 
-    /**
-     * @hide Internal DRM api
-     */
-    public static final void showDrmInfo(Context context, String path) {
-        if (isDrmFile(path)) {
-            showProperties(context, path, null);
-        }
+    public static final boolean validateLicense(Context context, String path,
+            String mimeType) {
+        return validateLicense(context, path, null, mimeType, null, null);
     }
 
-    /**
-     * @hide Internal DRM api
-     */
+    public static final boolean validateLicense(Context context, String path,
+            Uri uri, String mimeType) {
+        return validateLicense(context, path, uri, mimeType, null, null);
+    }
+
     public static final boolean validateLicense(Context context, String path,
             String mimeType, DialogInterface.OnClickListener okListener,
+            DialogInterface.OnClickListener cancelListener) {
+        return validateLicense(context, path, null, mimeType, null, null);
+    }
+
+    public static final boolean validateLicense(Context context, String path,
+            Uri uri, String mimeType,
+            DialogInterface.OnClickListener okListener,
             DialogInterface.OnClickListener cancelListener) {
         boolean result = true;
         DrmManagerClientWrapper drmClient = null;
@@ -905,9 +970,9 @@ public class OmaDrmHelper {
             }
             try {
                 drmClient = new DrmManagerClientWrapper(context);
-                int status = checkRightsStatus(drmClient, path, mimeType);
+                int status = checkRightsStatus(drmClient, path, uri, mimeType);
                 if (RightsStatus.RIGHTS_VALID != status) {
-                    ContentValues values = drmClient.getMetadata(path);
+                    ContentValues values = drmClient.getMetadata(path, uri);
                     String address = values.getAsString("Rights-Issuer");
                     buyLicense(context, address, okListener, cancelListener);
                     Log.w(TAG, "Drm License expared! can not proceed ahead");
@@ -925,14 +990,6 @@ public class OmaDrmHelper {
         }
 
         return result;
-    }
-
-    /**
-     * @hide Internal DRM api
-     */
-    public static final boolean validateLicense(Context context, String path,
-            String mimeType) {
-        return validateLicense(context, path, mimeType, null, null);
     }
 
     public static final boolean copyData(DrmManagerClient client, byte[] bytes,
@@ -992,29 +1049,46 @@ public class OmaDrmHelper {
         return false;
     }
 
-    /**
-     * @hide Internal Drm API
-     */
-    public static boolean consumeDrmRights(String path) {
+    public static boolean consumeDrmRights(String path, String mimeType) {
+        return consumeDrmRights(null, path, null);
+    }
+
+    public static boolean consumeDrmRights(Context context, String path) {
+        return consumeDrmRights(context, path, null);
+    }
+
+    public static boolean consumeDrmRights(Context context, Uri uri) {
+        return consumeDrmRights(context, convertUriToPath(context, uri), uri);
+    }
+
+    public static boolean consumeDrmRights(Context context, String path, Uri uri) {
         FileInputStream is = null;
         boolean result = false;
+        FileDescriptor fd = null;
         try {
-            FileDescriptor fd = null;
-            File file = new File(path);
-            if (file.exists()) {
-                is = new FileInputStream(file);
-                fd = is.getFD();
+            if (OmaDrmHelper.isSupportedUri(uri) && context != null) {
+                ContentResolver resolver = context.getContentResolver();
+                fd = resolver.openAssetFileDescriptor(uri, "r")
+                        .getFileDescriptor();
+            } else {
+                File file = new File(path);
+                if (file.exists()) {
+                    is = new FileInputStream(file);
+                    fd = is.getFD();
+                }
             }
-            result = nativeConsumeDrmRights(fd);
+            if (fd != null) {
+                result = nativeConsumeDrmRights(fd);
+            }
         } catch (IOException ioe) {
             Log.e(TAG, "Unable to decode drm file: " + ioe);
         } finally {
-            if (is != null) {
-                try {
+            try {
+                if (is != null) {
                     is.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "Unable to close drm file: " + e);
                 }
+            } catch (IOException e) {
+                Log.e(TAG, "Unable to close drm file: " + e);
             }
         }
         return result;
@@ -1023,50 +1097,79 @@ public class OmaDrmHelper {
     /**
      * @hide Internal Drm API
      */
-    public static boolean consumeDrmRightsNonBlocking(final String path) {
+    public static boolean consumeDrmRightsNonBlocking(final Context context,
+            final String path) {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                consumeDrmRights(path);
+                consumeDrmRights(context, path);
             }
         }, "consumeDrmRightsNonBlocking");
         return true;
     }
 
-    /**
-     * @hide Internal Drm API
-     */
-    public static byte[] getDrmDecryptedData(String path) {
+    public static byte[] getDrmDecryptedData(Context context, String path) {
+        return getDrmDecryptedData(context, path, null, false);
+    }
+
+    public static byte[] getDrmDecryptedData(Context context, String path,
+            boolean consumeRights) {
+        return getDrmDecryptedData(context, path, null, consumeRights);
+    }
+
+    public static byte[] getDrmDecryptedData(Context context, Uri uri) {
+        return getDrmDecryptedData(context, convertUriToPath(context, uri),
+                uri, false);
+    }
+
+    public static byte[] getDrmDecryptedData(Context context, Uri uri,
+            boolean consumeRights) {
+        return getDrmDecryptedData(context, convertUriToPath(context, uri),
+                uri, consumeRights);
+    }
+
+    public static byte[] getDrmDecryptedData(Context context, String path,
+            Uri uri) {
+        return getDrmDecryptedData(context, path, uri, false);
+    }
+
+    public static byte[] getDrmDecryptedData(Context context, String path,
+            Uri uri, boolean consumeRights) {
         if (!isOmaDrmEnabled()) {
             return null;
         }
         FileInputStream is = null;
+        FileDescriptor fd = null;
         byte[] result = null;
         try {
-            FileDescriptor fd = null;
-            File file = new File(path);
-            if (file.exists()) {
-                is = new FileInputStream(file);
-                fd = is.getFD();
+            if (isSupportedUri(uri) && context != null) {
+                ContentResolver resolver = context.getContentResolver();
+                fd = resolver.openAssetFileDescriptor(uri, "r")
+                        .getFileDescriptor();
+            } else {
+                File file = new File(path);
+                if (file.exists()) {
+                    is = new FileInputStream(file);
+                    fd = is.getFD();
+                }
             }
-            result = nativeGetDrmDecryptedData(fd);
+            if (fd != null) {
+                result = nativeGetDrmDecryptedData(fd, consumeRights);
+            }
         } catch (IOException ioe) {
             Log.e(TAG, "Unable to decode drm file: " + ioe);
         } finally {
-            if (is != null) {
-                try {
+            try {
+                if (is != null) {
                     is.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "Unable to close drm file: " + e);
                 }
+            } catch (IOException e) {
+                Log.e(TAG, "Unable to close drm file: " + e);
             }
         }
         return result;
     }
 
-    /**
-     * @hide Internal Drm API
-     */
     public static final void updateDrmFileTitle(Context context, Uri uri,
             String filePath) {
         if (isDrmFile(getFilePath(context, Uri.parse(filePath)))) {
@@ -1080,7 +1183,38 @@ public class OmaDrmHelper {
         }
     }
 
-    public static String getSelectAudioPath(Context context, long mSelectedId) {
+    public static final void refactorMimetype(Context context, String path,
+            Uri uri) {
+        if (isDrmFile(path) && isSupportedUri(uri)) {
+            FileDescriptor fd = null;
+            byte[] result = null;
+            DrmManagerClientWrapper drmClient = null;
+            ContentResolver resolver = context.getContentResolver();
+            try {
+                drmClient = new DrmManagerClientWrapper(context);
+                if (isSupportedUri(uri)) {
+                    fd = resolver.openAssetFileDescriptor(uri, "r")
+                            .getFileDescriptor();
+                }
+                if (fd != null) {
+                    String mimetype = drmClient.getInternalInfo(path, fd);
+                    if (!TextUtils.isEmpty(mimetype)) {
+                        ContentValues cv = new ContentValues();
+                        cv.put("ct", mimetype);
+                        resolver.update(uri, cv, null, null);
+                    }
+                }
+            } catch (IOException ioe) {
+                Log.e(TAG, "Unable to decode drm file: " + ioe);
+            } finally {
+                if (drmClient != null) {
+                    drmClient.release();
+                }
+            }
+        }
+    }
+
+    public static String getSelectedAudioPath(Context context, long selectedId) {
         String result = "";
         if (!isOmaDrmEnabled()) {
             return result;
@@ -1091,8 +1225,7 @@ public class OmaDrmHelper {
         }
         try {
             final String[] ccols = new String[] { MediaStore.Audio.Media.DATA };
-            String where = MediaStore.Audio.Media._ID + "='" + mSelectedId
-                    + "'";
+            String where = MediaStore.Audio.Media._ID + "='" + selectedId + "'";
             Cursor cursor = query(context,
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, ccols, where,
                     null, null);
@@ -1152,11 +1285,19 @@ public class OmaDrmHelper {
         }
     }
 
-    /**
-     * @hide Show DRM license.
-     *
-     */
-    private static void showProperties(Context context, String path,
+    public static final void showDrmInfo(Context context, String path) {
+        if (isDrmFile(path)) {
+            showProperties(context, path, null, null);
+        }
+    }
+
+    public static final void showDrmInfo(Context context, String path, Uri uri) {
+        if (isDrmFile(path)) {
+            showProperties(context, path, uri, null);
+        }
+    }
+
+    private static void showProperties(Context context, String path, Uri uri,
             String drmType) {
         if (!isDrmFile(getFilePath(context, Uri.parse(path)))) {
             return;
@@ -1166,10 +1307,13 @@ public class OmaDrmHelper {
         ContentValues playContentValues = null;
         ContentValues displayContentValues = null;
         DrmManagerClientWrapper drmClient = new DrmManagerClientWrapper(context);
+        String rightsIssuerUrl = null;
 
         try {
-            playContentValues = drmClient.getConstraints(path, 1);
-            displayContentValues = drmClient.getConstraints(path, 7);
+            playContentValues = drmClient.getConstraints(path, uri, 1);
+            displayContentValues = drmClient.getConstraints(path, uri, 7);
+            ContentValues values = drmClient.getMetadata(path, uri);
+            rightsIssuerUrl = values.getAsString("Rights-Issuer");
         } catch (Exception ex) {
             Log.e(TAG, "Exception while showProperties :" + ex.toString());
         } finally {
@@ -1180,6 +1324,7 @@ public class OmaDrmHelper {
 
         if (playContentValues != null
                 && playContentValues.getAsInteger("valid") != 0) {
+            rightsIssuerUrl = ""; // No need to send url to by license
             if (playContentValues.getAsInteger("unlimited") != 0) {
                 message += OmaDrmStrings.getString(context,
                         OmaDrmStrings.PLAY_UNLIMITED) + "\n";
@@ -1190,6 +1335,7 @@ public class OmaDrmHelper {
             }
         } else if (displayContentValues != null
                 && displayContentValues.getAsInteger("valid") != 0) {
+            rightsIssuerUrl = ""; // No need to send url to by license
             if (displayContentValues.getAsInteger("unlimited") != 0) {
                 message += OmaDrmStrings.getString(context,
                         OmaDrmStrings.PLAY_UNLIMITED) + "\n";
@@ -1203,13 +1349,19 @@ public class OmaDrmHelper {
                     .getString(context, OmaDrmStrings.NO_RIGHTS) + "\n";
         }
 
-        new AlertDialog.Builder(context)
-                .setTitle(
-                        OmaDrmStrings.getString(context,
-                                OmaDrmStrings.LICENSE_INFO))
-                .setMessage(message)
-                .setPositiveButton(android.R.string.yes, null)
-                .setIcon(android.R.drawable.ic_dialog_info).show();
+        if (!TextUtils.isEmpty(rightsIssuerUrl)) {
+            // It does not have license, need to buy rights
+            buyLicense(context, rightsIssuerUrl, null, null);
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(OmaDrmStrings.getString(context,
+                OmaDrmStrings.LICENSE_INFO));
+        builder.setMessage(message);
+        builder.setPositiveButton(android.R.string.yes, null);
+        builder.setIcon(android.R.drawable.ic_dialog_info);
+        builder.show();
     }
 
     private static String formatMsg(Context context, String message,
@@ -1264,97 +1416,89 @@ public class OmaDrmHelper {
         return message;
     }
 
-    private static void buyLicense(final Context context, final String address,
+    private static void buyLicense(final Context context,
+            final String licenseUrl,
             final DialogInterface.OnClickListener okListener,
             final DialogInterface.OnClickListener cancelListener) {
-        if (TextUtils.isEmpty(address)) {
-            new AlertDialog.Builder(context)
-                    .setIcon(android.R.drawable.ic_dialog_alert)
-                    .setTitle(
-                            OmaDrmStrings.getString(context,
-                                    OmaDrmStrings.LICENSE_EXPIRED))
-                    .setMessage(
-                            OmaDrmStrings.getString(context,
-                                    OmaDrmStrings.LICENSE_RENEW_NOT_POSSIBLE))
-                    .setPositiveButton(android.R.string.yes,
-                            new DialogInterface.OnClickListener() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setIcon(android.R.drawable.ic_dialog_alert);
+        if (TextUtils.isEmpty(licenseUrl)) {
+            builder.setTitle(OmaDrmStrings.getString(context,
+                    OmaDrmStrings.LICENSE_EXPIRED));
+            builder.setMessage(OmaDrmStrings.getString(context,
+                    OmaDrmStrings.LICENSE_RENEW_NOT_POSSIBLE));
+            builder.setPositiveButton(android.R.string.yes,
+                    new DialogInterface.OnClickListener() {
 
-                                @Override
-                                public void onClick(DialogInterface dialog,
-                                        int which) {
-                                    if (cancelListener != null) {
-                                        cancelListener.onClick(dialog, which);
-                                    }
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            if (cancelListener != null) {
+                                cancelListener.onClick(dialog, which);
+                            }
 
-                                }
-                            })
-                    .setOnCancelListener(
-                            new DialogInterface.OnCancelListener() {
+                        }
+                    });
+            builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
 
-                                @Override
-                                public void onCancel(DialogInterface dialog) {
-                                    if (cancelListener != null) {
-                                        cancelListener.onClick(dialog, -1);
-                                    }
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                    if (cancelListener != null) {
+                        cancelListener.onClick(dialog, -1);
+                    }
 
-                                }
-                            }).show();
+                }
+            });
+            builder.show();
         } else {
-            new AlertDialog.Builder(context)
-                    .setIcon(android.R.drawable.ic_dialog_alert)
-                    .setTitle(
-                            OmaDrmStrings.getString(context,
-                                    OmaDrmStrings.LICENSE_EXPIRED))
-                    .setMessage(
-                            OmaDrmStrings.getString(context,
-                                    OmaDrmStrings.LICENSE_RENEW))
-                    .setPositiveButton(android.R.string.ok,
-                            new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog,
-                                        int which) {
-                                    Intent i = new Intent(Intent.ACTION_VIEW);
-                                    i.setData(Uri.parse(address));
-                                    try {
-                                        context.startActivity(i);
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "ActivityNotFoundException="
+            builder.setTitle(OmaDrmStrings.getString(context,
+                    OmaDrmStrings.LICENSE_EXPIRED));
+            builder.setMessage(OmaDrmStrings.getString(context,
+                    OmaDrmStrings.LICENSE_RENEW));
+            builder.setPositiveButton(
+                    OmaDrmStrings.getString(context, OmaDrmStrings.BUY_LICENSE),
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            Intent i = new Intent(Intent.ACTION_VIEW);
+                            i.setData(Uri.parse(licenseUrl));
+                            try {
+                                context.startActivity(i);
+                            } catch (Exception e) {
+                                Log.e(TAG,
+                                        "ActivityNotFoundException="
                                                 + e.toString());
-                                        String str = OmaDrmStrings
-                                                .getString(
-                                                        context,
-                                                        OmaDrmStrings.ACTIVITY_NOT_FOUND);
-                                        Toast.makeText(context, str + address,
-                                                Toast.LENGTH_LONG).show();
-                                    }
+                                String str = OmaDrmStrings.getString(context,
+                                        OmaDrmStrings.ACTIVITY_NOT_FOUND);
+                                Toast.makeText(context, str + licenseUrl,
+                                        Toast.LENGTH_LONG).show();
+                            }
 
-                                    if (okListener != null) {
-                                        okListener.onClick(dialog, which);
-                                    }
-                                }
-                            })
-                    .setNegativeButton(android.R.string.no,
-                            new DialogInterface.OnClickListener() {
+                            if (okListener != null) {
+                                okListener.onClick(dialog, which);
+                            }
+                        }
+                    });
+            builder.setNegativeButton(android.R.string.no,
+                    new DialogInterface.OnClickListener() {
 
-                                @Override
-                                public void onClick(DialogInterface dialog,
-                                        int which) {
-                                    if (cancelListener != null) {
-                                        cancelListener.onClick(dialog, which);
-                                    }
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            if (cancelListener != null) {
+                                cancelListener.onClick(dialog, which);
+                            }
 
-                                }
-                            })
-                    .setOnCancelListener(
-                            new DialogInterface.OnCancelListener() {
+                        }
+                    });
+            builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
 
-                                @Override
-                                public void onCancel(DialogInterface dialog) {
-                                    if (cancelListener != null) {
-                                        cancelListener.onClick(dialog, -1);
-                                    }
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                    if (cancelListener != null) {
+                        cancelListener.onClick(dialog, -1);
+                    }
 
-                                }
-                            }).show();
+                }
+            });
+            builder.show();
         }
     }
 
@@ -1370,7 +1514,25 @@ public class OmaDrmHelper {
         return false;
     }
 
+    /**
+     * Check provided uri is supportable for DRm or not. Now we are only
+     * supporting MMS uri to support DRM.
+     */
+    public static final boolean isSupportedUri(Uri uri) {
+        if (uri != null) {
+            String scheme = uri.getScheme();
+            String authority = uri.getAuthority();
+            // implement logic to find supportable uri
+            if (ContentResolver.SCHEME_CONTENT.equals(scheme)
+                    && "mms".equals(authority)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static native boolean nativeConsumeDrmRights(FileDescriptor fd);
 
-    private static native byte[] nativeGetDrmDecryptedData(FileDescriptor fd);
+    private static native byte[] nativeGetDrmDecryptedData(FileDescriptor fd,
+            boolean consumeRights);
 }
