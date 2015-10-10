@@ -162,6 +162,7 @@ public class RecentsView extends FrameLayout implements TaskStackView.TaskStackV
             if (child != mSearchBar) {
                 TaskStackView stackView = (TaskStackView) child;
                 stackView.dismissAllTasks();
+                break;
             }
         }
     }
@@ -608,8 +609,30 @@ public class RecentsView extends FrameLayout implements TaskStackView.TaskStackV
     }
 
     @Override
-    public void onAllTaskViewsDismissed() {
-        mCb.onAllTaskViewsDismissed();
+    public void onAllTaskViewsDismissed(final ArrayList<Task> tasks) {
+
+        postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // Update the animation, first
+                mCb.onAllTaskViewsDismissed();
+            }
+        },150);
+
+        // remove task in activitiy manager can take sometime so delaying the request. This
+        // gives enough time for exiting animation to start.
+        postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (tasks != null) {
+                    int size;
+                    size = tasks.size();
+                    for (int i=0; i < size; i++) {
+                        onTaskViewDismissed(tasks.get(i));
+                    }
+                }
+            }
+        },250);
     }
 
     /** Final callback after Recents is finally hidden. */
