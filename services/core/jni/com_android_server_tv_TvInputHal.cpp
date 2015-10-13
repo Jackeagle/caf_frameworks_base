@@ -207,16 +207,16 @@ status_t BufferProducerThread::readyToRun() {
             break;
         }
         mSeq++;
+        mBuffers[k].seqNum = mSeq;
         mBuffers[k].buffer = buffer;
         mBuffers[k].bufferState = CAPTURE;
         err = mDevice->request_capture(mDevice, mDeviceId, mStream.stream_id,
                                     mBuffers[k].buffer->handle, mSeq);
         if (err != NO_ERROR) {
-            ALOGE("Error: %d request capture (no frames)", err);
+            ALOGE("Error: %d request capture (no frames), seq = %d", err, mSeq);
             return err;
         }
-        mBuffers[k].seqNum = mSeq;
-        ALOGV("Send buffer = %p for capture", buffer->handle);
+        ALOGV("Send buffer = %p for capture, seq = %d", buffer->handle, mSeq);
     }
     ALOGV("Exit %s NO_ERROR", __func__);
     return NO_ERROR;
@@ -308,6 +308,10 @@ void BufferProducerThread::onCaptured(uint32_t seq, bool succeeded) {
                 ALOGV("Released buffer count = %d", mReleasedBufCnt);
             }
         }
+        else
+        {
+            ALOGV("Set buffer index = %d to RELEASED", idx);
+        }
     }
     else
     {
@@ -343,7 +347,6 @@ int BufferProducerThread::findBufferIndex(uint32_t seq)
 {
    int index = -1;
 
-   ALOGV("Enter %s(%d)", __func__, __LINE__);
    for (uint32_t k = 0; k < mStream.buffer_producer.buffer_count; k++)
    {
       if (mBuffers[k].seqNum == seq)
@@ -352,6 +355,7 @@ int BufferProducerThread::findBufferIndex(uint32_t seq)
          break;
       }
    }
+   ALOGV("Exit %s(%d) buffer index = %d", __func__, __LINE__, index);
    return index;
 }
 
