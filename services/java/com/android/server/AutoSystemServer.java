@@ -238,14 +238,14 @@ public class AutoSystemServer extends SystemServer {
             mSystemServiceManager.startService(PRINT_MANAGER_SERVICE_CLASS);
         }
 
-        //Starting HDMI controller service.
-        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
-            mSystemServiceManager.startService(HdmiControlService.class);
-        }
-
         //Starting TV Input Manager Service.
         if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
             mSystemServiceManager.startService(TvInputManagerService.class);
+        }
+
+        //Starting HDMI controller service.
+        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
+            mSystemServiceManager.startService(HdmiControlService.class);
         }
 
         //Starting MMS Service Broker.
