@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution.
  *
  * Copyright (C) 2008 The Android Open Source Project
@@ -19,6 +19,8 @@
 
 package android.media;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
@@ -634,6 +636,7 @@ public class AudioRecord
      */
     public void startRecording()
     throws IllegalStateException {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AudioRecord__startRecording, "");
         if (!isAudioRecordAllowed()) {
             Log.e(TAG, "User permission denied!");
             return;
@@ -661,6 +664,7 @@ public class AudioRecord
      */
     public void startRecording(MediaSyncEvent syncEvent)
     throws IllegalStateException {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AudioRecord__startRecording, "");
         if (!isAudioRecordAllowed()) {
             Log.e(TAG, "User permission denied!");
             return;
@@ -685,6 +689,7 @@ public class AudioRecord
      */
     public void stop()
     throws IllegalStateException {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AudioRecord__stop, "");
         if (mState != STATE_INITIALIZED) {
             throw new IllegalStateException("stop() called on an uninitialized AudioRecord.");
         }

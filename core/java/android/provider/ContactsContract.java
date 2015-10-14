@@ -16,6 +16,8 @@
 
 package android.provider;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.accounts.Account;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -1503,6 +1505,8 @@ public final class ContactsContract {
          *            {@link #CONTENT_LOOKUP_URI} to attempt refreshing.
          */
         public static Uri getLookupUri(ContentResolver resolver, Uri contactUri) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__getLookupUri,
+                    "contactUri, " + ((contactUri == null) ? "null":contactUri).toString());
             final Cursor c = resolver.query(contactUri, new String[] {
                     Contacts.LOOKUP_KEY, Contacts._ID
             }, null, null, null);
@@ -1527,6 +1531,8 @@ public final class ContactsContract {
          * given {@link ContactsContract.Contacts#_ID} and {@link #LOOKUP_KEY}.
          */
         public static Uri getLookupUri(long contactId, String lookupKey) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__getLookupUri,
+                    "lookupKey, " + ((lookupKey == null) ? "null":lookupKey));
             return ContentUris.withAppendedId(Uri.withAppendedPath(Contacts.CONTENT_LOOKUP_URI,
                     lookupKey), contactId);
         }
@@ -1537,6 +1543,8 @@ public final class ContactsContract {
          * Returns null if the contact cannot be found.
          */
         public static Uri lookupContact(ContentResolver resolver, Uri lookupUri) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__lookupContact,
+                    "lookupUri, " + ((lookupUri == null) ? "null":lookupUri).toString());
             if (lookupUri == null) {
                 return null;
             }
@@ -2011,6 +2019,8 @@ public final class ContactsContract {
          */
         public static InputStream openContactPhotoInputStream(ContentResolver cr, Uri contactUri,
                 boolean preferHighres) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__openContactPhotoInputStream,
+                    "contactUri, " + ((contactUri == null) ? "null":contactUri).toString());
             if (preferHighres) {
                 final Uri displayPhotoUri = Uri.withAppendedPath(contactUri,
                         Contacts.Photo.DISPLAY_PHOTO);
@@ -2058,6 +2068,8 @@ public final class ContactsContract {
          * of the thumbnail the high-res picture is preferred
          */
         public static InputStream openContactPhotoInputStream(ContentResolver cr, Uri contactUri) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__openContactPhotoInputStream,
+                    "contactUri, " + ((contactUri == null) ? "null":contactUri).toString());
             return openContactPhotoInputStream(cr, contactUri, false);
         }
     }
@@ -2768,6 +2780,9 @@ public final class ContactsContract {
          * entry of the given {@link RawContacts} entry.
          */
         public static Uri getContactLookupUri(ContentResolver resolver, Uri rawContactUri) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__getContactLookupUri,
+                    "rawContactUri, " +
+                    ((rawContactUri == null) ? "null":rawContactUri).toString());
             // TODO: use a lighter query by joining rawcontacts with contacts in provider
             final Uri dataUri = Uri.withAppendedPath(rawContactUri, Data.CONTENT_DIRECTORY);
             final Cursor cursor = resolver.query(dataUri, new String[] {
@@ -4667,6 +4682,8 @@ public final class ContactsContract {
          * </p>
          */
         public static Uri getContactLookupUri(ContentResolver resolver, Uri dataUri) {
+            SeempLog.record(SeempApiEnum.SEEMP_API_ContactsContract__getContactLookupUri,
+                    "dataUri, " + ((dataUri == null) ? "null":dataUri).toString());
             final Cursor cursor = resolver.query(dataUri, new String[] {
                     RawContacts.CONTACT_ID, Contacts.LOOKUP_KEY
             }, null, null, null);

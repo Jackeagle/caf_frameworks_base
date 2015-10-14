@@ -16,6 +16,8 @@
 
 package android.content;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.accounts.Account;
 import android.app.ActivityManagerNative;
 import android.app.ActivityThread;
@@ -419,6 +421,10 @@ public abstract class ContentResolver {
      */
     public final Cursor query(Uri uri, String[] projection,
             String selection, String[] selectionArgs, String sortOrder) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_ContentResolver__query, "uri, " +
+                ((uri == null) ? "null":uri).toString() + "selection, " +
+                ((selection == null) ? "null":selection) + "sortOrder, " +
+                ((sortOrder == null) ? "null":sortOrder));
         return query(uri, projection, selection, selectionArgs, sortOrder, null);
     }
 
@@ -459,6 +465,10 @@ public abstract class ContentResolver {
     public final Cursor query(final Uri uri, String[] projection,
             String selection, String[] selectionArgs, String sortOrder,
             CancellationSignal cancellationSignal) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_ContentResolver__query, "uri, " +
+                ((uri == null) ? "null":uri).toString() + "selection, " +
+                ((selection == null) ? "null":selection) + "sortOrder, " +
+                ((sortOrder == null) ? "null":sortOrder));
         IContentProvider unstableProvider = acquireUnstableProvider(uri);
         if (unstableProvider == null) {
             return null;
@@ -1198,6 +1208,8 @@ public abstract class ContentResolver {
      */
     public final Uri insert(Uri url, ContentValues values)
     {
+        SeempLog.record(SeempApiEnum.SEEMP_API_ContentResolver__insert, "url, " +
+                ((url == null) ? "null":url).toString());
         IContentProvider provider = acquireProvider(url);
         if (provider == null) {
             throw new IllegalArgumentException("Unknown URL " + url);

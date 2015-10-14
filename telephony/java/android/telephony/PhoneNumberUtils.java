@@ -16,6 +16,8 @@
 
 package android.telephony;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import com.android.i18n.phonenumbers.NumberParseException;
 import com.android.i18n.phonenumbers.PhoneNumberUtil;
 import com.android.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
@@ -152,6 +154,7 @@ public class PhoneNumberUtils
      *         <code>null</code> if the number cannot be found.
      */
     public static String getNumberFromIntent(Intent intent, Context context) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_PhoneNumberUtils__getNumberFromIntent, "");
         String number = null;
 
         Uri uri = intent.getData();

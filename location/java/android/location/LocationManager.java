@@ -16,6 +16,8 @@
 
 package android.location;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import com.android.internal.location.ProviderProperties;
 
 import android.annotation.SystemApi;
@@ -344,6 +346,7 @@ public class LocationManager {
      * @return list of Strings containing names of the providers
      */
     public List<String> getProviders(boolean enabledOnly) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__getProviders, "");
         try {
             return mService.getProviders(null, enabledOnly);
         } catch (RemoteException e) {
@@ -364,6 +367,8 @@ public class LocationManager {
      * given provider.
      */
     public LocationProvider getProvider(String name) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__getProvider,
+                "name, " + ((name == null) ? "null":name));
         checkProvider(name);
         try {
             ProviderProperties properties = mService.getProviderProperties(name);
@@ -388,6 +393,7 @@ public class LocationManager {
      * @return list of Strings containing names of the providers
      */
     public List<String> getProviders(Criteria criteria, boolean enabledOnly) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__getProviders, "");
         checkCriteria(criteria);
         try {
             return mService.getProviders(criteria, enabledOnly);
@@ -420,6 +426,7 @@ public class LocationManager {
      * @return name of the provider that best matches the requirements
      */
     public String getBestProvider(Criteria criteria, boolean enabledOnly) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__getBestProvider, "");
         checkCriteria(criteria);
         try {
             return mService.getBestProvider(criteria, enabledOnly);
@@ -451,6 +458,8 @@ public class LocationManager {
      */
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             LocationListener listener) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates,
+                "provider, " + ((provider == null) ? "null":provider));
         checkProvider(provider);
         checkListener(listener);
 
@@ -482,6 +491,8 @@ public class LocationManager {
      */
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             LocationListener listener, Looper looper) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates,
+                "provider, " + ((provider == null) ? "null":provider));
         checkProvider(provider);
         checkListener(listener);
 
@@ -514,6 +525,7 @@ public class LocationManager {
      */
     public void requestLocationUpdates(long minTime, float minDistance, Criteria criteria,
             LocationListener listener, Looper looper) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates, "");
         checkCriteria(criteria);
         checkListener(listener);
 
@@ -541,6 +553,8 @@ public class LocationManager {
      */
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             PendingIntent intent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates,
+                "provider, " + ((provider == null) ? "null":provider));
         checkProvider(provider);
         checkPendingIntent(intent);
 
@@ -642,6 +656,7 @@ public class LocationManager {
      */
     public void requestLocationUpdates(long minTime, float minDistance, Criteria criteria,
             PendingIntent intent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates, "");
         checkCriteria(criteria);
         checkPendingIntent(intent);
 
@@ -812,6 +827,7 @@ public class LocationManager {
     @SystemApi
     public void requestLocationUpdates(LocationRequest request, LocationListener listener,
             Looper looper) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates, "");
         checkListener(listener);
         requestLocationUpdates(request, listener, looper, null);
     }
@@ -839,6 +855,7 @@ public class LocationManager {
      */
     @SystemApi
     public void requestLocationUpdates(LocationRequest request, PendingIntent intent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates, "");
         checkPendingIntent(intent);
         requestLocationUpdates(request, null, null, intent);
     }
@@ -857,6 +874,7 @@ public class LocationManager {
 
     private void requestLocationUpdates(LocationRequest request, LocationListener listener,
             Looper looper, PendingIntent intent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__requestLocationUpdates, "");
 
         String packageName = mContext.getPackageName();
 
@@ -964,6 +982,7 @@ public class LocationManager {
      */
     public void addProximityAlert(double latitude, double longitude, float radius, long expiration,
             PendingIntent intent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__addProximityAlert, "");
         checkPendingIntent(intent);
         if (expiration < 0) expiration = Long.MAX_VALUE;
 
@@ -1122,6 +1141,8 @@ public class LocationManager {
      * @throws IllegalArgumentException if provider is null
      */
     public boolean isProviderEnabled(String provider) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__isProviderEnabled,
+                "provider, " + ((provider == null) ? "null":provider));
         checkProvider(provider);
 
         try {
@@ -1175,6 +1196,8 @@ public class LocationManager {
      * @throws IllegalArgumentException if provider is null or doesn't exist
      */
     public Location getLastKnownLocation(String provider) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__getLastKnownLocation,
+                "provider, " + ((provider == null) ? "null":provider));
         checkProvider(provider);
         String packageName = mContext.getPackageName();
         LocationRequest request = LocationRequest.createFromDeprecatedProvider(
@@ -1493,6 +1516,7 @@ public class LocationManager {
      * @throws SecurityException if the ACCESS_FINE_LOCATION permission is not present
      */
     public boolean addGpsStatusListener(GpsStatus.Listener listener) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__addGpsStatusListener, "");
         boolean result;
 
         if (mGpsStatusListeners.get(listener) != null) {
@@ -1539,6 +1563,7 @@ public class LocationManager {
      * @throws SecurityException if the ACCESS_FINE_LOCATION permission is not present
      */
     public boolean addNmeaListener(GpsStatus.NmeaListener listener) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__addNmeaListener, "");
         boolean result;
 
         if (mNmeaListeners.get(listener) != null) {
@@ -1657,6 +1682,9 @@ public class LocationManager {
      * @return true if the command succeeds.
      */
     public boolean sendExtraCommand(String provider, String command, Bundle extras) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_LocationManager__sendExtraCommand,
+                "provider, " + ((provider == null) ? "null":provider) + "command, " +
+                ((command == null) ? "null":command));
         try {
             return mService.sendExtraCommand(provider, command, extras);
         } catch (RemoteException e) {
