@@ -178,9 +178,6 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private static final String ACTION_PKT_CNT_SAMPLE_INTERVAL_ELAPSED =
             "android.net.ConnectivityService.action.PKT_CNT_SAMPLE_INTERVAL_ELAPSED";
 
-    private static final String NETID_UPDATE =
-        "org.codeaurora.NETID_UPDATE";
-
     private static final String EXTRA_NETWORK_TYPE = "netType";
 
     private static final String EXTRA_NETID = "netID";
@@ -4399,18 +4396,6 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     }
 
-    private void sendNetworkInfoUpdateBroadcast(int type, int netid) {
-        Intent intent = new Intent(NETID_UPDATE);
-        intent.putExtra(EXTRA_NETWORK_TYPE, type);
-        intent.putExtra(EXTRA_NETID, netid);
-        log("sendNetworkInfoUpdateBroadcast type = " + type + " netid = " + netid);
-        try {
-            mContext.sendBroadcast(intent);
-        } catch (SecurityException se) {
-            loge("sendPrefChangedBroadcast() SecurityException: " + se);
-        }
-    }
-
     private void updateNetworkInfo(NetworkAgentInfo networkAgent, NetworkInfo newInfo) {
         NetworkInfo.State state = newInfo.getState();
         NetworkInfo oldInfo = null;
@@ -4465,18 +4450,6 @@ public class ConnectivityService extends IConnectivityManager.Stub
             }
             // Consider network even though it is not yet validated.
             //FIXME: L-MR1 fix
-            //rematchNetworkAndRequests(networkAgent, false);
-            int val = SystemProperties.getInt("persist.cne.feature", 0);
-            boolean isPropFeatureEnabled = (val == 3) ? true : false;
-            if (isPropFeatureEnabled) {
-               if ((newInfo.getType() == ConnectivityManager.TYPE_WIFI) ||
-                    (newInfo.getType() == ConnectivityManager.TYPE_MOBILE)) {
-                  if (DBG) {
-                    log("sending network info update for type = " + newInfo.getType());
-                  }
-                  sendNetworkInfoUpdateBroadcast(newInfo.getType(), networkAgent.network.netId);
-               }
-            }
             rematchNetworkAndRequests(networkAgent, NascentState.NOT_JUST_VALIDATED,
                     ReapUnvalidatedNetworks.REAP);
         } else if (state == NetworkInfo.State.DISCONNECTED ||

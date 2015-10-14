@@ -1241,7 +1241,7 @@ public class ConnectivityManager {
     }
 
     private void renewRequestLocked(LegacyRequest l) {
-        l.expireSequenceNumber++;
+        l.expireSequenceNumber = nextSequenceNumber();
         Log.d(TAG, "renewing request to seqNum " + l.expireSequenceNumber);
         sendExpireMsgForFeature(l.networkCapabilities, l.expireSequenceNumber, l.delay);
     }
@@ -1272,7 +1272,7 @@ public class ConnectivityManager {
         LegacyRequest l = new LegacyRequest();
         l.networkCapabilities = netCap;
         l.delay = delay;
-        l.expireSequenceNumber = 0;
+        l.expireSequenceNumber = nextSequenceNumber();
         l.networkRequest = sendRequestForNetwork(netCap, l.networkCallback, 0,
                 REQUEST, type);
         if (l.networkRequest == null) return null;
@@ -2405,10 +2405,16 @@ public class ConnectivityManager {
         }
     }
 
+    private synchronized int nextSequenceNumber() {
+        return mNextSequenceNumber++;
+    }
+
     static final HashMap<NetworkRequest, NetworkCallback> sNetworkCallback =
             new HashMap<NetworkRequest, NetworkCallback>();
     static final AtomicInteger sCallbackRefCount = new AtomicInteger(0);
     static CallbackHandler sCallbackHandler = null;
+    static int mNextSequenceNumber = 0;
+
 
     private final static int LISTEN  = 1;
     private final static int REQUEST = 2;
