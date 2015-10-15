@@ -16,6 +16,8 @@
 
 package android.provider;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -236,6 +238,7 @@ public class Browser {
      */
     public static final Cursor getAllBookmarks(ContentResolver cr) throws
             IllegalStateException {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__getAllBookmarks, "");
         return cr.query(Bookmarks.CONTENT_URI,
                 new String[] { Bookmarks.URL },
                 Bookmarks.IS_FOLDER + " = 0", null, null);
@@ -251,6 +254,7 @@ public class Browser {
      */
     public static final Cursor getAllVisitedUrls(ContentResolver cr) throws
             IllegalStateException {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__getAllVisitedUrls, "");
         return cr.query(Combined.CONTENT_URI,
                 new String[] { Combined.URL }, null, null,
                 Combined.DATE_CREATED + " ASC");
@@ -261,6 +265,8 @@ public class Browser {
     }
 
     private static final Cursor getVisitedLike(ContentResolver cr, String url) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__getVisitedLike, "url, " +
+                ((url == null) ? "null":url));
         boolean secure = false;
         String compareString = url;
         if (compareString.startsWith("http://")) {
@@ -311,6 +317,8 @@ public class Browser {
      */
     public static final void updateVisitedHistory(ContentResolver cr,
                                                   String url, boolean real) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__updateVisitedHistory, "url, " +
+                ((url == null) ? "null":url));
         long now = System.currentTimeMillis();
         Cursor c = null;
         try {
@@ -360,6 +368,7 @@ public class Browser {
      *  @hide pending API council approval
      */
     public static final String[] getVisitedHistory(ContentResolver cr) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__getVisitedHistory, "");
         Cursor c = null;
         String[] str = null;
         try {
@@ -395,6 +404,7 @@ public class Browser {
      * @param cr The ContentResolver used to access the database.
      */
     public static final void truncateHistory(ContentResolver cr) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__truncateHistory, "");
         // TODO make a single request to the provider to do this in a single transaction
         Cursor cursor = null;
         try {
@@ -426,6 +436,7 @@ public class Browser {
      * @return boolean  True if the history can be cleared.
      */
     public static final boolean canClearHistory(ContentResolver cr) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__canClearHistory, "");
         Cursor cursor = null;
         boolean ret = false;
         try {
@@ -463,6 +474,8 @@ public class Browser {
      *                      null means all items.
      */
     private static final void deleteHistoryWhere(ContentResolver cr, String whereClause) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__deleteHistoryWhere, "whereClause, " +
+                ((whereClause == null) ? "null":whereClause));
         Cursor cursor = null;
         try {
             cursor = cr.query(History.CONTENT_URI, new String[] { History.URL }, whereClause,
@@ -489,6 +502,7 @@ public class Browser {
      */
     public static final void deleteHistoryTimeFrame(ContentResolver cr,
             long begin, long end) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__deleteHistoryTimeFrame, "");
         String whereClause;
         String date = BookmarkColumns.DATE;
         if (-1 == begin) {
@@ -514,6 +528,8 @@ public class Browser {
      */
     public static final void deleteFromHistory(ContentResolver cr,
                                                String url) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__deleteFromHistory, "url, " +
+                ((url == null) ? "null":url));
         cr.delete(History.CONTENT_URI, History.URL + "=?", new String[] { url });
     }
 
@@ -525,6 +541,8 @@ public class Browser {
      * @param search    The string to add to the searches database.
      */
     public static final void addSearchUrl(ContentResolver cr, String search) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__addSearchUrl, "search, " +
+                ((search == null) ? "null":search));
         // The content provider will take care of updating existing searches instead of duplicating
         ContentValues values = new ContentValues();
         values.put(Searches.SEARCH, search);
@@ -538,6 +556,7 @@ public class Browser {
      * @param cr   The ContentResolver used to access the database.
      */
     public static final void clearSearches(ContentResolver cr) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__clearSearches, "");
         // FIXME: Should this clear the urls to which these searches lead?
         // (i.e. remove google.com/query= blah blah blah)
         try {
@@ -560,6 +579,8 @@ public class Browser {
      */
     public static final void requestAllIcons(ContentResolver cr, String where,
             WebIconDatabase.IconListener listener) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Browser__requestAllIcons, "where, " +
+                ((where == null) ? "null":where));
         // Do nothing: this is no longer used.
     }
 

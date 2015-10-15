@@ -16,6 +16,8 @@
 
 package android.speech;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -260,6 +262,7 @@ public class SpeechRecognizer {
      *        not set explicitly, default values will be used by the recognizer.
      */
     public void startListening(final Intent recognizerIntent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_SpeechRecognizer__startListening, "");
         if (recognizerIntent == null) {
             throw new IllegalArgumentException("intent must not be null");
         }

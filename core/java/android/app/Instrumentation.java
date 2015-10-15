@@ -16,6 +16,8 @@
 
 package android.app;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -373,6 +375,7 @@ public class Instrumentation {
      * @see Context#startActivity
      */
     public Activity startActivitySync(Intent intent) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__startActivitySync, "");
         validateNotAppThread();
 
         synchronized (mSync) {
@@ -1474,6 +1477,7 @@ public class Instrumentation {
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__execStartActivity, "");
         IApplicationThread whoThread = (IApplicationThread) contextThread;
         if (mActivityMonitors != null) {
             synchronized (mSync) {
@@ -1529,6 +1533,7 @@ public class Instrumentation {
     public void execStartActivitiesAsUser(Context who, IBinder contextThread,
             IBinder token, Activity target, Intent[] intents, Bundle options,
             int userId) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__execStartActivitiesAsUser, "");
         IApplicationThread whoThread = (IApplicationThread) contextThread;
         if (mActivityMonitors != null) {
             synchronized (mSync) {
@@ -1591,6 +1596,7 @@ public class Instrumentation {
     public ActivityResult execStartActivity(
         Context who, IBinder contextThread, IBinder token, Fragment target,
         Intent intent, int requestCode, Bundle options) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__execStartActivity, "");
         IApplicationThread whoThread = (IApplicationThread) contextThread;
         if (mActivityMonitors != null) {
             synchronized (mSync) {
@@ -1651,6 +1657,7 @@ public class Instrumentation {
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options, UserHandle user) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__execStartActivity, "");
         IApplicationThread whoThread = (IApplicationThread) contextThread;
         if (mActivityMonitors != null) {
             synchronized (mSync) {
@@ -1688,6 +1695,7 @@ public class Instrumentation {
     public ActivityResult execStartActivityAsCaller(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options, int userId) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__execStartActivityAsCaller, "");
         IApplicationThread whoThread = (IApplicationThread) contextThread;
         if (mActivityMonitors != null) {
             synchronized (mSync) {
@@ -1725,6 +1733,7 @@ public class Instrumentation {
     public void execStartActivityFromAppTask(
             Context who, IBinder contextThread, IAppTask appTask,
             Intent intent, Bundle options) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_Instrumentation__execStartActivityFromAppTask, "");
         IApplicationThread whoThread = (IApplicationThread) contextThread;
         if (mActivityMonitors != null) {
             synchronized (mSync) {

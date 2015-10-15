@@ -16,6 +16,8 @@
 
 package android.hardware;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.os.Handler;
 import android.util.Log;
 import android.util.SparseArray;
@@ -514,6 +516,8 @@ public abstract class SensorManager {
      */
     @Deprecated
     public boolean registerListener(SensorListener listener, int sensors) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_android_hardware_SensorManager__registerListener,
+                "");
         return registerListener(listener, sensors, SENSOR_DELAY_NORMAL);
     }
 
@@ -542,6 +546,8 @@ public abstract class SensorManager {
      */
     @Deprecated
     public boolean registerListener(SensorListener listener, int sensors, int rate) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_android_hardware_SensorManager__registerListener,
+                "");
         return getLegacySensorManager().registerListener(listener, sensors, rate);
     }
 
@@ -679,6 +685,8 @@ public abstract class SensorManager {
      */
     public boolean registerListener(SensorEventListener listener, Sensor sensor,
             int samplingPeriodUs) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_android_hardware_SensorManager__registerListener,
+                "");
         return registerListener(listener, sensor, samplingPeriodUs, null);
     }
 
@@ -736,6 +744,8 @@ public abstract class SensorManager {
      */
     public boolean registerListener(SensorEventListener listener, Sensor sensor,
             int samplingPeriodUs, int maxReportLatencyUs) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_android_hardware_SensorManager__registerListener,
+                "");
         int delay = getDelay(samplingPeriodUs);
         return registerListenerImpl(listener, sensor, delay, null, maxReportLatencyUs, 0);
     }
@@ -771,6 +781,8 @@ public abstract class SensorManager {
      */
     public boolean registerListener(SensorEventListener listener, Sensor sensor,
             int samplingPeriodUs, Handler handler) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_android_hardware_SensorManager__registerListener,
+                "");
         int delay = getDelay(samplingPeriodUs);
         return registerListenerImpl(listener, sensor, delay, handler, 0, 0);
     }
@@ -802,6 +814,8 @@ public abstract class SensorManager {
      */
     public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs,
             int maxReportLatencyUs, Handler handler) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_android_hardware_SensorManager__registerListener,
+                "");
         int delayUs = getDelay(samplingPeriodUs);
         return registerListenerImpl(listener, sensor, delayUs, handler, maxReportLatencyUs, 0);
     }

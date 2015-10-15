@@ -16,6 +16,8 @@
 
 package android.webkit;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.annotation.SystemApi;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -287,7 +289,11 @@ public class WebChromeClient {
      *                 origin.
      */
     public void onGeolocationPermissionsShowPrompt(String origin,
-            GeolocationPermissions.Callback callback) {}
+            GeolocationPermissions.Callback callback) {
+            SeempLog.record(
+                    SeempApiEnum.SEEMP_API_WebChromeClient__onGeolocationPermissionsShowPrompt,
+                    "origin, " + ((origin == null) ? "null":origin));
+            }
 
     /**
      * Notify the host application that a request for Geolocation permissions,

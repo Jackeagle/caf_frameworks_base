@@ -16,6 +16,8 @@
 
 package com.android.server.accounts;
 
+import android.util.SeempApiEnum;
+import android.util.SeempLog;
 import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountAndUser;
@@ -588,6 +590,8 @@ public class AccountManagerService
 
     @Override
     public String getUserData(Account account, String key) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AccountManagerService__getUserData,
+                "key, " + ((key == null) ? "null":key));
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "getUserData: " + account
                     + ", key " + key
@@ -1049,6 +1053,7 @@ public class AccountManagerService
     @Override
     public void removeAccount(IAccountManagerResponse response, Account account,
             boolean expectActivityLaunch) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AccountManagerService__removeAccount, "");
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "removeAccount: " + account
                     + ", response " + response
@@ -1460,6 +1465,8 @@ public class AccountManagerService
 
     @Override
     public void setUserData(Account account, String key, String value) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AccountManagerService__setUserData, "key, " +
+                ((key == null) ? "null":key) + "value, " + ((value == null) ? "null":value));
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "setUserData: " + account
                     + ", key " + key
@@ -1797,6 +1804,9 @@ public class AccountManagerService
     public void addAccount(final IAccountManagerResponse response, final String accountType,
             final String authTokenType, final String[] requiredFeatures,
             final boolean expectActivityLaunch, final Bundle optionsIn) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AccountManagerService__addAccount,
+                "accountType, " + ((accountType == null) ? "null":accountType) +
+                "authTokenType, " + ((authTokenType == null) ? "null":authTokenType));
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "addAccount: accountType " + accountType
                     + ", response " + response
@@ -2031,6 +2041,8 @@ public class AccountManagerService
     @Override
     public void editProperties(IAccountManagerResponse response, final String accountType,
             final boolean expectActivityLaunch) {
+        SeempLog.record(SeempApiEnum.SEEMP_API_AccountManagerService__editProperties,
+                "accountType, " + ((accountType == null) ? "null":accountType));
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "editProperties: accountType " + accountType
                     + ", response " + response
