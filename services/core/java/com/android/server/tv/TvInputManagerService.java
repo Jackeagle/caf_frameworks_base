@@ -37,6 +37,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.content.res.Resources;
 import android.graphics.Rect;
 import android.hardware.hdmi.HdmiControlManager;
 import android.hardware.hdmi.HdmiDeviceInfo;
@@ -121,6 +122,8 @@ public final class TvInputManagerService extends SystemService {
 
     // A map from user id to UserState.
     private final SparseArray<UserState> mUserStates = new SparseArray<>();
+    private boolean mIsBootOpt = Resources.getSystem().
+            getBoolean(com.android.internal.R.bool.config_boot_opt);
 
     private final WatchLogHandler mWatchLogHandler;
 
@@ -147,6 +150,12 @@ public final class TvInputManagerService extends SystemService {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             registerBroadcastReceivers();
         } else if (phase == SystemService.PHASE_THIRD_PARTY_APPS_CAN_START) {
+            synchronized (mLock) {
+                buildTvInputListLocked(mCurrentUserId, null);
+                buildTvContentRatingSystemListLocked(mCurrentUserId);
+            }
+        } else if (mIsBootOpt == true && phase ==
+                SystemService.PHASE_SERVICES_DEFER_COMPLETED) {
             synchronized (mLock) {
                 buildTvInputListLocked(mCurrentUserId, null);
                 buildTvContentRatingSystemListLocked(mCurrentUserId);

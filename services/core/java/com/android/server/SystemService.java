@@ -80,6 +80,11 @@ public abstract class SystemService {
      */
     public static final int PHASE_BOOT_COMPLETED = 1000;
 
+    /**
+     * After receiving this boot phase, deferred services can get/do their stuff.
+     */
+    public static final int PHASE_SERVICES_DEFER_COMPLETED = 1024;
+
     private final Context mContext;
 
     /**
