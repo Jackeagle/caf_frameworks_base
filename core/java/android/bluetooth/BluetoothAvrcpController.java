@@ -21,6 +21,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.media.MediaMetadata;
+import android.media.session.PlaybackState;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
@@ -29,8 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This class provides the public APIs to control the Bluetooth AVRCP Controller
- * profile.
+ * This class provides the public APIs to control the Bluetooth AVRCP Controller. It currently
+ * supports player information, playback support and track metadata.
  *
  *<p>BluetoothAvrcpController is a proxy object for controlling the Bluetooth AVRCP
  * Service via IPC. Use {@link BluetoothAdapter#getProfileProxy} to get
@@ -40,7 +42,7 @@ import java.util.List;
  */
 public final class BluetoothAvrcpController implements BluetoothProfile {
     private static final String TAG = "BluetoothAvrcpController";
-    private static final boolean DBG = true;
+    private static final boolean DBG = false;
     private static final boolean VDBG = false;
 
     /**
@@ -62,7 +64,40 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
      * receive.
      */
     public static final String ACTION_CONNECTION_STATE_CHANGED =
-        "android.bluetooth.acrcp-controller.profile.action.CONNECTION_STATE_CHANGED";
+        "android.bluetooth.avrcp-controller.profile.action.CONNECTION_STATE_CHANGED";
+
+    /**
+     * Intent used to broadcast the change in metadata state of playing track on the AVRCP
+     * AG.
+     *
+     * <p>This intent will have the two extras:
+     * <ul>
+     *    <li> {@link #EXTRA_METADATA} - {@link MediaMetadata} containing the current metadata.</li>
+     *    <li> {@link #EXTRA_PLAYBACK} - {@link PlaybackState} containing the current playback
+     *    state. </li>
+     * </ul>
+     */
+    public static final String ACTION_TRACK_EVENT =
+        "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
+
+
+    /**
+     * Intent used to broadcast the change in player application setting state on AVRCP AG.
+     *
+     * <p>This intent will have the following extras:
+     * <ul>
+     *    <li> {@link #EXTRA_PLAYER_SETTING} - {@link BluetoothAvrcpPlayerSettings} containing the
+     *    most recent player setting. </li>
+     * </ul>
+     */
+    public static final String ACTION_PLAYER_SETTING =
+        "android.bluetooth.avrcp-controller.profile.action.PLAYER_SETTING";
+
+    public static final int EXTRA_METADATA = 0x00;
+
+    public static final int EXTRA_PLAYBACK = 0x01;
+
+    public static final int EXTRA_PLAYER_SETTING = 0x02;
 
     private Context mContext;
     private ServiceListener mServiceListener;
@@ -70,33 +105,33 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     private BluetoothAdapter mAdapter;
 
     final private IBluetoothStateChangeCallback mBluetoothStateChangeCallback =
-            new IBluetoothStateChangeCallback.Stub() {
-                public void onBluetoothStateChange(boolean up) {
-                    if (DBG) Log.d(TAG, "onBluetoothStateChange: up=" + up);
-                    if (!up) {
-                        if (VDBG) Log.d(TAG,"Unbinding service...");
-                        synchronized (mConnection) {
-                            try {
-                                mService = null;
-                                mContext.unbindService(mConnection);
-                            } catch (Exception re) {
-                                Log.e(TAG,"",re);
-                            }
+        new IBluetoothStateChangeCallback.Stub() {
+            public void onBluetoothStateChange(boolean up) {
+                if (DBG) Log.d(TAG, "onBluetoothStateChange: up=" + up);
+                if (!up) {
+                    if (VDBG) Log.d(TAG,"Unbinding service...");
+                    synchronized (mConnection) {
+                        try {
+                            mService = null;
+                            mContext.unbindService(mConnection);
+                        } catch (Exception re) {
+                            Log.e(TAG,"",re);
                         }
-                    } else {
-                        synchronized (mConnection) {
-                            try {
-                                if (mService == null) {
-                                    if (VDBG) Log.d(TAG,"Binding service...");
-                                    doBind();
-                                }
-                            } catch (Exception re) {
-                                Log.e(TAG,"",re);
+                    }
+                } else {
+                    synchronized (mConnection) {
+                        try {
+                            if (mService == null) {
+                                if (VDBG) Log.d(TAG,"Binding service...");
+                                doBind();
                             }
+                        } catch (Exception re) {
+                            Log.e(TAG,"",re);
                         }
                     }
                 }
-        };
+            }
+      };
 
     /**
      * Create a BluetoothAvrcpController proxy object for interacting with the local
@@ -306,6 +341,67 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
         }
         if (mService == null) Log.w(TAG, "Proxy not attached to service");
         return 0;
+        }
+    /**
+     * Gets the player application settings.
+     *
+     * @return the {@link BluetoothAvrcpPlayerSettings} or {@link null} if there is an error.
+     */
+    public BluetoothAvrcpPlayerSettings getPlayerSettings(BluetoothDevice device) {
+        if (DBG) Log.d(TAG, "getPlayerSettings");
+        BluetoothAvrcpPlayerSettings settings = null;
+        if (mService != null && isEnabled()) {
+            try {
+                settings = mService.getPlayerSettings(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in getMetadata() " + e);
+                return null;
+            }
+        }
+        return settings;
+    }
+
+    /**
+     * Gets the metadata for the current track.
+     *
+     * This should be usually called when application UI needs to be updated, eg. when the track
+     * changes or immediately after connecting and getting the current state.
+     * @return the {@link MediaMetadata} or {@link null} if there is an error.
+     */
+    public MediaMetadata getMetadata(BluetoothDevice device) {
+        if (DBG) Log.d(TAG, "getMetadata");
+        MediaMetadata metadata = null;
+        if (mService != null && isEnabled()) {
+            try {
+                metadata = mService.getMetadata(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in getMetadata() " + e);
+                return null;
+            }
+        }
+        return metadata;
+    }
+
+    /**
+     * Gets the playback state for current track.
+     *
+     * When the application is first connecting it can use current track state to get playback info.
+     * For all further updates it should listen to notifications.
+     * @return the {@link PlaybackState} or {@link null} if there is an error.
+     */
+    public PlaybackState getPlaybackState(BluetoothDevice device) {
+        if (DBG) Log.d(TAG, "getPlaybackState");
+        PlaybackState playbackState = null;
+        if (mService != null && isEnabled()) {
+            try {
+                playbackState = mService.getPlaybackState(device);
+            } catch (RemoteException e) {
+                Log.e(TAG,
+                    "Error talking to BT service in getPlaybackState() " + e);
+                return null;
+            }
+        }
+        return playbackState;
     }
 
     private final ServiceConnection mConnection = new ServiceConnection() {
