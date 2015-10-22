@@ -413,6 +413,7 @@ public class Tethering extends BaseNetworkObserver {
         Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
 
         mContext.sendStickyBroadcastAsUser(broadcast, UserHandle.ALL);
+        showTetheredNotification(com.android.internal.R.drawable.stat_sys_tether_wifi);
 
     }
 
@@ -694,7 +695,12 @@ public class Tethering extends BaseNetworkObserver {
 
         if (mTetheredNotification != null) {
             if (mTetheredNotification.icon == icon) {
+                if (mContext.getResources().getBoolean(com.android.internal.R.bool.config_softap_extention)
+                    && icon == com.android.internal.R.drawable.stat_sys_tether_wifi) {
+                       // if softap extension feature is on, allow to update icon.
+                } else {
                     return;
+                }
             }
             notificationManager.cancelAsUser(null, mTetheredNotification.icon,
                     UserHandle.ALL);
@@ -710,7 +716,23 @@ public class Tethering extends BaseNetworkObserver {
         Resources r = Resources.getSystem();
         CharSequence title = r.getText(com.android.internal.R.string.tethered_notification_title);
 
-        CharSequence message = r.getText(com.android.internal.R.string.tethered_notification_message);
+        CharSequence message;
+
+        int size = mConnectedDeviceMap.size();
+        if (mContext.getResources().getBoolean(com.android.internal.R.bool.config_softap_extention)
+            && icon == com.android.internal.R.drawable.stat_sys_tether_wifi) {
+            if (size == 0) {
+                message = r.getText(com.android.internal.R.string.tethered_notification_no_device_message);
+            } else if (size == 1) {
+                message = String.format((r.getText(com.android.internal.R.string.tethered_notification_one_device_message)).toString(),
+                             size);
+            } else {
+                message = String.format((r.getText(com.android.internal.R.string.tethered_notification_multi_device_message)).toString(),
+                             size);
+            }
+        } else {
+             message = r.getText(com.android.internal.R.string.tethered_notification_message);
+        }
 
         if (mTetheredNotification == null) {
             mTetheredNotification = new Notification();
@@ -719,8 +741,14 @@ public class Tethering extends BaseNetworkObserver {
         mTetheredNotification.icon = icon;
         mTetheredNotification.defaults &= ~Notification.DEFAULT_SOUND;
         mTetheredNotification.flags = Notification.FLAG_ONGOING_EVENT;
-        mTetheredNotification.tickerText = title;
-
+        if (mContext.getResources().getBoolean(com.android.internal.R.bool.config_softap_extention)
+            && icon == com.android.internal.R.drawable.stat_sys_tether_wifi
+            && size > 0) {
+             mTetheredNotification.tickerText = message;
+             mTetheredNotification.priority = Notification.PRIORITY_MIN;
+        } else {
+             mTetheredNotification.tickerText = title;
+        }
         mTetheredNotification.visibility = Notification.VISIBILITY_PUBLIC;
         mTetheredNotification.color = mContext.getResources().getColor(
                 com.android.internal.R.color.system_notification_accent_color);
