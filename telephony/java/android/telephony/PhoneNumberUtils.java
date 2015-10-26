@@ -24,6 +24,7 @@ import com.android.i18n.phonenumbers.ShortNumberUtil;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.location.Country;
 import android.location.CountryDetector;
@@ -1496,14 +1497,30 @@ public class PhoneNumberUtils
      * @hide
      */
     public static boolean isVideoCallNumValid(String number){
-        String norNumber = normalizeNumber(number);
-        if (norNumber == null || "".equals(norNumber) ||
-                ((norNumber.startsWith("+") ? norNumber.length() < 8 : norNumber.length() < 7))
-                || number.contains("#") || number.contains("*")) {
+        if (null == number) {
             return false;
-        } else {
-            return true;
         }
+        if (!Resources.getSystem().getBoolean(
+                com.android.internal.R.bool.config_regional_number_patterns_video_call)) {
+            return false;
+        }
+        /**
+         * Check non-digit characters '#', '+', ',', and ';'
+         * "%23" stands for '#'
+         * "%2B" stands for '+'
+         * "%2C" stands for ','
+         * "%3B" stands for ';'
+         */
+        if (number.contains("%23") || number.contains("%2B") ||
+                number.contains("%2C") || number.contains("%3B") ||
+                number.contains("*")) {
+            return false;
+        }
+        String norNumber = normalizeNumber(number);
+        if (norNumber == null || "".equals(norNumber) || norNumber.length() < 7) {
+            return false;
+        }
+        return true;
     }
 
     /**
