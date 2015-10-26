@@ -2833,6 +2833,20 @@ public class WifiManager {
             return null;
         }
     }
+     /**
+     * get concurrency support
+     *
+     * @return true if concurrency is allowed.
+     *
+     * @hide no intent to publish
+     */
+    public boolean getConcurrency() {
+        try {
+            return mService.getConcurrency();
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
 
     /**
      * Framework layer autojoin enable/disable when device is associated
@@ -2843,6 +2857,20 @@ public class WifiManager {
     public boolean enableAutoJoinWhenAssociated(boolean enabled) {
         try {
             return mService.enableAutoJoinWhenAssociated(enabled);
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+    /**
+     * Check if P2P GO  is supported
+     *
+     * @return true if p2pGO is allowed.
+     *
+     * @hide no intent to publish
+     */
+    public boolean isP2pAutoGoSet() {
+        try {
+            return mService.isP2pAutoGoSet();
         } catch (RemoteException e) {
             return false;
         }
@@ -2867,7 +2895,52 @@ public class WifiManager {
         try {
             mService.setHalBasedAutojoinOffload(enabled);
         } catch (RemoteException e) {
+        }
+    }
+    /**
+     * Gets SoftAP interface name
+     *
+     * @return SAP interface name
+     *
+     * @hide no intent to publish
+     */
+    public String getSAPInterfaceName() {
+        try {
+            return mService.getSAPInterfaceName();
+        } catch (RemoteException e) {
+            return null;
+        }
+    }
 
+    /**
+     * Gets  station wpa state
+     *
+     * @return true if station in associaiting state
+     *
+     * @hide no intent to publish
+     */
+    public String fetchStaStateNative() {
+        try {
+            return mService.fetchStaStateNative();
+        } catch (RemoteException e) {
+            return null;
+        }
+    }
+
+    /**
+     * WifiP2PService calls this method to set P2P GO restart
+     * so that P2P-GO is restarted after ongoing STA connection
+     * is complete either with success or failure.
+     *
+     * @return void
+     *
+     * @hide no intent to publish
+     */
+    public void setP2pAutoGoRestart() {
+        try {
+            mService.setP2pAutoGoRestart();
+        } catch (RemoteException e) {
+             Log.e(TAG, "setP2pAutoGoRestart fail");
         }
     }
 
@@ -2881,5 +2954,21 @@ public class WifiManager {
         } catch (RemoteException e) {
         }
         return 0;
+    }
+     /**
+     * WifiP2PService calls this method to set P2P GO channel.
+     * If STA connected on same band as  of P2PGO then start
+     * P2PGO on station channel else set to default frequency.
+     *
+     * @return void
+     *
+     * @hide no intent to publish
+     */
+    public void setP2pGoChannel() {
+        try {
+            mService.setP2pGoChannel();
+        } catch (RemoteException e) {
+             Log.e(TAG, "setP2pAutoGoRestart fail");
+        }
     }
 }

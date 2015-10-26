@@ -58,24 +58,27 @@ public class TetherUtil {
         /**
          * Disable Wifi if enabling tethering
          */
-        int wifiState = wifiManager.getWifiState();
-        if (enable && ((wifiState == WifiManager.WIFI_STATE_ENABLING) ||
+	if (!wifiManager.getConcurrency()) {
+            int wifiState = wifiManager.getWifiState();
+            if (enable && ((wifiState == WifiManager.WIFI_STATE_ENABLING) ||
                     (wifiState == WifiManager.WIFI_STATE_ENABLED))) {
-            wifiManager.setWifiEnabled(false);
-            Settings.Global.putInt(cr, Settings.Global.WIFI_SAVED_STATE, 1);
+                wifiManager.setWifiEnabled(false);
+                Settings.Global.putInt(cr, Settings.Global.WIFI_SAVED_STATE, 1);
+            }
         }
-
         boolean success = wifiManager.setWifiApEnabled(null, enable);
         /**
          *  If needed, restore Wifi on tether disable
          */
-        if (!enable) {
-            int wifiSavedState = Settings.Global.getInt(cr, Settings.Global.WIFI_SAVED_STATE, 0);
-            if (wifiSavedState == 1) {
-                wifiManager.setWifiEnabled(true);
-                Settings.Global.putInt(cr, Settings.Global.WIFI_SAVED_STATE, 0);
+	if (!wifiManager.getConcurrency()){
+            if (!enable) {
+                int wifiSavedState = Settings.Global.getInt(cr, Settings.Global.WIFI_SAVED_STATE, 0);
+                if (wifiSavedState == 1) {
+                    wifiManager.setWifiEnabled(true);
+                    Settings.Global.putInt(cr, Settings.Global.WIFI_SAVED_STATE, 0);
+                }
             }
-        }
+       }
         return success;
     }
 
