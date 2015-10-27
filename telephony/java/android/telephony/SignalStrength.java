@@ -832,6 +832,11 @@ public class SignalStrength implements Parcelable {
         else if (mLteRsrp >= threshRsrp[1]) rsrpIconLevel = SIGNAL_STRENGTH_POOR;
         else if (mLteRsrp >= threshRsrp[0]) rsrpIconLevel = SIGNAL_STRENGTH_NONE_OR_UNKNOWN;
 
+        if (Resources.getSystem().getBoolean(
+                com.android.internal.R.bool.config_regional_lte_singnal_threshold)){
+            log("getLTELevel - rsrp = " + rsrpIconLevel);
+            if (rsrpIconLevel != -1) return rsrpIconLevel;
+        }
         /*
          * Values are -200 dB to +300 (SNR*10dB) RS_SNR >= 13.0 dB =>4 bars 4.5
          * dB <= RS_SNR < 13.0 dB => 3 bars 1.0 dB <= RS_SNR < 4.5 dB => 2 bars
