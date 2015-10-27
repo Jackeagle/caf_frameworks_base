@@ -6411,6 +6411,15 @@ public final class ActivityManagerService extends ActivityManagerNative
                 mHandler.sendMessageDelayed(nmsg, POWER_CHECK_DELAY);
                 // Tell anyone interested that we are done booting!
                 SystemProperties.set("sys.boot_completed", "1");
+                if (mContext != null && mContext.getResources().
+                    getBoolean(com.android.internal.R.bool.config_boot_opt) == true) {
+                    IPackageManager pm = AppGlobals.getPackageManager();
+                    try {
+                        if (pm.isFirstBoot() == false) pm.startLaterScanApkThread();
+                    } catch (RemoteException e) {
+                        throw new SecurityException(e);
+                    }
+                }
 
                 // And trigger dev.bootcomplete if we are not showing encryption progress
                 if (!"trigger_restart_min_framework".equals(SystemProperties.get("vold.decrypt"))
