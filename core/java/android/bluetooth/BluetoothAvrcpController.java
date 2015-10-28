@@ -42,7 +42,7 @@ import java.util.List;
  */
 public final class BluetoothAvrcpController implements BluetoothProfile {
     private static final String TAG = "BluetoothAvrcpController";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
     private static final boolean VDBG = false;
 
     /**
@@ -93,11 +93,38 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String ACTION_PLAYER_SETTING =
         "android.bluetooth.avrcp-controller.profile.action.PLAYER_SETTING";
 
-    public static final int EXTRA_METADATA = 0x00;
+    public static final String EXTRA_METADATA =
+            "android.bluetooth.avrcp-controller.profile.extra.METADATA";
 
-    public static final int EXTRA_PLAYBACK = 0x01;
+    public static final String EXTRA_PLAYBACK =
+            "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
 
-    public static final int EXTRA_PLAYER_SETTING = 0x02;
+    public static final String EXTRA_PLAYER_SETTING =
+            "android.bluetooth.avrcp-controller.profile.extra.PLAYER_SETTING";
+
+    /*
+     * KeyCoded for Pass Through Commands
+     */
+    public static final int PASS_THRU_CMD_ID_PLAY = 0x44;
+    public static final int PASS_THRU_CMD_ID_PAUSE = 0x46;
+    public static final int PASS_THRU_CMD_ID_VOL_UP = 0x41;
+    public static final int PASS_THRU_CMD_ID_VOL_DOWN = 0x42;
+    public static final int PASS_THRU_CMD_ID_STOP = 0x45;
+    public static final int PASS_THRU_CMD_ID_FF = 0x49;
+    public static final int PASS_THRU_CMD_ID_REWIND = 0x48;
+    public static final int PASS_THRU_CMD_ID_FORWARD = 0x4B;
+    public static final int PASS_THRU_CMD_ID_BACKWARD = 0x4C;
+    /* Key State Variables */
+    public static final int KEY_STATE_PRESSED = 0;
+    public static final int KEY_STATE_RELEASED = 1;
+    /* Group Navigation Key Codes */
+    public static final int PASS_THRU_CMD_ID_NEXT_GRP = 0x00;
+    public static final int PASS_THRU_CMD_ID_PREV_GRP = 0x01;
+    /* Remote supported Features */
+    public static final int BTRC_FEAT_METADATA = 0x01;
+    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
+    public static final int BTRC_FEAT_BROWSE = 0x04;
+
 
     private Context mContext;
     private ServiceListener mServiceListener;
@@ -259,89 +286,6 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
         if (mService == null) Log.w(TAG, "Proxy not attached to service");
     }
 
-    public void getMetaData(int[] attributeIds) {
-        if (DBG) Log.d(TAG, "getMetaData num requested Ids = " + attributeIds.length);
-        if (mService != null && isEnabled()) {
-            try {
-                mService.getMetaData(attributeIds);
-                return;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in getMetaData", e);
-                return;
-            }
-        }
-        if (mService == null) Log.w(TAG, "Proxy not attached to service");
-    }
-
-    public void getPlayStatus(int[] playStatusIds) {
-        if (DBG) Log.d(TAG, "getPlayStatus num requested Ids  = "+ playStatusIds.length);
-        if (mService != null && isEnabled()) {
-            try {
-                mService.getPlayStatus(playStatusIds);
-                return;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in getPlayStatus()", e);
-                return;
-            }
-        }
-        if (mService == null) Log.w(TAG, "Proxy not attached to service");
-    }
-
-    public void getPlayerApplicationSetting() {
-        if (DBG) Log.d(TAG, "getPlayerApplicationSetting");
-        if (mService != null && isEnabled()) {
-            try {
-                mService.getPlayerApplicationSetting();
-                return;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in getPlayerApplicationSetting()", e);
-                return;
-            }
-        }
-        if (mService == null) Log.w(TAG, "Proxy not attached to service");
-    }
-
-    public void setPlayerApplicationSetting(int attributeId, int attributeVal) {
-        if (DBG) Log.d(TAG, "setPlayerApplicationSetting attribId = " + attributeId + " attribVal = " + attributeVal);
-        if (mService != null && isEnabled()) {
-            try {
-                mService.setPlayerApplicationSetting(attributeId, attributeVal);
-                return;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in setPlayerApplicationSetting()", e);
-                return;
-            }
-        }
-        if (mService == null) Log.w(TAG, "Proxy not attached to service");
-    }
-
-    public BluetoothAvrcpInfo getSupportedPlayerAppSetting(BluetoothDevice device) {
-        if (DBG) Log.d(TAG, "getSupportedPlayerAppSetting dev = " + device);
-        if (mService != null && isEnabled()) {
-            try {
-                return mService.getSupportedPlayerAppSetting(device);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in getSupportedPlayerAppSetting()", e);
-                return null;
-            }
-        }
-        if (mService == null) Log.w(TAG, "Proxy not attached to service");
-        return null;
-    }
-
-    public int getSupportedFeatures(BluetoothDevice device) {
-        if (DBG) Log.d(TAG, "getSupportedFeatures dev = " + device);
-        if (mService != null && isEnabled()) {
-            try {
-                return mService.getSupportedFeatures(device);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in getSupportedFeatures()", e);
-                return 0;
-            }
-        }
-        if (mService == null) Log.w(TAG, "Proxy not attached to service");
-        return 0;
-        }
     /**
      * Gets the player application settings.
      *
@@ -354,7 +298,7 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
             try {
                 settings = mService.getPlayerSettings(device);
             } catch (RemoteException e) {
-                Log.e(TAG, "Error talking to BT service in getMetadata() " + e);
+                Log.e(TAG, "Error talking to BT service in getPlayerSettings() " + e);
                 return null;
             }
         }
@@ -402,6 +346,60 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
             }
         }
         return playbackState;
+    }
+
+    /**
+     * Sets the player app setting for current player.
+     * returns true in case setting is supported by remote, false otherwise
+     */
+    public boolean setPlayerApplicationSetting(BluetoothAvrcpPlayerSettings plAppSetting) {
+        if (DBG) Log.d(TAG, "setPlayerApplicationSetting");
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.setPlayerApplicationSetting(plAppSetting);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in setPlayerApplicationSetting() " + e);
+                return false;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return false;
+    }
+
+    /**
+     * Informs AvrcpControllerService to start fetching Album Art.
+     * Fetching will start only after this api is called.
+     * input parameters are preferred values from app.
+     * if input parameters are null, 0, 0, 0: image in native encoding will be fetched.
+     */
+    public void startFetchingAlbumArt(String mimeType, int height, int width, long maxSize) {
+        if (DBG) Log.d(TAG, "startFetchingAlbumArt");
+        if (mService != null && isEnabled()) {
+            try {
+                mService.startFetchingAlbumArt(mimeType, height, width, maxSize);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in startFetchingAlbumArt() " + e);
+                return;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return ;
+    }
+    /*
+     * Send Group Navigation Command to Remote.
+     */
+    public void sendGroupNavigationCmd(BluetoothDevice device, int keyCode, int keyState) {
+        Log.d(TAG, "sendGroupNavigationCmd dev = " + device + " key " + keyCode + " State = " + keyState);
+        if (mService != null && isEnabled()) {
+            try {
+                mService.sendGroupNavigationCmd(device, keyCode, keyState);
+                return;
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in sendGroupNavigationCmd()", e);
+                return;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
     }
 
     private final ServiceConnection mConnection = new ServiceConnection() {

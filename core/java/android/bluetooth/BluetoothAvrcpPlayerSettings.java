@@ -109,6 +109,7 @@ public final class BluetoothAvrcpPlayerSettings implements Parcelable {
 
     public void writeToParcel(Parcel out, int flags) {
         out.writeInt(mSettings);
+        out.writeInt(mSettingsValue.size());
         for (int k : mSettingsValue.keySet()) {
             out.writeInt(k);
             out.writeInt(mSettingsValue.get(k));
