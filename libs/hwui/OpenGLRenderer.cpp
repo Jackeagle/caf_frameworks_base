@@ -2875,12 +2875,15 @@ status_t OpenGLRenderer::drawPath(const SkPath* path, const SkPaint* paint) {
 
     const PathTexture* texture = mCaches.pathCache.get(path, paint);
     if (!texture) return DrawGlInfo::kStatusDone;
-    const AutoTexture autoCleanup(texture);
 
     const float x = texture->left - texture->offset;
     const float y = texture->top - texture->offset;
 
     drawPathTexture(texture, x, y, paint);
+
+    if (texture->cleanup) {
+        mCaches.pathCache.remove(path, paint);
+    }
 
     return DrawGlInfo::kStatusDrew;
 }
