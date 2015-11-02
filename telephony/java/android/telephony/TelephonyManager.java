@@ -702,7 +702,6 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getDeviceId() {
-        android.util.SeempLog.record(9);
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null)
@@ -725,7 +724,7 @@ public class TelephonyManager {
      * @param slotId of which deviceID is returned
      */
     public String getDeviceId(int slotId) {
-        android.util.SeempLog.record(9);
+        android.util.SeempLog.record_str(8, ""+slotId);
         // FIXME this assumes phoneId == slotId
         try {
             IPhoneSubInfo info = getSubscriberInfo();
@@ -822,7 +821,7 @@ public class TelephonyManager {
      * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION ACCESS_FINE_LOCATION}.
      */
     public CellLocation getCellLocation() {
-        android.util.SeempLog.record(66);
+        android.util.SeempLog.record(49);
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) {
@@ -920,7 +919,7 @@ public class TelephonyManager {
      */
     @Deprecated
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
-        android.util.SeempLog.record(67);
+        android.util.SeempLog.record(50);
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null)
@@ -1932,7 +1931,6 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getSimSerialNumber() {
-         android.util.SeempLog.record(10);
          return getSimSerialNumber(getDefaultSubscription());
     }
 
@@ -1946,7 +1944,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getSimSerialNumber(int subId) {
-        android.util.SeempLog.record(10);
+        android.util.SeempLog.record_str(388, ""+subId);
         try {
             IPhoneSubInfo info = getSubscriberInfo();
             if (info == null)
@@ -2021,7 +2019,6 @@ public class TelephonyManager {
      *   {@link android.Manifest.permission#READ_PHONE_STATE READ_PHONE_STATE}
      */
     public String getSubscriberId() {
-        android.util.SeempLog.record(114);
         return getSubscriberId(getDefaultSubscription());
     }
 
@@ -2037,7 +2034,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getSubscriberId(int subId) {
-        android.util.SeempLog.record(114);
+        android.util.SeempLog.record_str(389, ""+subId);
         try {
             IPhoneSubInfo info = getSubscriberInfo();
             if (info == null)
@@ -2108,7 +2105,6 @@ public class TelephonyManager {
      * The default SMS app can also use this.
      */
     public String getLine1Number() {
-        android.util.SeempLog.record(11);
         return getLine1NumberForSubscriber(getDefaultSubscription());
     }
 
@@ -2127,6 +2123,7 @@ public class TelephonyManager {
      */
     /** {@hide} */
     public String getLine1NumberForSubscriber(int subId) {
+        android.util.SeempLog.record_str(9, ""+subId);
         String number = null;
         try {
             ITelephony telephony = getITelephony();
