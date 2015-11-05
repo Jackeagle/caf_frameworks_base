@@ -306,6 +306,20 @@ public class WifiP2pManager {
      */
     public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_RADAR_DETECTED = 2;
 
+    /**
+     * Wi-Fi p2p go state change due to cac completed
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_CAC_COMPLETED = 3;
+
+    /**
+     * Wi-Fi p2p go state change due to cac completed
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_CSA_FINISHED = 4;
+
     IWifiP2pManager mService;
 
     private static final int BASE = Protocol.BASE_WIFI_P2P_MANAGER;
