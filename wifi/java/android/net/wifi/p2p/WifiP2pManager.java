@@ -283,6 +283,29 @@ public class WifiP2pManager {
     public static final String EXTRA_HANDOVER_MESSAGE =
             "android.net.wifi.p2p.EXTRA_HANDOVER_MESSAGE";
 
+     /**
+     * The lookup key for an int that indicates reason for state change
+     * Retrieve it with {@link android.content.Intent#getIntExtra(String,int)}.
+     *
+     * @hide
+     */
+    public static final String EXTRA_P2P_AUTO_GO_STATE_CHANGE_REASON =
+                                    "wifi_p2p_autogo_state_change_reason";
+
+    /**
+     * Wi-Fi p2p go default state change reason
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_DEFAULT = 1;
+
+    /**
+     * Wi-Fi p2p go state change due to radar detection
+     *
+     * @hide
+     */
+    public static final int WIFI_P2P_GO_STATE_CHANGE_REASON_RADAR_DETECTED = 2;
+
     IWifiP2pManager mService;
 
     private static final int BASE = Protocol.BASE_WIFI_P2P_MANAGER;
