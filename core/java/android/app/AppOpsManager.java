@@ -769,13 +769,13 @@ public class AppOpsManager {
             UserManager.DISALLOW_CONFIG_VPN, // ACTIVATE_VPN
             null, //WIFI_CHANGE
             null, //BLUETOOTH_CHANGE
-            null, //SEND_MMS
-            null, //READ_MMS
-            null, //WRITE_MMS
+            UserManager.DISALLOW_SMS, //SEND_MMS
+            UserManager.DISALLOW_SMS, //READ_MMS
+            UserManager.DISALLOW_SMS, //WRITE_MMS
             null, //BOOT_COMPLETED
             null, //NFC_CHANGE
-            null, //DELETE_SMS
-            null, //DELETE_MMS
+            UserManager.DISALLOW_SMS, //DELETE_SMS
+            UserManager.DISALLOW_SMS, //DELETE_MMS
             null, //DELETE_CONTACTS
             null, //DELETE_CALL_LOG
             null, //DATA_CONNECT_CHANGE
