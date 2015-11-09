@@ -54,6 +54,11 @@ public class ActivityTrigger
     }
 
     /** &hide */
+    public void activityStartProcessTrigger(String process, int pid) {
+        native_at_startProcessActivity(process, pid);
+    }
+
+    /** &hide */
     public void activityStartTrigger(Intent intent, ActivityInfo acInfo, ApplicationInfo appInfo) {
         ComponentName cn = intent.getComponent();
         int overrideFlags = 0;
@@ -85,4 +90,5 @@ public class ActivityTrigger
     private native int native_at_startActivity(String activity, int flags);
     private native void native_at_resumeActivity(String activity);
     private native void native_at_deinit();
+    private native void native_at_startProcessActivity(String process, int pid);
 }
