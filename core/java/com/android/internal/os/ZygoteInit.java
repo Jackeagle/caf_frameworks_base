@@ -184,10 +184,10 @@ public class ZygoteInit {
             Log.i(TAG, " ******* Zygote Init Preload deferred *******");
             preloadClasses();
             preloadResources();
+            preloadTextResources();
         }
         preloadOpenGL();
         preloadSharedLibraries();
-        preloadTextResources();
         // Ask the WebViewFactory to do any initialization that must run in the zygote process,
         // for memory sharing purposes.
         WebViewFactory.prepareWebViewInZygote();
@@ -705,6 +705,7 @@ public class ZygoteInit {
                     Log.i(TAG," ***** zygote init.Reading after boot completed.*****");
                     preloadClasses();
                     preloadResources();
+                    preloadTextResources();
                     preloaded = true;
                 }
             }
