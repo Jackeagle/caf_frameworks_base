@@ -166,7 +166,8 @@ public class TelecomLoaderService extends SystemService {
 
     @Override
     public void onBootPhase(int phase) {
-        if (phase == PHASE_ACTIVITY_MANAGER_READY) {
+        if (phase == PHASE_ACTIVITY_MANAGER_READY ||
+                phase == PHASE_SERVICES_DEFER_COMPLETED) {
             registerDefaultAppNotifier();
             registerCarrierConfigChangedReceiver();
             connectToTelecom();

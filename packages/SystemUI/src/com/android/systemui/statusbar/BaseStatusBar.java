@@ -2068,7 +2068,8 @@ public abstract class BaseStatusBar extends SystemUI implements
                         || mStatusBarKeyguardViewManager.isOccluded())
                 && !mStatusBarKeyguardViewManager.isInputRestricted();
         try {
-            interrupt = interrupt && !mDreamManager.isDreaming();
+            if (mDreamManager != null)
+                interrupt = interrupt && !mDreamManager.isDreaming();
         } catch (RemoteException e) {
             Log.d(TAG, "failed to query dream manager", e);
         }
