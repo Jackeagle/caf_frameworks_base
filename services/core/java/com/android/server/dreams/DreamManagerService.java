@@ -104,7 +104,8 @@ public final class DreamManagerService extends SystemService {
 
     @Override
     public void onBootPhase(int phase) {
-        if (phase == SystemService.PHASE_THIRD_PARTY_APPS_CAN_START) {
+        if (phase == SystemService.PHASE_THIRD_PARTY_APPS_CAN_START ||
+                phase == SystemService.PHASE_SERVICES_DEFER_COMPLETED) {
             if (Build.IS_DEBUGGABLE) {
                 SystemProperties.addChangeCallback(mSystemPropertiesChanged);
             }
