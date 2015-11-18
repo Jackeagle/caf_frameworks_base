@@ -62,6 +62,8 @@ public class WifiConfiguration implements Parcelable {
     public static final int INVALID_NETWORK_ID = -1;
     /** {@hide} */
     public static final String SIMNumVarName = "sim_num";
+    /** {@hide} */
+    public int channel = 6;
 
 
     /**

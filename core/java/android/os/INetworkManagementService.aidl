@@ -136,6 +136,15 @@ interface INetworkManagementService
      */
     void setIpForwardingEnabled(boolean enabled);
 
+     /**
+     * Create sap interface
+     */
+    void sapCreateIntf(String wlanIface);
+
+     /**
+     * Remove sap interface
+     */
+    void sapRemoveIntf(String wlanIface);
     /**
      * Start tethering services with the specified dhcp server range
      * arg is a set of start end pairs defining the ranges.
@@ -156,7 +165,6 @@ interface INetworkManagementService
      * Tethers the specified interface
      */
     void tetherInterface(String iface);
-
     /**
      * Untethers the specified interface
      */

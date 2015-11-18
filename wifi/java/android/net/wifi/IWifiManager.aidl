@@ -171,5 +171,16 @@ interface IWifiManager
     void factoryReset();
 
     Network getCurrentNetwork();
+    boolean getConcurrency();
+
+    boolean isP2pAutoGoSet();
+
+    String getSAPInterfaceName();
+
+    String fetchStaStateNative();
+
+    void setP2pAutoGoRestart();
+
+    void setP2pGoChannel();
 }
 

@@ -36,6 +36,9 @@ import android.net.Network;
 import android.net.NetworkInfo;
 import android.net.NetworkUtils;
 import android.net.RouteInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.p2p.WifiP2pManager;
+import android.content.Context;
 import android.net.wifi.WifiDevice;
 import android.os.Binder;
 import android.os.INetworkManagementService;
@@ -117,6 +120,7 @@ public class Tethering extends BaseNetworkObserver {
     private final INetworkManagementService mNMService;
     private final INetworkStatsService mStatsService;
     private Looper mLooper;
+    private WifiP2pManager mWifiP2pManager;
 
     private HashMap<String, TetherInterfaceSM> mIfaces; // all tethered/tetherable ifaces
 
@@ -139,6 +143,7 @@ public class Tethering extends BaseNetworkObserver {
         "192.168.48.2", "192.168.48.254", "192.168.49.2", "192.168.49.254",
     };
 
+    private boolean dhcpServerStartedByMe = false;
     private String[] mDefaultDnsServers;
     private static final String DNS_DEFAULT_SERVER1 = "8.8.8.8";
     private static final String DNS_DEFAULT_SERVER2 = "8.8.4.4";
@@ -147,6 +152,7 @@ public class Tethering extends BaseNetworkObserver {
 
     private Notification.Builder mTetheredNotificationBuilder;
     private int mLastNotificationId;
+    private WifiManager mWifiManager = null;
 
     private boolean mRndisEnabled;       // track the RNDIS function enabled state
     private boolean mUsbTetherRequested; // true if USB tethering should be started
@@ -200,6 +206,8 @@ public class Tethering extends BaseNetworkObserver {
             mDhcpRange = DHCP_DEFAULT_RANGE;
         }
 
+        mWifiManager =
+            (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
         // load device config info
         updateConfiguration();
 
@@ -228,7 +236,6 @@ public class Tethering extends BaseNetworkObserver {
             tetherableWifiRegexs = mContext.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_wifi_regexs);
         }
-
         int ifaceTypes[] = mContext.getResources().getIntArray(
                 com.android.internal.R.array.config_tether_upstream_types);
         Collection<Integer> upstreamIfaceTypes = new ArrayList();
@@ -274,6 +281,28 @@ public class Tethering extends BaseNetworkObserver {
                     // ignore usb0 down after enabling RNDIS
                     // we will handle disconnect in interfaceRemoved instead
                     if (VDBG) Log.d(TAG, "ignore interface down for " + iface);
+                } else if (isWifi(iface) && mWifiManager.getConcurrency()) {
+                    int wifiApState = 0;
+                    if (mWifiManager != null) {
+                        wifiApState = mWifiManager.getWifiApState();
+                    }
+
+                    // Ignore AP interface down after enabling STA connection.
+                    // If STA connects to same  band the SAP is enabled, the
+                    // driver stops SAP before it proceeds for STA connection
+                    // hence ignore interface down. After STA connection,
+                    // driver starts SAP on STA channel.
+
+                    if ((wifiApState == WifiManager.WIFI_AP_STATE_DISABLING) ||
+                       (wifiApState == WifiManager.WIFI_AP_STATE_DISABLED)) {
+                        if (VDBG) Log.d(TAG, "Got intf down for " + iface);
+                        sm.sendMessage(TetherInterfaceSM.CMD_INTERFACE_DOWN);
+                        mIfaces.remove(iface);
+                    } else {
+                        if (VDBG) {
+                            Log.d(TAG, "ignore interface down for " + iface);
+                        }
+                    }
                 } else if (sm != null) {
                     sm.sendMessage(TetherInterfaceSM.CMD_INTERFACE_DOWN);
                     mIfaces.remove(iface);
@@ -1478,11 +1507,26 @@ public class Tethering extends BaseNetworkObserver {
                     return false;
                 }
                 try {
-                    mNMService.startTethering(mDhcpRange);
+                    if(DBG)
+                        Log.d(TAG, "mNMService.isTetheringStarted() = "+
+                            mNMService.isTetheringStarted() +
+                            "dhcpServerStartedByMe = " +dhcpServerStartedByMe);
+                    if(!mNMService.isTetheringStarted() &&
+                            dhcpServerStartedByMe == false) {
+                        mNMService.startTethering(mDhcpRange);
+                        dhcpServerStartedByMe = true;
+                    }
                 } catch (Exception e) {
                     try {
-                        mNMService.stopTethering();
-                        mNMService.startTethering(mDhcpRange);
+                        if( dhcpServerStartedByMe ) {
+                            mNMService.stopTethering();
+                            dhcpServerStartedByMe = false;
+                        }
+                        if(!mNMService.isTetheringStarted() &&
+                               dhcpServerStartedByMe == false) {
+                            mNMService.startTethering(mDhcpRange);
+                            dhcpServerStartedByMe = true;
+                        }
                     } catch (Exception ee) {
                         transitionTo(mStartTetheringErrorState);
                         return false;
@@ -1492,7 +1536,14 @@ public class Tethering extends BaseNetworkObserver {
             }
             protected boolean turnOffMasterTetherSettings() {
                 try {
-                    mNMService.stopTethering();
+                    mWifiP2pManager = (WifiP2pManager)
+                        mContext.getSystemService(Context.WIFI_P2P_SERVICE);
+                    if (mWifiP2pManager != null) {
+                        if( !mWifiP2pManager.getP2pAutoGoStatus()) {
+                            mNMService.stopTethering();
+                            dhcpServerStartedByMe = false;
+                        }
+                    }
                 } catch (Exception e) {
                     transitionTo(mStopTetheringErrorState);
                     return false;
