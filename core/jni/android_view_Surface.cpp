@@ -192,25 +192,6 @@ static inline SkColorType convertPixelFormat(PixelFormat format) {
     }
 }
 
-static void nativeSetDirtyRect(JNIEnv* env, jclass clazz,
-        jlong nativeObject, jobject dirtyRect) {
-
-    sp<Surface> surface(reinterpret_cast<Surface *>(nativeObject));
-
-    if (!isSurfaceValid(surface)) {
-        doThrowIAE(env);
-        return;
-    }
-
-    Rect rect;
-    rect.left = env->GetIntField(dirtyRect, gRectClassInfo.left);
-    rect.top = env->GetIntField(dirtyRect, gRectClassInfo.top);
-    rect.right = env->GetIntField(dirtyRect, gRectClassInfo.right);
-    rect.bottom = env->GetIntField(dirtyRect, gRectClassInfo.bottom);
-
-    surface->setDirtyRect(&rect);
-}
-
 static jlong nativeLockCanvas(JNIEnv* env, jclass clazz,
         jlong nativeObject, jobject canvasObj, jobject dirtyRectObj) {
     sp<Surface> surface(reinterpret_cast<Surface *>(nativeObject));
@@ -461,8 +442,6 @@ static JNINativeMethod gSurfaceMethods[] = {
             (void*)nativeReadFromParcel },
     {"nativeWriteToParcel", "(JLandroid/os/Parcel;)V",
             (void*)nativeWriteToParcel },
-    {"nativeSetDirtyRect", "(JLandroid/graphics/Rect;)V",
-           (void*)nativeSetDirtyRect },
     {"nativeGetWidth", "(J)I", (void*)nativeGetWidth },
     {"nativeGetHeight", "(J)I", (void*)nativeGetHeight },
 

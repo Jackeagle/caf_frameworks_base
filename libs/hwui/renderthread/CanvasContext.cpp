@@ -228,6 +228,11 @@ void CanvasContext::draw() {
     if (!dirty.isEmpty()) {
         status = mCanvas->prepareDirty(dirty.fLeft, dirty.fTop,
                 dirty.fRight, dirty.fBottom, mOpaque);
+
+        Rect dirtyRect = mCanvas->getTilingClip();
+        mNativeWindow->perform(mNativeWindow.get(),NATIVE_WINDOW_SET_DIRTY_RECT,
+                (int)dirtyRect.left, (int)dirtyRect.top, (int)ceilf(dirtyRect.right),
+                (int)ceilf(dirtyRect.bottom));
     } else {
         status = mCanvas->prepare(mOpaque);
     }

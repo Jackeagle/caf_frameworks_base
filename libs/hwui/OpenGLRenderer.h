@@ -235,6 +235,8 @@ public:
     int getViewportWidth() { return currentSnapshot()->getViewportWidth(); }
     int getViewportHeight() { return currentSnapshot()->getViewportHeight(); }
 
+    Rect getTilingClip() { return mTilingClip; }
+
     /**
      * Scales the alpha on the current snapshot. This alpha value will be modulated
      * with other alpha values when drawing primitives.
