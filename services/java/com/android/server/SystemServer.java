@@ -44,6 +44,7 @@ import android.os.storage.IMountService;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Slog;
+import android.util.Log;
 import android.view.WindowManager;
 import android.webkit.WebViewFactory;
 
@@ -179,6 +180,8 @@ public class SystemServer {
      */
     public static void main(String[] args) {
         SystemServer extendedService = null,systemServer = null;
+
+        Log.printMarker("SystemServer - Start");
         if (mIsBootOpt == true) {
             try {
                 Class c = Class.forName("com.android.server.AutoSystemServer");
