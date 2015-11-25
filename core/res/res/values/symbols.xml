@@ -2334,6 +2334,10 @@
 
   <java-symbol type="drawable" name="platlogo_m" />
 
+  <!-- language/locale picker extention feature -->
+  <java-symbol type="string" name="locale_codes" />
+  <java-symbol type="bool"   name="config_display_country_for_locale_codes" />
+
   <!-- config softap extention feature -->
   <java-symbol type="bool" name="config_softap_extention" />
 
@@ -2384,4 +2388,11 @@
   <!-- Data Connectivity Error Configurations -->
   <java-symbol type="bool" name="config_reject_ggsn_perm_failure" />
   <java-symbol type="bool" name="config_protocol_errors_perm_failure" />
+
+  <!-- Regional Specific Symbols -->
+  <java-symbol type="bool" name="config_dateformat" />
+  <java-symbol type="integer" name="wifi_hotspot_security_type" />
+  <java-symbol type="string" name="def_wifi_wifihotspot_pass" />
+  <java-symbol type="string" name="def_wifi_direct_name" />
+  <java-symbol type="string" name="def_custom_bt_defname" />
 </resources>
