@@ -2430,4 +2430,5 @@
   <!-- configuration to show/hide toast for video calls -->
   <java-symbol type="bool" name="config_display_video_quality_toast" />
   <java-symbol type="bool" name="config_call_session_event_toast" />
+  <java-symbol type="bool" name="config_display_data_usage_toast" />
 </resources>
