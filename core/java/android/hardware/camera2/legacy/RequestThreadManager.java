@@ -298,7 +298,9 @@ public class RequestThreadManager {
         if (DEBUG) Log.d(TAG, "doJpegCapturePrepare");
 
         mCamera.takePicture(mJpegShutterCallback, /*raw*/null, mJpegCallback);
-        mPreviewRunning = false;
+        if (!mCamera.previewEnabled()) {
+            mPreviewRunning = false;
+        }
     }
 
     private void doPreviewCapture(RequestHolder request) throws IOException {
