@@ -156,6 +156,7 @@ public final class TvInputManagerService extends SystemService {
             }
         } else if (mIsBootOpt == true && phase ==
                 SystemService.PHASE_SERVICES_DEFER_COMPLETED) {
+            registerBroadcastReceivers();
             synchronized (mLock) {
                 buildTvInputListLocked(mCurrentUserId, null);
                 buildTvContentRatingSystemListLocked(mCurrentUserId);
