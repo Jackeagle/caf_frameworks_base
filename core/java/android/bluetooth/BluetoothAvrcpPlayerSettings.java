@@ -25,6 +25,8 @@ import java.util.Map;
 
 /**
  * Class used to identify settings associated with the player on AG.
+ *
+ * {@hide}
  */
 public final class BluetoothAvrcpPlayerSettings implements Parcelable {
     public static final String TAG = "BluetoothAvrcpPlayerSettings";
