@@ -577,7 +577,8 @@ public class AutoPackageManagerService extends PackageManagerService {
                     // the rest of the commands above) because there's precious little we
                     // can do about it. A settings error is reported, though.
                     adjustCpuAbisForSharedUserLPw(setting.packages, null /* scanned package */,
-                            false /* force dexopt */, false /* defer dexopt */);
+                            false /* force dexopt */, false /* defer dexopt */,
+                            false /* boot complete */);
             }
         }
     }
