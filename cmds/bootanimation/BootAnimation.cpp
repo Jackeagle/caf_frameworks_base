@@ -67,10 +67,12 @@ namespace android {
 static const int ANIM_ENTRY_NAME_MAX = 256;
 
 /*
- * Under this threshold(100M), bootanimation may be stuck during running.
+ * Under this threshold(50M), bootanimation may be stuck during running.
+ * Besides bootanimation being stucking, the runtime of other processes will
+ * be much longer than before when memory is under this threshold.
  * Test on device with 1G memory.
  */
-static const unsigned long LOW_MEM_THRESHOLD = 102400;
+static const unsigned long LOW_MEM_THRESHOLD = 51200;
 
 // ---------------------------------------------------------------------------
 
