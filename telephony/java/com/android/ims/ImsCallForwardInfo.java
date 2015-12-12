@@ -31,8 +31,6 @@ public class ImsCallForwardInfo implements Parcelable {
     public int mStatus;
     // 0x91: International, 0x81: Unknown
     public int mToA;
-    // Service class
-    public int mServiceClass;
     // Number (it will not include the "sip" or "tel" URI scheme)
     public String mNumber;
     // No reply timer for CF
@@ -55,7 +53,6 @@ public class ImsCallForwardInfo implements Parcelable {
         out.writeInt(mCondition);
         out.writeInt(mStatus);
         out.writeInt(mToA);
-        out.writeInt(mServiceClass);
         out.writeString(mNumber);
         out.writeInt(mTimeSeconds);
     }
@@ -65,7 +62,6 @@ public class ImsCallForwardInfo implements Parcelable {
         return super.toString() + ", Condition: " + mCondition
             + ", Status: " + ((mStatus == 0) ? "disabled" : "enabled")
             + ", ToA: " + mToA + ", Number=" + mNumber
-            + ", Service Class: " + mServiceClass
             + ", Time (seconds): " + mTimeSeconds;
     }
 
@@ -73,7 +69,6 @@ public class ImsCallForwardInfo implements Parcelable {
         mCondition = in.readInt();
         mStatus = in.readInt();
         mToA = in.readInt();
-        mServiceClass = in.readInt();
         mNumber = in.readString();
         mTimeSeconds = in.readInt();
     }
