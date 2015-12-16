@@ -1318,8 +1318,18 @@ public final class ActiveServices {
             return;
         }
         if(SERVICE_RESCHEDULE == true) {
-            ActivityRecord top_rc = mAm.getFocusedStack().topRunningActivityLocked(null);
-            if(top_rc.nowVisible || r.shortName.contains(top_rc.packageName)) {
+            boolean shouldDelay = false;
+            ActivityRecord top_rc = null;
+            ActivityStack stack = mAm.getFocusedStack();
+            if(stack != null) {
+                top_rc = stack.topRunningActivityLocked(null);
+            }
+            if(top_rc != null) {
+                if(!top_rc.nowVisible && !r.shortName.contains(top_rc.packageName)) {
+                    shouldDelay = true;
+                }
+            }
+            if(!shouldDelay) {
                 bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true);
             } else {
                 if (DEBUG_DELAYED_SERVICE) {
