@@ -140,6 +140,7 @@ public class WifiTracker {
         mFilter.addAction(WifiManager.LINK_CONFIGURATION_CHANGED_ACTION);
         mFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         mFilter.addAction(WifiManager.RSSI_CHANGED_ACTION);
+        mFilter.addAction(WifiManager.ACTION_AUTH_PASSWORD_WRONG);
     }
 
     /**
@@ -518,7 +519,11 @@ public class WifiTracker {
                         .sendToTarget();
             } else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)) {
                 mWorkHandler.sendEmptyMessage(WorkHandler.MSG_UPDATE_NETWORK_INFO);
+            } else if (WifiManager.ACTION_AUTH_PASSWORD_WRONG.equals(action)) {
+                Toast.makeText(context, R.string.wifi_auth_password_wrong,
+                             Toast.LENGTH_SHORT).show();
             }
+
         }
     };
 
