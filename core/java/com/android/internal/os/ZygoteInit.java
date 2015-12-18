@@ -591,6 +591,8 @@ public class ZygoteInit {
                 throw new RuntimeException("No ABI list supplied.");
             }
 
+            Log.printMarker("Zygote - Start");
+
             registerZygoteSocket(socketName);
             EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_START,
                 SystemClock.uptimeMillis());
