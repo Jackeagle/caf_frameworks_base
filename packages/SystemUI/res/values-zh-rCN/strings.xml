@@ -373,4 +373,5 @@
     <string name="hidden_notifications_setup" msgid="41079514801976810">"设置"</string>
     <string name="muted_by" msgid="6147073845094180001">"已被<xliff:g id="THIRD_PARTY">%1$s</xliff:g>设为静音"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>（<xliff:g id="EXIT_CONDITION">%2$s</xliff:g>）"</string>
+    <string name="hotspot_apm_message">"飞行模式开启的情况下不能够链接到移动网络,请关闭飞行模式后重试。"</string>
 </resources>
