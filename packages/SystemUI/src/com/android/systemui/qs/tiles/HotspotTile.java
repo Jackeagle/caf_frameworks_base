@@ -19,10 +19,12 @@ package com.android.systemui.qs.tiles;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.provider.Settings;
 
 import com.android.systemui.R;
 import com.android.systemui.qs.UsageTracker;
 import com.android.systemui.qs.QSTile;
+import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardMonitor;
 
@@ -67,6 +69,17 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
 
     @Override
     protected void handleClick() {
+        boolean airplaneMode = (Settings.Global.getInt(mContext.getContentResolver(),
+                Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
+        if (airplaneMode) {
+            SystemUIDialog d = new SystemUIDialog(mContext);
+            d.setTitle(R.string.quick_settings_hotspot_label);
+            d.setMessage(R.string.hotspot_apm_message);
+            d.setPositiveButton(com.android.internal.R.string.ok, null);
+            d.setShowForAllUsers(true);
+            d.show();
+            return;
+        }
         final boolean isEnabled = (Boolean) mState.value;
         mController.setHotspotEnabled(!isEnabled);
         mEnable.setAllowAnimation(true);
