@@ -16,6 +16,8 @@
 
 package android.widget;
 
+import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
+
 import android.R;
 import android.annotation.ColorInt;
 import android.annotation.DrawableRes;
@@ -31,6 +33,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.UndoManager;
+import android.content.pm.ApplicationInfo;
 import android.content.res.ColorStateList;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
@@ -115,14 +118,14 @@ import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewParent;
-import android.view.ViewStructure;
 import android.view.ViewConfiguration;
 import android.view.ViewDebug;
 import android.view.ViewGroup.LayoutParams;
-import android.view.ViewRootImpl;
-import android.view.ViewTreeObserver;
 import android.view.ViewHierarchyEncoder;
+import android.view.ViewParent;
+import android.view.ViewRootImpl;
+import android.view.ViewStructure;
+import android.view.ViewTreeObserver;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -148,8 +151,6 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Locale;
-
-import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
 
 /**
  * Displays text to the user and optionally allows them to edit it.  A TextView
@@ -376,7 +377,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         public Drawables(Context context) {
             final int targetSdkVersion = context.getApplicationInfo().targetSdkVersion;
-            mIsRtlCompatibilityMode = (targetSdkVersion < JELLY_BEAN_MR1 ||
+            final boolean isSystemApp = (context.getApplicationInfo().flags &
+                ApplicationInfo.FLAG_SYSTEM) != 0;
+            mIsRtlCompatibilityMode = ((targetSdkVersion < JELLY_BEAN_MR1 && !isSystemApp) ||
                 !context.getApplicationInfo().hasRtlSupport());
             mOverride = false;
         }
@@ -1474,7 +1477,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         }
                     }
                 }
+            } else if (mText instanceof Spannable) {
+                // Reset the selection.
+                stopTextActionMode();
+                Selection.setSelection((Spannable) mText, getSelectionStart(), getSelectionEnd());
             }
+
             if (mEditor.hasSelectionController()) {
                 mEditor.startSelectionActionMode();
             }
@@ -5243,14 +5251,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             mEditor.mCreatedWithASelection = false;
         }
 
-        // Phone specific code (there is no ExtractEditText on tablets).
-        // ExtractEditText does not call onFocus when it is displayed, and mHasSelectionOnFocus can
-        // not be set. Do the test here instead.
-        if (isInExtractedMode() && hasSelection() && mEditor != null
-                && mEditor.mTextActionMode == null && isShown() && hasWindowFocus()) {
-            mEditor.startSelectionActionMode();
-        }
-
         unregisterForPreDraw();
 
         return true;
@@ -6518,10 +6518,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             case TEXT_ALIGNMENT_GRAVITY:
                 switch (mGravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK) {
                     case Gravity.START:
-                        alignment = Layout.Alignment.ALIGN_NORMAL;
+                        alignment = !isLayoutRtl() ? Layout.Alignment.ALIGN_NORMAL :
+                            Layout.Alignment.ALIGN_RIGHT;
                         break;
                     case Gravity.END:
-                        alignment = Layout.Alignment.ALIGN_OPPOSITE;
+                        alignment = !isLayoutRtl() ? Layout.Alignment.ALIGN_OPPOSITE :
+                            Layout.Alignment.ALIGN_LEFT;
                         break;
                     case Gravity.LEFT:
                         alignment = Layout.Alignment.ALIGN_LEFT;
@@ -9600,8 +9602,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     TextDirectionHeuristic getTextDirectionHeuristic() {
         if (hasPasswordTransformationMethod()) {
-            // passwords fields should be LTR
-            return TextDirectionHeuristics.LTR;
+            // passwords fields should be ANYRTL_LTR
+            return TextDirectionHeuristics.ANYRTL_LTR;
         }
 
         // Always need to resolve layout direction first

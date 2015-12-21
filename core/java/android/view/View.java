@@ -33,6 +33,7 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -2355,7 +2356,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *                            1      PFLAG3_APPLYING_INSETS
      *                           1       PFLAG3_FITTING_SYSTEM_WINDOWS
      *                          1        PFLAG3_NESTED_SCROLLING_ENABLED
-     *                         1         PFLAG3_ASSIST_BLOCKED
+     *                         1         PFLAG3_SCROLL_INDICATOR_TOP
+     *                        1          PFLAG3_SCROLL_INDICATOR_BOTTOM
+     *                       1           PFLAG3_SCROLL_INDICATOR_LEFT
+     *                      1            PFLAG3_SCROLL_INDICATOR_RIGHT
+     *                     1             PFLAG3_SCROLL_INDICATOR_START
+     *                    1              PFLAG3_SCROLL_INDICATOR_END
+     *                   1               PFLAG3_ASSIST_BLOCKED
      * |-------|-------|-------|-------|
      */
 
@@ -2549,7 +2556,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>Indicates that we are allowing {@link ViewStructure} to traverse
      * into this view.<p>
      */
-    static final int PFLAG3_ASSIST_BLOCKED = 0x100;
+    static final int PFLAG3_ASSIST_BLOCKED = 0x4000;
 
     /**
      * Always allow a user to over-scroll this view, provided it is a
@@ -7635,7 +7642,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @ResolvedLayoutDir
     public int getLayoutDirection() {
         final int targetSdkVersion = getContext().getApplicationInfo().targetSdkVersion;
-        if (targetSdkVersion < JELLY_BEAN_MR1) {
+        if (targetSdkVersion < JELLY_BEAN_MR1 && !isSystemApp()) {
             mPrivateFlags2 |= PFLAG2_LAYOUT_DIRECTION_RESOLVED;
             return LAYOUT_DIRECTION_RESOLVED_DEFAULT;
         }
@@ -14138,7 +14145,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private boolean isRtlCompatibilityMode() {
         final int targetSdkVersion = getContext().getApplicationInfo().targetSdkVersion;
-        return targetSdkVersion < JELLY_BEAN_MR1 || !hasRtlSupport();
+        return (targetSdkVersion < JELLY_BEAN_MR1 && !isSystemApp()) || !hasRtlSupport();
+    }
+
+    /**
+     * Return true if we are in a system app context.
+     */
+    private boolean isSystemApp() {
+        return ((getContext().getApplicationInfo().flags & ApplicationInfo.FLAG_SYSTEM) != 0);
     }
 
     /**

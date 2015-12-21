@@ -438,6 +438,7 @@ public final class SystemServer {
         boolean disableNetwork = SystemProperties.getBoolean("config.disable_network", false);
         boolean disableNetworkTime = SystemProperties.getBoolean("config.disable_networktime", false);
         boolean isEmulator = SystemProperties.get("ro.kernel.qemu").equals("1");
+	boolean disableAtlas = SystemProperties.getBoolean("config.disable_atlas", true);
 
         try {
             Slog.i(TAG, "Reading configuration...");
@@ -875,6 +876,11 @@ public final class SystemServer {
                 if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
                     mSystemServiceManager.startService(VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
                 }
+
+                if (GestureLauncherService.isGestureLauncherEnabled(context.getResources())) {
+                    Slog.i(TAG, "Gesture Launcher Service");
+                    mSystemServiceManager.startService(GestureLauncherService.class);
+                }
             }
 
             try {
@@ -927,7 +933,7 @@ public final class SystemServer {
                 mSystemServiceManager.startService(DreamManagerService.class);
             }
 
-            if (!disableNonCoreServices) {
+            if (!disableNonCoreServices && !disableAtlas) {
                 try {
                     Slog.i(TAG, "Assets Atlas Service");
                     atlas = new AssetAtlasService(context);
