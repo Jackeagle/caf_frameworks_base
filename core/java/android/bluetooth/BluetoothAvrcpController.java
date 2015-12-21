@@ -31,8 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This class provides the public APIs to control the Bluetooth AVRCP Controller. It currently
- * supports player information, playback support and track metadata.
+ * This class provides the public APIs to control the Bluetooth AVRCP Controller
+ * profile.
  *
  *<p>BluetoothAvrcpController is a proxy object for controlling the Bluetooth AVRCP
  * Service via IPC. Use {@link BluetoothAdapter#getProfileProxy} to get
@@ -102,6 +102,40 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String EXTRA_PLAYER_SETTING =
             "android.bluetooth.avrcp-controller.profile.extra.PLAYER_SETTING";
 
+
+    public static final String AVAILABLE_MEDIA_PLAYERS_UPDATE =
+            "android.bluetooth.avrcp-controller.profile.action.REMOTE_PLAYERS_UPDATE";
+
+    public static final String BROWSED_PLAYER_CHANGED =
+            "android.bluetooth.avrcp-controller.profile.action.BROWSED_PLAYER_CHANGED";
+
+    public static final String ADDRESSED_PLAYER_CHANGED =
+            "android.bluetooth.avrcp-controller.profile.action.ADDRESSED_PLAYER_CHANGED";
+
+    public static final String EXTRA_REMOTE_PLAYERS =
+            "android.bluetooth.avrcp-controller.profile.extra.PLAYERS";
+
+    public static final String EXTRA_PLAYER_UPDATE_STATUS =
+            "android.bluetooth.avrcp-controller.profile.extra.STATUS";
+
+    public static final String BROWSE_COMMAND_GET_NOW_PLAYING_LIST =
+            "android.bluetooth.avrcp-controller.browse.GET_NPL";
+
+    public static final String BROWSE_COMMAND_ADD_TO_NOW_PLAYING_LIST =
+            "android.bluetooth.avrcp-controller.browse.ADD_TO_NPL";
+
+    public static final String EXTRA_ADD_TO_NOW_PLAYING_LIST =
+            "id";
+
+    public static final String SESSION_EVENT_REFRESH_LIST =
+            "android.bluetooth.avrcp-controller.event.REFRESH_LIST";
+
+    public static final String AVRCP_BROWSE_THUMBNAILS_UPDATE =
+            "android.bluetooth.avrcp-controller.profile.action.THUMBNAIL_UPDATE";
+    public static final String EXTRA_MEDIA_IDS =
+            "android.bluetooth.avrcp-controller.profile.extra.MEDIA_IDS";
+    public static final String EXTRA_THUMBNAILS =
+            "android.bluetooth.avrcp-controller.profile.extra.THUMBNAILS";
     /*
      * KeyCoded for Pass Through Commands
      */
@@ -125,6 +159,20 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
     public static final int BTRC_FEAT_BROWSE = 0x04;
 
+    /* Browsing constants */
+    public static final int PLAYER_FEATURE_MASK_SIZE = 16;
+    public static final int PLAYER_FEATURE_BITMASK_BROWSING_BIT = 59;
+    public static final int PLAYER_FEATURE_BITMASK_ONLY_BROWSABLE_WHEN_ADDRESSED = 63;
+    public static final int PLAYER_FEATURE_BITMASK_SEARCH_BIT = 60;
+    public static final int PLAYER_FEATURE_BITMASK_ONLY_SEARCHABLE_WHEN_ADDRESSED = 64;
+    public static final int PLAYER_FEATURE_BITMASK_NOW_PLAYING_BIT = 65;
+    public static final int PLAYER_FEATURE_BITMASK_ADD_TO_NOW_PLAYING_BIT = 61;
+
+    public static final int AVRCP_SCOPE_MEDIA_PLAYLIST = 0;
+    public static final int AVRCP_SCOPE_VFS = 1;
+    public static final int AVRCP_SCOPE_SEARCH = 2;
+    public static final int AVRCP_SCOPE_NOW_PLAYING = 3;
+    public static final int AVRCP_SCOPE_NONE = 4;
 
     private Context mContext;
     private ServiceListener mServiceListener;
@@ -401,7 +449,82 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
         }
         if (mService == null) Log.w(TAG, "Proxy not attached to service");
     }
-
+    /*
+     * Sets player with given ID as browsed player, returns false if player id is not in playerList
+     * or is not browsable.
+     */
+    public boolean SetBrowsedPlayer(int playerId) {
+        Log.d(TAG, "setBrowsePlayer playerId = " + playerId);
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.SetBrowsedPlayer(playerId);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in setBrowsePlayer()", e);
+                return false;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return false;
+    }
+    /*
+     * Sets player with given ID as browsed player, returns false if player id is not in playerList
+     */
+    public boolean SetAddressedPlayer(int playerId) {
+        Log.d(TAG, "SetAddressedPlayer playerId = " + playerId);
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.SetAddressedPlayer(playerId);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in SetAddressedPlayer()", e);
+                return false;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return false;
+    }
+    /*
+     * To get current list of players, Will return an object of type BluetoothAvrcpRemoteMediaPlayers
+     * null otherwise
+     */
+    public BluetoothAvrcpRemoteMediaPlayers GetRemoteAvailableMediaPlayer() {
+        Log.d(TAG, "GetRemoteAvailableMediaPlayer ");
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.GetRemoteAvailableMediaPlayer();
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in GetRemoteAvailableMediaPlayer()", e);
+                return null;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return null;
+    }
+    public BluetoothAvrcpRemoteMediaPlayers GetAddressedPlayer() {
+        Log.d(TAG, "GetAddressedPlayer ");
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.GetAddressedPlayer();
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in GetAddressedPlayer()", e);
+                return null;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return null;
+    }
+    public BluetoothAvrcpRemoteMediaPlayers GetBrowsedPlayer() {
+        Log.d(TAG, "GetBrowsedPlayer ");
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.GetBrowsedPlayer();
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in GetBrowsedPlayer()", e);
+                return null;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return null;
+    }
     private final ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
             if (DBG) Log.d(TAG, "Proxy object connected");
