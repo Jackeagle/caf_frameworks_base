@@ -20,6 +20,7 @@ import android.bluetooth.BluetoothA2dp;
 import android.bluetooth.BluetoothA2dpSink;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadset;
+import android.bluetooth.BluetoothHeadsetClient;
 import android.bluetooth.BluetoothMap;
 import android.bluetooth.BluetoothInputDevice;
 import android.bluetooth.BluetoothPan;
@@ -79,6 +80,7 @@ public final class LocalBluetoothProfileManager {
     private A2dpProfile mA2dpProfile;
     private A2dpSinkProfile mA2dpSinkProfile;
     private HeadsetProfile mHeadsetProfile;
+    private HeadsetClientProfile mHeadsetClientProfile;
     private MapProfile mMapProfile;
     private final HidProfile mHidProfile;
     private OppProfile mOppProfile;
@@ -171,6 +173,20 @@ public final class LocalBluetoothProfileManager {
             }
         } else if (mA2dpSinkProfile != null) {
             Log.w(TAG, "Warning: A2DP Sink profile was previously added but the UUID is now missing.");
+        }
+
+        // Headset Client/ Handsfree Client
+        if (BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.Handsfree) ||
+            BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.HSP)) {
+            if (mHeadsetClientProfile == null) {
+                if (DEBUG) Log.d(TAG, "Adding local HEADSET Client profile");
+                mHeadsetClientProfile = new HeadsetClientProfile(mContext, mLocalAdapter,
+                        mDeviceManager, this);
+                addProfile(mHeadsetClientProfile, HeadsetClientProfile.NAME,
+                        BluetoothHeadsetClient.ACTION_CONNECTION_STATE_CHANGED);
+            }
+        } else if (mHeadsetClientProfile != null) {
+            Log.w(TAG, "Warning: HEADSET CLIENT profile was previously added but the UUID is now missing.");
         }
 
         // Headset / Handsfree
@@ -309,6 +325,10 @@ public final class LocalBluetoothProfileManager {
         if (profile != null) {
             return profile.isProfileReady();
         }
+        profile = mHeadsetClientProfile;
+        if (profile != null) {
+            return profile.isProfileReady();
+        }
         profile = mA2dpProfile;
         if (profile != null) {
             return profile.isProfileReady();
@@ -333,6 +353,10 @@ public final class LocalBluetoothProfileManager {
 
     public HeadsetProfile getHeadsetProfile() {
         return mHeadsetProfile;
+    }
+
+    public HeadsetClientProfile getHeadsetClientProfile() {
+        return mHeadsetClientProfile;
     }
 
     public PbapServerProfile getPbapProfile(){
@@ -372,6 +396,16 @@ public final class LocalBluetoothProfileManager {
                             BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.Handsfree))) {
                 profiles.add(mHeadsetProfile);
                 removedProfiles.remove(mHeadsetProfile);
+            }
+        }
+
+        if (mHeadsetClientProfile != null) {
+            if ((BluetoothUuid.isUuidPresent(localUuids, BluetoothUuid.HSP) &&
+                    BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.HSP_AG)) ||
+                    (BluetoothUuid.isUuidPresent(localUuids, BluetoothUuid.Handsfree) &&
+                            BluetoothUuid.isUuidPresent(uuids, BluetoothUuid.Handsfree_AG))) {
+                profiles.add(mHeadsetClientProfile);
+                removedProfiles.remove(mHeadsetClientProfile);
             }
         }
 

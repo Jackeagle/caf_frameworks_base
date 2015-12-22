@@ -7250,6 +7250,9 @@ public final class Settings {
                 BLUETOOTH_A2DP_SINK_PRIORITY_PREFIX = "bluetooth_a2dp_sink_priority_";
         /** {@hide} */
         public static final String
+                BLUETOOTH_HEADSET_AG_PRIORITY_PREFIX = "bluetooth_headset_ag_priority_";
+        /** {@hide} */
+        public static final String
                 BLUETOOTH_A2DP_SRC_PRIORITY_PREFIX = "bluetooth_a2dp_src_priority_";
         /** {@hide} */
         public static final String
@@ -7358,6 +7361,14 @@ public final class Settings {
          */
         public static final String getBluetoothA2dpSrcPriorityKey(String address) {
             return BLUETOOTH_A2DP_SRC_PRIORITY_PREFIX + address.toUpperCase(Locale.ROOT);
+        }
+
+        /**
+         * Get the key that retrieves a bluetooth headset ag's priority.
+         * @hide
+         */
+        public static final String getBluetoothHeadsetAgPriorityKey(String address) {
+            return BLUETOOTH_HEADSET_AG_PRIORITY_PREFIX + address.toUpperCase(Locale.ROOT);
         }
 
         /**
