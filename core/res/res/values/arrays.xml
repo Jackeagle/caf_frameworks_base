@@ -449,4 +449,8 @@
         <item>@color/Red_700</item>
     </array>
 
+    <string-array name="app_ops_labels">
+        <item>Trying to enable wifi</item>
+        <item>Trying to enable BT</item>
+    </string-array>
 </resources>
