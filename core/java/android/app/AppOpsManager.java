@@ -237,8 +237,14 @@ public class AppOpsManager {
     public static final int OP_TURN_SCREEN_ON = 61;
     /** @hide Get device accounts. */
     public static final int OP_GET_ACCOUNTS = 62;
+    /** @hide boot completed . */
+    public static final int OP_BOOT_COMPLETED = 63;
+    /** @hide CHANGE_WIFI_STATE . */
+    public static final int OP_CHANGE_WIFI_STATE = 64;
+    /** @hide BLUETOOTH_ADMIN . */
+    public static final int OP_BLUETOOTH_ADMIN = 65;
     /** @hide */
-    public static final int _NUM_OP = 63;
+    public static final int _NUM_OP = 66;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -336,6 +342,15 @@ public class AppOpsManager {
     /** @hide Get device accounts. */
     public static final String OPSTR_GET_ACCOUNTS
             = "android:get_accounts";
+    /** @hide boot completed */
+    public static final String OPSTR_BOOT_COMPLETED
+            = "android:boot_completed";
+    /** @hide CHANGE_WIFI_STATE . */
+    public static final String OPSTR_CHANGE_WIFI_STATE
+            = "android:change_wifi_state";
+    /** @hide BLUETOOTH_ADMIN . */
+    public static final String OPSTR_BLUETOOTH_ADMIN
+            = "android:bluetooth_admin";
 
     /**
      * This maps each operation to the operation that serves as the
@@ -345,7 +360,7 @@ public class AppOpsManager {
      * presented to the user as one switch then this can be used to
      * make them all controlled by the same single operation.
      */
-    private static int[] sOpToSwitch = new int[] {
+    private static int[] sOpToSwitch = new int[]{
             OP_COARSE_LOCATION,
             OP_COARSE_LOCATION,
             OP_COARSE_LOCATION,
@@ -409,13 +424,16 @@ public class AppOpsManager {
             OP_WRITE_EXTERNAL_STORAGE,
             OP_TURN_SCREEN_ON,
             OP_GET_ACCOUNTS,
+            OP_BOOT_COMPLETED,
+            OP_CHANGE_WIFI_STATE,
+            OP_BLUETOOTH_ADMIN,
     };
 
     /**
      * This maps each operation to the public string constant for it.
      * If it doesn't have a public string constant, it maps to null.
      */
-    private static String[] sOpToString = new String[] {
+    private static String[] sOpToString = new String[]{
             OPSTR_COARSE_LOCATION,
             OPSTR_FINE_LOCATION,
             null,
@@ -478,14 +496,17 @@ public class AppOpsManager {
             OPSTR_READ_EXTERNAL_STORAGE,
             OPSTR_WRITE_EXTERNAL_STORAGE,
             null,
-            OPSTR_GET_ACCOUNTS
+            OPSTR_GET_ACCOUNTS,
+            OPSTR_BOOT_COMPLETED,
+            OPSTR_CHANGE_WIFI_STATE,
+            OPSTR_BLUETOOTH_ADMIN,
     };
 
     /**
      * This provides a simple name for each operation to be used
      * in debug output.
      */
-    private static String[] sOpNames = new String[] {
+    private static String[] sOpNames = new String[]{
             "COARSE_LOCATION",
             "FINE_LOCATION",
             "GPS",
@@ -549,13 +570,16 @@ public class AppOpsManager {
             "WRITE_EXTERNAL_STORAGE",
             "TURN_ON_SCREEN",
             "GET_ACCOUNTS",
+            "BOOT_COMPLETED",
+            "CHANGE_WIFI_STATE",
+            "BLUETOOTH_ADMIN",
     };
 
     /**
      * This optionally maps a permission to an operation.  If there
      * is no permission associated with an operation, it is null.
      */
-    private static String[] sOpPerms = new String[] {
+    private static String[] sOpPerms = new String[]{
             android.Manifest.permission.ACCESS_COARSE_LOCATION,
             android.Manifest.permission.ACCESS_FINE_LOCATION,
             null,
@@ -618,7 +642,10 @@ public class AppOpsManager {
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
             null, // no permission for turning the screen on
-            Manifest.permission.GET_ACCOUNTS
+            Manifest.permission.GET_ACCOUNTS,
+            android.Manifest.permission.RECEIVE_BOOT_COMPLETED,
+            android.Manifest.permission.CHANGE_WIFI_STATE,
+            android.Manifest.permission.BLUETOOTH_ADMIN,
     };
 
     /**
@@ -626,7 +653,7 @@ public class AppOpsManager {
      * Each Op should be filled with a restriction string from UserManager or
      * null to specify it is not affected by any user restriction.
      */
-    private static String[] sOpRestrictions = new String[] {
+    private static String[] sOpRestrictions = new String[]{
             UserManager.DISALLOW_SHARE_LOCATION, //COARSE_LOCATION
             UserManager.DISALLOW_SHARE_LOCATION, //FINE_LOCATION
             UserManager.DISALLOW_SHARE_LOCATION, //GPS
@@ -690,13 +717,16 @@ public class AppOpsManager {
             null, // WRITE_EXTERNAL_STORAGE
             null, // TURN_ON_SCREEN
             null, // GET_ACCOUNTS
+            null, // BOOT_COMPLETED
+            null, // OP_CHANGE_WIFI_STATE
+            null, // OP_BLUETOOTH_ADMIN
     };
 
     /**
      * This specifies whether each option should allow the system
      * (and system ui) to bypass the user restriction when active.
      */
-    private static boolean[] sOpAllowSystemRestrictionBypass = new boolean[] {
+    private static boolean[] sOpAllowSystemRestrictionBypass = new boolean[]{
             false, //COARSE_LOCATION
             false, //FINE_LOCATION
             false, //GPS
@@ -760,12 +790,15 @@ public class AppOpsManager {
             false, // WRITE_EXTERNAL_STORAGE
             false, // TURN_ON_SCREEN
             false, // GET_ACCOUNTS
+            false, // BOOT_COMPLETED
+            false, // OP_CHANGE_WIFI_STATE
+            false, // OP_BLUETOOTH_ADMIN
     };
 
     /**
      * This specifies the default mode for each operation.
      */
-    private static int[] sOpDefaultMode = new int[] {
+    private static int[] sOpDefaultMode = new int[]{
             AppOpsManager.MODE_ALLOWED,
             AppOpsManager.MODE_ALLOWED,
             AppOpsManager.MODE_ALLOWED,
@@ -829,6 +862,9 @@ public class AppOpsManager {
             AppOpsManager.MODE_ALLOWED,
             AppOpsManager.MODE_ALLOWED,  // OP_TURN_ON_SCREEN
             AppOpsManager.MODE_ALLOWED,
+            AppOpsManager.MODE_ALLOWED,
+            AppOpsManager.MODE_ALLOWED,
+            AppOpsManager.MODE_ALLOWED,
     };
 
     /**
@@ -838,7 +874,7 @@ public class AppOpsManager {
      * system (such as OP_WRITE_SMS, which should be allowed only
      * for whichever app is selected as the current SMS app).
      */
-    private static boolean[] sOpDisableReset = new boolean[] {
+    private static boolean[] sOpDisableReset = new boolean[]{
             false,
             false,
             false,
@@ -901,7 +937,10 @@ public class AppOpsManager {
             false,
             false,
             false,
-            false
+            false, //OP_GET_ACCOUNTS
+            false, //OP_BOOT_COMPLETED
+            false, //OP_CHANGE_WIFI_STATE
+            false, //OP_BLUETOOTH_ADMIN
     };
 
     /**
@@ -947,12 +986,12 @@ public class AppOpsManager {
             throw new IllegalStateException("sOpAllowSYstemRestrictionsBypass length "
                     + sOpRestrictions.length + " should be " + _NUM_OP);
         }
-        for (int i=0; i<_NUM_OP; i++) {
+        for (int i = 0; i < _NUM_OP; i++) {
             if (sOpToString[i] != null) {
                 sOpStrToOp.put(sOpToString[i], i);
             }
         }
-        for (int i=0; i<_NUM_OP; i++) {
+        for (int i = 0; i < _NUM_OP; i++) {
             if (sOpPerms[i] != null) {
                 sPermToOp.put(sOpPerms[i], i);
             }
@@ -961,6 +1000,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve the op switch that controls the given operation.
+     *
      * @hide
      */
     public static int opToSwitch(int op) {
@@ -969,6 +1009,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve a non-localized name for the operation, for debugging output.
+     *
      * @hide
      */
     public static String opToName(int op) {
@@ -980,7 +1021,7 @@ public class AppOpsManager {
      * @hide
      */
     public static int strDebugOpToOp(String op) {
-        for (int i=0; i<sOpNames.length; i++) {
+        for (int i = 0; i < sOpNames.length; i++) {
             if (sOpNames[i].equals(op)) {
                 return i;
             }
@@ -990,6 +1031,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve the permission associated with an operation, or null if there is not one.
+     *
      * @hide
      */
     public static String opToPermission(int op) {
@@ -998,6 +1040,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve the user restriction associated with an operation, or null if there is not one.
+     *
      * @hide
      */
     public static String opToRestriction(int op) {
@@ -1006,6 +1049,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve the app op code for a permission, or null if there is not one.
+     *
      * @hide
      */
     public static int permissionToOpCode(String permission) {
@@ -1016,6 +1060,7 @@ public class AppOpsManager {
     /**
      * Retrieve whether the op allows the system (and system ui) to
      * bypass the user restriction.
+     *
      * @hide
      */
     public static boolean opAllowSystemBypassRestriction(int op) {
@@ -1024,6 +1069,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve the default mode for the operation.
+     *
      * @hide
      */
     public static int opToDefaultMode(int op) {
@@ -1032,6 +1078,7 @@ public class AppOpsManager {
 
     /**
      * Retrieve whether the op allows itself to be reset.
+     *
      * @hide
      */
     public static boolean opAllowsReset(int op) {
@@ -1040,6 +1087,7 @@ public class AppOpsManager {
 
     /**
      * Class holding all of the operation information associated with an app.
+     *
      * @hide
      */
     public static class PackageOps implements Parcelable {
@@ -1075,7 +1123,7 @@ public class AppOpsManager {
             dest.writeString(mPackageName);
             dest.writeInt(mUid);
             dest.writeInt(mEntries.size());
-            for (int i=0; i<mEntries.size(); i++) {
+            for (int i = 0; i < mEntries.size(); i++) {
                 mEntries.get(i).writeToParcel(dest, flags);
             }
         }
@@ -1085,7 +1133,7 @@ public class AppOpsManager {
             mUid = source.readInt();
             mEntries = new ArrayList<OpEntry>();
             final int N = source.readInt();
-            for (int i=0; i<N; i++) {
+            for (int i = 0; i < N; i++) {
                 mEntries.add(OpEntry.CREATOR.createFromParcel(source));
             }
         }
@@ -1115,7 +1163,7 @@ public class AppOpsManager {
         private final String mProxyPackageName;
 
         public OpEntry(int op, int mode, long time, long rejectTime, int duration,
-                int proxyUid, String proxyPackage) {
+                       int proxyUid, String proxyPackage) {
             mOp = op;
             mMode = mode;
             mTime = time;
@@ -1146,11 +1194,11 @@ public class AppOpsManager {
         }
 
         public int getDuration() {
-            return mDuration == -1 ? (int)(System.currentTimeMillis()-mTime) : mDuration;
+            return mDuration == -1 ? (int) (System.currentTimeMillis() - mTime) : mDuration;
         }
 
         public int getProxyUid() {
-            return  mProxyUid;
+            return mProxyUid;
         }
 
         public String getProxyPackageName() {
@@ -1233,9 +1281,9 @@ public class AppOpsManager {
     /**
      * Retrieve current operation state for one application.
      *
-     * @param uid The uid of the application of interest.
+     * @param uid         The uid of the application of interest.
      * @param packageName The name of the application of interest.
-     * @param ops The set of operations you are interested in, or null if you want all of them.
+     * @param ops         The set of operations you are interested in, or null if you want all of them.
      * @hide
      */
     public List<AppOpsManager.PackageOps> getOpsForPackage(int uid, String packageName, int[] ops) {
@@ -1267,14 +1315,14 @@ public class AppOpsManager {
      * Restrictions are temporary additional constraints imposed on top of the persisted rules
      * defined by {@link #setMode}.
      *
-     * @param code The operation to restrict.
-     * @param usage The {@link android.media.AudioAttributes} usage value.
-     * @param mode The restriction mode (MODE_IGNORED,MODE_ERRORED) or MODE_ALLOWED to unrestrict.
+     * @param code              The operation to restrict.
+     * @param usage             The {@link android.media.AudioAttributes} usage value.
+     * @param mode              The restriction mode (MODE_IGNORED,MODE_ERRORED) or MODE_ALLOWED to unrestrict.
      * @param exceptionPackages Optional list of packages to exclude from the restriction.
      * @hide
      */
     public void setRestriction(int code, @AttributeUsage int usage, int mode,
-            String[] exceptionPackages) {
+                               String[] exceptionPackages) {
         try {
             final int uid = Binder.getCallingUid();
             mService.setAudioRestriction(code, usage, uid, mode, exceptionPackages);
@@ -1308,20 +1356,22 @@ public class AppOpsManager {
 
     /**
      * Monitor for changes to the operating mode for the given op in the given app package.
-     * @param op The operation to monitor, one of OPSTR_*.
+     *
+     * @param op          The operation to monitor, one of OPSTR_*.
      * @param packageName The name of the application to monitor.
-     * @param callback Where to report changes.
+     * @param callback    Where to report changes.
      */
     public void startWatchingMode(String op, String packageName,
-            final OnOpChangedListener callback) {
+                                  final OnOpChangedListener callback) {
         startWatchingMode(strOpToOp(op), packageName, callback);
     }
 
     /**
      * Monitor for changes to the operating mode for the given op in the given app package.
-     * @param op The operation to monitor, one of OP_*.
+     *
+     * @param op          The operation to monitor, one of OP_*.
      * @param packageName The name of the application to monitor.
-     * @param callback Where to report changes.
+     * @param callback    Where to report changes.
      * @hide
      */
     public void startWatchingMode(int op, String packageName, final OnOpChangedListener callback) {
@@ -1331,7 +1381,7 @@ public class AppOpsManager {
                 cb = new IAppOpsCallback.Stub() {
                     public void opChanged(int op, String packageName) {
                         if (callback instanceof OnOpChangedInternalListener) {
-                            ((OnOpChangedInternalListener)callback).onOpChanged(op, packageName);
+                            ((OnOpChangedInternalListener) callback).onOpChanged(op, packageName);
                         }
                         if (sOpToString[op] != null) {
                             callback.onOpChanged(sOpToString[op], packageName);
@@ -1386,8 +1436,9 @@ public class AppOpsManager {
      * used for a quick check to see if an operation has been disabled for the application,
      * as an early reject of some work.  This does not modify the time stamp or other data
      * about the operation.
-     * @param op The operation to check.  One of the OPSTR_* constants.
-     * @param uid The user id of the application attempting to perform the operation.
+     *
+     * @param op          The operation to check.  One of the OPSTR_* constants.
+     * @param uid         The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1412,8 +1463,9 @@ public class AppOpsManager {
      * that these two match, and if not, return {@link #MODE_IGNORED}.  If this call
      * succeeds, the last execution time of the operation for this app will be updated to
      * the current time.
-     * @param op The operation to note.  One of the OPSTR_* constants.
-     * @param uid The user id of the application attempting to perform the operation.
+     *
+     * @param op          The operation to note.  One of the OPSTR_* constants.
+     * @param uid         The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1440,7 +1492,8 @@ public class AppOpsManager {
      * package name match, and if not, return {@link #MODE_IGNORED}. If this call
      * succeeds, the last execution time of the operation for the proxied app and
      * your app will be updated to the current time.
-     * @param op The operation to note.  One of the OPSTR_* constants.
+     *
+     * @param op                 The operation to note.  One of the OPSTR_* constants.
      * @param proxiedPackageName The name of the application calling into the proxy application.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1467,8 +1520,9 @@ public class AppOpsManager {
      * the current time and the operation will be marked as "running".  In this case you must
      * later call {@link #finishOp(String, int, String)} to report when the application is no
      * longer performing the operation.
-     * @param op The operation to start.  One of the OPSTR_* constants.
-     * @param uid The user id of the application attempting to perform the operation.
+     *
+     * @param op          The operation to start.  One of the OPSTR_* constants.
+     * @param uid         The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1505,8 +1559,9 @@ public class AppOpsManager {
      * used for a quick check to see if an operation has been disabled for the application,
      * as an early reject of some work.  This does not modify the time stamp or other data
      * about the operation.
-     * @param op The operation to check.  One of the OP_* constants.
-     * @param uid The user id of the application attempting to perform the operation.
+     *
+     * @param op          The operation to check.  One of the OP_* constants.
+     * @param uid         The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1529,6 +1584,7 @@ public class AppOpsManager {
     /**
      * Like {@link #checkOp} but instead of throwing a {@link SecurityException} it
      * returns {@link #MODE_ERRORED}.
+     *
      * @hide
      */
     public int checkOpNoThrow(int op, int uid, String packageName) {
@@ -1543,7 +1599,7 @@ public class AppOpsManager {
      * Do a quick check to validate if a package name belongs to a UID.
      *
      * @throws SecurityException if the package name doesn't belong to the given
-     *             UID, or if ownership cannot be verified.
+     *                           UID, or if ownership cannot be verified.
      */
     public void checkPackage(int uid, String packageName) {
         try {
@@ -1558,6 +1614,7 @@ public class AppOpsManager {
 
     /**
      * Like {@link #checkOp} but at a stream-level for audio operations.
+     *
      * @hide
      */
     public int checkAudioOp(int op, int stream, int uid, String packageName) {
@@ -1575,6 +1632,7 @@ public class AppOpsManager {
     /**
      * Like {@link #checkAudioOp} but instead of throwing a {@link SecurityException} it
      * returns {@link #MODE_ERRORED}.
+     *
      * @hide
      */
     public int checkAudioOpNoThrow(int op, int stream, int uid, String packageName) {
@@ -1591,8 +1649,9 @@ public class AppOpsManager {
      * that these two match, and if not, return {@link #MODE_IGNORED}.  If this call
      * succeeds, the last execution time of the operation for this app will be updated to
      * the current time.
-     * @param op The operation to note.  One of the OP_* constants.
-     * @param uid The user id of the application attempting to perform the operation.
+     *
+     * @param op          The operation to note.  One of the OP_* constants.
+     * @param uid         The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1620,14 +1679,14 @@ public class AppOpsManager {
      * package name match, and if not, return {@link #MODE_IGNORED}. If this call
      * succeeds, the last execution time of the operation for the proxied app and
      * your app will be updated to the current time.
-     * @param op The operation to note. One of the OPSTR_* constants.
+     *
+     * @param op                 The operation to note. One of the OPSTR_* constants.
      * @param proxiedPackageName The name of the application calling into the proxy application.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
      * causing the app to crash).
      * @throws SecurityException If the proxy or proxied app has been configured to
-     * crash on this op.
-     *
+     *                           crash on this op.
      * @hide
      */
     public int noteProxyOp(int op, String proxiedPackageName) {
@@ -1644,6 +1703,7 @@ public class AppOpsManager {
     /**
      * Like {@link #noteProxyOp(int, String)} but instead
      * of throwing a {@link SecurityException} it returns {@link #MODE_ERRORED}.
+     *
      * @hide
      */
     public int noteProxyOpNoThrow(int op, String proxiedPackageName) {
@@ -1658,6 +1718,7 @@ public class AppOpsManager {
     /**
      * Like {@link #noteOp} but instead of throwing a {@link SecurityException} it
      * returns {@link #MODE_ERRORED}.
+     *
      * @hide
      */
     public int noteOpNoThrow(int op, int uid, String packageName) {
@@ -1696,8 +1757,9 @@ public class AppOpsManager {
      * the current time and the operation will be marked as "running".  In this case you must
      * later call {@link #finishOp(int, int, String)} to report when the application is no
      * longer performing the operation.
-     * @param op The operation to start.  One of the OP_* constants.
-     * @param uid The user id of the application attempting to perform the operation.
+     *
+     * @param op          The operation to start.  One of the OP_* constants.
+     * @param uid         The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
      * @return Returns {@link #MODE_ALLOWED} if the operation is allowed, or
      * {@link #MODE_IGNORED} if it is not allowed and should be silently ignored (without
@@ -1720,6 +1782,7 @@ public class AppOpsManager {
     /**
      * Like {@link #startOp} but instead of throwing a {@link SecurityException} it
      * returns {@link #MODE_ERRORED}.
+     *
      * @hide
      */
     public int startOpNoThrow(int op, int uid, String packageName) {
@@ -1740,6 +1803,7 @@ public class AppOpsManager {
      * been started with {@link #startOp(int, int, String)}.  There is no validation of input
      * or result; the parameters supplied here must be the exact same ones previously passed
      * in when starting the operation.
+     *
      * @hide
      */
     public void finishOp(int op, int uid, String packageName) {
