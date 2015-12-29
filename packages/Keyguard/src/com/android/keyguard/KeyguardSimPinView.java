@@ -61,9 +61,13 @@ public class KeyguardSimPinView extends KeyguardPinBasedInputView {
         @Override
         public void onSubIdUpdated(long oldSubId, long newSubId) {
             if (mSubId == oldSubId) {
-                mSubId = newSubId;
-                //subId updated, handle sub info changed.
-                handleSubInfoChange();
+                if (DEBUG) Log.d(TAG, "onSubIdUpdated: new: " + newSubId + ", old: " + oldSubId);
+                long subId = mKgUpdateMonitor.getSimPinLockSubId();
+                if (subId != mSubId && SubscriptionManager.isValidSubId(subId)) {
+                    mSubId = subId;
+                    //subId updated, handle sub info changed.
+                    handleSubInfoChange();
+                }
             }
         }
 
