@@ -72,9 +72,13 @@ public class KeyguardSimPukView extends KeyguardPinBasedInputView {
         @Override
         public void onSubIdUpdated(int oldSubId, int newSubId) {
             if (mSubId == oldSubId) {
-                mSubId = newSubId;
-                //subId updated, handle sub info changed.
-                handleSubInfoChange();
+                if (DEBUG) Log.d(TAG, "onSubIdUpdated: new: " + newSubId + ", old: " + oldSubId);
+                int subId = mKgUpdateMonitor.getSimPukLockSubId();
+                if (subId != mSubId && SubscriptionManager.isValidSubscriptionId(subId)) {
+                    mSubId = subId;
+                    //subId updated, handle sub info changed.
+                    handleSubInfoChange();
+                }
             }
         }
 
