@@ -777,7 +777,9 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             int phoneId = SubscriptionManager.getPhoneId(subId);
             mDataActivity[phoneId] = state;
             for (Record r : mRecords) {
-                if ((r.events & PhoneStateListener.LISTEN_DATA_ACTIVITY) != 0) {
+                if ((r.events & PhoneStateListener.LISTEN_DATA_ACTIVITY) != 0 &&
+                            ((r.subId == subId) ||
+                            (r.subId == SubscriptionManager.DEFAULT_SUB_ID))) {
                     try {
                         r.callback.onDataActivity(state);
                     } catch (RemoteException ex) {
