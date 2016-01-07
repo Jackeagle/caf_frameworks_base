@@ -466,14 +466,15 @@ public class Watchdog extends Thread {
             // Trigger the kernel to dump all blocked threads, and backtraces on all CPUs to the kernel log
             Slog.e(TAG, "Triggering SysRq for system_server watchdog");
             doSysRq('w');
-            doSysRq('l');
 
             // At times, when user space watchdog traces don't give an indication on
             // which component held a lock, because of which other threads are blocked,
             // (thereby causing Watchdog), crash the device to analyze RAM dumps
             boolean crashOnWatchdog = SystemProperties
                                         .getBoolean("persist.sys.crashOnWatchdog", false);
+
             if (crashOnWatchdog) {
+                doSysRq('l');
                 // wait until the above blocked threads be dumped into kernel log
                 SystemClock.sleep(3000);
 
