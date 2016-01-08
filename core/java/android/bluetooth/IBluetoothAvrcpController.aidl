@@ -18,6 +18,7 @@
 package android.bluetooth;
 
 import android.bluetooth.BluetoothAvrcpPlayerSettings;
+import android.bluetooth.BluetoothAvrcpRemoteMediaPlayers;
 import android.bluetooth.BluetoothDevice;
 import android.media.MediaMetadata;
 import android.media.session.PlaybackState;
@@ -38,4 +39,9 @@ interface IBluetoothAvrcpController {
     boolean setPlayerApplicationSetting(in BluetoothAvrcpPlayerSettings plAppSetting);
     void sendGroupNavigationCmd(in BluetoothDevice device, int keyCode, int keyState);
     void startFetchingAlbumArt(in String mimeType, int height, int width, long maxSize);
+    boolean SetBrowsedPlayer(in int playerId);
+    boolean SetAddressedPlayer(in int playerId);
+    BluetoothAvrcpRemoteMediaPlayers GetRemoteAvailableMediaPlayer();
+    BluetoothAvrcpRemoteMediaPlayers GetAddressedPlayer();
+    BluetoothAvrcpRemoteMediaPlayers GetBrowsedPlayer();
 }
