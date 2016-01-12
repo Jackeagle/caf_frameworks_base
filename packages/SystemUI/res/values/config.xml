@@ -164,6 +164,9 @@
     -->
     <integer name="status_bar_style">0</integer>
 
+    <!-- For operator -->
+    <integer name="status_bar_style_operator">3</integer>
+
     <!-- Control whether status bar should fetch mobile signal icons from xml file dynamically -->
     <bool name="config_read_icons_from_xml">false</bool>
 
