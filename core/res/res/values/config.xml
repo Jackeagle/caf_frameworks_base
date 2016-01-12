@@ -580,6 +580,9 @@
          docked if the dock is configured to enable the accelerometer. -->
     <bool name="config_supportAutoRotation">true</bool>
 
+    <!-- Configuration to support rotation lock toggle -->
+    <bool name="config_forceSupportRotationLockToggle">false</bool>
+
     <!-- If true, the screen can be rotated via the accelerometer in all 4
          rotations as the default behavior. -->
     <bool name="config_allowAllRotations">false</bool>
@@ -2467,4 +2470,10 @@
     <bool name="config_regional_hotspot_show_maximum_connection_enable">false</bool>
     <bool name="config_regional_hotspot_show_broadcast_ssid_checkbox">false</bool>
     <bool name="config_regional_hotspot_show_notification_when_turn_on">false</bool>
+    <!-- Zero Balance redirect URL config -->
+    <string name="operator_config_url" translatable="false"></string>
+    <!-- Zero Balance ping URL config -->
+    <string name="operator_ping_url" translatable="false"></string>
+    <!-- Zero Balance feature enable config -->
+    <bool name="config_zero_balance_operator">false</bool>
 </resources>

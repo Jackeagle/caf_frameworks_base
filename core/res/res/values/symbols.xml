@@ -1479,6 +1479,7 @@
   <java-symbol type="bool" name="config_reverseDefaultRotation" />
   <java-symbol type="bool" name="config_showNavigationBar" />
   <java-symbol type="bool" name="config_supportAutoRotation" />
+  <java-symbol type="bool" name="config_forceSupportRotationLockToggle" />
   <java-symbol type="bool" name="target_honeycomb_needs_options_menu" />
   <java-symbol type="dimen" name="navigation_bar_height" />
   <java-symbol type="dimen" name="navigation_bar_height_landscape" />
@@ -2418,6 +2419,8 @@
 
   <java-symbol type="array" name="origin_carrier_names" />
   <java-symbol type="array" name="locale_carrier_names" />
+  <!-- Symbols/Overlays for carrier hotspot -->
+  <java-symbol type="bool" name="config_regional_hotspot_show_maximum_connection_enable" />
 
   <!-- keypress optimization -->
   <java-symbol type="bool" name="config_enableKeypressOptimization" />
@@ -2438,4 +2441,7 @@
   <java-symbol type="bool" name="config_regional_hotspot_show_notification_when_turn_on" />
 
   <java-symbol type="bool" name="config_showOperatorNameInStatusBar" />
+  <java-symbol type="string" name="operator_config_url" />
+  <java-symbol type="string" name="operator_ping_url" />
+  <java-symbol type="bool" name="config_zero_balance_operator"/>
 </resources>
