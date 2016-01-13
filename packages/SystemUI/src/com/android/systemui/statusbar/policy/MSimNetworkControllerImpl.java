@@ -531,7 +531,12 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
                         + phoneId + "state=" + state.getState());
                 }
                 mMSimServiceState[phoneId] = state;
-                mServiceState = mMSimServiceState[mDefaultPhoneId];
+                int defaultDataPhoneId = SubscriptionManager.getPhoneId(
+                        SubscriptionManager.getDefaultDataSubId());
+                if (!SubscriptionManager.isValidPhoneId(defaultDataPhoneId)) {
+                    defaultDataPhoneId = mDefaultPhoneId;
+                }
+                mServiceState = mMSimServiceState[defaultDataPhoneId];
                 if (SystemProperties.getBoolean("ro.config.combined_signal", true)) {
                     /*
                      * if combined_signal is set to true only then consider data
