@@ -47,6 +47,7 @@ import static com.android.server.NetworkManagementSocketTagger.PROP_QTAGUID_ENAB
 import android.annotation.NonNull;
 import android.app.ActivityManagerNative;
 import android.content.Context;
+import android.content.res.Resources;
 import android.net.ConnectivityManager;
 import android.net.INetworkManagementEventObserver;
 import android.net.InterfaceConfiguration;
@@ -143,6 +144,9 @@ public class NetworkManagementService extends INetworkManagementService.Stub
      * permission.
      */
     public static final String PERMISSION_SYSTEM = "SYSTEM";
+
+    private boolean mIsBootOpt = Resources.getSystem().
+            getBoolean(com.android.internal.R.bool.config_boot_opt);
 
     class NetdResponseCode {
         /* Keep in sync with system/netd/server/ResponseCode.h */
@@ -250,6 +254,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     private volatile boolean mBandwidthControlEnabled;
     private volatile boolean mFirewallEnabled;
     private volatile boolean mStrictEnabled;
+    private volatile boolean mNativeDeamonConnected;
 
     private boolean mMobileActivityFromRadio = false;
     private int mLastPowerStateFromRadio = DataConnectionRealTimeInfo.DC_POWER_STATE_LOW;
@@ -565,11 +570,8 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             }
         }
 
-        try {
-            mConnector.execute("strict", "enable");
-            mStrictEnabled = true;
-        } catch (NativeDaemonConnectorException e) {
-            Log.wtf(TAG, "Failed strict enable", e);
+        if (mIsBootOpt == false) {
+            strictInitialize();
         }
 
         // push any existing quota or UID rules
@@ -604,14 +606,9 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                 }
             }
 
-            size = mUidCleartextPolicy.size();
-            if (size > 0) {
-                Slog.d(TAG, "Pushing " + size + " active UID cleartext policies");
-                final SparseIntArray local = mUidCleartextPolicy;
-                mUidCleartextPolicy = new SparseIntArray();
-                for (int i = 0; i < local.size(); i++) {
-                    setUidCleartextNetworkPolicy(local.keyAt(i), local.valueAt(i));
-                }
+            mNativeDeamonConnected = true;
+            if (mIsBootOpt == false) {
+                executeBufferedCleartextNetworkPolicy();
             }
 
             setFirewallEnabled(mFirewallEnabled || LockdownVpnTracker.isEnabled());
@@ -1894,6 +1891,27 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         }
     }
 
+    private void strictInitialize() {
+        try {
+            mConnector.execute("strict", "enable");
+            mStrictEnabled = true;
+        } catch (NativeDaemonConnectorException e) {
+            Log.wtf(TAG, "Failed strict enable", e);
+        }
+    }
+
+    private void executeBufferedCleartextNetworkPolicy() {
+        int size = mUidCleartextPolicy.size();
+        if (size > 0) {
+            Slog.d(TAG, "Pushing " + size + " active UID cleartext policies");
+            final SparseIntArray local = mUidCleartextPolicy;
+            mUidCleartextPolicy = new SparseIntArray();
+            for (int i = 0; i < local.size(); i++) {
+                setUidCleartextNetworkPolicy(local.keyAt(i), local.valueAt(i));
+            }
+        }
+    }
+
     @Override
     public void setUidCleartextNetworkPolicy(int uid, int policy) {
         if (Binder.getCallingUid() != uid) {
@@ -1910,6 +1928,10 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                 // Module isn't enabled yet; stash the requested policy away to
                 // apply later once the daemon is connected.
                 mUidCleartextPolicy.put(uid, policy);
+                if (mIsBootOpt && mNativeDeamonConnected) {
+                    strictInitialize();
+                    executeBufferedCleartextNetworkPolicy();
+                }
                 return;
             }
 
