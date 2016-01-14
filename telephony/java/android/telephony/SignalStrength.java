@@ -403,7 +403,6 @@ public class SignalStrength implements Parcelable {
 
         mTdScdmaRscp = ((mTdScdmaRscp >= 25) && (mTdScdmaRscp <= 120))
                 ? -mTdScdmaRscp : SignalStrength.INVALID;
-
         // Cqi no change
         if (DBG) log("Signal after validate=" + this);
     }
