@@ -66,6 +66,12 @@ public class CarrierText extends TextView {
         public void onStartedWakingUp() {
             setSelected(true);
         };
+
+        public void onSimStateChanged(int subId, int slotId, IccCardConstants.State simState) {
+            if (getStatusForIccState(simState) == StatusMode.SimIoError) {
+                updateCarrierText();
+            }
+        };
     };
     /**
      * The status of this lock screen. Primarily used for widgets on LockScreen.
@@ -285,6 +291,8 @@ public class CarrierText extends TextView {
             case SimNotReady:
                 // Null is reserved for denoting missing, in this case we have nothing to display.
                 carrierText = ""; // nothing to display yet.
+                if (TelephonyManager.getDefault().isMultiSimEnabled())
+                    carrierText = text;
                 break;
 
             case NetworkLocked:
