@@ -136,6 +136,10 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
             "android.bluetooth.avrcp-controller.profile.extra.MEDIA_IDS";
     public static final String EXTRA_THUMBNAILS =
             "android.bluetooth.avrcp-controller.profile.extra.THUMBNAILS";
+
+    public static final String BROWSE_COMMAND_BROWSE_FOLDER_UP = "UP";
+    public static final String BROWSE_COMMAND_BROWSE_FOLDER_DOWN = "DOWN";
+
     /*
      * KeyCoded for Pass Through Commands
      */
@@ -155,9 +159,11 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final int PASS_THRU_CMD_ID_NEXT_GRP = 0x00;
     public static final int PASS_THRU_CMD_ID_PREV_GRP = 0x01;
     /* Remote supported Features */
+    public static final int BTRC_FEAT_NONE = 0x00;
     public static final int BTRC_FEAT_METADATA = 0x01;
     public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
     public static final int BTRC_FEAT_BROWSE = 0x04;
+    public static final int  BTRC_FEAT_COVER_ART = 0x08;
 
     /* Browsing constants */
     public static final int PLAYER_FEATURE_MASK_SIZE = 16;
@@ -524,6 +530,19 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
         }
         if (mService == null) Log.w(TAG, "Proxy not attached to service");
         return null;
+    }
+    public int getSupportedFeatures(BluetoothDevice device) {
+        Log.d(TAG, "getSupportedFeatures dev = " + device);
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.getSupportedFeatures(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in getSupportedFeatures()", e);
+                return 0;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return 0;
     }
     private final ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {

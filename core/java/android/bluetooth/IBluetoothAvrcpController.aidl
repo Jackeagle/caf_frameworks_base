@@ -44,4 +44,5 @@ interface IBluetoothAvrcpController {
     BluetoothAvrcpRemoteMediaPlayers GetRemoteAvailableMediaPlayer();
     BluetoothAvrcpRemoteMediaPlayers GetAddressedPlayer();
     BluetoothAvrcpRemoteMediaPlayers GetBrowsedPlayer();
+    int getSupportedFeatures(in BluetoothDevice device);
 }
