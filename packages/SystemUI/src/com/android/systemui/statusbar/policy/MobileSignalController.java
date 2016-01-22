@@ -40,6 +40,7 @@ import android.util.SparseArray;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkControllerImpl.Config;
@@ -133,7 +134,7 @@ public class MobileSignalController extends SignalController<
         mLastState.enabled = mCurrentState.enabled = hasMobileData;
         mLastState.iconGroup = mCurrentState.iconGroup = mDefaultIcons;
         // Get initial data sim state.
-        updateDataSim();
+        updateDataSim(mDefaults.getDefaultDataSubId());
     }
 
     public void setConfiguration(Config config) {
@@ -405,7 +406,10 @@ public class MobileSignalController extends SignalController<
                     intent.getStringExtra(TelephonyIntents.EXTRA_PLMN));
             notifyListenersIfNecessary();
         } else if (action.equals(TelephonyIntents.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)) {
-            updateDataSim();
+            int ddsSubId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY,
+                    SubscriptionManager.INVALID_SUBSCRIPTION_ID);
+            Log.d(mTag, "got ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED, new DDS = "+ ddsSubId);
+            updateDataSim(ddsSubId);
             notifyListenersIfNecessary();
         } else if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
             if (mConfig.showLocale) {
@@ -415,10 +419,9 @@ public class MobileSignalController extends SignalController<
         }
     }
 
-    private void updateDataSim() {
-        int defaultDataSub = mDefaults.getDefaultDataSubId();
-        if (SubscriptionManager.isValidSubscriptionId(defaultDataSub)) {
-            mCurrentState.dataSim = defaultDataSub == mSubscriptionInfo.getSubscriptionId();
+    private void updateDataSim(int ddsSubId) {
+        if (SubscriptionManager.isValidSubscriptionId(ddsSubId)) {
+            mCurrentState.dataSim = ddsSubId == mSubscriptionInfo.getSubscriptionId();
         } else {
             // There doesn't seem to be a data sim selected, however if
             // there isn't a MobileSignalController with dataSim set, then
