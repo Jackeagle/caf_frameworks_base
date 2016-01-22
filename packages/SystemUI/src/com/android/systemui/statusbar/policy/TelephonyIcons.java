@@ -247,9 +247,21 @@ class TelephonyIcons {
                     R.drawable.stat_sys_data_idle_lte_operator }
     };
 
+    static final int[][] DATA_LTE_PLUS_OPERATOR = {
+            { R.drawable.stat_sys_data_idle_lte_plus_operator,
+                    R.drawable.stat_sys_data_idle_lte_plus_operator,
+                    R.drawable.stat_sys_data_idle_lte_plus_operator,
+                    R.drawable.stat_sys_data_idle_lte_plus_operator },
+            { R.drawable.stat_sys_data_idle_lte_plus_operator,
+                    R.drawable.stat_sys_data_idle_lte_plus_operator,
+                    R.drawable.stat_sys_data_idle_lte_plus_operator,
+                    R.drawable.stat_sys_data_idle_lte_plus_operator }
+    };
+
     static final int QS_DATA_LTE = R.drawable.ic_qs_signal_lte;
     static final int QS_DATA_LTE_PLUS = R.drawable.ic_qs_signal_lte_plus;
     static final int QS_DATA_LTE_OPERATOR = R.drawable.ic_qs_signal_lte_operator;
+    static final int QS_DATA_LTE_PLUS_OPERATOR = R.drawable.ic_qs_signal_lte_plus_operator;
 
     static final int FLIGHT_MODE_ICON = R.drawable.stat_sys_airplane_mode;
     static final int ROAMING_ICON = R.drawable.stat_sys_data_fully_connected_roam;
@@ -266,6 +278,7 @@ class TelephonyIcons {
     static final int ICON_4G_PLUS = R.drawable.stat_sys_data_fully_connected_4g_plus;
     static final int ICON_1X = R.drawable.stat_sys_data_fully_connected_1x;
     static final int ICON_LTE_OPERATOR = R.drawable.stat_sys_data_idle_lte_operator;
+    static final int ICON_LTE_PLUS_OPERATOR = R.drawable.stat_sys_data_idle_lte_plus_operator;
     static final int ICON_CARRIER_NETWORK_CHANGE =
             R.drawable.stat_sys_signal_carrier_network_change_animation;
 
@@ -276,6 +289,7 @@ class TelephonyIcons {
     static final int QS_ICON_4G_PLUS = R.drawable.ic_qs_signal_4g_plus;
     static final int QS_ICON_1X = R.drawable.ic_qs_signal_1x;
     static final int QS_ICON_LTE_OPERATOR = R.drawable.ic_qs_signal_lte_operator;
+    static final int QS_ICON_LTE_PLUS_OPERATOR = R.drawable.ic_qs_signal_lte_plus_operator;
     static final int QS_ICON_CARRIER_NETWORK_CHANGE =
             R.drawable.ic_qs_signal_carrier_network_change_animation;
     static final int DATA_TYPE_UNKNOWN = 0;
@@ -289,6 +303,7 @@ class TelephonyIcons {
     static final int DATA_TYPE_1X = 8;
     static final int DATA_TYPE_LTE = 9;
     static final int DATA_TYPE_LTE_OPERATOR = 10;
+    static final int DATA_TYPE_LTE_PLUS_OPERATOR = 11;
 
     static final int SIGNAL_STRENGTH_TYPE_G = 0;
     static final int SIGNAL_STRENGTH_TYPE_E = 1;
@@ -558,6 +573,13 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_LTE_OPERATOR;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             mDataTypeGenerationArray[3], null, NS);
+                    if ( type == TelephonyManager.NETWORK_TYPE_LTE_CA) {
+                        //Select LTE+ icon.
+                        mSelectedDataActivityIndex[slot] = DATA_TYPE_LTE_PLUS_OPERATOR;
+                        mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
+                                mDataTypeGenerationArray[4], null, NS);
+                        mSelectedQSDataTypeIcon[slot] = QS_DATA_LTE_PLUS_OPERATOR;
+                    }
                     mSelectedQSDataTypeIcon[slot] = QS_DATA_LTE_OPERATOR;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[2];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_4G;
@@ -983,5 +1005,19 @@ class TelephonyIcons {
             TelephonyIcons.QS_DATA_LTE_OPERATOR
             );
 
+    static final MobileIconGroup LTE_PLUS_OPERATOR = new MobileIconGroup(
+            "LTE_PLUS_OPERATOR",
+            TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH,
+            TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH,
+            0, 0,
+            TelephonyIcons.TELEPHONY_NO_NETWORK,
+            TelephonyIcons.QS_TELEPHONY_NO_NETWORK,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
+            R.string.accessibility_data_connection_lte,
+            TelephonyIcons.ICON_LTE_PLUS_OPERATOR,
+            true,
+            TelephonyIcons.QS_DATA_LTE_PLUS_OPERATOR
+            );
 }
 
