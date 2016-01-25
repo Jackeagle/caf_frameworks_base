@@ -123,4 +123,11 @@ interface IExtTelephony {
     * @return true or false
     */
     boolean isFdnEnabled();
+
+    /** 
+    * Get primary stack phone id.
+    * @param - void
+    * @return phone id
+    */
+    int getPrimaryStackPhoneId();
 }
