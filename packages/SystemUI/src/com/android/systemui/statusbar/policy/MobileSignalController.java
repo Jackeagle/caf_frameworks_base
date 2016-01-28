@@ -38,6 +38,7 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.CarrierAppUtils;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
 import com.android.systemui.R;
@@ -89,6 +90,7 @@ public class MobileSignalController extends SignalController<
     private final int STATUS_BAR_STYLE_DATA_VOICE = 3;
     private int mStyle = STATUS_BAR_STYLE_ANDROID_DEFAULT;
     private DataEnabledSettingObserver mDataEnabledSettingObserver;
+    CarrierAppUtils.CARRIER carrier = CarrierAppUtils.getCarrierId();
 
     // TODO: Reduce number of vars passed in, if we have the NetworkController, probably don't
     // need listener lists anymore.
@@ -124,7 +126,12 @@ public class MobileSignalController extends SignalController<
             mapIconSets();
         }
 
-        mStyle = context.getResources().getInteger(R.integer.status_bar_style);
+        if (carrier != null && (CarrierAppUtils.CARRIER.TELEPHONY_CARRIER_ONE
+                 == carrier)) {
+            mStyle = context.getResources().getInteger(R.integer.status_bar_style_operator);
+        } else {
+            mStyle = context.getResources().getInteger(R.integer.status_bar_style);
+        }
 
         String networkName = info.getCarrierName() != null ? info.getCarrierName().toString()
                 : mNetworkNameDefault;
@@ -254,7 +261,11 @@ public class MobileSignalController extends SignalController<
             mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_HSPAP, TelephonyIcons.H_PLUS);
         }
 
-        if (mConfig.show4gForLte) {
+        if (carrier != null && (CarrierAppUtils.CARRIER.TELEPHONY_CARRIER_ONE
+                 == carrier)) {
+             mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE,
+                     TelephonyIcons.LTE_OPERATOR);
+        } else if (mConfig.show4gForLte) {
             if (mContext.getResources().getBoolean(R.bool.show_4glte_icon_for_lte)) {
                 mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE,
                         TelephonyIcons.FOUR_G_LTE);
