@@ -1797,7 +1797,8 @@ public class PackageManagerService extends IPackageManager.Stub {
                             .forName("com.android.server.pm.AutoPackageManagerService");
                     if (c != null) {
                         Class[] inner = c.getDeclaredClasses();
-                        Object obj = inner[0].newInstance();
+                        Constructor con = inner[0].getDeclaredConstructor(Context.class);
+                        Object obj = con.newInstance(context);
                         Method method = inner[0].getMethod("loadAppScanList",
                                 noparams);
                         method.invoke(obj, null);
