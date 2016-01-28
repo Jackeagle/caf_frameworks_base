@@ -634,15 +634,6 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         } catch (NameNotFoundException e) {
             e.printStackTrace();
         }
-        if ((version < 23) && (Binder.getCallingUid() > 10000)
-                && (packageName.indexOf("android.uid.systemui") != 0)
-                && (packageName.indexOf("android.uid.system") != 0)) {
-            int result = mAppOpsManager.noteOp(AppOpsManager.OP_BLUETOOTH_ADMIN,
-                    Binder.getCallingUid(), packageName);
-            if (result == AppOpsManager.MODE_IGNORED) {
-                return false;
-            }
-        }
 
         if (DBG) {
             Log.d(TAG, "enable():  mBluetooth =" + mBluetooth +
