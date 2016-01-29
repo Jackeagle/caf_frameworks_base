@@ -1051,18 +1051,27 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
     }
 
     public void notifyVoLteServiceStateChanged(VoLteServiceState lteState) {
+        notifyVoLteServiceStateChangedForSubscriber(SubscriptionManager.DEFAULT_SUB_ID,
+                lteState);
+    }
+
+    public void notifyVoLteServiceStateChangedForSubscriber(long subId, VoLteServiceState lteState) {
         if (!checkNotifyPermission("notifyVoLteServiceStateChanged()")) {
             return;
         }
         synchronized (mRecords) {
-            mVoLteServiceState = lteState;
-            for (Record r : mRecords) {
-                if ((r.events & PhoneStateListener.LISTEN_VOLTE_STATE) != 0) {
-                    try {
-                        r.callback.onVoLteServiceStateChanged(
-                                new VoLteServiceState(mVoLteServiceState));
-                    } catch (RemoteException ex) {
-                        mRemoveList.add(r.binder);
+            int phoneId = SubscriptionManager.getPhoneId(subId);
+            if (validatePhoneId(phoneId)) {
+                mVoLteServiceState = lteState;
+                for (Record r : mRecords) {
+                    if (((r.events & PhoneStateListener.LISTEN_VOLTE_STATE) != 0) &&
+                            (r.subId == subId)) {
+                        try {
+                            r.callback.onVoLteServiceStateChanged(
+                                    new VoLteServiceState(mVoLteServiceState));
+                        } catch (RemoteException ex) {
+                            mRemoveList.add(r.binder);
+                        }
                     }
                 }
             }
