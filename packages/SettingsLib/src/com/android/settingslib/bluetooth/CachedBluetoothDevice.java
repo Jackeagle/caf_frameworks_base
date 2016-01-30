@@ -873,7 +873,8 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
                         if ((profile instanceof A2dpProfile)||
                             (profile instanceof A2dpSinkProfile)){
                             a2dpNotConnected = true;
-                        } else if (profile instanceof HeadsetProfile) {
+                        } else if ((profile instanceof HeadsetProfile) ||
+                                   (profile instanceof HeadsetClientProfile)) {
                             headsetNotConnected = true;
                         }
                     }

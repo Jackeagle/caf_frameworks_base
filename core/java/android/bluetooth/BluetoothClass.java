@@ -285,6 +285,8 @@ public final class BluetoothClass implements Parcelable {
     public static final int PROFILE_NAP = 5;
     /** @hide */
     public static final int PROFILE_A2DP_SINK = 6;
+    /** @hide */
+    public static final int PROFILE_HEADSET_CLIENT = 7;
 
     /**
      * Check class bits for possible bluetooth profile support.
@@ -338,6 +340,31 @@ public final class BluetoothClass implements Parcelable {
                 case Device.AUDIO_VIDEO_HANDSFREE:
                 case Device.AUDIO_VIDEO_WEARABLE_HEADSET:
                 case Device.AUDIO_VIDEO_CAR_AUDIO:
+                    return true;
+                default:
+                    return false;
+            }
+        } else if (profile == PROFILE_HEADSET_CLIENT) {
+            // The render service class is required by the spec for HFP, so is a
+            // pretty good signal
+            if (hasService(Service.TELEPHONY)) {
+                return true;
+            }
+            // Just in case they forgot the render service class
+            switch (getDeviceClass()) {
+                case Device.COMPUTER_UNCATEGORIZED:
+                case Device.COMPUTER_DESKTOP:
+                case Device.COMPUTER_SERVER:
+                case Device.COMPUTER_LAPTOP:
+                case Device.COMPUTER_HANDHELD_PC_PDA:
+                case Device.COMPUTER_PALM_SIZE_PC_PDA:
+                case Device.COMPUTER_WEARABLE:
+                case Device.PHONE_UNCATEGORIZED:
+                case Device.PHONE_CELLULAR:
+                case Device.PHONE_CORDLESS:
+                case Device.PHONE_SMART:
+                case Device.PHONE_MODEM_OR_GATEWAY:
+                case Device.PHONE_ISDN:
                     return true;
                 default:
                     return false;
