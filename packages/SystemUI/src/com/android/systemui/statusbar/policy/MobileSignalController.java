@@ -265,8 +265,6 @@ public class MobileSignalController extends SignalController<
                  == carrier)) {
              mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE,
                      TelephonyIcons.LTE_OPERATOR);
-             mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
-                     TelephonyIcons.LTE_PLUS_OPERATOR);
         } else if (mConfig.show4gForLte) {
             if (mContext.getResources().getBoolean(R.bool.show_4glte_icon_for_lte)) {
                 mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE,
