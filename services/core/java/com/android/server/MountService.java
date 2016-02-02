@@ -695,13 +695,39 @@ class MountService extends IMountService.Stub
         }
     };
 
+    private BroadcastReceiver mEarlyMountReceiver = new BroadcastReceiver() {
+        public void onReceive(final Context context, Intent intent) {
+            String action = intent.getAction();
+            if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
+                Slog.d(TAG, "***** Getting info from vold ******");
+                if (mSystemReady && mDaemonConnected) {
+                    killMediaProvider();
+
+                    mDisks.clear();
+                    mVolumes.clear();
+
+                    addInternalVolume();
+                    try {
+                        mConnector.execute("volume", "getinfo", null);
+                    } catch (NativeDaemonConnectorException e) {
+                        throw e.rethrowAsParcelableException();
+                    }
+                }
+            }
+        }
+    };
+
     @Override
     public void waitForAsecScan() {
-        waitForLatch(mAsecsScanned, "mAsecsScanned");
+        if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
+            waitForLatch(mAsecsScanned, "mAsecsScanned");
+        }
     }
 
     private void waitForReady() {
-        waitForLatch(mConnectedSignal, "mConnectedSignal");
+        if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
+            waitForLatch(mConnectedSignal, "mConnectedSignal");
+        }
     }
 
     private void waitForLatch(CountDownLatch latch, String condition) {
@@ -742,11 +768,19 @@ class MountService extends IMountService.Stub
 
     private void handleSystemReady() {
         synchronized (mLock) {
-            resetIfReadyAndConnectedLocked();
+            if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
+                resetIfReadyAndConnectedLocked();
+            }
         }
 
         // Start scheduling nominally-daily fstrim operations
         MountServiceIdler.scheduleIdlePass(mContext);
+        if ("1".equals(SystemProperties.get("vold.earlymount", "0"))) {
+            if (mContext != null) {
+                mContext.registerReceiver(mEarlyMountReceiver,
+                        new IntentFilter(Intent.ACTION_BOOT_COMPLETED));
+            }
+        }
     }
 
     /**
@@ -873,7 +907,9 @@ class MountService extends IMountService.Stub
     @Override
     public void onDaemonConnected() {
         mDaemonConnected = true;
-        mHandler.obtainMessage(H_DAEMON_CONNECTED).sendToTarget();
+        if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
+            mHandler.obtainMessage(H_DAEMON_CONNECTED).sendToTarget();
+        }
     }
 
     private void handleDaemonConnected() {
