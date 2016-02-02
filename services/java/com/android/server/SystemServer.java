@@ -878,34 +878,12 @@ public class SystemServer {
                 startBackupManagerService();
                 startVoiceRecognizerService();
 
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
-                    mSystemServiceManager.startService(VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
-                }
-
                 if (GestureLauncherService.isGestureLauncherEnabled(context.getResources())) {
                     Slog.i(TAG, "Gesture Launcher Service");
                     mSystemServiceManager.startService(GestureLauncherService.class);
                 }
             }
 
-            try {
-                Slog.i(TAG, "DiskStats Service");
-                ServiceManager.addService("diskstats", new DiskStatsService(context));
-            } catch (Throwable e) {
-                reportWtf("starting DiskStats Service", e);
-            }
-
-            try {
-                // need to add this service even if SamplingProfilerIntegration.isEnabled()
-                // is false, because it is this service that detects system property change and
-                // turns on SamplingProfilerIntegration. Plus, when sampling profiler doesn't work,
-                // there is little overhead for running this service.
-                Slog.i(TAG, "SamplingProfiler Service");
-                ServiceManager.addService("samplingprofiler",
-                            new SamplingProfilerService(context));
-            } catch (Throwable e) {
-                reportWtf("starting SamplingProfiler Service", e);
-            }
             startDiskStatsService();
             startSamplingProfilerService();
 
