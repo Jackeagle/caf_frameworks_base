@@ -5810,6 +5810,8 @@ public class WindowManagerService extends IWindowManager.Stub
         boolean wallpaperEnabled = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_enableWallpaperService)
                 && !mOnlyCore;
+        boolean mIsBootOpt = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_boot_opt);
         boolean haveKeyguard = true;
         // TODO(multidisplay): Expand to all displays?
         final WindowList windows = getDefaultWindowListLocked();
@@ -5845,6 +5847,7 @@ public class WindowManagerService extends IWindowManager.Stub
             return true;
         }
 
+        if (mIsBootOpt == true && mSystemBooted == true) return false;
         // If we are turning on the screen after the boot is completed
         // normally, don't do so until we have the application and
         // wallpaper.
