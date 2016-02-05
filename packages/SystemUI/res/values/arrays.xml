@@ -108,8 +108,6 @@
         <item>drawable/stat_sys_data_fully_connected_4g_plus</item>
         <!--LTE-->
         <item>drawable/stat_sys_data_idle_lte_operator</item>
-        <!--LTE+-->
-        <item>drawable/stat_sys_data_idle_lte_plus_operator</item>
     </string-array>
 
     <!--data type description-->
@@ -183,7 +181,6 @@
         <item>array/telephony_data_activity_1x_sim1</item>
         <item>array/telephony_data_activity_lte_sim1</item>
         <item>array/telephony_data_activity_lte_operator_sim1</item>
-        <item>array/telephony_data_activity_lte_plus_operator_sim1</item>
     </string-array>
 
     <!--reserved for overlay-->
@@ -376,21 +373,6 @@
     </string-array>
     <!--reserved for overlay-->
     <string-array name="telephony_data_activity_lte_operator_sim3">
-    </string-array>
-
-     <string-array name="telephony_data_activity_lte_plus_operator_sim1">
-        <item>drawable/stat_sys_data_idle_lte_plus_operator</item>
-        <item>drawable/stat_sys_data_in_lte_plus_operator</item>
-        <item>drawable/stat_sys_data_out_lte_plus_operator</item>
-        <item>drawable/stat_sys_data_inandout_lte_plus_operator</item>
-        <item>drawable/stat_sys_data_idle_lte_plus_operator</item>
-    </string-array>
-
-    <!--reserved for overlay-->
-    <string-array name="telephony_data_activity_lte_plus_operator_sim2">
-    </string-array>
-    <!--reserved for overlay-->
-    <string-array name="telephony_data_activity_lte_plus_operator_sim3">
     </string-array>
 
     <!--signal strength-->
