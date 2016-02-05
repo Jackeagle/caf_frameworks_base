@@ -979,25 +979,25 @@ public class AppOpsService extends IAppOpsService.Stub {
             op.duration = 0;
             final int switchCode = AppOpsManager.opToSwitch(code);
             UidState uidState = ops.uidState;
-            if (code == AppOpsManager.OP_CHANGE_WIFI_STATE
-                    || code == AppOpsManager.OP_BLUETOOTH_ADMIN) {
-                final Op switchOp = switchCode
-                        != code ? getOpLocked(ops, switchCode, true) : op;
-                if (Looper.myLooper() == mLooper) {
-                    return switchOp.mode;
-                }
-                if (op.remember == true) {
-                    if (uidState.opModes == null) {
-                        return defaultMode;
-                    } else {
-                        return uidState.opModes.get(code);
-                    }
-                } else {
-                    final PermissionDialogReq req;
-                    req = askOperationLocked(code, uid, packageName, switchOp);
-                    return req.get();
-                }
-            } else {
+//            if (code == AppOpsManager.OP_CHANGE_WIFI_STATE
+//                    || code == AppOpsManager.OP_BLUETOOTH_ADMIN) {
+//                final Op switchOp = switchCode
+//                        != code ? getOpLocked(ops, switchCode, true) : op;
+//                if (Looper.myLooper() == mLooper) {
+//                    return switchOp.mode;
+//                }
+//                if (op.remember == true) {
+//                    if (uidState.opModes == null) {
+//                        return defaultMode;
+//                    } else {
+//                        return uidState.opModes.get(code);
+//                    }
+//                } else {
+//                    final PermissionDialogReq req;
+//                    req = askOperationLocked(code, uid, packageName, switchOp);
+//                    return req.get();
+//                }
+//            } else {
                 if (uidState.opModes != null) {
                     final int uidMode = uidState.opModes.get(switchCode);
                     if (uidMode != AppOpsManager.MODE_ALLOWED) {
@@ -1023,7 +1023,7 @@ public class AppOpsService extends IAppOpsService.Stub {
                 op.proxyUid = proxyUid;
                 op.proxyPackageName = proxyPackageName;
                 return AppOpsManager.MODE_ALLOWED;
-            }
+//            }
         }
     }
 
