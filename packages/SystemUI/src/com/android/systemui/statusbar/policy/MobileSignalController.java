@@ -38,8 +38,10 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.telephony.CarrierAppUtils;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkControllerImpl.Config;
@@ -87,8 +89,10 @@ public class MobileSignalController extends SignalController<
     private final int STATUS_BAR_STYLE_CDMA_1X_COMBINED = 1;
     private final int STATUS_BAR_STYLE_DEFAULT_DATA = 2;
     private final int STATUS_BAR_STYLE_DATA_VOICE = 3;
+    private final int STATUS_BAR_STYLE_EXTENDED = 4;
     private int mStyle = STATUS_BAR_STYLE_ANDROID_DEFAULT;
     private DataEnabledSettingObserver mDataEnabledSettingObserver;
+    CarrierAppUtils.CARRIER carrier = CarrierAppUtils.getCarrierId();
 
     // TODO: Reduce number of vars passed in, if we have the NetworkController, probably don't
     // need listener lists anymore.
@@ -124,7 +128,12 @@ public class MobileSignalController extends SignalController<
             mapIconSets();
         }
 
-        mStyle = context.getResources().getInteger(R.integer.status_bar_style);
+        if (carrier != null && (CarrierAppUtils.CARRIER.TELEPHONY_CARRIER_ONE
+                 == carrier)) {
+            mStyle = context.getResources().getInteger(R.integer.status_bar_style_extended);
+        } else {
+            mStyle = context.getResources().getInteger(R.integer.status_bar_style);
+        }
 
         String networkName = info.getCarrierName() != null ? info.getCarrierName().toString()
                 : mNetworkNameDefault;
@@ -133,7 +142,7 @@ public class MobileSignalController extends SignalController<
         mLastState.enabled = mCurrentState.enabled = hasMobileData;
         mLastState.iconGroup = mCurrentState.iconGroup = mDefaultIcons;
         // Get initial data sim state.
-        updateDataSim();
+        updateDataSim(mDefaults.getDefaultDataSubId());
     }
 
     public void setConfiguration(Config config) {
@@ -326,7 +335,8 @@ public class MobileSignalController extends SignalController<
                 activityIn, activityOut, dataActivityId, mobileActivityId,
                 icons.mStackedDataIcon, icons.mStackedVoiceIcon,
                 dataContentDescription, description, icons.mIsWide,
-                mSubscriptionInfo.getSubscriptionId());
+                mSubscriptionInfo.getSubscriptionId(), getImsIconId(),
+                isImsRegisteredInAirplaneMode());
 
         mCallbackHandler.post(new Runnable() {
             @Override
@@ -334,6 +344,26 @@ public class MobileSignalController extends SignalController<
                 mNetworkController.updateNetworkLabelView();
             }
         });
+    }
+
+    private boolean isImsRegisteredInAirplaneMode() {
+        return mStyle == STATUS_BAR_STYLE_EXTENDED
+                && mPhone != null && mPhone.isImsRegistered()
+                && mCurrentState.airplaneMode;
+    }
+
+    private int getImsIconId() {
+        if (mStyle == STATUS_BAR_STYLE_EXTENDED
+                && isImsRegisteredOnDataSim()) {
+            return R.drawable.ims_services_hd;
+        } else {
+            return 0;
+        }
+    }
+
+    private boolean isImsRegisteredOnDataSim() {
+        return mPhone != null && mPhone.isImsRegistered()
+                && mCurrentState.dataSim;
     }
 
     @Override
@@ -405,7 +435,10 @@ public class MobileSignalController extends SignalController<
                     intent.getStringExtra(TelephonyIntents.EXTRA_PLMN));
             notifyListenersIfNecessary();
         } else if (action.equals(TelephonyIntents.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)) {
-            updateDataSim();
+            int ddsSubId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY,
+                    SubscriptionManager.INVALID_SUBSCRIPTION_ID);
+            Log.d(mTag, "got ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED, new DDS = "+ ddsSubId);
+            updateDataSim(ddsSubId);
             notifyListenersIfNecessary();
         } else if (action.equals(Intent.ACTION_LOCALE_CHANGED)) {
             if (mConfig.showLocale) {
@@ -415,10 +448,9 @@ public class MobileSignalController extends SignalController<
         }
     }
 
-    private void updateDataSim() {
-        int defaultDataSub = mDefaults.getDefaultDataSubId();
-        if (SubscriptionManager.isValidSubscriptionId(defaultDataSub)) {
-            mCurrentState.dataSim = defaultDataSub == mSubscriptionInfo.getSubscriptionId();
+    private void updateDataSim(int ddsSubId) {
+        if (SubscriptionManager.isValidSubscriptionId(ddsSubId)) {
+            mCurrentState.dataSim = ddsSubId == mSubscriptionInfo.getSubscriptionId();
         } else {
             // There doesn't seem to be a data sim selected, however if
             // there isn't a MobileSignalController with dataSim set, then
