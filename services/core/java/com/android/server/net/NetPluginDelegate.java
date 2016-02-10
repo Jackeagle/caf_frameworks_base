@@ -1,5 +1,5 @@
 /*
- *Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ *Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
  *Redistribution and use in source and binary forms, with or without
  *modification, are permitted provided that the following conditions are
@@ -31,6 +31,7 @@ package com.android.server.net;
 
 import dalvik.system.PathClassLoader;
 
+import java.io.File;
 import java.lang.reflect.Constructor;
 
 import android.util.Slog;
@@ -45,9 +46,10 @@ class NetPluginDelegate {
     private static Class tetherExtensionClass = null;
     private static Object tetherExtensionObj = null;
 
-    static void getTetherStats(NetworkStats uidStats, NetworkStats devStats,
+    public static void getTetherStats(NetworkStats uidStats, NetworkStats devStats,
             NetworkStats xtStats) {
-        loadTetherExtJar();
+        if (LOGV) Slog.v(TAG, "getTetherStats() E");
+        if(!loadTetherExtJar()) return;
         try {
             tetherExtensionClass.getMethod("getTetherStats", NetworkStats.class,
                     NetworkStats.class, NetworkStats.class).invoke(tetherExtensionObj, uidStats,
@@ -58,8 +60,9 @@ class NetPluginDelegate {
         }
     }
 
-    static void setQuota(String iface, long quota) {
-        loadTetherExtJar();
+    public static void setQuota(String iface, long quota) {
+        if (LOGV) Slog.v(TAG, "setQuota(" + iface + ", " + quota + ") E");
+        if(!loadTetherExtJar()) return;
         try {
             tetherExtensionClass.getMethod("setQuota", String.class, long.class).invoke(
                     tetherExtensionObj, iface, quota);
@@ -68,26 +71,37 @@ class NetPluginDelegate {
         }
     }
 
-
-
-    private static void loadTetherExtJar() {
+    private static boolean loadTetherExtJar() {
         final String realProvider = "com.qualcomm.qti.tetherstatsextension.TetherStatsReporting";
         final String realProviderPath = "/system/framework/ConnectivityExt.jar";
-            if (tetherExtensionClass == null && tetherExtensionObj == null) {
-                if (LOGV) Slog.v(TAG, "loading ConnectivityExt jar");
-                try {
 
-                    PathClassLoader classLoader = new PathClassLoader(realProviderPath,
-                            ClassLoader.getSystemClassLoader());
-
-                    tetherExtensionClass = classLoader.loadClass(realProvider);
-                    tetherExtensionObj = tetherExtensionClass.newInstance();
-                        if (LOGV)
-                            Slog.v(TAG, "ConnectivityExt jar loaded");
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    Log.w(TAG, "unable to ConnectivityExt jar");
-                }
+        if (tetherExtensionClass != null && tetherExtensionObj != null) {
+            return true;
         }
+
+        boolean pathExists = new File(realProviderPath).exists();
+        if (!pathExists) {
+            Log.w(TAG, "ConnectivityExt jar file not present");
+            return false;
+        }
+
+        if (tetherExtensionClass == null && tetherExtensionObj == null) {
+            if (LOGV) Slog.v(TAG, "loading ConnectivityExt jar");
+            try {
+                PathClassLoader classLoader = new PathClassLoader(realProviderPath,
+                    ClassLoader.getSystemClassLoader());
+
+                tetherExtensionClass = classLoader.loadClass(realProvider);
+                tetherExtensionObj = tetherExtensionClass.newInstance();
+                if (LOGV)
+                    Slog.v(TAG, "ConnectivityExt jar loaded");
+            } catch (Exception e) {
+                e.printStackTrace();
+                Log.w(TAG, "unable to load ConnectivityExt jar");
+                return false;
+            }
+        }
+
+        return true;
     }
 }
