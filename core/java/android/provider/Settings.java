@@ -3893,6 +3893,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.DEFAULT_DNS_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.PREFERRED_NETWORK_MODE);
             MOVED_TO_GLOBAL.add(Settings.Global.WEBVIEW_DATA_REDUCTION_PROXY_KEY);
+            MOVED_TO_GLOBAL.add(Settings.Global.WIFI_AP_WARM_BOOT_SAVED_STATE);
         }
 
         /** @hide */
@@ -6787,6 +6788,11 @@ public final class Settings {
         * @hide
         */
        public static final String WIFI_SAVED_STATE = "wifi_saved_state";
+       /**
+        * Used to save state for SAP for warm_boot case
+        * @hide
+        */
+       public static final String WIFI_AP_WARM_BOOT_SAVED_STATE = "softap_warm_boot_saved_state";
 
        /**
         * The interval in milliseconds to scan as used by the wifi supplicant
