@@ -109,7 +109,8 @@ public class VoiceInteractionManagerService extends SystemService {
 
     @Override
     public void onBootPhase(int phase) {
-        if (phase == PHASE_THIRD_PARTY_APPS_CAN_START) {
+        if (phase == PHASE_THIRD_PARTY_APPS_CAN_START ||
+                phase == PHASE_SERVICES_DEFER_COMPLETED) {
             mServiceStub.systemRunning(isSafeMode());
         }
     }
