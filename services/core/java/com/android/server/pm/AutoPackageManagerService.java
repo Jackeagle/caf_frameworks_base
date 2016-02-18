@@ -49,6 +49,11 @@ import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
 import android.os.FileUtils;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Pair;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -91,17 +96,52 @@ public class AutoPackageManagerService extends PackageManagerService {
     private static final String TAG = "AutoPackageManagerService";
 
     public static class AutoPackageManagerLoader {
+        private static AutoSQLiteHelper mAutoDb;
+        public AutoPackageManagerLoader(Context context) {
+            mAutoDb = new AutoSQLiteHelper(context,
+                    "/data/misc/bootopt", 1, "conf_table");
+        }
         public static void loadAppScanList() {
             Slog.i(TAG, "Load App Scan List.....");
             mUseAppScanList = false;
-            if (mScanListFile.exists()) {
-                mPrivAppList = new ArraySet<String>();
-                mSystemAppList = new ArraySet<String>();
-                mDataAppList = new ArraySet<String>();
-                mVendorAppList = new ArraySet<String>();
+            mPrivAppList = new ArraySet<String>();
+            mSystemAppList = new ArraySet<String>();
+            mDataAppList = new ArraySet<String>();
+            mVendorAppList = new ArraySet<String>();
+            loadList(mScanListFile);
+            if ((!mSystemAppList.isEmpty() || !mDataAppList.isEmpty()
+                    || !mVendorAppList.isEmpty() ||  !mPrivAppList.isEmpty())
+                    && mScanListFile.exists()) {
+                mUseAppScanList = true;
+            }
+            if (mAutoDb == null) return; // Don't try to read when null.
+            if ((mAutoDb.getProfilesRowCount() != 0) && (mUseAppScanList == true)) {
+                List<String> dbList_privapp = mAutoDb.readFromDb(Pair.create("priv-app", ""));
+                if (dbList_privapp != null && dbList_privapp.size() > 0) {
+                    for (String str : dbList_privapp) {
+                        mPrivAppList.add(str);
+                    }
+                }
+                List<String> dbList_data = mAutoDb.readFromDb(Pair.create("data-app", ""));
+                if (dbList_data != null && dbList_data.size() > 0) {
+                    for (String str : dbList_data) {
+                        mDataAppList.add(str);
+                    }
+                }
+                List<String> dbList_sys = mAutoDb.readFromDb(Pair.create("system-app", ""));
+                if (dbList_sys != null &&  dbList_sys.size() > 0)  {
+                    for (String str : dbList_sys) {
+                        mSystemAppList.add(str);
+                    }
+                }
+            }
+        }
+
+        public static void loadList(File file) {
+            if (file.exists()) {
                 BufferedReader br = null;
                 try {
-                    br = new BufferedReader(new FileReader(mScanListFile), 256);
+                    br = new BufferedReader(new FileReader(file), 256);
                     String line;
                     ArraySet<String> fillList = null;
                     while ((line = br.readLine()) != null) {
@@ -124,10 +164,6 @@ public class AutoPackageManagerService extends PackageManagerService {
                             fillList.add(line);
                         }
                     }
-                    if (!mSystemAppList.isEmpty() || !mDataAppList.isEmpty()
-                            || !mVendorAppList.isEmpty() ||  !mPrivAppList.isEmpty()) {
-                        mUseAppScanList = true;
-                    }
                 } catch (IOException e) {
                     mSystemAppList.clear();
                     mVendorAppList.clear();
@@ -137,7 +173,8 @@ public class AutoPackageManagerService extends PackageManagerService {
                     mVendorAppList = null;
                     mDataAppList = null;
                     mPrivAppList = null;
-                    Log.e(TAG, "Error reading " + mScanListFile.getPath() + ".", e);
+                    mUseAppScanList = false;
+                    Log.e(TAG, "Error reading " + file.getPath() + ".", e);
                 } finally {
                     if (br != null) {
                         try {
@@ -147,9 +184,9 @@ public class AutoPackageManagerService extends PackageManagerService {
                     }
                 }
             }
-            Slog.i(TAG, "mUseAppScanList=" + mUseAppScanList);
         }
     }
+
     public  final boolean isPackageFilename(String name) {
         return name != null && name.endsWith(".apk");
     }
@@ -160,7 +197,7 @@ public class AutoPackageManagerService extends PackageManagerService {
 
     protected void scanDirLI(File dir, int parseFlags, int scanFlags, long currentTime) {
         ArraySet<String> list = null;
-        if (isFirstBoot()) {
+        if (isFirstBoot() || !mUseAppScanList) {
             super.scanDirLI(dir,parseFlags,scanFlags, 0);
             return;
         }
@@ -181,6 +218,7 @@ public class AutoPackageManagerService extends PackageManagerService {
                 File file = new File(dir, s);
                 if (!file.exists() || !isPackageFilename(s)) {
                     // Ignore entries which are not apk's
+                    Slog.d(TAG, "Failed to locate apk " + file.getPath());
                     continue;
                 }
                 PackageParser.Package pkg = null;
@@ -210,6 +248,10 @@ public class AutoPackageManagerService extends PackageManagerService {
                     }
                 }
             }
+        } else {
+            // When Packages list is empty, please call super version of scanDirLI
+            super.scanDirLI(dir, parseFlags, scanFlags, 0);
+            return;
         }
     }
 
@@ -263,7 +305,7 @@ public class AutoPackageManagerService extends PackageManagerService {
     public void startLaterScanApkThread() {
         if (!mUseAppScanList) return;
         final int scanFlags = SCAN_NO_PATHS | SCAN_DEFER_DEX | SCAN_BOOTING | SCAN_INITIAL;
-        Slog.i(TAG," ********** LaterscanApp ****************");
+        Slog.i(TAG, " ********** LaterscanApp ****************");
         final VersionInfo ver = mSettings.getInternalVersion();
         new Thread() {
             @Override
@@ -508,7 +550,7 @@ public class AutoPackageManagerService extends PackageManagerService {
                             int uidds = getPackageUid(name, -1);
                             // Check the staus of package whether it is running or not.
                             if (am != null && !am.isUserRunning(uidds, true)) {
-                                Slog.i(TAG,"Sending broadcast for core package...:" + name);
+                                Slog.i(TAG, "Sending broadcast for core package...:" + name);
                                 am.broadcastIntent(null, bcIntent, null, null, 0, null, null,
                                         receiverPermission,
                                         android.app.AppOpsManager.OP_NONE, extras,
@@ -519,7 +561,7 @@ public class AutoPackageManagerService extends PackageManagerService {
                         PackageInfo pkInfo = getPackageInfo(name,PackageManager.GET_ACTIVITIES,0);
                         if (pkInfo != null && (pkInfo.activities == null
                                 || pkInfo.coreApp == false)) {
-                            Slog.i(TAG,"Sending BC Intent to stopped package: " + name);
+                            Slog.i(TAG, "Sending BC Intent to stopped package: " + name);
                             Intent bcIntent = new Intent(Intent.ACTION_BOOT_COMPLETED)
                                     .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
                                     .setPackage(name);
@@ -530,7 +572,7 @@ public class AutoPackageManagerService extends PackageManagerService {
                             int uidds = getPackageUid(name, -1);
                             // Check the staus of package whether it is running or not.
                             if (am != null && !am.isUserRunning(uidds, true)) {
-                                Slog.i(TAG,"Sending broadcast for stopped package...:" + name);
+                                Slog.i(TAG, "Sending broadcast for stopped package...:" + name);
                                 am.broadcastIntent(null, bcIntent, null, null, 0, null, null,
                                         receiverPermission,
                                         android.app.AppOpsManager.OP_NONE, extras,
@@ -539,7 +581,7 @@ public class AutoPackageManagerService extends PackageManagerService {
                         }
                     }
                 } catch(RemoteException e) {
-                    Slog.e(TAG,"Exception while sending broadcast to stopped package");
+                    Slog.e(TAG, "Exception while sending broadcast to stopped package");
                 }
                 mSystemAppList.clear();
                 mPrivAppList.clear();
@@ -581,5 +623,110 @@ public class AutoPackageManagerService extends PackageManagerService {
                             false /* boot complete */);
             }
         }
+    }
+}
+
+class AutoSQLiteHelper extends SQLiteOpenHelper {
+    private int dbVersion;
+    private String dbName;
+    private String tableName;
+    private static final String KEY = "key";
+    private static final String VALUE = "value";
+    private static final String[] COLUMNS = {KEY,VALUE};
+    private static final String TAG = "AutoSQlite";
+
+    public AutoSQLiteHelper(Context context, String dbName, int dbVersion, String tableName) {
+        super(context, dbName, null, dbVersion);
+        this.dbName = dbName;
+        this.dbVersion = dbVersion;
+        this.tableName = tableName;
+        SQLiteDatabase db = getWritableDatabase();
+        Log.i(TAG, "AutoSQLiteHelper : " + dbName + " " + tableName);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        Log.i(TAG, "Create Table, Doesn't exist earlier....");
+        createTable(db, tableName);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // Drop older table if existed
+        db.execSQL("DROP TABLE IF EXISTS " + tableName);
+        // create fresh table
+        onCreate(db);
+    }
+
+    public void writeToDb(Pair<String, String> data) {
+        SQLiteDatabase db = getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        if (data != null) {
+            values.put(KEY, data.first);
+            values.put(VALUE, data.second);
+        }
+
+        if (db != null) {
+            db.insert(tableName, null, values);
+            db.close();
+        } else {
+            Log.e(TAG,"No writable database");
+        }
+    }
+
+    public List<String> readFromDb(Pair<String, String> data) {
+        List<String> dbList = new ArrayList<String>();
+        if (data == null) {
+            Log.e(TAG,"DbObject is null");
+            return null;
+        }
+
+        SQLiteDatabase db = getReadableDatabase();
+        if (db != null) {
+            Cursor cursor = db.query(tableName,
+                    new String[] {KEY,VALUE},
+                    KEY + "=?",
+                    new String[] { data.first },
+                    null,
+                    null,
+                    null,
+                    null);
+            if (cursor != null && cursor.getCount() > 0) {
+                cursor.moveToNext();
+                do {
+                    Log.i(TAG, "Value read from db is: " + cursor.getString(1));
+                    dbList.add(cursor.getString(1));
+                } while (cursor.moveToNext());
+                cursor.close();
+            }
+            return dbList;
+        }
+        return null;
+    }
+
+    public int getProfilesRowCount() {
+        String query = "SELECT  * FROM conf_table";
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.rawQuery(query, null);
+        int count = cursor.getCount();
+        cursor.close();
+        Log.i(TAG, "Row count is : " + count);
+        return count;
+    }
+
+    private void createTable(SQLiteDatabase db, String tableName) {
+        String CREATE_TABLE = "CREATE TABLE " + tableName + "( " +
+                "key TEXT, " + "value TEXT )";
+        // create table
+        db.execSQL(CREATE_TABLE);
+    }
+
+    public void deleteEntry(Pair<String, String> data) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete(tableName,
+                KEY + " = ?",
+                new String[] { data.first });
+        db.close();
     }
 }
