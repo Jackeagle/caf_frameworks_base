@@ -241,6 +241,7 @@ public class LocationManagerService extends ILocationManager.Stub {
     }
 
     public void systemRunning() {
+        Log.printMarker("LocationManager");
         synchronized (mLock) {
             if (D) Log.d(TAG, "systemReady()");
 
