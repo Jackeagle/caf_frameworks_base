@@ -26,6 +26,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Slog;
+import android.content.res.Resources;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -85,12 +86,17 @@ public abstract class WindowOrientationListener {
      */
     private WindowOrientationListener(Context context, Handler handler, int rate) {
         mHandler = handler;
-        mSensorManager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
+        if (Resources.getSystem().
+                getBoolean(com.android.internal.R.bool.config_boot_opt) == true) {
+            mSensorManager = null;
+        } else {
+            mSensorManager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
+        }
         mRate = rate;
 
         mSensorType = context.getResources().getString(
                 com.android.internal.R.string.config_orientationSensorType);
-        if (!TextUtils.isEmpty(mSensorType)) {
+        if (mSensorManager != null && !TextUtils.isEmpty(mSensorType)) {
             List<Sensor> sensors = mSensorManager.getSensorList(Sensor.TYPE_ALL);
             final int N = sensors.size();
             for (int i = 0; i < N; i++) {
@@ -105,7 +111,7 @@ public abstract class WindowOrientationListener {
             }
         }
 
-        if (mOrientationJudge == null) {
+        if (mSensorManager != null && mOrientationJudge == null) {
             mSensor = mSensorManager.getDefaultSensor(USE_GRAVITY_SENSOR
                     ? Sensor.TYPE_GRAVITY : Sensor.TYPE_ACCELEROMETER);
             if (mSensor != null) {
@@ -130,7 +136,9 @@ public abstract class WindowOrientationListener {
                     Slog.d(TAG, "WindowOrientationListener enabled");
                 }
                 mOrientationJudge.resetLocked();
-                mSensorManager.registerListener(mOrientationJudge, mSensor, mRate, mHandler);
+                if (mSensorManager != null) {
+                    mSensorManager.registerListener(mOrientationJudge, mSensor, mRate, mHandler);
+                }
                 mEnabled = true;
             }
         }
@@ -149,7 +157,9 @@ public abstract class WindowOrientationListener {
                 if (LOG) {
                     Slog.d(TAG, "WindowOrientationListener disabled");
                 }
-                mSensorManager.unregisterListener(mOrientationJudge);
+                if (mSensorManager != null) {
+                    mSensorManager.unregisterListener(mOrientationJudge);
+                }
                 mEnabled = false;
             }
         }
