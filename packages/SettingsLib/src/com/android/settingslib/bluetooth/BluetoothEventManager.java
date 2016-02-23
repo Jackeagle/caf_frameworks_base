@@ -123,6 +123,16 @@ public final class BluetoothEventManager {
         registerProfileIntentReceiver();
     }
 
+    // set bluetooth default name
+    private void setDefaultBtName() {
+        String name = mContext.getResources().getString(
+            com.android.internal.R.string.def_custom_bt_defname);
+        Log.d(TAG, "custom bluetooth name: " + name);
+        if (!TextUtils.isEmpty(name)) {
+            mLocalAdapter.setName(name);
+        }
+    }
+
     /** Register to start receiving callbacks for Bluetooth events. */
     public void registerCallback(BluetoothCallback callback) {
         synchronized (mCallbacks) {
@@ -158,6 +168,14 @@ public final class BluetoothEventManager {
                                     BluetoothAdapter.ERROR);
             // update local profiles and get paired devices
             mLocalAdapter.setBluetoothStateInt(state);
+            SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(mContext);
+            boolean isFirstBoot = preferences.getBoolean("is_first_boot", true);
+            if (isFirstBoot && state == BluetoothAdapter.STATE_ON) {
+                setDefaultBtName();
+                SharedPreferences.Editor edit = preferences.edit();
+                edit.putBoolean("is_first_boot", false);
+                edit.apply();
+            }
             // send callback to update UI and possibly start scanning
             synchronized (mCallbacks) {
                 for (BluetoothCallback callback : mCallbacks) {
