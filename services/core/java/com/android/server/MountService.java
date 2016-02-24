@@ -708,6 +708,19 @@ class MountService extends IMountService.Stub
 
                     addInternalVolume();
                     try {
+                        mConnector.execute("volume", "geteminfo", null);
+                        // Tell vold about all existing and started users
+                        final UserManager um = mContext.getSystemService(UserManager.class);
+                        if (um != null) {
+                            final List<UserInfo> users = um.getUsers();
+                            for (UserInfo user : users) {
+                                mConnector.execute("volume", "user_added", user.id,
+                                        user.serialNumber);
+                            }
+                            for (int userId : mStartedUsers) {
+                                mConnector.execute("volume", "user_started", userId);
+                            }
+                        }
                         mConnector.execute("volume", "getinfo", null);
                     } catch (NativeDaemonConnectorException e) {
                         throw e.rethrowAsParcelableException();
