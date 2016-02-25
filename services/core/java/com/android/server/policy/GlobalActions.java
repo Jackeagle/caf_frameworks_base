@@ -1081,8 +1081,11 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         @Override
         public void onServiceStateChanged(ServiceState serviceState) {
             if (!mHasTelephony) return;
-            final boolean inAirplaneMode = serviceState.getState() == ServiceState.STATE_POWER_OFF;
-            mAirplaneState = inAirplaneMode ? ToggleAction.State.On : ToggleAction.State.Off;
+            boolean airplaneModeOn = Settings.Global.getInt(
+                    mContext.getContentResolver(),
+                    Settings.Global.AIRPLANE_MODE_ON,
+                    0) == 1;
+            mAirplaneState = airplaneModeOn ? ToggleAction.State.On : ToggleAction.State.Off;
             mAirplaneModeOn.updateState(mAirplaneState);
             mAdapter.notifyDataSetChanged();
         }
