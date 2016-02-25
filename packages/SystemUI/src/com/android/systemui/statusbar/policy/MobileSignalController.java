@@ -379,7 +379,7 @@ public class MobileSignalController extends SignalController<
 
     private boolean isImsRegisteredOnDataSim() {
         return mPhone != null && mPhone.isImsRegistered()
-                && mCurrentState.dataSim;
+                && mCurrentState.dataSim && !isRoaming();
     }
 
     @Override
