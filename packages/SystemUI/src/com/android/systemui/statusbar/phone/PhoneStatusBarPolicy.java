@@ -45,7 +45,6 @@ import com.android.systemui.statusbar.policy.BluetoothController;
 import com.android.systemui.statusbar.policy.BluetoothController.Callback;
 import com.android.systemui.statusbar.policy.CastController;
 import com.android.systemui.statusbar.policy.CastController.CastDevice;
-import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.UserInfoController;
 
 /**
@@ -58,7 +57,6 @@ public class PhoneStatusBarPolicy implements Callback {
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private static final String SLOT_CAST = "cast";
-    private static final String SLOT_HOTSPOT = "hotspot";
     private static final String SLOT_BLUETOOTH = "bluetooth";
     private static final String SLOT_TTY = "tty";
     private static final String SLOT_ZEN = "zen";
@@ -70,7 +68,6 @@ public class PhoneStatusBarPolicy implements Callback {
     private final StatusBarManager mService;
     private final Handler mHandler = new Handler();
     private final CastController mCast;
-    private final HotspotController mHotspot;
     private final AlarmManager mAlarmManager;
     private final UserInfoController mUserInfoController;
 
@@ -118,11 +115,10 @@ public class PhoneStatusBarPolicy implements Callback {
         }
     };
 
-    public PhoneStatusBarPolicy(Context context, CastController cast, HotspotController hotspot,
+    public PhoneStatusBarPolicy(Context context, CastController cast,
             UserInfoController userInfoController, BluetoothController bluetooth) {
         mContext = context;
         mCast = cast;
-        mHotspot = hotspot;
         mBluetooth = bluetooth;
         mBluetooth.addStateChangedCallback(this);
         mService = (StatusBarManager) context.getSystemService(Context.STATUS_BAR_SERVICE);
@@ -173,14 +169,6 @@ public class PhoneStatusBarPolicy implements Callback {
         mService.setIconVisibility(SLOT_CAST, false);
         mCast.addCallback(mCastCallback);
 
-        // hotspot
-        if (!mContext.getResources().getBoolean(com.android.internal.R.bool
-               .config_regional_hotspot_show_notification_when_turn_on)) {
-            mService.setIcon(SLOT_HOTSPOT, R.drawable.stat_sys_hotspot, 0,
-                    mContext.getString(R.string.accessibility_status_bar_hotspot));
-            mService.setIconVisibility(SLOT_HOTSPOT, mHotspot.isHotspotEnabled());
-            mHotspot.addCallback(mHotspotCallback);
-        }
         // managed profile
         mService.setIcon(SLOT_MANAGED_PROFILE, R.drawable.stat_sys_managed_profile_status, 0,
                 mContext.getString(R.string.accessibility_managed_profile));
@@ -425,13 +413,6 @@ public class PhoneStatusBarPolicy implements Callback {
                     profileChanged(newProfileId);
                 }
             };
-
-    private final HotspotController.Callback mHotspotCallback = new HotspotController.Callback() {
-        @Override
-        public void onHotspotChanged(boolean enabled) {
-            mService.setIconVisibility(SLOT_HOTSPOT, enabled);
-        }
-    };
 
     private final CastController.Callback mCastCallback = new CastController.Callback() {
         @Override
