@@ -625,16 +625,6 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
 
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
                 "Need BLUETOOTH ADMIN permission");
-        AppOpsManager mAppOpsManager = mContext.getSystemService(AppOpsManager.class);
-        String packageName = mContext.getPackageManager().getNameForUid(Binder.getCallingUid());
-        int version = 0;
-        try {
-            version = (mContext.getPackageManager().getPackageInfo(packageName,
-                    0)).applicationInfo.targetSdkVersion;
-        } catch (NameNotFoundException e) {
-            e.printStackTrace();
-        }
-
         if (DBG) {
             Log.d(TAG, "enable():  mBluetooth =" + mBluetooth +
                     " mBinding = " + mBinding);
