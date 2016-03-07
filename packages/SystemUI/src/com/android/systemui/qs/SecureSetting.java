@@ -80,4 +80,8 @@ public abstract class SecureSetting extends ContentObserver implements Listenabl
             setListening(true);
         }
     }
+
+    public int getUserId() {
+        return mUserId;
+    }
 }
