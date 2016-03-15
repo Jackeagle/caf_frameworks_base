@@ -380,4 +380,5 @@
     <string name="quick_settings_reset_confirmation_title" msgid="748792586749897883">"要隐藏“<xliff:g id="TILE_LABEL">%1$s</xliff:g>”吗？"</string>
     <string name="quick_settings_reset_confirmation_message" msgid="2235970126803317374">"下次在设置中将其开启后，此快捷设置条目将会重新显示。"</string>
     <string name="quick_settings_reset_confirmation_button" msgid="2660339101868367515">"隐藏"</string>
+    <string name="hotspot_apm_message">"飞行模式开启的情况下不能够链接到移动网络,请关闭飞行模式后重试。"</string>
 </resources>
