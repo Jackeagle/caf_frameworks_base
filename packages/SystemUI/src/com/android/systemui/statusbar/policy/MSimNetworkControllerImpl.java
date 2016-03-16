@@ -52,6 +52,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.android.internal.telephony.CarrierAppUtils;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.TelephonyIntents;
@@ -114,6 +115,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
     private HashMap<Integer, Integer> mSubIdPhoneIdMap;
     ArrayList<MSimSignalCluster> mSimSignalClusters = new ArrayList<MSimSignalCluster>();
     ArrayList<TextView> mSubsLabelViews = new ArrayList<TextView>();
+    CarrierAppUtils.CARRIER mCarrier = CarrierAppUtils.getCarrierId();
 
     public interface MSimSignalCluster {
         void setWifiIndicators(boolean visible, int strengthIcon, int activityIcon,
@@ -1366,16 +1368,19 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
 
         // mobile label
         N = mMobileLabelViews.size();
-        if (phoneId == dataSub) {
-            for (int i=0; i<N; i++) {
-                TextView v = mMobileLabelViews.get(i);
-                v.setText(mobileLabel);
-                if ("".equals(mobileLabel)) {
-                    v.setVisibility(View.GONE);
-                } else {
-                    v.setVisibility(View.VISIBLE);
+       // Removing Notification panel  showing the SPN name twice if its the data sub
+        if (mCarrier != CarrierAppUtils.CARRIER.TELEPHONY_CARRIER_ONE) {
+            if (phoneId == dataSub) {
+                for (int i=0; i<N; i++) {
+                    TextView v = mMobileLabelViews.get(i);
+                    v.setText(mobileLabel);
+                    if ("".equals(mobileLabel)) {
+                        v.setVisibility(View.GONE);
+                    } else {
+                        v.setVisibility(View.VISIBLE);
+                    }
                 }
-            }
+           }
         }
         setCarrierText();
     }
