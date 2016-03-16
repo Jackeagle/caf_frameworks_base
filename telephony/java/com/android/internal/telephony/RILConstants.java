@@ -25,6 +25,7 @@ package com.android.internal.telephony;
  */
 
 import android.os.SystemProperties;
+import android.telephony.TelephonyManager;
 
 /**
  * {@hide}
@@ -107,8 +108,10 @@ public interface RILConstants {
     int NETWORK_MODE_TD_SCDMA_GSM_WCDMA_CDMA_EVDO  = 21; /*TD-SCDMA,EvDo,CDMA,GSM/WCDMA*/
     int NETWORK_MODE_TD_SCDMA_LTE_CDMA_EVDO_GSM_WCDMA = 22; /* TD-SCDMA/LTE/GSM/WCDMA, CDMA, and
                                                                EvDo */
-    int PREFERRED_NETWORK_MODE      = SystemProperties.getInt("ro.telephony.default_network",
-            NETWORK_MODE_WCDMA_PREF);
+
+    int PREFERRED_NETWORK_MODE = Integer.parseInt(TelephonyManager.getTelephonyProperty(0,
+                "ro.telephony.default_network",
+                Integer.toString(NETWORK_MODE_WCDMA_PREF)));
 
     int CDMA_CELL_BROADCAST_SMS_DISABLED = 1;
     int CDMA_CELL_BROADCAST_SMS_ENABLED  = 0;
