@@ -1811,10 +1811,6 @@ public final class PowerManagerService extends SystemService
                     updatePowerStateLocked();
                 }
             } else if (wakefulness == WAKEFULNESS_DOZING) {
-                if (isDreaming) {
-                    return; // continue dozing
-                }
-
                 // Doze has ended or will be stopped.  Update the power state.
                 reallyGoToSleepNoUpdateLocked(SystemClock.uptimeMillis(), Process.SYSTEM_UID);
                 updatePowerStateLocked();

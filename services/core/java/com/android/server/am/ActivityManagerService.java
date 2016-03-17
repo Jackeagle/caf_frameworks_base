@@ -10101,9 +10101,8 @@ public final class ActivityManagerService extends ActivityManagerNative
         switch (mWakefulness) {
             case PowerManagerInternal.WAKEFULNESS_AWAKE:
             case PowerManagerInternal.WAKEFULNESS_DREAMING:
-                // If we're interactive but applications are already paused then defer
-                // resuming them until the lock screen is hidden.
-                return mSleeping && mLockScreenShown != LOCK_SCREEN_HIDDEN;
+                // Fall back because during quickpress of power key
+                // mSleeping value never changes.
             case PowerManagerInternal.WAKEFULNESS_DOZING:
                 // If we're dozing then pause applications whenever the lock screen is shown.
                 return mLockScreenShown != LOCK_SCREEN_HIDDEN;
