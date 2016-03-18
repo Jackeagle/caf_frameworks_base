@@ -964,8 +964,14 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
         boolean something = false;
         boolean withSamePlmnSpn = showPlmn && plmn != null
                 && showSpn && spn != null && plmn.equals(spn);
+        boolean config_display_rat = false;
+        int[] subId = SubscriptionManager.getSubId(phoneId);
+        if (subId != null && subId.length >= 1) {
+            config_display_rat = SubscriptionManager.getResourcesForSubId(mContext,
+                    subId[0]).getBoolean(com.android.internal.R.bool.config_display_rat);
+        }
         if (showPlmn && plmn != null) {
-            if(mContext.getResources().getBoolean(com.android.internal.R.bool.config_display_rat) &&
+            if (config_display_rat &&
                     mMSimServiceState[phoneId] != null) {
                 plmn = appendRatToNetworkName(plmn, mMSimServiceState[phoneId]);
             }
@@ -973,17 +979,16 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             something = true;
         }
         if (!withSamePlmnSpn && showSpn && spn != null) {
-            if(mContext.getResources().getBoolean(
+            if (mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_spn_display_control)
-                    && something){
+                    && something) {
                Slog.d(TAG,"Do not display spn string when showPlmn and showSpn are both true"
                        + "and plmn string is not null");
             } else {
                 if (something) {
                     str.append(mNetworkNameSeparator);
                 }
-                if(mContext.getResources().getBoolean(com.android.internal.R.bool.
-                        config_display_rat) && mMSimServiceState[phoneId] != null) {
+                if (config_display_rat && mMSimServiceState[phoneId] != null) {
                     spn = appendRatToNetworkName(spn, mMSimServiceState[phoneId]);
                 }
                 str.append(spn);
@@ -996,7 +1001,7 @@ public class MSimNetworkControllerImpl extends NetworkControllerImpl {
             mMSimNetworkName[phoneId] = mNetworkNameDefault;
         }
         Slog.d(TAG, "mMSimNetworkName[phoneId] " + mMSimNetworkName[phoneId]
-                                                      + "phoneId " + phoneId);
+                + ", phoneId " + phoneId + ", config_display_rat=" + config_display_rat);
     }
 
     // ===== Full or limited Internet connectivity ==================================
