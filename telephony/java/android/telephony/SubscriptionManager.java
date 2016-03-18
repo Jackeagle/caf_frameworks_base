@@ -18,12 +18,17 @@ package android.telephony;
 
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
+import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.net.Uri;
 import android.provider.BaseColumns;
 import android.telephony.Rlog;
 import android.os.ServiceManager;
 import android.os.RemoteException;
+import android.text.TextUtils;
+import android.util.DisplayMetrics;
 
 import com.android.internal.telephony.ISub;
 import com.android.internal.telephony.PhoneConstants;
@@ -1111,6 +1116,30 @@ public class SubscriptionManager implements BaseColumns {
         } catch (RemoteException ex) {
             return INVALID_SUB_ID;
         }
+    }
+
+    /**
+     * Returns the resources related to Subscription.
+     * @param Context object
+     * @param Subscription Id of Subscription who's resources are required
+     * @return Resources of the Sub.
+     * @hide
+     */
+    public static Resources getResourcesForSubId(Context context, long subId) {
+        String operatorNumeric = TelephonyManager.getDefault().getIccOperatorNumeric(subId);
+
+        Configuration config = context.getResources().getConfiguration();
+        Configuration newConfig = new Configuration();
+        newConfig.setTo(config);
+        if (!TextUtils.isEmpty(operatorNumeric)) {
+            newConfig.mcc = Integer.parseInt(operatorNumeric.substring(0,3));
+            newConfig.mnc = Integer.parseInt(operatorNumeric.substring(3));
+        }
+        logd("getResourcesForSubId: " + subId + ", mccmnc = " + newConfig.mcc + newConfig.mnc);
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        DisplayMetrics newMetrics = new DisplayMetrics();
+        newMetrics.setTo(metrics);
+        return new Resources(context.getResources().getAssets(), newMetrics, newConfig);
     }
 }
 
