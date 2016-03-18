@@ -302,7 +302,7 @@ public class MobileSignalController extends SignalController<
             showDataIcon = mCurrentState.dataConnected;
         } else {
             showDataIcon = mCurrentState.dataConnected
-                    || mCurrentState.iconGroup == TelephonyIcons.ROAMING;
+                    || (mCurrentState.iconGroup == TelephonyIcons.ROAMING || isRoaming());
         }
         IconState statusIcon = new IconState(mCurrentState.enabled && !mCurrentState.airplaneMode,
                 getCurrentIconId(), contentDescription);
@@ -325,9 +325,10 @@ public class MobileSignalController extends SignalController<
                         && mCurrentState.activityOut;
         if (!mContext.getResources().getBoolean(R.bool.show_roaming_and_network_icons)) {
             showDataIcon &= mCurrentState.isDefault
-                    || mCurrentState.iconGroup == TelephonyIcons.ROAMING;
+                    || (mCurrentState.iconGroup == TelephonyIcons.ROAMING || isRoaming());
         }
-        showDataIcon &= mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT;
+        showDataIcon &= (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT
+                || mStyle == STATUS_BAR_STYLE_EXTENDED);
         int typeIcon = showDataIcon ? icons.mDataType : 0;
         int dataActivityId = showMobileActivity() ? 0 : icons.mActivityId;
         int mobileActivityId = showMobileActivity() ? icons.mActivityId : 0;
@@ -336,7 +337,8 @@ public class MobileSignalController extends SignalController<
                 icons.mStackedDataIcon, icons.mStackedVoiceIcon,
                 dataContentDescription, description, icons.mIsWide,
                 mSubscriptionInfo.getSubscriptionId(), getImsIconId(),
-                isImsRegisteredInAirplaneMode());
+                isImsRegisteredInAirplaneMode(), getdataNetworkTypeInRoamingId(),
+                getEmbmsIconId());
 
         mCallbackHandler.post(new Runnable() {
             @Override
@@ -361,8 +363,38 @@ public class MobileSignalController extends SignalController<
         }
     }
 
+    private int getdataNetworkTypeInRoamingId() {
+        if ((mStyle == STATUS_BAR_STYLE_EXTENDED) && isRoaming()
+                && isMobileDataEnabled(mSubscriptionInfo.getSubscriptionId())) {
+            int dataType = getDataNetworkType();
+            if (dataType == TelephonyManager.NETWORK_TYPE_LTE) {
+                return R.drawable.stat_sys_data_fully_connected_lte_networktype_in_roam;
+            } else if (dataType == TelephonyManager.NETWORK_TYPE_LTE_CA) {
+                return R.drawable.stat_sys_data_fully_connected_lte_plus_networktype_in_roam;
+            } else {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    private int getEmbmsIconId() {
+        if (mStyle == STATUS_BAR_STYLE_EXTENDED
+                && isEmbmsActiveOnDataSim()) {
+            return R.drawable.lte_embms_services_all_brackets;
+        } else {
+            return 0;
+        }
+    }
+
     private boolean isImsRegisteredOnDataSim() {
         return mPhone != null && mPhone.isImsRegistered()
+                && mCurrentState.dataSim && !isRoaming();
+    }
+
+    private boolean isEmbmsActiveOnDataSim() {
+        return mNetworkController.isEmbmsActive()
                 && mCurrentState.dataSim;
     }
 
@@ -626,7 +658,6 @@ public class MobileSignalController extends SignalController<
         final boolean roaming = isRoaming();
         final int voiceType = getVoiceNetworkType();
         final int dataType =  getDataNetworkType();
-
         int[][] sbIcons = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH;
         int[][] qsIcons = TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH;
         int[] contentDesc = AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH;
@@ -759,7 +790,8 @@ public class MobileSignalController extends SignalController<
 
     private boolean showMobileActivity() {
         return (mStyle == STATUS_BAR_STYLE_DEFAULT_DATA)
-                || (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT);
+                || (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT)
+                || (mStyle == STATUS_BAR_STYLE_EXTENDED);
     }
 
     private int getVoiceNetworkType() {

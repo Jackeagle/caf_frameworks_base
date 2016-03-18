@@ -259,12 +259,15 @@ public class SignalClusterView
             int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
             int mobileActivityId, int stackedDataId, int stackedVoiceId,
             String typeContentDescription, String description, boolean isWide, int subId,
-            int imsIconId, boolean isImsInAirplane) {
+            int imsIconId, boolean isImsInAirplane, int dataNetworkTypeInRoamingId,
+            int embmsIconId) {
         PhoneState state = getState(subId);
         if (state == null) {
             return;
         }
         state.mMobileImsId = imsIconId;
+        state.mDataNetworkTypeInRoamingId = dataNetworkTypeInRoamingId;
+        state.mMobileEmbmsId = embmsIconId;
         mImsRegistered = isImsInAirplane;
         this.setMobileDataIndicators(statusIcon, qsIcon, statusType, qsType, activityIn,
                 activityOut, dataActivityId, mobileActivityId, stackedDataId,
@@ -582,9 +585,11 @@ public class SignalClusterView
         private String mMobileDescription, mMobileTypeDescription;
 
         private ViewGroup mMobileGroup;
-        private ImageView mMobile, mMobileDark, mMobileType, mRoaming, mMobileIms;
+        private ImageView mMobile, mMobileDark, mMobileType, mRoaming, mMobileIms,
+                mDataNetworkTypeInRoaming, mMobileEmbms;
 
-        private int mDataActivityId = 0, mMobileActivityId = 0, mMobileImsId = 0;
+        private int mDataActivityId = 0, mMobileActivityId = 0, mMobileImsId = 0,
+                 mDataNetworkTypeInRoamingId =0, mMobileEmbmsId = 0;
         private int mStackedDataId = 0, mStackedVoiceId = 0;
         private ImageView mDataActivity, mMobileActivity, mStackedData, mStackedVoice;
         private ViewGroup mMobileSingleGroup, mMobileStackedGroup;
@@ -603,7 +608,9 @@ public class SignalClusterView
             mMobileType     = (ImageView) root.findViewById(R.id.mobile_type);
             mMobileActivity = (ImageView) root.findViewById(R.id.mobile_inout);
             mMobileIms      = (ImageView) root.findViewById(R.id.ims_hd);
-
+            mDataNetworkTypeInRoaming = (ImageView) root
+                    .findViewById(R.id.dataNetwork_type_in_roaming);
+            mMobileEmbms    = (ImageView) root.findViewById(R.id.embms);
             mDataActivity   = (ImageView) root.findViewById(R.id.data_inout);
             mStackedData    = (ImageView) root.findViewById(R.id.mobile_signal_data);
             mStackedVoice   = (ImageView) root.findViewById(R.id.mobile_signal_voice);
@@ -653,6 +660,9 @@ public class SignalClusterView
                 }
 
                 mMobileIms.setImageResource(mMobileImsId);
+                mMobileEmbms.setImageResource(mMobileEmbmsId);
+
+                mDataNetworkTypeInRoaming.setImageResource(mDataNetworkTypeInRoamingId);
 
                 if (mStackedDataId != 0 && mStackedVoiceId != 0) {
                     mStackedData.setImageResource(mStackedDataId);
@@ -697,7 +707,9 @@ public class SignalClusterView
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);
             mMobileActivity.setVisibility(mMobileActivityId != 0 ? View.VISIBLE : View.GONE);
             mMobileIms.setVisibility(mMobileImsId != 0 ? View.VISIBLE : View.GONE);
-
+            mDataNetworkTypeInRoaming.setVisibility(mDataNetworkTypeInRoamingId != 0 ? View.VISIBLE
+                    : View.GONE);
+            mMobileEmbms.setVisibility(mMobileEmbmsId != 0 ? View.VISIBLE : View.GONE);
             return mMobileVisible;
         }
 
