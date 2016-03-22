@@ -4540,7 +4540,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
 
                 if (mWinShowWhenLocked != null &&
-                        mWinShowWhenLocked.getAppToken() != win.getAppToken()) {
+                        mWinShowWhenLocked.getAppToken() != win.getAppToken() &&
+                        isKeyguardLocked()) {
                     win.hideLw(false);
                 }
             }
