@@ -489,7 +489,7 @@
     <integer translatable="false" name="config_wifi_framework_scan_result_rssi_level_patchup_value">-85</integer>
 
     <!-- Boolean indicating associated network selection is allowed -->
-    <bool translatable="false" name="config_wifi_framework_enable_associated_network_selection">true</bool>
+    <bool translatable="false" name="config_wifi_framework_enable_associated_network_selection">false</bool>
 
     <!-- Boolean indicating that wifi only link configuratios that have exact same credentials (i.e PSK) -->
     <bool translatable="false" name="config_wifi_only_link_same_credential_configurations">true</bool>
