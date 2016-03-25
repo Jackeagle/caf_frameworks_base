@@ -1591,14 +1591,21 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     public boolean isOOS()
     {
         boolean ret = true;
-        for (int subId : mServiceStates.keySet()) {
-            ServiceState state = mServiceStates.get(subId);
-            if (((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
-                    && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
-                    || (state.isEmergencyOnly())) {
-                ret = false;
-                break;
+        List<SubscriptionInfo> subs = getSubscriptionInfo(false);
+        final int N = subs.size();
+        if(N!=0){
+            for (int i = 0; i < N; i++) {
+                int subId = subs.get(i).getSubscriptionId();
+                ServiceState state = mServiceStates.get(subId);
+                if (state!=null&&(((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
+                        && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
+                        || (state.isEmergencyOnly()))) {
+                    ret = false;
+                    break;
+                }
             }
+        }else{
+            ret = false;
         }
         return ret;
     }
