@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.net.wifi.IWifiManager;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WifiActivityEnergyInfo;
 import android.os.BatteryStats;
 import android.os.Binder;
@@ -1216,6 +1217,12 @@ public final class BatteryStatsService extends IBatteryStats.Stub
         }
 
         try {
+            int wifiState = mWifiManager.getWifiEnabledState();
+            if (wifiState != WifiManager.WIFI_STATE_ENABLED) {
+                Slog.wtf(TAG, "Wifi is in disabled state");
+                return null;
+            }
+
             // We read the data even if we are not on battery. This is so that we keep the
             // correct delta from when we should start reading (aka when we are on battery).
             WifiActivityEnergyInfo info = mWifiManager.reportActivityInfo();
