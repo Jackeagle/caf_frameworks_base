@@ -196,8 +196,6 @@ public class CarrierText extends TextView {
         boolean anySimReadyAndInService = false;
         boolean showLocale = getContext().getResources().getBoolean(
                 com.android.systemui.R.bool.config_monitor_locale_change);
-        boolean showRat = getContext().getResources().getBoolean(
-                com.android.systemui.R.bool.config_display_rat);
         CharSequence displayText = null;
         String carrier = "405854";
 
@@ -230,6 +228,8 @@ public class CarrierText extends TextView {
             int subId = subs.get(i).getSubscriptionId();
             int phoneId = SubscriptionManager.getPhoneId(subId);
             State simState = mKeyguardUpdateMonitor.getSimState(subId);
+            boolean showRat = SubscriptionManager.getResourcesForSubId(mContext,
+                subId).getBoolean(R.bool.config_display_rat);
             if (showRat) {
                 ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(phoneId);
                 if (ss != null && (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
