@@ -1411,6 +1411,10 @@ public final class ActivityManagerService extends ActivityManagerNative
     boolean mEnableBServicePropagation =
             SystemProperties.getBoolean("ro.sys.fw.bservice_enable", false);
 
+    // Check if memperf Enabled.
+    boolean mIsMemPerfEnabled = SystemProperties.getBoolean("ro.memperf.enable", false);
+
+
     /**
      * Flag whether the current user is a "monkey", i.e. whether
      * the UI is driven by a UI automation tool.
@@ -18817,8 +18821,10 @@ public final class ActivityManagerService extends ActivityManagerNative
                         }
                     }
                 }
-                Process.setSwappiness(app.pid,
-                        app.curSchedGroup <= Process.THREAD_GROUP_BG_NONINTERACTIVE);
+                if (!mIsMemPerfEnabled) {
+                    Process.setSwappiness(app.pid,
+                            app.curSchedGroup <= Process.THREAD_GROUP_BG_NONINTERACTIVE);
+                }
             }
         }
         if (app.repForegroundActivities != app.foregroundActivities) {

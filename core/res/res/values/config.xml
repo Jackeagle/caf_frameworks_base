@@ -2401,6 +2401,7 @@
         <item>China Mobile</item>
         <item>China Unicom</item>
         <item>China Telecom</item>
+        <item>China Mobile (HD)</item>
         <item>中国移动</item>
         <item>中国联通</item>
         <item>中国电信</item>
@@ -2417,7 +2418,8 @@
         <item>China_Mobile</item>
         <item>China_Unicom</item>
         <item>China_Telecom</item>
-       <item>China_Mobile</item>
+        <item>China_Mobile</item>
+        <item>China_Mobile</item>
         <item>China_Unicom</item>
         <item>China_Telecom</item>
         <item>China_Mobile</item>
