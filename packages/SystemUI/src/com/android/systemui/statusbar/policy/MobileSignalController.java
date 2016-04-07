@@ -301,7 +301,7 @@ public class MobileSignalController extends SignalController<
             showDataIcon = mCurrentState.dataConnected;
         } else {
             showDataIcon = mCurrentState.dataConnected
-                    || mCurrentState.iconGroup == TelephonyIcons.ROAMING;
+                    || (mCurrentState.iconGroup == TelephonyIcons.ROAMING || isRoaming());
         }
         IconState statusIcon = new IconState(mCurrentState.enabled && !mCurrentState.airplaneMode,
                 getCurrentIconId(), contentDescription);
@@ -324,7 +324,7 @@ public class MobileSignalController extends SignalController<
                         && mCurrentState.activityOut;
         if (!mContext.getResources().getBoolean(R.bool.show_roaming_and_network_icons)) {
             showDataIcon &= mCurrentState.isDefault
-                    || mCurrentState.iconGroup == TelephonyIcons.ROAMING;
+                    || (mCurrentState.iconGroup == TelephonyIcons.ROAMING || isRoaming());
         }
         showDataIcon &= (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT
                 || mStyle == STATUS_BAR_STYLE_EXTENDED);
@@ -363,7 +363,8 @@ public class MobileSignalController extends SignalController<
     }
 
     private int getdataNetworkTypeInRoamingId() {
-        if (mStyle == STATUS_BAR_STYLE_EXTENDED && isRoaming()) {
+        if ((mStyle == STATUS_BAR_STYLE_EXTENDED) && isRoaming()
+                && mCurrentState.dataConnected) {
             int dataType = getDataNetworkType();
             if (dataType == TelephonyManager.NETWORK_TYPE_LTE) {
                 return R.drawable.stat_sys_data_fully_connected_lte_networktype_in_roam;
@@ -554,13 +555,21 @@ public class MobileSignalController extends SignalController<
                 && plmn.equals(spn)) {
             showSpn = false;
         }
+        boolean showRat = mConfig.showRat;
+        int[] subId = SubscriptionManager.getSubId(getSimSlotIndex());
+        if (subId != null && subId.length >= 1) {
+            showRat = SubscriptionManager.getResourcesForSubId(mContext,
+                    subId[0]).getBoolean(com.android.internal.R.bool.config_display_rat);
+        }
         String networkClass = getNetworkClassString(mServiceState);
+        Log.d(mTag, "networkClass=" + networkClass + " showRat=" + showRat +
+                " slot=" + getSimSlotIndex());
         StringBuilder str = new StringBuilder();
         StringBuilder strData = new StringBuilder();
         if (showPlmn && plmn != null) {
             str.append(plmn);
             strData.append(plmn);
-            if (mConfig.showRat) {
+            if (showRat) {
                 str.append(" ").append(networkClass);
                 strData.append(" ").append(networkClass);
             }
@@ -570,7 +579,7 @@ public class MobileSignalController extends SignalController<
                 str.append(mNetworkNameSeparator);
             }
             str.append(spn);
-            if (mConfig.showRat) str.append(" ").append(networkClass);
+            if (showRat) str.append(" ").append(networkClass);
         }
         if (str.length() != 0) {
             mCurrentState.networkName = str.toString();
@@ -582,7 +591,7 @@ public class MobileSignalController extends SignalController<
                 strData.append(mNetworkNameSeparator);
             }
             strData.append(dataSpn);
-            if (mConfig.showRat) strData.append(" ").append(networkClass);
+            if (showRat) strData.append(" ").append(networkClass);
         }
         if (strData.length() != 0) {
             mCurrentState.networkNameData = strData.toString();
