@@ -116,13 +116,13 @@ public class Scroller  {
     */
     private Performance mPerf = null;
     boolean bIsPerfBoostEnabled = false;
-    private int lBoostTimeOut = 0;
     private int lBoostCpuBoost = 0;
     private int lBoostSchedBoost = 0;
     private int lBoostPcDisblBoost = 0;
     private int lBoostKsmBoost = 0;
     private int lBoostPreferIdle =0;
-
+    private int sBoostTimeOut = 0;
+    private int scrollBoostTimeOut = 0;
 
     // A context-specific coefficient adjusted to physical values.
     private float mPhysicalCoeff;
@@ -200,7 +200,7 @@ public class Scroller  {
         if (bIsPerfBoostEnabled) {
         lBoostSchedBoost = context.getResources().getInteger(
                com.android.internal.R.integer.scrollboost_schedboost_param);
-        lBoostTimeOut = context.getResources().getInteger(
+        sBoostTimeOut = context.getResources().getInteger(
                com.android.internal.R.integer.scrollboost_timeout_param);
         lBoostCpuBoost = context.getResources().getInteger(
                com.android.internal.R.integer.scrollboost_cpuboost_param);
@@ -436,10 +436,14 @@ public class Scroller  {
         mDurationReciprocal = 1.0f / (float) mDuration;
 
         if ((mPerf != null) && (duration != 0)) {
-            if (0 == lBoostTimeOut) {
-                lBoostTimeOut = mDuration;
+            if (0 == sBoostTimeOut) {
+                //config value is not defined
+                scrollBoostTimeOut = mDuration;
+            } else {
+                //config value is present
+                scrollBoostTimeOut = sBoostTimeOut;
             }
-            mPerf.perfLockAcquire(lBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
+            mPerf.perfLockAcquire(scrollBoostTimeOut, lBoostPcDisblBoost, lBoostSchedBoost,
                                           lBoostCpuBoost, lBoostKsmBoost,lBoostPreferIdle);
         }
     }
