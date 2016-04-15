@@ -120,7 +120,7 @@ public final class Log {
      */
     public static int printMarker(String markerTAG) {
         try {
-                File f = new File("/sys/bootkpi/marker_entry");
+                File f = new File("/sys/kernel/debug/bootkpi/kpi_values");
                 if (!f.exists())
                     return -1; // No file...Dont do anything.
                 FileOutputStream fos = new FileOutputStream(f);
