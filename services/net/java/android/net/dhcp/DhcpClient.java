@@ -644,6 +644,10 @@ public class DhcpClient extends BaseDhcpStateMachine {
     }
 
     public boolean isValidPacket(DhcpPacket packet) {
+        if (packet == null) {
+            Log.e(TAG,"Not a valid packet ,its NULL");
+            return false;
+        }
         // TODO: check checksum.
         int xid = packet.getTransactionId();
         if (xid != mTransactionId) {
@@ -660,6 +664,10 @@ public class DhcpClient extends BaseDhcpStateMachine {
     }
 
     public void setDhcpLeaseExpiry(DhcpPacket packet) {
+        if (packet == null) {
+            Log.e(TAG,"This is strange ..Packet NULL");
+            return;
+        }
         long leaseTimeMillis = packet.getLeaseTimeMillis();
         mDhcpLeaseExpiry =
                 (leaseTimeMillis > 0) ? SystemClock.elapsedRealtime() + leaseTimeMillis : 0;
