@@ -762,6 +762,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     } catch (RemoteException e) {
                         Log.e(TAG, "Unable to call onBluetoothServiceUp() on callback #" + i, e);
                     }
+                    Log.d(TAG, "Broadcasted onBluetoothServiceUp() to " + mCallbacks.getBroadcastItem(i));
                 }
             } finally {
                 mCallbacks.finishBroadcast();
@@ -784,6 +785,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     } catch (RemoteException e) {
                         Log.e(TAG, "Unable to call onBluetoothServiceDown() on callback #" + i, e);
                     }
+                    Log.d(TAG, "Broadcasted onBluetoothServiceDown() to " + mCallbacks.getBroadcastItem(i));
                 }
             } finally {
                 mCallbacks.finishBroadcast();
@@ -1143,6 +1145,11 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                             (newState == BluetoothAdapter.STATE_OFF) &&
                             (mBluetooth != null) && mEnable) {
                         recoverBluetoothServiceFromError();
+                    }
+                    if ((prevState == BluetoothAdapter.STATE_TURNING_ON) &&
+                            (newState == BluetoothAdapter.STATE_OFF) &&
+                            (mBluetooth != null) && mEnable) {
+                        persistBluetoothSetting(BLUETOOTH_OFF);
                     }
                     if ((prevState == BluetoothAdapter.STATE_TURNING_ON) &&
                             (newState == BluetoothAdapter.STATE_BLE_ON) &&
