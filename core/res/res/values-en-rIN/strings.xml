@@ -989,6 +989,7 @@
     <string name="lockscreen_sim_puk_locked_instructions" msgid="8127916255245181063">"See the User Guide or contact Customer Care."</string>
     <string name="lockscreen_sim_locked_message" msgid="8066660129206001039">"SIM card is locked."</string>
     <string name="lockscreen_sim_unlock_progress_dialog_message" msgid="595323214052881264">"Unlocking SIM card…"</string>
+    <string name="lockscreen_airplane_mode_on">Aeroplane Mode</string>
     <string name="lockscreen_too_many_failed_attempts_dialog_message" msgid="6481623830344107222">"You have incorrectly drawn your unlock pattern <xliff:g id="NUMBER_0">%d</xliff:g> times. \n\nTry again in <xliff:g id="NUMBER_1">%d</xliff:g> seconds."</string>
     <string name="lockscreen_too_many_failed_password_attempts_dialog_message" msgid="2725973286239344555">"You have incorrectly typed your password <xliff:g id="NUMBER_0">%d</xliff:g> times. \n\nTry again in <xliff:g id="NUMBER_1">%d</xliff:g> seconds."</string>
     <string name="lockscreen_too_many_failed_pin_attempts_dialog_message" msgid="6216672706545696955">"You have incorrectly typed your PIN <xliff:g id="NUMBER_0">%d</xliff:g> times. \n\nTry again in <xliff:g id="NUMBER_1">%d</xliff:g> seconds."</string>
