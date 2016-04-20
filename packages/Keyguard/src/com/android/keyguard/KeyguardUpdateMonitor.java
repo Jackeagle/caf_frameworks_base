@@ -1591,14 +1591,21 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     public boolean isOOS()
     {
         boolean ret = true;
-        for (int subId : mServiceStates.keySet()) {
-            ServiceState state = mServiceStates.get(subId);
-            if (((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
-                    && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
-                    || (state.isEmergencyOnly())) {
-                ret = false;
-                break;
+        List<SubscriptionInfo> subs = getSubscriptionInfo(false);
+        final int N = subs.size();
+        if(N!=0){
+            for (int i = 0; i < N; i++) {
+                int subId = subs.get(i).getSubscriptionId();
+                ServiceState state = mServiceStates.get(subId);
+                if (state!=null&&(((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
+                        && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
+                        || (state.isEmergencyOnly()))) {
+                    ret = false;
+                    break;
+                }
             }
+        }else{
+            ret = false;
         }
         return ret;
     }
@@ -1708,6 +1715,20 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         return resultId;
     }
 
+    public State getNextIccCardState() {
+        List<SubscriptionInfo> list = getSubscriptionInfo(false /* forceReload */);
+        State resultState = State.UNKNOWN;
+        for (int i = 0; i < list.size(); i++) {
+            SubscriptionInfo info = list.get(i);
+            int subId = info.getSubscriptionId();
+            State state = getSimState(subId);
+            if (state == State.PIN_REQUIRED || state == State.PUK_REQUIRED){
+                resultState = state;
+                break;
+            }
+        }
+        return resultState;
+    }
     public SubscriptionInfo getSubscriptionInfoForSubId(int subId) {
         List<SubscriptionInfo> list = getSubscriptionInfo(false /* forceReload */);
         for (int i = 0; i < list.size(); i++) {

@@ -76,9 +76,20 @@ public class KeyguardSimPinView extends KeyguardPinBasedInputView {
 
     public void resetState() {
         super.resetState();
+        handleSubInfoChangeIfNeeded();
         if (DEBUG) Log.v(TAG, "Resetting state");
         if (mShowDefaultMessage) {
             showDefaultMessage();
+        }
+    }
+
+    private void handleSubInfoChangeIfNeeded() {
+        KeyguardUpdateMonitor monitor = KeyguardUpdateMonitor.getInstance(mContext);
+        int subId = monitor.getNextSubIdForState(IccCardConstants.State.PIN_REQUIRED);
+        if (subId != mSubId && SubscriptionManager.isValidSubscriptionId(subId)) {
+            mSubId = subId;
+            mRemainingAttempts = -1;
+            mShowDefaultMessage = true;
         }
     }
 
