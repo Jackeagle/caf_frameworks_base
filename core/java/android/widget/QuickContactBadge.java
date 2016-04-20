@@ -342,7 +342,10 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
                 switch(token) {
                     case TOKEN_PHONE_LOOKUP_AND_TRIGGER:
                         trigger = true;
-                        createUri = Uri.fromParts("tel", extras.getString(EXTRA_URI_CONTENT), null);
+                        String number = extras.getString(EXTRA_URI_CONTENT);
+                        if (number != null) {
+                            createUri = Uri.fromParts("tel", number, null);
+                        }
 
                         //$FALL-THROUGH$
                     case TOKEN_PHONE_LOOKUP: {
