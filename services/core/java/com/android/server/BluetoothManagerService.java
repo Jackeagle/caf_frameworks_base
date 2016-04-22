@@ -1469,6 +1469,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 }
             } else if (newState == BluetoothAdapter.STATE_ON) {
                 boolean isUp = (newState==BluetoothAdapter.STATE_ON);
+                Log.printMarker("BTM:STATE_ON");
                 sendBluetoothStateCallback(isUp);
                 sendBleStateChanged(prevState, newState);
 
