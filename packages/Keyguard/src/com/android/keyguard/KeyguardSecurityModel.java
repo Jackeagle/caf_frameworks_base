@@ -56,36 +56,35 @@ public class KeyguardSecurityModel {
 
     SecurityMode getSecurityMode() {
         KeyguardUpdateMonitor monitor = KeyguardUpdateMonitor.getInstance(mContext);
+        IccCardConstants.State simState = IccCardConstants.State.UNKNOWN;
+        simState = monitor.getNextIccCardState();
 
-        if (SubscriptionManager.isValidSubscriptionId(
-                monitor.getNextSubIdForState(IccCardConstants.State.PIN_REQUIRED))) {
+        if (simState == IccCardConstants.State.PIN_REQUIRED) {
             return SecurityMode.SimPin;
-        }
-
-        if (mIsPukScreenAvailable && SubscriptionManager.isValidSubscriptionId(
-                monitor.getNextSubIdForState(IccCardConstants.State.PUK_REQUIRED))) {
+        } else if (simState == IccCardConstants.State.PUK_REQUIRED
+                && mIsPukScreenAvailable) {
             return SecurityMode.SimPuk;
-        }
+        } else {
+            final int security = mLockPatternUtils.getActivePasswordQuality(
+                    KeyguardUpdateMonitor.getCurrentUser());
+            switch (security) {
+                case DevicePolicyManager.PASSWORD_QUALITY_NUMERIC:
+                case DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX:
+                    return SecurityMode.PIN;
 
-        final int security = mLockPatternUtils.getActivePasswordQuality(
-                KeyguardUpdateMonitor.getCurrentUser());
-        switch (security) {
-            case DevicePolicyManager.PASSWORD_QUALITY_NUMERIC:
-            case DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX:
-                return SecurityMode.PIN;
+                case DevicePolicyManager.PASSWORD_QUALITY_ALPHABETIC:
+                case DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC:
+                case DevicePolicyManager.PASSWORD_QUALITY_COMPLEX:
+                    return SecurityMode.Password;
 
-            case DevicePolicyManager.PASSWORD_QUALITY_ALPHABETIC:
-            case DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC:
-            case DevicePolicyManager.PASSWORD_QUALITY_COMPLEX:
-                return SecurityMode.Password;
+                case DevicePolicyManager.PASSWORD_QUALITY_SOMETHING:
+                    return SecurityMode.Pattern;
+                case DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED:
+                    return SecurityMode.None;
 
-            case DevicePolicyManager.PASSWORD_QUALITY_SOMETHING:
-                return SecurityMode.Pattern;
-            case DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED:
-                return SecurityMode.None;
-
-            default:
-                throw new IllegalStateException("Unknown security quality:" + security);
-        }
+                default:
+                    throw new IllegalStateException("Unknown security quality:" + security);
+            }
+         }
     }
 }

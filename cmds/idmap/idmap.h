@@ -18,6 +18,17 @@
     _rc; })
 #endif
 
+
+#ifndef KEEP_FAILURE_RETRY
+// Used to retry syscalls that can return EINTR or EAGAIN.
+#define KEEP_FAILURE_RETRY(exp) ({         \
+    typeof (exp) _rc;                      \
+    do {                                   \
+        _rc = (exp);                       \
+    } while (_rc == -1 && (errno == EINTR || errno == EAGAIN)); \
+    _rc; })
+#endif
+
 int idmap_create_path(const char *target_apk_path, const char *overlay_apk_path,
         const char *idmap_path);
 
