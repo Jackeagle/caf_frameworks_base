@@ -701,26 +701,7 @@ class MountService extends IMountService.Stub
             if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
                 Slog.d(TAG, "***** Getting info from vold ******");
                 if (mSystemReady && mDaemonConnected) {
-                    killMediaProvider();
-
-                    mDisks.clear();
-                    mVolumes.clear();
-
-                    addInternalVolume();
                     try {
-                        mConnector.execute("volume", "geteminfo", null);
-                        // Tell vold about all existing and started users
-                        final UserManager um = mContext.getSystemService(UserManager.class);
-                        if (um != null) {
-                            final List<UserInfo> users = um.getUsers();
-                            for (UserInfo user : users) {
-                                mConnector.execute("volume", "user_added", user.id,
-                                        user.serialNumber);
-                            }
-                            for (int userId : mStartedUsers) {
-                                mConnector.execute("volume", "user_started", userId);
-                            }
-                        }
                         mConnector.execute("volume", "getinfo", null);
                     } catch (NativeDaemonConnectorException e) {
                         throw e.rethrowAsParcelableException();
@@ -732,15 +713,11 @@ class MountService extends IMountService.Stub
 
     @Override
     public void waitForAsecScan() {
-        if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
-            waitForLatch(mAsecsScanned, "mAsecsScanned");
-        }
+        waitForLatch(mAsecsScanned, "mAsecsScanned");
     }
 
     private void waitForReady() {
-        if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
-            waitForLatch(mConnectedSignal, "mConnectedSignal");
-        }
+        waitForLatch(mConnectedSignal, "mConnectedSignal");
     }
 
     private void waitForLatch(CountDownLatch latch, String condition) {
@@ -781,9 +758,7 @@ class MountService extends IMountService.Stub
 
     private void handleSystemReady() {
         synchronized (mLock) {
-            if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
-                resetIfReadyAndConnectedLocked();
-            }
+            resetIfReadyAndConnectedLocked();
         }
 
         // Start scheduling nominally-daily fstrim operations
@@ -920,9 +895,7 @@ class MountService extends IMountService.Stub
     @Override
     public void onDaemonConnected() {
         mDaemonConnected = true;
-        if (!"1".equals(SystemProperties.get("vold.earlymount", "0"))) {
-            mHandler.obtainMessage(H_DAEMON_CONNECTED).sendToTarget();
-        }
+        mHandler.obtainMessage(H_DAEMON_CONNECTED).sendToTarget();
     }
 
     private void handleDaemonConnected() {
