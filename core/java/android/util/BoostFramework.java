@@ -64,32 +64,36 @@ public class BoostFramework {
                 Class perfClass;
                 PathClassLoader perfClassLoader;
 
-	        perfClassLoader = new PathClassLoader(PERFORMANCE_JAR,
-                                  ClassLoader.getSystemClassLoader());
-                perfClass = perfClassLoader.loadClass(PERFORMANCE_CLASS);
-                mConstructor = perfClass.getConstructor();
+                perfClassLoader = new PathClassLoader(PERFORMANCE_JAR,
+                                        ClassLoader.getSystemClassLoader());
+                if (perfClassLoader != null) {
+                    perfClass = perfClassLoader.loadClass(PERFORMANCE_CLASS);
+                    mConstructor = perfClass.getConstructor();
 
-                Class[] argClasses = new Class[] {int.class, int[].class};
-                mAcquireFunc =  perfClass.getDeclaredMethod("perfLockAcquire", argClasses);
-                Log.v(TAG,"mAcquireFunc method = " + mAcquireFunc);
+                    Class[] argClasses = new Class[] {int.class, int[].class};
+                    mAcquireFunc =  perfClass.getDeclaredMethod("perfLockAcquire", argClasses);
+                    Log.v(TAG,"mAcquireFunc method = " + mAcquireFunc);
 
-                argClasses = new Class[] {};
-                mReleaseFunc =  perfClass.getDeclaredMethod("perfLockRelease", argClasses);
-                Log.v(TAG,"mReleaseFunc method = " + mReleaseFunc);
+                    argClasses = new Class[] {};
+                    mReleaseFunc =  perfClass.getDeclaredMethod("perfLockRelease", argClasses);
+                    Log.v(TAG,"mReleaseFunc method = " + mReleaseFunc);
 
-                argClasses = new Class[] {MotionEvent.class, DisplayMetrics.class, int.class, int[].class};
-                mAcquireTouchFunc =  perfClass.getDeclaredMethod("perfLockAcquireTouch", argClasses);
-                Log.v(TAG,"mAcquireTouchFunc method = " + mAcquireTouchFunc);
+                    argClasses = new Class[] {MotionEvent.class, DisplayMetrics.class,
+                            int.class, int[].class};
+                    mAcquireTouchFunc =  perfClass.getDeclaredMethod("perfLockAcquireTouch",
+                            argClasses);
+                    Log.v(TAG,"mAcquireTouchFunc method = " + mAcquireTouchFunc);
 
-                argClasses = new Class[] {int.class, String.class};
-                mIOPStart =  perfClass.getDeclaredMethod("perfIOPrefetchStart", argClasses);
-                Log.v(TAG,"mIOPStart method = " + mIOPStart);
+                    argClasses = new Class[] {int.class, String.class};
+                    mIOPStart =  perfClass.getDeclaredMethod("perfIOPrefetchStart", argClasses);
+                    Log.v(TAG,"mIOPStart method = " + mIOPStart);
 
-                argClasses = new Class[] {};
-                mIOPStop =  perfClass.getDeclaredMethod("perfIOPrefetchStop", argClasses);
-                Log.v(TAG,"mIOPStop method = " + mIOPStop);
+                    argClasses = new Class[] {};
+                    mIOPStop =  perfClass.getDeclaredMethod("perfIOPrefetchStop", argClasses);
+                    Log.v(TAG,"mIOPStop method = " + mIOPStop);
 
-                mIsLoaded = true;
+                    mIsLoaded = true;
+                }
             }
             catch(Exception e) {
                 Log.e(TAG,"BoostFramework() : Exception_1 = " + e);
@@ -122,11 +126,13 @@ public class BoostFramework {
 /** @hide */
     public int perfLockAcquire(int duration, int... list) {
         int ret = -1;
-        try {
-            Object retVal = mAcquireFunc.invoke(mPerf, duration, list);
-            ret = (int)retVal;
-        } catch(Exception e) {
-            Log.e(TAG,"Exception " + e);
+        if (mAcquireFunc != null) {
+            try {
+                Object retVal = mAcquireFunc.invoke(mPerf, duration, list);
+                ret = (int)retVal;
+            } catch(Exception e) {
+                Log.e(TAG,"Exception " + e);
+            }
         }
         return ret;
     }
@@ -134,11 +140,13 @@ public class BoostFramework {
 /** @hide */
     public int perfLockRelease() {
         int ret = -1;
-        try {
-            Object retVal = mReleaseFunc.invoke(mPerf);
-            ret = (int)retVal;
-        } catch(Exception e) {
-            Log.e(TAG,"Exception " + e);
+        if (mReleaseFunc != null) {
+            try {
+                Object retVal = mReleaseFunc.invoke(mPerf);
+                ret = (int)retVal;
+            } catch(Exception e) {
+                Log.e(TAG,"Exception " + e);
+            }
         }
         return ret;
     }
@@ -146,11 +154,13 @@ public class BoostFramework {
     public int perfLockAcquireTouch(MotionEvent ev, DisplayMetrics metrics,
                                    int duration, int... list) {
         int ret = -1;
-        try {
-            Object retVal = mAcquireTouchFunc.invoke(mPerf, ev, metrics, duration, list);
-            ret = (int)retVal;
-        } catch(Exception e) {
-            Log.e(TAG,"Exception " + e);
+        if (mAcquireTouchFunc != null) {
+            try {
+                Object retVal = mAcquireTouchFunc.invoke(mPerf, ev, metrics, duration, list);
+                ret = (int)retVal;
+            } catch(Exception e) {
+                Log.e(TAG,"Exception " + e);
+            }
         }
         return ret;
     }
@@ -159,11 +169,13 @@ public class BoostFramework {
     public int perfIOPrefetchStart(int pid, String pkg_name)
     {
         int ret = -1;
-        try {
-            Object retVal = mIOPStart.invoke(mPerf,pid,pkg_name);
-            ret = (int)retVal;
-        } catch(Exception e) {
-            Log.e(TAG,"Exception " + e);
+        if (mIOPStart != null) {
+            try {
+                Object retVal = mIOPStart.invoke(mPerf,pid,pkg_name);
+                ret = (int)retVal;
+            } catch(Exception e) {
+                Log.e(TAG,"Exception " + e);
+            }
         }
         return ret;
     }
@@ -172,13 +184,15 @@ public class BoostFramework {
     public int perfIOPrefetchStop()
     {
         int ret = -1;
-         try {
-             Object retVal = mIOPStop.invoke(mPerf);
-             ret = (int)retVal;
-         } catch(Exception e) {
-             Log.e(TAG,"Exception " + e);
-         }
-         return ret;
+        if (mIOPStop != null) {
+            try {
+                Object retVal = mIOPStop.invoke(mPerf);
+                 ret = (int)retVal;
+            } catch(Exception e) {
+                Log.e(TAG,"Exception " + e);
+            }
+        }
+        return ret;
     }
 
 };
