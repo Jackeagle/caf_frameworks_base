@@ -20,7 +20,6 @@ PRODUCT_COPY_FILES := \
     frameworks/base/data/fonts/fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fonts.xml
 
 PRODUCT_PACKAGES := \
-    DroidSansFallback.ttf \
     DroidSansMono.ttf \
     Clockopia.ttf \
     AndroidClock.ttf \

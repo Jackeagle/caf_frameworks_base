@@ -57,14 +57,14 @@ ifneq ($(SMALLER_FONT_FOOTPRINT),true)
 # Do not include Motoya if we are including Noto Sans Japanese
 ifneq ($(FONT_NOTOSANS_JP_FULL),true)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := MTLmr3m.ttf
-LOCAL_SRC_FILES := $(LOCAL_MODULE)
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
-include $(BUILD_PREBUILT)
-extra_font_files += MTLmr3m.ttf
+#include $(CLEAR_VARS)
+#LOCAL_MODULE := MTLmr3m.ttf
+#LOCAL_SRC_FILES := $(LOCAL_MODULE)
+#LOCAL_MODULE_CLASS := ETC
+#LOCAL_MODULE_TAGS := optional
+#LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
+#include $(BUILD_PREBUILT)
+#extra_font_files += MTLmr3m.ttf
 
 endif  # !FONT_NOTOSANS_JP_FULL
 endif  # !SMALLER_FONT_FOOTPRINT
