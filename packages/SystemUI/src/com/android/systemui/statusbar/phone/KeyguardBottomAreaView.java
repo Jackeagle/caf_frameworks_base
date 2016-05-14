@@ -46,7 +46,7 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
 import android.widget.TextView;
-
+import android.view.MotionEvent;
 import com.android.internal.util.cm.LockscreenShortcutsHelper;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.EmergencyButton;
@@ -663,5 +663,15 @@ public class KeyguardBottomAreaView extends FrameLayout implements View.OnClickL
         public int getIntrinsicHeight() {
             return mIntrinsicHeight;
         }
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (getAlpha() == 0f) {
+            //in case quick setting panel is expanded, alpha changes to 0,
+            //don't handle touch event here.
+            return false;
+        }
+        return super.dispatchTouchEvent(ev);
     }
 }
