@@ -2514,8 +2514,13 @@ final class ActivityStack {
             if (next != r) {
                 final TaskRecord task = r.task;
                 if (r.frontOfTask && task == topTask() && task.isOverHomeStack()) {
-                    mStackSupervisor.moveHomeStackTaskToTop(task.getTaskToReturnTo(),
-                            reason + " adjustFocus");
+                    // Move the home stack to the top if this stack is fullscreen or there is no
+                    // other visible stack.
+                    if (mStackSupervisor.moveHomeStackTaskToTop(
+                            task.getTaskToReturnTo(), reason + " adjustFocus")) {
+                        // Activity focus was already adjusted. Nothing else to do...
+                        return;
+                    }
                 }
             }
             ActivityRecord top = mStackSupervisor.topRunningActivityLocked();
@@ -3503,7 +3508,6 @@ final class ActivityStack {
                 mTaskHistory.remove(taskNdx);
                 mTaskHistory.add(top, task);
                 updateTaskMovement(task, true);
-                mWindowManager.moveTaskToTop(task.taskId);
                 return;
             }
         }
@@ -3529,13 +3533,15 @@ final class ActivityStack {
         // Shift all activities with this task up to the top
         // of the stack, keeping them in the same internal order.
         insertTaskAtTop(tr);
-        moveToFront(reason);
+
+        // Set focus to the top running activity of this stack.
+        ActivityRecord r = topRunningActivityLocked(null);
+        mService.setFocusedActivityLocked(r, reason);
 
         if (DEBUG_TRANSITION) Slog.v(TAG, "Prepare to front transition: task=" + tr);
         if (source != null &&
                 (source.intent.getFlags()&Intent.FLAG_ACTIVITY_NO_ANIMATION) != 0) {
             mWindowManager.prepareAppTransition(AppTransition.TRANSIT_NONE, false);
-            ActivityRecord r = topRunningActivityLocked(null);
             if (r != null) {
                 mNoAnimActivities.add(r);
             }
