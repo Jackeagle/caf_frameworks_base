@@ -54,6 +54,7 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.Signature;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Binder;
@@ -309,6 +310,8 @@ public class BackupManagerService {
             = new ArrayMap<String,TransportConnection>();
     String mCurrentTransport;
     ActiveRestoreSession mActiveRestoreSession;
+    private static boolean mIsBootOpt = Resources.getSystem().
+            getBoolean(com.android.internal.R.bool.config_boot_opt);
 
     // Watch the device provisioning operation during setup
     ContentObserver mProvisionedObserver;
@@ -340,6 +343,17 @@ public class BackupManagerService {
             if (phase == PHASE_SYSTEM_SERVICES_READY) {
                 sInstance.initialize(UserHandle.USER_OWNER);
             } else if (phase == PHASE_THIRD_PARTY_APPS_CAN_START) {
+                ContentResolver r = sInstance.mContext.getContentResolver();
+                boolean areEnabled = Settings.Secure.getInt(r,
+                        Settings.Secure.BACKUP_ENABLED, 0) != 0;
+                try {
+                    sInstance.setBackupEnabled(areEnabled);
+                } catch (RemoteException e) {
+                    // can't happen; it's a local object
+                }
+            } else if (mIsBootOpt == true && phase ==
+                SystemService.PHASE_SERVICES_DEFER_COMPLETED) {
+                sInstance.initialize(UserHandle.USER_OWNER);
                 ContentResolver r = sInstance.mContext.getContentResolver();
                 boolean areEnabled = Settings.Secure.getInt(r,
                         Settings.Secure.BACKUP_ENABLED, 0) != 0;
