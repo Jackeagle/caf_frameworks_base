@@ -115,6 +115,12 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String EXTRA_REMOTE_PLAYERS =
             "android.bluetooth.avrcp-controller.profile.extra.PLAYERS";
 
+    public static final String EXTRA_FOLDER_TYPE =
+            "android.bluetooth.avrcp-controller.profile.extra.FOLDER_TYPE";
+
+    public static final String EXTRA_MEDIA_TYPE =
+            "android.bluetooth.avrcp-controller.profile.extra.MEDIA_TYPE";
+
     public static final String EXTRA_PLAYER_UPDATE_STATUS =
             "android.bluetooth.avrcp-controller.profile.extra.STATUS";
 
@@ -140,6 +146,20 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String BROWSE_COMMAND_BROWSE_FOLDER_UP = "UP";
     public static final String BROWSE_COMMAND_BROWSE_FOLDER_DOWN = "DOWN";
 
+    /*
+     * Media Type. Folder Type, Item Type
+     */
+    public static final int MEDIA_TYPE_AUDIO   = 0x00;
+    public static final int MEDIA_TYPE_VIDEO   = 0x01;
+    public static final int MEDIA_TYPE_ERROR   = 0xFF;
+    public static final int FOLDER_TYPE_MIXED  = 0x00;
+    public static final int FOLDER_TYPE_TITLES = 0x01;
+    public static final int FOLDER_TYPE_ALBUMS = 0x02;
+    public static final int FOLDER_TYPE_ARTISTS = 0x03;
+    public static final int FOLDER_TYPE_GENRES = 0x04;
+    public static final int FOLDER_TYPE_PLAYLISTS = 0x05;
+    public static final int FOLDER_TYPE_YEARS = 0x06;
+    public static final int FOLDER_TYPE_ERROR = 0xFF;
     /*
      * KeyCoded for Pass Through Commands
      */
