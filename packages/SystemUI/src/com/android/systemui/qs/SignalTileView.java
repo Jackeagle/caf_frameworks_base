@@ -139,7 +139,7 @@ public final class SignalTileView extends QSTileView {
         if (getContext().getResources().getBoolean(R.bool.show_roaming_and_network_icons)) {
             TelephonyManager tm =
                     (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
-            mRoaming.setVisibility(tm.isNetworkRoaming()? View.VISIBLE : View.GONE);
+            mRoaming.setVisibility(tm.isNetworkRoaming() && s.isShowRoaming ? View.VISIBLE : View.GONE);
         }
     }
 
