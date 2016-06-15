@@ -572,12 +572,13 @@ class TelephonyIcons {
                         //Select 4G+ icon.
                         mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                                 mDataTypeGenerationArray[2], null, NS);
+                        mSelectedQSDataTypeIcon[slot] = QS_DATA_4G_PLUS;
                     } else {
                         mSelectedDataActivityIndex[slot] = DATA_TYPE_4G;
                         mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                                 mDataTypeGenerationArray[1], null, NS);
+                        mSelectedQSDataTypeIcon[slot] = QS_DATA_4G;
                     }
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_4G;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[1];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_4G;
                 }
