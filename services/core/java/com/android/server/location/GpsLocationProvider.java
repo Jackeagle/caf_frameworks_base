@@ -1100,7 +1100,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
         }
 
         if (DEBUG) Log.d(TAG, "setRequest " + mProviderRequest);
-        if (mProviderRequest.reportLocation && !mDisableGps) {
+        if (mProviderRequest.reportLocation && !mDisableGps && isEnabled()) {
             // update client uids
             updateClientUids(mWorkSource);
 
