@@ -2117,17 +2117,21 @@ public class MediaFocusControl implements OnFinished {
 
     private void onSetRemoteControlClientBrowsedPlayer() {
         Log.d(TAG, "onSetRemoteControlClientBrowsedPlayer: ");
-        PlayerRecord prse = mPRStack.peek();
-        if (prse.getRcc() == null) {
-            Log.d(TAG, "can not proceed with setBrowsedPlayer");
-        } else {
-            Log.d(TAG, "proceed with setBrowsedPlayer");
-            try {
-                Log.d(TAG, "Calling setBrowsedPlayer");
-                prse.getRcc().setBrowsedPlayer();
-            } catch (RemoteException e) {
-                Log.e(TAG, "Current valid remote client is dead: "+ e);
+        if (!mPRStack.empty()) {
+            PlayerRecord prse = mPRStack.peek();
+            if (prse.getRcc() == null) {
+                Log.d(TAG, "can not proceed with setBrowsedPlayer");
+            } else {
+                Log.d(TAG, "proceed with setBrowsedPlayer");
+                try {
+                    Log.d(TAG, "Calling setBrowsedPlayer");
+                    prse.getRcc().setBrowsedPlayer();
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Current valid remote client is dead: "+ e);
+                }
             }
+        } else {
+            Log.e(TAG, "player Record stack empty");
         }
     }
 
