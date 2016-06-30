@@ -3261,6 +3261,14 @@ public final class ActivityManagerService extends ActivityManagerNative
     }
 
     boolean isAllowedWhileBooting(ApplicationInfo ai) {
+        IPackageManager pm = AppGlobals.getPackageManager();
+        try {
+            if (pm.isFirstBoot() == true &&
+                    (ai != null && ai.packageName.equals("com.android.bluetooth"))) {
+                Slog.i(TAG, "Bluetooth is not allowed while boot in first boot");
+                return false;
+            }
+        } catch(RemoteException e) {}
         return (ai.flags&ApplicationInfo.FLAG_PERSISTENT) != 0;
     }
 
@@ -3314,6 +3322,11 @@ public final class ActivityManagerService extends ActivityManagerNative
                             MountServiceInternal.class);
                     mountExternal = mountServiceInternal.getExternalStorageMountMode(uid,
                             app.info.packageName);
+                    // Bluetooth app required MOUNT_EXTERNAL_DEFAULT, early or late start
+                    if (app.info.packageName.equals("com.android.bluetooth")
+                            && mountExternal == Zygote.MOUNT_EXTERNAL_NONE) {
+                        mountExternal = Zygote.MOUNT_EXTERNAL_DEFAULT;
+                    }
                 } catch (RemoteException e) {
                     throw e.rethrowAsRuntimeException();
                 }
