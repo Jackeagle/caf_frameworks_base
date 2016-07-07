@@ -40,7 +40,14 @@ public final class SignalTileView extends QSTileView {
     private ImageView mOut;
     private ImageView mRoaming;
 
+    private boolean mSupportRoaming = true;
+
     private int mWideOverlayIconStartPadding;
+
+    public SignalTileView(Context context, boolean supportRoaming) {
+        this(context);
+        this.mSupportRoaming = supportRoaming;
+    }
 
     public SignalTileView(Context context) {
         super(context);
@@ -71,8 +78,8 @@ public final class SignalTileView extends QSTileView {
             mRoaming.setImageResource(R.drawable.ic_qs_signal_r);
             mRoaming.setVisibility(View.GONE);
             LinearLayout iconLayout = new LinearLayout(mContext);
-            iconLayout.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             iconLayout.addView(mRoaming, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            iconLayout.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             mIconFrame.addView(iconLayout, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         } else {
             mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -139,8 +146,10 @@ public final class SignalTileView extends QSTileView {
         if (getContext().getResources().getBoolean(R.bool.show_roaming_and_network_icons)) {
             TelephonyManager tm =
                     (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
-            mRoaming.setVisibility(tm.isNetworkRoaming()? View.VISIBLE : View.GONE);
-        }
+            if (mSupportRoaming) {
+                mRoaming.setVisibility(tm.isNetworkRoaming()? View.VISIBLE : View.GONE);
+            }
+         }
     }
 
     private void setVisibility(View view, boolean shown, boolean visible) {
