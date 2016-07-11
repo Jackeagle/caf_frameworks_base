@@ -829,9 +829,9 @@ public abstract class BaseStatusBar extends SystemUI implements
                         : color);
             }
         }
-
+        boolean showWFCcolorIcon = mContext.getResources().getBoolean(R.bool.config_wfc_show_color_icon);
         if (entry.icon != null) {
-            entry.icon.setTag(R.id.icon_is_pre_L, entry.targetSdk < Build.VERSION_CODES.LOLLIPOP);
+            entry.icon.setTag(R.id.icon_is_pre_L, entry.targetSdk < Build.VERSION_CODES.LOLLIPOP || showWFCcolorIcon);
         }
     }
 

@@ -354,4 +354,6 @@
 
     <!-- When true, show charging animation -->
     <bool name="config_show_battery_charging_anim">true</bool>
+
+    <bool name="config_wfc_show_color_icon">false</bool>
 </resources>

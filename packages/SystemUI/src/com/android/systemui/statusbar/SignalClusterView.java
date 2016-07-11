@@ -24,6 +24,7 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.Animatable;
 import android.graphics.drawable.Drawable;
 import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.ArraySet;
 import android.util.AttributeSet;
@@ -69,7 +70,7 @@ public class SignalClusterView
     private int mEthernetIconId = 0;
     private int mLastEthernetIconId = -1;
     private boolean mWifiVisible = false;
-    private boolean mImsRegistered = false;
+    private boolean mImsOverWifi = false;
     private int mWifiStrengthId = 0, mWifiActivityId = 0;
     private int mLastWifiStrengthId = -1, mLastWifiActivityId = -1;
     private boolean mIsAirplaneMode = false;
@@ -86,7 +87,7 @@ public class SignalClusterView
     ViewGroup mEthernetGroup, mWifiGroup;
     View mNoSimsCombo;
     ImageView mVpn, mEthernet, mWifi, mAirplane,
-                mNoSims, mEthernetDark, mWifiDark, mNoSimsDark, mImsAirplane;
+                mNoSims, mEthernetDark, mWifiDark, mNoSimsDark, mImsOverWifiImageView;
     ImageView mWifiActivity;
     View mWifiAirplaneSpacer;
     View mWifiSignalSpacer;
@@ -177,7 +178,7 @@ public class SignalClusterView
         mAirplane       = (ImageView) findViewById(R.id.airplane);
         mNoSims         = (ImageView) findViewById(R.id.no_sims);
         mNoSimsDark     = (ImageView) findViewById(R.id.no_sims_dark);
-        mImsAirplane    = (ImageView) findViewById(R.id.airplane_ims);
+        mImsOverWifiImageView    = (ImageView) findViewById(R.id.ims_over_wifi);
         mNoSimsCombo    =             findViewById(R.id.no_sims_combo);
         mWifiAirplaneSpacer =         findViewById(R.id.wifi_airplane_spacer);
         mWifiSignalSpacer =           findViewById(R.id.wifi_signal_spacer);
@@ -200,7 +201,7 @@ public class SignalClusterView
         mWifi           = null;
         mWifiActivity   = null;
         mAirplane       = null;
-        mImsAirplane    = null;
+        mImsOverWifiImageView    = null;
         mMobileSignalGroup.removeAllViews();
         mMobileSignalGroup = null;
         TunerService.get(mContext).removeTunable(this);
@@ -259,7 +260,7 @@ public class SignalClusterView
             int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
             int mobileActivityId, int stackedDataId, int stackedVoiceId,
             String typeContentDescription, String description, boolean isWide, int subId,
-            int imsIconId, boolean isImsInAirplane, int dataNetworkTypeInRoamingId,
+            int imsIconId, boolean isImsOverWifi, int dataNetworkTypeInRoamingId,
             int embmsIconId) {
         PhoneState state = getState(subId);
         if (state == null) {
@@ -268,7 +269,7 @@ public class SignalClusterView
         state.mMobileImsId = imsIconId;
         state.mDataNetworkTypeInRoamingId = dataNetworkTypeInRoamingId;
         state.mMobileEmbmsId = embmsIconId;
-        mImsRegistered = isImsInAirplane;
+        mImsOverWifi = isImsOverWifi;
         this.setMobileDataIndicators(statusIcon, qsIcon, statusType, qsType, activityIn,
                 activityOut, dataActivityId, mobileActivityId, stackedDataId,
                 stackedVoiceId, typeContentDescription, description, isWide, subId);
@@ -289,6 +290,17 @@ public class SignalClusterView
         apply();
     }
 
+    private boolean getImsOverWifiStatus(int subId) {
+        TelephonyManager tm =
+                (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if (tm != null
+                && (tm.isVoWifiCallingAvailableUsingSubId(subId)
+                || tm.isVideoTelephonyWifiCallingAvailableUsingSubId(subId))) {
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void setSubs(List<SubscriptionInfo> subs) {
         if (hasCorrectSubs(subs)) {
@@ -300,9 +312,12 @@ public class SignalClusterView
             mMobileSignalGroup.removeAllViews();
         }
         final int n = subs.size();
+        boolean imsOverWiFi = false;
         for (int i = 0; i < n; i++) {
             inflatePhoneState(subs.get(i).getSubscriptionId());
+            imsOverWiFi |= getImsOverWifiStatus(subs.get(i).getSubscriptionId());
         }
+        mImsOverWifi = imsOverWiFi;
         if (isAttachedToWindow()) {
             applyIconTint();
         }
@@ -516,10 +531,10 @@ public class SignalClusterView
             mAirplane.setVisibility(View.GONE);
         }
 
-        if (mIsAirplaneMode && mImsRegistered){
-            mImsAirplane.setVisibility(View.VISIBLE);
+        if (mImsOverWifi){
+            mImsOverWifiImageView.setVisibility(View.VISIBLE);
         } else {
-            mImsAirplane.setVisibility(View.GONE);
+            mImsOverWifiImageView.setVisibility(View.GONE);
         }
 
         if (mIsAirplaneMode && mWifiVisible) {

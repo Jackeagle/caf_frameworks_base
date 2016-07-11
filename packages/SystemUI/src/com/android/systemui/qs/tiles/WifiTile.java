@@ -92,7 +92,7 @@ public class WifiTile extends QSTile<QSTile.SignalState> {
 
     @Override
     public QSTileView createTileView(Context context) {
-        return new SignalTileView(context);
+        return new SignalTileView(context, false);
     }
 
     @Override

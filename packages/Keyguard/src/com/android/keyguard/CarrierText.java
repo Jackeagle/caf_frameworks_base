@@ -36,11 +36,13 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.os.SystemProperties;
 
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.IccCardConstants.State;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.settingslib.WirelessUtils;
+import android.telephony.TelephonyManager;
 
 public class CarrierText extends TextView {
     private static final boolean DEBUG = KeyguardConstants.DEBUG;
@@ -53,6 +55,8 @@ public class CarrierText extends TextView {
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
 
     private WifiManager mWifiManager;
+
+    private boolean[] mSimErrorState = new boolean[TelephonyManager.getDefault().getPhoneCount()];
 
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
         @Override
@@ -69,7 +73,17 @@ public class CarrierText extends TextView {
         };
 
         public void onSimStateChanged(int subId, int slotId, IccCardConstants.State simState) {
+            if (slotId < 0) {
+                Log.d(TAG, "onSimStateChanged() - slotId invalid: " + slotId);
+                return;
+            }
+
+            Log.d(TAG,"onSimStateChanged: " + getStatusForIccState(simState));
             if (getStatusForIccState(simState) == StatusMode.SimIoError) {
+                mSimErrorState[slotId] = true;
+                updateCarrierText();
+            } else if (mSimErrorState[slotId]) {
+                mSimErrorState[slotId] = false;
                 updateCarrierText();
             }
         };
@@ -110,16 +124,64 @@ public class CarrierText extends TextView {
         mWifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
     }
 
+    /**
+     * Checks if there are faulty cards. Adds the text depending on the slot of the card
+     * @param text: current carrier text based on the sim state
+     * @param noSims: whether a valid sim card is inserted
+     * @return text
+    */
+    private CharSequence updateCarrierTextWithSimIoError(CharSequence text, boolean noSims) {
+        final CharSequence carrier = "";
+        CharSequence carrierTextForSimState = getCarrierTextForSimState(
+            IccCardConstants.State.CARD_IO_ERROR, carrier);
+        for (int index = 0; index < mSimErrorState.length; index++) {
+            if (mSimErrorState[index]) {
+                // In the case when no sim cards are detected but a faulty card is inserted
+                // overwrite the text and only show "Invalid card"
+                if (noSims) {
+                    return concatenate(carrierTextForSimState,
+                        getContext().getText(com.android.internal.R.string.emergency_calls_only));
+                } else if (index == 0) {
+                    // prepend "Invalid card" when faulty card is inserted in slot 0
+                    text = concatenate(carrierTextForSimState, text);
+                } else {
+                    // concatenate "Invalid card" when faulty card is inserted in slot 1
+                    text = concatenate(text, carrierTextForSimState);
+                }
+            }
+        }
+        return text;
+    }
+
     protected void updateCarrierText() {
         boolean allSimsMissing = true;
         boolean anySimReadyAndInService = false;
         boolean showLocale = getContext().getResources().getBoolean(
                 com.android.internal.R.bool.config_monitor_locale_change);
         CharSequence displayText = null;
-
+        String carrier = "405854";
         List<SubscriptionInfo> subs = mKeyguardUpdateMonitor.getSubscriptionInfo(false);
         final int N = subs.size();
         if (DEBUG) Log.d(TAG, "updateCarrierText(): " + N);
+        // If the Subscription Infos are not available and if any of the sims are not
+        // in SIM_STATE_ABSENT,set displayText as "NO SERVICE".
+        // displayText will be overrided after the Subscription infos are available and
+        // displayText is set according to the SIM Status.
+        String property = SystemProperties.get("persist.radio.atel.carrier");
+            if (N == 0 && carrier.equals(property)) {
+                 boolean isSimAbsent = false;
+                 for (int i = 0; i < TelephonyManager.getDefault().getSimCount(); i++) {
+                      if (TelephonyManager.getDefault().getSimState(i)
+                            == TelephonyManager.SIM_STATE_ABSENT) {
+                            isSimAbsent = true;
+                            break;
+                      }
+            }
+            if (!isSimAbsent) {
+                allSimsMissing = false;
+                displayText = getContext().getString(R.string.keyguard_carrier_default);
+            }
+        }
         for (int i = 0; i < N; i++) {
             CharSequence networkClass = "";
             int subId = subs.get(i).getSubscriptionId();
@@ -232,6 +294,7 @@ public class CarrierText extends TextView {
             }
         }
 
+        displayText = updateCarrierTextWithSimIoError(displayText, allSimsMissing);
         // APM (airplane mode) != no carrier state. There are carrier services
         // (e.g. WFC = Wi-Fi calling) which may operate in APM.
         if (!anySimReadyAndInService && WirelessUtils.isAirplaneModeOn(mContext)) {
