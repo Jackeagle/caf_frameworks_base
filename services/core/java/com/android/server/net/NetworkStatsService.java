@@ -76,6 +76,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.database.ContentObserver;
 import android.net.IConnectivityManager;
 import android.net.INetworkManagementEventObserver;
 import android.net.INetworkStatsService;
@@ -243,6 +244,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     private NetworkStats mUidOperations = new NetworkStats(0L, 10);
 
     private final Handler mHandler;
+    private Handler mStatsHandler = null;
 
     private boolean mSystemReady;
     private long mPersistThreshold = 2 * MB_IN_BYTES;
@@ -275,6 +277,14 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         HandlerThread thread = new HandlerThread(TAG);
         thread.start();
         mHandler = new Handler(thread.getLooper(), mHandlerCallback);
+
+        ContentResolver contentResolver = mContext.getContentResolver();
+        contentResolver.registerContentObserver(Settings.Global.getUriFor(
+               NETSTATS_GLOBAL_ALERT_BYTES), false, mGlobalAlertBytesObserver);
+
+        HandlerThread mStatsThread = new HandlerThread("StatsObserver");
+        mStatsThread.start();
+        mStatsHandler = new Handler(mStatsThread.getLooper());
 
         mSystemDir = checkNotNull(systemDir);
         mBaseDir = new File(systemDir, "netstats");
@@ -435,6 +445,18 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             // ignored; service lives in system_server
         }
     }
+
+    private final ContentObserver mGlobalAlertBytesObserver =
+        new ContentObserver(mStatsHandler) {
+        public void onChange(boolean selfChange) {
+            long GlobalAlertBytes = mSettings.getGlobalAlertBytes(mPersistThreshold);
+            if (GlobalAlertBytes > 0) {
+                mGlobalAlertBytes = GlobalAlertBytes;
+            } else {
+                mGlobalAlertBytes = mPersistThreshold;
+            }
+        };
+    };
 
     @Override
     public INetworkStatsSession openSession() {

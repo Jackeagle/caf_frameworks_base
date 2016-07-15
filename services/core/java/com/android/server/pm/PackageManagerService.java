@@ -272,6 +272,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import android.os.SystemProperties;
 
 /**
  * Keep track of all those .apks everywhere.
@@ -1131,6 +1132,10 @@ public class PackageManagerService extends IPackageManager.Stub {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
         }
 
+        private boolean isStrictOpEnable() {
+            return SystemProperties.getBoolean("persist.sys.strict_op_enable", false);
+        }
+
         PackageHandler(Looper looper) {
             super(looper);
         }
@@ -1442,6 +1447,16 @@ public class PackageManagerService extends IPackageManager.Stub {
                             // Log current value of "unknown sources" setting
                             EventLog.writeEvent(EventLogTags.UNKNOWN_SOURCES_ENABLED,
                                 getUnknownSourcesSettings());
+
+                            if (isStrictOpEnable()) {
+                                //For CTA security test
+                                //Show permission control menu after installation
+                                Intent intent = new Intent(Intent.ACTION_MANAGE_APP_PERMISSIONS);
+                                intent.putExtra(Intent.EXTRA_PACKAGE_NAME, packageName);
+                                intent.putExtra("hideInfoButton", true);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                mContext.startActivity(intent);
+                            }
                         }
                         // Force a gc to clear up things
                         Runtime.getRuntime().gc();
@@ -13397,8 +13412,9 @@ public class PackageManagerService extends IPackageManager.Stub {
                 for (int curUser : users) {
                     long timeout = SystemClock.uptimeMillis() + 5000;
                     synchronized (conn) {
-                        long now = SystemClock.uptimeMillis();
-                        while (conn.mContainerService == null && now < timeout) {
+                        long now;
+                        while (conn.mContainerService == null &&
+                                (now = SystemClock.uptimeMillis()) < timeout) {
                             try {
                                 conn.wait(timeout - now);
                             } catch (InterruptedException e) {
