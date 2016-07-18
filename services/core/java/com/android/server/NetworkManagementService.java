@@ -866,8 +866,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
 
     @Override
     public void addUpstreamV6Interface(String iface) throws RemoteException {
-        mContext.enforceCallingOrSelfPermission(
-                android.Manifest.permission.ACCESS_NETWORK_STATE, "NetworkManagementService");
+        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
 
         Slog.d(TAG, "addUpstreamInterface("+ iface + ")");
         try {
@@ -881,8 +880,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
 
     @Override
     public void removeUpstreamV6Interface(String iface) throws RemoteException {
-        mContext.enforceCallingOrSelfPermission(
-                android.Manifest.permission.ACCESS_NETWORK_STATE, "NetworkManagementService");
+        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
 
         Slog.d(TAG, "removeUpstreamInterface(" + iface + ")");
         try {
