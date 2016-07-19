@@ -321,7 +321,6 @@ public class VolumeDialog {
         final int x = loc[0] - mlp.leftMargin;
         final int y = loc[1] - mlp.topMargin;
         if (D.BUG) Log.d(TAG, "repositionExpandAnim x=" + x + " y=" + y);
-        mExpandButton.setTranslationX(x);
         mExpandButton.setTranslationY(y);
         mExpandButton.setTag((Integer) y);
     }
