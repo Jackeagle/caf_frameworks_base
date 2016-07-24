@@ -1591,22 +1591,30 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     public boolean isOOS()
     {
         boolean ret = true;
-        List<SubscriptionInfo> subs = getSubscriptionInfo(false);
-        final int N = subs.size();
-        if(N!=0){
-            for (int i = 0; i < N; i++) {
-                int subId = subs.get(i).getSubscriptionId();
-                ServiceState state = mServiceStates.get(subId);
-                if (state!=null&&(((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
-                        && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
-                        || (state.isEmergencyOnly()))) {
-                    ret = false;
-                    break;
+        int phoneCount = TelephonyManager.getDefault().getPhoneCount();
+
+        for (int phoneId = 0; phoneId < phoneCount; phoneId++) {
+            int[] subId = SubscriptionManager.getSubId(phoneId);
+            if (subId != null && subId.length >= 1) {
+                if (DEBUG) Log.d(TAG, "slot id:" + phoneId + " subId:" + subId[0]);
+                ServiceState state = mServiceStates.get(subId[0]);
+                if (state != null) {
+                    if (state.isEmergencyOnly())
+                        ret = false;
+                    if ((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
+                            && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
+                        ret = false;
+                    if (DEBUG) {
+                        Log.d(TAG, "is emergency: " + state.isEmergencyOnly());
+                        Log.d(TAG, "voice state: " + state.getVoiceRegState());
+                    }
+                } else {
+                    if (DEBUG) Log.d(TAG, "state is NULL");
                 }
             }
-        }else{
-            ret = false;
         }
+
+        if (DEBUG) Log.d(TAG, "is Emergency supported: " + ret);
         return ret;
     }
 
