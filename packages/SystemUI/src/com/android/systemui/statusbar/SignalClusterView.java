@@ -595,13 +595,12 @@ public class SignalClusterView
     private class PhoneState {
         private final int mSubId;
         private boolean mMobileVisible = false;
-        private boolean isRoaming = false;
         private int mMobileStrengthId = 0, mMobileTypeId = 0;
         private boolean mIsMobileTypeIconWide;
         private String mMobileDescription, mMobileTypeDescription;
 
         private ViewGroup mMobileGroup;
-        private ImageView mMobile, mMobileDark, mMobileType, mMobileIms,
+        private ImageView mMobile, mMobileDark, mMobileType, mRoaming, mMobileIms,
                 mDataNetworkTypeInRoaming, mMobileEmbms;
 
         private int mDataActivityId = 0, mMobileActivityId = 0, mMobileImsId = 0,
@@ -633,11 +632,10 @@ public class SignalClusterView
 
             mMobileSingleGroup = (ViewGroup) root.findViewById(R.id.mobile_signal_single);
             mMobileStackedGroup = (ViewGroup) root.findViewById(R.id.mobile_signal_stacked);
+            mRoaming        = (ImageView) root.findViewById(R.id.mobile_roaming);
         }
 
         public boolean apply(boolean isSecondaryIcon) {
-            TelephonyManager tm =
-                    (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
             if (mMobileVisible && !mIsAirplaneMode) {
                 mMobile.setImageResource(mMobileStrengthId);
                 Drawable mobileDrawable = mMobile.getDrawable();
@@ -656,6 +654,7 @@ public class SignalClusterView
                         ad.start();
                     }
                 }
+                mMobileType.setImageResource(mMobileTypeId);
 
                 mDataActivity.setImageResource(mDataActivityId);
                 Drawable dataActivityDrawable = mDataActivity.getDrawable();
@@ -678,6 +677,8 @@ public class SignalClusterView
                 mMobileIms.setImageResource(mMobileImsId);
                 mMobileEmbms.setImageResource(mMobileEmbmsId);
 
+                mDataNetworkTypeInRoaming.setImageResource(mDataNetworkTypeInRoamingId);
+
                 if (mStackedDataId != 0 && mStackedVoiceId != 0) {
                     mStackedData.setImageResource(mStackedDataId);
                     mStackedVoice.setImageResource(mStackedVoiceId);
@@ -690,18 +691,14 @@ public class SignalClusterView
                     mMobileStackedGroup.setVisibility(View.GONE);
                 }
 
-                boolean isShowRoamNetworkIcon =
-                        mContext.getResources().getBoolean(R.bool.show_roaming_and_network_icons);
-                isRoaming = (tm != null && tm.isNetworkRoaming(mSubId)) ? true : false;
-                if (isRoaming && isShowRoamNetworkIcon) {
-                    mMobileType.setImageDrawable(getContext().getResources().getDrawable(
-                            R.drawable.stat_sys_data_fully_connected_roam));
-                    mDataNetworkTypeInRoaming.setImageResource(mMobileTypeId);
-                } else if (isRoaming && !isShowRoamNetworkIcon) {
-                    mMobileType.setImageDrawable(getContext().getResources().getDrawable(
+                TelephonyManager tm =
+                        (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+                if (tm != null && tm.isNetworkRoaming(mSubId) &&
+                        (mContext.getResources().getBoolean(R.bool.show_roaming_and_network_icons))) {
+                    mRoaming.setImageDrawable(getContext().getResources().getDrawable(
                             R.drawable.stat_sys_data_fully_connected_roam));
                 } else {
-                    mMobileType.setImageResource(mMobileTypeId);
+                    mRoaming.setImageDrawable(null);
                 }
                 mMobileGroup.setContentDescription(mMobileTypeDescription
                         + " " + mMobileDescription);
@@ -721,12 +718,11 @@ public class SignalClusterView
             if (DEBUG) Log.d(TAG, String.format("mobile: %s sig=%d typ=%d",
                         (mMobileVisible ? "VISIBLE" : "GONE"), mMobileStrengthId, mMobileTypeId));
 
-            mMobileType.setVisibility(isRoaming ? View.VISIBLE : mMobileTypeId != 0 ? View.VISIBLE
-                    : View.GONE);
+            mMobileType.setVisibility(mMobileTypeId != 0 ? View.VISIBLE : View.GONE);
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);
             mMobileActivity.setVisibility(mMobileActivityId != 0 ? View.VISIBLE : View.GONE);
             mMobileIms.setVisibility(mMobileImsId != 0 ? View.VISIBLE : View.GONE);
-            mDataNetworkTypeInRoaming.setVisibility(mMobileTypeId != 0 && isRoaming ? View.VISIBLE
+            mDataNetworkTypeInRoaming.setVisibility(mDataNetworkTypeInRoamingId != 0 ? View.VISIBLE
                     : View.GONE);
             mMobileEmbms.setVisibility(mMobileEmbmsId != 0 ? View.VISIBLE : View.GONE);
             return mMobileVisible;

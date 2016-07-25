@@ -688,8 +688,6 @@ public class MobileSignalController extends SignalController<
         final int inet = mCurrentState.inetCondition;
         final boolean dataConnected = mCurrentState.dataConnected;
         final boolean roaming = isRoaming();
-        final boolean isShowRoamNetworkIcon = mContext.getResources().getBoolean(
-                    R.bool.show_roaming_and_network_icons);
         final int voiceType = getVoiceNetworkType();
         final int dataType =  getDataNetworkType();
         int[][] sbIcons = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH;
@@ -779,7 +777,9 @@ public class MobileSignalController extends SignalController<
             dataContentDesc = TelephonyIcons.getDataTypeDesc(slotId);
             qsDataTypeIcon = TelephonyIcons.getQSDataTypeIcon(slotId);
         }
-        if (roaming && !isShowRoamNetworkIcon) {
+        if (roaming && !mContext.getResources().getBoolean(
+                    R.bool.show_roaming_and_network_icons)) {
+            dataTypeIcon = TelephonyIcons.ROAMING_ICON;
             qsDataTypeIcon = TelephonyIcons.QS_DATA_R;
         }
         if (DEBUG) {
@@ -790,7 +790,7 @@ public class MobileSignalController extends SignalController<
         mCurrentState.iconGroup = new MobileIconGroup(
                 TelephonyManager.getNetworkTypeName(dataType),
                 sbIcons, qsIcons, contentDesc, 0, 0, sbDiscState, qsDiscState, discContentDesc,
-                dataContentDesc, dataTypeIcon, roaming && isShowRoamNetworkIcon , qsDataTypeIcon,
+                dataContentDesc, dataTypeIcon, false, qsDataTypeIcon,
                 singleSignalIcon, stackedDataIcon, stackedVoiceIcon, dataActivityId);
        }
 
