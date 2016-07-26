@@ -16,13 +16,11 @@
 
 package com.android.server.pm;
 import android.content.Context;
-import static android.content.pm.PackageManager.INSTALL_FAILED_INTERNAL_ERROR;
 import static android.content.pm.PackageManager.INSTALL_FAILED_INVALID_APK;
 
 import android.util.ArrayMap;
 
 import com.android.internal.R;
-import com.android.internal.content.NativeLibraryHelper;
 import com.android.server.pm.Settings.DatabaseVersion;
 import com.android.server.pm.Settings.VersionInfo;
 import android.app.ActivityManager;
@@ -33,19 +31,15 @@ import android.app.IActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
-import android.content.pm.IPackageScanOpt;
-import android.content.pm.IPackageScanOpt.PackageScanOptException;
 import android.content.pm.KeySet;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser.PackageLite;
-import android.content.pm.PackageParser.PackageParserException;
 import android.content.pm.PackageParser;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Environment.UserEnvironment;
-import android.os.Parcel;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.system.ErrnoException;
@@ -60,8 +54,6 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Pair;
-
-import dalvik.system.PathClassLoader;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -90,7 +82,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 
-import libcore.io.IoUtils;
 
 
 public class AutoPackageManagerService extends PackageManagerService {
@@ -103,68 +94,6 @@ public class AutoPackageManagerService extends PackageManagerService {
     private static ArraySet<String> mDataAppList;
     private static boolean mUseAppScanList = false;
     private static final String TAG = "AutoPackageManagerService";
-
-    private static final String OPTIMIZATION_JAR = "/system/framework/PackageScanOpt.jar";
-    private static final String OPTIMIZATION_CLASS
-            = "com.qualcomm.qti.packagescanopt.PackageScanOpt";
-    private static boolean mIsOptLoaded = false;
-    private static IPackageScanOpt iPkgOpt = null;
-
-    protected long recordPeroidT(final int num, final long lastMs) {
-        long ret = 0;
-        if (mIsOptLoaded) {
-            ret = iPkgOpt.recordPeroidT(num, lastMs);
-        }
-        return ret;
-    }
-
-    protected void dumpPeroidT() {
-        if (mIsOptLoaded) {
-            iPkgOpt.dumpPeroidT();
-        }
-    }
-
-    protected PackageParser.Package parsePackage(PackageParser pp,
-            File scanFile, int parseFlags, int scanFlags)
-        throws PackageParserException {
-        PackageParser.Package pkg = null;
-        if (mIsOptLoaded) {
-            try {
-                pkg = iPkgOpt.optParsePackage(pp, scanFile, parseFlags, scanFlags);
-            } catch (PackageScanOptException ex) {
-                pkg = super.parsePackage(pp, scanFile, parseFlags, scanFlags);
-            }
-        } else {
-            pkg = super.parsePackage(pp, scanFile, parseFlags, scanFlags);
-        }
-        return pkg;
-    }
-
-    @Override
-    public void derivePackageAbi(PackageParser.Package pkg, File scanFile,
-            String cpuAbiOverride, boolean extractLibs)
-        throws PackageManagerException {
-        boolean needCheckNativeLib = true;
-        IPackageScanOpt.PkgAbiInfo pkgAbiInfo = new IPackageScanOpt.PkgAbiInfo();
-
-        if (mIsOptLoaded) {
-            needCheckNativeLib = iPkgOpt.readNativeInfo(pkg, pkgAbiInfo);
-            derivePackageAbi(pkg, scanFile, cpuAbiOverride, extractLibs,
-                    needCheckNativeLib,
-                    pkgAbiInfo.primaryCpuAbi, pkgAbiInfo.secondaryCpuAbi);
-            if (needCheckNativeLib) {
-                iPkgOpt.writeNativeInfo(pkg, scanFile);
-            }
-        } else {
-            derivePackageAbi(pkg, scanFile, cpuAbiOverride, extractLibs, true, null, null);
-        }
-    }
-
-    public void cleanUselessPkgInfo() {
-        if (mIsOptLoaded) {
-            iPkgOpt.cleanUselessPkgInfo();
-        }
-    }
 
     public static class AutoPackageManagerLoader {
         private static AutoSQLiteHelper mAutoDb;
@@ -256,196 +185,6 @@ public class AutoPackageManagerService extends PackageManagerService {
                 }
             }
         }
-
-        public static void loadScanOpt() {
-            if (mIsOptLoaded == false) {
-                try {
-                    Class optClass;
-                    PathClassLoader optClassLoader;
-
-                    optClassLoader = new PathClassLoader(OPTIMIZATION_JAR,
-                            ClassLoader.getSystemClassLoader());
-
-                    if (optClassLoader != null) {
-                        optClass = optClassLoader.loadClass(OPTIMIZATION_CLASS);
-                        Constructor<? extends IPackageScanOpt> mConstructor =
-                                optClass.getConstructor();
-                        if (mConstructor != null) {
-                            iPkgOpt = mConstructor.newInstance();
-                        }
-                        if (iPkgOpt != null) {
-                            mIsOptLoaded = true;
-                        }
-                    }
-                } catch (ClassNotFoundException | InstantiationException
-                        | IllegalAccessException | NoSuchMethodException
-                        | InvocationTargetException ex) {
-                    // Any Exception hint that ScanOpt load failed.
-                    Log.w(TAG, "Load Optimization PMS failed: " + ex.getMessage());
-                }
-            }
-        }
-    }
-
-    /**
-     * Derive the ABI of a non-system package located at {@code scanFile}. This information
-     * is derived purely on the basis of the contents of {@code scanFile} and
-     * {@code cpuAbiOverride}.
-     *
-     * If {@code extractLibs} is true, native libraries are extracted from the app if required.
-     */
-    public void derivePackageAbi(PackageParser.Package pkg, File scanFile,
-            String cpuAbiOverride, boolean extractLibs,
-            boolean needCheckNativeLib,
-            String primaryCpuAbi, String secondaryCpuAbi)
-        throws PackageManagerException {
-        // TODO: We can probably be smarter about this stuff. For installed apps,
-        // we can calculate this information at install time once and for all. For
-        // system apps, we can probably assume that this information doesn't change
-        // after the first boot scan. As things stand, we do lots of unnecessary work.
-
-        // Give ourselves some initial paths; we'll come back for another
-        // pass once we've determined ABI below.
-        setNativeLibraryPaths(pkg);
-
-        // We would never need to extract libs for forward-locked and external packages,
-        // since the container service will do it for us. We shouldn't attempt to
-        // extract libs from system app when it was not updated.
-        if (pkg.isForwardLocked() || pkg.applicationInfo.isExternalAsec() ||
-                ((pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0 &&
-                 !pkg.isUpdatedSystemApp())) {
-            extractLibs = false;
-        }
-
-        final String nativeLibraryRootStr = pkg.applicationInfo.nativeLibraryRootDir;
-        final boolean useIsaSpecificSubdirs = pkg.applicationInfo.nativeLibraryRootRequiresIsa;
-
-        if (needCheckNativeLib) {
-            NativeLibraryHelper.Handle handle = null;
-            try {
-                handle = NativeLibraryHelper.Handle.create(scanFile);
-                // TODO(multiArch): This can be null for apps that didn't go through the
-                // usual installation process. We can calculate it again, like we
-                // do during install time.
-                //
-                // TODO(multiArch): Why do we need to rescan ASEC apps again ? It seems totally
-                // unnecessary.
-                final File nativeLibraryRoot = new File(nativeLibraryRootStr);
-
-                // Null out the abis so that they can be recalculated.
-                pkg.applicationInfo.primaryCpuAbi = null;
-                pkg.applicationInfo.secondaryCpuAbi = null;
-                if ((pkg.applicationInfo.flags & ApplicationInfo.FLAG_MULTIARCH) != 0) {
-                    // Warn if we've set an abiOverride for multi-lib packages..
-                    // By definition, we need to copy both 32 and 64 bit libraries for
-                    // such packages.
-                    if (pkg.cpuAbiOverride != null
-                            && !NativeLibraryHelper.CLEAR_ABI_OVERRIDE.equals(pkg.cpuAbiOverride)) {
-                        Slog.w(TAG, "Ignoring abiOverride for multi arch application.");
-                    }
-
-                    int abi32 = PackageManager.NO_NATIVE_LIBRARIES;
-                    int abi64 = PackageManager.NO_NATIVE_LIBRARIES;
-                    if (Build.SUPPORTED_32_BIT_ABIS.length > 0) {
-                        if (extractLibs) {
-                            abi32 = NativeLibraryHelper.copyNativeBinariesForSupportedAbi(handle,
-                                    nativeLibraryRoot, Build.SUPPORTED_32_BIT_ABIS,
-                                    useIsaSpecificSubdirs);
-                        } else {
-                            abi32 = NativeLibraryHelper.findSupportedAbi(handle,
-                                    Build.SUPPORTED_32_BIT_ABIS);
-                        }
-                    }
-
-                    if (abi32 < 0) {
-                        if (abi32 != PackageManager.NO_NATIVE_LIBRARIES &&
-                                abi32 != PackageManager.INSTALL_FAILED_NO_MATCHING_ABIS) {
-                            throw new PackageManagerException(abi32,
-                                    "Error unpackaging 32 bit native libs for multiarch app.");
-                        }
-                    }
-
-                    if (Build.SUPPORTED_64_BIT_ABIS.length > 0) {
-                        if (extractLibs) {
-                            abi64 = NativeLibraryHelper.copyNativeBinariesForSupportedAbi(handle,
-                                    nativeLibraryRoot, Build.SUPPORTED_64_BIT_ABIS,
-                                    useIsaSpecificSubdirs);
-                        } else {
-                            abi64 = NativeLibraryHelper.findSupportedAbi(handle,
-                                    Build.SUPPORTED_64_BIT_ABIS);
-                        }
-                    }
-
-                    if (abi64 < 0) {
-                        if (abi64 != PackageManager.NO_NATIVE_LIBRARIES &&
-                                abi64 != PackageManager.INSTALL_FAILED_NO_MATCHING_ABIS) {
-                            throw new PackageManagerException(abi64,
-                                    "Error unpackaging 64 bit native libs for multiarch app.");
-                        }
-                    }
-
-                    if (abi64 >= 0) {
-                        pkg.applicationInfo.primaryCpuAbi = Build.SUPPORTED_64_BIT_ABIS[abi64];
-                    }
-
-                    if (abi32 >= 0) {
-                        final String abi = Build.SUPPORTED_32_BIT_ABIS[abi32];
-                        if (abi64 >= 0) {
-                            pkg.applicationInfo.secondaryCpuAbi = abi;
-                        } else {
-                            pkg.applicationInfo.primaryCpuAbi = abi;
-                        }
-                    }
-                } else {
-                    String[] abiList = (cpuAbiOverride != null) ?
-                            new String[] { cpuAbiOverride } : Build.SUPPORTED_ABIS;
-
-                    // Enable gross and lame hacks for apps that are built with old
-                    // SDK tools. We must scan their APKs for renderscript bitcode and
-                    // not launch them if it's present. Don't bother checking on devices
-                    // that don't have 64 bit support.
-                    boolean needsRenderScriptOverride = false;
-                    if (Build.SUPPORTED_64_BIT_ABIS.length > 0 && cpuAbiOverride == null &&
-                            NativeLibraryHelper.hasRenderscriptBitcode(handle)) {
-                        abiList = Build.SUPPORTED_32_BIT_ABIS;
-                        needsRenderScriptOverride = true;
-                    }
-
-                    final int copyRet;
-                    if (extractLibs) {
-                        copyRet = NativeLibraryHelper.copyNativeBinariesForSupportedAbi(handle,
-                                nativeLibraryRoot, abiList, useIsaSpecificSubdirs);
-                    } else {
-                        copyRet = NativeLibraryHelper.findSupportedAbi(handle, abiList);
-                    }
-
-                    if (copyRet < 0 && copyRet != PackageManager.NO_NATIVE_LIBRARIES) {
-                        throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
-                                "Error unpackaging native libs for app, errorCode=" + copyRet);
-                    }
-
-                    if (copyRet >= 0) {
-                        pkg.applicationInfo.primaryCpuAbi = abiList[copyRet];
-                    } else if (copyRet == PackageManager.NO_NATIVE_LIBRARIES
-                            && cpuAbiOverride != null) {
-                        pkg.applicationInfo.primaryCpuAbi = cpuAbiOverride;
-                    } else if (needsRenderScriptOverride) {
-                        pkg.applicationInfo.primaryCpuAbi = abiList[0];
-                    }
-                }
-            } catch (IOException ioe) {
-                Slog.e(TAG, "Unable to get canonical file " + ioe.toString());
-            } finally {
-                IoUtils.closeQuietly(handle);
-            }
-        } else {
-            pkg.applicationInfo.primaryCpuAbi = primaryCpuAbi;
-            pkg.applicationInfo.secondaryCpuAbi = secondaryCpuAbi;
-        }
-
-        // Now that we've calculated the ABIs and determined if it's an internal app,
-        // we will go ahead and populate the nativeLibraryPath.
-        setNativeLibraryPaths(pkg);
     }
 
     public  final boolean isPackageFilename(String name) {
@@ -564,8 +303,6 @@ public class AutoPackageManagerService extends PackageManagerService {
     }
 
     public void startLaterScanApkThread() {
-        dumpPeroidT();
-
         if (!mUseAppScanList) return;
         final int scanFlags = SCAN_NO_PATHS | SCAN_DEFER_DEX | SCAN_BOOTING | SCAN_INITIAL;
         Slog.i(TAG, " ********** LaterscanApp ****************");
@@ -576,7 +313,6 @@ public class AutoPackageManagerService extends PackageManagerService {
                 synchronized (mInstallLock) {
                     // writer
                     int scanMode =  SCAN_NO_PATHS | SCAN_DEFER_DEX;
-
                     laterScanDir(mPrivilegedAppDir, mPrivAppList,
                             PackageParser.PARSE_IS_SYSTEM
                             | PackageParser.PARSE_IS_SYSTEM_DIR
@@ -855,8 +591,6 @@ public class AutoPackageManagerService extends PackageManagerService {
                 mPrivAppList = null;
                 mVendorAppList = null;
                 mDataAppList = null;
-
-                cleanUselessPkgInfo();
             };
         }.start();
     }
