@@ -28,7 +28,7 @@
  */
 
 package android.util;
-
+import android.content.res.Resources;
 import android.util.Log;
 import dalvik.system.PathClassLoader;
 import java.lang.reflect.Constructor;
@@ -52,14 +52,16 @@ public class BoostFramework {
     private static Method mIOPStart = null;
     private static Method mIOPStop  = null;
     private static Constructor<Class> mConstructor = null;
+    private static boolean mIsCpuBoostEnabled = Resources.getSystem()
+                .getBoolean(com.android.internal.R.bool.config_enableCpuBoostForScroller);
+
 
 /** @hide */
     private Object mPerf = null;
 
 /** @hide */
     public BoostFramework() {
-
-        if (mIsLoaded == false) {
+        if (mIsLoaded == false && mIsCpuBoostEnabled == true) {
             try {
                 Class perfClass;
                 PathClassLoader perfClassLoader;
@@ -75,7 +77,7 @@ public class BoostFramework {
                     Log.v(TAG,"mAcquireFunc method = " + mAcquireFunc);
 
                     argClasses = new Class[] {};
-                    mReleaseFunc =  perfClass.getDeclaredMethod("perfLockRelease", argClasses);
+                    mReleaseFunc = perfClass.getDeclaredMethod("perfLockRelease", argClasses);
                     Log.v(TAG,"mReleaseFunc method = " + mReleaseFunc);
 
                     argClasses = new Class[] {MotionEvent.class, DisplayMetrics.class,
@@ -94,8 +96,7 @@ public class BoostFramework {
 
                     mIsLoaded = true;
                 }
-            }
-            catch(Exception e) {
+            } catch(Exception e) {
                 Log.e(TAG,"BoostFramework() : Exception_1 = " + e);
             }
         }
@@ -104,11 +105,9 @@ public class BoostFramework {
             if (mConstructor != null) {
                 mPerf = mConstructor.newInstance();
             }
-        }
-        catch(Exception e) {
+        } catch(Exception e) {
             Log.e(TAG,"BoostFramework() : Exception_2 = " + e);
         }
-
         Log.v(TAG,"BoostFramework() : mPerf = " + mPerf);
     }
 
