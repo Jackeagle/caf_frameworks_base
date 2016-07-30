@@ -1802,6 +1802,9 @@ public class PackageManagerService extends IPackageManager.Stub {
                         Method method = inner[0].getMethod("loadAppScanList",
                                 noparams);
                         method.invoke(obj, null);
+                        method = inner[0].getMethod("loadScanOpt",
+                                noparams);
+                        method.invoke(obj, null);
                         Constructor constructor = c.getDeclaredConstructor(
                                 Context.class, Installer.class, boolean.class,
                                 boolean.class);
@@ -5804,6 +5807,12 @@ public class PackageManagerService extends IPackageManager.Stub {
         }
     }
 
+    protected PackageParser.Package parsePackage(PackageParser pp,
+            File scanFile, int parseFlags, int scanFlags)
+        throws PackageParserException {
+        return pp.parsePackage(scanFile, parseFlags);
+    }
+
     /*
      *  Scan a package and return the newly parsed package.
      *  Returns null in case of errors and the error code is stored in mLastScanError
@@ -5823,7 +5832,7 @@ public class PackageManagerService extends IPackageManager.Stub {
 
         final PackageParser.Package pkg;
         try {
-            pkg = pp.parsePackage(scanFile, parseFlags);
+            pkg = parsePackage(pp, scanFile, parseFlags, scanFlags);
         } catch (PackageParserException e) {
             throw PackageManagerException.from(e);
         }
@@ -7152,7 +7161,8 @@ public class PackageManagerService extends IPackageManager.Stub {
                     pkg, forceDex, (scanFlags & SCAN_DEFER_DEX) != 0, true /* boot complete */);
         }
 
-        if ((scanFlags & SCAN_NO_DEX) == 0) {
+        if ((pkg.readParcel == null || pkg.readParcel.dataPosition() == 0)
+                && (scanFlags & SCAN_NO_DEX) == 0) {
             int result = mPackageDexOptimizer.performDexOpt(pkg, null /* instruction sets */,
                     forceDex, (scanFlags & SCAN_DEFER_DEX) != 0, false /* inclDependencies */,
                     (scanFlags & SCAN_BOOTING) == 0);
@@ -7160,6 +7170,9 @@ public class PackageManagerService extends IPackageManager.Stub {
                 throw new PackageManagerException(INSTALL_FAILED_DEXOPT, "scanPackageLI");
             }
         }
+        /* Free readParcel & writeParcel from Parcel Pool. Otherwise, always be with pkg instance */
+        pkg.readParcel = null;
+        pkg.writeParcel = null;
         if (mFactoryTest && pkg.requestedPermissions.contains(
                 android.Manifest.permission.FACTORY_TEST)) {
             pkg.applicationInfo.flags |= ApplicationInfo.FLAG_FACTORY_TEST;
@@ -7914,7 +7927,7 @@ public class PackageManagerService extends IPackageManager.Stub {
      * Derive and set the location of native libraries for the given package,
      * which varies depending on where and how the package was installed.
      */
-    private void setNativeLibraryPaths(PackageParser.Package pkg) {
+    protected void setNativeLibraryPaths(PackageParser.Package pkg) {
         final ApplicationInfo info = pkg.applicationInfo;
         final String codePath = pkg.codePath;
         final File codeFile = new File(codePath);

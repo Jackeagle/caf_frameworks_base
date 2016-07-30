@@ -38,6 +38,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileUtils;
+import android.os.Parcel;
 import android.os.PatternMatcher;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -4253,6 +4254,16 @@ public class PackageParser {
      */
     public final static class Package {
 
+        /**
+         * Store Parcel data of Packge class instance.
+         * {@hide}
+         */
+        public Parcel readParcel = null;
+        /**
+         * @hide
+         */
+        public Parcel writeParcel = null;
+
         public String packageName;
 
         /** Names of any split APKs, ordered by parsed splitName */
@@ -4292,7 +4303,7 @@ public class PackageParser {
         public boolean baseHardwareAccelerated;
 
         // For now we only support one application per package.
-        public final ApplicationInfo applicationInfo = new ApplicationInfo();
+        public ApplicationInfo applicationInfo = new ApplicationInfo();
 
         public final ArrayList<Permission> permissions = new ArrayList<Permission>(0);
         public final ArrayList<PermissionGroup> permissionGroups = new ArrayList<PermissionGroup>(0);
@@ -4552,6 +4563,14 @@ public class PackageParser {
             owner = _owner;
             intents = null;
             className = null;
+        }
+
+        //this construct is only used for parceling as we do not want to parse
+        //ParseComponentArgs
+        public Component(Package _owner, String _className, ArrayList<II> _intents) {
+            owner = _owner;
+            className = _className;
+            intents = _intents;
         }
 
         public Component(final ParsePackageItemArgs args, final PackageItemInfo outInfo) {
@@ -4860,6 +4879,13 @@ public class PackageParser {
     public final static class Activity extends Component<ActivityIntentInfo> {
         public final ActivityInfo info;
 
+        public Activity(final ActivityInfo _info, ApplicationInfo ai,
+                Package owner, String className, ArrayList<ActivityIntentInfo> intents) {
+            super(owner, className, intents);
+            info = _info;
+            info.applicationInfo = ai;
+        }
+
         public Activity(final ParseComponentArgs args, final ActivityInfo _info) {
             super(args, _info);
             info = _info;
@@ -4919,6 +4945,13 @@ public class PackageParser {
             info = _info;
             info.applicationInfo = args.owner.applicationInfo;
         }
+
+        public Service(final ServiceInfo _info, ApplicationInfo ai,
+                Package owner, String className, ArrayList<ServiceIntentInfo> intents) {
+            super(owner, className, intents);
+            info = _info;
+            info.applicationInfo = ai;
+        }
         
         public void setPackageName(String packageName) {
             super.setPackageName(packageName);
@@ -4960,6 +4993,14 @@ public class PackageParser {
             super(args, _info);
             info = _info;
             info.applicationInfo = args.owner.applicationInfo;
+            syncable = false;
+        }
+
+        public Provider(final ProviderInfo _info, ApplicationInfo ai,
+                Package owner, String className, ArrayList<ProviderIntentInfo> intents) {
+            super(owner, className, intents);
+            info = _info;
+            info.applicationInfo = ai;
             syncable = false;
         }
         
@@ -5011,6 +5052,11 @@ public class PackageParser {
 
         public Instrumentation(final ParsePackageItemArgs args, final InstrumentationInfo _info) {
             super(args, _info);
+            info = _info;
+        }
+
+        public Instrumentation(final InstrumentationInfo _info, Package owner, String className) {
+            super(owner, className, null);
             info = _info;
         }
         
