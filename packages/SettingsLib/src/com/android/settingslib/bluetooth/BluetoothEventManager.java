@@ -123,6 +123,12 @@ public final class BluetoothEventManager {
         registerProfileIntentReceiver();
     }
 
+    public void setDefaultReceiverHandler() {
+        mContext.unregisterReceiver(mBroadcastReceiver);
+        mContext.registerReceiver(mBroadcastReceiver, mAdapterIntentFilter, null, mReceiverHandler);
+        registerProfileIntentReceiver();
+    }
+
     // set bluetooth default name
     private void setDefaultBtName() {
         String name = mContext.getResources().getString(
