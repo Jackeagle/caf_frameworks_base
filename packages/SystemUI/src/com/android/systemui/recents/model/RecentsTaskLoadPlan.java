@@ -92,6 +92,7 @@ public class RecentsTaskLoadPlan {
      */
     synchronized void preloadPlan(RecentsTaskLoader loader, boolean isTopTaskHome) {
         if (DEBUG) Log.d(TAG, "preloadPlan");
+        RecentsConfiguration.reinitialize(mContext, mSystemServicesProxy);
 
         // This activity info cache will be used for both preloadPlan() and executePlan()
         mActivityInfoCache.clear();
