@@ -57,6 +57,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
+import android.os.SystemProperties;
 
 class BluetoothManagerService extends IBluetoothManager.Stub {
     private static final String TAG = "BluetoothManagerService";
@@ -299,6 +300,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         Settings.Global.putInt(mContext.getContentResolver(),
                                Settings.Global.BLUETOOTH_ON,
                                value);
+        SystemProperties.set("persist.bluetooth.state", Integer.toString(value));
     }
 
     /**
