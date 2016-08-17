@@ -548,7 +548,10 @@ public class AutoPackageManagerService extends PackageManagerService {
                     pkg = scanPackageLI(file.getParentFile(), 0,
                                 scanMode | SCAN_REQUIRE_KNOWN, 0, null);
                 }
-                if (null != pkg) pkgList.add(pkg.packageName);
+                if (null != pkg) {
+                    pkgList.add(pkg.packageName);
+                    updateSharedLibrariesLPw(pkg, null);
+                }
             } catch (PackageManagerException e) {
                 // Don't mess around with apps in system partition.
                 if (pkg == null && (flags & PackageParser.PARSE_IS_SYSTEM) == 0 &&
@@ -717,7 +720,11 @@ public class AutoPackageManagerService extends PackageManagerService {
                                 mSettings.enableSystemPackageLPw(packageName);
 
                                 try {
-                                    scanPackageLI(scanFile, reparseFlags, scanFlags, 0, null);
+                                    PackageParser.Package pkg = scanPackageLI(scanFile,
+                                        reparseFlags, scanFlags, 0, null);
+                                    if (null != pkg) {
+                                        updateSharedLibrariesLPw(pkg, null);
+                                    }
                                 } catch (PackageManagerException e) {
                                     Slog.e(TAG, "Failed to parse original system package: "
                                             + e.getMessage());
@@ -729,7 +736,7 @@ public class AutoPackageManagerService extends PackageManagerService {
 
                     // Now that we know all of the shared libraries, update all clients to have
                     // the correct library paths.
-                    updateAllSharedLibrariesLPw();
+                    //updateAllSharedLibrariesLPw();
                     executeAdjustCpuAbisForSharedUserLPw();
 
                     // Now that we know all the packages we are keeping,

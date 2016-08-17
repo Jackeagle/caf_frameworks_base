@@ -6452,7 +6452,7 @@ public class PackageManagerService extends IPackageManager.Stub {
         }
     }
 
-    private void updateSharedLibrariesLPw(PackageParser.Package pkg,
+    protected void updateSharedLibrariesLPw(PackageParser.Package pkg,
             PackageParser.Package changingLib) throws PackageManagerException {
         if (pkg.usesLibraries != null || pkg.usesOptionalLibraries != null) {
             final ArraySet<String> usesLibraryFiles = new ArraySet<>();
