@@ -21,6 +21,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.TypedArray;
+import android.provider.Settings;
 import android.text.format.DateFormat;
 import android.util.AttributeSet;
 import android.widget.TextView;
@@ -114,10 +115,10 @@ public class DateView extends TextView {
     }
 
     private String getDateFormat() {
-        if (getContext().getResources().getBoolean(
-                com.android.internal.R.bool.config_dateformat)
-                ) {
-            return DateFormat.getDateFormat(getContext()).format(mCurrentTime);
+        if (getContext().getResources().getBoolean(com.android.internal.R.bool.config_dateformat)) {
+            String dateformat = Settings.System.getString(getContext().getContentResolver(),
+                    Settings.System.DATE_FORMAT);
+            return DateFormat.format(dateformat, mCurrentTime).toString();
         } else {
             return mDateFormat.format(mCurrentTime);
         }
