@@ -164,6 +164,8 @@ public class CallLog {
         public static final int MISSED_TYPE = 3;
         /** Call log type for voicemails. */
         public static final int VOICEMAIL_TYPE = 4;
+        /** Call log type for IMS missed calls. */
+        private static final int MISSED_IMS_TYPE = 7;
 
         /**
          * Bit-mask describing features of the call (e.g. video).
@@ -548,7 +550,7 @@ public class CallLog {
             values.put(PHONE_ACCOUNT_ADDRESS, accountAddress);
             values.put(NEW, Integer.valueOf(1));
 
-            if (callType == MISSED_TYPE) {
+            if (callType == MISSED_TYPE || callType == MISSED_IMS_TYPE) {
                 values.put(IS_READ, Integer.valueOf(is_read ? 1 : 0));
             }
 
