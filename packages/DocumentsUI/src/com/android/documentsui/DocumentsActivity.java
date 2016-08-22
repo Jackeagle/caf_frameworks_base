@@ -525,14 +525,23 @@ public class DocumentsActivity extends BaseActivity {
         }
 
         final int size = mState.stack.size();
+
         if (size > 1) {
             mState.stack.pop();
             onCurrentDirectoryChanged(ANIM_UP);
         } else if (size == 1 && !isRootsDrawerOpen()) {
             // TODO: open root drawer once we can capture back key
-            super.onBackPressed();
+            try {
+                super.onBackPressed();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "onBackPressed catch IllegalStateException: " + e);
+            }
         } else {
-            super.onBackPressed();
+            try {
+                super.onBackPressed();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "onBackPressed 2 catch IllegalStateException: " + e);
+            }
         }
     }
 
