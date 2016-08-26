@@ -67,12 +67,13 @@ public:
     static inline void zipTimeToTimespec(uint32_t when, struct tm* timespec) {
         const uint32_t date = when >> 16;
         timespec->tm_year = ((date >> 9) & 0x7F) + 80; // Zip is years since 1980
-        timespec->tm_mon = (date >> 5) & 0x0F;
+        timespec->tm_mon = ((date >> 5) & 0x0F) - 1;
         timespec->tm_mday = date & 0x1F;
 
         timespec->tm_hour = (when >> 11) & 0x1F;
         timespec->tm_min = (when >> 5) & 0x3F;
         timespec->tm_sec = (when & 0x1F) << 1;
+        timespec->tm_isdst = -1;
     }
 private:
     ZipUtils() {}
