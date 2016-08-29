@@ -118,9 +118,8 @@ public class DateView extends TextView {
         if (getContext().getResources().getBoolean(com.android.internal.R.bool.config_dateformat)) {
             String dateformat = Settings.System.getString(getContext().getContentResolver(),
                     Settings.System.DATE_FORMAT);
-            return DateFormat.format(dateformat, mCurrentTime).toString();
-        } else {
-            return mDateFormat.format(mCurrentTime);
+            if (dateformat != null) return DateFormat.format(dateformat, mCurrentTime).toString();
         }
+        return mDateFormat.format(mCurrentTime);
     }
 }
