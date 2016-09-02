@@ -61,4 +61,5 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <string name="def_wifi_direct_name" translatable="false"></string>
     <!-- custom date format or not  -->
     <bool name="config_dateformat">false</bool>
+    <bool name="config_usb_data_unlock">false</bool>
 </resources>
