@@ -201,6 +201,7 @@ public:
     PathTexture* getArc(float width, float height, float startAngle, float sweepAngle,
             bool useCenter, const SkPaint* paint);
     PathTexture* get(const SkPath* path, const SkPaint* paint);
+    void         remove(const SkPath* path, const SkPaint* paint);
 
     /**
      * Removes the specified path. This is meant to be called from threads
@@ -304,6 +305,12 @@ private:
     GLuint mMaxTextureSize;
 
     bool mDebugEnabled;
+
+    /**
+     * Driver allocated 4k/8k/16k memory for small path cache,
+     * limit the number of PathTexture in case occupy too much memory in hardware.
+     */
+    uint32_t mTexNum;
 
     sp<PathProcessor> mProcessor;
 
