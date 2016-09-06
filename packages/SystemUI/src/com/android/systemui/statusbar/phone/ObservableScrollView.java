@@ -71,7 +71,12 @@ public class ObservableScrollView extends ScrollView {
         mHandlingTouchEvent = true;
         mLastX = ev.getX();
         mLastY = ev.getY();
-        boolean result = super.onTouchEvent(ev);
+        boolean result = false;
+        try{
+            result = super.onTouchEvent(ev);
+        } catch(IllegalArgumentException ex) {
+            ex.printStackTrace();
+        }
         mHandlingTouchEvent = false;
         return result;
     }
