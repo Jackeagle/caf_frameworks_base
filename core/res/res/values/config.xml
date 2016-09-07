@@ -2393,6 +2393,7 @@
         <item>CMCC</item>
         <item>CHN-UNICOM</item>
         <item>China Mobile</item>
+        <item>China Mobile (HD)</item>
         <item>China Unicom</item>
         <item>China Telecom</item>
         <item>中国移动</item>
@@ -2409,9 +2410,10 @@
         <item>China_Mobile</item>
         <item>China_Unicom</item>
         <item>China_Mobile</item>
+        <item>China_Mobile_HD</item>
         <item>China_Unicom</item>
         <item>China_Telecom</item>
-       <item>China_Mobile</item>
+        <item>China_Mobile</item>
         <item>China_Unicom</item>
         <item>China_Telecom</item>
         <item>China_Mobile</item>
