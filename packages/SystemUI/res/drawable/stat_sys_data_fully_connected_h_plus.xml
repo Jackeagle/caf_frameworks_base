@@ -28,10 +28,10 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="15dp"
-    android:height="13.5dp"
-    android:viewportWidth="30"
-    android:viewportHeight="27">
+    android:width="11dp"
+    android:height="18.5dp"
+    android:viewportWidth="23"
+    android:viewportHeight="35">
 
     <path
         android:fillColor="#FFFFFF"
