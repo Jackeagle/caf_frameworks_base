@@ -62,6 +62,21 @@ public class NetPluginDelegate {
         if (LOGV) Slog.v(TAG, "getTetherStats() X");
     }
 
+    public static NetworkStats peekTetherStats() {
+        if (LOGV) Slog.v(TAG, "peekTetherStats() E");
+        NetworkStats ret_val = null;
+        if(!loadTetherExtJar()) return ret_val;
+        try {
+            ret_val = (NetworkStats) tetherExtensionClass.getMethod("peekTetherStats")
+                    .invoke(tetherExtensionObj);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Log.w(TAG, "error in invoke method");
+        }
+        if (LOGV) Slog.v(TAG, "peekTetherStats() X");
+        return ret_val;
+    }
+
     public static void setQuota(String iface, long quota) {
         if (LOGV) Slog.v(TAG, "setQuota(" + iface + ", " + quota + ") E");
         if(!loadTetherExtJar()) return;
