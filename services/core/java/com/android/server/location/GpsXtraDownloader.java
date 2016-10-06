@@ -29,6 +29,8 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.params.ConnRouteParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.client.params.HttpClientParams;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -125,6 +127,11 @@ public class GpsXtraDownloader {
             if (DEBUG) Log.d(TAG, "XTRA user agent: " + mUserAgent);
             client = AndroidHttpClient.newInstance(mUserAgent);
             HttpUriRequest req = new HttpGet(url);
+
+            // enable redirect
+            if (DEBUG) Log.d(TAG, "Enable redirect");
+            HttpParams httpParams=client.getParams();
+            HttpClientParams.setRedirecting(httpParams, true);
 
             if (isProxySet) {
                 HttpHost proxy = new HttpHost(proxyHost, proxyPort);
