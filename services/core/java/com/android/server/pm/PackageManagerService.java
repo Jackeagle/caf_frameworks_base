@@ -440,6 +440,8 @@ public class PackageManagerService extends IPackageManager.Stub {
     final String[] mSeparateProcesses;
     boolean mIsUpgrade;
 
+    protected boolean mForceExecute;
+
     // This is where all application persistent data goes.
     final File mAppDataDir;
 
@@ -6796,7 +6798,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                 pkg.applicationInfo.flags |= ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
             }
 
-            if ((parseFlags&PackageParser.PARSE_IS_SYSTEM_DIR) == 0) {
+            if ((parseFlags&PackageParser.PARSE_IS_SYSTEM_DIR) == 0 || mForceExecute) {
                 // Check all shared libraries and map to their actual file path.
                 // We only do this here for apps not on a system dir, because those
                 // are the only ones that can fail an install due to this.  We

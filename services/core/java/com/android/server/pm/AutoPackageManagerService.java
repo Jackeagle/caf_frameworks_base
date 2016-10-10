@@ -533,6 +533,7 @@ public class AutoPackageManagerService extends PackageManagerService {
             Slog.d(TAG, "later scan apk=" + file.getPath());
             PackageParser.Package pkg = null;
             try {
+                mForceExecute = true;
                 if(file.getPath().contains("system/priv-app")) {
                     pkg = scanPackageLI(file.getParentFile(),
                             PackageParser.PARSE_IS_SYSTEM
@@ -548,11 +549,13 @@ public class AutoPackageManagerService extends PackageManagerService {
                     pkg = scanPackageLI(file.getParentFile(), 0,
                                 scanMode | SCAN_REQUIRE_KNOWN, 0, null);
                 }
+                mForceExecute = false;
                 if (null != pkg) {
                     pkgList.add(pkg.packageName);
                     updateSharedLibrariesLPw(pkg, null);
                 }
             } catch (PackageManagerException e) {
+                mForceExecute = false;
                 // Don't mess around with apps in system partition.
                 if (pkg == null && (flags & PackageParser.PARSE_IS_SYSTEM) == 0 &&
                         mLastScanError == PackageManager.INSTALL_FAILED_INVALID_APK) {
