@@ -88,6 +88,7 @@ import android.app.ActivityManager;
 import android.app.ActivityManagerNative;
 import android.app.AppGlobals;
 import android.app.IActivityManager;
+import android.app.ResourcesManager;
 import android.app.admin.IDevicePolicyManager;
 import android.app.backup.IBackupManager;
 import android.app.usage.UsageStats;
@@ -216,6 +217,7 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FastXmlSerializer;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.Preconditions;
+import com.android.server.AttributeCache;
 import com.android.server.EventLogTags;
 import com.android.server.FgThread;
 import com.android.server.IntentResolver;
@@ -16088,14 +16090,28 @@ public class PackageManagerService extends IPackageManager.Stub {
                 } else {
                     Slog.w(TAG, "Failed to unload " + ps.codePath);
                 }
+
+                // Try very hard to release any references to this package
+                // so we don't risk the system server being killed due to
+                // open FDs
+                AttributeCache.instance().removePackage(ps.name);
             }
 
             mSettings.writeLPr();
         }
         }
 
+        // Try very hard to release any references to this path so we don't risk
+        // the system server being killed due to open FDs
+        ResourcesManager.getInstance().invalidatePath(vol.getPath().getAbsolutePath());
+
         if (DEBUG_INSTALL) Slog.d(TAG, "Unloaded packages " + unloaded);
         sendResourcesChangedBroadcast(false, false, unloaded, null);
+
+        for (int i = 0; i < 3; i++) {
+            System.gc();
+            System.runFinalization();
+        }
     }
 
     /**

@@ -50,6 +50,14 @@ public final class ResourcesKey {
         return !Configuration.EMPTY.equals(mOverrideConfiguration);
     }
 
+
+    public boolean isPathReferenced(String path) {
+        if (mResDir != null && mResDir.startsWith(path)) {
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public int hashCode() {
         return mHash;

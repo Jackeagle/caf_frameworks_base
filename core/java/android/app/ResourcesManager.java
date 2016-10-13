@@ -60,6 +60,25 @@ public class ResourcesManager {
         }
     }
 
+    public void invalidatePath(String path) {
+        synchronized (this) {
+            int count = 0;
+            for (int i = 0; i < mActiveResources.size();) {
+                final ResourcesKey key = mActiveResources.keyAt(i);
+                if (key.isPathReferenced(path)) {
+                    final Resources res = mActiveResources.removeAt(i).get();
+                    if (res != null) {
+                        res.flushLayoutCache();
+                    }
+                    count++;
+                } else {
+                    i++;
+                }
+            }
+            Log.d(TAG, "Invalidated " + count + " asset managers that referenced " + path);
+        }
+    }
+
     public Configuration getConfiguration() {
         return mResConfiguration;
     }
