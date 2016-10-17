@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
   Copyright (c) 2015, The Linux Foundation. All rights reserved.
 
@@ -28,15 +28,15 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="15dp"
-    android:height="13.5dp"
+    android:width="30dp"
+    android:height="27dp"
     android:viewportWidth="30"
     android:viewportHeight="27">
 
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M10.099,13.902H7.953V9.339H4.774v4.563H2.621V3.238h2.153v4.313h3.179V3.238h2.146V13.902z" />
+        android:pathData="M12.738,19.764H9.745v-6.248h-4.79v6.248H1.952V4.236h3.003v6.506h4.789V4.236h2.995L12.738,19.764L12.738,19.764z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M18.684,7.645h2.969v1.734h-2.969v3.383h-1.845V9.379h-2.984V7.645h2.984V4.48h1.845V7.645z" />
+        android:pathData="M18.05,11.204h1.998v1.694H18.05v2.291h-1.846v-2.291H14.2v-1.694h2.004V8.978h1.846V11.204z" />
 </vector>

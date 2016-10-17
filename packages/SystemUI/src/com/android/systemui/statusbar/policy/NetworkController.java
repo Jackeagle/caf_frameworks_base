@@ -58,7 +58,7 @@ public interface NetworkController {
                 int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
                 int mobileActivityId, int stackedDataIcon, int stackedVoiceIcon,
                 String typeContentDescription, String description, boolean isWide,
-                int subId, int imsIconId, boolean isImsOverWifi, int dataNetworkTypeInRoamingId,
+                int subId, boolean isMobileIms, boolean isImsOverWifi, int dataNetworkTypeId,
                 int embmsIconId);
     }
 

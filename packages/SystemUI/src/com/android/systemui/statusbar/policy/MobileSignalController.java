@@ -333,12 +333,11 @@ public class MobileSignalController extends SignalController<
         }
         showDataIcon &= (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT
                 || mStyle == STATUS_BAR_STYLE_EXTENDED);
-        int typeIcon = showDataIcon ? icons.mDataType : 0;
+        int typeIcon = 0;
         int dataActivityId = showMobileActivity() ? 0 : icons.mActivityId;
         int mobileActivityId = showMobileActivity() ? icons.mActivityId : 0;
-        int dataNetworkTypeInRoamingId = 0;
+        int dataNetworkTypeId = showDataIcon ? icons.mDataType : 0;
         if (mStyle == STATUS_BAR_STYLE_EXTENDED && isRoaming()) {
-            dataNetworkTypeInRoamingId = mCurrentState.dataConnected ? typeIcon : 0;
             typeIcon = TelephonyIcons.ROAMING_ICON;
             qsTypeIcon = mCurrentState.dataConnected ? qsTypeIcon : 0;
         }
@@ -346,10 +345,9 @@ public class MobileSignalController extends SignalController<
                 activityIn, activityOut, dataActivityId, mobileActivityId,
                 icons.mStackedDataIcon, icons.mStackedVoiceIcon,
                 dataContentDescription, description, icons.mIsWide,
-                mSubscriptionInfo.getSubscriptionId(), getImsIconId(),
-                isImsRegisteredInWifi(), dataNetworkTypeInRoamingId,
+                mSubscriptionInfo.getSubscriptionId(), isMobileIms(),
+                isImsRegisteredInWifi(), dataNetworkTypeId,
                 getEmbmsIconId());
-
         mCallbackHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -380,17 +378,27 @@ public class MobileSignalController extends SignalController<
         return false;
     }
 
-    private int getImsIconId() {
+    private boolean isMobileIms() {
         if (mStyle != STATUS_BAR_STYLE_EXTENDED || mServiceState == null ||
-                (mServiceState.getVoiceRegState() != ServiceState.STATE_IN_SERVICE) ||
-                isRoaming()) {
-            return 0;
+                (mServiceState.getVoiceRegState() != ServiceState.STATE_IN_SERVICE)) {
+            return false;
         }
-
-        if (mCurrentState.imsRadioTechnology == ServiceState.RIL_RADIO_TECHNOLOGY_LTE) {
-            return R.drawable.volte;
+        List<SubscriptionInfo> subInfos = SubscriptionManager.from(mContext)
+                        .getActiveSubscriptionInfoList();
+        if (subInfos != null) {
+            for (SubscriptionInfo subInfo: subInfos) {
+                int subId = subInfo.getSubscriptionId();
+                if (mPhone != null
+                        && (mPhone.isVolteAvailableUsingSubId(subId)
+                        || (mPhone.isVideoTelephonyAvailableUsingSubId(subId)
+                        && !(mPhone.isVideoTelephonyWifiCallingAvailableUsingSubId(subId))))){
+                    return true;
+                }
+            }
+        } else {
+            Log.e(mTag, "Invalid SubscriptionInfo");
         }
-        return 0;
+        return false;
     }
 
     private int getEmbmsIconId() {
