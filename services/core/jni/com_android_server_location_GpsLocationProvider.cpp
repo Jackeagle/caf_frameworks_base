@@ -638,9 +638,15 @@ static jint android_location_GpsLocationProvider_read_sv_status(
     mask[1] = sGpsSvStatus.almanac_mask;
     mask[2] = sGpsSvStatus.used_in_fix_mask;
 
-    gnssMask[0] = sGpsSvStatus.glo_used_in_fix_mask;
-    gnssMask[1] = sGpsSvStatus.bds_used_in_fix_mask;
-    gnssMask[2] = sGpsSvStatus.gal_used_in_fix_mask;
+    gnssMask[0] = sGpsSvStatus.glo_ephemeris_mask;
+    gnssMask[1] = sGpsSvStatus.glo_almanac_mask;
+    gnssMask[2] = sGpsSvStatus.glo_used_in_fix_mask;
+    gnssMask[3] = sGpsSvStatus.bds_ephemeris_mask;
+    gnssMask[4] = sGpsSvStatus.bds_almanac_mask;
+    gnssMask[5] = sGpsSvStatus.bds_used_in_fix_mask;
+    gnssMask[6] = sGpsSvStatus.gal_ephemeris_mask;
+    gnssMask[7] = sGpsSvStatus.gal_almanac_mask;
+    gnssMask[8] = sGpsSvStatus.gal_used_in_fix_mask;
 
     env->ReleaseIntArrayElements(prnArray, prns, 0);
     env->ReleaseFloatArrayElements(snrArray, snrs, 0);

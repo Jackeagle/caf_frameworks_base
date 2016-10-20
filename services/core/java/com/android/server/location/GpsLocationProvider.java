@@ -1485,7 +1485,13 @@ public class GpsLocationProvider implements LocationProviderInterface {
         if (VERBOSE) {
             Log.v(TAG, "SV count: " + svCount +
                     " ephemerisMask: " + Integer.toHexString(mSvMasks[EPHEMERIS_MASK]) +
-                    " almanacMask: " + Integer.toHexString(mSvMasks[ALMANAC_MASK]));
+                    " almanacMask: " + Integer.toHexString(mSvMasks[ALMANAC_MASK]) +
+                    " GLO ephemerisMask: " + Long.toHexString(mGnssSvMasks[GLONASS_EPHEMERIS_MASK]) +
+                    " GLO almanacMask: " + Long.toHexString(mGnssSvMasks[GLONASS_ALMANAC_MASK]) +
+                    " BDS ephemerisMask: " + Long.toHexString(mGnssSvMasks[BDS_EPHEMERIS_MASK]) +
+                    " BDS almanacMask: " + Long.toHexString(mGnssSvMasks[BDS_ALMANAC_MASK]) +
+                    " GAL ephemerisMask: " + Long.toHexString(mGnssSvMasks[GAL_EPHEMERIS_MASK]) +
+                    " GAL almanacMask: " + Long.toHexString(mGnssSvMasks[GAL_ALMANAC_MASK]));
             for (int i = 0; i < svCount; i++) {
                 if(mSvs[i] <= GPS_SV_PRN_MAX)
                 {
@@ -1501,6 +1507,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
                           " snr: " + mSnrs[i]/10 +
                           " elev: " + mSvElevations[i] +
                           " azimuth: " + mSvAzimuths[i] +
+                          ((mGnssSvMasks[GLONASS_EPHEMERIS_MASK] & (1 << (mSvs[i] - GLONASS_SV_PRN_MIN))) == 0 ? "  " : " E") +
+                          ((mGnssSvMasks[GLONASS_ALMANAC_MASK] & (1 << (mSvs[i] - GLONASS_SV_PRN_MIN))) == 0 ? "  " : " A") +
                           ((mGnssSvMasks[GLONASS_USED_FOR_FIX_MASK] & (1 << (mSvs[i] - GLONASS_SV_PRN_MIN))) == 0 ? "" : "U"));
 
                 } else if(mSvs[i] >= BDS_SV_PRN_MIN && mSvs[i] <= BDS_SV_PRN_MAX) {
@@ -1508,6 +1516,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
                           " snr: " + mSnrs[i]/10 +
                           " elev: " + mSvElevations[i] +
                           " azimuth: " + mSvAzimuths[i] +
+                          ((mGnssSvMasks[BDS_EPHEMERIS_MASK] & (1 << (mSvs[i] - BDS_SV_PRN_MIN))) == 0 ? "  " : " E") +
+                          ((mGnssSvMasks[BDS_ALMANAC_MASK] & (1 << (mSvs[i] - BDS_SV_PRN_MIN))) == 0 ? "  " : " A") +
                           ((mGnssSvMasks[BDS_USED_FOR_FIX_MASK] & (1 << (mSvs[i] - BDS_SV_PRN_MIN))) == 0 ? "" : "U"));
                 }
                 else if(mSvs[i] >= GAL_SV_PRN_MIN && mSvs[i] <= GAL_SV_PRN_MAX) {
@@ -1515,6 +1525,8 @@ public class GpsLocationProvider implements LocationProviderInterface {
                           " snr: " + mSnrs[i]/10 +
                           " elev: " + mSvElevations[i] +
                           " azimuth: " + mSvAzimuths[i] +
+                          ((mGnssSvMasks[GAL_EPHEMERIS_MASK] & (1 << (mSvs[i] - GAL_SV_PRN_MIN))) == 0 ? "  " : " E") +
+                          ((mGnssSvMasks[GAL_ALMANAC_MASK] & (1 << (mSvs[i] - GAL_SV_PRN_MIN))) == 0 ? "  " : " A") +
                           ((mGnssSvMasks[GAL_USED_FOR_FIX_MASK] & (1 << (mSvs[i] - GAL_SV_PRN_MIN))) == 0 ? "" : "U"));
                 }
             }
@@ -2265,9 +2277,15 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private static final int EPHEMERIS_MASK = 0;
     private static final int ALMANAC_MASK = 1;
     private static final int USED_FOR_FIX_MASK = 2;
-    private static final int GLONASS_USED_FOR_FIX_MASK = 0;
-    private static final int BDS_USED_FOR_FIX_MASK = 1;
-    private static final int GAL_USED_FOR_FIX_MASK = 2;
+    private static final int GLONASS_EPHEMERIS_MASK = 0;
+    private static final int GLONASS_ALMANAC_MASK = 1;
+    private static final int GLONASS_USED_FOR_FIX_MASK = 2;
+    private static final int BDS_EPHEMERIS_MASK = 3;
+    private static final int BDS_ALMANAC_MASK = 4;
+    private static final int BDS_USED_FOR_FIX_MASK = 5;
+    private static final int GAL_EPHEMERIS_MASK = 6;
+    private static final int GAL_ALMANAC_MASK = 7;
+    private static final int GAL_USED_FOR_FIX_MASK = 8;
     private static final int GPS_SV_PRN_MIN = 1;
     private static final int GPS_SV_PRN_MAX = 32;
     private static final int GLONASS_SV_PRN_MIN = 65;
@@ -2283,7 +2301,7 @@ public class GpsLocationProvider implements LocationProviderInterface {
     private float mSvElevations[] = new float[MAX_SVS];
     private float mSvAzimuths[] = new float[MAX_SVS];
     private int mSvMasks[] = new int[3];
-    private long mGnssSvMasks[] = new long[3];
+    private long mGnssSvMasks[] = new long[9];
     private int mSvCount;
     // preallocated to avoid memory allocation in reportNmea()
     private byte[] mNmeaBuffer = new byte[120];
