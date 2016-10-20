@@ -41,9 +41,15 @@ public final class GpsStatus {
     private static final int BDS_SV_PRN_MAX = 235;
     private static final int GAL_SV_PRN_MIN = 301;
     private static final int GAL_SV_PRN_MAX = 336;
-    private static final int GLONASS_USED_FOR_FIX_MASK = 0;
-    private static final int BDS_USED_FOR_FIX_MASK = 1;
-    private static final int GAL_USED_FOR_FIX_MASK = 2;
+    private static final int GLONASS_EPHEMERIS_MASK = 0;
+    private static final int GLONASS_ALMANAC_MASK = 1;
+    private static final int GLONASS_USED_FOR_FIX_MASK = 2;
+    private static final int BDS_EPHEMERIS_MASK = 3;
+    private static final int BDS_ALMANAC_MASK = 4;
+    private static final int BDS_USED_FOR_FIX_MASK = 5;
+    private static final int GAL_EPHEMERIS_MASK = 6;
+    private static final int GAL_ALMANAC_MASK = 7;
+    private static final int GAL_USED_FOR_FIX_MASK = 8;
     private static final int NUM_SATELLITES = GAL_SV_PRN_MAX;
 
     /* These package private values are modified by the LocationManager class */
@@ -162,7 +168,7 @@ public final class GpsStatus {
     synchronized void setStatus(int svCount, int[] prns, float[] snrs,
                                 float[] elevations, float[] azimuths,
                                 int ephemerisMask, int almanacMask,
-                                int usedInFixMask, long[] gnssUsedInFixMask) {
+                                int usedInFixMask, long[] gnssSvMask) {
         clearSatellites();
         Log.v(TAG, "Received SV Status Update: SV count: " + svCount);
         Log.v(TAG, "Svids: ");
@@ -187,14 +193,20 @@ public final class GpsStatus {
                     satellite.mUsedInFix = ((usedInFixMask & prnShift) != 0);
                 } else if(prn >= GLONASS_SV_PRN_MIN && prn <= GLONASS_SV_PRN_MAX) {
                     int prnShift = (1 << (prn - (GLONASS_SV_PRN_MIN)));
-                    satellite.mUsedInFix = ((gnssUsedInFixMask[GLONASS_USED_FOR_FIX_MASK] & prnShift) != 0);
+                    satellite.mHasEphemeris = ((gnssSvMask[GLONASS_EPHEMERIS_MASK] & prnShift) != 0);
+                    satellite.mHasAlmanac = ((gnssSvMask[GLONASS_ALMANAC_MASK] & prnShift) != 0);
+                    satellite.mUsedInFix = ((gnssSvMask[GLONASS_USED_FOR_FIX_MASK] & prnShift) != 0);
                 } else if(prn >= BDS_SV_PRN_MIN && prn <= BDS_SV_PRN_MAX) {
                     int prnShift = (1 << (prn - (BDS_SV_PRN_MIN)));
-                    satellite.mUsedInFix = ((gnssUsedInFixMask[BDS_USED_FOR_FIX_MASK] & prnShift) != 0);
+                    satellite.mHasEphemeris = ((gnssSvMask[BDS_EPHEMERIS_MASK] & prnShift) != 0);
+                    satellite.mHasAlmanac = ((gnssSvMask[BDS_ALMANAC_MASK] & prnShift) != 0);
+                    satellite.mUsedInFix = ((gnssSvMask[BDS_USED_FOR_FIX_MASK] & prnShift) != 0);
                 }
                 else if(prn >= GAL_SV_PRN_MIN && prn <= GAL_SV_PRN_MAX) {
                     int prnShift = (1 << (prn - (GAL_SV_PRN_MIN)));
-                    satellite.mUsedInFix = ((gnssUsedInFixMask[GAL_USED_FOR_FIX_MASK] & prnShift) != 0);
+                    satellite.mHasEphemeris = ((gnssSvMask[GAL_EPHEMERIS_MASK] & prnShift) != 0);
+                    satellite.mHasAlmanac = ((gnssSvMask[GAL_ALMANAC_MASK] & prnShift) != 0);
+                    satellite.mUsedInFix = ((gnssSvMask[GAL_USED_FOR_FIX_MASK] & prnShift) != 0);
                 }
                 Log.v(TAG, prn + ",");
             }

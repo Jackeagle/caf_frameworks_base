@@ -1467,11 +1467,11 @@ public class LocationManager {
                                       float[] elevations, float[] azimuths,
                                       int ephemerisMask, int almanacMask,
                                       int usedInFixMask,
-                                      long[] gnssUsedInFixMask) {
+                                      long[] gnssSvMask) {
             if (mListener != null) {
                 mGpsStatus.setStatus(svCount, prns, snrs, elevations, azimuths,
                                      ephemerisMask, almanacMask,
-                                     usedInFixMask, gnssUsedInFixMask);
+                                     usedInFixMask, gnssSvMask);
 
                 Message msg = Message.obtain();
                 msg.what = GpsStatus.GPS_EVENT_SATELLITE_STATUS;
