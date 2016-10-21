@@ -23,7 +23,9 @@ import android.database.ContentObserver;
 import android.net.NetworkCapabilities;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PersistableBundle;
 import android.provider.Settings;
+import android.telephony.CarrierConfigManager;
 import android.telephony.CellLocation;
 import android.telephony.gsm.GsmCellLocation;
 import android.telephony.PhoneStateListener;
@@ -93,6 +95,8 @@ public class MobileSignalController extends SignalController<
     private int mStyle = STATUS_BAR_STYLE_ANDROID_DEFAULT;
     private DataEnabledSettingObserver mDataEnabledSettingObserver;
     CarrierAppUtils.CARRIER carrier = CarrierAppUtils.getCarrierId();
+
+    private int[] mCarrierOneThresholdValues;
 
     // TODO: Reduce number of vars passed in, if we have the NetworkController, probably don't
     // need listener lists anymore.
@@ -485,6 +489,31 @@ public class MobileSignalController extends SignalController<
             if (mConfig.showLocale) {
                 updateNetworkName(mLastShowSpn, mLastSpn, mLastDataSpn, mLastShowPlmn, mLastPlmn);
                 notifyListenersIfNecessary();
+            }
+        } else if (action.equals(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED)) {
+            CarrierConfigManager configLoader = (CarrierConfigManager)
+                    mContext.getSystemService(Context.CARRIER_CONFIG_SERVICE);
+            if (configLoader != null) {
+                try {
+                    PersistableBundle b = configLoader.getConfigForSubId(mSubscriptionInfo
+                            .getSubscriptionId());
+                    boolean useCarrierOneThresholdValues =
+                            b.getBoolean("use_operator_signal_strength_threshold_values");
+                    if (useCarrierOneThresholdValues) {
+                        mCarrierOneThresholdValues =
+                                b.getIntArray("operator_signal_strength_threshold_values");
+                    }
+                }
+                catch (Exception e) {
+                    Log.d(mTag, "handleBroadcast: Carrier config error: " + e);
+                }
+            } else {
+                Log.d(mTag, "handleBroadcast: configLoader is null");
+            }
+
+            if (mCarrierOneThresholdValues != null && !isRoaming() && mSignalStrength != null) {
+                mSignalStrength.setThreshRsrp(mCarrierOneThresholdValues);
+                updateTelephony();
             }
         }
     }
@@ -942,6 +971,11 @@ public class MobileSignalController extends SignalController<
                         ((signalStrength == null) ? "" : (" level=" + signalStrength.getLevel())));
             }
             mSignalStrength = signalStrength;
+
+            if (mCarrierOneThresholdValues != null && !isRoaming() && mSignalStrength != null) {
+                mSignalStrength.setThreshRsrp(mCarrierOneThresholdValues);
+            }
+
             updateTelephony();
         }
 
