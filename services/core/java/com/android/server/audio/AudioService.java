@@ -75,7 +75,6 @@ import android.media.audiopolicy.AudioMix;
 import android.media.audiopolicy.AudioPolicy;
 import android.media.audiopolicy.AudioPolicyConfig;
 import android.media.audiopolicy.IAudioPolicyCallback;
-import android.media.MediaExtractor;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Environment;
@@ -704,7 +703,6 @@ public class AudioService extends IAudioService.Stub {
 
     public void onSystemReady() {
         mSystemReady = true;
-        MediaExtractor extractor = new MediaExtractor();
         sendMsg(mAudioHandler, MSG_LOAD_SOUND_EFFECTS, SENDMSG_QUEUE,
                 0, 0, null, 0);
 
