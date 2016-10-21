@@ -214,7 +214,8 @@ public class KeyguardBouncer {
         ensureView();
         if (mKeyguardView != null) {
             SecurityMode mode = mKeyguardView.getSecurityMode();
-            return mode == SecurityMode.SimPin || mode == SecurityMode.SimPuk;
+            return mode == SecurityMode.SimPin || mode == SecurityMode.SimPuk
+                    || mode == SecurityMode.DeviceSubsidy;
         }
         return false;
     }
@@ -226,7 +227,8 @@ public class KeyguardBouncer {
     public boolean isFullscreenBouncer() {
         if (mKeyguardView != null) {
             SecurityMode mode = mKeyguardView.getCurrentSecurityMode();
-            return mode == SecurityMode.SimPin || mode == SecurityMode.SimPuk;
+            return mode == SecurityMode.SimPin || mode == SecurityMode.SimPuk
+                    || mode == SecurityMode.DeviceSubsidy;
         }
         return false;
     }
@@ -260,5 +262,10 @@ public class KeyguardBouncer {
     public void notifyKeyguardAuthenticated(boolean strongAuth) {
         ensureView();
         mKeyguardView.finish(strongAuth);
+    }
+
+    public boolean isSubsidyLockEnabled() {
+        return mKeyguardView != null && mKeyguardView.getSecurityMode() ==
+                SecurityMode.DeviceSubsidy;
     }
 }

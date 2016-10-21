@@ -248,4 +248,10 @@ public class KeyguardUpdateMonitorCallback {
      * has changed.
      */
     public void onStrongAuthStateChanged(int userId) { }
+
+    /**
+     * Called when the state of Subsidy lock changed.
+     * @param isLocked
+     */
+    public void onSubsidyLockStateChanged(boolean isLocked) { }
 }
