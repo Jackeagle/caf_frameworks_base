@@ -168,4 +168,12 @@ interface IExtTelephony {
     */
     int getPrimaryStackPhoneId();
 
+    /**
+    * Check for PERSO unlocked or not.
+    * @return
+    *        false - if PERSO unlocked
+    *        true - if PERSO locked
+    */
+    boolean isDeviceNetworkPersoLocked();
+
 }
