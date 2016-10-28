@@ -176,4 +176,11 @@ interface IExtTelephony {
     */
     boolean isDeviceNetworkPersoLocked();
 
+    /**
+     * Returns ID of the slot in which PrimaryCarrier SIM card present.
+     * If none of the slot contains PrimaryCarrier SIM this would return '-1'
+     * Supported values: 0, 1, -1
+     */
+    int getPrimaryCarrierSlotId();
+
 }
