@@ -302,12 +302,7 @@ public class MobileSignalController extends SignalController<
 
         // Show icon in QS when we are connected or need to show roaming.
         boolean showDataIcon = false;
-        if (mContext.getResources().getBoolean(R.bool.show_roaming_and_network_icons)) {
-            showDataIcon = mCurrentState.dataConnected;
-        } else {
-            showDataIcon = mCurrentState.dataConnected
-                    || (mCurrentState.iconGroup == TelephonyIcons.ROAMING || isRoaming());
-        }
+        showDataIcon = mCurrentState.dataConnected;
         IconState statusIcon = new IconState(mCurrentState.enabled && !mCurrentState.airplaneMode,
                 getCurrentIconId(), contentDescription);
 
@@ -327,10 +322,7 @@ public class MobileSignalController extends SignalController<
         boolean activityOut = mCurrentState.dataConnected
                         && !mCurrentState.carrierNetworkChangeMode
                         && mCurrentState.activityOut;
-        if (!mContext.getResources().getBoolean(R.bool.show_roaming_and_network_icons)) {
-            showDataIcon &= mCurrentState.isDefault
-                    || (mCurrentState.iconGroup == TelephonyIcons.ROAMING || isRoaming());
-        }
+        showDataIcon &= mCurrentState.isDefault;
         showDataIcon &= (mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT
                 || mStyle == STATUS_BAR_STYLE_EXTENDED);
         int typeIcon = 0;
