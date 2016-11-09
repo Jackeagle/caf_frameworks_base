@@ -1371,10 +1371,10 @@ public class ExifInterface {
      * and make a single call rather than multiple calls for each attribute.
      */
     public void saveAttributes() throws IOException {
-        if (!mIsSupportedFile) {
-            throw new UnsupportedOperationException(
-                    "ExifInterface only supports saving attributes on JPEG formats.");
-        }
+         if (!mIsSupportedFile) {
+             throw new IOException("ExifInterface only supports saving attributes on JPEG formats.");
+         }
+
         // Keep the thumbnail in memory
         mThumbnailBytes = getThumbnail();
 
