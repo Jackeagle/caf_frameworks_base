@@ -27,12 +27,12 @@
   OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-      android:width="16.5dp"
-      android:height="12dp"
-      android:viewportWidth="45"
-      android:viewportHeight="24.0">
-
+<vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="19dp"
+    android:viewportHeight="24.0"
+    android:viewportWidth="30.0">
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M3.723,14.904h3.883v1.615H1.625V7.477h2.099V14.904z" />
