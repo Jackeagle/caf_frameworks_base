@@ -75,6 +75,7 @@ import android.media.audiopolicy.AudioMix;
 import android.media.audiopolicy.AudioPolicy;
 import android.media.audiopolicy.AudioPolicyConfig;
 import android.media.audiopolicy.IAudioPolicyCallback;
+import android.media.MediaExtractor;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Environment;
@@ -671,6 +672,7 @@ public class AudioService extends IAudioService.Stub {
                 new IntentFilter(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         intentFilter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
         intentFilter.addAction(Intent.ACTION_DOCK_EVENT);
+        intentFilter.addAction(Intent.ACTION_BOOT_COMPLETED);
         intentFilter.addAction(Intent.ACTION_SCREEN_ON);
         intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
         intentFilter.addAction(Intent.ACTION_USER_SWITCHED);
@@ -703,9 +705,6 @@ public class AudioService extends IAudioService.Stub {
 
     public void onSystemReady() {
         mSystemReady = true;
-        sendMsg(mAudioHandler, MSG_LOAD_SOUND_EFFECTS, SENDMSG_QUEUE,
-                0, 0, null, 0);
-
         mKeyguardManager =
                 (KeyguardManager) mContext.getSystemService(Context.KEYGUARD_SERVICE);
         mScoConnectionState = AudioManager.SCO_AUDIO_STATE_ERROR;
@@ -4466,14 +4465,19 @@ public class AudioService extends IAudioService.Stub {
                 case MSG_LOAD_SOUND_EFFECTS:
                     //FIXME: onLoadSoundEffects() should be executed in a separate thread as it
                     // can take several dozens of milliseconds to complete
-                    boolean loaded = onLoadSoundEffects();
-                    if (msg.obj != null) {
-                        LoadSoundEffectReply reply = (LoadSoundEffectReply)msg.obj;
-                        synchronized (reply) {
-                            reply.mStatus = loaded ? 0 : -1;
-                            reply.notify();
+                    final Message msg_load = msg;
+                    new Thread(new Runnable() {
+                        boolean loaded = onLoadSoundEffects();
+                        public void run() {
+                            if (msg_load.obj != null) {
+                                LoadSoundEffectReply reply = (LoadSoundEffectReply)msg_load.obj;
+                                synchronized (reply) {
+                                    reply.mStatus = loaded ? 0 : -1;
+                                    reply.notify();
+                                }
+                            }
                         }
-                    }
+                    }).start();
                     break;
 
                 case MSG_PLAY_SOUND_EFFECT:
@@ -5071,7 +5075,11 @@ public class AudioService extends IAudioService.Stub {
             int inDevice;
             int state;
 
-            if (action.equals(Intent.ACTION_DOCK_EVENT)) {
+            if (action.equals(Intent.ACTION_BOOT_COMPLETED)) {
+                MediaExtractor me = new MediaExtractor();
+                sendMsg(mAudioHandler, MSG_LOAD_SOUND_EFFECTS, SENDMSG_QUEUE,
+                        0, 0, null, 0);
+            } else if (action.equals(Intent.ACTION_DOCK_EVENT)) {
                 int dockState = intent.getIntExtra(Intent.EXTRA_DOCK_STATE,
                         Intent.EXTRA_DOCK_STATE_UNDOCKED);
                 int config;
