@@ -948,6 +948,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
         mRemoteDisplay = null;
         mRemoteDisplayInterface = null;
         mRemoteDisplayConnected = false;
+        mRemoteDisplayRtspTeardownTimedOut = false;
         mHandler.removeCallbacks(mRtspTimeout);
 
         mWifiP2pManager.setMiracastMode(WifiP2pManager.MIRACAST_DISABLED);
