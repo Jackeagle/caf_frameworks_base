@@ -75,7 +75,7 @@ public final class SignalTileView extends QSTileView {
             LinearLayout iconLayout = new LinearLayout(mContext);
             iconLayout.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             iconLayout.addView(mRoaming, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-            mIconFrame.addView(iconLayout, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            mIconFrame.addView(iconLayout, LayoutParams.WRAP_CONTENT, 30);
         } else {
             mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         }
