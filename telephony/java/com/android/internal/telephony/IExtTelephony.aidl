@@ -183,4 +183,21 @@ interface IExtTelephony {
      */
     int getPrimaryCarrierSlotId();
 
+    /**
+    * Get current primary card slot Id.
+    * @param - void
+    * @return slot index
+    */
+    int getCurrentPrimaryCardSlotId();
+
+    /**
+    * supply pin to unlock sim locked on network.
+    * @param - pin - network pin to unlock the sim.
+    * @param - type - PersoSubState for which the sim is locked onto.
+    * @param - slotId - on which SIM slot the pin request is sent.
+    * @return Boolean
+    *        true - If the request become success
+    *        false - If the request failed.
+    */
+    boolean supplyNetworkDepersonalization(String pin, String type, int slotId);
 }
