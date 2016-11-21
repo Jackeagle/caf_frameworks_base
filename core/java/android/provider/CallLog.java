@@ -196,6 +196,12 @@ public class CallLog {
         /** Call had video. */
         public static final int FEATURES_VIDEO = 0x1;
 
+        /** Call had enriched data.
+         *
+         * @hide
+         */
+        public static final int FEATURES_ENRICHED = 0x100;
+
         /**
          * The phone number as the user entered it.
          * <P>Type: TEXT</P>
