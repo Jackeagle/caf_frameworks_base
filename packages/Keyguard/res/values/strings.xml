@@ -385,4 +385,20 @@
     </plurals>
 
     <string name="button_lockscreen_emergency_call">Emergency call</string>
+
+    <string name="kg_subsidy_title_locked">Device Locked</string>
+    <string name="kg_subsidy_content_locked">
+        Please insert a valid SIM to unlock the device.\n\nTap to unlock after making sure that connection to data network(cellular or Wi-Fi) is active.</string>
+    <string name="kg_subsidy_title_activation">Activate SIM</string>
+    <string name="kg_subsidy_content_activation">
+        Please tap Activate button to tele-verify. If you have already tele-verified, please tap Unlock button.</string>
+    <string name="kg_subsidy_title_activating">Activating SIM</string>
+    <string name="kg_subsidy_content_activating">Please wait&#8230; \n\n checking with server.</string>
+    <string name="kg_subsidy_content_pin_locked">Please call customer care to get the code to unlock or insert a valid SIM</string>
+    <string name="kg_subsidy_wrong_pin">Invalid code</string>
+    <string name="kg_button_unlock">Unlock</string>
+    <string name="kg_button_activate">Activate</string>
+    <string name="kg_subsidy_wifi">WIFI</string>
+    <string name="unlock_toast">Device unlocked</string>
+    <string name="kg_unlock_progress_dialog_message">Unlocking device\u2026</string>
 </resources>

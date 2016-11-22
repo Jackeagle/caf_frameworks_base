@@ -1900,8 +1900,11 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
     }
 
     private int adjustDisableFlags(int state) {
+        boolean isSubsidyEnabled = mStatusBarKeyguardViewManager != null
+                && mStatusBarKeyguardViewManager.isSubsidyLockEnabled();
         if (!mLaunchTransitionFadingAway && !mKeyguardFadingAway
-                && (mExpandedVisible || mBouncerShowing || mWaitingForKeyguardExit)) {
+                && (mExpandedVisible || (mBouncerShowing && !isSubsidyEnabled)
+                        || mWaitingForKeyguardExit)) {
             state |= StatusBarManager.DISABLE_NOTIFICATION_ICONS;
             state |= StatusBarManager.DISABLE_SYSTEM_INFO;
         }
