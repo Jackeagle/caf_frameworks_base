@@ -362,4 +362,11 @@
     <bool name="config_showSignalForIWlan">false</bool>
     <bool name="config_show_long_operator_name">false</bool>
     <bool name="config_show_long_operator_name_when_roaming">false</bool>
+
+    <!-- List of Carrier one mcc mncs-->
+    <string-array name="config_carrier_one_networks" translatable="false">
+    </string-array>
+
+    <integer-array name="carrier_one_strength_threshold_values">
+    </integer-array>
 </resources>
