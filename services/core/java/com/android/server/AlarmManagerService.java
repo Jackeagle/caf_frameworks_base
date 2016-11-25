@@ -1242,6 +1242,7 @@ class AlarmManagerService extends SystemService {
         @Override
         public void run(){
             if (mBlockedUids.contains(mUid) && mTriggeredUids.contains(mUid)) {
+                synchronized(mLock) {
                 if (mWakeLock.isHeld()) {
                     mWakeLock.release();
                     if (localLOGV)
@@ -1252,6 +1253,7 @@ class AlarmManagerService extends SystemService {
             return;
         }
     }
+}
     void dumpImpl(PrintWriter pw) {
         synchronized (mLock) {
             pw.println("Current Alarm Manager state:");
