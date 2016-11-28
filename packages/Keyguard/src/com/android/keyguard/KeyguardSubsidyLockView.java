@@ -80,10 +80,10 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
 
         mEmergencyView = findViewById(R.id.emergency_view);
         mProgressTitleView = (TextView) findViewById(R.id.kg_progress_title);
-        mProgressTitleView.setVisibility(View.GONE);
+        mProgressTitleView.setText(R.string.kg_subsidy_title_unlock_progress_dialog);
         mProgressContentView =
             (TextView) findViewById(R.id.kg_progress_content);
-        mProgressContentView.setText(R.string.kg_subsidy_content_activating);
+        mProgressContentView.setText(R.string.kg_subsidy_content_progress_server);
         mUnlockBtn = (Button) findViewById(R.id.unlock);
 
         mUnlockBtn.setOnClickListener(new OnClickListener() {

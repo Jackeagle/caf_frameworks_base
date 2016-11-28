@@ -94,10 +94,9 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
 
         mEmergencyView = findViewById(R.id.emergency_view);
         mProgressTitleView = (TextView) findViewById(R.id.kg_progress_title);
-        mProgressTitleView.setText(R.string.kg_subsidy_title_activating);
         mProgressContentView = (TextView)
             findViewById(R.id.kg_progress_content);
-        mProgressContentView.setText(R.string.kg_subsidy_content_activating);
+        mProgressContentView.setText(R.string.kg_subsidy_content_progress_server);
         mUnlockBtn = (Button) findViewById(R.id.unlock);
         mUnlockBtn.setOnClickListener(new OnClickListener() {
             @Override
@@ -107,7 +106,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                 }
                 mContentView.setVisibility(View.GONE);
                 mEmergencyView.setVisibility(View.GONE);
-                mProgressTitleView.setVisibility(View.GONE);
+                mProgressTitleView.setText(R.string.kg_subsidy_title_unlock_progress_dialog);
                 mProgressView.setVisibility(View.VISIBLE);
                 Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
                 intent.setPackage(getResources().getString(
@@ -128,6 +127,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                     Log.d(TAG, " Activate Button Pressed ");
                 }
                 mActivationCallInitiated = true;
+                mProgressTitleView.setText(R.string.kg_subsidy_title_progress_activating);
                 getContext().startActivity(getSimActivationCallIntent());
             }
         });
@@ -296,7 +296,6 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                         mActivationCallInitiated = false;
                         mContentView.setVisibility(View.GONE);
                         mEmergencyView.setVisibility(View.GONE);
-                        mProgressTitleView.setVisibility(View.VISIBLE);
                         mProgressView.setVisibility(View.VISIBLE);
                     }
                     disableNavigationBar(false);
@@ -312,7 +311,6 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                 if (mProgressView.getVisibility() == View.VISIBLE) {
                     mContentView.setVisibility(View.VISIBLE);
                     mEmergencyView.setVisibility(View.VISIBLE);
-                    mProgressTitleView.setVisibility(View.VISIBLE);
                     mProgressView.setVisibility(View.GONE);
                 }
             }

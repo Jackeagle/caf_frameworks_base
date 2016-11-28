@@ -50,7 +50,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
     private static final float SCRIM_BEHIND_ALPHA_KEYGUARD = 0.45f;
     private static final float SCRIM_BEHIND_ALPHA_UNLOCKING = 0.2f;
     private static final float SCRIM_IN_FRONT_ALPHA = 0.75f;
-    private static final float SUBSIDY_SCRIM_IN_FRONT_ALPHA = 0.1f;
+    private static final float SUBSIDY_SCRIM_BEHIND_ALPHA = 0.4f;
     private static final int TAG_KEY_ANIM = R.id.scrim;
     private static final int TAG_KEY_ANIM_TARGET = R.id.scrim_target;
     private static final int TAG_HUN_START_ALPHA = R.id.hun_scrim_alpha_start;
@@ -233,10 +233,10 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
             setScrimInFrontColor(fraction * SCRIM_IN_FRONT_ALPHA);
             setScrimBehindColor(behindFraction * SCRIM_BEHIND_ALPHA_KEYGUARD);
         } else if (mBouncerShowing) {
-            // Decrease alpha of front scrim to make statusbar visible
+            // Adjusted alpha of back scrim to make status bar visible
             // when anyone of the subsidy lock view is in foreground.
-            setScrimInFrontColor(mIsSubsidyLocked ? SUBSIDY_SCRIM_IN_FRONT_ALPHA : SCRIM_IN_FRONT_ALPHA);
-            setScrimBehindColor(0f);
+            setScrimInFrontColor(SCRIM_IN_FRONT_ALPHA);
+            setScrimBehindColor(mIsSubsidyLocked ? SUBSIDY_SCRIM_BEHIND_ALPHA : 0f);
         } else {
             float fraction = Math.max(0, Math.min(mFraction, 1));
             setScrimInFrontColor(0f);

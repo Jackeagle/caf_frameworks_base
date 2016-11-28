@@ -130,7 +130,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         if (mUnlockProgressDialog == null) {
             mUnlockProgressDialog = new ProgressDialog(mContext);
             mUnlockProgressDialog.setMessage(
-                    mContext.getString(R.string.kg_unlock_progress_dialog_message));
+                    mContext.getString(R.string.kg_pin_unlock_progress_dialog));
             mUnlockProgressDialog.setIndeterminate(true);
             mUnlockProgressDialog.setCancelable(false);
             mUnlockProgressDialog.getWindow().setType(
