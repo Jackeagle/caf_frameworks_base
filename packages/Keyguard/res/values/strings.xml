@@ -394,8 +394,13 @@
         Please tap Activate button to tele-verify. If you have already tele-verified, please tap Unlock button.</string>
     <string name="kg_subsidy_title_activating">Activating SIM</string>
     <string name="kg_subsidy_content_activating">Please wait&#8230; \n\n checking with server.</string>
-    <string name="kg_subsidy_content_pin_locked">Please call customer care to get the code to unlock or insert a valid SIM</string>
-    <string name="kg_subsidy_wrong_pin">Invalid code</string>
+    <string name="kg_subsidy_content_pin_locked">Please call customer care to get the code to unlock or insert a valid SIM.</string>
+    <plurals name="kg_subsidy_wrong_pin">
+        <item quantity="one">Invalid code. \nYou have <xliff:g id="number">%d</xliff:g> attempt left.</item>
+        <item quantity="other">Invalid code. \nYou have <xliff:g id="number">%d</xliff:g> attempts left.</item>
+    </plurals>
+    <string name="kg_subsidy_too_many_failed_attempts_countdown">Maximum attempts reached. \nRetry after <xliff:g id="number">%d</xliff:g> minutes.</string>
+    <string name="kg_subsidy_too_many_failed_attempts_countdown_sec">Maximum attempts reached. \nRetry after <xliff:g id="number">%d</xliff:g> seconds.</string>
     <string name="kg_button_unlock">Unlock</string>
     <string name="kg_button_activate">Activate</string>
     <string name="kg_subsidy_wifi">WIFI</string>

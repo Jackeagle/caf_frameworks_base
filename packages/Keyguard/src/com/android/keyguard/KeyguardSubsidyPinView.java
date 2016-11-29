@@ -34,8 +34,10 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.os.CountDownTimer;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.WindowManager;
@@ -55,6 +57,9 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     private Context mContext;
     private CheckUnlockPin mCheckUnlockPinThread;
     private ProgressDialog mUnlockProgressDialog = null;
+    private int mRetryAttemptRemaining;
+    private CountDownTimer mCountDownTimer;
+    private long mDeadLineTime;
 
     public KeyguardSubsidyPinView(Context context) {
         this(context, null);
@@ -63,6 +68,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     public KeyguardSubsidyPinView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mContext = context;
+        mRetryAttemptRemaining = getTotalRetryAttempts();
     }
 
     public void resetState() {
@@ -83,11 +89,6 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     }
 
     @Override
-    protected boolean shouldLockout(long deadline) {
-        return false;
-    }
-
-    @Override
     protected int getPasswordTextViewId() {
         return R.id.subsidy_pinEntry;
     }
@@ -105,6 +106,11 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         if (mEcaView instanceof EmergencyCarrierArea) {
             ((EmergencyCarrierArea) mEcaView).setCarrierTextVisible(false);
         }
+    }
+
+    private int getTotalRetryAttempts() {
+        return mContext.getResources().getInteger(
+                R.integer.config_max_enter_code_attempt);
     }
 
     @Override
@@ -164,8 +170,8 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                                     Intent intent = new Intent(
                                         SubsidyUtility.ACTION_USER_REQUEST);
 
-                                    intent.setPackage(getResources().getString(
-                                            R.string.config_slc_package_name));
+                                    intent.setPackage(mContext.getResources()
+                                        .getString(R.string.config_slc_package_name));
                                     intent.putExtra(SubsidyController
                                         .getInstance(mContext)
                                         .getCurrentSubsidyState()
@@ -205,13 +211,90 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
 
     @Override
     public int getWrongPasswordStringId() {
-        return R.string.kg_subsidy_wrong_pin;
+        return R.plurals.kg_subsidy_wrong_pin;
+    }
+
+    @Override
+    public void reset() {
+        if (DEBUG) {
+            Log.v(TAG, "Reset the state based based on the current state");
+        }
+        resetPasswordText(false /* animate */);
+        // if the user is currently locked out, enforce it.
+        long deadline = getDeadlineTime();
+        if (shouldLockout(deadline)) {
+            handleAttemptLockout(deadline);
+        } else {
+            resetState();
+        }
     }
 
     public void handleErrorCase() {
-        mSecurityMessageDisplay.setMessage(getWrongPasswordStringId(), true);
+        if (DEBUG) {
+            Log.v(TAG, "Handle error case when user attemp with wrong pin");
+        }
+        mRetryAttemptRemaining--;
+
+        if (mRetryAttemptRemaining > 0) {
+            mSecurityMessageDisplay.setMessage(
+                    mContext.getResources().getQuantityString(
+                            R.plurals.kg_subsidy_wrong_pin,
+                            mRetryAttemptRemaining, mRetryAttemptRemaining),
+                    true);
+        } else if (mRetryAttemptRemaining == 0) {
+            int attemptTimeOut =
+                    mContext.getResources().getInteger(
+                            R.integer.config_timeout_after_max_attempt_milli);
+            mDeadLineTime = SystemClock.elapsedRealtime() + attemptTimeOut;
+            handleAttemptLockout(mDeadLineTime);
+        }
         resetPasswordText(true);
         mCallback.userActivity();
+    }
+
+    @Override
+    protected void handleAttemptLockout(long elapsedRealtimeDeadline) {
+        setPasswordEntryEnabled(false);
+
+        final long elapsedRealtime = SystemClock.elapsedRealtime();
+
+        mCountDownTimer =
+                new CountDownTimer(elapsedRealtimeDeadline - elapsedRealtime,
+                        1000) {
+                    @Override
+                    public void onTick(long millisUntilFinished) {
+                        // Condition to distinguish min/sec to display.
+                        // If more than 1 minutes remaining it will be displayed
+                        // in minutes, if less than 1 minutes is displayed in
+                        // seconds.
+                        if (millisUntilFinished > 60000) {
+                            int minutesRemaining =
+                                    (int) (millisUntilFinished / 60000);
+                            minutesRemaining++;
+                            mSecurityMessageDisplay.setMessage(
+                                    R.string.kg_subsidy_too_many_failed_attempts_countdown,
+                                    true, minutesRemaining);
+                        } else {
+                            int secondsRemaining =
+                                    (int) (millisUntilFinished / 1000);
+                            secondsRemaining++;
+                            mSecurityMessageDisplay.setMessage(
+                                    R.string.kg_subsidy_too_many_failed_attempts_countdown_sec,
+                                    true, secondsRemaining);
+                        }
+                    }
+
+                    @Override
+                    public void onFinish() {
+                        if (DEBUG) {
+                            Log.v(TAG, "CountDownTimer onFinish called");
+                        }
+                        mRetryAttemptRemaining = getTotalRetryAttempts();
+                        setPasswordEntryEnabled(true);
+                        showDefaultMessage();
+                    }
+
+                }.start();
     }
 
     private abstract class CheckUnlockPin extends Thread {
@@ -255,5 +338,13 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                 });
             }
         }
+    }
+
+    public long getDeadlineTime() {
+        final long now = SystemClock.elapsedRealtime();
+        if (mDeadLineTime < now && mDeadLineTime != 0) {
+            return 0L;
+        }
+        return mDeadLineTime;
     }
 }
