@@ -29,6 +29,7 @@ import android.util.Slog;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
 
 import com.android.internal.widget.LockPatternUtils;
@@ -473,6 +474,15 @@ public class KeyguardSecurityContainer extends FrameLayout implements KeyguardSe
         mCurrentSecuritySelection = securityMode;
         mSecurityCallback.onSecurityModeChanged(securityMode,
                 securityMode != SecurityMode.None && newView.needsInput());
+
+        if (SubsidyUtility.isSubsidyLockFeatureEnabled(getContext())) {
+            Button setupWifiButton =
+                    (Button) getRootView().findViewById(R.id.setup_wifi);
+            if (setupWifiButton != null &&
+                    mCurrentSecuritySelection != SecurityMode.DeviceSubsidy) {
+                setupWifiButton.setVisibility(View.GONE);
+            }
+        }
     }
 
     private KeyguardSecurityViewFlipper getFlipper() {
