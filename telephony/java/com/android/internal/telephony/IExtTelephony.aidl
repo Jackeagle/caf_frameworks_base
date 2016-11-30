@@ -169,12 +169,13 @@ interface IExtTelephony {
     int getPrimaryStackPhoneId();
 
     /**
-    * Check for PERSO unlocked or not.
+    * Get current device perso state.
     * @return
-    *        false - if PERSO unlocked
-    *        true - if PERSO locked
+    *        0 - not perso locked
+    *        1 - perso locked
+    *        -1 - invalid, error in getting status
     */
-    boolean isDeviceNetworkPersoLocked();
+    int getDevicePersoLockedState();
 
     /**
      * Returns ID of the slot in which PrimaryCarrier SIM card present.
