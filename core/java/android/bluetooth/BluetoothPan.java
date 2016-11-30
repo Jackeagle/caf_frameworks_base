@@ -22,10 +22,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.net.wifi.WifiManager;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.util.Log;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,7 +45,7 @@ public final class BluetoothPan implements BluetoothProfile {
     private static final String TAG = "BluetoothPan";
     private static final boolean DBG = true;
     private static final boolean VDBG = false;
-
+    private boolean isEoGREDisabled = SystemProperties.getBoolean("persist.sys.disable_eogre", true);
     /**
      * Intent used to broadcast the change in connection state of the Pan
      * profile.
@@ -342,7 +343,10 @@ public final class BluetoothPan implements BluetoothProfile {
 
     public void setBluetoothTethering(boolean value) {
         if (DBG) log("setBluetoothTethering(" + value + ")");
-
+        if(value && isEoGREDisabled == false) {
+            WifiManager  wifiManager = (WifiManager)mContext.getSystemService(Context.WIFI_SERVICE);
+            wifiManager.setWifiApEnabled(null, false);
+        }
         if (mPanService != null && isEnabled()) {
             try {
                 mPanService.setBluetoothTethering(value);
