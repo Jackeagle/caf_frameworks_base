@@ -146,6 +146,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private int mErrorRecoveryRetryCounter;
     private final int mSystemUiUid;
     private boolean mIntentPending = false;
+    private boolean mIsRecoveringService = false;
 
     private void registerForAirplaneMode(IntentFilter filter) {
         final ContentResolver resolver = mContext.getContentResolver();
@@ -931,6 +932,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 case MESSAGE_SAVE_NAME_AND_ADDRESS: {
                     boolean unbind = false;
                     if (DBG) Log.d(TAG,"MESSAGE_SAVE_NAME_AND_ADDRESS");
+
+                    mIsRecoveringService = false;
                     synchronized(mConnection) {
                         if (!mEnable && mBluetooth != null && !mConnection.isGetNameAddressOnly()) {
                             try {
@@ -1004,6 +1007,9 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
 
                 case MESSAGE_DISABLE:
                     mHandler.removeMessages(MESSAGE_RESTART_BLUETOOTH_SERVICE);
+
+                    mIsRecoveringService = false;
+
                     if (mEnable && mBluetooth != null) {
                         waitForOnOff(true, false);
                         mEnable = false;
@@ -1048,6 +1054,11 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 case MESSAGE_BLUETOOTH_SERVICE_CONNECTED:
                 {
                     if (DBG) Log.d(TAG,"MESSAGE_BLUETOOTH_SERVICE_CONNECTED: " + msg.arg1);
+
+                    if(mIsRecoveringService) {
+                        Log.w(TAG,"Recovering now. BluetoothManagerService will rebind IBluetooth");
+                        break;
+                    }
 
                     IBinder service = (IBinder) msg.obj;
                     synchronized(mConnection) {
@@ -1207,6 +1218,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 {
                     Log.d(TAG, "MESSAGE_RESTART_BLUETOOTH_SERVICE:"
                         +" Restart IBluetooth service");
+                    mIsRecoveringService = false;
                     /* Enable without persisting the setting as
                      it doesnt change when IBluetooth
                      service restarts */
@@ -1655,6 +1667,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         mEnable = false;
 
         if (mErrorRecoveryRetryCounter++ < MAX_ERROR_RESTART_RETRIES) {
+            // avoid race with service connected
+            mIsRecoveringService = true;
             // Send a Bluetooth Restart message to reenable bluetooth
             Message restartMsg = mHandler.obtainMessage(
                              MESSAGE_RESTART_BLUETOOTH_SERVICE);
