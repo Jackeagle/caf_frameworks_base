@@ -40,7 +40,9 @@ import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
@@ -60,6 +62,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     private int mRetryAttemptRemaining;
     private CountDownTimer mCountDownTimer;
     private long mDeadLineTime;
+    private WifiSetupButton mSetupWifiButton;
 
     public KeyguardSubsidyPinView(Context context) {
         this(context, null);
@@ -130,7 +133,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         if (mUnlockProgressDialog == null) {
             mUnlockProgressDialog = new ProgressDialog(mContext);
             mUnlockProgressDialog.setMessage(
-                    mContext.getString(R.string.kg_unlock_progress_dialog_message));
+                    mContext.getString(R.string.kg_pin_unlock_progress_dialog));
             mUnlockProgressDialog.setIndeterminate(true);
             mUnlockProgressDialog.setCancelable(false);
             mUnlockProgressDialog.getWindow().setType(
@@ -164,9 +167,8 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                                     mUnlockProgressDialog.hide();
                                 }
                                 if (isSuccess) {
-                                    if (DEBUG) {
-                                        Log.d(TAG, "Local Unlock code is correct and verified");
-                                    }
+                                    Log.d(TAG, "Local Unlock code is correct and verified");
+
                                     Intent intent = new Intent(
                                         SubsidyUtility.ACTION_USER_REQUEST);
 
@@ -346,5 +348,25 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
             return 0L;
         }
         return mDeadLineTime;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mSetupWifiButton =
+                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
+        setSetupWifiButtonVisibility(View.VISIBLE);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mSetupWifiButton = null;
+    }
+
+    public void setSetupWifiButtonVisibility(int isVisible) {
+        if (mSetupWifiButton != null) {
+            mSetupWifiButton.setVisibility(isVisible);
+        }
     }
 }

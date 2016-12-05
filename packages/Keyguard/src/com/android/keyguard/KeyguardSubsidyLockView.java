@@ -33,10 +33,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.net.wifi.WifiManager;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -57,9 +57,8 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
     private TextView mProgressTitleView;
     private TextView mProgressContentView;
     private Button mUnlockBtn;
-    private Button mWifiBtn;
     private Context mContext;
-    private WifiManager mWifiManager;
+    private WifiSetupButton mSetupWifiButton;
 
     public KeyguardSubsidyLockView(Context context) {
         super(context);
@@ -80,10 +79,10 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
 
         mEmergencyView = findViewById(R.id.emergency_view);
         mProgressTitleView = (TextView) findViewById(R.id.kg_progress_title);
-        mProgressTitleView.setVisibility(View.GONE);
+        mProgressTitleView.setText(R.string.kg_subsidy_title_unlock_progress_dialog);
         mProgressContentView =
             (TextView) findViewById(R.id.kg_progress_content);
-        mProgressContentView.setText(R.string.kg_subsidy_content_activating);
+        mProgressContentView.setText(R.string.kg_subsidy_content_progress_server);
         mUnlockBtn = (Button) findViewById(R.id.unlock);
 
         mUnlockBtn.setOnClickListener(new OnClickListener() {
@@ -95,6 +94,7 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                 mContentView.setVisibility(View.GONE);
                 mEmergencyView.setVisibility(View.GONE);
                 mProgressView.setVisibility(View.VISIBLE);
+                setSetupWifiButtonVisibility(View.GONE);
                 Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
                 intent.setPackage(getResources().getString(
                         R.string.config_slc_package_name));
@@ -103,28 +103,6 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                     .getLaunchIntent(0), true);
                 mContext.sendBroadcast(intent,
                     SubsidyUtility.BROADCAST_PERMISSION);
-            }
-        });
-        mContext.getApplicationContext().registerReceiver(
-                mWifiStateChangedReceiver,
-                new IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION));
-        mWifiBtn = (Button) findViewById(R.id.wifi_icon);
-        mWifiManager =
-            (WifiManager) mContext
-            .getApplicationContext().getSystemService(
-                    Context.WIFI_SERVICE);
-        int wiFiState = WifiManager.WIFI_STATE_UNKNOWN;;
-        if (mWifiManager != null) {
-            wiFiState = mWifiManager.getWifiState();
-        }
-        setWiFiDrawable(wiFiState);
-        mWifiBtn.setOnClickListener(new OnClickListener() {
-            public void onClick(View v) {
-                Intent wifiIntent = new Intent(SubsidyUtility.WIFI_SETUP_SCREEN_INTENT);
-                wifiIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                mContext.startActivity(wifiIntent);
             }
         });
     }
@@ -156,7 +134,6 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
 
     @Override
     public void onResume(int reason) {
-
     }
 
     @Override
@@ -182,48 +159,14 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
         return false;
     }
 
-    public void setWiFiDrawable(int wifiState) {
-        if (WifiManager.WIFI_STATE_DISABLED == wifiState) {
-            mWifiBtn.setCompoundDrawablesWithIntrinsicBounds(0,
-                    R.drawable.kg_subsidy_wifi_off, 0, 0);
-        } else if (WifiManager.WIFI_STATE_ENABLED == wifiState) {
-            mWifiBtn.setCompoundDrawablesWithIntrinsicBounds(0,
-                    R.drawable.kg_subsidy_wifi, 0, 0);
-        } else {
-            mWifiBtn.setCompoundDrawablesWithIntrinsicBounds(0,
-                    R.drawable.kg_subsidy_wifi_off, 0, 0);
-        }
-    }
-
-    /*
-     * Get current WiFi state
-     */
-    public int getWiFiState() {
-        int wiFiState = WifiManager.WIFI_STATE_UNKNOWN;
-        if (mWifiManager != null) {
-            wiFiState = mWifiManager.getWifiState();
-        }
-        return wiFiState;
-    }
-
-    private BroadcastReceiver mWifiStateChangedReceiver =
-        new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                int wiFiState = WifiManager.WIFI_STATE_UNKNOWN;
-                if (WifiManager.WIFI_STATE_CHANGED_ACTION.equals(intent
-                            .getAction())) {
-                    wiFiState = getWiFiState();
-                }
-                setWiFiDrawable(wiFiState);
-            }
-        };
-
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(
                 mInfoCallback);
+        mSetupWifiButton =
+                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
+        setSetupWifiButtonVisibility(View.VISIBLE);
     }
 
     @Override
@@ -231,6 +174,7 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
         super.onDetachedFromWindow();
         KeyguardUpdateMonitor.getInstance(mContext).removeCallback(
                 mInfoCallback);
+        mSetupWifiButton = null;
     }
 
     KeyguardUpdateMonitorCallback mInfoCallback =
@@ -242,6 +186,13 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                     mEmergencyView.setVisibility(View.VISIBLE);
                     mProgressView.setVisibility(View.GONE);
                 }
+                setSetupWifiButtonVisibility(View.VISIBLE);
             }
         };
+
+    public void setSetupWifiButtonVisibility(int isVisible) {
+        if (mSetupWifiButton != null) {
+            mSetupWifiButton.setVisibility(isVisible);
+        }
+    }
 }

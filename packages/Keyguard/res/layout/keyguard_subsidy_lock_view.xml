@@ -81,15 +81,6 @@
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:textColor="@android:color/black" />
 
-            <Button
-                android:id="@+id/wifi_icon"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:drawableTop="@drawable/kg_subsidy_wifi"
-                style="?android:attr/buttonBarButtonStyle"
-                android:text="@string/kg_subsidy_wifi"
-                 />
-
         <Button
             android:id="@+id/unlock"
             android:layout_width="wrap_content"

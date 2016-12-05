@@ -258,9 +258,8 @@ public class SubsidyController {
 
     class UnlockScreenState extends ApLockedState {
         public UnlockScreenState() {
-            if (DEBUG) {
-                Log.d(TAG, " In UnlockScreenState");
-            }
+           Log.d(TAG, " In UnlockScreenState");
+
             mLayoutId = R.layout.keyguard_subsidy_lock_view;
             mViewId = R.id.keyguard_subsidy_lock_view;
             mExtraLaunchIntent = SubsidyUtility.EXTRA_INTENT_KEY_UNLOCK;
@@ -285,9 +284,8 @@ public class SubsidyController {
 
     class ActivateScreenState extends ApLockedState {
         public ActivateScreenState() {
-            if (DEBUG) {
-                Log.d(TAG, " In ActivateScreenState");
-            }
+            Log.d(TAG, " In ActivateScreenState");
+
             mLayoutId = R.layout.keyguard_subsidy_activate_view;
             mViewId = R.id.keyguard_subsidy_activate_view;
         }
@@ -316,9 +314,7 @@ public class SubsidyController {
 
     class ApUnlockedState extends SubsidyState {
         public ApUnlockedState() {
-            if (DEBUG) {
-                Log.d(TAG, " In AppUnlockedState");
-            }
+            Log.d(TAG, " In AppUnlockedState");
         }
 
         @Override
@@ -346,9 +342,8 @@ public class SubsidyController {
     class DeviceLockedState extends SubsidyState {
 
         public DeviceLockedState() {
-            if (DEBUG) {
-                Log.d(TAG, " In DeviceLockedState");
-            }
+            Log.d(TAG, " In DeviceLockedState");
+
             mLayoutId = R.layout.keyguard_subsidy_pin_view;
             mViewId = R.id.keyguard_subsidy_pin_view;
             mExtraLaunchIntent = SubsidyUtility.EXTRA_INTENT_KEY_PIN_VERIFIED;
@@ -385,9 +380,7 @@ public class SubsidyController {
     class DeviceUnlockedState extends SubsidyState {
 
         public DeviceUnlockedState() {
-            if (DEBUG) {
-                Log.d(TAG, " In DeviceUnlockedState");
-            }
+            Log.d(TAG, " In DeviceUnlockedState");
         }
 
         @Override

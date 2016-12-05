@@ -70,6 +70,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
     private Context mContext;
     private TelephonyManager mTelephonyManager;
     private boolean mActivationCallInitiated;
+    private WifiSetupButton mSetupWifiButton;
 
     public KeyguardSubsidyActivateView(Context context) {
         super(context);
@@ -94,10 +95,9 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
 
         mEmergencyView = findViewById(R.id.emergency_view);
         mProgressTitleView = (TextView) findViewById(R.id.kg_progress_title);
-        mProgressTitleView.setText(R.string.kg_subsidy_title_activating);
         mProgressContentView = (TextView)
             findViewById(R.id.kg_progress_content);
-        mProgressContentView.setText(R.string.kg_subsidy_content_activating);
+        mProgressContentView.setText(R.string.kg_subsidy_content_progress_server);
         mUnlockBtn = (Button) findViewById(R.id.unlock);
         mUnlockBtn.setOnClickListener(new OnClickListener() {
             @Override
@@ -107,8 +107,9 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                 }
                 mContentView.setVisibility(View.GONE);
                 mEmergencyView.setVisibility(View.GONE);
-                mProgressTitleView.setVisibility(View.GONE);
+                mProgressTitleView.setText(R.string.kg_subsidy_title_unlock_progress_dialog);
                 mProgressView.setVisibility(View.VISIBLE);
+                setSetupWifiButtonVisibility(View.GONE);
                 Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
                 intent.setPackage(getResources().getString(
                         R.string.config_slc_package_name));
@@ -128,6 +129,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                     Log.d(TAG, " Activate Button Pressed ");
                 }
                 mActivationCallInitiated = true;
+                mProgressTitleView.setText(R.string.kg_subsidy_title_progress_activating);
                 getContext().startActivity(getSimActivationCallIntent());
             }
         });
@@ -217,6 +219,9 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
         super.onAttachedToWindow();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(
                 mInfoCallback);
+        mSetupWifiButton =
+                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
+        setSetupWifiButtonVisibility(View.VISIBLE);
     }
 
     @Override
@@ -224,6 +229,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
         super.onDetachedFromWindow();
         KeyguardUpdateMonitor.getInstance(mContext).removeCallback(
                 mInfoCallback);
+        mSetupWifiButton = null;
     }
 
     private Intent getSimActivationCallIntent() {
@@ -278,9 +284,8 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
             public void onPhoneStateChanged(int phoneState) {
                 if (TelephonyManager.CALL_STATE_IDLE == phoneState) {
                     if (wasOffHook && mActivationCallInitiated) {
-                        if (DEBUG) {
-                            Log.d(TAG, "Tele-Verification is done ");
-                        }
+                        Log.d(TAG, "Tele-Verification is done ");
+
                         Intent intent = new
                             Intent(SubsidyUtility.ACTION_USER_REQUEST);
 
@@ -296,8 +301,8 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                         mActivationCallInitiated = false;
                         mContentView.setVisibility(View.GONE);
                         mEmergencyView.setVisibility(View.GONE);
-                        mProgressTitleView.setVisibility(View.VISIBLE);
                         mProgressView.setVisibility(View.VISIBLE);
+                        setSetupWifiButtonVisibility(View.GONE);
                     }
                     disableNavigationBar(false);
                 } else if (TelephonyManager.CALL_STATE_OFFHOOK
@@ -312,9 +317,15 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                 if (mProgressView.getVisibility() == View.VISIBLE) {
                     mContentView.setVisibility(View.VISIBLE);
                     mEmergencyView.setVisibility(View.VISIBLE);
-                    mProgressTitleView.setVisibility(View.VISIBLE);
                     mProgressView.setVisibility(View.GONE);
                 }
+                setSetupWifiButtonVisibility(View.VISIBLE);
             }
         };
+
+    public void setSetupWifiButtonVisibility(int isVisible) {
+        if (mSetupWifiButton != null) {
+            mSetupWifiButton.setVisibility(isVisible);
+        }
+    }
 }
