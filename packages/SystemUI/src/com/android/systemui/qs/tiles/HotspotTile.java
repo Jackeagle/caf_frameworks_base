@@ -26,10 +26,11 @@ import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.os.SystemProperties;
 import android.provider.Settings;
-
+import android.widget.Toast;
 import com.android.internal.logging.MetricsLogger;
 import com.android.systemui.Prefs;
 import com.android.systemui.R;
+import com.android.systemui.SysUIToast;
 import com.android.systemui.qs.QSTile;
 import com.android.systemui.qs.UsageTracker;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
