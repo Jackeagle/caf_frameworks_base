@@ -16,8 +16,6 @@
 
 package com.android.keyguard;
 
-import com.android.internal.telephony.ConfigResourceUtil;
-
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.SystemProperties;
@@ -256,7 +254,7 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView
                 || (subsidyStatus == SUBSIDYLOCK_RESTRICTED);
         SubscriptionInfo sir = SubscriptionManager.from(getContext())
                 .getActiveSubscriptionInfo(subId);
-        if (sir == null) {
+        if (sir == null || (sir.getMcc() == 0 || sir.getMnc() == 0)) {
             return false;
         }
         boolean isWhiteListed = isWhiteListed(
@@ -272,10 +270,10 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView
     private boolean isWhiteListed(String mcc, String mnc) {
         boolean mccAllowed = false;
         boolean mncAllowed = false;
-        String[] mccWhiteList = ConfigResourceUtil.getStringArray(
-                getContext(), "mccs_white_listed");
-        String[] mncsWhiteList = ConfigResourceUtil.getStringArray(
-                getContext(), "mncs_white_listed");
+        String[] mccWhiteList = getContext().getResources()
+                .getStringArray(R.array.mccs_white_listed);
+        String[] mncsWhiteList = getContext().getResources()
+                .getStringArray(R.array.mncs_white_listed);
         for (String mccRegEx : mccWhiteList) {
             mccAllowed |= Pattern.compile(mccRegEx).matcher(mcc).matches();
             if (mccAllowed) {
