@@ -52,6 +52,7 @@ public class SubsidyController {
     private SubsidyState mPreviousSubsidyState;
     private Context mContext;
     private boolean mStopStateTransitions = false;
+    private boolean mAllowDupIntentFromClient = false;
 
     private SubsidyController(Context context) {
         mContext = context;
@@ -78,6 +79,7 @@ public class SubsidyController {
                 || state == SubsidyLockState.DEVICE_LOCKED
                 || state == SubsidyLockState.SUBSIDY_STATUS_UNKNOWN) {
             mCurrentSubsidyState = new UnlockScreenState();
+            mAllowDupIntentFromClient = true;
         }
         if (state == SubsidyLockState.AP_UNLOCKED) {
             mCurrentSubsidyState = new ApUnlockedState();
@@ -94,10 +96,18 @@ public class SubsidyController {
                     Log.d(TAG, "Received intent for SubsidyLock feature " +  intent);
                 }
                 if (!mStopStateTransitions) {
-                    boolean isLocked = processIntent(intent);
-                    KeyguardUpdateMonitor.getInstance(mContext)
-                        .dispatchSubsidyLockStateChanged(isLocked);
-
+                    boolean isValid = processIntent(intent);
+                    Log.d(TAG, "Received different intent = "+ isValid);
+                    Log.d(TAG, "Previous state progress is still on = "+ mPreviousSubsidyState
+                            .getInProgressState());
+                    if (isValid || mPreviousSubsidyState.getInProgressState()
+                            || mAllowDupIntentFromClient) {
+                        KeyguardUpdateMonitor
+                                .getInstance(mContext)
+                                .dispatchSubsidyLockStateChanged(
+                                        mCurrentSubsidyState.isLocked());
+                        mAllowDupIntentFromClient = false;
+                    }
                     if (isDeviceUnLocked()) {
                         if (DEBUG) {
                             Log.d(TAG, " UnRegistered From  SLC");
@@ -133,9 +143,16 @@ public class SubsidyController {
         } else {
             return false;
         }
+
+        if (mPreviousSubsidyState.getClass().equals(
+                mCurrentSubsidyState.getClass())) {
+            Log.d(TAG, "Current state is same as previous so return");
+            return false;
+        }
+
         mCurrentSubsidyState.init(mContext);
 
-        return mCurrentSubsidyState.isLocked();
+        return true;
     }
 
     public void setDeviceUnlocked() {
@@ -161,7 +178,8 @@ public class SubsidyController {
         int viewId = 0;
         if (mCurrentSubsidyState != null) {
             viewId = mCurrentSubsidyState.getViewId();
-        } else if (mPreviousSubsidyState != null) {
+        }
+        if (mPreviousSubsidyState != null && viewId == 0) {
             viewId = mPreviousSubsidyState.getViewId();
         }
         if (viewId == 0) {
@@ -175,7 +193,8 @@ public class SubsidyController {
         int layoutId = 0;
         if (mCurrentSubsidyState != null) {
             layoutId = mCurrentSubsidyState.getLayoutId();
-        } else if (mPreviousSubsidyState != null) {
+        }
+        if (mPreviousSubsidyState != null && layoutId == 0) {
             layoutId = mPreviousSubsidyState.getLayoutId();
         }
         if (layoutId == 0) {
@@ -190,6 +209,7 @@ public class SubsidyController {
         protected int mLayoutId;
         protected int mViewId;
         protected String mExtraLaunchIntent;
+        private boolean mIsUserRequestInProgress;
 
         protected void init(final Context context) {
             final ConnectivityManager connectivityManager =
@@ -215,6 +235,14 @@ public class SubsidyController {
 
         protected boolean isLocked() {
             return false;
+        }
+
+        protected void setInProgressState(boolean isProgress) {
+            mIsUserRequestInProgress = isProgress;
+        }
+
+        protected boolean getInProgressState() {
+            return mIsUserRequestInProgress;
         }
 
         private void disableWifiTethering(Context context) {
@@ -279,7 +307,6 @@ public class SubsidyController {
         protected String getLaunchIntent(int resId) {
             return mExtraLaunchIntent;
         }
-
     }
 
     class ActivateScreenState extends ApLockedState {

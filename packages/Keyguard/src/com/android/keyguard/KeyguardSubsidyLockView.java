@@ -59,15 +59,16 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
     private Button mUnlockBtn;
     private Context mContext;
     private WifiSetupButton mSetupWifiButton;
+    private SubsidyController mController;
 
     public KeyguardSubsidyLockView(Context context) {
-        super(context);
-        mContext = context;
+        this(context, null);
     }
 
     public KeyguardSubsidyLockView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mContext = context;
+        mController = SubsidyController.getInstance(mContext);
     }
 
     @Override
@@ -95,11 +96,11 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                 mEmergencyView.setVisibility(View.GONE);
                 mProgressView.setVisibility(View.VISIBLE);
                 setSetupWifiButtonVisibility(View.GONE);
+                mController.getCurrentSubsidyState().setInProgressState(true);
                 Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
                 intent.setPackage(getResources().getString(
                         R.string.config_slc_package_name));
-                intent.putExtra(SubsidyController
-                    .getInstance(mContext).getCurrentSubsidyState()
+                intent.putExtra(mController.getCurrentSubsidyState()
                     .getLaunchIntent(0), true);
                 mContext.sendBroadcast(intent,
                     SubsidyUtility.BROADCAST_PERMISSION);
@@ -185,6 +186,8 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                     mContentView.setVisibility(View.VISIBLE);
                     mEmergencyView.setVisibility(View.VISIBLE);
                     mProgressView.setVisibility(View.GONE);
+                    mController.getCurrentSubsidyState()
+                        .setInProgressState(false);
                 }
                 setSetupWifiButtonVisibility(View.VISIBLE);
             }
