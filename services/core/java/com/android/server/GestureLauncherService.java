@@ -34,6 +34,7 @@ import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Slog;
@@ -323,7 +324,7 @@ public class GestureLauncherService extends SystemService {
                 Intent intent = new Intent(Intent.ACTION_CALL_PRIVILEGED,
                         Uri.fromParts("tel", mEmergencyNumber, null));
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(intent);
+                getContext().startActivityAsUser(intent, UserHandle.CURRENT);
             } else {
                 Slog.i(TAG, "Power button double tap gesture detected, launching camera. Interval="
                         + doubleTapInterval + "ms");
