@@ -1318,23 +1318,25 @@ public class Tethering extends BaseNetworkObserver {
                             break;
                         }
                         cleanupUpstream();
-                        if (newUpstreamIfaceName != null) {
-                            try {
-                                mNMService.enableNat(mIfaceName, newUpstreamIfaceName);
-                                mNMService.startInterfaceForwarding(mIfaceName,
-                                        newUpstreamIfaceName);
-                            } catch (Exception e) {
-                                Log.e(TAG, "Exception enabling Nat: " + e.toString());
-                                try {
-                                    mNMService.disableNat(mIfaceName, newUpstreamIfaceName);
-                                } catch (Exception ee) {}
-                                try {
-                                    mNMService.untetherInterface(mIfaceName);
-                                } catch (Exception ee) {}
+                        if (SystemProperties.getBoolean("persist.sys.disable_eogre", true) == true) {
+                            if (newUpstreamIfaceName != null) {
+                                 try {
+                                    mNMService.enableNat(mIfaceName, newUpstreamIfaceName);
+                                    mNMService.startInterfaceForwarding(mIfaceName,
+                                            newUpstreamIfaceName);
+                                } catch (Exception e) {
+                                     Log.e(TAG, "Exception enabling Nat: " + e.toString());
+                                    try {
+                                        mNMService.disableNat(mIfaceName, newUpstreamIfaceName);
+                                    } catch (Exception ee) {}
+                                    try {
+                                        mNMService.untetherInterface(mIfaceName);
+                                    } catch (Exception ee) {}
 
-                                setLastError(ConnectivityManager.TETHER_ERROR_ENABLE_NAT_ERROR);
-                                transitionTo(mInitialState);
-                                return true;
+                                    setLastError(ConnectivityManager.TETHER_ERROR_ENABLE_NAT_ERROR);
+                                    transitionTo(mInitialState);
+                                    return true;
+                                }
                             }
                         }
                         mMyUpstreamIfaceName = newUpstreamIfaceName;
@@ -1817,7 +1819,8 @@ public class Tethering extends BaseNetworkObserver {
             boolean mTryCell = !WAIT_FOR_NETWORK_TO_SETTLE;
             @Override
             public void enter() {
-                turnOnMasterTetherSettings(); // may transition us out
+                if (SystemProperties.getBoolean("persist.sys.disable_eogre", true) == true)
+                    turnOnMasterTetherSettings(); // may transition us out
                 startListeningForSimChanges();
 
                 mTryCell = !WAIT_FOR_NETWORK_TO_SETTLE; // better try something first pass
