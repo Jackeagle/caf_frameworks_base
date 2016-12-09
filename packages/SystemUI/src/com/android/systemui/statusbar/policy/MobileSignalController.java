@@ -390,8 +390,7 @@ public class MobileSignalController extends SignalController<
     }
 
     private boolean isMobileIms() {
-        if (mStyle != STATUS_BAR_STYLE_EXTENDED || mServiceState == null ||
-                (mServiceState.getVoiceRegState() != ServiceState.STATE_IN_SERVICE)) {
+        if (mStyle != STATUS_BAR_STYLE_EXTENDED) {
             return false;
         }
 
