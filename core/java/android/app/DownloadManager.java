@@ -1041,24 +1041,7 @@ public class DownloadManager {
             if (cursor.moveToFirst()) {
                 int status = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_STATUS));
                 if (DownloadManager.STATUS_SUCCESSFUL == status) {
-                    int indx = cursor.getColumnIndexOrThrow(
-                            Downloads.Impl.COLUMN_DESTINATION);
-                    int destination = cursor.getInt(indx);
-                    // TODO: if we ever add API to DownloadManager to let the caller specify
-                    // non-external storage for a downloaded file, then the following code
-                    // should also check for that destination.
-                    if (destination == Downloads.Impl.DESTINATION_CACHE_PARTITION ||
-                            destination == Downloads.Impl.DESTINATION_SYSTEMCACHE_PARTITION ||
-                            destination == Downloads.Impl.DESTINATION_CACHE_PARTITION_NOROAMING ||
-                            destination == Downloads.Impl.DESTINATION_CACHE_PARTITION_PURGEABLE) {
-                        // return private uri
-                        return ContentUris.withAppendedId(Downloads.Impl.CONTENT_URI, id);
-                    } else {
-                        // return public uri
-                        String path = cursor.getString(
-                                cursor.getColumnIndexOrThrow(COLUMN_LOCAL_FILENAME));
-                        return Uri.fromFile(new File(path));
-                    }
+                    return ContentUris.withAppendedId(Downloads.Impl.ALL_DOWNLOADS_CONTENT_URI, id);
                 }
             }
         } finally {
@@ -1279,7 +1262,7 @@ public class DownloadManager {
      * @hide
      */
     public Uri getDownloadUri(long id) {
-        return ContentUris.withAppendedId(mBaseUri, id);
+        return ContentUris.withAppendedId(Downloads.Impl.ALL_DOWNLOADS_CONTENT_URI, id);
     }
 
     /**
@@ -1360,7 +1343,7 @@ public class DownloadManager {
 
             // return content URI for cache download
             long downloadId = getLong(getColumnIndex(Downloads.Impl._ID));
-            return ContentUris.withAppendedId(mBaseUri, downloadId).toString();
+            return ContentUris.withAppendedId(Downloads.Impl.ALL_DOWNLOADS_CONTENT_URI, downloadId).toString();
         }
 
         private long getReason(int status) {
