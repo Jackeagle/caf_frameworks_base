@@ -28,6 +28,6 @@ oneway interface IGpsStatusListener
     void onFirstFix(int ttff);
     void onSvStatusChanged(int svCount, in int[] prns, in float[] snrs,
             in float[] elevations, in float[] azimuths,
-            int ephemerisMask, int almanacMask, int usedInFixMask, in long[] gnssUsedInFixMask);
+            int ephemerisMask, int almanacMask, int usedInFixMask, in long[] gnssSvMask);
     void onNmeaReceived(long timestamp, String nmea);
 }
