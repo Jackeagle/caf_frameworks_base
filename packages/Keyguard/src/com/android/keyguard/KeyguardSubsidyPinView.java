@@ -75,7 +75,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     }
 
     public void resetState() {
-        super.resetState();
+        mPasswordEntry.setEnabled(true);
         showDefaultMessage();
     }
 
@@ -229,6 +229,17 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         } else {
             resetState();
         }
+    }
+    @Override
+    protected void resetPasswordText(boolean animate) {
+        super.resetPasswordText(animate);
+        setOkButtonEnabled(false);
+    }
+
+    @Override
+    protected void onUserInput() {
+        super.onUserInput();
+        setOkButtonEnabled(mPasswordEntry.getText().length() > 0);
     }
 
     public void handleErrorCase() {
