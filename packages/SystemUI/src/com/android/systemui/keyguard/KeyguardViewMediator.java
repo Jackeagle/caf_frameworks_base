@@ -418,7 +418,7 @@ public class KeyguardViewMediator extends SystemUI {
             }
 
             int size = mKeyguardStateCallbacks.size();
-            boolean simPinSecure = mUpdateMonitor.isSimPinSecure();
+            boolean simPinSecure = mUpdateMonitor.isSimPinSecure() || mIsSubsidyOrDeviceLocked;
             for (int i = size - 1; i >= 0; i--) {
                 try {
                     mKeyguardStateCallbacks.get(i).onSimSecureStateChanged(simPinSecure);
