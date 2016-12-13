@@ -4469,7 +4469,8 @@ public class AudioService extends IAudioService.Stub {
                     new Thread(new Runnable() {
                         boolean loaded = onLoadSoundEffects();
                         public void run() {
-                            if (msg_load.obj != null) {
+                            if (msg_load.obj != null &&
+                                    msg_load.obj instanceof LoadSoundEffectReply) {
                                 LoadSoundEffectReply reply = (LoadSoundEffectReply)msg_load.obj;
                                 synchronized (reply) {
                                     reply.mStatus = loaded ? 0 : -1;
