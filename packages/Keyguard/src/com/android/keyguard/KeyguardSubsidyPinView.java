@@ -61,7 +61,6 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     private ProgressDialog mUnlockProgressDialog = null;
     private int mRetryAttemptRemaining;
     private CountDownTimer mCountDownTimer;
-    private long mDeadLineTime;
     private WifiSetupButton mSetupWifiButton;
 
     public KeyguardSubsidyPinView(Context context) {
@@ -223,7 +222,8 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         }
         resetPasswordText(false /* animate */);
         // if the user is currently locked out, enforce it.
-        long deadline = getDeadlineTime();
+        long deadline = mLockPatternUtils.getLockoutAttemptDeadline(
+                KeyguardUpdateMonitor.getCurrentUser());
         if (shouldLockout(deadline)) {
             handleAttemptLockout(deadline);
         } else {
@@ -258,8 +258,9 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
             int attemptTimeOut =
                     mContext.getResources().getInteger(
                             R.integer.config_timeout_after_max_attempt_milli);
-            mDeadLineTime = SystemClock.elapsedRealtime() + attemptTimeOut;
-            handleAttemptLockout(mDeadLineTime);
+            long deadline = mLockPatternUtils.setLockoutAttemptDeadline(
+                    KeyguardUpdateMonitor.getCurrentUser(), attemptTimeOut);
+            handleAttemptLockout(deadline);
         }
         resetPasswordText(true);
         mCallback.userActivity();
@@ -271,7 +272,8 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
 
         final long elapsedRealtime = SystemClock.elapsedRealtime();
 
-        mCountDownTimer =
+        if (mCountDownTimer == null) {
+            mCountDownTimer =
                 new CountDownTimer(elapsedRealtimeDeadline - elapsedRealtime,
                         1000) {
                     @Override
@@ -303,11 +305,12 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                             Log.v(TAG, "CountDownTimer onFinish called");
                         }
                         mRetryAttemptRemaining = getTotalRetryAttempts();
-                        setPasswordEntryEnabled(true);
-                        showDefaultMessage();
+                        resetState();
+                        mCountDownTimer = null;
                     }
 
                 }.start();
+        }
     }
 
     private abstract class CheckUnlockPin extends Thread {
@@ -353,17 +356,11 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         }
     }
 
-    public long getDeadlineTime() {
-        final long now = SystemClock.elapsedRealtime();
-        if (mDeadLineTime < now && mDeadLineTime != 0) {
-            return 0L;
-        }
-        return mDeadLineTime;
-    }
-
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        KeyguardUpdateMonitor.getInstance(mContext).registerCallback(
+                mInfoCallback);
         mSetupWifiButton =
                 (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
         setSetupWifiButtonVisibility(View.VISIBLE);
@@ -372,8 +369,27 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        KeyguardUpdateMonitor.getInstance(mContext).removeCallback(
+                mInfoCallback);
         mSetupWifiButton = null;
     }
+
+    KeyguardUpdateMonitorCallback mInfoCallback =
+            new KeyguardUpdateMonitorCallback() {
+                @Override
+                public void onSubsidyLockStateChanged(boolean isLocked) {
+                    if (!isLocked) {
+                        mLockPatternUtils.setLockoutAttemptDeadline(
+                                KeyguardUpdateMonitor.getCurrentUser(), 0);
+                        if (mCountDownTimer != null) {
+                            mCountDownTimer.cancel();
+                            mCountDownTimer = null;
+                        }
+                        mRetryAttemptRemaining = getTotalRetryAttempts();
+                        showDefaultMessage();
+                    }
+                }
+            };
 
     public void setSetupWifiButtonVisibility(int isVisible) {
         if (mSetupWifiButton != null) {
