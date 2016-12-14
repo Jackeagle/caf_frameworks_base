@@ -38,6 +38,7 @@ import android.view.View;
 import android.widget.TextView;
 import android.os.SystemProperties;
 
+import com.android.internal.telephony.CarrierAppUtils;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.IccCardConstants.State;
 import com.android.internal.telephony.TelephonyIntents;
@@ -50,6 +51,8 @@ public class CarrierText extends TextView {
 
     private static CharSequence mSeparator;
 
+    private static CharSequence mCarrierTextSeparator;
+
     private final boolean mIsEmergencyCallCapable;
 
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -59,6 +62,8 @@ public class CarrierText extends TextView {
     private boolean[] mSimMissingState = new boolean[TelephonyManager.getDefault().getPhoneCount()];
 
     private final boolean mDisplayNoSim;
+
+    private static CarrierAppUtils.CARRIER mCarrierId = CarrierAppUtils.getCarrierId();
 
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
         @Override
@@ -331,6 +336,7 @@ public class CarrierText extends TextView {
         super.onFinishInflate();
         mSeparator = getResources().getString(
                 com.android.internal.R.string.kg_text_message_separator);
+        mCarrierTextSeparator = getResources().getString(R.string.carrier_text_separator);
         boolean shouldMarquee = KeyguardUpdateMonitor.getInstance(mContext).isDeviceInteractive();
         setSelected(shouldMarquee); // Allow marquee to work.
     }
@@ -479,7 +485,14 @@ public class CarrierText extends TextView {
         final boolean plmnValid = !TextUtils.isEmpty(plmn);
         final boolean spnValid = !TextUtils.isEmpty(spn);
         if (plmnValid && spnValid) {
-            return new StringBuilder().append(plmn).append(mSeparator).append(spn).toString();
+            if (mCarrierId != null && (CarrierAppUtils.CARRIER.TELEPHONY_CARRIER_ONE
+                 == mCarrierId)) {
+                return new StringBuilder().append(plmn)
+                        .append(mCarrierTextSeparator).append(spn).toString();
+            } else {
+                return new StringBuilder().append(plmn)
+                        .append(mSeparator).append(spn).toString();
+            }
         } else if (plmnValid) {
             return plmn;
         } else if (spnValid) {
