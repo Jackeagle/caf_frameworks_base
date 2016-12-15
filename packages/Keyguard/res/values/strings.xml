@@ -420,6 +420,7 @@
         <item quantity="one">SIM is now disabled. Enter PUK code to continue. You have <xliff:g id="number">%d</xliff:g> remaining attempt before SIM becomes permanently unusable. Contact carrier for details.</item>
         <item quantity="other">SIM is now disabled. Enter PUK code to continue. You have <xliff:g id="number">%d</xliff:g> remaining attempts before SIM becomes permanently unusable. Contact carrier for details.</item>
     </plurals>
+    <string name="kg_hint_text_to_release_key_to_unlock">Release \u0020 <![CDATA[ <img src="ic_star.png"/>]]> \u0020 to unlock</string>
     <!-- Carrier Name -->
     <string name="China_Mobile">China Mobile</string>
     <string name="China_Unicom">China Unicom</string>

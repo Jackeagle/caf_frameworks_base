@@ -213,6 +213,16 @@
                />
        </LinearLayout>
     </LinearLayout>
+    <include
+        android:id="@+id/key_notify"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        layout="@layout/keyguard_notify" />
+    <Space android:id="@+id/key_space"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight=".5"
+     />
     <include layout="@layout/keyguard_eca"
                    android:id="@+id/keyguard_selector_fade_container"
                    android:layout_width="match_parent"
