@@ -43,7 +43,9 @@ import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import android.view.View.OnKeyListener;
+import android.view.KeyEvent;
+import android.util.Log;
 /**
  * This widget implements the dynamic action bar tab behavior that can change
  * across different configurations or circumstances.
@@ -285,12 +287,36 @@ public class ScrollingTabContainerView extends HorizontalScrollView
                     mContentHeight));
         } else {
             tabView.setFocusable(true);
-
+            //focus is needed but background should bot get highlighted
+            tabView.setBackgroundDrawable(null);
             if (mTabClickListener == null) {
                 mTabClickListener = new TabClickListener();
             }
             tabView.setOnClickListener(mTabClickListener);
+            //content functionality handling done to support LEFT and RIGHT
+            // movement
+            tabView.setOnKeyListener(new OnKeyListener() {
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+
+                    if (event.getAction() == KeyEvent.ACTION_UP) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                                || keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                            TabView tabView = (TabView) v;
+                            tabView.getTab().select();
+                            final int tabCount = mTabLayout.getChildCount();
+                            for (int i = 0; i < tabCount; i++) {
+                                final View child = mTabLayout.getChildAt(i);
+                                child.setSelected(child == v);
+                            }
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            });
         }
+        //According to 5700 UI requirements removing focus to the tabview of the ActionBar
+        tabView.setFocusable(false);
         return tabView;
     }
 

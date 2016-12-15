@@ -33,8 +33,8 @@ key 11    0
 key 158   BACK              WAKE_DROPPED
 key 230   SOFT_RIGHT        WAKE
 key 60    SOFT_RIGHT        WAKE
-key 107   ENDCALL           WAKE_DROPPED
-key 62    ENDCALL           WAKE_DROPPED
+key 107   ENDCALL
+key 62    ENDCALL
 key 229   MENU              WAKE_DROPPED
 key 139   MENU              WAKE_DROPPED
 key 59    MENU              WAKE_DROPPED

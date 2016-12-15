@@ -121,12 +121,12 @@ key 98    NUMPAD_DIVIDE
 key 99    SYSRQ
 key 100   ALT_RIGHT
 # key 101 "KEY_LINEFEED"
-key 102   MOVE_HOME
+key 102   HOME
 key 103   DPAD_UP
 key 104   PAGE_UP
 key 105   DPAD_LEFT
 key 106   DPAD_RIGHT
-key 107   MOVE_END
+key 107   ENDCALL
 key 108   DPAD_DOWN
 key 109   PAGE_DOWN
 key 110   INSERT
@@ -169,6 +169,7 @@ key 143   POWER             WAKE
 # key 147 "KEY_XFER"
 # key 148 "KEY_PROG1"
 # key 149 "KEY_PROG2"
+#key 249   PTT
 key 150   EXPLORER
 # key 151 "KEY_MSDOS"
 key 152   POWER             WAKE
@@ -188,7 +189,7 @@ key 165   MEDIA_PREVIOUS
 key 166   MEDIA_STOP
 key 167   MEDIA_RECORD
 key 168   MEDIA_REWIND
-key 169   CALL
+key 231   CALL
 # key 170 "KEY_ISO"
 key 171   MUSIC
 key 172   HOME
@@ -205,8 +206,11 @@ key 180   NUMPAD_RIGHT_PAREN
 # key 183   F13
 # key 184   F14
 # key 185   F15
+key 185   CLEAR
 # key 186   F16
+#key 186   FLASH
 # key 187   F17
+#key 187   SPK_TOGGLE
 # key 188   F18
 # key 189   F19
 # key 190   F20
@@ -232,7 +236,7 @@ key 208   MEDIA_FAST_FORWARD
 # key 210 "KEY_PRINT"
 # key 211 "KEY_HP"
 key 212   CAMERA
-key 213   MUSIC
+key 213   POUND
 # key 214 "KEY_QUESTION"
 key 215   ENVELOPE
 # key 216 "KEY_CHAT"
@@ -299,10 +303,10 @@ key 317   BUTTON_THUMBL
 key 318   BUTTON_THUMBR
 
 
-# key 352 "KEY_OK"
+key 352   ENTER
 key 353   DPAD_CENTER
 # key 354 "KEY_GOTO"
-# key 355 "KEY_CLEAR"
+key 355   STAR
 # key 356 "KEY_POWER2"
 # key 357 "KEY_OPTION"
 # key 358 "KEY_INFO"

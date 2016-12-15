@@ -1344,7 +1344,7 @@
     <!-- This enum provides the same keycode values as can be found in
         {@link android.view.KeyEvent}. -->
     <attr name="keycode">
-        <enum name="KEYCODE_UNKNOWN" value="0" />
+       <!-- <enum name="KEYCODE_UNKNOWN" value="0" />
         <enum name="KEYCODE_SOFT_LEFT" value="1" />
         <enum name="KEYCODE_SOFT_RIGHT" value="2" />
         <enum name="KEYCODE_HOME" value="3" />
@@ -1566,7 +1566,7 @@
         <enum name="KEYCODE_ASSIST" value="219" />
         <enum name="KEYCODE_BRIGHTNESS_DOWN" value="220" />
         <enum name="KEYCODE_BRIGHTNESS_UP" value="221" />
-        <enum name="KEYCODE_MEDIA_AUDIO_TRACK" value="222" />
+        <enum name="KEYCODE_MEDIA_AUDIO_TRACK" value="222" />-->
     </attr>
 
     <!-- ***************************************************************** -->

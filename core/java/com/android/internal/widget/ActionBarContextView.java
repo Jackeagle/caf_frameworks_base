@@ -286,7 +286,8 @@ public class ActionBarContextView extends AbsActionBarView implements AnimatorLi
     @Override
     public boolean showOverflowMenu() {
         if (mActionMenuPresenter != null) {
-            return mActionMenuPresenter.showOverflowMenu();
+            //disabling overflow menu
+            return false;
         }
         return false;
     }

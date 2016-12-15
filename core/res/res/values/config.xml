@@ -1511,4 +1511,7 @@
    <integer name="ascrollboost_pcdisbl">0</integer>
    <!-- Configuration to add vibrate with ringtone option -->
    <bool name="config_addVibrateWithRingtoneOption">false</bool>
+
+   <!-- Config flag to enable UI optimizations related to layout cuts, font issues-->
+   <bool name="config_ui_optimization">false</bool>
 </resources>

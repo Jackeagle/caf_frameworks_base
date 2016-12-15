@@ -630,7 +630,8 @@ public class ActionBarView extends AbsActionBarView {
                 // a bit easier for developers in the common case.
                 // (It would be silly to show it as up without responding to it.)
                 if (setUp) {
-                    setHomeButtonEnabled(true);
+                    // Setting the default Home enabled value to false
+                    setHomeButtonEnabled(false);
                 }
             }
 
@@ -1398,7 +1399,8 @@ public class ActionBarView extends AbsActionBarView {
         }
 
         public void setShowUp(boolean isUp) {
-            mUpView.setVisibility(isUp ? VISIBLE : GONE);
+            //Default Arrow key Visibility is set to GONE
+            mUpView.setVisibility(GONE);
         }
 
         public void setShowIcon(boolean showIcon) {
