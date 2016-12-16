@@ -1015,10 +1015,7 @@ public abstract class PagedView extends ViewGroup implements ViewGroup.OnHierarc
                 return true;
             }
         } else if (direction == View.FOCUS_RIGHT) {
-            if (getCurrentPage() < getPageCount() - 1) {
-                snapToPage(getCurrentPage() + 1);
                 return true;
-            }
         }
         return super.dispatchUnhandledMove(focused, direction);
     }

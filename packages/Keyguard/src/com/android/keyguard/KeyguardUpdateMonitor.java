@@ -47,6 +47,7 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.provider.Settings;
+import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
 
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.MSimConstants;
@@ -1310,7 +1311,8 @@ public class KeyguardUpdateMonitor {
 
     public void reportSimUnlocked(int subscription) {
         if (DEBUG) Log.d(TAG, "reportSimUnlocked(" + subscription + ")");
-        handleSimStateChange(new SimArgs(IccCardConstants.State.READY, subscription));
+        mSimState[subscription] = IccCardConstants.State.READY;
+        handleSimStateChange(new SimArgs(mSimState[subscription], subscription));
     }
 
     /**
@@ -1455,4 +1457,29 @@ public class KeyguardUpdateMonitor {
     public boolean isScreenOn() {
         return mScreenOn;
     }
+
+    /* <CDR-EAS-510> Start */
+    private boolean mTimeoutInProgress;
+    private SecurityMode mCurrentlyLockedMode = SecurityMode.Invalid;
+    //Set true when lock screen timeout in running, false otherwise.
+    void setTimeoutInProgress(boolean progress) {
+        mTimeoutInProgress = progress;
+    }
+
+    //Returns true if lock screen timeout is running.
+    boolean isTimeoutInProgress() {
+        return mTimeoutInProgress;
+    }
+
+    // A setter to set current locked mode.
+    void setCurrentSecuritySelection(SecurityMode mode) {
+        Log.d(TAG, "Currently locked mode: "+ mode );
+        mCurrentlyLockedMode = mode;
+    }
+
+    // A getter to know current locked mode.
+    SecurityMode getCurrentSecuritySelection() {
+        return mCurrentlyLockedMode;
+    }
+    /* <CDR-EAS-510> End */
 }

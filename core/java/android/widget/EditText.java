@@ -26,7 +26,7 @@ import android.text.method.MovementMethod;
 import android.util.AttributeSet;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-
+import android.view.KeyEvent;
 
 /*
  * This is supposed to be a *very* thin veneer over TextView.
@@ -117,7 +117,46 @@ public class EditText extends TextView {
         super.setEllipsize(ellipsis);
     }
 
-    @Override
+    /**
+     * @hide
+     * Api called by application to trigger the start of the selection of text
+     * @param str Start index to be passed to initiate the text selection traversal
+     * @param enable Enables the text selection highlightment
+     * @return void
+     */
+    public void setStartIndex(int str, boolean enable) {
+
+        setPerformactionMode(0,str,enable);
+    }
+
+    /**
+     * @hide
+     * Api called to trigger the paste from the application context
+     * @param value defines the end index where the clipboard data has to be pasted
+     */
+    public void setPaste(int value) {
+        if (getEditor() != null) {
+            getEditor().setPaste();
+        }
+    }
+
+    /**
+     * @hide
+     * Api used to trigger the actionmode
+     */
+    public void setPerformactionMode(int start ,int end, boolean value) {
+        if (getEditor() != null) {
+            //Trigger the action mode to show copy/paste
+            setSelectionFlag(true);
+            if(!value)
+            {
+              selectAllText();
+            }
+            getEditor().startSelectionActionMode();
+
+        }
+    }
+
     public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
         super.onInitializeAccessibilityEvent(event);
         event.setClassName(EditText.class.getName());
@@ -127,5 +166,37 @@ public class EditText extends TextView {
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
         info.setClassName(EditText.class.getName());
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (getEditor() != null) {
+            if (getSelectionFlag() && ((keyCode == KeyEvent.KEYCODE_ENTER))) {
+                setSelectionFlag(false);
+                getEditor().stopSelectionActionMode();
+                return true;
+            }
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+
+        // if selection is set for every keyevent up,down,right and left trigger the actionmode 
+        if (getSelectionFlag()) {
+            if ((event.getAction() == KeyEvent.ACTION_UP)
+                    && ((keyCode == KeyEvent.KEYCODE_DPAD_UP)
+                            || (keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
+                            || (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) || (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT))
+                            && (getSelectionStart() != getSelectionEnd())) {
+
+                setPerformactionMode(0, 0, true);
+
+            }
+
+        }
+        return super.onKeyUp(keyCode, event);
+
     }
 }

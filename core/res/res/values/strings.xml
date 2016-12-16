@@ -4579,4 +4579,8 @@
     
     <!-- TORCH NOTIFICATION STRINGS END-->
     <string name="cancelSel">Cancel Selection</string>
+    <!-- borqs_india:Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permlab_notification_led">Notification LED</string>
+    <!-- borqs_india: Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permdesc_notification_led">Allows the app to control Notification LED.</string>
 </resources>

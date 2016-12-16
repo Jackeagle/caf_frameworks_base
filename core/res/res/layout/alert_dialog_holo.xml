@@ -39,13 +39,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical|start"
+            android:gravity="center_horizontal|bottom"
             android:minHeight="@dimen/alert_dialog_title_height"
             android:layout_marginStart="16dip"
             android:layout_marginEnd="16dip">
             <ImageView android:id="@+id/icon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:paddingEnd="8dip"
                 android:src="@null" />
             <com.android.internal.widget.DialogTitle android:id="@+id/alertTitle"

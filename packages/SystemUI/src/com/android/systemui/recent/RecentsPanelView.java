@@ -62,10 +62,13 @@ import android.widget.ImageView.ScaleType;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 
+import android.view.KeyEvent;
+
 import com.android.systemui.R;
 import com.android.systemui.statusbar.BaseStatusBar;
 import com.android.systemui.statusbar.StatusBarPanel;
 import com.android.systemui.statusbar.phone.PhoneStatusBar;
+import android.os.Handler;
 
 import java.util.ArrayList;
 
@@ -87,13 +90,14 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
     private boolean mCallUiHiddenBeforeNextReload;
 
     private RecentTasksLoader mRecentTasksLoader;
-    private ArrayList<TaskDescription> mRecentTaskDescriptions;
+    /*private*/ public ArrayList<TaskDescription> mRecentTaskDescriptions;
     private TaskDescriptionAdapter mListAdapter;
     private int mThumbnailWidth;
     private boolean mFitThumbnailToXY;
     private int mRecentItemLayoutId;
     private boolean mHighEndGfx;
     private TextView mClearRecents;
+    private View mCurrentFocusedView;
 
     public static interface RecentsScrollView {
         public int numItemsInOneScreenful();
@@ -354,8 +358,10 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
 
             onAnimationEnd(null);
             setFocusable(true);
-            setFocusableInTouchMode(true);
+            //setFocusableInTouchMode(true);
             requestFocus();
+            bringFocusToChild();
+
         } else {
             mWaitingToShow = false;
             // call onAnimationEnd() and clearRecentTasksList() in onUiHidden()
@@ -772,6 +778,7 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
             return;
         }
         if (DEBUG) Log.v(TAG, "Jettison " + ad.getLabel());
+
         mRecentTaskDescriptions.remove(ad);
         mRecentTasksLoader.remove(ad);
 
@@ -795,6 +802,7 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
             sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
             setContentDescription(null);
         }
+        bringFocusToChild();
     }
 
     private void startApplicationDetailsActivity(String packageName) {
@@ -827,6 +835,7 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
             public boolean onMenuItemClick(MenuItem item) {
                 if (item.getItemId() == R.id.recent_remove_item) {
                     ((ViewGroup) mRecentsContainer).removeViewInLayout(selectedView);
+                    bringFocusToChild();
                 } else if (item.getItemId() == R.id.recent_inspect_item) {
                     ViewHolder viewHolder = (ViewHolder) selectedView.getTag();
                     if (viewHolder != null) {
@@ -872,4 +881,69 @@ public class RecentsPanelView extends FrameLayout implements OnItemClickListener
         }
         mRecentsContainer.drawFadedEdges(canvas, left, right, top, bottom);
     }
+
+        public void handleKeyPress(int keyCode, View selectedView, View anchorView, View thumbnailView){
+            mCurrentFocusedView = selectedView;
+            if (keyCode == KeyEvent.KEYCODE_ENTER) {
+                handleOnClick(selectedView);
+            } else if (keyCode == KeyEvent.KEYCODE_MENU) {
+                if( mContext instanceof RecentsActivity ) {
+                ((RecentsActivity) mContext).openOptionsMenu();
+                }
+            }
+        }
+
+
+    public void removeView() {
+        if( mCurrentFocusedView != null ) { // To handle NullPointerException
+            if( mRecentsContainer instanceof ViewGroup && mRecentsContainer != null ) {
+                ((ViewGroup) mRecentsContainer).removeViewInLayout(mCurrentFocusedView);
+            }
+        }
+        bringFocusToChild();
+    }
+
+    public void inspectView() {
+        if( mCurrentFocusedView != null ) { // To handle NullPointerException
+            ViewHolder viewHolder = (ViewHolder) mCurrentFocusedView.getTag();
+                if (viewHolder != null) {
+                    final TaskDescription ad = viewHolder.taskDescription;
+                    if( ad != null ) {
+                        startApplicationDetailsActivity(ad.packageName);
+                        show(false);
+                    }
+                } else {
+                    throw new IllegalStateException("Oops, no tag on view " + mCurrentFocusedView);
+                }
+        }
+    }
+
+    public void bringFocusToChild()  {
+        final Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (mRecentsContainer != null) {
+                    ViewGroup container = (ViewGroup) mRecentsContainer;
+                    if (container instanceof RecentsScrollView) {
+                        container = (ViewGroup) container.findViewById(
+                            R.id.recents_linear_layout);
+                    }
+                    if( mRecentTaskDescriptions != null && mRecentTaskDescriptions.size() > 0 ) { // nullpointer exception
+                        // index is reverse since most recent appears at the bottom...
+                        View firstChild = container.getChildAt(mRecentTaskDescriptions.size() - 1);
+                        //View firstChild = container.getChildAt(0);
+                        if( container.isInTouchMode() ) {
+                            // if DUT is in touch mode, then clear the focus
+                            container.clearFocus();
+                        } else {
+                            // if DUT is in nontouch mode, then request focus for the recently added task thumbnail
+                            if( firstChild!= null ) firstChild.requestFocus();
+                        }
+                    }
+               }
+            }
+        }, 500);
+    }
+
 }

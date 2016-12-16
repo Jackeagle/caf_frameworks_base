@@ -1468,6 +1468,14 @@
         android:description="@string/permdesc_readSyncStats"
         android:label="@string/permlab_readSyncStats" />
 
+    <!-- borqs_india: Allows System apps to access Notification LED
+    <p>Not for use by third-party applications.
+         @hide-->
+    <permission android:name="android.permission.NOTIFICATION_LED"
+        android:permissionGroup="android.permission-group.HARDWARE_CONTROLS"
+        android:protectionLevel="signature"
+        android:label="@string/permlab_notification_led"
+        android:description="@string/permdesc_notification_led" />
 
     <!-- ============================================ -->
     <!-- Permissions for low-level system interaction -->
