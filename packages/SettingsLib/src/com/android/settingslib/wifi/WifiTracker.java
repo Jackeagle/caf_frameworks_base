@@ -370,6 +370,7 @@ public class WifiTracker {
                     if (result.isPasspointNetwork()) {
                         WifiConfiguration config = mWifiManager.getMatchingWifiConfig(result);
                         if (config != null) {
+                            accessPoint.foundInScanResult = true;
                             accessPoint.update(config);
                         }
                     }
@@ -379,6 +380,7 @@ public class WifiTracker {
                             && connectionConfig != null && connectionConfig.isPasspoint()) {
                         /* This network is connected via this passpoint config */
                         /* SSID match is not going to work for it; so update explicitly */
+                        accessPoint.foundInScanResult = true;
                         accessPoint.update(connectionConfig);
                     }
 
