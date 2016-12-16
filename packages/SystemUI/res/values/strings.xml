@@ -536,4 +536,5 @@
 
     <string name="roamingTextSearching">Searching for Service</string>
     <string name="quick_settings_dds_sub">Card <xliff:g id="number">%d</xliff:g> data</string>
+     <string name="no_clearable_notification">No Claerable notification</string>
 </resources>

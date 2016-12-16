@@ -28,4 +28,5 @@ public interface RecentsCallback {
     void handleSwipe(View selectedView);
     void handleLongPress(View selectedView, View anchorView, View thumbnailView);
     void dismiss();
+    void handleKeyPress(int keyCode, View selectedView, View anchorView, View thumbnailView);
 }

@@ -134,7 +134,6 @@ public class TimePickerDialog extends AlertDialog
 
     @Override
     protected void onStop() {
-        tryNotifyTimeSet();
         super.onStop();
     }
 

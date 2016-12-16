@@ -17,15 +17,19 @@
 package com.android.server;
 
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.IHardwareService;
 import android.os.ServiceManager;
 import android.os.Message;
+import android.provider.Settings;
 import android.util.Slog;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import android.content.pm.PackageInfo;
+import android.util.Log;
 
 public class LightsService {
     private static final String TAG = "LightsService";
@@ -190,11 +194,298 @@ public class LightsService {
             if (on) {
                 getLight(LIGHT_ID_BUTTONS).setBrightness(mButtonBrightness);
 
-                mLightHandler.sendMessageDelayed(
+                //Set the display timeout of the device to key backlight as well
+                if (mContext != null) {
+                    ContentResolver resolver = mContext.getContentResolver();
+                    long keypadBacklightTime = Settings.System.getLong(resolver,
+                        Settings.System.SCREEN_OFF_TIMEOUT,mButtonLightTimeout);
+                    mLightHandler.sendMessageDelayed(
                         mLightHandler.obtainMessage(MSG_BBL_TIMEOUT),
-                        mButtonLightTimeout);
+                          keypadBacklightTime);
+                } else{
+                    mLightHandler.sendMessageDelayed(
+                        mLightHandler.obtainMessage(MSG_BBL_TIMEOUT),
+                           mButtonLightTimeout);
+                }
             } else {
                 getLight(LIGHT_ID_BUTTONS).setBrightness(0);
+            }
+        }
+
+        //borqs_india,start: to toggle speaker led on/off
+        private final String SPEAKER_LED = "/sys/class/leds/speaker-led/blink";
+        private final byte[] SPEAKER_LIGHT_ON = { '1' };
+        private final byte[] SPEAKER_LIGHT_OFF = { '0' };
+        //borqs_india, end
+
+        /**
+         *@hide
+         *borqs_india: turn Speaker led on
+         */
+        public void setSpeakerLedOn(boolean on){
+            synchronized(this){
+                try {
+                    FileOutputStream spkrLedFos = new FileOutputStream(SPEAKER_LED);
+                    if(on)
+                        spkrLedFos.write(SPEAKER_LIGHT_ON);
+                    else
+                        spkrLedFos.write(SPEAKER_LIGHT_OFF);
+                    spkrLedFos.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+       //borqs_india, start: to toggle notification led on/off
+        private final String NOTIFY_RED_LED = "/sys/class/leds/red/brightness";
+        private final String NOTIFY_GREEN_LED = "/sys/class/leds/green/brightness";
+        private final String NOTIFY_GREEN_LED_BLINK = "/sys/class/leds/green/blink";
+        private final String NOTIFY_RED_LED_BLINK = "/sys/class/leds/red/blink";
+        private final String NOTIFY_RED_LED_RAMP_STEP_MS = "/sys/class/leds/red/ramp_step_ms";
+        private final String NOTIFY_GREEN_LED_RAMP_STEP_MS = "/sys/class/leds/green/ramp_step_ms";
+        private final String NOTIFY_RED_LED_DUTY_PCTS = "/sys/class/leds/red/duty_pcts";
+        private final String NOTIFY_GREEN_LED_DUTY_PCTS = "/sys/class/leds/green/duty_pcts";
+
+        private final byte[] RAMP_STEP_MS = {'1','0','0'};
+        private final byte[] NOTIFICATION_LIGHT_ON = { '2', '5', '5'};
+        private final byte[] NOTIFICATION_LIGHT_OFF = { '0' };
+        private final byte[] NOTIFICATION_LIGHT_BLINK = {'1'};
+       //borqs_india, end
+        /**
+         * borqs_india: to check whether calling package has permission or not
+         */
+        private boolean checkCallingPkgPermission(String permission)
+        {
+            PackageManager pm = mContext.getPackageManager();
+            String callingPkg = pm.getNameForUid(getCallingUid());
+            if(callingPkg.equals("android.uid.system:"+android.os.Process.SYSTEM_UID))
+                return true;
+            try {
+                PackageInfo info = pm.getPackageInfo(callingPkg, PackageManager.GET_PERMISSIONS);
+                    if (info.requestedPermissions != null) {
+                        for (String p : info.requestedPermissions) {
+                            if (p.equals(permission)) {
+                                return true;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                      Log.e(TAG,"Error processing package:"+callingPkg);
+                      e.printStackTrace();
+                }
+            return false;
+        }
+       /**
+         *@hide
+         *borqs_india: turn notification red led on/off
+         */
+        public void setNotificationRedLedOn(boolean on){
+            if (!checkCallingPkgPermission(android.Manifest.permission.NOTIFICATION_LED)) {
+                throw new SecurityException("Requires NOTIFICATION_LED permission");
+            }
+            synchronized(this){
+                try {
+                    FileOutputStream notifyLedFos = new FileOutputStream(NOTIFY_RED_LED);
+                    if(on)
+                        notifyLedFos.write(NOTIFICATION_LIGHT_ON);
+                    else
+                        notifyLedFos.write(NOTIFICATION_LIGHT_OFF);
+                    notifyLedFos.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+       /**
+         *@hide
+         *borqs_india: turn notification green led on/off
+         */
+        public void setNotificationGreenLedOn(boolean on){
+            if (!checkCallingPkgPermission(android.Manifest.permission.NOTIFICATION_LED)) {
+                throw new SecurityException("Requires NOTIFICATION_LED permission");
+            }
+            synchronized(this){
+                try {
+                    FileOutputStream notifyLedFos = new FileOutputStream(NOTIFY_GREEN_LED);
+                    if(on)
+                        notifyLedFos.write(NOTIFICATION_LIGHT_ON);
+                    else
+                        notifyLedFos.write(NOTIFICATION_LIGHT_OFF);
+                    notifyLedFos.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+       /**
+         *@hide
+         *borqs_india: turn notification yellow led on/off
+         */
+        public void setNotificationYellowLedOn(boolean on){
+            if (!checkCallingPkgPermission(android.Manifest.permission.NOTIFICATION_LED)) {
+                throw new SecurityException("Requires NOTIFICATION_LED permission");
+            }
+            synchronized(this){
+                try {
+                    FileOutputStream notifyRedLedFos = new FileOutputStream(NOTIFY_RED_LED);
+                    FileOutputStream notifyGreenLedFos = new FileOutputStream(NOTIFY_GREEN_LED);
+                    if(on){
+                        notifyRedLedFos.write(NOTIFICATION_LIGHT_ON);
+                        notifyGreenLedFos.write(NOTIFICATION_LIGHT_ON);
+                    }else{
+                        notifyRedLedFos.write(NOTIFICATION_LIGHT_OFF);
+                        notifyGreenLedFos.write(NOTIFICATION_LIGHT_OFF);
+                    }
+                    notifyRedLedFos.close();
+                    notifyGreenLedFos.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+       /**
+         *@hide
+         *borqs_india: to get the duty_pcts based on fixed ramp_step_ms
+         */
+        public byte[] getDutyPcts(int onMs, int offMs){
+            final String rampStr = new String(RAMP_STEP_MS);
+            final String offStr = "0";
+            if(onMs <= 0 || offMs < 0 ) {
+                Log.i(TAG,"Invalid onMs or offMs!");
+                return null;
+            }
+            final int mRamp = Integer.parseInt(rampStr);
+            int i,j,ni = onMs / mRamp;
+            int nj = offMs / mRamp;
+            if((onMs % mRamp) != 0 && (((onMs % mRamp) >= (mRamp/2)) || (onMs < mRamp)))
+                ni+=1;
+            if((offMs % mRamp) != 0 && (((offMs % mRamp) >= (mRamp/2)) || (offMs < mRamp)))
+                nj+=1;
+            StringBuffer buf = new StringBuffer();
+            for(i=0 ; i < ni ; i++)
+                buf.append(rampStr+",");
+            for(j = 0 ; j < nj ; j++)
+                buf.append(offStr+",");
+            buf.deleteCharAt(buf.length()-1);
+            Log.i(TAG,"dutyPcts:"+new String(buf.toString().getBytes()));
+            return buf.toString().getBytes();
+        }
+       /**
+         *@hide
+         *borqs_india: blink notification yellow led for given onMs and offMs
+         * passing onMs<=0 will turn off the blinking
+         * passing offMs=0 will turn on led instead of blink
+         */
+        public void setNotificationYellowLedBlink(int onMs, int offMs){
+            if (!checkCallingPkgPermission(android.Manifest.permission.NOTIFICATION_LED)) {
+                throw new SecurityException("Requires NOTIFICATION_LED permission");
+            }
+            synchronized(this){
+                try {
+                    FileOutputStream notifyLedFosGreen = new FileOutputStream(NOTIFY_GREEN_LED_BLINK);
+                    FileOutputStream notifyLedFosRed = new FileOutputStream(NOTIFY_RED_LED_BLINK);
+                    if(onMs <= 0){
+                        Log.i(TAG,"Notification YELLOW Led blink turned off!");
+                        notifyLedFosGreen.write(NOTIFICATION_LIGHT_OFF);
+                        notifyLedFosRed.write(NOTIFICATION_LIGHT_OFF);
+                        notifyLedFosRed.close();
+                        notifyLedFosGreen.close();
+                        return;
+                    }
+                    byte dutyPcts[] = getDutyPcts(onMs,offMs);
+                    if(dutyPcts != null){
+                        FileOutputStream notifyLedRampFosGreen = new FileOutputStream(NOTIFY_GREEN_LED_RAMP_STEP_MS);
+                        FileOutputStream notifyLedRampFosRed = new FileOutputStream(NOTIFY_RED_LED_RAMP_STEP_MS);
+                        FileOutputStream notifyLedDutyFosGreen = new FileOutputStream(NOTIFY_GREEN_LED_DUTY_PCTS);
+                        FileOutputStream notifyLedDutyFosRed = new FileOutputStream(NOTIFY_RED_LED_DUTY_PCTS);
+                        notifyLedFosGreen.write(NOTIFICATION_LIGHT_BLINK);
+                        notifyLedFosRed.write(NOTIFICATION_LIGHT_BLINK);
+                        notifyLedRampFosGreen.write(RAMP_STEP_MS);
+                        notifyLedRampFosRed.write(RAMP_STEP_MS);
+                        notifyLedDutyFosGreen.write(dutyPcts);
+                        notifyLedDutyFosRed.write(dutyPcts);
+                        notifyLedFosGreen.close();
+                        notifyLedFosRed.close();
+                        notifyLedRampFosGreen.close();
+                        notifyLedRampFosRed.close();
+                        notifyLedDutyFosGreen.close();
+                        notifyLedDutyFosRed.close();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+       /**
+         *@hide
+         *borqs_india: turn notification green led blink
+         * passing onMs<=0 will turn off the blinking
+         * passing offMs=0 will turn on led instead of blink
+         */
+        public void setNotificationGreenLedBlink(int onMs, int offMs){
+            if (!checkCallingPkgPermission(android.Manifest.permission.NOTIFICATION_LED)) {
+                throw new SecurityException("Requires NOTIFICATION_LED permission");
+            }
+            synchronized(this){
+                try {
+                    FileOutputStream notifyLedFos = new FileOutputStream(NOTIFY_GREEN_LED_BLINK);
+                    if(onMs <= 0){
+                        Log.i(TAG,"Notification GREEN Led blink turned off!");
+                        notifyLedFos.write(NOTIFICATION_LIGHT_OFF);
+                        notifyLedFos.close();
+                        return;
+                    }
+                    byte dutyPcts[] = getDutyPcts(onMs,offMs);
+                    if(dutyPcts != null){
+                        FileOutputStream notifyLedRampFos = new FileOutputStream(NOTIFY_GREEN_LED_RAMP_STEP_MS);
+                        FileOutputStream notifyLedDutyFos = new FileOutputStream(NOTIFY_GREEN_LED_DUTY_PCTS);
+                        notifyLedFos.write(NOTIFICATION_LIGHT_BLINK);
+                        notifyLedRampFos.write(RAMP_STEP_MS);
+                        notifyLedDutyFos.write(dutyPcts);
+                        notifyLedFos.close();
+                        notifyLedRampFos.close();
+                        notifyLedDutyFos.close();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+       /**
+         *@hide
+         *borqs_india: turn notification red led blink
+         * passing onMs<=0 will turn off the blinking
+         * passing offMs=0 will turn on led instead of blink
+         */
+        public void setNotificationRedLedBlink(int onMs, int offMs){
+            if (!checkCallingPkgPermission(android.Manifest.permission.NOTIFICATION_LED)) {
+                throw new SecurityException("Requires NOTIFICATION_LED permission");
+            }
+            synchronized(this){
+                try {
+                    FileOutputStream notifyLedFos = new FileOutputStream(NOTIFY_RED_LED_BLINK);
+                    if(onMs <= 0){
+                        Log.i(TAG,"Notification RED Led blink turned off!");
+                        notifyLedFos.write(NOTIFICATION_LIGHT_OFF);
+                        notifyLedFos.close();
+                        return;
+                    }
+                    byte dutyPcts[] = getDutyPcts(onMs,offMs);
+                    if(dutyPcts != null){
+                        FileOutputStream notifyLedRampFos = new FileOutputStream(NOTIFY_RED_LED_RAMP_STEP_MS);
+                        FileOutputStream notifyLedDutyFos = new FileOutputStream(NOTIFY_RED_LED_DUTY_PCTS);
+                        notifyLedFos.write(NOTIFICATION_LIGHT_BLINK);
+                        notifyLedRampFos.write(RAMP_STEP_MS);
+                        notifyLedDutyFos.write(dutyPcts);
+                        notifyLedFos.close();
+                        notifyLedRampFos.close();
+                        notifyLedDutyFos.close();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     };

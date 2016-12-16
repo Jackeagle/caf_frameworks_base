@@ -40,6 +40,8 @@ import com.android.systemui.recent.RecentsPanelView.TaskDescriptionAdapter;
 import java.util.HashSet;
 import java.util.Iterator;
 
+import android.view.KeyEvent;
+
 public class RecentsVerticalScrollView extends ScrollView
         implements SwipeHelper.Callback, RecentsPanelView.RecentsScrollView {
     private static final String TAG = RecentsPanelView.TAG;
@@ -151,6 +153,22 @@ public class RecentsVerticalScrollView extends ScrollView
             thumbnailView.setOnClickListener(launchAppListener);
             thumbnailView.setOnLongClickListener(longClickListener);
 
+            OnKeyListener keyListener = new OnKeyListener() {
+                public boolean onKey(View v, int keyCode, KeyEvent event) {
+                    //borqs_india: handle only KeyEvent.ACTION_DOWN, don't handle other Key Events
+                    if ((event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_MENU )||(event.getAction() == KeyEvent.ACTION_UP &&
+                            keyCode == KeyEvent.KEYCODE_ENTER)) {
+                        final View anchorView = view.findViewById(R.id.app_description);
+                        mCallback.handleKeyPress(keyCode, view, anchorView, thumbnailView);
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            };
+
+           view.setOnKeyListener(keyListener);
+
             // We don't want to dismiss recents if a user clicks on the app title
             // (we also don't want to launch the app either, though, because the
             // app title is a small target and doesn't have great click feedback)
@@ -178,6 +196,8 @@ public class RecentsVerticalScrollView extends ScrollView
                 }
             };
         getViewTreeObserver().addOnGlobalLayoutListener(updateScroll);
+
+        fullScroll(ScrollView.FOCUS_DOWN);
     }
 
     @Override
