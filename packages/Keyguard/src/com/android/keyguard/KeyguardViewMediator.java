@@ -61,7 +61,7 @@ import android.view.WindowManagerPolicy;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.widget.LockPatternUtils;
 
-
+import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
 /**
  * Mediates requests related to the keyguard.  This includes queries about the
  * state of the keyguard, power management events that effect whether the keyguard
@@ -185,6 +185,12 @@ public class KeyguardViewMediator {
      * we sleep.
      */
     private PowerManager.WakeLock mShowKeyguardWakeLock;
+
+    //<CDR-EAS-510> Start
+    private PowerManager.WakeLock mTimeoutWakeLock;
+    private boolean  mLockTimeoutFeatureEnabled = false;
+    private int mLockAfterTimeout = KEYGUARD_LOCK_AFTER_DELAY_DEFAULT;
+    //<CDR-EAS-510> End
 
     private KeyguardViewManager mKeyguardViewManager;
 
@@ -1059,6 +1065,14 @@ public class KeyguardViewMediator {
                     }
                 }
             }
+            /* <CDR-EAS-510> Start */
+            else if ("com.android.settings.lockAfterTimeout".equals(intent.getAction())){
+                if(mLockTimeoutFeatureEnabled) {
+                   //user changed the lock timeout, so report user activity
+                   onReportUserActivity();
+                }
+            }
+            /* <CDR-EAS-510> End */
         }
     };
 
@@ -1396,6 +1410,17 @@ public class KeyguardViewMediator {
                 && mSearchManager.getAssistIntent(mContext, false, UserHandle.USER_CURRENT) != null;
     }
 
+    /** <CDR-EAS-510> Start
+     * This will return true if insecure lock screen is being shown in
+     * secure mode.
+     * Use case: We show slide to unlock till lock after timeout is
+     * reached.
+    */
+    boolean isInsecureShowingInSecureMode() {
+        return mLockPatternUtils.isSecure()
+          && mUpdateMonitor.getCurrentSecuritySelection() == SecurityMode.None;
+    }
+
     public static MultiUserAvatarCache getAvatarCache() {
         return sMultiUserAvatarCache;
     }
@@ -1413,4 +1438,68 @@ public class KeyguardViewMediator {
     public void onBootCompleted() {
         mUpdateMonitor.dispatchBootCompleted();
     }
+
+    /**
+     * On every reportUserActivity we reset the current lock timeout.
+     */
+    public void onReportUserActivity() {
+        long timeout;
+        if((mLockPatternUtils.getDevicePolicyManager().getMaximumTimeToLock(null))
+           <= 0 || (mShowing && !isInsecureShowingInSecureMode())
+           || !mLockPatternUtils.isSecure()) {
+         return;// No policy OR already showing OR not secure
+        }
+        final long policyTimeout = mLockPatternUtils.getDevicePolicyManager()
+          .getMaximumTimeToLock(null);
+        if (policyTimeout > 0) {
+            //Policy in effect. Make sure we don't go beyond policy limit.
+            //Take only minimum of (policyTimeout - displayTimeout) and
+            //Automatic lock time out
+            timeout = Math.min(policyTimeout, mLockAfterTimeout);
+        } else {
+            timeout = mLockAfterTimeout;
+        }
+        // How long from now do we set the lock timer
+        long when = timeout + DELAY_TIME;
+        //minumum lock timeout we allow is 15 secs.
+        //Any value below should be reset to 15 secs.
+        if (when < 15000) {
+          when = 15000;
+        }
+        // We need a wakelock to keep our code running even if the display is off.
+        // Device should get locked even if the display is currently off!
+        mTimeoutWakeLock.acquire();
+        timeoutHandler.removeCallbacks(mScreenLockTimeout);
+        boolean success = timeoutHandler.postDelayed(mScreenLockTimeout, when);
+    }
+
+    //Delay of 300MS is necessary to avoid a ugly flicker causes when
+    //display timeout lock after timeout is same
+    private static final int DELAY_TIME = 300;
+    private Handler timeoutHandler = new Handler();
+    private Runnable mScreenLockTimeout = new Runnable(){
+        public void run() {
+            if(mLockPatternUtils.isSecure()){
+                if((mShowing && !isInsecureShowingInSecureMode()) ||
+                    (mLockPatternUtils.getDevicePolicyManager()
+                      .getMaximumTimeToLock(null)) <= 0) {
+                    return; //already being shown or policy is removed after
+                           //the intent got trigerred
+                }
+               if(mPM.isScreenOn()) {
+                   if(!isInsecureShowingInSecureMode()) {
+                      mUpdateMonitor.setTimeoutInProgress(false);
+                        doKeyguardLocked(null);
+                   } else {
+                      onReportUserActivity();
+                   }
+               } else {
+                   mUpdateMonitor.setTimeoutInProgress(false);
+                   doKeyguardLocked(null);
+               }
+           }
+           mTimeoutWakeLock.release();
+       }
+     };
+      /* <CDR-EAS-510> End */
 }

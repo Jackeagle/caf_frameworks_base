@@ -366,6 +366,8 @@
   <java-symbol type="dimen" name="notification_subtext_size" />
   <java-symbol type="dimen" name="immersive_mode_cling_width" />
 
+  <java-symbol type="string" name="torch_on_seccondary_msg" />
+  <java-symbol type="string" name="torch_on_primary_msg" /> 
   <java-symbol type="string" name="add_account_button_label" />
   <java-symbol type="string" name="addToDictionary" />
   <java-symbol type="string" name="action_bar_home_description" />
@@ -1141,6 +1143,7 @@
   <java-symbol type="drawable" name="cling_bg" />
   <java-symbol type="drawable" name="ic_lock_power_reboot" />
   <java-symbol type="drawable" name="ic_lock_profile" />
+  <java-symbol type="drawable" name="ic_flash_light" />
 
   <java-symbol type="layout" name="action_bar_home" />
   <java-symbol type="layout" name="action_bar_title_item" />

@@ -146,6 +146,10 @@ public class KeyguardService extends Service {
             checkPermission();
             mKeyguardViewMediator.onBootCompleted();
         }
+       public void onReportUserActivity() {
+            mKeyguardViewMediator.onReportUserActivity();
+       }
+
     };
 
 }
