@@ -632,8 +632,17 @@ public class KeyEvent extends InputEvent implements Parcelable {
     /** Key code constant: Audio Track key
      * Switches the audio tracks. */
     public static final int KEYCODE_MEDIA_AUDIO_TRACK = 222;
+    
+    /**
+     * Key code constant : FLASH key
+     * @hide
+     */
+    public static final int KEYCODE_FLASH = 226;
 
-    private static final int LAST_KEYCODE           = KEYCODE_MEDIA_AUDIO_TRACK;
+    private static final int LAST_KEYCODE           = KEYCODE_FLASH;
+
+
+    //private static final int LAST_KEYCODE           = KEYCODE_MEDIA_AUDIO_TRACK;
 
     // NOTE: If you add a new keycode here you must also add it to:
     //  isSystem()
@@ -878,6 +887,7 @@ public class KeyEvent extends InputEvent implements Parcelable {
         names.append(KEYCODE_BRIGHTNESS_DOWN, "KEYCODE_BRIGHTNESS_DOWN");
         names.append(KEYCODE_BRIGHTNESS_UP, "KEYCODE_BRIGHTNESS_UP");
         names.append(KEYCODE_MEDIA_AUDIO_TRACK, "KEYCODE_MEDIA_AUDIO_TRACK");
+        names.append(KEYCODE_FLASH, "KEYCODE_FLASH");
     };
 
     // Symbolic names of all metakeys in bit order from least significant to most significant.

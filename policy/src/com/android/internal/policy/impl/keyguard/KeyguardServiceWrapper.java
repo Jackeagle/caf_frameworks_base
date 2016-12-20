@@ -204,5 +204,13 @@ public class KeyguardServiceWrapper implements IKeyguardService {
     public IBinder asBinder() {
         return mService.asBinder();
     }
-
+    /* <CDR-EAS-510> Start */
+    public void onReportUserActivity(){
+        try {
+            mService.onReportUserActivity();
+        } catch (RemoteException e) {
+            Slog.w(TAG , "Remote Exception", e);
+        }
+    }
+    /* <CDR-EAS-510> End */
 }

@@ -4583,4 +4583,8 @@
     <string name="permlab_notification_led">Notification LED</string>
     <!-- borqs_india: Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permdesc_notification_led">Allows the app to control Notification LED.</string>
+    <!-- TORCH NOTIFICATION STRINGS START-->
+    <string name="torch_on_primary_msg">Torch is ON</string>
+    <string name="torch_on_seccondary_msg">Press and hold Torch key to turn it off</string>
+    <!-- TORCH NOTIFICATION STRINGS END-->
 </resources>

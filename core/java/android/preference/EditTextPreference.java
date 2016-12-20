@@ -108,7 +108,9 @@ public class EditTextPreference extends DialogPreference {
 
         EditText editText = mEditText;
         editText.setText(getText());
-        
+        if (getText() != null) {
+            editText.setSelection(getText().length());
+        }
         ViewParent oldParent = editText.getParent();
         if (oldParent != view) {
             if (oldParent != null) {

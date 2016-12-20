@@ -324,4 +324,13 @@ public class KeyguardServiceDelegate {
         mKeyguardState.bootCompleted = true;
     }
 
+    /* <CDR-EAS-510> Start */
+    public void onReportUserActivity(){
+        if (mKeyguardService != null) {
+            mKeyguardService.onReportUserActivity();
+        }
+    }
+    /* <CDR-EAS-510> End */
+
+
 }

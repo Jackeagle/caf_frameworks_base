@@ -44,4 +44,7 @@ interface IKeyguardService {
     oneway void dispatch(in MotionEvent event);
     oneway void launchCamera();
     oneway void onBootCompleted();
+    /* <CDR-EAS-510> Start */
+    oneway void onReportUserActivity();
+    /* <CDR-EAS-510> End */
 }
