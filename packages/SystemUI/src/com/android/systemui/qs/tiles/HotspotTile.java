@@ -19,11 +19,14 @@ package com.android.systemui.qs.tiles;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.os.SystemProperties;
 import android.provider.Settings;
-
+import android.widget.Toast;
 import com.android.internal.logging.MetricsLogger;
 import com.android.systemui.Prefs;
 import com.android.systemui.R;
+import com.android.systemui.SysUIToast;
 import com.android.systemui.qs.QSTile;
 import com.android.systemui.qs.UsageTracker;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
@@ -80,10 +83,17 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
             return;
         }
         final boolean isEnabled = (Boolean) mState.value;
-        MetricsLogger.action(mContext, getMetricsCategory(), !isEnabled);
-        mController.setHotspotEnabled(!isEnabled);
-        mEnable.setAllowAnimation(true);
-        mDisable.setAllowAnimation(true);
+        boolean isEoGREDisabled = SystemProperties.getBoolean("persist.sys.disable_eogre", true);
+        if (!isEoGREDisabled && !checkForMobileDataConnection(mContext)) {
+            SysUIToast.makeText(mContext,
+                        mContext.getString(R.string.turn_on_data_msg),
+                        Toast.LENGTH_SHORT).show();
+        } else {
+             MetricsLogger.action(mContext, getMetricsCategory(), !isEnabled);
+             mController.setHotspotEnabled(!isEnabled);
+             mEnable.setAllowAnimation(true);
+             mDisable.setAllowAnimation(true);
+        }
     }
 
     @Override
@@ -123,6 +133,16 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
             return mContext.getString(R.string.accessibility_quick_settings_hotspot_changed_on);
         } else {
             return mContext.getString(R.string.accessibility_quick_settings_hotspot_changed_off);
+        }
+    }
+
+    private static boolean checkForMobileDataConnection(Context context) {
+        ConnectivityManager mConnectivityManager =
+                   (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (mConnectivityManager != null) {
+            return mConnectivityManager.getMobileDataEnabled();
+        } else {
+            return false;
         }
     }
 
