@@ -507,7 +507,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             if (mLastPowerStateFromWifi != powerState) {
                 mLastPowerStateFromWifi = powerState;
                 try {
-                    getBatteryStats().noteWifiRadioPowerState(powerState, tsNanos);
+                    getBatteryStats().noteWifiRadioPowerState(powerState, tsNanos, uid);
                 } catch (RemoteException e) {
                 }
             }
@@ -1015,6 +1015,17 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     //
     // INetworkManagementService members
     //
+    @Override
+    public INetd getNetdService() throws RemoteException {
+        final CountDownLatch connectedSignal = mConnectedSignal;
+        if (connectedSignal != null) {
+            try {
+                connectedSignal.await();
+            } catch (InterruptedException ignored) {}
+        }
+
+        return mNetdService;
+    }
 
     @Override
     public String[] listInterfaces() {
@@ -1363,8 +1374,9 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             mConnector.execute("tether", "interface", "remove", iface);
         } catch (NativeDaemonConnectorException e) {
             throw e.rethrowAsParcelableException();
+        } finally {
+            removeInterfaceFromLocalNetwork(iface);
         }
-        removeInterfaceFromLocalNetwork(iface);
     }
 
     @Override
@@ -1582,7 +1594,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                     SOFT_AP_COMMAND_SUCCESS, logMsg);
 
             logMsg = "startAccessPoint Error starting softap";
-            args = new Object[] {"startap"};
+            args = new Object[] {"startap", wlanIface};
             executeOrLogWithMessage(SOFT_AP_COMMAND, args, NetdResponseCode.SoftapStatusResult,
                     SOFT_AP_COMMAND_SUCCESS, logMsg);
         } catch (NativeDaemonConnectorException e) {
@@ -2893,4 +2905,19 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             }
         }
     };
+	
+    @Override
+    public int removeRoutesFromLocalNetwork(List<RouteInfo> routes) {
+        int failures = 0;
+
+        for (RouteInfo route : routes) {
+            try {
+                modifyRoute("remove", "local", route);
+            } catch (IllegalStateException e) {
+                failures++;
+            }
+        }
+
+        return failures;
+    }
 }
