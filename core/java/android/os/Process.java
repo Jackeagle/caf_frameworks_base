@@ -999,7 +999,10 @@ public class Process {
     
     /** @hide */
     public static final native long getFreeMemory();
-    
+
+    /** @hide */
+    public static final native long getCachedMemory();
+
     /** @hide */
     public static final native long getTotalMemory();
     
