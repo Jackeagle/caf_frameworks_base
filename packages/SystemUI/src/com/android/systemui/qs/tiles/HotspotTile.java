@@ -84,7 +84,8 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
         }
         final boolean isEnabled = (Boolean) mState.value;
         boolean isEoGREDisabled = SystemProperties.getBoolean("persist.sys.disable_eogre", true);
-        if (!isEoGREDisabled && !checkForMobileDataConnection(mContext)) {
+        if (!isEoGREDisabled && !checkForMobileDataConnection(mContext)
+                && !mController.isHotspotEnabled()) {
             SysUIToast.makeText(mContext,
                         mContext.getString(R.string.turn_on_data_msg),
                         Toast.LENGTH_SHORT).show();
