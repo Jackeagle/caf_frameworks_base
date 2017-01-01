@@ -385,4 +385,5 @@
     </plurals>
 
     <string name="button_lockscreen_emergency_call">Emergency call</string>
+    <string name="carrier_text_separator">"  |  "</string>
 </resources>
