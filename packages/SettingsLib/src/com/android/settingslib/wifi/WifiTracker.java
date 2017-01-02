@@ -369,7 +369,7 @@ public class WifiTracker {
 
                     if (result.isPasspointNetwork()) {
                         WifiConfiguration config = mWifiManager.getMatchingWifiConfig(result);
-                        if (config != null) {
+                        if (config != null && config.SSID.equals(result.SSID)) {
                             accessPoint.foundInScanResult = true;
                             accessPoint.update(config);
                         }
