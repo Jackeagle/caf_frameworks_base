@@ -21,6 +21,7 @@ import android.content.ComponentName;
 import android.content.pm.FeatureInfo;
 import android.os.*;
 import android.os.Process;
+import android.os.SystemProperties;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -164,6 +165,13 @@ public class SystemConfig {
                 Environment.getOemDirectory(), "etc", "sysconfig"), true);
         readPermissions(Environment.buildPath(
                 Environment.getOemDirectory(), "etc", "permissions"), true);
+        // Remove android extension pack for opengles version 3.0
+        int value = SystemProperties.getInt("ro.opengles.version", 0);
+        if (value > 0 && (value == 196608)) {
+           if (mAvailableFeatures.remove("android.hardware.opengles.aep") != null) {
+               Slog.d(TAG, "Removed android.hardware.opengles.aep feature for opengles 3.0");
+           }
+        }
     }
 
     void readPermissions(File libraryDir, boolean onlyFeatures) {
