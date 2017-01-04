@@ -217,6 +217,8 @@ public class ViewConfiguration {
      */
     private static final long ACTION_MODE_HIDE_DURATION_DEFAULT = 2000;
 
+    private static final int SCROLL_FACTOR = 64;
+
     /**
      * Configuration values for overriding {@link #hasPermanentMenuKey()} behavior.
      * These constants must match the definition in res/values/config.xml.
@@ -243,6 +245,7 @@ public class ViewConfiguration {
 
     private boolean sHasPermanentMenuKey;
     private boolean sHasPermanentMenuKeySet;
+    private final int mScrollFactor;
 
     static final SparseArray<ViewConfiguration> sConfigurations =
             new SparseArray<ViewConfiguration>(2);
@@ -268,6 +271,7 @@ public class ViewConfiguration {
         mOverflingDistance = OVERFLING_DISTANCE;
         mFadingMarqueeEnabled = true;
         mGlobalActionsKeyTimeout = GLOBAL_ACTIONS_KEY_TIMEOUT;
+        mScrollFactor = SCROLL_FACTOR;
     }
 
     /**
@@ -351,6 +355,8 @@ public class ViewConfiguration {
                 com.android.internal.R.dimen.config_viewMaxFlingVelocity);
         mGlobalActionsKeyTimeout = res.getInteger(
                 com.android.internal.R.integer.config_globalActionsKeyTimeout);
+        mScrollFactor = res.getDimensionPixelSize(
+                com.android.internal.R.dimen.config_scrollFactor);
     }
 
     /**
@@ -650,6 +656,16 @@ public class ViewConfiguration {
      */
     public int getScaledMaximumFlingVelocity() {
         return mMaximumFlingVelocity;
+    }
+
+    /**
+     * @return Amount to scroll in response to a {@link MotionEvent#ACTION_SCROLL} event. Multiply
+     * this by the event's axis value to obtain the number of pixels to be scrolled.
+     * @hide
+     * @SystemApi
+     */
+    public int getScaledScrollFactor() {
+        return mScrollFactor;
     }
 
     /**
