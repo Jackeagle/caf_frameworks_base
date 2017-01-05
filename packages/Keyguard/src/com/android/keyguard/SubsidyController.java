@@ -52,7 +52,6 @@ public class SubsidyController {
     private SubsidyState mPreviousSubsidyState;
     private Context mContext;
     private boolean mStopStateTransitions = false;
-    private boolean mAllowDupIntentFromClient = false;
 
     private SubsidyController(Context context) {
         mContext = context;
@@ -73,13 +72,17 @@ public class SubsidyController {
         return sSubsidyController;
     }
 
+    /*
+     * Every reboot/factory reset, configuring screen is
+     * shown until a valid intent received from the client.
+     * If the device is Ap unlocked before reboot, subsidy
+     * lock won't happen after boot completed and act according
+     * to the intent received from the client.
+     */
     private void setDefaultSubsidyState(Context context) {
         int state = SubsidyUtility.getSubsidyLockStatus(context);
-        if (state == SubsidyLockState.AP_LOCKED
-                || state == SubsidyLockState.DEVICE_LOCKED
-                || state == SubsidyLockState.SUBSIDY_STATUS_UNKNOWN) {
-            mCurrentSubsidyState = new UnlockScreenState();
-            mAllowDupIntentFromClient = true;
+        if (SubsidyUtility.shouldShowSubsidyLock(context)) {
+            mCurrentSubsidyState = new ConfiguringScreenState();
         }
         if (state == SubsidyLockState.AP_UNLOCKED) {
             mCurrentSubsidyState = new ApUnlockedState();
@@ -100,13 +103,11 @@ public class SubsidyController {
                     Log.d(TAG, "Received different intent = "+ isValid);
                     Log.d(TAG, "Previous state progress is still on = "+ mPreviousSubsidyState
                             .getInProgressState());
-                    if (isValid || mPreviousSubsidyState.getInProgressState()
-                            || mAllowDupIntentFromClient) {
+                    if (isValid || mPreviousSubsidyState.getInProgressState()) {
                         KeyguardUpdateMonitor
                                 .getInstance(mContext)
                                 .dispatchSubsidyLockStateChanged(
                                         mCurrentSubsidyState.isLocked());
-                        mAllowDupIntentFromClient = false;
                     }
                     if (isDeviceUnLocked()) {
                         if (DEBUG) {
@@ -183,7 +184,7 @@ public class SubsidyController {
             viewId = mPreviousSubsidyState.getViewId();
         }
         if (viewId == 0) {
-            mCurrentSubsidyState = new UnlockScreenState();
+            mCurrentSubsidyState = new ConfiguringScreenState();
             viewId = mCurrentSubsidyState.getViewId();
         }
         return viewId;
@@ -198,7 +199,7 @@ public class SubsidyController {
             layoutId = mPreviousSubsidyState.getLayoutId();
         }
         if (layoutId == 0) {
-            mCurrentSubsidyState = new UnlockScreenState();
+            mCurrentSubsidyState = new ConfiguringScreenState();
             layoutId = mCurrentSubsidyState.getLayoutId();
         }
         return layoutId;
@@ -267,6 +268,31 @@ public class SubsidyController {
         private void disableAirplaneMode(Context context,
                 ConnectivityManager cm) {
             cm.setAirplaneMode(false);
+        }
+    }
+
+    class ConfiguringScreenState extends SubsidyState {
+
+        public ConfiguringScreenState() {
+            mLayoutId = R.layout.keyguard_subsidy_configuring_view;
+            mViewId = R.id.keyguard_subsidy_configuring_view;
+        }
+
+        @Override
+        protected void init(Context context) {
+            super.init(context);
+            SubsidyUtility.writeSubsidyLockStatus(context,
+                    SubsidyLockState.SUBSIDY_STATUS_UNKNOWN);
+        }
+
+        @Override
+        protected int getLayoutId() {
+            return mLayoutId;
+        }
+
+        @Override
+        protected int getViewId() {
+            return mViewId;
         }
     }
 
