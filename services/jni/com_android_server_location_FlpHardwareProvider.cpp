@@ -681,7 +681,8 @@ static void Init(JNIEnv* env, jobject obj) {
 
   // initialize the Flp interfaces
   if(sFlpInterface == NULL || sFlpInterface->init(&sFlpCallbacks) != 0) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("Init(): No FLP Interface !");
+    return;
   }
 
   if(sFlpDiagnosticInterface != NULL) {
@@ -701,7 +702,8 @@ static jboolean IsSupported(JNIEnv* env, jclass clazz) {
 
 static jint GetBatchSize(JNIEnv* env, jobject object) {
   if(sFlpInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("GetBatchSize(): No FLP Interface !");
+    return -1;
   }
 
   return sFlpInterface->get_batch_size();
@@ -713,7 +715,8 @@ static void StartBatching(
     jint id,
     jobject optionsObject) {
   if(sFlpInterface == NULL || optionsObject == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("StartBatching(): No FLP Interface !");
+    return;
   }
 
   FlpBatchOptions options;
@@ -728,7 +731,8 @@ static void UpdateBatchingOptions(
     jint id,
     jobject optionsObject) {
   if(sFlpInterface == NULL || optionsObject == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("UpdateBatchingOptions(): No FLP Interface !");
+    return;
   }
 
   FlpBatchOptions options;
@@ -739,7 +743,8 @@ static void UpdateBatchingOptions(
 
 static void StopBatching(JNIEnv* env, jobject object, jint id) {
   if(sFlpInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("StopBatching(): No FLP Interface !");
+    return;
   }
 
   sFlpInterface->stop_batching(id);
@@ -747,7 +752,8 @@ static void StopBatching(JNIEnv* env, jobject object, jint id) {
 
 static void Cleanup(JNIEnv* env, jobject object) {
   if(sFlpInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("Cleanup(): No FLP Interface !");
+    return;
   }
 
   sFlpInterface->cleanup();
@@ -770,7 +776,8 @@ static void Cleanup(JNIEnv* env, jobject object) {
 
 static void GetBatchedLocation(JNIEnv* env, jobject object, jint lastNLocations) {
   if(sFlpInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("GetBatchedLocation(): No FLP Interface !");
+    return;
   }
 
   sFlpInterface->get_batched_location(lastNLocations);
@@ -807,7 +814,8 @@ static void InjectDiagnosticData(JNIEnv* env, jobject object, jstring stringData
   }
 
   if(sFlpDiagnosticInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("InjectDiagnosticData(): No FLP Interface !");
+    return;
   }
 
   int length = env->GetStringLength(stringData);
@@ -826,7 +834,8 @@ static jboolean IsDeviceContextSupported() {
 
 static void InjectDeviceContext(JNIEnv* env, jobject object, jint enabledMask) {
   if(sFlpDeviceContextInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("InjectDeviceContext(): No FLP Interface !");
+    return;
   }
 
   int result = sFlpDeviceContextInterface->inject_device_context(enabledMask);
@@ -847,7 +856,8 @@ static void AddGeofences(
   }
 
   if (sFlpGeofencingInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("AddGeofences(): No FLP Interface !");
+    return;
   }
 
   jint geofenceRequestsCount = env->GetArrayLength(geofenceRequestsArray);
@@ -881,7 +891,8 @@ static void AddGeofences(
 
 static void PauseGeofence(JNIEnv* env, jobject object, jint geofenceId) {
   if(sFlpGeofencingInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("PauseGeofence(): No FLP Interface !");
+    return;
   }
 
   sFlpGeofencingInterface->pause_geofence(geofenceId);
@@ -893,7 +904,8 @@ static void ResumeGeofence(
     jint geofenceId,
     jint monitorTransitions) {
   if(sFlpGeofencingInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("ResumeGeofence(): No FLP Interface !");
+    return;
   }
 
   sFlpGeofencingInterface->resume_geofence(geofenceId, monitorTransitions);
@@ -909,7 +921,8 @@ static void ModifyGeofenceOption(
     jint unknownTimer,
     jint sourcesToUse) {
   if(sFlpGeofencingInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("ModifyGeofenceOption(): No FLP Interface !");
+    return;
   }
 
   GeofenceOptions options = {
@@ -928,7 +941,8 @@ static void RemoveGeofences(
     jobject object,
     jintArray geofenceIdsArray) {
   if(sFlpGeofencingInterface == NULL) {
-    ThrowOnError(env, FLP_RESULT_ERROR, __FUNCTION__);
+    ALOGE("RemoveGeofences(): No FLP Interface !");
+    return;
   }
 
   jsize geofenceIdsCount = env->GetArrayLength(geofenceIdsArray);
