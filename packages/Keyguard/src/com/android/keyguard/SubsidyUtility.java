@@ -30,6 +30,8 @@
 package com.android.keyguard;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Log;
@@ -45,6 +47,9 @@ public class SubsidyUtility {
 
     public static final String ACTION_SUBSIDY_LOCK_CLIENT =
         "org.codeaurora.intent.action.ACTION_LOCKSCREEN";
+
+    public static final String ACTION_SUBSIDY_LOCK_INTERNAL =
+        "org.codeaurora.intent.action.ACTION_LOCKSCREEN_INTERNAL";
 
     public static final String BROADCAST_PERMISSION =
         "com.codeaurora.permission.SUBSIDYLOCK";
@@ -130,5 +135,14 @@ public class SubsidyUtility {
                     == SubsidyUtility.SubsidyLockState.AP_LOCKED
                     || subsidyLockStatus
                     == SubsidyUtility.SubsidyLockState.DEVICE_LOCKED);
+    }
+
+    public static boolean isDataConnectionActive(Context context) {
+        ConnectivityManager cm =
+                (ConnectivityManager) context
+                        .getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        return activeNetwork != null
+                && activeNetwork.isConnected();
     }
 }

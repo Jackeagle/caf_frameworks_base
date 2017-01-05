@@ -167,19 +167,10 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                                 }
                                 if (isSuccess) {
                                     Log.d(TAG, "Local Unlock code is correct and verified");
-
-                                    Intent intent = new Intent(
-                                        SubsidyUtility.ACTION_USER_REQUEST);
-
-                                    intent.setPackage(mContext.getResources()
-                                        .getString(R.string.config_slc_package_name));
-                                    intent.putExtra(SubsidyController
-                                        .getInstance(mContext)
-                                        .getCurrentSubsidyState()
-                                        .getLaunchIntent(
-                                            R.string.kg_button_activate),
-                                        true);
-                                    mContext.sendBroadcast(intent,
+                                    mContext.sendBroadcast(SubsidyController
+                                            .getInstance(mContext)
+                                            .getCurrentSubsidyState()
+                                            .getLaunchIntent(),
                                         SubsidyUtility.BROADCAST_PERMISSION);
 
                                     SubsidyController.getInstance(mContext)

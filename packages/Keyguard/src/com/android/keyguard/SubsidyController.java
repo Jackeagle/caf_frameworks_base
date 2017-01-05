@@ -59,6 +59,8 @@ public class SubsidyController {
         final IntentFilter subsidyLockFilter = new IntentFilter();
         subsidyLockFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
         subsidyLockFilter.addAction(SubsidyUtility.ACTION_SUBSIDY_LOCK_CLIENT);
+        subsidyLockFilter.addAction(
+                SubsidyUtility.ACTION_SUBSIDY_LOCK_INTERNAL);
 
         mContext.registerReceiver(mSubsidyLockReceiver, subsidyLockFilter,
                     SubsidyUtility.BROADCAST_PERMISSION, null);
@@ -226,6 +228,10 @@ public class SubsidyController {
             }).start();
         }
 
+        protected Intent getLaunchIntent() {
+            return null;
+        }
+
         protected String getLaunchIntent(int resId) {
             return null;
         }
@@ -245,6 +251,7 @@ public class SubsidyController {
         protected boolean getInProgressState() {
             return mIsUserRequestInProgress;
         }
+
 
         private void disableWifiTethering(Context context) {
             TetherUtil.setWifiTethering(false, context);
@@ -330,8 +337,24 @@ public class SubsidyController {
         }
 
         @Override
-        protected String getLaunchIntent(int resId) {
-            return mExtraLaunchIntent;
+        protected Intent getLaunchIntent() {
+            Intent intent = null;
+            if(SubsidyUtility.isDataConnectionActive(mContext)) {
+                Log.w(TAG, "Data connection is now active!!!");
+                intent = new Intent(
+                        SubsidyUtility.ACTION_USER_REQUEST);
+                intent.setPackage(mContext.getResources().getString(
+                        R.string.config_slc_package_name));
+                intent.putExtra(mExtraLaunchIntent, true);
+            } else {
+                Log.w(TAG, "No active data connection");
+                intent = new Intent(
+                        SubsidyUtility.ACTION_SUBSIDY_LOCK_INTERNAL);
+                intent.putExtra(
+                        SubsidyUtility.EXTRA_INTENT_KEY_ENTER_CODE_SCREEN,
+                        true);
+            }
+            return intent;
         }
     }
 
@@ -410,8 +433,12 @@ public class SubsidyController {
         }
 
         @Override
-        protected String getLaunchIntent(int resId) {
-            return mExtraLaunchIntent;
+        protected Intent getLaunchIntent() {
+            Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
+            intent.setPackage(mContext.getResources().getString(
+                    R.string.config_slc_package_name));
+            intent.putExtra(mExtraLaunchIntent, true);
+            return intent;
         }
 
         @Override
