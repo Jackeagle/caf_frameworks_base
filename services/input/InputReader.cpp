@@ -14,6 +14,26 @@
  * limitations under the License.
  */
 
+/*
+ * BORQS Software Solutions Pvt Ltd. CONFIDENTIAL
+ * Copyright (c) 2016-17 All rights reserved.
+ *
+ * The source code contained or described herein and all documents
+ * related to the source code ("Material") are owned by BORQS Software
+ * Solutions Pvt Ltd. No part of the Material may be used,copied,
+ * reproduced, modified, published, uploaded,posted, transmitted,
+ * distributed, or disclosed in any way without BORQS Software
+ * Solutions Pvt Ltd. prior written permission.
+ *
+ * No license under any patent, copyright, trade secret or other
+ * intellectual property right is granted to or conferred upon you
+ * by disclosure or delivery of the Materials, either expressly, by
+ * implication, inducement, estoppel or otherwise. Any license
+ * under such intellectual property rights must be express and
+ * approved by BORQS Software Solutions Pvt Ltd. in writing.
+ *
+ */
+
 #define LOG_TAG "InputReader"
 
 //#define LOG_NDEBUG 0
@@ -52,6 +72,14 @@
 #include <limits.h>
 #include <math.h>
 
+
+#ifdef ENABLE_BROWSER_CURSOR_LOGS
+#include <android/log.h>
+    #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "BrowserCursor", __VA_ARGS__)
+#else
+    #define LOGE(...)
+#endif
+
 #define INDENT "  "
 #define INDENT2 "    "
 #define INDENT3 "      "
@@ -59,6 +87,22 @@
 #define INDENT5 "          "
 
 namespace android {
+
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+// flag to enable mouse pointer for browser app alone.
+// this is set to true/false when browser aap is resumed/poped in activity manager
+    static bool g_bIsBrowserAppForeground = 0;
+/* flag to store cursor's hidden status.
+ * this flag is true by default & stores the g_bIsBrowserAppForeground
+ * state temporarily if browser app goes to background. */
+    static bool g_bCursorState = 1;
+/* flag to store Enter event completion status.
+ * this flag makes sure we handle release event in case browser
+ * goes to background before release event is fired. */
+    static bool g_bNeedsEventCompletion = 0;
+/* Event count for initial long press. */
+    static int g_bScrollCount = 0;
+#endif
 
 // --- Constants ---
 
@@ -219,6 +263,25 @@ void InputReaderConfiguration::setDisplayInfo(bool external, const DisplayViewpo
 
 
 // --- InputReader ---
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+void InputReader::setIfBrowserApp(bool IsBrowserApp)
+{
+#if CURSOR_LOGS
+        LOGE("inputreader.h setIfBrowserApp  bIsBrowserApp = [%d]", IsBrowserApp);
+#endif
+        g_bIsBrowserAppForeground = IsBrowserApp;
+        // IsBrowserApp will be flase/true when browser app is paused/resumed
+        // check if browser app is paused.
+        /* Don't hide the cursor here if release event is not fired */
+        if(!g_bIsBrowserAppForeground && !g_bNeedsEventCompletion) {
+            InputMapper* mKeyboardCursorInputMapper = KeyboardInputMapper::getKeyboardCursorPointer();
+                if(mKeyboardCursorInputMapper) {
+                     // fade the cursor pointer when browser app is paused.
+                     mKeyboardCursorInputMapper->fadePointer();
+                }
+        }
+}
+#endif
 
 InputReader::InputReader(const sp<EventHubInterface>& eventHub,
         const sp<InputReaderPolicyInterface>& policy,
@@ -1966,14 +2029,40 @@ void VibratorInputMapper::dump(String8& dump) {
 
 
 // --- KeyboardInputMapper ---
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+InputMapper* KeyboardInputMapper::mCursorInputMapper = NULL ;
+/* Reference count for number of parents to Cursor Input Mapper */
+static int mNumOfKeyInputMappers = 0;
+#endif
 
 KeyboardInputMapper::KeyboardInputMapper(InputDevice* device,
         uint32_t source, int32_t keyboardType) :
         InputMapper(device), mSource(source),
         mKeyboardType(keyboardType) {
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+        if (mCursorInputMapper == NULL) {
+            // instantiate CursorInputMapper with device id, this is used to
+            // contorl mouse pointer from keyboardInputMapper
+            mCursorInputMapper = new CursorInputMapper(mDevice);
+        }
+        /* Increment Reference Count on create of KeyboardInputMapper */
+        mNumOfKeyInputMappers++;
+#endif
 }
 
 KeyboardInputMapper::~KeyboardInputMapper() {
+
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+        /* Decrement Reference Count on destroy of KeyboardInputMapper */
+        mNumOfKeyInputMappers--;
+        /* As mCursorInputMapper mapper is a static object,
+         * delete it only after all the parent objects are deleted. */
+        if ((NULL != mCursorInputMapper) && (0 == mNumOfKeyInputMappers)) {
+            // Destroy CursorInputMapper instance
+            delete mCursorInputMapper;
+            mCursorInputMapper = NULL;
+        }
+#endif
 }
 
 uint32_t KeyboardInputMapper::getSources() {
@@ -2051,7 +2140,170 @@ void KeyboardInputMapper::reset(nsecs_t when) {
     InputMapper::reset(when);
 }
 
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+// static global  G_LPData is used to preserve the event state for long press handling
+static longPressData G_LPData ;
+
+//Map the DPAD events to generate mouse event and dispatch it to cursorInputMapper to process.
+void DispatchMouseEventForDPAD(InputMapper* CursorMapper, const RawEvent* KrawEvent, int32_t keyCode, int iMovePixels)
+{
+    /* Move the cursor only when key is pressed. On the key release,
+    * pass the event but do not move the cursor. */
+    if(KrawEvent->value == 0) {
+        iMovePixels = 0;
+    }
+    RawEvent rawEvent ;
+    rawEvent.when = KrawEvent->when;
+    rawEvent.deviceId = KrawEvent->deviceId;
+    switch(keyCode) {
+        case AKEYCODE_DPAD_UP:
+#if CURSOR_LOGS
+            LOGE("DispatchMouseEventForDPAD AKEYCODE_DPAD_UP "
+                 "KrawEvent->value = [%d] KrawEvent->when = [%le]",
+                  KrawEvent->value, KrawEvent->when);
+#endif
+            rawEvent.type = EV_REL;
+            rawEvent.code = REL_Y;
+            rawEvent.value = -iMovePixels;
+            break;
+
+        case AKEYCODE_DPAD_DOWN:
+#if CURSOR_LOGS
+            LOGE("DispatchMouseEventForDPAD AKEYCODE_DPAD_DOWN "
+                 "KrawEvent->value = [%d] KrawEvent->when = [%le]",
+                  KrawEvent->value, KrawEvent->when);
+#endif
+            rawEvent.type = EV_REL;
+            rawEvent.code = REL_Y;
+            rawEvent.value = iMovePixels;
+            break;
+
+        case AKEYCODE_DPAD_LEFT:
+#if CURSOR_LOGS
+            LOGE("DispatchMouseEventForDPAD AKEYCODE_DPAD_LEFT "
+                 "KrawEvent->value = [%d] KrawEvent->when = [%le]",
+                  KrawEvent->value, KrawEvent->when);
+#endif
+            rawEvent.type = EV_REL;
+            rawEvent.code = REL_X;
+            rawEvent.value = -iMovePixels;
+            break;
+
+        case AKEYCODE_DPAD_RIGHT:
+#if CURSOR_LOGS
+            LOGE("HandleCursorPointerForDpad AKEYCODE_DPAD_RIGHT "
+                 "KrawEvent->value = [%d] KrawEvent->when = [%le]",
+                  KrawEvent->value, KrawEvent->when);
+#endif
+            rawEvent.type = EV_REL;
+            rawEvent.code = REL_X;
+            rawEvent.value = iMovePixels;
+            break;
+
+        case AKEYCODE_ENTER:
+            rawEvent.type = EV_KEY ;
+            rawEvent.code = BTN_LEFT ;
+            rawEvent.value = KrawEvent->value;
+#if CURSOR_LOGS
+            LOGE("DispatchMouseEventForDPAD AKEYCODE_ENTER "
+                 "KrawEvent->value = [%d] KrawEvent->when = [%le]",
+                  KrawEvent->value, KrawEvent->when);
+#endif
+            break;
+
+        case AKEYCODE_UNKNOWN:
+            rawEvent.type = EV_SYN ;
+            rawEvent.code = KrawEvent->code ;
+    }
+    // call process of cursorinputmapper to process the mouse event constructed
+    CursorMapper->process(&rawEvent);
+}
+
+//call back to handle long press
+void KeyboardInputMapper::timeoutExpired(nsecs_t when)
+{
+#if CURSOR_LOGS
+    LOGE("KeyboardInputMapper::timeoutExpired when = [%le]", when);
+    LOGE("KeyboardInputMapper::timeoutExpired "
+         "G_LPData.rawEvent.when + MAX_LONG_PRESS_NSECS = [%le]",
+         (G_LPData.rawEvent.when + MAX_LONG_PRESS_NSECS));
+#endif
+    if(g_bIsBrowserAppForeground && G_LPData.IsOn == true) {
+        if(when > G_LPData.longPressTimeOut) {
+            G_LPData.rawEvent.when = when;
+            /* Check to increase the timeout time for the first few
+             * long press events. */
+            if(g_bScrollCount < MAX_INITIAL_SCROLL_COUNT_FOR_LONG_PRESS) {
+                // Increment scroll count on long press.
+                g_bScrollCount++;
+                /* Increase timeout & move cursor by 8px for first
+                 * few events incase of long press. */
+                G_LPData.longPressTimeOut = when + INITIAL_MAX_LONG_PRESS_NSECS;
+                DispatchMouseEventForDPAD(mCursorInputMapper, &G_LPData.rawEvent, G_LPData.keyCode, CURSOR_MOVE_PIXELS);
+            } else {
+                /* Decrease the Timeout time so
+                 * cursor moves faster & move cursor by 30 px. */
+                G_LPData.longPressTimeOut = when + MAX_LONG_PRESS_NSECS;
+                DispatchMouseEventForDPAD(mCursorInputMapper, &G_LPData.rawEvent, G_LPData.keyCode, LONG_PRESS_CURSOR_MOVE_PIXELS);
+            }
+
+            RawEvent KrawEventSync ={when, 0, 0, 0, 0};
+            DispatchMouseEventForDPAD(mCursorInputMapper, &KrawEventSync, 0, CURSOR_MOVE_PIXELS );
+        }
+        getContext()->requestTimeoutAtTime(G_LPData.longPressTimeOut);
+    }
+}
+
+void KeyboardInputMapper::HandleCursorPointerForDpad(const RawEvent* KrawEvent, int32_t keyCode)
+{
+#if CURSOR_LOGS
+    LOGE("KeyboardInputMapper::HandleCursorPointerForDpad keyCode = [%d]",
+          keyCode);
+#endif
+    if(keyCode != AKEYCODE_ENTER && keyCode != AKEYCODE_UNKNOWN) {
+        // check if key pressed
+        if(KrawEvent->value != 0) {
+            G_LPData.rawEvent = *KrawEvent ;
+            G_LPData.keyCode = keyCode ;
+            // Increase initial timeout for long press.
+            G_LPData.longPressTimeOut = KrawEvent->when + INITIAL_MAX_LONG_PRESS_NSECS;
+            G_LPData.IsOn = true ;
+#if CURSOR_LOGS
+            LOGE("KeyboardInputMapper::HandleCursorPointerForDpad calling "
+                 "getContext()->requestTimeoutAtTime keyCode = [%d]",keyCode);
+#endif
+            //when key is pressed, mentaion the key state and request for timeout to handle key long press
+            getContext()->requestTimeoutAtTime(G_LPData.longPressTimeOut);
+        } else {
+#if CURSOR_LOGS
+            LOGE("KeyboardInputMapper::HandleCursorPointerForDpad KrawEvent->when = [%le]",
+                 KrawEvent->when);
+#endif
+            // Reset the scroll count if key up is received.
+            g_bScrollCount = 0;
+            // here reseting the key state which was preserved when key pressed.
+            if(keyCode == G_LPData.keyCode && G_LPData.IsOn == true) {
+                G_LPData.IsOn = false;
+                G_LPData.keyCode = 0 ;
+#if CURSOR_LOGS
+                LOGE("KeyboardInputMapper::HandleCursorPointerForDpad Resetting global "
+                     "event event keyCode = [%d]",keyCode);
+#endif
+            }
+        }
+    }
+    DispatchMouseEventForDPAD(mCursorInputMapper, KrawEvent, keyCode, CURSOR_MOVE_PIXELS);
+}
+
+#endif //SUPPORT_BROWSER_VIRTUAL_CURSOR
+
 void KeyboardInputMapper::process(const RawEvent* rawEvent) {
+#if CURSOR_LOGS
+    LOGE("KeyboardInputMapper::process rawEvent->code =[%d], rawEvent->deviceId=[%d], "
+         "rawEvent->type=[%d], rawEvent->value=[%d], rawEvent->when=[%f] \n", rawEvent->code,
+          rawEvent->deviceId, rawEvent->type, rawEvent->value, rawEvent->when);
+#endif
+
     switch (rawEvent->type) {
     case EV_KEY: {
         int32_t scanCode = rawEvent->code;
@@ -2065,7 +2317,43 @@ void KeyboardInputMapper::process(const RawEvent* rawEvent) {
                 keyCode = AKEYCODE_UNKNOWN;
                 flags = 0;
             }
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+#if CURSOR_LOGS
+            LOGE("KeyboardInputMapper::process keyCode =[%d]", keyCode);
+            LOGE("KeyboardInputMapper::process down time =[%lf] and down time =[%le]  \n",
+                 rawEvent->when, rawEvent->when);
+#endif
+            /* Reset state & allow release event only if Browser has gone to background.
+               & If Press event is fired already. */
+            if(!g_bIsBrowserAppForeground && g_bNeedsEventCompletion && AKEYCODE_ENTER == keyCode){
+                /* Store Browser g_bIsBrowserAppForeground state. */
+                g_bCursorState = g_bIsBrowserAppForeground;
+                /* Reset g_bIsBrowserAppForeground state to allow one last release event. */
+                g_bIsBrowserAppForeground = true;
+            }
+
+            //checking four way navigation keys to enable and control mouse pointer
+            if(g_bIsBrowserAppForeground && (AKEYCODE_DPAD_UP == keyCode
+                        || AKEYCODE_DPAD_DOWN == keyCode
+                        || AKEYCODE_DPAD_LEFT == keyCode
+                        || AKEYCODE_DPAD_RIGHT == keyCode
+                        || AKEYCODE_ENTER == keyCode)) {
+                /* Set NeedsEventCompletion to true on Press event. */
+                if(AKEYCODE_ENTER == keyCode && rawEvent->value == 1) {
+                    g_bNeedsEventCompletion = true;
+                }
+                /* Set NeedsEventCompletion to false on release event. */
+                if(AKEYCODE_ENTER == keyCode && rawEvent->value == 0) {
+                    g_bNeedsEventCompletion = false;
+                }
+                HandleCursorPointerForDpad(rawEvent, keyCode);
+            }
+            else {
+                processKey(rawEvent->when, rawEvent->value != 0, keyCode, scanCode, flags);
+            }
+#else
             processKey(rawEvent->when, rawEvent->value != 0, keyCode, scanCode, flags);
+#endif
         }
         break;
     }
@@ -2076,6 +2364,23 @@ void KeyboardInputMapper::process(const RawEvent* rawEvent) {
         break;
     }
     case EV_SYN: {
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+        if(g_bIsBrowserAppForeground) {
+            // handling sync event for cursor pointer
+            HandleCursorPointerForDpad(rawEvent, AKEYCODE_UNKNOWN);
+            /* Hide the cursor after handling the release event for long Press */
+            if(!g_bCursorState && !g_bNeedsEventCompletion) {
+                InputMapper* mKeyboardCursorInputMapper = KeyboardInputMapper::getKeyboardCursorPointer();
+                if(mKeyboardCursorInputMapper) {
+                    // fade the cursor pointer when browser app is paused.
+                    mKeyboardCursorInputMapper->fadePointer();
+                }
+                /* Restore the state after hiding cursor*/
+                g_bIsBrowserAppForeground = g_bCursorState;
+                g_bCursorState = true;
+           }
+        }
+#endif
         if (rawEvent->code == SYN_REPORT) {
             mCurrentHidUsage = 0;
         }
@@ -2092,7 +2397,10 @@ bool KeyboardInputMapper::isKeyboardOrGamepadKey(int32_t scanCode) {
 
 void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t keyCode,
         int32_t scanCode, uint32_t policyFlags) {
-
+#if CURSOR_LOGS
+    LOGE("KeyboardInputMapper::processKey when = [%lf] when = [%le]\n", when, when);
+    LOGE("KeyboardInputMapper::processKey keyCode =[%d]", keyCode);
+#endif
     if (down) {
         // Rotate key codes according to orientation if needed.
         if (mParameters.orientationAware && mParameters.hasAssociatedDisplay) {
@@ -2162,7 +2470,13 @@ void KeyboardInputMapper::processKey(nsecs_t when, bool down, int32_t keyCode,
     if (down && !isMetaKey(keyCode)) {
         getContext()->fadePointer();
     }
-
+#if CURSOR_LOGS
+    LOGE("KeyboardInputMapper::processKey Before notify =[%d]", keyCode);
+    LOGE("KeyboardInputMapper::processKey Before notify when = [%lf] when = [%le]\n",
+          when, when );
+    LOGE("KeyboardInputMapper::processKey Before notify downTime = [%lf] downTime = [%le]\n",
+          downTime, downTime );
+#endif
     NotifyKeyArgs args(when, getDeviceId(), mSource, policyFlags,
             down ? AKEY_EVENT_ACTION_DOWN : AKEY_EVENT_ACTION_UP,
             AKEY_EVENT_FLAG_FROM_SYSTEM, keyCode, scanCode, newMetaState, downTime);
@@ -2396,9 +2710,27 @@ void CursorInputMapper::reset(nsecs_t when) {
 }
 
 void CursorInputMapper::process(const RawEvent* rawEvent) {
+#if CURSOR_LOGS
+    LOGE("CursorInputMapper::process rawEvent->code =[%d], rawEvent->deviceId=[%d],"
+         "rawEvent->type=[%d], rawEvent->value=[%d], rawEvent->when=[%f] \n",
+          rawEvent->code, rawEvent->deviceId, rawEvent->type, rawEvent->value,
+          rawEvent->when);
+#endif
     mCursorButtonAccumulator.process(rawEvent);
     mCursorMotionAccumulator.process(rawEvent);
     mCursorScrollAccumulator.process(rawEvent);
+
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    if(g_bIsBrowserAppForeground && mPointerController == NULL) {
+        // create and configure the pointer controller
+        mSource = AINPUT_SOURCE_MOUSE;
+        mXPrecision = 1.0f;
+        mYPrecision = 1.0f;
+        mXScale = 1.0f;
+        mYScale = 1.0f;
+        mPointerController = getPolicy()->obtainPointerController(0);
+    }
+#endif
 
     if (rawEvent->type == EV_SYN && rawEvent->code == SYN_REPORT) {
         sync(rawEvent->when);
@@ -2424,17 +2756,36 @@ void CursorInputMapper::sync(nsecs_t when) {
     nsecs_t downTime = mDownTime;
     bool buttonsChanged = currentButtonState != lastButtonState;
     bool buttonsPressed = currentButtonState & ~lastButtonState;
-
+#if CURSOR_LOGS
+    LOGE("CursorInputMapper::sync downChanged=[%d] buttonsChanged=[%d] buttonsPressed=[%d]",
+          downChanged, buttonsChanged, buttonsPressed);
+#endif
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    float deltaX = mCursorMotionAccumulator.getRelativeX();
+    float deltaY = mCursorMotionAccumulator.getRelativeY();
+#else
     float deltaX = mCursorMotionAccumulator.getRelativeX() * mXScale;
     float deltaY = mCursorMotionAccumulator.getRelativeY() * mYScale;
+#endif
     bool moved = deltaX != 0 || deltaY != 0;
-
-    // Rotate delta according to orientation if needed.
+#if CURSOR_LOGS
+    LOGE("CursorInputMapper::sync deltaX=[%f] deltaY=[%f] moved=[%d]",
+          deltaX, deltaY, moved);
+#endif
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    // Remove orientation support as device does not support.
+//    if (mParameters.orientationAware && mParameters.hasAssociatedDisplay
+//            && (deltaX != 0.0f || deltaY != 0.0f)) {
+//        rotateDelta(mOrientation, &deltaX, &deltaY);
+//    }
+#else
+    // Rotate delta according to orientation if needed
     if (mParameters.orientationAware && mParameters.hasAssociatedDisplay
             && (deltaX != 0.0f || deltaY != 0.0f)) {
         rotateDelta(mOrientation, &deltaX, &deltaY);
     }
 
+#endif
     // Move the pointer.
     PointerProperties pointerProperties;
     pointerProperties.clear();
@@ -2447,7 +2798,10 @@ void CursorInputMapper::sync(nsecs_t when) {
     float vscroll = mCursorScrollAccumulator.getRelativeVWheel();
     float hscroll = mCursorScrollAccumulator.getRelativeHWheel();
     bool scrolled = vscroll != 0 || hscroll != 0;
-
+#if CURSOR_LOGS
+    LOGE("CursorInputMapper::sync vscroll=[%f] hscroll=[%f] scrolled=[%d]",
+          vscroll, hscroll, scrolled);
+#endif
     mWheelYVelocityControl.move(when, NULL, &vscroll);
     mWheelXVelocityControl.move(when, &hscroll, NULL);
 
@@ -2480,7 +2834,11 @@ void CursorInputMapper::sync(nsecs_t when) {
         pointerCoords.setAxisValue(AMOTION_EVENT_AXIS_Y, deltaY);
         displayId = ADISPLAY_ID_NONE;
     }
-
+#if CURSOR_LOGS
+    LOGE("CursorInputMapper::sync pointerCoords.getX()=[%f], "
+          "pointerCoords.getY()=[%f], displayId=[%d] ", pointerCoords.getX(),
+           pointerCoords.getY(), displayId );
+#endif
     pointerCoords.setAxisValue(AMOTION_EVENT_AXIS_PRESSURE, down ? 1.0f : 0.0f);
 
     // Moving an external trackball or mouse should wake the device.
@@ -2507,7 +2865,11 @@ void CursorInputMapper::sync(nsecs_t when) {
         } else {
             motionEventAction = AMOTION_EVENT_ACTION_HOVER_MOVE;
         }
-
+#if CURSOR_LOGS
+        LOGE("CursorInputMapper::sync metaState=[%d] motionEventAction=[%d] "
+             "mXPrecision=[%f] mYPrecision=[%f] downTime=[%f]", metaState,
+              motionEventAction, mXPrecision, mYPrecision, downTime);
+#endif
         NotifyMotionArgs args(when, getDeviceId(), mSource, policyFlags,
                 motionEventAction, 0, metaState, currentButtonState, 0,
                 displayId, 1, &pointerProperties, &pointerCoords,
@@ -2529,6 +2891,13 @@ void CursorInputMapper::sync(nsecs_t when) {
         if (scrolled) {
             pointerCoords.setAxisValue(AMOTION_EVENT_AXIS_VSCROLL, vscroll);
             pointerCoords.setAxisValue(AMOTION_EVENT_AXIS_HSCROLL, hscroll);
+#if CURSOR_LOGS
+            LOGE("CursorInputMapper::sync metaState=[%d] mXPrecision=[%f] "
+                 "mYPrecision=[%f] currentButtonState=[%d] pointerCoords.x=[%f] "
+                 "pointerCoords.y=[%f] downTime=[%f]", metaState, mXPrecision,
+                  mYPrecision, currentButtonState, pointerCoords.getX(),
+                  pointerCoords.getY(), downTime);
+#endif
 
             NotifyMotionArgs scrollArgs(when, getDeviceId(), mSource, policyFlags,
                     AMOTION_EVENT_ACTION_SCROLL, 0, metaState, currentButtonState,
