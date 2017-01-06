@@ -14,6 +14,26 @@
  * limitations under the License.
  */
 
+/*
+ * BORQS Software Solutions Pvt Ltd. CONFIDENTIAL
+ * Copyright (c) 2016-17 All rights reserved.
+ *
+ * The source code contained or described herein and all documents
+ * related to the source code ("Material") are owned by BORQS Software
+ * Solutions Pvt Ltd. No part of the Material may be used,copied,
+ * reproduced, modified, published, uploaded,posted, transmitted,
+ * distributed, or disclosed in any way without BORQS Software
+ * Solutions Pvt Ltd. prior written permission.
+ *
+ * No license under any patent, copyright, trade secret or other
+ * intellectual property right is granted to or conferred upon you
+ * by disclosure or delivery of the Materials, either expressly, by
+ * implication, inducement, estoppel or otherwise. Any license
+ * under such intellectual property rights must be express and
+ * approved by BORQS Software Solutions Pvt Ltd. in writing.
+ *
+ */
+
 #ifndef _UI_INPUT_READER_H
 #define _UI_INPUT_READER_H
 
@@ -42,7 +62,41 @@
 // which the delay will be truncated.
 #define MAX_VIBRATE_PATTERN_DELAY_NSECS (1000000 * 1000000000LL)
 
+// Enable/Disable logs for input reader
+//#define ENABLE_BROWSER_CURSOR_LOGS 0
+
+// flag to control cursor logs
+#define CURSOR_LOGS 0
+
+#define SUPPORT_BROWSER_VIRTUAL_CURSOR
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    // number of pixels to move on normal navigation key press.
+    #define CURSOR_MOVE_PIXELS   8
+
+    // number of pixels to move once we switch to fast move mode
+    #define LONG_PRESS_CURSOR_MOVE_PIXELS 30
+
+    /* Once long press of navigation key is detected, virtual cursor is moved
+     * 8px every 250 ms, up to MAX_INITIAL_SCROLL_COUNT_FOR_LONG_PRESS times.
+     * After this, we enter fast move mode, where every 100ms, 30px movement is
+     * done.
+     */
+    #define MAX_LONG_PRESS_NSECS  (100 * 1000000LL)
+    #define MAX_INITIAL_SCROLL_COUNT_FOR_LONG_PRESS   2
+    #define INITIAL_MAX_LONG_PRESS_NSECS  (250 * 1000000LL)
+#endif
+
 namespace android {
+
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+//data to be preserved for handling navigatio key long press
+struct longPressData{
+    RawEvent rawEvent;
+    nsecs_t longPressTimeOut;
+    int32_t keyCode;
+    bool IsOn;
+};
+#endif
 
 class InputDevice;
 class InputMapper;
@@ -337,6 +391,10 @@ public:
     virtual void vibrate(int32_t deviceId, const nsecs_t* pattern, size_t patternSize,
             ssize_t repeat, int32_t token) = 0;
     virtual void cancelVibrate(int32_t deviceId, int32_t token) = 0;
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    //This is called from activity manager when browser app is resumed/paused
+    virtual void setIfBrowserApp(bool IsBrowserApp) = 0;
+#endif
 };
 
 
@@ -444,6 +502,10 @@ private:
 
     InputReaderConfiguration mConfig;
 
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    //This is called from activity manager when browser app is resumed/paused
+    virtual void setIfBrowserApp(bool IsBrowserApp);
+#endif
     // The event queue.
     static const int EVENT_BUFFER_SIZE = 256;
     RawEvent mEventBuffer[EVENT_BUFFER_SIZE];
@@ -1023,6 +1085,19 @@ public:
             const int32_t* keyCodes, uint8_t* outFlags);
 
     virtual int32_t getMetaState();
+
+#ifdef SUPPORT_BROWSER_VIRTUAL_CURSOR
+    //Maps dpad events to mouse events to control mouse pointer
+    void HandleCursorPointerForDpad(const RawEvent* KrawEvent, int32_t keyCode);
+
+    // call back for handling navigation key long press
+    virtual void timeoutExpired(nsecs_t when);
+
+    static InputMapper* getKeyboardCursorPointer(){ return mCursorInputMapper ; }
+
+    //cursorinput mapper to control mouse pointer
+    static InputMapper* mCursorInputMapper ;
+#endif
 
 private:
     struct KeyDown {

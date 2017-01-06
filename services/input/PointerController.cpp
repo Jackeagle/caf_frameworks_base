@@ -109,7 +109,10 @@ bool PointerController::getBoundsLocked(float* outMinX, float* outMinY,
     }
 
     *outMinX = 0;
-    *outMinY = 0;
+   //*outMinY = 0;
+   /* Restricting the cursor from floating on status bar, this
+    * behavior is generic for all the devices that uses cursor like OTG mouse. */
+    *outMinY = 25;
     switch (mLocked.displayOrientation) {
     case DISPLAY_ORIENTATION_90:
     case DISPLAY_ORIENTATION_270:
