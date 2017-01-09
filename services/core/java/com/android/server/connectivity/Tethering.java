@@ -19,9 +19,6 @@ package com.android.server.connectivity;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothPan;
-import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -40,7 +37,6 @@ import android.net.NetworkInfo;
 import android.net.NetworkUtils;
 import android.net.RouteInfo;
 import android.net.wifi.WifiDevice;
-import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.INetworkManagementService;
 import android.os.Looper;
@@ -74,7 +70,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -169,10 +164,7 @@ public class Tethering extends BaseNetworkObserver {
     private static final int DNSMASQ_POLLING_INTERVAL = 1000;
     private static final int DNSMASQ_POLLING_MAX_TIMES = 10;
 
-    private AtomicReference<BluetoothPan> mBluetoothPan = new AtomicReference<BluetoothPan>();
-    private static final String mEnableAction = "tether.EoGRE.enable_disable";
     private boolean isEoGREDisabled =  SystemProperties.getBoolean("persist.sys.disable_eogre", true);
-    private BroadcastReceiver mEoGREReceiver;
 
     public Tethering(Context context, INetworkManagementService nmService,
             INetworkStatsService statsService, Looper looper) {
@@ -203,17 +195,6 @@ public class Tethering extends BaseNetworkObserver {
         filter.addAction(Intent.ACTION_MEDIA_UNSHARED);
         filter.addDataScheme("file");
         mContext.registerReceiver(mStateReceiver, filter);
-
-        mEoGREReceiver = new EoGREConfigReceiver();
-        filter = new IntentFilter();
-        filter.addAction(mEnableAction);
-        mContext.registerReceiver(mEoGREReceiver, filter);
-
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter != null) {
-            adapter.getProfileProxy(mContext, mProfileServiceListener,
-                   BluetoothProfile.PAN);
-        }
 
         mDhcpRange = context.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_dhcp_range);
@@ -756,62 +737,6 @@ public class Tethering extends BaseNetworkObserver {
         }
     }
 
-    private BluetoothProfile.ServiceListener mProfileServiceListener =
-        new BluetoothProfile.ServiceListener() {
-        public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            mBluetoothPan.set((BluetoothPan) proxy);
-        }
-        public void onServiceDisconnected(int profile) {
-            mBluetoothPan.set(null);
-        }
-    };
-
-    private class EoGREConfigReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context content, Intent intent) {
-            String action = intent.getAction();
-            isEoGREDisabled =  SystemProperties.getBoolean("persist.sys.disable_eogre", true);
-            WifiManager  wifiManager = (WifiManager)mContext.getSystemService(Context.WIFI_SERVICE);
-            int wifiApState = wifiManager.getWifiApState();
-            boolean usbTethered = false;
-            Log.d(TAG,"Intent to enable/disable eogre mode : " + action);
-            if (action == null) { return; }
-
-            synchronized (mPublicSync) {
-                Set ifaces = mIfaces.keySet();
-                for (Object iface : ifaces) {
-                    TetherInterfaceSM sm = mIfaces.get(iface);
-                    if (sm != null) {
-                        if (sm.isTethered()) {
-                            if (isUsb((String)iface)) {
-                                usbTethered = true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (action.equals(mEnableAction))  {
-                Boolean enable = intent.getExtras().getBoolean("enable");
-                if (enable == isEoGREDisabled) {
-                    BluetoothPan bluetoothPan = mBluetoothPan.get();
-                    if (bluetoothPan != null && bluetoothPan.isTetheringOn()) {
-                       bluetoothPan.setBluetoothTethering(false);
-                    }
-                    if (usbTethered) {
-                        setUsbTethering(false);
-                    }
-                    SystemProperties.set("persist.sys.disable_eogre",Boolean.toString(!enable));
-                    if (wifiApState == WifiManager.WIFI_AP_STATE_ENABLED ||
-                                        wifiApState == WifiManager.WIFI_AP_STATE_ENABLING) {
-                        wifiManager.setWifiApEnabled(null, false);
-                        wifiManager.setWifiApEnabled(null, true);
-                    }
-                }
-            }
-        }
-    }
-
     private class StateReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context content, Intent intent) {
@@ -924,6 +849,7 @@ public class Tethering extends BaseNetworkObserver {
     public int setUsbTethering(boolean enable) {
         if (VDBG) Log.d(TAG, "setUsbTethering(" + enable + ")");
         UsbManager usbManager = (UsbManager)mContext.getSystemService(Context.USB_SERVICE);
+
         synchronized (mPublicSync) {
             if (enable) {
                  if (mRndisEnabled) {
