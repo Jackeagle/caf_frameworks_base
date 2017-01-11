@@ -139,7 +139,14 @@ public class SubsidyController {
             mCurrentSubsidyState = new ApUnlockedState();
         } else if (intent.getBooleanExtra(
                     SubsidyUtility.EXTRA_INTENT_KEY_ENTER_CODE_SCREEN, false)) {
-            mCurrentSubsidyState = new DeviceLockedState();
+            boolean isPinVisible = intent.getBooleanExtra(
+                                   SubsidyUtility.EXTRA_INTENT_KEY_SHOW_PIN,
+                                   false);
+            if (!(mCurrentSubsidyState instanceof DeviceLockedState)) {
+                mCurrentSubsidyState = new DeviceLockedState();
+            }
+            ((DeviceLockedState) mCurrentSubsidyState)
+                    .setKeypadViewVisible(isPinVisible);
         } else if (intent.getBooleanExtra(
                     SubsidyUtility.EXTRA_INTENT_KEY_UNLOCK_PERMANENT, false)) {
             mCurrentSubsidyState = new DeviceUnlockedState();
@@ -148,7 +155,8 @@ public class SubsidyController {
         }
 
         if (mPreviousSubsidyState.getClass().equals(
-                mCurrentSubsidyState.getClass())) {
+                mCurrentSubsidyState.getClass())
+                && !mCurrentSubsidyState.isAllowDuplicateIntents()) {
             Log.d(TAG, "Current state is same as previous so return");
             return false;
         }
@@ -252,6 +260,9 @@ public class SubsidyController {
             return mIsUserRequestInProgress;
         }
 
+        protected boolean isAllowDuplicateIntents() {
+            return false;
+        }
 
         private void disableWifiTethering(Context context) {
             TetherUtil.setWifiTethering(false, context);
@@ -416,7 +427,7 @@ public class SubsidyController {
     }
 
     class DeviceLockedState extends SubsidyState {
-
+        boolean mIsKeypadViewVisible;
         public DeviceLockedState() {
             Log.d(TAG, " In DeviceLockedState");
 
@@ -454,6 +465,19 @@ public class SubsidyController {
         @Override
         protected int getViewId() {
             return mViewId;
+        }
+
+        @Override
+        protected boolean isAllowDuplicateIntents() {
+            return true;
+        }
+
+        private void setKeypadViewVisible(boolean isVisible) {
+            mIsKeypadViewVisible = isVisible;
+        }
+
+        public boolean getKeypadViewVisible() {
+            return mIsKeypadViewVisible;
         }
     }
 

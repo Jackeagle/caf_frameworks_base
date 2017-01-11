@@ -64,6 +64,9 @@ public class SubsidyUtility {
     // Show "Enter Code" Screen [TYPE: BOOLEAN]
     public static final String EXTRA_INTENT_KEY_ENTER_CODE_SCREEN =
         "INTENT_KEY_ENTER_CODE_SCREEN";
+    // Extra to show/hide PIN view in "Enter Code" [TYPE: BOOLEAN]
+    public static final String EXTRA_INTENT_KEY_SHOW_PIN =
+        "INTENT_KEY_SHOW_PIN";
     // Extra received when device is Subsidy Unlocked
     public static final String EXTRA_INTENT_KEY_UNLOCK_SCREEN =
         "INTENT_KEY_UNLOCK_SCREEN";
