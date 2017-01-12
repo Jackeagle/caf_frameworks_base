@@ -507,6 +507,7 @@ public class QsTuner extends Fragment implements Callback {
         public DraggableQsPanel(Context context) {
             super(context);
             mBrightnessView.setVisibility(View.GONE);
+            removeView(mSimSwitcherView);
         }
 
         @Override
