@@ -176,7 +176,8 @@ public class DatePicker extends FrameLayout {
 
         OnValueChangeListener onChangeListener = new OnValueChangeListener() {
             public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
-                updateInputState();
+                //Commented because cursor jumps unnecessarily
+                //updateInputState();
                 mTempDate.setTimeInMillis(mCurrentDate.getTimeInMillis());
                 // take care of wrapping of days and months to update greater fields
                 if (picker == mDaySpinner) {
@@ -229,6 +230,19 @@ public class DatePicker extends FrameLayout {
         mDaySpinner.setOnValueChangedListener(onChangeListener);
         mDaySpinnerInput = (EditText) mDaySpinner.findViewById(R.id.numberpicker_input);
 
+        // Modify Datepicker and Timepicker focus highlight function start
+        if (true) {
+            mDaySpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
+                public void onFocusChange(View v, boolean hasFocus) {
+                    if (hasFocus) {
+                        mDaySpinnerInput.setVisibility(View.VISIBLE);
+                        mDaySpinnerInput.requestFocus();
+                    }
+                }
+            });
+        }
+        // Modify Datepicker and Timepicker focus highlight function end
+
         // month
         mMonthSpinner = (NumberPicker) findViewById(R.id.month);
         mMonthSpinner.setMinValue(0);
@@ -238,11 +252,37 @@ public class DatePicker extends FrameLayout {
         mMonthSpinner.setOnValueChangedListener(onChangeListener);
         mMonthSpinnerInput = (EditText) mMonthSpinner.findViewById(R.id.numberpicker_input);
 
+        // Modify Datepicker and Timepicker focus highlight function start
+        if (true) {
+            mMonthSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
+                public void onFocusChange(View v, boolean hasFocus) {
+                    if (hasFocus) {
+                        mMonthSpinnerInput.setVisibility(View.VISIBLE);
+                        mMonthSpinnerInput.requestFocus();
+                    }
+                }
+            });
+        }
+        // Modify Datepicker and Timepicker focus highlight function end
+
         // year
         mYearSpinner = (NumberPicker) findViewById(R.id.year);
         mYearSpinner.setOnLongPressUpdateInterval(100);
         mYearSpinner.setOnValueChangedListener(onChangeListener);
         mYearSpinnerInput = (EditText) mYearSpinner.findViewById(R.id.numberpicker_input);
+
+        // Modify Datepicker and Timepicker focus highlight function start
+        if (true) {
+            mYearSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
+                public void onFocusChange(View v, boolean hasFocus) {
+                    if (hasFocus) {
+                        mYearSpinnerInput.setVisibility(View.VISIBLE);
+                        mYearSpinnerInput.requestFocus();
+                    }
+                }
+            });
+        }
+        // Modify Datepicker and Timepicker focus highlight function end
 
         // show only what the user required but make sure we
         // show something and the spinners have higher priority
@@ -291,6 +331,22 @@ public class DatePicker extends FrameLayout {
             setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
         }
     }
+
+    /**
+     * Modify date select type start
+     * @hide
+     */
+    public NumberPicker getYearSpinner(){
+        return mYearSpinner;
+    }
+
+    /**
+     * @hide
+     */
+    public NumberPicker getMonthSpinner(){
+        return mMonthSpinner;
+    }
+    // Modify date select type end
 
     /**
      * Gets the minimal date supported by this {@link DatePicker} in

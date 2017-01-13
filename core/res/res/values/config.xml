@@ -1501,7 +1501,7 @@
     <bool name="config_setDdsOnPrimarySub">false</bool>
 
     <!-- Config flag to enable UI optimizations related to layout cuts, font issues-->
-    <bool name="config_ui_optimization">true</bool>
+    <bool name="config_ui_optimization">false</bool>
 
 
    <!-- Activities list for boost -->

@@ -1035,22 +1035,7 @@ public class Editor {
                 // onFocusChanged
                 ensureEndedBatchEdit();
             }
-        } else {
-            if (mBlink != null) {
-                mBlink.cancel();
-            }
-            if (mInputContentType != null) {
-                mInputContentType.enterDown = false;
-            }
-            // Order matters! Must be done before onParentLostFocus to rely on isShowingUp
-            hideControllers();
-            if (mSuggestionsPopupWindow != null) {
-                mSuggestionsPopupWindow.onParentLostFocus();
-            }
-
-            // Don't leave us in the middle of a batch edit. Same as in onFocusChanged
-            ensureEndedBatchEdit();
-        }
+        } 
     }
 
     void onTouchEvent(MotionEvent event) {
@@ -2836,7 +2821,7 @@ public class Editor {
                     setAlphabeticShortcut('a').
                     setShowAsAction(
                             MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
-           //5700 always show cut in menu option
+           //Always show cut in menu option
             if (mTextView.canCut()) {*/
                 menu.add(0, TextView.ID_CUT, 0, com.android.internal.R.string.cut).
                     setIcon(styledAttributes.getResourceId(
@@ -2852,7 +2837,7 @@ public class Editor {
                     .setShowAsAction(
                             MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
             ///}
-            //5700 paste is triggered from application context
+            //Paste is triggered from application context
             if (mTextView.canPaste()) {
                 menu.add(0, TextView.ID_PASTE, 0, com.android.internal.R.string.paste).
                         setIcon(styledAttributes.getResourceId(
@@ -2876,7 +2861,8 @@ public class Editor {
             }
 
             if (menu.hasVisibleItems() || mode.getCustomView() != null) {
-                getSelectionController().show();
+                // Selection is not shown
+                // getSelectionController().show();
                 mTextView.setHasTransientState(true);
                 return true;
             } else {
