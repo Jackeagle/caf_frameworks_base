@@ -40,4 +40,14 @@ public class AccessibilityContentDescriptions {
         R.string.accessibility_wimax_three_bars,
         R.string.accessibility_wimax_signal_full
     };
+    // Add signal strength for 5 levels for start
+    static final int[] PHONE_SIGNAL_STRENGTH_NEW = {
+        R.string.accessibility_no_phone,
+        R.string.accessibility_phone_one_bar,
+        R.string.accessibility_phone_two_bars,
+        R.string.accessibility_phone_three_bars,
+        R.string.accessibility_phone_four_bars,
+        R.string.accessibility_phone_signal_full
+    };
+    // Add signal strength for 5 levels fori end
 }
