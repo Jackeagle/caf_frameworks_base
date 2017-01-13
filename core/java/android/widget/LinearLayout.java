@@ -23,7 +23,10 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
+import android.os.SystemProperties;
 import android.view.Gravity;
+import android.view.WindowManager;
 import android.view.View;
 import android.view.ViewDebug;
 import android.view.ViewGroup;
@@ -164,6 +167,10 @@ public class LinearLayout extends ViewGroup {
     private int mShowDividers;
     private int mDividerPadding;
 
+    private boolean mEnableUiOptimization = false;
+    private int mUiOptimizationChange = 0;
+    private int mImageToScreenPercentage = 40;
+
     public LinearLayout(Context context) {
         super(context);
     }
@@ -205,6 +212,11 @@ public class LinearLayout extends ViewGroup {
         mDividerPadding = a.getDimensionPixelSize(R.styleable.LinearLayout_dividerPadding, 0);
 
         a.recycle();
+
+        mEnableUiOptimization = context.getResources().getBoolean(
+                com.android.internal.R.bool.config_ui_optimization);
+        mUiOptimizationChange = Integer.parseInt(SystemProperties.get("persist.sys.uioptimization","1"));
+        //mImageToScreenPercentage = Integer.parseInt(SystemProperties.get("persist.sys.layoutcorrection", "40"));
     }
 
     /**
@@ -647,6 +659,82 @@ public class LinearLayout extends ViewGroup {
         final boolean useLargestChild = mUseLargestChild;
 
         int largestChildHeight = Integer.MIN_VALUE;
+
+        //Fix Layout Issues in a LinearLayout - START
+        if(mEnableUiOptimization) {
+            int layoutHeight = MeasureSpec.getSize(heightMeasureSpec);
+            int screenHeight;
+            DisplayMetrics displaymetrics = new DisplayMetrics();
+            WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
+            wm.getDefaultDisplay().getMetrics(displaymetrics);
+            screenHeight = displaymetrics.heightPixels;
+            if( mUiOptimizationChange == 1 && (layoutHeight > 0.5 * screenHeight )) {
+                double imageThresholdSize = (screenHeight * mImageToScreenPercentage) / 100.0;
+                View imageView = null;
+                int reqLength = 0;
+                for(int k=0; k<count; k++) {
+                    final View child = getVirtualChildAt(k);
+                    if(child == null) {
+                        reqLength += measureNullChild(k);
+                        continue;
+                    }
+                    if(child.getVisibility() == View.GONE) {
+                        continue;
+                    }
+                    if(hasDividerBeforeChildAt(k)) {
+                        reqLength += mDividerHeight;
+                    }
+                    LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) child.getLayoutParams();
+                    totalWeight += lp.weight;
+                    if (heightMode == MeasureSpec.EXACTLY && lp.height == 0 && lp.weight > 0) {
+                        // Optimization: don't bother measuring children who are going to use
+                        // leftover space. These views will get measured again down below if
+                        // there is any leftover space.
+                        final int totalLength = reqLength;
+                        reqLength = Math.max(totalLength, totalLength + lp.topMargin + lp.bottomMargin);
+                    } else {
+                        int oldHeight = Integer.MIN_VALUE;
+
+                        if (lp.height == 0 && lp.weight > 0) {
+                            // heightMode is either UNSPECIFIED or AT_MOST, and this
+                            // child wanted to stretch to fill available space.
+                            // Translate that to WRAP_CONTENT so that it does not end up
+                            // with a height of 0
+                            oldHeight = 0;
+                            lp.height = LayoutParams.WRAP_CONTENT;
+                        }
+
+                        // Determine how big this child would like to be. If this or
+                        // previous children have given a weight, then we allow it to
+                        // use all available space (and we will shrink things later
+                        // if needed).
+                        measureChildBeforeLayout(
+                               child, k, widthMeasureSpec, 0, heightMeasureSpec, 0);
+
+                        if (oldHeight != Integer.MIN_VALUE) {
+                           lp.height = oldHeight;
+                        }
+                        final int childHeight = child.getMeasuredHeight();
+                        final int totalLength = reqLength;
+                        reqLength = Math.max(totalLength, totalLength + childHeight + lp.topMargin +
+                               lp.bottomMargin + getNextLocationOffset(child));
+                        if((child instanceof ImageView) && (childHeight > imageThresholdSize )) {
+                            imageView = child;
+                        }
+
+                    }
+                }
+
+                if(reqLength > layoutHeight && imageView != null && totalWeight == 0) {
+                    LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) imageView.getLayoutParams();
+                    lp.height = 0;
+                    lp.weight = 1;
+                }
+
+                totalWeight = 0;
+            }
+        }
+        //Fix Layout Issues in a LinearLayout - END
 
         // See how tall everyone is. Also remember max width.
         for (int i = 0; i < count; ++i) {
