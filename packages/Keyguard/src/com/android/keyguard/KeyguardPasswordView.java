@@ -29,12 +29,18 @@ import android.view.View;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InputMethodSubtype;
+import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 
 import com.android.internal.widget.PasswordEntryKeyboardHelper;
 import com.android.internal.widget.PasswordEntryKeyboardView;
 
 import java.util.List;
+// Modify for keypad support
+import android.view.KeyEvent;
+import android.util.Log;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 /**
  * Displays an alphanumeric (latin-1) key entry for the user to enter
  * an unlock password
@@ -120,7 +126,16 @@ public class KeyguardPasswordView extends KeyguardAbsKeyInputView
                 }
             }
         });
-
+        mPasswordEntry.setOnEditorActionListener(new EditText.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView tv, int actionId, KeyEvent kv) {
+            // TODO Auto-generated method stub
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                verifyPasswordAndUnlock();
+                return true;
+            }
+            return false;
+        } });
         mPasswordEntry.requestFocus();
 
         // If there's more than one IME, enable the IME switcher button
@@ -203,5 +218,36 @@ public class KeyguardPasswordView extends KeyguardAbsKeyInputView
     @Override
     public int getWrongPasswordStringId() {
         return R.string.kg_wrong_password;
+    }
+
+    // Need to handle # to support input type change
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        boolean isDown = event.getAction() == KeyEvent.ACTION_DOWN;
+        switch (event.getKeyCode()) {
+            case KeyEvent.KEYCODE_POUND: {
+                if (isDown) {
+                    if(findFocus() == mPasswordEntry) {
+                        mPasswordEntry.setKeyListener(TextKeyListener.getInstance());
+                        mPasswordEntry.setInputType(InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                        return true;
+                    }
+                }
+                break;
+            }
+            //If focus is on password field, consume the DPAD_UP event
+            case KeyEvent.KEYCODE_DPAD_UP: {
+                if (isDown) {
+                    if(findFocus() == mPasswordEntry) {
+
+                        return true;
+                    }
+                }
+                break;
+            }
+            default: break;
+        }
+        return super.dispatchKeyEvent(event);
     }
 }

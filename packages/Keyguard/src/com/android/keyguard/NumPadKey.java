@@ -71,6 +71,14 @@ public class NumPadKey extends Button {
         mDigit = a.getInt(R.styleable.NumPadKey_digit, mDigit);
         setTextViewResId(a.getResourceId(R.styleable.NumPadKey_textView, 0));
 
+        // Modify to discard NumPadKey for keypad support start
+        if (!KeyguardService.isPhoneTypeTouch) {
+            setFocusable(false);
+            setEnabled(false);
+            setClickable(false);
+        }
+        // Modify to discard NumPadKey for keypad support by end
+
         setOnClickListener(mListener);
         setOnHoverListener(new LiftToActivateListener(context));
         setAccessibilityDelegate(new ObscureSpeechDelegate(context));
