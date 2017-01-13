@@ -81,7 +81,32 @@ public class StatusBarWindowView extends FrameLayout
                 mService.animateCollapsePanels();
             }
             return true;
-        }
+            case KeyEvent.KEYCODE_CLEAR:
+                case KeyEvent.KEYCODE_DEL:
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_DPAD_UP:
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    View v = getFocusedChild();
+                    if (v != null) {
+                        return v.dispatchKeyEvent(event);
+                    } else {
+                        return true;
+                    }
+        } /*else {
+            // Add SystemUI support keyboard end
+            switch (event.getKeyCode()) {
+            case KeyEvent.KEYCODE_BACK:
+                if (!down) {
+                    mService.animateCollapsePanels();
+                }
+                return true;
+            }
+            // Add SystemUI support keyboardi start
+        }*/
+        // Add SystemUI support keyboard end
         return super.dispatchKeyEvent(event);
     }
 

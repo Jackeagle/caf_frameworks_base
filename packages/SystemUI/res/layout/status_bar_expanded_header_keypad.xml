@@ -26,6 +26,8 @@
     android:gravity="center_vertical"
     android:baselineAligned="false"
     >
+
+    <!-- Modify SystemUI support keyboard start -->
     <RelativeLayout
         android:id="@+id/datetime"
         android:layout_width="wrap_content"
@@ -33,8 +35,12 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:background="@drawable/ic_notify_button_bg"
-        android:enabled="false"
+        android:clickable="true"
+        android:enabled="true"
+        android:focusable="true"
         >
+    <!-- Modify SystemUI support keyboard by end -->
+
         <com.android.systemui.statusbar.policy.Clock
             android:id="@+id/clock"
             android:layout_width="wrap_content"
@@ -48,23 +54,20 @@
         <com.android.systemui.statusbar.policy.DateView android:id="@+id/date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:singleLine="true"
             android:textAppearance="@style/TextAppearance.StatusBar.Expanded.Date"
-            android:layout_toEndOf="@id/clock"
-            android:layout_alignBaseline="@id/clock"
+            android:layout_toRightOf="@id/clock"
+            android:layout_centerVertical="true"
             />
     </RelativeLayout>
-    <ImageView android:id="@+id/tasklistSwitch"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:scaleType="center"
-        android:src="@drawable/ic_tasklist_switch"
-        />
+
+    <!-- Modify SystemUI support keyboard start -->
     <Space
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:enabled="false"
         />
+    <!-- Modify SystemUI support keyboard end -->
 
     <TextView
         android:id="@+id/header_debug_info"
@@ -79,6 +82,7 @@
         android:padding="2dp"
         />
 
+    <!-- Modify SystemUI support keyboard start -->
     <ImageView android:id="@+id/clear_all_button"
         android:layout_width="50dp"
         android:layout_height="50dp"
@@ -86,13 +90,19 @@
         android:src="@drawable/ic_notify_clear"
         android:background="@drawable/ic_notify_button_bg"
         android:contentDescription="@string/accessibility_clear_all"
-        />     
+        android:enabled="true"
+        android:focusable="true"
+        android:clickable="true"
+        />
+    <!-- Modify SystemUI support keyboard end -->
 
     <FrameLayout android:id="@+id/settings_button_holder"
         android:layout_width="50dp"
         android:layout_height="50dp"
         android:layout_gravity="right"
         >
+
+        <!-- Modify SystemUI support keyboard  start -->
         <ImageView android:id="@+id/settings_button"
             android:layout_width="50dp"
             android:layout_height="50dp"
@@ -100,7 +110,11 @@
             android:src="@drawable/ic_notify_settings"
             android:background="@drawable/ic_notify_button_bg"
             android:contentDescription="@string/accessibility_desc_quick_settings"
+            android:clickable="true"
+            android:enabled="true"
+            android:focusable="true"
             />
+        <!-- Modify SystemUI support keyboard end -->
         <ImageView android:id="@+id/notification_button"
             android:layout_width="50dp"
             android:layout_height="50dp"

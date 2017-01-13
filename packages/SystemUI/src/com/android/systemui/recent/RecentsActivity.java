@@ -25,9 +25,15 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.UserHandle;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+
+import android.util.Log;
+
 
 import com.android.systemui.R;
 import com.android.systemui.statusbar.StatusBarPanel;
@@ -234,7 +240,7 @@ public class RecentsActivity extends Activity {
                     boolean waitingForWindowAnimation = checkWaitingForAnimationParam &&
                             intent.getBooleanExtra(WAITING_FOR_WINDOW_ANIMATION_PARAM, false);
                     mRecentsPanel.show(true, recentTasksLoader.getLoadedTasks(),
-                            recentTasksLoader.isFirstScreenful(), waitingForWindowAnimation);
+                            recentTasksLoader.isFirstScreenful(), false);
                 }
             }
         }
@@ -247,4 +253,37 @@ public class RecentsActivity extends Activity {
     boolean isActivityShowing() {
          return mShowing;
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        if( mRecentsPanel.mRecentTaskDescriptions != null
+            && (mRecentsPanel.mRecentTaskDescriptions.size() != 0) ) {
+            // show the menu only when there exist one or more items in the
+            // recents apps list
+            MenuInflater inflater = getMenuInflater();
+            inflater.inflate(R.menu.recent_popup_menu, menu); //Menu Resource, Menu
+            return true;
+        }
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case R.id.recent_remove_item:
+                mRecentsPanel.removeView();
+            return true;
+
+            case R.id.recent_inspect_item:
+                mRecentsPanel.inspectView();
+              return true;
+
+              default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+
+
 }
