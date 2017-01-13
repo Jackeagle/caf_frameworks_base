@@ -273,6 +273,40 @@ public class KeyguardViewManager {
                 if (mKeyguardView.dispatchKeyEvent(event)) {
                     return true;
                 }
+                // Add Long press * to unlock start
+                // Whenever Messaging application is behind the lockscreen
+                // Once user unlock the screen, focus will goto messaging application
+                // resulting the text deletion, so changed logic
+                // Only after long press * and keyup results in unlock the screen
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    if (event.getKeyCode() == KeyEvent.KEYCODE_STAR) {
+                        if (event.getAction() == KeyEvent.ACTION_DOWN
+                            && event.getRepeatCount() == 0) {
+                            mLongPressStarKey = false;
+                            return true;
+                        } else if ((event.getAction() == KeyEvent.ACTION_UP) && (mLongPressStarKey)) {
+                            //release wake lock since we have detected a keyup
+                            //for long press of "*"
+                            if (mWakeLock != null && mWakeLock.isHeld()) {
+                                mWakeLock.release();
+                            }
+                            mKeyguardView.handleStarKey();
+                            mLongPressStarKey = false;
+                            return true;
+                        } else if (event.getAction() == KeyEvent.ACTION_DOWN
+                            && event.isLongPress() ) {
+                            mLongPressStarKey = true;
+                            //acquire wake lock for long press of "*" unles a
+                            //keyup happens for the same
+                            if (mWakeLock != null) {
+                                mWakeLock.acquire();
+                            }
+                            mKeyguardView.changeHintText();
+                            return true;
+                        }
+                    }
+               }
+               // Add Long press * to unlock end
             }
             return super.dispatchKeyEvent(event);
         }

@@ -22,16 +22,11 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:androidprv="http://schemas.android.com/apk/res/com.android.keyguard"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center">
-    <TextClock android:id="@+id/date_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/clock_white"
-        style="@style/widget_label"
-        android:gravity="center"
-        />
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:layout_marginTop="10dp"
+    android:gravity="right|bottom"
+>
     <TextView android:id="@+id/alarm_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -40,9 +35,12 @@
         android:drawableStart="@drawable/ic_alarm_small"
         android:textColor="@color/clock_gray"
         style="@style/widget_label"
-        android:layout_marginLeft="8dip"
-        android:layout_marginStart="8dip"
-        android:gravity="center"
-        android:visibility="gone"
+        android:visibility="invisible"
+        />
+    <TextClock android:id="@+id/date_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/clock_white"
+        style="@style/widget_label"
         />
 </LinearLayout>
