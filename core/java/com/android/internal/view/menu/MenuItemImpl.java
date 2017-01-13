@@ -562,7 +562,7 @@ public final class MenuItemImpl implements MenuItem {
           --FFFC is used where "C" is an OR  between 8 and
           4 which will retain the property
         */
-        mShowAsAction = (actionEnum&0XFFFC);
+        mShowAsAction = (actionEnum & 0XFFFC);
         mMenu.onItemActionRequestChanged(this);
     }
 

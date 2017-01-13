@@ -39,7 +39,6 @@
         android:clipToPadding="false"
         android:gravity="center"
         android:visibility="visible">
-    <!-- Modify Long press * to unlock of the prompt by zhangchen 20131225 start-->
     <RelativeLayout
       android:layout_width="fill_parent"
       android:layout_height="fill_parent"
@@ -47,7 +46,7 @@
 
       <include layout="@layout/keyguard_message_area"
            android:layout_width="match_parent"
-           android:layout_height="wrap_content" 
+           android:layout_height="wrap_content"
            android:layout_marginTop="150dp" />
       <TextView
            android:id="@+id/lockscreen_longpress_star_unlock_view"
@@ -69,7 +68,6 @@
            android:layout_height="220dp"
            android:layout_marginTop="140dp"
       />
-     <!-- Modify Long press * to unlock of the prompt by zhangchen 20131225 end-->
 
         <View
             android:id="@+id/keyguard_selector_view_frame"

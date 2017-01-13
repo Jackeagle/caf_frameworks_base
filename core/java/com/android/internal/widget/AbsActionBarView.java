@@ -175,8 +175,8 @@ public abstract class AbsActionBarView extends ViewGroup {
 
     public boolean showOverflowMenu() {
         if (mActionMenuPresenter != null) {
-            //not ot show overflow view
-            return false;//mActionMenuPresenter.showOverflowMenu();
+            //not to show overflow view
+            return false;
         }
         return false;
     }

@@ -421,7 +421,6 @@
         <item quantity="one">SIM is now disabled. Enter PUK code to continue. You have <xliff:g id="number">%d</xliff:g> remaining attempt before SIM becomes permanently unusable. Contact carrier for details.</item>
         <item quantity="other">SIM is now disabled. Enter PUK code to continue. You have <xliff:g id="number">%d</xliff:g> remaining attempts before SIM becomes permanently unusable. Contact carrier for details.</item>
     </plurals>
-    <string name="kg_hint_text_to_release_key_to_unlock">Release \u0020 <![CDATA[ <img src="ic_star.png"/>]]> \u0020 to unlock</string>
     <!-- Carrier Name -->
     <string name="China_Mobile">China Mobile</string>
     <string name="China_Unicom">China Unicom</string>
@@ -431,5 +430,6 @@
     <string name="unknown_title_name">Unknown title</string>
     <string name="unknown_album_name">Unknown album</string>
 
-    <string name="lockscreen_longpress_star_unlock">Deja presionado <![CDATA[ <img src="ic_star.png"/>]]>\t para desbloquear.</string>
+    <string name="lockscreen_longpress_star_unlock">"Press &amp; hold <![CDATA[ <img src="ic_star.png"/>]]> to unlock."</string>
+    <string name="kg_hint_text_to_release_key_to_unlock">Release \u0020 <![CDATA[ <img src="ic_star.png"/>]]> \u0020 to unlock</string>
 </resources>

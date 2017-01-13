@@ -470,12 +470,7 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
 
         // change the focus if applicable.
         if (oldTab != index) {
-            //5700 requirement where focus should not be there on the tab
-            // Bug-62054 & 62055  -start
-            // CTS-fix : Request focus for the current tab widget child.
-            if(mContext.getPackageName().contains("com.android.cts.stub"))
-                getChildTabViewAt(index).requestFocus();
-            // Bug-62054 & 62055-end
+            getChildTabViewAt(index).requestFocus();
         }
     }
 
@@ -501,16 +496,7 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
         }
 
         // Ensure you can navigate to the tab with the keyboard, and you can touch it
-        //5700 requirement where focus should not be there on the tab
-        // Bug-62054 & 62055  -start
-        // CTS FIX:CTS test case setCurrentTab tries to get the focuse
-        // child in the tab and fails as the child is not focusable
-        // currently. Making the child focusable
-        if(mContext.getPackageName().contains("com.android.cts.stub"))
-            child.setFocusable(true);
-        else
-            child.setFocusable(false);
-        // Bug-62054 & 62055  -end
+        child.setFocusable(true);
         child.setClickable(true);
 
         super.addView(child);
@@ -537,12 +523,7 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
     /** {@inheritDoc} */
     public void onFocusChange(View v, boolean hasFocus) {
         if (v == this && hasFocus && getTabCount() > 0) {
-            //5700 requirement where focus should not be there on the tab
-            // Bug-62054 & 62055  -start
-            // CTS FIX: Request focus for the current tab widget child
-            if(mContext.getPackageName().contains("com.android.cts.stub"))
-                getChildTabViewAt(mSelectedTab).requestFocus();
-            // Bug-62054 & 62055  -end
+            getChildTabViewAt(mSelectedTab).requestFocus();
             return;
         }
 

@@ -1,5 +1,5 @@
     <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+        xmlns:tools="http://schemas.android.com/tools"
         android:id="@+id/alarm_lyt"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -11,16 +11,6 @@
             android:layout_width="50dp"
             android:layout_height="wrap_content"
             android:drawableTop="@drawable/ic_missed"
-            android:gravity="top"
-            android:textAlignment="center"
-            android:textSize="18dp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/ptt_count"
-            android:layout_width="50dp"
-            android:layout_height="wrap_content"
-            android:drawableTop="@drawable/ic_ptt_single"
             android:gravity="top"
             android:textAlignment="center"
             android:textSize="18dp"
