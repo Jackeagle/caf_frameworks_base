@@ -548,7 +548,8 @@ public class ActionBarView extends AbsActionBarView {
     }
 
     public void setHomeButtonEnabled(boolean enable) {
-        setHomeButtonEnabled(enable, true);
+        // Setting the default Home enabled value to false
+        setHomeButtonEnabled(false, true);
     }
 
     private void setHomeButtonEnabled(boolean enable, boolean recordState) {
@@ -630,8 +631,7 @@ public class ActionBarView extends AbsActionBarView {
                 // a bit easier for developers in the common case.
                 // (It would be silly to show it as up without responding to it.)
                 if (setUp) {
-                    // Setting the default Home enabled value to false
-                    setHomeButtonEnabled(false);
+                    setHomeButtonEnabled(true);
                 }
             }
 

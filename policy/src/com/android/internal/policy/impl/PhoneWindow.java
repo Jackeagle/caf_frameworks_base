@@ -2419,7 +2419,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             if (getCallback() != null && !isDestroyed()) {
                 try {
                       mode = getCallback().onWindowStartingActionMode(wrappedCallback);
-                      //intilize of mode when action mode is set
+                      //initialisation of mode when action mode is set
                       mAmode = mode;
                     } catch (AbstractMethodError ame) {
                     // Older apps might not implement this callback method.
@@ -2468,10 +2468,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     if (callback.onCreateActionMode(mode, mode.getMenu())) {
                         mode.invalidate();
                         mActionModeView.initForMode(mode);
-                        //XP5 requirement not to show the actionmode
                         mActionModeView.setVisibility(View.GONE);
                         mActionMode = mode;
-                        //intilize of mode when action mode is set
                         mAmode = mode;
                         if (mActionModePopup != null) {
                             post(mShowActionModePopup);

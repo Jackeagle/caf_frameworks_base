@@ -29,7 +29,6 @@ please see styles_device_defaults.xml.
 ===============================================================
  -->
 <resources>
-    <!-- Global Theme Styles -->
     <eat-comment />
 
 
@@ -629,12 +628,12 @@ please see styles_device_defaults.xml.
     </style>
 
     <style name="Widget.ListView.DropDown">
-    	<item name="android:cacheColorHint">@null</item>
+        <item name="android:cacheColorHint">@null</item>
         <item name="android:divider">@android:drawable/divider_horizontal_bright_opaque</item>
     </style>
 
     <style name="Widget.ListView.Menu" parent="Widget.Holo.ListView">
-		<item name="android:cacheColorHint">@null</item>
+        <item name="android:cacheColorHint">@null</item>
         <item name="android:scrollbars">vertical</item>
         <item name="android:fadingEdge">none</item>
         <!-- Light background for the list in menus, so the divider for bright themes -->
@@ -904,7 +903,7 @@ please see styles_device_defaults.xml.
          <item name="android:textStyle">normal</item>
          <item name="android:textColor">?textColorPrimaryInverse</item>
          <item name="android:textColorHint">?textColorHintInverse</item>
-     </style>	
+     </style>
 
      <!-- @hide was 18sp -->
      <style name="TextAppearance.SearchResult.Title">

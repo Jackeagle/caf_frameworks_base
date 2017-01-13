@@ -13,7 +13,6 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:systemui="http://schemas.android.com/apk/res/com.android.systemui"
@@ -28,13 +27,11 @@
         android:src="@drawable/ic_qs_brightness_auto_off"
 
          />
-    <!--modified for NOT_FULL_DISPLAY by xushuang at 20140106  BEGIN-->
     <com.android.systemui.settings.ToggleSlider
         android:id="@+id/brightness_slider"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"    
+        android:layout_gravity="center_vertical"
         systemui:text="@string/status_bar_settings_auto_brightness_label"
         />
-    <!--modified for NOT_FULL_DISPLAY by xushuang at 20140106  END-->
 </LinearLayout>

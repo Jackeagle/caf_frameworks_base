@@ -41,9 +41,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:focusable="true" >
-
-
-
             <TextView
                 android:id="@+id/alarm_status"
                 style="@style/widget_label"
@@ -73,21 +70,7 @@
                 android:format12Hour="@string/keyguard_widget_12_hours_format"
                 android:format24Hour="@string/keyguard_widget_24_hours_format"
                 android:singleLine="true"
-                android:textColor="@color/clock_white"
-                />
-
-
-            <ImageButton
-                android:id="@+id/LEDSwitch"
-                android:layout_width="50dp"
-                android:layout_height="38dp"
-                android:layout_alignParentRight="true"
-                android:layout_below="@id/alarm_status"
-                android:layout_gravity="right"
-                android:background="@android:color/darker_gray"
-                android:padding="@dimen/kg_widget_view_height"
-                android:scaleType="center"
-                android:visibility="gone" />
+                android:textColor="@color/clock_white"/>
         </RelativeLayout>
 
     </com.android.keyguard.KeyguardStatusView>

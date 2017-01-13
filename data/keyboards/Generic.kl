@@ -169,7 +169,6 @@ key 143   POWER             WAKE
 # key 147 "KEY_XFER"
 # key 148 "KEY_PROG1"
 # key 149 "KEY_PROG2"
-#key 249   PTT
 key 150   EXPLORER
 # key 151 "KEY_MSDOS"
 key 152   POWER             WAKE
@@ -189,7 +188,6 @@ key 165   MEDIA_PREVIOUS
 key 166   MEDIA_STOP
 key 167   MEDIA_RECORD
 key 168   MEDIA_REWIND
-key 231   CALL
 # key 170 "KEY_ISO"
 key 171   MUSIC
 #key 172   HOME
@@ -206,11 +204,9 @@ key 180   NUMPAD_RIGHT_PAREN
 # key 183   F13
 # key 184   F14
 # key 185   F15
-key 185   CLEAR
+# key 185   CLEAR
 # key 186   F16
-#key 186   FLASH
 # key 187   F17
-#key 187   SPK_TOGGLE
 # key 188   F18
 # key 189   F19
 # key 190   F20
@@ -250,7 +246,7 @@ key 217   SEARCH
 key 224   BRIGHTNESS_DOWN
 key 225   BRIGHTNESS_UP
 key 226   HEADSETHOOK
-
+key 231   CALL
 key 256   BUTTON_1
 key 257   BUTTON_2
 key 258   BUTTON_3

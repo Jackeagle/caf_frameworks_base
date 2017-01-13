@@ -45,7 +45,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.view.View.OnKeyListener;
 import android.view.KeyEvent;
-import android.util.Log;
 /**
  * This widget implements the dynamic action bar tab behavior that can change
  * across different configurations or circumstances.
@@ -315,7 +314,6 @@ public class ScrollingTabContainerView extends HorizontalScrollView
                 }
             });
         }
-        //According to 5700 UI requirements removing focus to the tabview of the ActionBar
         tabView.setFocusable(false);
         return tabView;
     }

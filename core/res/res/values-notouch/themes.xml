@@ -1162,10 +1162,8 @@ please see themes_device_defaults.xml.
         <item name="actionOverflowButtonStyle">@android:style/Widget.Holo.ActionButton.Overflow</item>
         <item name="actionModeBackground">@android:drawable/cab_background_top_holo_dark</item>
         <item name="actionModeSplitBackground">@android:drawable/cab_background_bottom_holo_dark</item>
-        <!-- Added for 0032838 - start -->
         <!-- <item name="actionModeCloseDrawable">@android:drawable/ic_cab_done_holo_dark</item> -->
         <item name="actionModeCloseDrawable">@android:drawable/ic_cab_done_holo_dark_custom</item>
-        <!-- Added for 0032838 - end -->
         <item name="actionBarTabStyle">@style/Widget.Holo.ActionBar.TabView</item>
         <item name="actionBarTabBarStyle">@style/Widget.Holo.ActionBar.TabBar</item>
         <item name="actionBarTabTextStyle">@style/Widget.Holo.ActionBar.TabText</item>
@@ -1483,10 +1481,8 @@ please see themes_device_defaults.xml.
         <item name="actionOverflowButtonStyle">@android:style/Widget.Holo.Light.ActionButton.Overflow</item>
         <item name="actionModeBackground">@android:drawable/cab_background_top_holo_light</item>
         <item name="actionModeSplitBackground">@android:drawable/cab_background_bottom_holo_light</item>
-        <!-- Added for 0032838 - start -->
         <!-- <item name="actionModeCloseDrawable">@android:drawable/ic_cab_done_holo_light</item> -->
         <item name="actionModeCloseDrawable">@android:drawable/ic_cab_done_holo_light_custom</item>
-        <!-- Added for 0032838 - end -->
         <item name="actionBarTabStyle">@style/Widget.Holo.Light.ActionBar.TabView</item>
         <item name="actionBarTabBarStyle">@style/Widget.Holo.Light.ActionBar.TabBar</item>
         <item name="actionBarTabTextStyle">@style/Widget.Holo.Light.ActionBar.TabText</item>
@@ -1549,10 +1545,8 @@ please see themes_device_defaults.xml.
         <item name="actionOverflowButtonStyle">@android:style/Widget.Holo.ActionButton.Overflow</item>
         <item name="actionModeBackground">@android:drawable/cab_background_top_holo_dark</item>
         <item name="actionModeSplitBackground">@android:drawable/cab_background_bottom_holo_dark</item>
-        <!-- Added for 0032838 - start -->
         <!-- <item name="actionModeCloseDrawable">@android:drawable/ic_cab_done_holo_dark</item> -->
         <item name="actionModeCloseDrawable">@android:drawable/ic_cab_done_holo_dark_custom</item>
-        <!-- Added for 0032838 - end -->
         <item name="homeAsUpIndicator">@android:drawable/ic_ab_back_holo_dark</item>
         <item name="actionBarTabStyle">@style/Widget.Holo.Light.ActionBar.TabView.Inverse</item>
         <item name="actionBarTabBarStyle">@style/Widget.Holo.Light.ActionBar.TabBar.Inverse</item>
