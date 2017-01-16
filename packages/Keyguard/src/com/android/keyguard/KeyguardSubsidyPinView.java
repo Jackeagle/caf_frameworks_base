@@ -41,12 +41,14 @@ import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
 import com.android.internal.telephony.IExtTelephony;
+import com.android.keyguard.SubsidyController.*;
 
 /**
  * Displays a PIN pad for unlocking.
@@ -62,6 +64,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     private int mRetryAttemptRemaining;
     private CountDownTimer mCountDownTimer;
     private WifiSetupButton mSetupWifiButton;
+    private ViewGroup mContainer;
 
     public KeyguardSubsidyPinView(Context context) {
         this(context, null);
@@ -108,6 +111,9 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         if (mEcaView instanceof EmergencyCarrierArea) {
             ((EmergencyCarrierArea) mEcaView).setCarrierTextVisible(false);
         }
+
+        mContainer = (ViewGroup) findViewById(R.id.container);
+        mContainer.setVisibility(getkeypadViewVisibility());
     }
 
     private int getTotalRetryAttempts() {
@@ -273,7 +279,9 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                         // If more than 1 minutes remaining it will be displayed
                         // in minutes, if less than 1 minutes is displayed in
                         // seconds.
-                        if (millisUntilFinished > 60000) {
+                        if (getkeypadViewVisibility() != View.VISIBLE) {
+                            showDefaultMessage();
+                        } else if (millisUntilFinished > 60000) {
                             int minutesRemaining =
                                     (int) (millisUntilFinished / 60000);
                             minutesRemaining++;
@@ -379,6 +387,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                         mRetryAttemptRemaining = getTotalRetryAttempts();
                         showDefaultMessage();
                     }
+                    mContainer.setVisibility(getkeypadViewVisibility());
                 }
             };
 
@@ -386,5 +395,17 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         if (mSetupWifiButton != null) {
             mSetupWifiButton.setVisibility(isVisible);
         }
+    }
+
+    public int getkeypadViewVisibility() {
+        SubsidyState currentState =
+                SubsidyController
+                        .getInstance(mContext).getCurrentSubsidyState();
+        if (currentState instanceof DeviceLockedState) {
+            return ((DeviceLockedState) currentState).getKeypadViewVisible()
+                    ? View.VISIBLE
+                    : View.INVISIBLE;
+        }
+        return View.INVISIBLE;
     }
 }
