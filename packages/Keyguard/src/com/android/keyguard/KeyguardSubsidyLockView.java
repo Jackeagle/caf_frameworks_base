@@ -96,14 +96,11 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                 mEmergencyView.setVisibility(View.GONE);
                 mProgressView.setVisibility(View.VISIBLE);
                 setSetupWifiButtonVisibility(View.GONE);
-                mController.getCurrentSubsidyState().setInProgressState(true);
-                Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
-                intent.setPackage(getResources().getString(
-                        R.string.config_slc_package_name));
-                intent.putExtra(mController.getCurrentSubsidyState()
-                    .getLaunchIntent(0), true);
-                mContext.sendBroadcast(intent,
-                    SubsidyUtility.BROADCAST_PERMISSION);
+                mController.getCurrentSubsidyState().setInProgressState(
+                        true);
+                mContext.sendBroadcast(mController
+                        .getCurrentSubsidyState().getLaunchIntent(),
+                        SubsidyUtility.BROADCAST_PERMISSION);
             }
         });
     }

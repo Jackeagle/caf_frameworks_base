@@ -1540,6 +1540,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             final SimData state = data.getValue();
             callback.onSimStateChanged(state.subId, state.slotId, state.simState);
         }
+        callback.onSubsidyLockStateChanged(SubsidyUtility.shouldShowSubsidyLock(mContext));
     }
 
     public void sendKeyguardReset() {
