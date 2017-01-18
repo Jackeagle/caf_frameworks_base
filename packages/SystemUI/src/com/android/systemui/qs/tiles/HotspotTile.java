@@ -16,10 +16,14 @@
 
 package com.android.systemui.qs.tiles;
 
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.ConnectivityManager;
+import android.net.LinkProperties;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.widget.Toast;
@@ -31,6 +35,10 @@ import com.android.systemui.qs.QSTile;
 import com.android.systemui.qs.UsageTracker;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.HotspotController;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 /** Quick settings tile: Hotspot **/
 public class HotspotTile extends QSTile<QSTile.BooleanState> {
@@ -69,6 +77,15 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
         }
     }
 
+    private SystemUIDialog createSystemUIDialog(int id) {
+        SystemUIDialog  mSysUIDialog = new SystemUIDialog(mContext);
+        mSysUIDialog.setTitle(R.string.eogre_tethering_warning_dialog_title);
+        mSysUIDialog.setMessage(id);
+        mSysUIDialog.setPositiveButton(com.android.internal.R.string.ok,null);
+        mSysUIDialog.setShowForAllUsers(true);
+        return mSysUIDialog;
+    }
+
     @Override
     protected void handleClick() {
         boolean airplaneMode = (Settings.Global.getInt(mContext.getContentResolver(),
@@ -84,11 +101,18 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
         }
         final boolean isEnabled = (Boolean) mState.value;
         boolean isEoGREDisabled = SystemProperties.getBoolean("persist.sys.disable_eogre", true);
-        if (!isEoGREDisabled && !checkForMobileDataConnection(mContext)
-                && !mController.isHotspotEnabled()) {
-            SysUIToast.makeText(mContext,
-                        mContext.getString(R.string.turn_on_data_msg),
-                        Toast.LENGTH_SHORT).show();
+
+        if (!isEoGREDisabled && !mController.isHotspotEnabled()) {
+            if (!checkForMobileDataConnection(mContext)) {
+                createSystemUIDialog(R.string.turn_on_data_msg).show();
+            } else if (!checkForServerIPVersionMismatch(mContext)) {
+                createSystemUIDialog(R.string.eogre_tethering_warning_dialog_text).show();
+            } else {
+                 MetricsLogger.action(mContext, getMetricsCategory(), !isEnabled);
+                 mController.setHotspotEnabled(!isEnabled);
+                 mEnable.setAllowAnimation(true);
+                 mDisable.setAllowAnimation(true);
+            }
         } else {
              MetricsLogger.action(mContext, getMetricsCategory(), !isEnabled);
              mController.setHotspotEnabled(!isEnabled);
@@ -135,6 +159,34 @@ public class HotspotTile extends QSTile<QSTile.BooleanState> {
         } else {
             return mContext.getString(R.string.accessibility_quick_settings_hotspot_changed_off);
         }
+    }
+
+    private static boolean checkForServerIPVersionMismatch(Context context) {
+        ConnectivityManager mConnectivityManager =
+                   (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (mConnectivityManager != null) {
+            if (mConnectivityManager.getMobileDataEnabled()) {
+                LinkProperties mLinkProperties =
+                        mConnectivityManager.getLinkProperties(ConnectivityManager.TYPE_MOBILE);
+                String mServerIpProp = SystemProperties.get("persist.sys.eogre.serverip");
+                if (mLinkProperties == null || mServerIpProp.equals("")) {
+                    return false;
+                }
+                InetAddress mInetServerIP = null;
+                try {
+                    mInetServerIP = InetAddress.getByName(mServerIpProp);
+                } catch (UnknownHostException e) {
+                    return false;
+                }
+                if (mInetServerIP instanceof Inet6Address) {
+                    return  mLinkProperties.hasIPv6DefaultRoute();
+                }
+                else if (mInetServerIP instanceof Inet4Address) {
+                    return  mLinkProperties.hasIPv4DefaultRoute();
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean checkForMobileDataConnection(Context context) {

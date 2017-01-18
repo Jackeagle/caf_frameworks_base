@@ -1156,5 +1156,9 @@
     <string name="sim1">SIM 1</string>
     <string name="sim2">SIM 2</string>
     <!-- Toast message to turn on data for eogre -->
-    <string name="turn_on_data_msg">Please turn on data</string>
+    <string name="turn_on_data_msg">Please turn on data to enable JioNet hotspot</string>
+    <!-- EoGRE error Dialog title -->
+    <string name="eogre_tethering_warning_dialog_title">JioNet hotspot</string>
+    <!-- EoGRE error message for wrong  APN protocol -->
+    <string name="eogre_tethering_warning_dialog_text">To enable JioNet hotspot, please change APN protocol to IPv4/IPv6 and try again</string>
 </resources>
