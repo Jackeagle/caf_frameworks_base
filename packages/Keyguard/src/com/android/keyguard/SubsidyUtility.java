@@ -104,7 +104,7 @@ public class SubsidyUtility {
     };
 
     public static boolean isSubsidyLockFeatureEnabled(Context context) {
-        return SystemProperties.getInt("persist.radio.subsidylock", 0) == 1;
+        return SystemProperties.getInt("ro.radio.subsidylock", 0) == 1;
     }
 
     public static void writeSubsidyLockStatus(Context context, int state) {
