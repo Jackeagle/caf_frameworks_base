@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -70,7 +70,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
     private Context mContext;
     private TelephonyManager mTelephonyManager;
     private boolean mActivationCallInitiated;
-    private WifiSetupButton mSetupWifiButton;
+    private LinearLayout mSubsidySetupContainer;
 
     public KeyguardSubsidyActivateView(Context context) {
         super(context);
@@ -109,7 +109,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                 mEmergencyView.setVisibility(View.GONE);
                 mProgressTitleView.setText(R.string.kg_subsidy_title_unlock_progress_dialog);
                 mProgressView.setVisibility(View.VISIBLE);
-                setSetupWifiButtonVisibility(View.GONE);
+                setSubsidySetupContainerVisibility(View.GONE);
                 Intent intent = new Intent(SubsidyUtility.ACTION_USER_REQUEST);
                 intent.setPackage(getResources().getString(
                         R.string.config_slc_package_name));
@@ -219,9 +219,9 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
         super.onAttachedToWindow();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(
                 mInfoCallback);
-        mSetupWifiButton =
-                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
-        setSetupWifiButtonVisibility(View.VISIBLE);
+        mSubsidySetupContainer = (LinearLayout) getRootView()
+                .findViewById(R.id.subsidy_setup_container);
+        setSubsidySetupContainerVisibility(View.VISIBLE);
     }
 
     @Override
@@ -229,7 +229,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
         super.onDetachedFromWindow();
         KeyguardUpdateMonitor.getInstance(mContext).removeCallback(
                 mInfoCallback);
-        mSetupWifiButton = null;
+        mSubsidySetupContainer = null;
     }
 
     private Intent getSimActivationCallIntent() {
@@ -243,12 +243,10 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                     | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
                     | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
         final TelecomManager tm =
             (TelecomManager) mContext
             .getSystemService(Context.TELECOM_SERVICE);
         List<PhoneAccountHandle> accounts = tm.getCallCapablePhoneAccounts();
-
         IExtTelephony extTelephony =
                    IExtTelephony.Stub.asInterface(
                            ServiceManager.getService("extphone"));
@@ -302,7 +300,7 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                         mContentView.setVisibility(View.GONE);
                         mEmergencyView.setVisibility(View.GONE);
                         mProgressView.setVisibility(View.VISIBLE);
-                        setSetupWifiButtonVisibility(View.GONE);
+                        setSubsidySetupContainerVisibility(View.GONE);
                     }
                     disableNavigationBar(false);
                 } else if (TelephonyManager.CALL_STATE_OFFHOOK
@@ -319,13 +317,13 @@ public class KeyguardSubsidyActivateView extends LinearLayout implements
                     mEmergencyView.setVisibility(View.VISIBLE);
                     mProgressView.setVisibility(View.GONE);
                 }
-                setSetupWifiButtonVisibility(View.VISIBLE);
+                setSubsidySetupContainerVisibility(View.VISIBLE);
             }
         };
 
-    public void setSetupWifiButtonVisibility(int isVisible) {
-        if (mSetupWifiButton != null) {
-            mSetupWifiButton.setVisibility(isVisible);
+        public void setSubsidySetupContainerVisibility(int isVisible) {
+            if (mSubsidySetupContainer != null) {
+                mSubsidySetupContainer.setVisibility(isVisible);
+            }
         }
-    }
 }

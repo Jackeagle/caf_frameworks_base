@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -53,7 +53,7 @@ public class KeyguardSubsidyConfiguringStateView extends LinearLayout implements
     private TextView mProgressTitleView;
     private TextView mProgressContentView;
     private Context mContext;
-    private WifiSetupButton mSetupWifiButton;
+    private LinearLayout mSubsidySetupContainer;
 
     public KeyguardSubsidyConfiguringStateView(Context context) {
         this(context, null);
@@ -128,20 +128,20 @@ public class KeyguardSubsidyConfiguringStateView extends LinearLayout implements
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        mSetupWifiButton =
-                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
-        setSetupWifiButtonVisibility(View.GONE);
+        mSubsidySetupContainer =
+                (LinearLayout) getRootView().findViewById(R.id.subsidy_setup_container);
+        setSubsidySetupContainerVisibility(View.GONE);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mSetupWifiButton = null;
+        mSubsidySetupContainer = null;
     }
 
-    public void setSetupWifiButtonVisibility(int isVisible) {
-        if (mSetupWifiButton != null) {
-            mSetupWifiButton.setVisibility(isVisible);
+    public void setSubsidySetupContainerVisibility(int isVisible) {
+        if (mSubsidySetupContainer != null) {
+            mSubsidySetupContainer.setVisibility(isVisible);
         }
     }
 }

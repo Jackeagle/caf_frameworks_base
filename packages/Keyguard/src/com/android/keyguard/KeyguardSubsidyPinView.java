@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,9 +31,12 @@ package com.android.keyguard;
 
 import android.app.Dialog;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
+import android.net.ConnectivityManager;
 import android.os.CountDownTimer;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -45,8 +48,9 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
-
+import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.IExtTelephony;
 import com.android.keyguard.SubsidyController.*;
 
@@ -57,14 +61,17 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     private static final String TAG = "KeyguardSubsidyPinView";
     private static final boolean DEBUG = SubsidyUtility.DEBUG;
     private TextView mKeyguardMessageView;
+    private TextView mNoDataText;
     private ImageButton mEnterKey;
     private Context mContext;
     private CheckUnlockPin mCheckUnlockPinThread;
     private ProgressDialog mUnlockProgressDialog = null;
     private int mRetryAttemptRemaining;
     private CountDownTimer mCountDownTimer;
-    private WifiSetupButton mSetupWifiButton;
+    private LinearLayout mSubsidySetupContainer;
+    private KeyguardSubsidySetupButton mEnableDataButton;
     private ViewGroup mContainer;
+    private SubsidyController mController;
 
     public KeyguardSubsidyPinView(Context context) {
         this(context, null);
@@ -74,6 +81,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         super(context, attrs);
         mContext = context;
         mRetryAttemptRemaining = getTotalRetryAttempts();
+        mController = SubsidyController.getInstance(mContext);
     }
 
     public void resetState() {
@@ -157,7 +165,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
             handleErrorCase();
             return;
         }
-        SubsidyController.getInstance(mContext).stopStateTransitions(true);
+        mController.stopStateTransitions(true);
         getUnlockProgressDialog().show();
 
         if (mCheckUnlockPinThread == null) {
@@ -166,21 +174,18 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                     void onUnlockResponse(final boolean isSuccess) {
                         post(new Runnable() {
                             public void run() {
-                                SubsidyController.getInstance(mContext)
-                                                 .stopStateTransitions(false);
+                                mController.stopStateTransitions(false);
                                 if (mUnlockProgressDialog != null) {
                                     mUnlockProgressDialog.hide();
                                 }
                                 if (isSuccess) {
                                     Log.d(TAG, "Local Unlock code is correct and verified");
-                                    mContext.sendBroadcast(SubsidyController
-                                            .getInstance(mContext)
+                                    mContext.sendBroadcast(mController
                                             .getCurrentSubsidyState()
                                             .getLaunchIntent(),
                                         SubsidyUtility.BROADCAST_PERMISSION);
 
-                                    SubsidyController.getInstance(mContext)
-                                                         .setDeviceUnlocked();
+                                    mController.setDeviceUnlocked();
                                 } else {
                                     handleErrorCase();
                                 }
@@ -212,21 +217,6 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         return R.plurals.kg_subsidy_wrong_pin;
     }
 
-    @Override
-    public void reset() {
-        if (DEBUG) {
-            Log.v(TAG, "Reset the state based based on the current state");
-        }
-        resetPasswordText(false /* animate */);
-        // if the user is currently locked out, enforce it.
-        long deadline = mLockPatternUtils.getLockoutAttemptDeadline(
-                KeyguardUpdateMonitor.getCurrentUser());
-        if (shouldLockout(deadline)) {
-            handleAttemptLockout(deadline);
-        } else {
-            resetState();
-        }
-    }
     @Override
     protected void resetPasswordText(boolean animate) {
         super.resetPasswordText(animate);
@@ -360,9 +350,17 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         super.onAttachedToWindow();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(
                 mInfoCallback);
-        mSetupWifiButton =
-                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
-        setSetupWifiButtonVisibility(View.VISIBLE);
+        mContext.registerReceiver(connectivityReceiver, new IntentFilter(
+                ConnectivityManager.CONNECTIVITY_ACTION));
+        mSubsidySetupContainer = (LinearLayout) getRootView()
+                .findViewById(R.id.subsidy_setup_container);
+        mEnableDataButton = (KeyguardSubsidySetupButton) getRootView()
+                .findViewById(R.id.enable_data);
+        mNoDataText = (TextView) getRootView()
+                .findViewById(R.id.no_data_connection);
+        setNoDataTextVisibility();
+        setEnableDataButtonVisibility();
+        setSubsidySetupContainerVisibility(View.VISIBLE);
     }
 
     @Override
@@ -370,7 +368,10 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
         super.onDetachedFromWindow();
         KeyguardUpdateMonitor.getInstance(mContext).removeCallback(
                 mInfoCallback);
-        mSetupWifiButton = null;
+        mContext.unregisterReceiver(connectivityReceiver);
+        mNoDataText = null;
+        mSubsidySetupContainer = null;
+        mEnableDataButton = null;
     }
 
     KeyguardUpdateMonitorCallback mInfoCallback =
@@ -388,19 +389,48 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                         showDefaultMessage();
                     }
                     mContainer.setVisibility(getkeypadViewVisibility());
+                    setEnableDataButtonVisibility();
+                    setNoDataTextVisibility();
+                    setSubsidySetupContainerVisibility(View.VISIBLE);
+                }
+                public void onSimStateChanged(int subId, int slotId,
+                        IccCardConstants.State simState) {
+                    mController.processDataConnectivityForSlot();
+                    setEnableDataButtonVisibility();
                 }
             };
 
-    public void setSetupWifiButtonVisibility(int isVisible) {
-        if (mSetupWifiButton != null) {
-            mSetupWifiButton.setVisibility(isVisible);
+    private final BroadcastReceiver connectivityReceiver =
+            new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    setNoDataTextVisibility();
+                }
+            };
+
+    public void setNoDataTextVisibility() {
+        if (mNoDataText != null) {
+            mNoDataText.setVisibility(SubsidyUtility
+                    .isDataConnectionActive(mContext) ? View.GONE
+                    : View.VISIBLE);
+        }
+    }
+
+    public void setSubsidySetupContainerVisibility(int isVisible) {
+        if (mSubsidySetupContainer != null) {
+            mSubsidySetupContainer.setVisibility(isVisible);
+        }
+    }
+
+    public void setEnableDataButtonVisibility() {
+        if (mEnableDataButton != null) {
+            int visibility = mController.isEnableDataButtonVisible(mContext);
+            mEnableDataButton.setVisibility(visibility);
         }
     }
 
     public int getkeypadViewVisibility() {
-        SubsidyState currentState =
-                SubsidyController
-                        .getInstance(mContext).getCurrentSubsidyState();
+        SubsidyState currentState = mController.getCurrentSubsidyState();
         if (currentState instanceof DeviceLockedState) {
             return ((DeviceLockedState) currentState).getKeypadViewVisible()
                     ? View.VISIBLE
