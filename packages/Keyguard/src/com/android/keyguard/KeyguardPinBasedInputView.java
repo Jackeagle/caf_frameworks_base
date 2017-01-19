@@ -38,7 +38,7 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView
     private static final int SUBSIDYLOCK_RESTRICTED = 103;
     private static final String SUBSIDY_STATUS = "subsidy_status";
     private static final String SUBSIDY_LOCK_SYSTEM_PROPERY
-            = "persist.radio.subsidylock";
+            = "ro.radio.subsidylock";
 
     protected PasswordTextView mPasswordEntry;
     private View mOkButton;
