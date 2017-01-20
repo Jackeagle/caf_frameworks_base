@@ -939,8 +939,10 @@ public class KeyguardViewMediator {
             return;
         }
 
-        if (mLockPatternUtils.getActiveProfileLockMode() == Profile.LockMode.DISABLE) {
-            if (DEBUG) Log.d(TAG, "isKeyguardDisabled: keyguard is disabled by profile");
+        if (mUserManager.getUsers(true).size() < 2 && !lockedOrMissing &&
+                 KeyguardService.isPhoneTypeTouch) {
+            if (DEBUG) Log.d(TAG, "doKeyguard: not showing because lockscreen is off");
+            hideLocked();
             return;
         }
 

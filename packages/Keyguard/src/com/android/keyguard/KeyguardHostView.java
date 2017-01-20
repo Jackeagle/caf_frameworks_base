@@ -1342,7 +1342,7 @@ public class KeyguardHostView extends KeyguardViewBase {
             updateSecurityView(v);
             view = (KeyguardSecurityView)v;
 
-            if(securityMode == SecurityMode.None) {
+            if(securityMode == SecurityMode.None &&!KeyguardService.isPhoneTypeTouch) {
                 TextView unLockTextView =
                     (TextView)v.findViewById(R.id.
                     lockscreen_longpress_star_unlock_view);
