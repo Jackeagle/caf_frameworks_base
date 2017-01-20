@@ -29,6 +29,7 @@ import android.os.HandlerThread;
 import android.os.Message;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.provider.Settings.System;
 import android.util.AttributeSet;
@@ -355,6 +356,18 @@ public class VolumePreference extends SeekBarDialogPreference implements
 
         public void onProgressChanged(SeekBar seekBar, int progress,
                 boolean fromTouch) {
+            int subtype = SystemProperties.getInt("persist.subtype", 0);
+            if (subtype == 2) {
+                // first set the volume so that when volume changed from 0 to index 1
+                // volume index is set before starting ringtone playback
+                postSetVolume(progress);
+                if (isSamplePlaying()) {
+                    postStopSample();
+                }
+                postStartSample();
+                return;
+            }
+
             if (!fromTouch) {
                 return;
             }
