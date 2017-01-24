@@ -33,6 +33,10 @@
     <string name="jumpOut">Jump out</string>
     <string name="startFromActivity">Start voice interaction</string>
     <string name="stopFromActivity">Stop voice interaction</string>
+    <string name="placeholder">Preferences placeholder</string>
+    <string name="interacting">We are interacting!</string>
+    <string name="disallowContext">Disallow context</string>
+    <string name="disallowScreenshot">Disallow screenshot</string>
 
     <string name="largetext">This is a bunch of text that we will use to show how we handle it
 when reporting it for assist data.  We need many many lines of text, like\n
