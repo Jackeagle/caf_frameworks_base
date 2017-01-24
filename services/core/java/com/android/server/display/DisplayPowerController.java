@@ -28,6 +28,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.DisplayManagerInternal.DisplayPowerCallbacks;
 import android.hardware.display.DisplayManagerInternal.DisplayPowerRequest;
 import android.os.Handler;
@@ -253,6 +254,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private ObjectAnimator mColorFadeOnAnimator;
     private ObjectAnimator mColorFadeOffAnimator;
     private RampAnimator<DisplayPowerState> mScreenBrightnessRampAnimator;
+
+    private final boolean mHeadless = DisplayManagerGlobal.isHeadless();
 
     /**
      * Creates the display power controller.
@@ -504,6 +507,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     };
 
     private void updatePowerState() {
+
+        if (mHeadless) return;
+
         // Update the power state request.
         final boolean mustNotify;
         boolean mustInitialize = false;
@@ -1114,6 +1120,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private void dumpLocal(PrintWriter pw) {
         pw.println();
         pw.println("Display Power Controller Thread State:");
+        pw.println("  mHeadless=" + mHeadless);
         pw.println("  mPowerRequest=" + mPowerRequest);
         pw.println("  mWaitingForNegativeProximity=" + mWaitingForNegativeProximity);
 
@@ -1132,8 +1139,11 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         pw.println("  mPendingScreenOff=" + mPendingScreenOff);
         pw.println("  mReportedToPolicy=" + reportedToPolicyToString(mReportedScreenStateToPolicy));
 
-        pw.println("  mScreenBrightnessRampAnimator.isAnimating()=" +
+        if (!mHeadless)
+            pw.println("  mScreenBrightnessRampAnimator.isAnimating()=" +
                 mScreenBrightnessRampAnimator.isAnimating());
+        else
+            pw.println("  mScreenBrightnessRampAnimator.isAnimating()=false");
 
         if (mColorFadeOnAnimator != null) {
             pw.println("  mColorFadeOnAnimator.isStarted()=" +
