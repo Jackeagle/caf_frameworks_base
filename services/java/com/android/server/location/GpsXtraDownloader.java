@@ -45,6 +45,7 @@ import java.util.Random;
 public class GpsXtraDownloader {
 
     private static final String TAG = "GpsXtraDownloader";
+    private static final int MAX_XTRA_FILE_SIZE = 100 * 1024;  // 100KB
     static final boolean DEBUG = false;
     
     private Context mContext;
@@ -145,7 +146,8 @@ public class GpsXtraDownloader {
             byte[] body = null;
             if (entity != null) {
                 try {
-                    if (entity.getContentLength() > 0) {
+                    long size = entity.getContentLength();
+                    if (size > 0 && size < MAX_XTRA_FILE_SIZE) {
                         body = new byte[(int) entity.getContentLength()];
                         DataInputStream dis = new DataInputStream(entity.getContent());
                         try {
@@ -158,6 +160,12 @@ public class GpsXtraDownloader {
                             }
                         }
                     }
+                } catch (OutOfMemoryError oom) {
+                    if (DEBUG) Log.e(TAG, "Security alert. reason:" + oom);
+                    return null;
+                } catch (Exception e) {
+                    if (DEBUG) Log.e(TAG, "exception. reason:" + e);
+                    return null;
                 } finally {
                     if (entity != null) {
                         entity.consumeContent();
