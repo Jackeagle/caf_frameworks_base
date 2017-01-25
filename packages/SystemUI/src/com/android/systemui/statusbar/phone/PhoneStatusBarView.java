@@ -148,8 +148,7 @@ public class PhoneStatusBarView extends PanelBar {
     @Override
     public void onPanelPeeked() {
         super.onPanelPeeked();
-        //Disabling expansion of statubar view
-        //mBar.makeExpandedVisible();
+        mBar.makeExpandedVisible();
     }
 
     @Override
