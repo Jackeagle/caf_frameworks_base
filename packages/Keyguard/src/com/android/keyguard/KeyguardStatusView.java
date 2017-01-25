@@ -104,8 +104,7 @@ public class KeyguardStatusView extends GridLayout {
         mDateView.setFormat24Hour(Patterns.dateView);
         mDateView.setFormat12Hour(Patterns.dateView);
 
-        //mClockView.setFormat12Hour(Patterns.clockView12);
-        mClockView.setFormat24Hour(Patterns.clockView24);
+        mClockView.setFormat12Hour(Patterns.clockView12);
 
         refreshAlarmStatus();
     }
