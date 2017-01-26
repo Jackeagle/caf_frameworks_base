@@ -322,6 +322,12 @@ public class SettingsDrawerActivity extends Activity {
 
     private void updateUserHandlesIfNeeded(Tile tile) {
         List<UserHandle> userHandles = tile.userHandle;
+        if (mUserManager == null){
+            if (DEBUG) {
+                Log.d(TAG, "mUserManager is null ");
+            }
+            return;
+        }
 
         for (int i = userHandles.size() - 1; i >= 0; i--) {
             if (mUserManager.getUserInfo(userHandles.get(i).getIdentifier()) == null) {
