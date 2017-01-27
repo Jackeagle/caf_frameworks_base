@@ -56,13 +56,17 @@ public class PowerUI extends SystemUI {
     int mBatteryStatus = BatteryManager.BATTERY_STATUS_UNKNOWN;
     int mPlugType = 0;
     int mInvalidCharger = 0;
-
+    int mIfDisChargeHappen = 0;
     int mLowBatteryAlertCloseLevel;
     int[] mLowBatteryReminderLevels = new int[2];
+    static int mOldPluggedFull = 0;
+    static int mUsbPlugged = 0;
 
     AlertDialog mInvalidChargerDialog;
     AlertDialog mLowBatteryDialog;
+    AlertDialog mFullBatteryDialog;
     TextView mBatteryLevelTextView;
+    TextView mBatteryFullTextView;
 
     private long mScreenOffTime = -1;
 
@@ -145,6 +149,10 @@ public class PowerUI extends SystemUI {
                     Slog.d(TAG, "plugged        " + oldPlugged + " --> " + plugged);
                 }
 
+                if (oldBatteryStatus == BatteryManager.BATTERY_STATUS_FULL
+                    && mBatteryStatus == BatteryManager.BATTERY_STATUS_DISCHARGING) {
+                    mIfDisChargeHappen = 1;
+                }
                 if (oldInvalidCharger == 0 && mInvalidCharger != 0) {
                     Slog.d(TAG, "showing invalid charger warning");
                     showInvalidChargerDialog();
@@ -157,8 +165,8 @@ public class PowerUI extends SystemUI {
                 }
 
                 if (!plugged
-                        && (bucket < oldBucket || oldPlugged)
-                        && mBatteryStatus != BatteryManager.BATTERY_STATUS_UNKNOWN
+                        && ((bucket < oldBucket || oldPlugged) || (mBatteryLevel==1 || oldPlugged))
+                        && mBatteryStatus != BatteryManager.BATTERY_STATUS_CHARGING
                         && bucket < 0) {
                     showLowBatteryWarning();
 
@@ -171,6 +179,22 @@ public class PowerUI extends SystemUI {
                 } else if (mBatteryLevelTextView != null) {
                     showLowBatteryWarning();
                 }
+                if(!plugged) {
+                    mOldPluggedFull = 0;
+                    dismissFullBatteryWarning();
+                }
+                if(mBatteryLevel >= 100 && plugged
+                   && mOldPluggedFull == 0 && mIfDisChargeHappen == 1) {
+                   mOldPluggedFull = 1 ;
+                   showFullBatteryWarning();
+                   playLowBatterySound();
+                   mIfDisChargeHappen = 0;
+                } else if ( mBatteryLevel < 100 && isChargerConnected(mPlugType)) {
+                    if (mUsbPlugged == 1) {
+                        playChargerConnectedSound();
+                      }
+                        mUsbPlugged ++;
+                }
             } else if (Intent.ACTION_SCREEN_OFF.equals(action)) {
                 mScreenOffTime = SystemClock.elapsedRealtime();
             } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
@@ -180,6 +204,18 @@ public class PowerUI extends SystemUI {
             }
         }
     };
+
+    final boolean isChargerConnected(int mPlugType) {
+            return (mPlugType == BatteryManager.BATTERY_PLUGGED_USB
+                || mPlugType == BatteryManager.BATTERY_PLUGGED_AC);
+    }
+
+    void dismissFullBatteryWarning() {
+        if (mFullBatteryDialog != null) {
+            Slog.i(TAG, "closing Full battery warning: level=" + mBatteryLevel);
+            mFullBatteryDialog.dismiss();
+        }
+    }
 
     void dismissLowBatteryWarning() {
         if (mLowBatteryDialog != null) {
@@ -244,6 +280,51 @@ public class PowerUI extends SystemUI {
         }
     }
 
+    void showFullBatteryWarning() {
+        Slog.i(TAG,
+                ((mBatteryFullTextView == null) ? "showing" : "updating")
+                + " Full battery warning: level=" + mBatteryLevel
+                + " [ 50 ]");
+
+        if( Settings.Secure.getInt(mContext.getContentResolver(),"borqs.system.stability",0) == 1)
+            return;
+
+        if (mBatteryFullTextView != null) {
+            Slog.i(TAG,"mBatteryFullTextView is not null");
+        } else
+           {
+            View v = View.inflate(mContext, R.layout.battery_full, null);
+            mBatteryFullTextView = (TextView)v.findViewById(R.id.level_percent);
+
+
+            AlertDialog.Builder b = new AlertDialog.Builder(mContext);
+                b.setCancelable(true);
+                b.setTitle(R.string.battery_full_title);
+                b.setView(v);
+                b.setIconAttribute(android.R.attr.alertDialogIcon);
+                b.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                      public void onClick(DialogInterface dialog, int which) {
+                                dismissFullBatteryWarning();
+                                mBatteryFullTextView = null;
+                      }
+                 });
+
+            AlertDialog d = b.create();
+            d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    public void onDismiss(DialogInterface dialog) {
+                        mLowBatteryDialog = null;
+                        mBatteryFullTextView = null;
+                    }
+                });
+            d.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+            d.getWindow().getAttributes().privateFlags |=
+                    WindowManager.LayoutParams.PRIVATE_FLAG_SHOW_FOR_ALL_USERS;
+            d.show();
+            mFullBatteryDialog = d;
+        }
+    }
+
+
     void playLowBatterySound() {
         final ContentResolver cr = mContext.getContentResolver();
 
@@ -265,6 +346,35 @@ public class PowerUI extends SystemUI {
         if (Settings.Global.getInt(cr, Settings.Global.POWER_SOUNDS_ENABLED, 1) == 1) {
             final String soundPath = Settings.Global.getString(cr,
                     Settings.Global.LOW_BATTERY_SOUND);
+            if (soundPath != null) {
+                final Uri soundUri = Uri.parse("file://" + soundPath);
+                if (soundUri != null) {
+                    final Ringtone sfx = RingtoneManager.getRingtone(mContext, soundUri);
+                    if (sfx != null) {
+                        sfx.setStreamType(AudioManager.STREAM_SYSTEM);
+                        sfx.play();
+                    }
+                }
+            }
+        }
+    }
+
+    void playChargerConnectedSound() {
+        final ContentResolver cr = mContext.getContentResolver();
+
+        final int silenceAfter = Settings.Global.getInt(cr,
+                Settings.Global.LOW_BATTERY_SOUND_TIMEOUT, 0);
+        final long offTime = SystemClock.elapsedRealtime() - mScreenOffTime;
+        if (silenceAfter > 0
+                && mScreenOffTime > 0
+                && offTime > silenceAfter) {
+            Slog.i(TAG, "screen off too long (" + offTime + "ms, limit " + silenceAfter
+                    + "ms): not waking up the user with charger connected sound");
+            return;
+        }
+        if (Settings.Global.getInt(cr, Settings.Global.POWER_SOUNDS_ENABLED, 1) == 1) {
+            final String soundPath = Settings.Global.getString(cr,
+                    Settings.Global.WIRELESS_CHARGING_STARTED_SOUND);
             if (soundPath != null) {
                 final Uri soundUri = Uri.parse("file://" + soundPath);
                 if (soundUri != null) {

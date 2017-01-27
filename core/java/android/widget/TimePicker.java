@@ -166,6 +166,19 @@ public class TimePicker extends FrameLayout {
         mHourSpinnerInput = (EditText) mHourSpinner.findViewById(R.id.numberpicker_input);
         mHourSpinnerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
 
+        // Modify Datepicker and Timepicker focus highlight function start
+        if (true) {
+            mHourSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
+                public void onFocusChange(View v, boolean hasFocus) {
+                    if (hasFocus) {
+                        mHourSpinnerInput.setVisibility(View.VISIBLE);
+                        mHourSpinnerInput.requestFocus();
+                    }
+                }
+            });
+        }
+        // Modify Datepicker and Timepicker focus highlight function end
+
         // divider (only for the new widget style)
         mDivider = (TextView) findViewById(R.id.divider);
         if (mDivider != null) {
@@ -180,7 +193,7 @@ public class TimePicker extends FrameLayout {
         mMinuteSpinner.setFormatter(NumberPicker.getTwoDigitFormatter());
         mMinuteSpinner.setOnValueChangedListener(new NumberPicker.OnValueChangeListener() {
             public void onValueChange(NumberPicker spinner, int oldVal, int newVal) {
-                updateInputState();
+                //updateInputState();
                 int minValue = mMinuteSpinner.getMinValue();
                 int maxValue = mMinuteSpinner.getMaxValue();
                 if (oldVal == maxValue && newVal == minValue) {
@@ -203,6 +216,19 @@ public class TimePicker extends FrameLayout {
         });
         mMinuteSpinnerInput = (EditText) mMinuteSpinner.findViewById(R.id.numberpicker_input);
         mMinuteSpinnerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+
+        // Modify Datepicker and Timepicker focus highlight function start
+        if (true) {
+            mMinuteSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
+                public void onFocusChange(View v, boolean hasFocus) {
+                    if (hasFocus) {
+                        mMinuteSpinnerInput.setVisibility(View.VISIBLE);
+                        mMinuteSpinnerInput.requestFocus();
+                    }
+                }
+            });
+        }
+        // Modify Datepicker and Timepicker focus highlight function end
 
         /* Get the localized am/pm strings and use them in the spinner */
         mAmPmStrings = new DateFormatSymbols().getAmPmStrings();
@@ -229,7 +255,8 @@ public class TimePicker extends FrameLayout {
             mAmPmSpinner.setDisplayedValues(mAmPmStrings);
             mAmPmSpinner.setOnValueChangedListener(new OnValueChangeListener() {
                 public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
-                    updateInputState();
+                    //Commented because cursor jumps to Hour field after change AM/PM
+                    //updateInputState();
                     picker.requestFocus();
                     mIsAm = !mIsAm;
                     updateAmPmControl();
@@ -238,6 +265,19 @@ public class TimePicker extends FrameLayout {
             });
             mAmPmSpinnerInput = (EditText) mAmPmSpinner.findViewById(R.id.numberpicker_input);
             mAmPmSpinnerInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
+
+            // Modify Datepicker and Timepicker focus highlight function start
+            if (true) {
+                mAmPmSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
+                    public void onFocusChange(View v, boolean hasFocus) {
+                        if (hasFocus) {
+                            mAmPmSpinnerInput.setVisibility(View.VISIBLE);
+                            mAmPmSpinnerInput.requestFocus();
+                        }
+                    }
+                });
+            }
+            // Modify Datepicker and Timepicker focus highlight function end
         }
 
         if (isAmPmAtStart()) {
@@ -280,6 +320,27 @@ public class TimePicker extends FrameLayout {
         if (getImportantForAccessibility() == IMPORTANT_FOR_ACCESSIBILITY_AUTO) {
             setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
         }
+    }
+
+    /**
+     * Modify time select type start
+     * @hide
+     */
+    public NumberPicker getHourSpinner(){
+        return mHourSpinner;
+    }
+
+    /**
+     * @hide
+     */
+    public NumberPicker getAmPmSpinner(){
+        return mAmPmSpinner;
+    }
+    // Modify time select type end
+
+    /** @hide */
+    public NumberPicker getMinuteSpinner() {
+        return mMinuteSpinner;
     }
 
     private void getHourFormatData() {

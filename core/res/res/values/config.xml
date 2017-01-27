@@ -1501,7 +1501,7 @@
     <bool name="config_setDdsOnPrimarySub">false</bool>
 
     <!-- Config flag to enable UI optimizations related to layout cuts, font issues-->
-    <bool name="config_ui_optimization">true</bool>
+    <bool name="config_ui_optimization">false</bool>
 
 
    <!-- Activities list for boost -->
@@ -1517,7 +1517,6 @@
    <bool name="config_addVibrateWithRingtoneOption">false</bool>
  
    <!-- Modify config_defaultNotificationColor to green liyang 20131226 start -->
-    <color name="config_defaultNotificationColor_Green">#ff00ff00</color>
-    <!-- Modify config_defaultNotificationColor to green liyang 20131226 end-->
-
+   <color name="config_defaultNotificationColor_Green">#ff00ff00</color>
+   <!-- Modify config_defaultNotificationColor to green liyang 20131226 end-->
 </resources>

@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 -->
-
-<!--    android:background="@drawable/status_bar_closed_default_background" -->
 <merge
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:systemui="http://schemas.android.com/apk/res/com.android.systemui"
@@ -46,5 +44,5 @@
         android:textColor="#666666"
         android:textSize="12sp"
         android:visibility="gone"
-/>
+    />
 </merge>

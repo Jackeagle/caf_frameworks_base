@@ -5611,16 +5611,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /** {@inheritDoc} */
     public void userActivity() {
-        /* <CDR-EAS-510> Start */
-        if(mLockTimeoutFeatureEnabled) {
-            //report every user activity to KeyguardViewMediator so that it
-            //can trigger lock timeout
-            if (mKeyguardDelegate != null) {
-              mKeyguardDelegate.onReportUserActivity();
-            }
-        }
-        /* <CDR-EAS-510> end */
-
         // ***************************************
         // NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
         // ***************************************

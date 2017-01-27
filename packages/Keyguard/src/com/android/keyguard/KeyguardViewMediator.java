@@ -933,15 +933,16 @@ public class KeyguardViewMediator {
             return;
         }
 
-        if (mUserManager.getUsers(true).size() < 2 && !lockedOrMissing) {
+        if (mUserManager.getUsers(true).size() < 2 &&
+                 mLockPatternUtils.isLockScreenDisabled() &&  !lockedOrMissing) {
             if (DEBUG) Log.d(TAG, "doKeyguard: not showing because lockscreen is off");
-                //setShowingLocked(false);
-                hideLocked();
             return;
         }
 
-        if (mLockPatternUtils.getActiveProfileLockMode() == Profile.LockMode.DISABLE) {
-            if (DEBUG) Log.d(TAG, "isKeyguardDisabled: keyguard is disabled by profile");
+        if (mUserManager.getUsers(true).size() < 2 && !lockedOrMissing &&
+                 KeyguardService.isPhoneTypeTouch) {
+            if (DEBUG) Log.d(TAG, "doKeyguard: not showing because lockscreen is off");
+            hideLocked();
             return;
         }
 
@@ -1065,14 +1066,6 @@ public class KeyguardViewMediator {
                     }
                 }
             }
-            /* <CDR-EAS-510> Start */
-            else if ("com.android.settings.lockAfterTimeout".equals(intent.getAction())){
-                if(mLockTimeoutFeatureEnabled) {
-                   //user changed the lock timeout, so report user activity
-                   onReportUserActivity();
-                }
-            }
-            /* <CDR-EAS-510> End */
         }
     };
 
@@ -1439,40 +1432,6 @@ public class KeyguardViewMediator {
         mUpdateMonitor.dispatchBootCompleted();
     }
 
-    /**
-     * On every reportUserActivity we reset the current lock timeout.
-     */
-    public void onReportUserActivity() {
-        long timeout;
-        if((mLockPatternUtils.getDevicePolicyManager().getMaximumTimeToLock(null))
-           <= 0 || (mShowing && !isInsecureShowingInSecureMode())
-           || !mLockPatternUtils.isSecure()) {
-         return;// No policy OR already showing OR not secure
-        }
-        final long policyTimeout = mLockPatternUtils.getDevicePolicyManager()
-          .getMaximumTimeToLock(null);
-        if (policyTimeout > 0) {
-            //Policy in effect. Make sure we don't go beyond policy limit.
-            //Take only minimum of (policyTimeout - displayTimeout) and
-            //Automatic lock time out
-            timeout = Math.min(policyTimeout, mLockAfterTimeout);
-        } else {
-            timeout = mLockAfterTimeout;
-        }
-        // How long from now do we set the lock timer
-        long when = timeout + DELAY_TIME;
-        //minumum lock timeout we allow is 15 secs.
-        //Any value below should be reset to 15 secs.
-        if (when < 15000) {
-          when = 15000;
-        }
-        // We need a wakelock to keep our code running even if the display is off.
-        // Device should get locked even if the display is currently off!
-        mTimeoutWakeLock.acquire();
-        timeoutHandler.removeCallbacks(mScreenLockTimeout);
-        boolean success = timeoutHandler.postDelayed(mScreenLockTimeout, when);
-    }
-
     //Delay of 300MS is necessary to avoid a ugly flicker causes when
     //display timeout lock after timeout is same
     private static final int DELAY_TIME = 300;
@@ -1490,8 +1449,6 @@ public class KeyguardViewMediator {
                    if(!isInsecureShowingInSecureMode()) {
                       mUpdateMonitor.setTimeoutInProgress(false);
                         doKeyguardLocked(null);
-                   } else {
-                      onReportUserActivity();
                    }
                } else {
                    mUpdateMonitor.setTimeoutInProgress(false);

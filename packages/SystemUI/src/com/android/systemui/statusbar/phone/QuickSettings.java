@@ -344,6 +344,13 @@ class QuickSettings {
                 }
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            userTile.setEnabled(true);
+            userTile.setFocusable(true);
+            userTile.setClickable(true);
+         }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addUserTile(userTile, new QuickSettingsModel.RefreshCallback() {
             @Override
             public void refreshView(QuickSettingsTileView view, State state) {
@@ -370,6 +377,13 @@ class QuickSettings {
                 showBrightnessDialog();
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            brightnessTile.setEnabled(true);
+            brightnessTile.setFocusable(true);
+            brightnessTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addBrightnessTile(brightnessTile,
                 new QuickSettingsModel.BasicRefreshCallback(brightnessTile));
         parent.addView(brightnessTile);
@@ -384,6 +398,13 @@ class QuickSettings {
                 startSettingsActivity(android.provider.Settings.ACTION_SETTINGS);
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            settingsTile.setEnabled(true);
+            settingsTile.setFocusable(true);
+            settingsTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addSettingsTile(settingsTile,
                 new QuickSettingsModel.BasicRefreshCallback(settingsTile));
         parent.addView(settingsTile);
@@ -426,6 +447,12 @@ class QuickSettings {
                     wifiTile.setPressed(false);
                     return true;
                 }} );
+        }  
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            wifiTile.setEnabled(true);
+            wifiTile.setFocusable(true);
+            wifiTile.setClickable(true);
         }
         mModel.addWifiTile(wifiTile, new NetworkActivityCallback() {
             @Override
@@ -473,6 +500,11 @@ class QuickSettings {
                         return true;
                     }
                 });
+            }
+if (true) {
+                rssiTile.setEnabled(true);
+                rssiTile.setFocusable(true);
+                rssiTile.setClickable(true);
             }
 
             mModel.addRSSITile(rssiTile, new NetworkActivityCallback() {
@@ -528,6 +560,13 @@ class QuickSettings {
                     mRotationLockController.setRotationLocked(!locked);
                 }
             });
+            // Add SystemUI support keyboard by liuzhihao 20130709 start
+            if (true) {
+                rotationLockTile.setEnabled(true);
+                rotationLockTile.setFocusable(true);
+                rotationLockTile.setClickable(true);
+            }
+            // Add SystemUI support keyboard by liuzhihao 20130709 end
             mModel.addRotationLockTile(rotationLockTile, mRotationLockController,
                     new QuickSettingsModel.RefreshCallback() {
                         @Override
@@ -578,6 +617,13 @@ class QuickSettings {
                 startSettingsActivity(Intent.ACTION_POWER_USAGE_SUMMARY);
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            batteryTile.setEnabled(true);
+            batteryTile.setFocusable(true);
+            batteryTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addBatteryTile(batteryTile, new QuickSettingsModel.RefreshCallback() {
             @Override
             public void refreshView(QuickSettingsTileView unused, State state) {
@@ -603,6 +649,13 @@ class QuickSettings {
         // Airplane Mode
         final QuickSettingsBasicTile airplaneTile
                 = new QuickSettingsBasicTile(mContext);
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            airplaneTile.setEnabled(true);
+            airplaneTile.setFocusable(true);
+            airplaneTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addAirplaneModeTile(airplaneTile, new QuickSettingsModel.RefreshCallback() {
             @Override
             public void refreshView(QuickSettingsTileView unused, State state) {
@@ -642,6 +695,13 @@ class QuickSettings {
                         return true;
                     }});
             }
+            // Add SystemUI support keyboard by liuzhihao 20130709 start
+            if (true) {
+                bluetoothTile.setEnabled(true);
+                bluetoothTile.setFocusable(true);
+                bluetoothTile.setClickable(true);
+             }
+            // Add SystemUI support keyboard by liuzhihao 20130709 end
             mModel.addBluetoothTile(bluetoothTile, new QuickSettingsModel.RefreshCallback() {
                 @Override
                 public void refreshView(QuickSettingsTileView unused, State state) {
@@ -710,6 +770,13 @@ class QuickSettings {
                 locationTile.setText(state.label);
             }
         });
+  // Add SystemUI support keyboard by liuzhihao 20130709 start
+           if (true) {
+               locationTile.setEnabled(true);
+               locationTile.setFocusable(true);
+               locationTile.setClickable(true);
+           }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         parent.addView(locationTile);
     }
 
@@ -724,6 +791,13 @@ class QuickSettings {
                 startSettingsActivity(AlarmClock.ACTION_SHOW_ALARMS);
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            alarmTile.setEnabled(true);
+            alarmTile.setFocusable(true);
+            alarmTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addAlarmTile(alarmTile, new QuickSettingsModel.RefreshCallback() {
             @Override
             public void refreshView(QuickSettingsTileView unused, State alarmState) {
@@ -758,6 +832,13 @@ class QuickSettings {
                 dialog[0].show();
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+           if (true) {
+               remoteDisplayTile.setEnabled(true);
+               remoteDisplayTile.setFocusable(true);
+               remoteDisplayTile.setClickable(true);
+           }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addRemoteDisplayTile(remoteDisplayTile,
                 new QuickSettingsModel.BasicRefreshCallback(remoteDisplayTile)
                         .setShowWhenEnabled(true));
@@ -779,6 +860,13 @@ class QuickSettings {
                     } catch (Exception e) {}
                 }
             });
+            // Add SystemUI support keyboard by liuzhihao 20130709 start
+            if (true) {
+               imeTile.setEnabled(true);
+               imeTile.setFocusable(true);
+               imeTile.setClickable(true);
+            }
+            // Add SystemUI support keyboard by liuzhihao 20130709 end
             mModel.addImeTile(imeTile,
                     new QuickSettingsModel.BasicRefreshCallback(imeTile)
                             .setShowWhenEnabled(true));
@@ -797,6 +885,13 @@ class QuickSettings {
                 showBugreportDialog();
             }
         });
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+            bugreportTile.setEnabled(true);
+            bugreportTile.setFocusable(true);
+            bugreportTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addBugreportTile(bugreportTile, new QuickSettingsModel.RefreshCallback() {
             @Override
             public void refreshView(QuickSettingsTileView view, State state) {
@@ -835,7 +930,13 @@ class QuickSettings {
         sslCaCertWarningTile.setImageResource(
                 com.android.internal.R.drawable.indicator_input_error);
         sslCaCertWarningTile.setTextResource(R.string.ssl_ca_cert_warning);
-
+        // Add SystemUI support keyboard by liuzhihao 20130709 start
+        if (true) {
+           sslCaCertWarningTile.setEnabled(true);
+           sslCaCertWarningTile.setFocusable(true);
+           sslCaCertWarningTile.setClickable(true);
+        }
+        // Add SystemUI support keyboard by liuzhihao 20130709 end
         mModel.addSslCaCertWarningTile(sslCaCertWarningTile,
                 new QuickSettingsModel.BasicRefreshCallback(sslCaCertWarningTile)
                         .setShowWhenEnabled(true));
@@ -1048,6 +1149,14 @@ class QuickSettings {
         }
 
         private void setVisibility(View view, boolean visible) {
+            //Bugzilla 32241: This is the regression of the bug fix of
+            // 24809. Since the activity_in and activity_out is removed
+            //in quick_settings_tile_rssi.xml so adding the null check
+            //here to avoid the nullpointer exception.
+            if(view == null) {
+                return;
+            }
+            //Bugzilla 32241: END
             final float newAlpha = visible ? 1 : 0;
             if (view.getAlpha() != newAlpha) {
                 view.animate()

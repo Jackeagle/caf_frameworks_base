@@ -675,7 +675,7 @@ public class Activity extends ContextThemeWrapper
     private static final String SAVED_DIALOGS_TAG = "android:savedDialogs";
     private static final String SAVED_DIALOG_KEY_PREFIX = "android:dialog_";
     private static final String SAVED_DIALOG_ARGS_KEY_PREFIX = "android:dialog_args_";
-    private   ActionMode mMode = null;
+    private ActionMode mMode = null;
     private ActionMode.Callback mcallback =null;
 
     private static class ManagedDialog {
@@ -3478,17 +3478,6 @@ public class Activity extends ContextThemeWrapper
      * @see #startActivity 
      */
     public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
-        //borqs_india, start: fix for bug 28823.
-        //Block Google now search before the completion of setupwizard
-        try {
-            if((Settings.Secure.getInt(getContentResolver(), Settings.Secure.USER_SETUP_COMPLETE) != 1)
-                && intent.toString().contains("android.intent.action.WEB_SEARCH")) {
-                return;
-            }
-        } catch (SettingNotFoundException ex) {
-           Log.e(TAG, "SettingNotFoundException: " + ex);
-        }
-        //borqs_india, end
         if (mParent == null) {
             Instrumentation.ActivityResult ar =
                 mInstrumentation.execStartActivity(
@@ -5053,7 +5042,7 @@ public class Activity extends ContextThemeWrapper
      * @see ActionMode
      */
     public ActionMode startActionMode(ActionMode.Callback callback) {
-        //Initilize the callback/mode when actionmode is initilized
+        //Initialised the callback/mode when actionmode is initialised
         mcallback = callback;
         mMode = mWindow.getDecorView().startActionMode(callback);
         return mMode;
@@ -5075,7 +5064,7 @@ public class Activity extends ContextThemeWrapper
         initActionBar();
         mcallback = callback;
         if (mActionBar != null) {
-          //initilizing of mode and callback to be called when onMenuclick
+          //initialisation of mode and callback to be called when onMenuclick
           mMode = mActionBar.startActionMode(callback);
           return mMode;
         }

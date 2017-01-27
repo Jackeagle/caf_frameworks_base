@@ -103,11 +103,6 @@ import android.app.Notification;
 public class KeyguardHostView extends KeyguardViewBase {
     private static final String TAG = "KeyguardHostView";
 
-    private static boolean mFlashLightState = false;
-    ImageButton mFlashLightSwitch;
-    FlashLightStatusChangeBroadcastReceiver broadCastReceiver =
-            new FlashLightStatusChangeBroadcastReceiver();
-
     // Transport control states.
     static final int TRANSPORT_GONE = 0;
     static final int TRANSPORT_INVISIBLE = 1;
@@ -173,7 +168,6 @@ public class KeyguardHostView extends KeyguardViewBase {
     private Handler mHd;
     private INotificationManager mNm;
     private TextView mMissedCount;
-    private TextView mPttCount;
     private TextView mVoiceCount;
     private TextView mMsgCount;
     private Notificationdata mNdata;
@@ -185,12 +179,8 @@ public class KeyguardHostView extends KeyguardViewBase {
     private  static final int APP_MSG_COUNT = 2;
     private  static final int APP_ALL_COUNT = 3;
     private  static final int APP_VOICE_COUNT = 4;
-    private  static final int APP_PTT_COUNT = 5;
     private  static String VOICE_MAIL = "voicemail";
     private  static String VOICE_MAIL_SPANISH = "Correo de voz";
-    private boolean mPttFlag = false;
- // Intent action for PTT missed evensts
-    private final String INTENT_ACTION_FOR_PTT_MISSED_EVENTS = "com.sonim.eptt.action.DISPLAY_ALERT";
     /*package*/ interface UserSwitcherCallback {
         void hideSecurityView(int duration);
         void showSecurityView();
@@ -271,49 +261,7 @@ public class KeyguardHostView extends KeyguardViewBase {
             Log.v(TAG, "Keyguard secure camera disabled by DPM");
         }
     }
-
-    /*
-     * Register Broadcast receiver for long press of 5
-     */
-    public void registerBroadcastReceiver(Context context) {
-        context.registerReceiver(broadCastReceiver, new IntentFilter(
-              "CHANGE_LED_STATUS_BY_5"));
-     }
-    public void registerPTTBroadcastReceiver(Context context) {
-        context.registerReceiver(new BroadcastReceiver() {
-
-            @Override
-            public void onReceive(Context arg0, Intent intent) {
-                // TODO Auto-generated method stub
-                Message msgptt = new Message();
-                msgptt.what = APP_PTT_COUNT;
-                try {
-                    Context con = mContext.createPackageContext(
-                            "com.sonim.borqs.launcher", 0);
-                    SharedPreferences pref = con.getSharedPreferences(
-                            "com.sonim.borqs.launcher.ptt.prefs",
-                            Context.MODE_MULTI_PROCESS);
-                    mPttFlag = pref.getBoolean("ptt_msg_present", false);
-                } catch (Exception e) {
-                    Log.e("Not data shared", e.toString());
-                }
-                if (intent != null) {
-                    msgptt.arg1 = intent.getIntExtra("state", 0);
-                }
-                if (mHd != null) {
-                    mHd.sendMessage(msgptt);
-                }
-            }
-        }, new IntentFilter(INTENT_ACTION_FOR_PTT_MISSED_EVENTS));
-    }
-
-    /*
-     * unregister Broadcast receiver for long press of 5
-     */
-    public void unregisterBroadcastReceiver(Context context) {
-         context.unregisterReceiver(broadCastReceiver);
-     }
-
+    
     public void announceCurrentSecurityMethod() {
         View v = (View) getSecurityView(mCurrentSecuritySelection);
         if (v != null) {
@@ -410,6 +358,9 @@ public class KeyguardHostView extends KeyguardViewBase {
     private static final boolean isMusicPlaying(int playbackState) {
         // This should agree with the list in AudioService.isPlaystateActive()
         //Modify remove the  playmusic interface in the lockscreen by zhangchen 20140116 start
+        if (!KeyguardService.isPhoneTypeTouch) {
+           return false;
+       } else {
             switch (playbackState) {
                case RemoteControlClient.PLAYSTATE_PLAYING:
                case RemoteControlClient.PLAYSTATE_BUFFERING:
@@ -420,6 +371,7 @@ public class KeyguardHostView extends KeyguardViewBase {
                   return true;
                default:
                   return false;
+            }
        }
         //Modify remove the  playmusic interface in the lockscreen by zhangchen 20140116 end
     }
@@ -498,7 +450,6 @@ public class KeyguardHostView extends KeyguardViewBase {
 
         private String missedcount;
         private String msgcount;
-        private String pttcount;
         private String voicecount;
     }
 
@@ -656,14 +607,6 @@ public class KeyguardHostView extends KeyguardViewBase {
             }
             // if all the notification views have to be set
             if (sb == null) {
-                try {
-                      Context  con = mContext.createPackageContext("com.sonim.borqs.launcher", 0);
-                      SharedPreferences pref = con.getSharedPreferences(
-                            "com.sonim.borqs.launcher.ptt.prefs", Context.MODE_MULTI_PROCESS);
-                      mPttFlag = pref.getBoolean("ptt_msg_present",false);
-                } catch (NameNotFoundException e) {
-                    Log.e("Not data shared", e.toString());
-                }
                 msg.what = APP_ALL_COUNT;
             }
             msg.obj = nd;
@@ -898,13 +841,6 @@ public class KeyguardHostView extends KeyguardViewBase {
                             mVoiceCount.setVisibility(View.GONE);
                         }
                     }
-                    if(mPttCount != null) {
-                       if(mPttFlag || msg.arg1==1) {
-                          mPttCount.setVisibility(View.VISIBLE);
-                       }else{
-                          mPttCount.setVisibility(View.GONE);
-                       }
-                    }
                     break;
                 case APP_VOICE_COUNT:
                     if (mVoiceCount != null) {
@@ -921,15 +857,6 @@ public class KeyguardHostView extends KeyguardViewBase {
                         }
                     }
                     break;
-                case APP_PTT_COUNT:
-                    if(mPttCount != null) {
-                        if(mPttFlag || msg.arg1==1) {
-                           mPttCount.setVisibility(View.VISIBLE);
-                        }else {
-                           mPttCount.setVisibility(View.GONE);
-                        }
-                     }
-                    break;
                 default:
                     break;
                 }
@@ -939,10 +866,6 @@ public class KeyguardHostView extends KeyguardViewBase {
         };
         mAppWidgetHost.startListening();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(mUpdateMonitorCallbacks);
-        registerBroadcastReceiver(mContext);
-        if (mContext != null) {
-            registerPTTBroadcastReceiver(mContext);
-        }
         /* When the view gets attached a thread is triggered to query of all databases
          * to update the view
         */
@@ -956,7 +879,6 @@ public class KeyguardHostView extends KeyguardViewBase {
         super.onDetachedFromWindow();
         mAppWidgetHost.stopListening();
         KeyguardUpdateMonitor.getInstance(mContext).removeCallback(mUpdateMonitorCallbacks);
-        unregisterBroadcastReceiver(mContext);
     }
 
     void addWidget(AppWidgetHostView view, int pageIndex) {
@@ -1420,8 +1342,7 @@ public class KeyguardHostView extends KeyguardViewBase {
             updateSecurityView(v);
             view = (KeyguardSecurityView)v;
 
-            //BORQS: Setting HTML image to lockscreen--start
-           /* if(securityMode == SecurityMode.None) {
+            if(securityMode == SecurityMode.None &&!KeyguardService.isPhoneTypeTouch) {
                 TextView unLockTextView =
                     (TextView)v.findViewById(R.id.
                     lockscreen_longpress_star_unlock_view);
@@ -1437,13 +1358,11 @@ public class KeyguardHostView extends KeyguardViewBase {
                     releaseUnLockTextView.setText(
                         Html.fromHtml(hintText, new TextViewImageGetter(), null));
                 }
-            }*/
-            // BORQS: Setting HTML image to lockscreen--end
+            }
             // Retrieval of notification object views
             View mView = v.findViewById(R.id.key_notify);
             if (mView != null) {
                 mMissedCount = (TextView) mView.findViewById(R.id.missed_count);
-                mPttCount = (TextView) mView.findViewById(R.id.ptt_count);
                 mVoiceCount = (TextView) mView.findViewById(R.id.voice_count);
                 mMsgCount = (TextView) mView.findViewById(R.id.msg_count);
             }
@@ -1610,9 +1529,15 @@ public class KeyguardHostView extends KeyguardViewBase {
     private int getSecurityViewIdForMode(SecurityMode securityMode) {
         switch (securityMode) {
             case None:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_selector_view_new;
+                }
                 return R.id.keyguard_selector_view;
             case Pattern: return R.id.keyguard_pattern_view;
             case PIN:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_pin_view_new;
+                }
                 return R.id.keyguard_pin_view;
             case Password: return R.id.keyguard_password_view;
             case Biometric: return R.id.keyguard_face_unlock_view;
@@ -1621,10 +1546,16 @@ public class KeyguardHostView extends KeyguardViewBase {
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.id.msim_keyguard_sim_pin_view;
                 }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_sim_pin_view_new;
+                }
                 return R.id.keyguard_sim_pin_view;
             case SimPuk:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.id.msim_keyguard_sim_puk_view;
+                }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_sim_puk_view_new;
                 }
                 return R.id.keyguard_sim_puk_view;
         }
@@ -1634,9 +1565,15 @@ public class KeyguardHostView extends KeyguardViewBase {
     private int getLayoutIdFor(SecurityMode securityMode) {
         switch (securityMode) {
             case None:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_selector_view_new;
+                }
                 return R.layout.keyguard_selector_view;
             case Pattern: return R.layout.keyguard_pattern_view;
             case PIN:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_pin_view_new;
+                }
                 return R.layout.keyguard_pin_view;
             case Password: return R.layout.keyguard_password_view;
             case Biometric: return R.layout.keyguard_face_unlock_view;
@@ -1645,10 +1582,16 @@ public class KeyguardHostView extends KeyguardViewBase {
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.layout.msim_keyguard_sim_pin_view;
                 }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_sim_pin_view_new;
+                }
                 return R.layout.keyguard_sim_pin_view;
             case SimPuk:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.layout.msim_keyguard_sim_puk_view;
+                }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_sim_puk_view_new;
                 }
                 return R.layout.keyguard_sim_puk_view;
             default:
@@ -1791,94 +1734,8 @@ public class KeyguardHostView extends KeyguardViewBase {
     private void addDefaultStatusWidget(int index) {
         LayoutInflater inflater = LayoutInflater.from(mContext);
         View statusWidget = inflater.inflate(R.layout.keyguard_status_view, null, true);
-
-        // Add flashLight to lock screen -start
-        mFlashLightSwitch = (ImageButton) statusWidget.findViewById(R.id.LEDSwitch);
-        mFlashLightState = getLEDStatus();
-        setLEDStatus(mFlashLightState, mFlashLightSwitch, mContext);
-        mFlashLightSwitch.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent("CHANGE_LED_STATUS");
-                intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-                mContext.sendBroadcast(intent);
-            }
-        });
-        //Add flashLight to lock screen -end
+     
         mAppWidgetContainer.addWidget(statusWidget, index);
-    }
-
-    private boolean getLEDStatus() {
-        FileInputStream red;
-        int torch_status = 0;
-        try {
-            red = new FileInputStream("/sys/class/leds/led:flash_torch/brightness");
-            torch_status = red.read();
-            red.close();
-        } catch (FileNotFoundException e) {
-             Log.d(TAG, e.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        if(torch_status == '1') {
-            return true;
-        }
-        return false;
-    }
-
-    private void setLEDStatus(boolean flashLightState,
-            ImageButton flashLightSwitch, Context context) {
-        //Get resources from FlshLight apk
-        final String packName = "qualcomm.android.LEDFlashlight";
-        Resources resources = null;;
-        String flashLightOnDrawable = "flashlight_on";
-        String flashLightOffDrawable = "flashlight_off";
-        int flashLightOnRes = 0;
-        int flashLightOffRes = 0;
-
-        try {
-            PackageManager manager = context.getPackageManager();
-            resources = manager.getResourcesForApplication(packName);
-
-            flashLightOnRes = resources.getIdentifier(flashLightOnDrawable,
-                    "drawable", packName);
-            flashLightOffRes = resources.getIdentifier(flashLightOffDrawable,
-                    "drawable", packName);
-
-            //Get the state of flash light and set drawable
-            int flashLightResId = flashLightState ? flashLightOnRes:flashLightOffRes;
-            Drawable flashLightDrawable = resources.getDrawable(flashLightResId);
-            flashLightSwitch.setBackgroundDrawable(flashLightDrawable);
-            flashLightSwitch.setEnabled(true);
-
-        }
-        catch (NameNotFoundException e) {
-            e.printStackTrace();
-        }
-
-    }
-
-    public class FlashLightStatusChangeBroadcastReceiver extends BroadcastReceiver {
-
-        public FlashLightStatusChangeBroadcastReceiver() {
-        }
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final Context mContext = context;
-            if (intent.getAction().equals("CHANGE_LED_STATUS_BY_5")) {
-                //Disable flash light for .5 second
-                mFlashLightSwitch.setEnabled(false);
-                Handler handler = new Handler();
-                handler.postDelayed(new Runnable() {
-                    public void run() {
-                        mFlashLightState = getLEDStatus();
-                        setLEDStatus(mFlashLightState, mFlashLightSwitch,
-                                        mContext);
-                    }
-                }, 500);
-            }
-        }
     }
 
     private void addWidgetsFromSettings() {
@@ -2324,8 +2181,8 @@ public class KeyguardHostView extends KeyguardViewBase {
     //Add Long press * to unlock by zhangchen 20131115 end
 
     /** Change the hint text to unlock when long press of "*" is detected */
-    /*public void changeHintText() {
-        if (FeatureQuery.FEATURE_KEYPAD_SUPPORT && mKeyguardSelectorView != null) {
+    public void changeHintText() {
+        if (!KeyguardService.isPhoneTypeTouch && mKeyguardSelectorView != null) {
             FrameLayout unlockHintText =  (FrameLayout) mKeyguardSelectorView.
                 findViewById(R.id.keyguard_selector_unlock_hint);
             if ( unlockHintText != null ) {
@@ -2337,7 +2194,7 @@ public class KeyguardHostView extends KeyguardViewBase {
                 selectorParentFrame.setVisibility(View.GONE);
             }
         }
-    }*/
+    }
 
     /**
      *  Dismisses the keyguard by going to the next screen or making it gone.
