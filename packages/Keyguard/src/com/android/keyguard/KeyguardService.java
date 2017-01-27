@@ -39,6 +39,7 @@ public class KeyguardService extends Service {
     static final String TAG = "KeyguardService";
     static final String PERMISSION = android.Manifest.permission.CONTROL_KEYGUARD;
     private KeyguardViewMediator mKeyguardViewMediator;
+    public static int vmcount=0;
 
     @Override
     public void onCreate() {
@@ -145,6 +146,10 @@ public class KeyguardService extends Service {
             checkPermission();
             mKeyguardViewMediator.onBootCompleted();
         }
+       public void onReportUserActivity() {
+            mKeyguardViewMediator.onReportUserActivity();
+       }
+
     };
 
 }

@@ -245,6 +245,30 @@ public class LinkMovementMethod extends ScrollingMovementMethod {
         } else {
             text.removeSpan(FROM_BELOW);
         }
+
+        /* XP5: 50465: text view with links:
+           we can assume that flow  will come
+           here only if TextView has got focus*/
+        if(((dir & View.FOCUS_DOWN) != 0)
+                         || ((dir & View.FOCUS_RIGHT) != 0)
+                         || ((dir & View.FOCUS_FORWARD) != 0) ) {
+            // if came here via down and right,
+            //   do a down to first link
+            if (view != null) {
+                right(view, text);
+            }
+        }
+        else if(((dir & View.FOCUS_UP) != 0)
+                             || ((dir & View.FOCUS_LEFT) != 0)
+                             || ((dir & View.FOCUS_BACKWARD) != 0) ) {
+            // if came via up, do a up to last link
+            if (view != null) {
+                left(view, text);
+            }
+        }
+        /* XP5: 50645: text view with links ends here.
+           Does not apply to EditText*/
+
     }
 
     public static MovementMethod getInstance() {

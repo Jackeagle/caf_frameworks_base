@@ -23,6 +23,8 @@ import android.app.ProgressDialog;
 import android.app.SearchManager;
 import android.app.StatusBarManager;
 import android.app.UiModeManager;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -66,6 +68,7 @@ import android.os.Vibrator;
 import android.provider.Settings;
 import android.service.dreams.DreamService;
 import android.service.dreams.IDreamManager;
+import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
@@ -112,6 +115,21 @@ import static android.view.WindowManager.LayoutParams.*;
 import static android.view.WindowManagerPolicy.WindowManagerFuncs.LID_ABSENT;
 import static android.view.WindowManagerPolicy.WindowManagerFuncs.LID_OPEN;
 import static android.view.WindowManagerPolicy.WindowManagerFuncs.LID_CLOSED;
+
+import java.util.List;
+import android.app.ActivityManager.RunningTaskInfo;
+import android.app.KeyguardManager;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import android.view.inputmethod.InputMethodManager; //Added by dean
+import android.media.ToneGenerator;
+
+// Handle End key for sending intent
+import android.content.pm.PackageManager;
+import android.content.pm.IPackageManager;
+import android.os.ServiceManager;
+import android.os.Binder;
+// Handle End key for sending intent
 
 /**
  * WindowManagerPolicy implementation for the Android phone UI.  This
@@ -164,7 +182,27 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static public final String SYSTEM_DIALOG_REASON_HOME_KEY = "homekey";
     static public final String SYSTEM_DIALOG_REASON_ASSIST = "assist";
 
-    /**
+    static public final String APPLICATION_MAT = "com.borqs.MAT";
+    /* Add Sonim-ignore keypad when capturing hdr image by sunxiaotian 20140619 start */
+    static public final String APPLICATION_CAMERA = "com.android.camera2";
+    /* Add Sonim-ignore keypad when capturing hdr image by sunxiaotian 20140619 end */
+
+    static public final String APPLICATION_HOME = "com.sonim.borqs.launcher";
+    static public final String APPLICATION_HOME_MAIN_ACTIVITY = "com.sonim.borqs.launcher.LauncherActivity";
+    static public final String APPLICATION_DIALER = "com.android.dialer";
+
+    //PTT_XP5, Handle PTT key in Contacts application
+    static public final String APPLICATION_CONTACTS ="com.android.contacts";
+    static public final String APPLICATION_PTT = "com.sonim.eptt";
+
+    static private final String APPLICATION_CALL = "com.android.dialer";
+    static private final String APPLICATION_CALL_CLASS = "com.android.incallui.InCallActivity";
+    static private final String PROFILE_STATUS_INTENT = "CHANGE_PROFILE_STATUS";
+    static private final String PTT_SPEAKER_INTENT="com.borqs.android.intent.action.PTT_SPEAKER_KEY";
+    //Intent extra to say whether Home got visibility due to RED key press
+    private static final String INTENT_EXTRA_FOR_RED_KEY = "extra_for_red_key_press";
+    public static final String CAMERA_LAUNCH_INTENT = "com.borqs.camera.lunchcamera";
+     /**
      * These are the system UI flags that, when changing, can cause the layout
      * of the screen to change.
      */
@@ -300,6 +338,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mLidKeyboardAccessibility;
     int mLidNavigationAccessibility;
     boolean mLidControlsSleep;
+    /* <CDR-EAS-510> Start */
+    boolean mLockTimeoutFeatureEnabled = false;
+    /* <CDR-EAS-510> End */
     int mLongPressOnPowerBehavior = -1;
     boolean mScreenOnEarly = false;
     boolean mScreenOnFully = false;
@@ -316,6 +357,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // The last window we were told about in focusChanged.
     WindowState mFocusedWindow;
     IApplicationToken mFocusedApp;
+
+    //Added by dean for long press code 5 to turn on/off light
+    public static final byte[] LIGHTE_ON = { '1', '2', '7' };
+    public static final byte[] LIGHTE_OFF = { '0' };
+    private boolean isLedOn = false;
+
+    //Flag to tell whether Torch is on or off
+    private boolean mTorchOn = false;
 
     private final class PointerLocationPointerEventListener implements PointerEventListener {
         @Override
@@ -478,6 +527,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     SettingsObserver mSettingsObserver;
     ShortcutManager mShortcutManager;
     PowerManager.WakeLock mBroadcastWakeLock;
+    PowerManager.WakeLock mTorchWakeLock;
     PowerManager.WakeLock mQuickBootWakeLock;
     boolean mHavePendingMediaKeyRepeatWithWakeLock;
 
@@ -496,6 +546,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_DISPATCH_MEDIA_KEY_REPEAT_WITH_WAKE_LOCK = 4;
     boolean mWifiDisplayConnected = false;
     int     mWifiDisplayUIBCRotation = -1;
+
+    private boolean isEndCall = false;
+    InputMethodManager inputManager = null;
+
+    // Added Permission for using the END (red) key by SONIM
+    private static final String END_KEY_PERMISSION = "com.sonim.permission.USE_END_KEY";
+
+    private ToneGenerator mToneGenerator;
+    private static final int TONE_LENGTH_INFINITE = -1;
 
     private class PolicyHandler extends Handler {
         @Override
@@ -840,7 +899,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private void handleDoubleTapOnHome() {
         if (mDoubleTapOnHomeBehavior == DOUBLE_TAP_HOME_RECENT_SYSTEM_UI) {
             mHomeConsumed = true;
-            toggleRecentApps();
+            // BORQS 35279 - Emergency in-call activity is getting displayed
+            // in "recents tab" on welcome screen
+            // Recent apps not being shown till device provisioned
+            if(isDeviceProvisioned()) {
+                toggleRecentApps();
+            }
         }
     }
 
@@ -935,6 +999,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mBroadcastWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 "PhoneWindowManager.mBroadcastWakeLock");
+        mTorchWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                "PhoneWindowManager.mTorchWakeLock");
         mQuickBootWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 "PhoneWindowManager.mQuickBootWakeLock");
         mLongPressPoweronTime = SystemProperties.getInt("ro.quickboot.press_duration",
@@ -962,7 +1028,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 com.android.internal.R.bool.config_enableTranslucentDecor);
         mButtonLightEnabled = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_button_light_enabled);
-
         if (mButtonLightEnabled) {
             mLight = IHardwareService.Stub.asInterface(
                     ServiceManager.getService("hardware"));
@@ -971,6 +1036,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         readConfigurationDependentBehaviors();
+
+        // Modify for home and endcall control by liuzhihao 20140118 start
+        // register for system UI
+        IntentFilter mSystemUIFilter = new IntentFilter();
+        mSystemUIFilter.addAction("com.android.systemui.action.REQUEST_FOCUS");
+        mSystemUIFilter.addAction("com.android.systemui.action.PULL_DOWN");
+        mSystemUIFilter.addAction("com.android.systemui.action.NO_FOCUS");
+        if (true) {
+            context.registerReceiver(mSystemUIReceiver, mSystemUIFilter);
+        }
+        // Modify for home and endcall control by liuzhihao 20140118 end
 
         // register for dock events
         IntentFilter filter = new IntentFilter();
@@ -1058,6 +1134,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         } else {
             screenTurnedOff(WindowManagerPolicy.OFF_BECAUSE_OF_USER);
         }
+        mToneGenerator = new ToneGenerator(AudioManager.STREAM_DTMF, 80);
+
+        // added by ashwath for sonim application keys policy
+       /* if (true) {
+            mSonimAppKeyPolicy = SonimAppKeyPolicy.getInstance(mContext);
+            mSonimAppKeyPolicy.createdb();
+            // FIXME: Do it for FOTA update also/ parsePreInstalledPackages
+            // works for
+            // firstboot and FactoryReset
+            mSonimAppKeyPolicy.parsePreInstalledPackages();
+        }*/
+        IntentFilter cameraFilter = new IntentFilter(CAMERA_LAUNCH_INTENT);
+        if (context != null)
+            context.registerReceiver(mCameraReciever,cameraFilter);
     }
 
     /**
@@ -2014,6 +2104,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
         };
 
+    boolean mKeyToneEnabled = false;
+
     /** {@inheritDoc} */
     @Override
     public long interceptKeyBeforeDispatching(WindowState win, KeyEvent event, int policyFlags) {
@@ -2031,6 +2123,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     + " canceled=" + canceled);
         }
 
+        // retrieve the Key press tone play back setting.
+        mKeyToneEnabled = true;//Settings.System.getInt(mContext.getContentResolver(),
+                //Settings.System.KEY_PRESS_TONE_ENABLED, 1) == 1;
+
         // Add key vibrate
         boolean isEnabled = (Settings.System.getInt(mContext.getContentResolver(),
                    Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0);
@@ -2043,9 +2139,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                  }
         }
 
-        if (mButtonLightEnabled && (down && repeatCount == 0 && (keyCode == KeyEvent.KEYCODE_HOME
+        //Modify button light feature by liyang 20140213 start
+        /*if (mButtonLightEnabled && (down && repeatCount == 0 && (keyCode == KeyEvent.KEYCODE_HOME
                 || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
                 || keyCode == KeyEvent.KEYCODE_SEARCH))) {
+            try {
+                mLight.setButtonLightEnabled(true);
+            } catch(RemoteException e) {
+                Slog.e(TAG, "remote call for turn on button light failed.");
+            }
+        }*/
+        //Enable the KeyButton Light only when the screen is ON.
+        if (mButtonLightEnabled && mPowerManager.isScreenOn()
+                                && (down && repeatCount == 0)) {
             try {
                 mLight.setButtonLightEnabled(true);
             } catch(RemoteException e) {
@@ -2092,6 +2198,31 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // it handle it, because that gives us the correct 5 second
         // timeout.
         if (keyCode == KeyEvent.KEYCODE_HOME) {
+            if(down && mKeyToneEnabled && repeatCount == 0) {
+                playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+            }
+
+            if (mFocusedWindow != null && (APPLICATION_MAT.equals(mFocusedWindow.getOwningPackage()))) {
+               return 0;
+            }
+
+            /*
+             * Add Sonim-ignore keypad when capturing hdr image by sunxiaotian
+             * 20140619 start
+             */
+            if (mFocusedWindow != null
+                    && APPLICATION_CAMERA.equals(mFocusedWindow
+                            .getOwningPackage())
+                    && SystemProperties.getInt("persist.sys.camera.blocker", 0) == 1) {
+                return 0;
+            }
+            /* Add Sonim-ignore keypad when capturing hdr image by sunxiaotian 20140619 end */
+            // Modify for home and endcall control by liuzhihao 20140118 start
+            if (mSystemUIHasFocus && down) {
+                mSystemUIHasFocus = false;
+                return 0;
+            }
+            // Modify for home and endcall control by liuzhihao 20140118 end
 
             // If we have released the home key, and didn't do anything else
             // while it was pressed, then it is time to go home!
@@ -2174,6 +2305,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
             return -1;
         } else if (keyCode == KeyEvent.KEYCODE_MENU) {
+            if(down && mKeyToneEnabled && repeatCount == 0) {
+                playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+            }
             // Hijack modified menu keys for debugging features
             final int chordBug = KeyEvent.META_SHIFT_ON;
 
@@ -2243,6 +2377,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
             }
             return -1;
+        } else if ((keyCode == KeyEvent.KEYCODE_STAR) && (event.isLongPress())) {
+            //Bug 6272 - [AT&T]In the Home screen,Long press the * key, no lock screen
+            if (APPLICATION_HOME.equals(mFocusedWindow.getOwningPackage())) {
+                //Send broadcast to launcher to know whether any folder is in edit mode
+                //then launcher will send the broadcast about the folder state
+                Intent intent = new Intent();
+                intent.setAction("windowmanager.folder.openstate");
+                mContext.sendBroadcast(intent);
+
+                IntentFilter folderopenStateIntentFilter = new IntentFilter("launcher.folder.openstate");
+                mContext.registerReceiver(mFolderOpenStateReceiver, folderopenStateIntentFilter);
+
+                return 0;
+            }
         } else if (keyCode == KeyEvent.KEYCODE_SYSRQ) {
             if (down && repeatCount == 0) {
                 mHandler.post(mScreenshotRunnable);
@@ -2395,9 +2543,42 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return -1;
         }
 
-        // Let the application handle the key.
-        return 0;
-    }
+        //BORQS INDIA - <CDR-RBP-1080> - START
+        //Adding key press tone
+        if(down && mKeyToneEnabled && repeatCount == 0) {
+            if( keyCode == KeyEvent.KEYCODE_BACK
+                || keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                || keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                || keyCode == KeyEvent.KEYCODE_DPAD_UP
+                || keyCode == KeyEvent.KEYCODE_ENTER 
+                || keyCode == KeyEvent.KEYCODE_CLEAR) {
+                    playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+                return 0;
+            }
+
+            if (!APPLICATION_DIALER.equals(mFocusedWindow.getOwningPackage())) {
+                if((keyCode == KeyEvent.KEYCODE_0 )
+                    || (keyCode == KeyEvent.KEYCODE_1 )
+                    || (keyCode == KeyEvent.KEYCODE_2 )
+                    || (keyCode == KeyEvent.KEYCODE_3 )
+                    || (keyCode == KeyEvent.KEYCODE_4 )
+                    || (keyCode == KeyEvent.KEYCODE_5 )
+                    || (keyCode == KeyEvent.KEYCODE_6 )
+                    || (keyCode == KeyEvent.KEYCODE_7 )
+                    || (keyCode == KeyEvent.KEYCODE_8 )
+                    || (keyCode == KeyEvent.KEYCODE_9 )
+                    || (keyCode == KeyEvent.KEYCODE_STAR )
+                    || (keyCode == KeyEvent.KEYCODE_POUND )) {
+                    playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+                    return 0;
+                }
+           }
+        //BORQS INDIA - <CDR-RBP-1080> - END
+   }
+  return 0;
+}
 
     /** {@inheritDoc} */
     @Override
@@ -2585,7 +2766,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         } catch (RemoteException e) {
                         }
                         sendCloseSystemWindows(SYSTEM_DIALOG_REASON_HOME_KEY);
-                        startDockOrHome();
+                        startDockOrHome(false);
                     }
                 }
             });
@@ -2596,7 +2777,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             } catch (RemoteException e) {
             }
             sendCloseSystemWindows(SYSTEM_DIALOG_REASON_HOME_KEY);
-            startDockOrHome();
+            startDockOrHome(false);
         }
     }
 
@@ -3495,10 +3676,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 WindowManager.LayoutParams attrs) {
         if (DEBUG_LAYOUT) Slog.i(TAG, "Win " + win + ": isVisibleOrBehindKeyguardLw="
                 + win.isVisibleOrBehindKeyguardLw());
-        if (mTopFullscreenOpaqueWindowState == null
-                && win.isVisibleLw() && attrs.type == TYPE_INPUT_METHOD) {
-            mForcingShowNavBar = true;
-            mForcingShowNavBarLayer = win.getSurfaceLayer();
+        if (mTopFullscreenOpaqueWindowState == null && (win.getAttrs().privateFlags
+                &WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_SHOW_NAV_BAR) != 0
+                || (win.isVisibleLw() && attrs.type == TYPE_INPUT_METHOD)) {
+            if (mForcingShowNavBarLayer < 0) {
+                mForcingShowNavBar = true;
+                mForcingShowNavBarLayer = win.getSurfaceLayer();
+            }
         }
         if (mTopFullscreenOpaqueWindowState == null &&
                 win.isVisibleOrBehindKeyguardLw() && !win.isGoneForLayoutLw()) {
@@ -3512,7 +3696,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (attrs.type == TYPE_KEYGUARD) {
                 mShowingLockscreen = true;
             }
-            boolean appWindow = attrs.type >= FIRST_APPLICATION_WINDOW
+            boolean applyWindow = attrs.type >= FIRST_APPLICATION_WINDOW
                     && attrs.type <= LAST_APPLICATION_WINDOW;
             if (attrs.type == TYPE_DREAM) {
                 // If the lockscreen was showing when the dream started then wait
@@ -3520,41 +3704,30 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (!mDreamingLockscreen
                         || (win.isVisibleLw() && win.hasDrawnLw())) {
                     mShowingDream = true;
-                    appWindow = true;
+                    applyWindow = true;
                 }
             }
-
-            final boolean showWhenLocked = (attrs.flags & FLAG_SHOW_WHEN_LOCKED) != 0;
-            final boolean dismissKeyguard = (attrs.flags & FLAG_DISMISS_KEYGUARD) != 0;
-            if (appWindow) {
-                if (showWhenLocked || (dismissKeyguard && !isKeyguardSecure())) {
-                    mAppsToBeHidden.remove(win.getAppToken());
-                } else {
-                    mAppsToBeHidden.add(win.getAppToken());
+            if (applyWindow
+                    && attrs.x == 0 && attrs.y == 0
+                    && attrs.width == WindowManager.LayoutParams.MATCH_PARENT
+                    && attrs.height == WindowManager.LayoutParams.MATCH_PARENT) {
+                if (DEBUG_LAYOUT) Slog.v(TAG, "Fullscreen window: " + win);
+                mTopFullscreenOpaqueWindowState = win;
+                if ((attrs.flags & FLAG_SHOW_WHEN_LOCKED) != 0) {
+                    if (DEBUG_LAYOUT) Slog.v(TAG, "Setting mHideLockScreen to true by win " + win);
+                    mHideLockScreen = true;
+                    mForceStatusBarFromKeyguard = false;
                 }
-                if (attrs.x == 0 && attrs.y == 0
-                        && attrs.width == WindowManager.LayoutParams.MATCH_PARENT
-                        && attrs.height == WindowManager.LayoutParams.MATCH_PARENT) {
-                    if (DEBUG_LAYOUT) Slog.v(TAG, "Fullscreen window: " + win);
-                    mTopFullscreenOpaqueWindowState = win;
-                    if (mAppsToBeHidden.isEmpty()) {
-                        if (showWhenLocked) {
-                            if (DEBUG_LAYOUT) Slog.v(TAG,
-                                    "Setting mHideLockScreen to true by win " + win);
-                            mHideLockScreen = true;
-                            mForceStatusBarFromKeyguard = false;
-                        }
-                        if (dismissKeyguard && mDismissKeyguard == DISMISS_KEYGUARD_NONE) {
-                            if (DEBUG_LAYOUT) Slog.v(TAG, "Setting mDismissKeyguard true by win " + win);
-                            mDismissKeyguard = mWinDismissingKeyguard == win ?
-                                    DISMISS_KEYGUARD_CONTINUE : DISMISS_KEYGUARD_START;
-                            mWinDismissingKeyguard = win;
-                            mForceStatusBarFromKeyguard = mShowingLockscreen && isKeyguardSecure();
-                        }
-                    }
-                    if ((attrs.flags & FLAG_ALLOW_LOCK_WHILE_SCREEN_ON) != 0) {
-                        mAllowLockscreenWhenOn = true;
-                    }
+                if ((attrs.flags & FLAG_DISMISS_KEYGUARD) != 0
+                        && mDismissKeyguard == DISMISS_KEYGUARD_NONE) {
+                    if (DEBUG_LAYOUT) Slog.v(TAG, "Setting mDismissKeyguard true by win " + win);
+                    mDismissKeyguard = mWinDismissingKeyguard == win ?
+                            DISMISS_KEYGUARD_CONTINUE : DISMISS_KEYGUARD_START;
+                    mWinDismissingKeyguard = win;
+                    mForceStatusBarFromKeyguard = mShowingLockscreen && isKeyguardSecure();
+                }
+                if ((attrs.flags & FLAG_ALLOW_LOCK_WHILE_SCREEN_ON) != 0) {
+                    mAllowLockscreenWhenOn = true;
                 }
             }
         }
@@ -3640,7 +3813,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (mKeyguard != null) {
             if (localLOGV) Slog.v(TAG, "finishPostLayoutPolicyLw: mHideKeyguard="
                     + mHideLockScreen);
-            if (mDismissKeyguard != DISMISS_KEYGUARD_NONE && !isKeyguardSecure()) {
+            if (mDismissKeyguard != DISMISS_KEYGUARD_NONE && !mKeyguardDelegate.isSecure()) {
                 if (mKeyguard.hideLw(true)) {
                     changes |= FINISH_LAYOUT_REDO_LAYOUT
                             | FINISH_LAYOUT_REDO_CONFIG
@@ -3808,6 +3981,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     void handleVolumeKey(int stream, int keycode) {
         IAudioService audioService = getAudioService();
+        int flags = AudioManager.FLAG_SHOW_UI | AudioManager.FLAG_VIBRATE;
+
         if (audioService == null) {
             return;
         }
@@ -3825,11 +4000,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 : AudioManager.ADJUST_LOWER,
                         mContext.getOpPackageName());
             } else {
-                audioService.adjustStreamVolume(stream,
-                        keycode == KeyEvent.KEYCODE_VOLUME_UP
+                audioService.adjustSuggestedStreamVolume(
+                    keycode == KeyEvent.KEYCODE_VOLUME_UP
                                 ? AudioManager.ADJUST_RAISE
                                 : AudioManager.ADJUST_LOWER,
-                        0,
+                                stream, flags,
                         mContext.getOpPackageName());
             }
         } catch (RemoteException e) {
@@ -3960,6 +4135,33 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    /**
+     * This function will turn on the display and the keypad backlight when
+     * they both are OFF and there is an active GSM or PTT call
+     */
+    private int wakeUpScreen(int result, boolean isScreenOn, boolean isDownEvevnt){
+        if (!isScreenOn && !isDownEvevnt) {
+            ITelephony telephonyService = getTelephonyService();
+            if (telephonyService != null) {
+                try {
+                      if (telephonyService.isOffhook()) {
+                          result |= ACTION_WAKE_UP;
+                          if (mButtonLightEnabled) {
+                              try {
+                                  mLight.setButtonLightEnabled(true);
+                              } catch (RemoteException e) {
+                                 Slog.e(TAG, "Keypad backlight call failed");
+                              }
+                          }
+                       }
+                    } catch (RemoteException ex) {
+                        Log.e(TAG, "ITelephony threw RemoteException", ex);
+                    }
+                }
+            }
+       return result;
+    }
+
     /** {@inheritDoc} */
     @Override
     public int interceptKeyBeforeQueueing(KeyEvent event, int policyFlags, boolean isScreenOn) {
@@ -3989,6 +4191,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return 0;
         }
 
+        // retrieve the Key press tone play back setting.
+        mKeyToneEnabled = true;//Settings.System.getInt(mContext.getContentResolver(),
+            //Settings.System.KEY_PRESS_TONE_ENABLED, 1) == 1;
+
         final boolean isInjected = (policyFlags & WindowManagerPolicy.FLAG_INJECTED) != 0;
 
         // If screen is off then we treat the case where the keyguard is open but hidden
@@ -4002,6 +4208,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         if (keyCode == KeyEvent.KEYCODE_POWER) {
             policyFlags |= WindowManagerPolicy.FLAG_WAKE;
+            //Light up the backlight when lighting up the display
+            //Power key implementation is being handled here
+            if (mButtonLightEnabled) {
+                try {
+                      mLight.setButtonLightEnabled(true);
+                    } catch (RemoteException e) {
+                        Slog.e(TAG, "Keypad backlight call failed");
+                    }
+            }
         }
         final boolean isWakeKey = (policyFlags & (WindowManagerPolicy.FLAG_WAKE
                 | WindowManagerPolicy.FLAG_WAKE_DROPPED)) != 0;
@@ -4103,14 +4318,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 break;
                             }
                             if (telephonyService.isOffhook()
+                                    && (result & ACTION_PASS_TO_USER) == 1
+                                    && keyguardActive && isScreenOn) {
+                                // If we are in call, keyguardactive and screen on
+                                // we decided not to pass the key to
+                                // the application, handle the volume change here.
+                                handleVolumeKey(AudioManager.STREAM_VOICE_CALL, keyCode);
+                                break;
+                            } else if (telephonyService.isOffhook()
                                     && (result & ACTION_PASS_TO_USER) == 0) {
                                 // If we are in call but we decided not to pass the key to
                                 // the application, handle the volume change here.
-                                if(audioManager.isBluetoothScoOn()) {
-                                    handleVolumeKey(AudioManager.STREAM_BLUETOOTH_SCO, keyCode);
-                                } else {
-                                    handleVolumeKey(AudioManager.STREAM_VOICE_CALL, keyCode);
-                                }
+                                handleVolumeKey(AudioManager.STREAM_VOICE_CALL, keyCode);
                                 break;
                             }
                         } catch (RemoteException ex) {
@@ -4125,14 +4344,63 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         break;
                     }
                 }
+                result = wakeUpScreen(result, isScreenOn, down);
                 break;
             }
 
             case KeyEvent.KEYCODE_ENDCALL: {
+                if (mButtonLightEnabled) {
+                    try {
+                        mLight.setButtonLightEnabled(true);
+                    } catch(RemoteException e) {
+                        Slog.e(TAG, "Remote call for turning on button light failed.");
+                    }
+                }
+
+                if (DEBUG_INPUT) {
+                    try {
+                        IPackageManager pm = IPackageManager.Stub.asInterface(ServiceManager.getService("package"));
+                        if (pm.checkUidPermission(END_KEY_PERMISSION, Binder.getCallingUid())
+                            == PackageManager.PERMISSION_DENIED) {
+                            Log.e(TAG, "END KEY PERMISSION_DENIED ");
+                        }
+                        } catch (RemoteException e) {
+                            Log.e(TAG, "END KEY PERMISSION_DENIED - RemoteException ");
+                    }
+                }
+                //Added by SONIM for END Key Down/Up
+
                 result &= ~ACTION_PASS_TO_USER;
+                if(down && mKeyToneEnabled) {
+                    playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+                }
+                if (mFocusedWindow != null
+                        && (APPLICATION_MAT.equals(mFocusedWindow.getOwningPackage()))) {
+                    result = 1;
+                    break;
+                }
+                //Add a judgement for CIT by lvhongshan 20140228 end.
+                /* Add Sonim-ignore keypad when capturing hdr image by sunxiaotian 20140619 start */
+                if (mFocusedWindow != null && APPLICATION_CAMERA.equals(mFocusedWindow.getOwningPackage())
+                    && SystemProperties.getInt("persist.sys.camera.blocker", 0) == 1) {
+                    result = 1;
+                    break;
+               }
+                /* Add Sonim-ignore keypad when capturing hdr image by sunxiaotian 20140619 end */
+                // Modify for home and endcall control by liuzhihao 20140118 start
+                if (mSystemUIHasFocus && down) {
+                    mSystemUIHasFocus = false;
+                    result = 1;
+                }
+                /*CharSequence emergencyDialerClass = "com.android.phone.EmergencyDialer";
+                if (mFocusedWindow.toString().contains(emergencyDialerClass)) {
+                    result = 1;
+                    break;
+                }*/
+                // Modify for home and endcall control by liuzhihao 20140118 end
+                ITelephony telephonyService = getTelephonyService();
+                boolean hungUp = false;
                 if (down) {
-                    ITelephony telephonyService = getTelephonyService();
-                    boolean hungUp = false;
                     if (telephonyService != null) {
                         try {
                             hungUp = telephonyService.endCall();
@@ -4140,15 +4408,63 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             Log.w(TAG, "ITelephony threw RemoteException", ex);
                         }
                     }
+                   //borqs_india start: Disable power key behavior for
+                    //END_CALL button when monkey is running. Avoiding possible
+                    //scenario of powering off phone when monkey is running.
+                    if(!ActivityManager.isUserAMonkey()) {
                     interceptPowerKeyDown(!isScreenOn || hungUp);
+                    }
+                    //borqs_india end.
                 } else {
                     if (interceptPowerKeyUp(canceled)) {
+                        try {
+                            if (telephonyService != null && telephonyService.isOffhook()) {
+                                //BORQS INDIA-START
+                                //Check whenever calling screen in background
+                                //then bring the incall screen to front otherwise
+                                //end the call
+                                //Off-hook:At least one call exists that is dialing,
+                                //active, or on hold, and no calls are ringing or
+                                //waiting.
+                                //If Statusbar expanded then, collapse the statusbar
+                                //and show the incall screen
+                                StatusBarManager mStatusBarManager = (StatusBarManager)mContext.getSystemService(Context.STATUS_BAR_SERVICE);
+                                mStatusBarManager.collapsePanels();
+                                String currentFocusedWindow = mFocusedWindow.toString();
+                                CharSequence inCallActivityClass = "com.android.incallui.InCallActivity";
+                                if ((currentFocusedWindow != null) &&
+                                    !(currentFocusedWindow.contains(inCallActivityClass))) {
+                                    Intent intent = new Intent();
+                                    intent.setAction(intent.ACTION_MAIN);
+                                    intent.setClassName("com.android.dialer",
+                                        "com.android.incallui.InCallActivity");
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                        | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                                            mContext.startActivity(intent);
+                                            break;
+                                }
+                                //BORQS INDIA-END
+                                hungUp = telephonyService.endCall();
+                       } 
+                       //If there is any incoming calls then end the call
+                            //When user press ENDCALL key
+                            else if (telephonyService != null && telephonyService.isRinging()) {
+                                hungUp = telephonyService.endCall();
+                            } 
+                        //Otherwise launch the HOME
                         if ((mEndcallBehavior
                                 & Settings.System.END_BUTTON_BEHAVIOR_HOME) != 0) {
-                            if (goHome()) {
+                            if (goHome(true)) {
                                 break;
                             }
+                        } 
+                      }
+                        catch (RemoteException ex) {
+                            Log.w(TAG, "Telephony manager threw RemoteException", ex);
+                        } catch (Exception ex) {
+                            Log.w(TAG, "General Exception", ex);
                         }
+
                         if ((mEndcallBehavior
                                 & Settings.System.END_BUTTON_BEHAVIOR_SLEEP) != 0) {
                             result = (result & ~ACTION_WAKE_UP) | ACTION_GO_TO_SLEEP;
@@ -4160,6 +4476,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
             case KeyEvent.KEYCODE_POWER: {
                 result &= ~ACTION_PASS_TO_USER;
+
+                //Play the key press tone
+                if(down && mKeyToneEnabled && event.getRepeatCount() == 0) {
+                    playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+                }
+
                 if (down) {
                     mImmersiveModeConfirmation.onPowerKeyDown(isScreenOn, event.getDownTime(),
                             isImmersiveMode(mLastSystemUiFlags));
@@ -4169,6 +4491,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mPowerKeyTime = event.getDownTime();
                         interceptScreenshotChord();
                         interceptScreenshotLog();
+                        // Added to access the power key in mat application.
+                        // This will not switch off the phone in mat application,
+                        // instead overriding behavior of Power key in MAT
+                        // application.
+                        if (mFocusedWindow != null
+                                && (APPLICATION_MAT.equals(mFocusedWindow
+                                        .getOwningPackage()))) {
+                            result = 1;
+                            break;
+                        }
+                        // Modify for home and endcall control by liuzhihao 20140118
+                        // end
 
                         if (mButtonLightEnabled) {
                             try {
@@ -4205,6 +4539,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     cancelPendingScreenshotChordAction();
                     if (interceptPowerKeyUp(canceled || mPendingPowerKeyUpCanceled)) {
                         result = (result & ~ACTION_WAKE_UP) | ACTION_GO_TO_SLEEP;
+                    if (mScreenOnEarly && !mScreenOnFully) {
+                             // Suppressed redundant power key press while
+                             // it is already in the process of turning the
+                             // screen on.
+                        } else {
+                            boolean status = true;//handleShortPressOnPowerKey();
+                            CharSequence emergencyDialerClass = "com.android.phone.EmergencyDialer";
+                            if (mFocusedWindow != null &&
+                                    mFocusedWindow.toString().contains(emergencyDialerClass)) {
+                                result = 1;
+                            } else if (status) {
+                                result = 0;
+                            }
+                        }
                     }
                     mPendingPowerKeyUpCanceled = false;
                 }
@@ -4253,7 +4601,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
 
             case KeyEvent.KEYCODE_CALL: {
-                if (down) {
+                if (down) {//Key press will be heared only when screen on
+                    if(mKeyToneEnabled && isScreenOn) {
+                        playTone(ToneGenerator.TONE_PROP_BEEP, TONE_LENGTH_INFINITE);
+                    }
                     ITelephony telephonyService = getTelephonyService();
                     if (telephonyService != null) {
                         try {
@@ -4271,11 +4622,232 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         }
                     }
                 }
+                result = wakeUpScreen(result, isScreenOn, down);
+                break;
+            }
+
+            //Switch on or off torch on torch key press
+            case KeyEvent.KEYCODE_FLASH: {
+                // Added to access the FLASH key in mat application.
+                if (mFocusedWindow != null
+                    && (APPLICATION_MAT.equals(mFocusedWindow.getOwningPackage()))) {
+                    result = 1;
+                    break;
+                }
+
+                if ((event.getAction() == KeyEvent.ACTION_DOWN)) {
+                    // Start a timer to track the long press of torch key
+                    mHandler.removeCallbacks(mLongPressTorchKeyTimeoutRunnable);
+                    mHandler.postDelayed(mLongPressTorchKeyTimeoutRunnable,
+                        ViewConfiguration.getLongPressTimeout());
+                } else if ((event.getAction() == KeyEvent.ACTION_UP)) {
+                    // Remove the timer if UP event is detected of torch key
+                    mHandler.removeCallbacks(mLongPressTorchKeyTimeoutRunnable);
+                }
+                result = 0;
+                result = wakeUpScreen(result, isScreenOn, down);
+                break;
+            }
+            case KeyEvent.KEYCODE_0:
+            case KeyEvent.KEYCODE_1:
+            case KeyEvent.KEYCODE_2:
+            case KeyEvent.KEYCODE_3:
+            case KeyEvent.KEYCODE_4:
+            case KeyEvent.KEYCODE_5:
+            case KeyEvent.KEYCODE_6:
+            case KeyEvent.KEYCODE_7:
+            case KeyEvent.KEYCODE_8:
+            case KeyEvent.KEYCODE_9:
+            case KeyEvent.KEYCODE_POUND:
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_CLEAR:
+            case KeyEvent.KEYCODE_HOME:
+            case KeyEvent.KEYCODE_BACK:
+            case KeyEvent.KEYCODE_MENU:{
+                result = wakeUpScreen(result, isScreenOn, down);
+                break;
+            }
+            case KeyEvent.KEYCODE_STAR:
+            {
+                result = wakeUpScreen(result, isScreenOn, down);
+                if(keyguardActive && !isScreenOn && down) {
+                    result |= ACTION_WAKE_UP;
+                }
                 break;
             }
         }
         return result;
     }
+/**
+     * Checks whether Home screen is visible or not.
+     */
+    private boolean isHomeVisible(){
+        String currentFocusedWindow = mFocusedWindow != null ?
+                    mFocusedWindow.toString() : null;
+        if ((currentFocusedWindow != null) &&
+                    (currentFocusedWindow.contains(APPLICATION_HOME_MAIN_ACTIVITY))) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * A Handler object which will get triggered after a long press is detected
+     * on the Torch key, typically delay when a long press is realized is 500 ms
+     * in Android base configuration. We are relying on this value for the torch
+     * as well unless we are required to change this to something else.
+     * When Torch is switched on after a long press of Torch key, we post a
+     * notification and when it is switched off, we remove that notification.
+     */
+    private final Runnable mLongPressTorchKeyTimeoutRunnable = new Runnable() {
+        @Override
+        public void run() {
+            //Acquire a partial wakelock, Fix for Bug 46083
+            mBroadcastWakeLock.acquire(500);
+            // Send a brodcast to toggle torch state
+            Intent intent = new Intent("CHANGE_LED_STATUS");
+            intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            mContext.sendBroadcast(intent);
+            if ( mTorchOn ) {
+                mTorchOn = false;
+            } else {
+                mTorchOn = true;
+            }
+            //Initialize Notification Manager object
+            NotificationManager notificationManager = (NotificationManager)
+                mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (mTorchOn) {
+                //Post a notification if the torch is switched on
+                if(mTorchWakeLock != null && !mTorchWakeLock.isHeld())
+                    mTorchWakeLock.acquire();
+                Notification notif  = new Notification.Builder(mContext)
+                 .setContentTitle(mContext.getString(R.string.torch_on_primary_msg))
+                 .setContentText(mContext.getString(R.string.torch_on_seccondary_msg))
+                 .setSmallIcon(R.drawable.ic_flash_light)
+                 .build();
+                notif.flags |= Notification.FLAG_NO_CLEAR;
+                notificationManager.notify(0, notif);
+             } else {
+                //Remove notification if the torch is switched off
+                if(mTorchWakeLock != null  && mTorchWakeLock.isHeld())
+                    mTorchWakeLock.release();
+                notificationManager.cancel(0);
+             }
+        }
+    };
+
+    //BORQS INDIA - <CDR-RBP-1080> - START
+    //This method play tone using tone generator
+    private void playTone(int tone,int durationMs) {
+    AudioManager audiomanager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+        int ringerMode = audiomanager.getRingerMode();
+        if ((ringerMode == audiomanager.RINGER_MODE_SILENT)
+            || (ringerMode == audiomanager.RINGER_MODE_VIBRATE)) {
+            return;
+        }
+        if (mToneGenerator != null) {
+            mToneGenerator.startTone(tone, durationMs);
+            /*try{
+                Thread.sleep(200);
+                mToneGenerator.stopTone();
+            } catch (Exception e){
+                e.toString();
+            }*/
+        }
+    }
+    //BORQS INDIA - <CDR-RBP-1080> - END
+
+    // added by ashwath for sonim application keys policy - start
+    private ActivityManager activityManager;
+    private KeyguardManager mKeyguardManager;
+    private TelephonyManager mTelephonyMgr;
+    private String topActivityPackageName = null;
+    private List<RunningTaskInfo> runningTaskInfos;
+    private List<ActivityManager.RecentTaskInfo> recentTasks;
+
+    KeyguardManager getKeyguardManager() {
+        if (mKeyguardManager == null) {
+            mKeyguardManager = (KeyguardManager)mContext.getSystemService(Context.KEYGUARD_SERVICE);
+        }
+        return mKeyguardManager;
+    }
+
+    TelephonyManager getTelephonyManager() {
+        if (mTelephonyMgr == null) {
+            mTelephonyMgr = (TelephonyManager)mContext.getSystemService(
+                    Context.TELEPHONY_SERVICE);
+        }
+        return mTelephonyMgr;
+    }
+
+    public String getTopActivityPackageName(Context context) {
+        if (activityManager == null) {
+            activityManager = (ActivityManager) (mContext
+                    .getSystemService(android.content.Context.ACTIVITY_SERVICE));
+        }
+        runningTaskInfos = activityManager.getRunningTasks(1);
+        if (runningTaskInfos != null) {
+            ComponentName f = runningTaskInfos.get(0).topActivity;
+            topActivityPackageName = f.getPackageName();
+        }
+        return topActivityPackageName;
+    }
+
+    private Intent findLaunched(String ClassName){
+        if (activityManager == null){
+            activityManager = (ActivityManager)(mContext.getSystemService(android.content.Context.ACTIVITY_SERVICE));
+        }
+        recentTasks = activityManager.getRecentTasks(30, 0x0002);
+        for (int i=0; i< recentTasks.size(); i++){
+            ActivityManager.RecentTaskInfo info = recentTasks.get(i);
+            Intent intent = new Intent(info.baseIntent);
+            intent.setFlags((intent.getFlags()&~Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                    | Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (ClassName.equals(intent.getComponent().getClassName())){
+                return intent;
+            }
+        }
+        recentTasks = null;
+        return null;
+    }
+
+    private void startAppKeyIntent(String packageName, String activityName){
+        Intent mIntent = findLaunched(activityName);
+        if ( mIntent!=null ){
+            mContext.startActivity(mIntent);
+        } else {
+            mIntent = new Intent();
+            mIntent.setClassName(packageName, activityName);
+            mIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        }
+        try {
+            mContext.startActivity(mIntent);
+        } catch (Exception ex) {
+            Log.w(TAG, "ApplicationKey threw Exception", ex);
+        }
+    }
+
+    private void handleAppShortcut(String application_key) {
+        if (application_key.equals("Camera")){
+            startAppKeyIntent("com.android.camera2", "com.android.camera.CameraLauncher");
+        } else if (application_key.equals("Browser")){
+            startAppKeyIntent("com.android.browser", "com.android.browser.BrowserActivity");
+        } else if (application_key.equals("People")){
+            startAppKeyIntent("com.android.contacts", "com.android.contacts.activities.PeopleActivity");
+        } else if (application_key.equals("Messaging")){
+            startAppKeyIntent("com.android.mms", "com.android.mms.ui.ConversationList");
+        } else if (application_key.equals("Email")){
+            startAppKeyIntent("com.android.email", "com.android.email.activity.Welcome");
+        } else if (application_key.equals("Music")){
+            startAppKeyIntent("com.android.music", "com.android.music.MusicBrowserActivity");
+        }
+    }
+    // added by ashwath for sonim application keys policy - end
 
     /**
      * When the screen is off we ignore some keys that might otherwise typically
@@ -4382,6 +4954,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    // Modify for home and endcall control by liuzhihao 20140118 start
+    private boolean mSystemUIHasFocus = false;
+    // add for SystemUI
+    BroadcastReceiver mSystemUIReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals("com.android.systemui.action.REQUEST_FOCUS")) {
+                mSystemUIHasFocus = true;
+            } else if (intent.getAction().equals("com.android.systemui.action.PULL_DOWN")) {
+                mSystemUIHasFocus = false;
+            } else if (intent.getAction().equals("com.android.systemui.action.NO_FOCUS")) {
+                mSystemUIHasFocus = false;
+            } else {
+                mSystemUIHasFocus = false;
+            }
+        }
+    };
+    // Modify for home and endcall control by liuzhihao 20140118 end
+
     BroadcastReceiver mDockReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -4439,6 +5030,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+    BroadcastReceiver mCameraReciever = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+           if (intent != null && intent.getAction() != null) {
+               if (CAMERA_LAUNCH_INTENT.equals(intent.getAction())) {
+                   if (mContext != null) {
+                       NotificationManager notificationManager = (NotificationManager)
+                       mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+                       notificationManager.cancel(0);
+                       mTorchOn = false;
+                       if(mTorchWakeLock != null  && mTorchWakeLock.isHeld())
+                           mTorchWakeLock.release();
+                   }
+               }
+           }
+       }
+    };
+
     private void requestTransientBars(WindowState swipeTarget) {
         synchronized (mWindowManagerFuncs.getWindowManagerLock()) {
             boolean sb = mStatusBarController.checkShowTransientBarLw();
@@ -4493,6 +5102,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         synchronized (mLock) {
             updateOrientationListenerLp();
             updateLockScreenTimeout();
+        }
+
+        //Turnoff the ButtonLight as well while screen is going off.
+        if (mButtonLightEnabled) {
+           try {
+                mLight.setButtonLightEnabled(false);
+            } catch(RemoteException e) {
+                Slog.e(TAG, "Remote call for turning on button light failed.");
+           }
         }
     }
 
@@ -4902,6 +5520,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mKeyguardDelegate = new KeyguardServiceDelegate(mContext, null);
             mKeyguardDelegate.onSystemReady();
         }
+        //Added by dean for long press code 5 to turn on/off light
+         if(inputManager == null) {
+            inputManager = (InputMethodManager) mContext.getSystemService(Context.INPUT_METHOD_SERVICE);
+         }
         synchronized (mLock) {
             updateOrientationListenerLp();
             mSystemReady = true;
@@ -4989,6 +5611,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /** {@inheritDoc} */
     public void userActivity() {
+        /* <CDR-EAS-510> Start */
+        if(mLockTimeoutFeatureEnabled) {
+            //report every user activity to KeyguardViewMediator so that it
+            //can trigger lock timeout
+            if (mKeyguardDelegate != null) {
+              mKeyguardDelegate.onReportUserActivity();
+            }
+        }
+        /* <CDR-EAS-510> end */
+
         // ***************************************
         // NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
         // ***************************************
@@ -5143,7 +5775,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         return null;
     }
 
-    void startDockOrHome() {
+    void startDockOrHome(boolean isHomeTriggeredFromRedKey) {
         awakenDreams();
 
         Intent dock = createHomeDockIntent();
@@ -5154,7 +5786,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             } catch (ActivityNotFoundException e) {
             }
         }
-
+        mHomeIntent.putExtra(INTENT_EXTRA_FOR_RED_KEY,
+            isHomeTriggeredFromRedKey);
         mContext.startActivityAsUser(mHomeIntent, UserHandle.CURRENT);
     }
 
@@ -5162,15 +5795,27 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      * goes to the home screen
      * @return whether it did anything
      */
-    boolean goHome() {
-        if (false) {
-            // This code always brings home to the front.
-            try {
-                ActivityManagerNative.getDefault().stopAppSwitches();
-            } catch (RemoteException e) {
+    boolean goHome(boolean isHomeTriggeredFromRedKey) {
+        // Add the feature to control press endcall button enter to home by wanglei 20131230 start
+        if (true) {
+        // Add the feature to control press endcall button enter to home by wanglei 20131230 end
+            //This code prevent bringing home to front when screen is locked.
+            if(!mKeyguardDelegate.isShowing()) {
+                //Don't go to home if the foreground application is MAT
+                if (mFocusedWindow != null
+                        && (APPLICATION_MAT.equals(mFocusedWindow
+                                .getOwningPackage()))) {
+                    return true;
+                } else {
+                    // This code always brings home to the front.
+                    try {
+                        ActivityManagerNative.getDefault().stopAppSwitches();
+                    } catch (RemoteException e) {
+                    }
+                    sendCloseSystemWindows();
+                    startDockOrHome(isHomeTriggeredFromRedKey);
+                }
             }
-            sendCloseSystemWindows();
-            startDockOrHome();
         } else {
             // This code brings home to the front or, if it is already
             // at the front, puts the device to sleep.
@@ -5504,6 +6149,23 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         return true;
     }
+
+    //This broadcast receiver will get the state whether folder is state
+    //of renaming
+    private BroadcastReceiver mFolderOpenStateReceiver = new BroadcastReceiver() {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals("launcher.folder.openstate")) {
+                Bundle b = intent.getExtras();
+                if (!b.getBoolean("openstate") ) {
+                    lockNow(null);
+                    mPowerManager.goToSleep(SystemClock.uptimeMillis());
+                }
+            }
+        }
+    };
 
     @Override
     public void dump(String prefix, PrintWriter pw, String[] args) {

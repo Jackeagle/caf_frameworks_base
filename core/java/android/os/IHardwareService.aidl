@@ -23,5 +23,17 @@ interface IHardwareService
     boolean getFlashlightEnabled();
     void setFlashlightEnabled(boolean on);
     void setButtonLightEnabled(boolean on);
-}
 
+    //borqs_india, start: to toggle the Speaker LED On/Off
+    void setSpeakerLedOn(boolean on);
+    //borqs_india, end
+
+    //borqs_india, start: to toggle/blink notification led
+    void setNotificationRedLedOn(boolean on);
+    void setNotificationGreenLedOn(boolean on);
+    void setNotificationYellowLedOn(boolean on);
+    void setNotificationRedLedBlink(int onMs, int offMs);
+    void setNotificationGreenLedBlink(int onMs, int offMs);
+    void setNotificationYellowLedBlink(int onMs, int offMs);
+    //borqs_india, end
+}

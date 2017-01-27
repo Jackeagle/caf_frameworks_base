@@ -78,7 +78,7 @@ public class BrightnessController implements ToggleSlider.Listener {
             if (BRIGHTNESS_MODE_URI.equals(uri)) {
                 updateMode();
             } else if (BRIGHTNESS_URI.equals(uri)) {
-                updateSlider();
+                return;
             } else {
                 updateMode();
                 updateSlider();

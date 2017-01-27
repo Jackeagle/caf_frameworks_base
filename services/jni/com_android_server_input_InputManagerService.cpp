@@ -14,6 +14,26 @@
  * limitations under the License.
  */
 
+/*
+ * BORQS Software Solutions Pvt Ltd. CONFIDENTIAL
+ * Copyright (c) 2016-17 All rights reserved.
+ *
+ * The source code contained or described herein and all documents
+ * related to the source code ("Material") are owned by BORQS Software
+ * Solutions Pvt Ltd. No part of the Material may be used,copied,
+ * reproduced, modified, published, uploaded,posted, transmitted,
+ * distributed, or disclosed in any way without BORQS Software
+ * Solutions Pvt Ltd. prior written permission.
+ *
+ * No license under any patent, copyright, trade secret or other
+ * intellectual property right is granted to or conferred upon you
+ * by disclosure or delivery of the Materials, either expressly, by
+ * implication, inducement, estoppel or otherwise. Any license
+ * under such intellectual property rights must be express and
+ * approved by BORQS Software Solutions Pvt Ltd. in writing.
+ *
+ */
+
 #define LOG_TAG "InputManager-JNI"
 
 //#define LOG_NDEBUG 0
@@ -1047,6 +1067,12 @@ static void nativeSetDisplayViewport(JNIEnv* env, jclass clazz, jint ptr, jboole
     im->setDisplayViewport(external, v);
 }
 
+//BROWSER CURSOR : Notify input reader if browser app is paused/resumed
+static void setIfBrowserApp(JNIEnv* env, jclass clazz, jint ptr, jboolean bIsBrowserApp) {
+    NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
+    im->getInputManager()->getReader()->setIfBrowserApp(bIsBrowserApp);
+}
+
 static jint nativeGetScanCodeState(JNIEnv* env, jclass clazz,
         jint ptr, jint deviceId, jint sourceMask, jint scanCode) {
     NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
@@ -1376,6 +1402,8 @@ static JNINativeMethod gInputManagerMethods[] = {
             (void*) nativeMonitor },
     { "nativeSetHoverIcon", "(ILandroid/view/PointerIcon;)V",
             (void*) nativeSetHoverIcon },
+    { "setIfBrowserApp", "(IZ)V",
+            (void*) setIfBrowserApp },
 };
 
 #define FIND_CLASS(var, className) \

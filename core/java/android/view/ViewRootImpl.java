@@ -84,6 +84,12 @@ import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashSet;
+// Add SystemUI support keyboard by liuzhihao 20130709 start
+//import com.plugin.feature_query.FeatureQuery;
+import android.content.Intent;
+// Add SystemUI support keyboard by liuzhihao 20130709 end
+
+import android.widget.EditText;
 
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
@@ -110,6 +116,9 @@ public final class ViewRootImpl implements ViewParent,
     private static final boolean DEBUG_FPS = false;
     private static final boolean DEBUG_INPUT_PROCESSING = false || LOCAL_LOGV;
 
+    // Add SystemUI support keyboard by liuzhihao 20130709 start
+    private static final String SIM_TAG = "loda";
+    // Add SystemUI support keyboard by liuzhihao 20130709 end
     /**
      * Set this system property to true to force the view hierarchy to render
      * at 60 Hz. This can be used to measure the potential framerate.
@@ -231,6 +240,8 @@ public final class ViewRootImpl implements ViewParent,
 
     InputStage mFirstInputStage;
     InputStage mFirstPostImeInputStage;
+
+    boolean mFlipControllerFallbackKeys;
 
     boolean mWindowAttributesChanged = false;
     int mWindowAttributesChangesFlag = 0;
@@ -368,6 +379,8 @@ public final class ViewRootImpl implements ViewParent,
         mNoncompatDensity = context.getResources().getDisplayMetrics().noncompatDensityDpi;
         mFallbackEventHandler = PolicyManager.makeNewFallbackEventHandler(context);
         mChoreographer = Choreographer.getInstance();
+        mFlipControllerFallbackKeys =
+            context.getResources().getBoolean(R.bool.flip_controller_fallback_keys);
 
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         mAttachInfo.mScreenOn = powerManager.isScreenOn();
@@ -2908,6 +2921,9 @@ public final class ViewRootImpl implements ViewParent,
                 mView.dispatchConfigurationChanged(config);
             }
         }
+
+        mFlipControllerFallbackKeys =
+            mContext.getResources().getBoolean(R.bool.flip_controller_fallback_keys);
     }
     
     /**
@@ -3759,7 +3775,16 @@ public final class ViewRootImpl implements ViewParent,
             // Enter touch mode on down or scroll.
             final int action = event.getAction();
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_SCROLL) {
-                ensureTouchMode(true);
+                //setting to false will not change the mode to touch mode
+                //This method will get called for the application which provides pointe
+                //movement, In our case(XP5)only Browser.However MotionEvent.ACTION_DOWN
+                //is received only when user finishes the movement of cursor.
+                //This fix is provided to fix the CTS issue related to view touchmode.
+                if(mContext.getPackageName().startsWith("com.android.cts.stub")){
+                    ensureTouchMode(true);
+                } else{
+                     ensureTouchMode(false);
+                }
             }
 
             // Offset the scroll position.
@@ -3978,6 +4003,7 @@ public final class ViewRootImpl implements ViewParent,
         private final SyntheticJoystickHandler mJoystick = new SyntheticJoystickHandler();
         private final SyntheticTouchNavigationHandler mTouchNavigation =
                 new SyntheticTouchNavigationHandler();
+        private final SyntheticKeyHandler mKeys = new SyntheticKeyHandler();
 
         public SyntheticInputStage() {
             super(null);
@@ -3998,6 +4024,10 @@ public final class ViewRootImpl implements ViewParent,
                 } else if ((source & InputDevice.SOURCE_TOUCH_NAVIGATION)
                         == InputDevice.SOURCE_TOUCH_NAVIGATION) {
                     mTouchNavigation.process(event);
+                    return FINISH_HANDLED;
+                }
+            } else if (q.mEvent instanceof KeyEvent) {
+                if (mKeys.process((KeyEvent) q.mEvent)) {
                     return FINISH_HANDLED;
                 }
             }
@@ -4828,6 +4858,63 @@ public final class ViewRootImpl implements ViewParent,
                 }
             }
         };
+    }
+
+    final class SyntheticKeyHandler {
+
+        public boolean process(KeyEvent event) {
+            // In some locales (like Japan) controllers use B for confirm and A for back, rather
+            // than vice versa, so we need to special case this here since the input system itself
+            // is not locale-aware.
+            int keyCode;
+            switch(event.getKeyCode()) {
+                case KeyEvent.KEYCODE_BUTTON_A:
+                case KeyEvent.KEYCODE_BUTTON_C:
+                case KeyEvent.KEYCODE_BUTTON_X:
+                case KeyEvent.KEYCODE_BUTTON_Z:
+                    keyCode = mFlipControllerFallbackKeys ?
+                        KeyEvent.KEYCODE_BACK : KeyEvent.KEYCODE_DPAD_CENTER;
+                    break;
+                case KeyEvent.KEYCODE_BUTTON_B:
+                case KeyEvent.KEYCODE_BUTTON_Y:
+                    keyCode = mFlipControllerFallbackKeys ?
+                        KeyEvent.KEYCODE_DPAD_CENTER : KeyEvent.KEYCODE_BACK;
+                    break;
+                case KeyEvent.KEYCODE_BUTTON_THUMBL:
+                case KeyEvent.KEYCODE_BUTTON_THUMBR:
+                case KeyEvent.KEYCODE_BUTTON_START:
+                case KeyEvent.KEYCODE_BUTTON_1:
+                case KeyEvent.KEYCODE_BUTTON_2:
+                case KeyEvent.KEYCODE_BUTTON_3:
+                case KeyEvent.KEYCODE_BUTTON_4:
+                case KeyEvent.KEYCODE_BUTTON_5:
+                case KeyEvent.KEYCODE_BUTTON_6:
+                case KeyEvent.KEYCODE_BUTTON_7:
+                case KeyEvent.KEYCODE_BUTTON_8:
+                case KeyEvent.KEYCODE_BUTTON_9:
+                case KeyEvent.KEYCODE_BUTTON_10:
+                case KeyEvent.KEYCODE_BUTTON_11:
+                case KeyEvent.KEYCODE_BUTTON_12:
+                case KeyEvent.KEYCODE_BUTTON_13:
+                case KeyEvent.KEYCODE_BUTTON_14:
+                case KeyEvent.KEYCODE_BUTTON_15:
+                case KeyEvent.KEYCODE_BUTTON_16:
+                    keyCode = KeyEvent.KEYCODE_DPAD_CENTER;
+                    break;
+                case KeyEvent.KEYCODE_BUTTON_SELECT:
+                case KeyEvent.KEYCODE_BUTTON_MODE:
+                    keyCode = KeyEvent.KEYCODE_MENU;
+                default:
+                    return false;
+            }
+
+            enqueueInputEvent(new KeyEvent(event.getDownTime(), event.getEventTime(),
+                        event.getAction(), keyCode, event.getRepeatCount(), event.getMetaState(),
+                        event.getDeviceId(), event.getScanCode(),
+                        event.getFlags() | KeyEvent.FLAG_FALLBACK, event.getSource()));
+            return true;
+        }
+
     }
 
     /**

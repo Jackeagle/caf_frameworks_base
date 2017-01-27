@@ -40,6 +40,7 @@ import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.SystemProperties;
+import android.os.PowerManager;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -83,6 +84,8 @@ public class KeyguardViewManager {
     private LockPatternUtils mLockPatternUtils;
     private int mPanelOrientation = 0;
 
+    private PowerManager.WakeLock mWakeLock;
+
     private KeyguardUpdateMonitorCallback mBackgroundChanger = new KeyguardUpdateMonitorCallback() {
         @Override
         public void onSetBackground(Bitmap bmp) {
@@ -111,6 +114,10 @@ public class KeyguardViewManager {
         mLockPatternUtils = lockPatternUtils;
         mPanelOrientation =
                 SystemProperties.getInt("persist.panel.orientation", 0) / 90;
+        // Instantiate power manager's wakelock object
+        PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
+        mWakeLock = pm.newWakeLock((PowerManager.FULL_WAKE_LOCK
+            | PowerManager.ON_AFTER_RELEASE), TAG);
     }
 
     /**
@@ -247,6 +254,8 @@ public class KeyguardViewManager {
                 if (DEBUG) Log.v(TAG, "onConfigurationChanged: view not visible");
             }
         }
+
+        private boolean mLongPressStarKey = false;
 
         @Override
         public boolean dispatchKeyEvent(KeyEvent event) {

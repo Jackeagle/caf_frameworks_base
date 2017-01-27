@@ -103,8 +103,8 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 import libcore.io.IoUtils;
-
-
+import android.media.ToneGenerator;
+import android.os.IHardwareService;
 /** {@hide} */
 public class NotificationManagerService extends INotificationManager.Stub
 {
@@ -138,6 +138,7 @@ public class NotificationManagerService extends INotificationManager.Stub
     private static final boolean ENABLE_BLOCKED_TOASTS = true;
 
     private static final String ENABLED_NOTIFICATION_LISTENERS_SEPARATOR = ":";
+    private static final String PKG_SYSTEMUI = "com.android.systemui";
 
     final Context mContext;
     final IActivityManager mAm;
@@ -265,11 +266,10 @@ public class NotificationManagerService extends INotificationManager.Stub
 
         @Override
         public void binderDied() {
-            // Remove the listener, but don't unbind from the service. The system will bring the
-            // service back up, and the onServiceConnected handler will readd the listener with the
-            // new binding. If this isn't a bound service, and is just a registered
-            // INotificationListener, just removing it from the list is all we need to do anyway.
-            removeListenerImpl(this.listener, this.userid);
+            if (connection == null) {
+                // This is not a service; it won't be recreated. We can give up this connection.
+                unregisterListener(this.listener, this.userid);
+            }
         }
 
         /** convenience method for looking in mEnabledListenersForCurrentUser */
@@ -667,8 +667,10 @@ public class NotificationManagerService extends INotificationManager.Stub
     @Override
     public void registerListener(final INotificationListener listener,
             final ComponentName component, final int userid) {
-        checkCallerIsSystem();
-
+        if (!( component != null && component.getPackageName() != null
+                   && component.getPackageName().equals(PKG_SYSTEMUI))) {
+           checkCallerIsSystem();
+        }
         synchronized (mNotificationList) {
             try {
                 NotificationListenerInfo info
@@ -763,10 +765,12 @@ public class NotificationManagerService extends INotificationManager.Stub
     }
 
     /**
-     * Removes a listener from the list and unbinds from its service.
+     * Remove a listener binder directly
      */
-    public void unregisterListener(final INotificationListener listener, final int userid) {
-        if (listener == null) return;
+    @Override
+    public void unregisterListener(INotificationListener listener, int userid) {
+        // no need to check permissions; if your listener binder is in the list,
+        // that's proof that you had permission to add it in the first place
 
         NotificationListenerInfo info = removeListenerImpl(listener, userid);
         if (info != null && info.connection != null) {
@@ -788,7 +792,10 @@ public class NotificationManagerService extends INotificationManager.Stub
                 final NotificationListenerInfo info = mListeners.get(i);
                 if (info.listener.asBinder() == listener.asBinder()
                         && info.userid == userid) {
-                    listenerInfo = mListeners.remove(i);
+                    mListeners.remove(i);
+                    if (info.connection != null) {
+                        mContext.unbindService(info.connection);
+                    }
                 }
             }
         }
@@ -1241,6 +1248,12 @@ public class NotificationManagerService extends INotificationManager.Stub
             } else if (action.equals(Intent.ACTION_USER_PRESENT)) {
                 // turn off LED when user passes through lock screen
                 mNotificationLight.turnOff();
+                //borqs_india: turn off notification led
+                try{
+                    mLightService.setNotificationGreenLedBlink(0,0);
+                }catch(Exception e){
+                    e.printStackTrace();
+                }
             } else if (action.equals(Intent.ACTION_USER_SWITCHED)) {
                 // reload per-user settings
                 mSettingsObserver.update(null);
@@ -1325,6 +1338,15 @@ public class NotificationManagerService extends INotificationManager.Stub
         mAttentionLight = lights.getLight(LightsService.LIGHT_ID_ATTENTION);
 
         Resources resources = mContext.getResources();
+        //Modify  blink light feature by liyang 20131226 start
+/*        if (FeatureQuery.FEATURE_FRAMEWORKS_FIX_PLATFORM_BUGS) {
+            mDefaultNotificationColor = resources.getColor(
+                com.android.internal.R.color.config_defaultNotificationColor_Green);
+        } else {*/
+            mDefaultNotificationColor = resources.getColor(
+                com.android.internal.R.color.config_defaultNotificationColor);
+  //      }
+        //Modify  blink light feature by liyang 20131226 end
         mDefaultNotificationColor = resources.getColor(
                 R.color.config_defaultNotificationColor);
         mDefaultNotificationLedOn = resources.getInteger(
@@ -1391,8 +1413,17 @@ public class NotificationManagerService extends INotificationManager.Stub
                 Slog.w(TAG, "Problem accessing scorer " + scorerName + ".", e);
             }
         }
+        //borqs_india,start: initializing harware service to use NotificationLed APIs & initializing ledpkgList
+        mLightService = IHardwareService.Stub.asInterface(ServiceManager.getService("hardware"));
+        ledpkgList = new ArrayList<String>();
+        ledpkgList.add("com.android.phone");
+        ledpkgList.add("com.android.mms");
+        ledpkgList.add("com.android.calendar");
+        ledpkgList.add("com.sonim.eptt");
+        //TODO: extends the list ledpkgList for new packages which requires led notification
+        //borqs_india,end
     }
-
+    private IHardwareService mLightService;
     /**
      * Read the old XML-based app block database and import those blockages into the AppOps system.
      */
@@ -1917,7 +1948,20 @@ public class NotificationManagerService extends INotificationManager.Stub
                                 try {
                                     final IRingtonePlayer player = mAudioService.getRingtonePlayer();
                                     if (player != null) {
-                                        player.playAsync(soundUri, user, looping, audioStreamType);
+                                        // Added below code to play
+                                        // motification sound while in
+                                        // ongoing call screen
+                                        if (mInCall == true) {
+                                            int toneType = ToneGenerator.TONE_PROP_BEEP;  // passed to ToneGenerator.startTone()
+                                            int toneVolume = 80;  // passed to the ToneGenerator constructor
+                                            ToneGenerator toneGenerator = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, toneVolume);
+                                            toneGenerator.startTone(toneType);
+                                        } else {
+                                            player.playAsync(soundUri,
+                                            user,
+                                            looping,
+                                            audioStreamType);
+                                        }
                                     }
                                 } catch (RemoteException e) {
                                 } finally {
@@ -2042,9 +2086,17 @@ public class NotificationManagerService extends INotificationManager.Stub
             r.statusBarKey = null;
             notifyRemovedLocked(r);
         }
-
+        // BORQS: 34699 - "Dismiss all" when clicked for calendar notification
+        // doesn't stop “notification sound” when External song is set as
+        // notification ringtone
+        // Stop the notification sound only when current notification packagename
+        // and cancelled notification package name same
         // sound
-        if (mSoundNotification == r) {
+        if ((mSoundNotification == r) ||
+            ((mSoundNotification != null) && (mSoundNotification.sbn != null)
+            && (r != null ) && (r.sbn != null)
+            && mSoundNotification.sbn.getPackageName().equals(r.sbn.getPackageName()))) {
+
             mSoundNotification = null;
             final long identity = Binder.clearCallingIdentity();
             try {
@@ -2268,8 +2320,15 @@ public class NotificationManagerService extends INotificationManager.Stub
         }
 
         // Don't flash while we are in a call or screen is on
+        // Moved android default implementation
         if (mLedNotification == null || mInCall || mScreenOn) {
             mNotificationLight.turnOff();
+            //borqs_india: turn off notification led
+            try{
+                mLightService.setNotificationGreenLedBlink(0,0);
+            }catch(Exception e){
+                e.printStackTrace();
+            }
         } else {
             final Notification ledno = mLedNotification.sbn.getNotification();
             int ledARGB = ledno.ledARGB;
@@ -2282,10 +2341,36 @@ public class NotificationManagerService extends INotificationManager.Stub
             }
             if (mNotificationPulseEnabled) {
                 // pulse repeatedly
-                mNotificationLight.setFlashing(ledARGB, LightsService.LIGHT_FLASH_TIMED,
-                        ledOnMS, ledOffMS);
+                if(!notifyCustomLed(ledno))
+                    mNotificationLight.setFlashing(ledARGB, LightsService.LIGHT_FLASH_TIMED,
+                            ledOnMS, ledOffMS);
             }
         }
+    }
+    private final int NOTIFY_ON = 500;
+    private final int NOTIFY_OFF = 5000;
+    private final ArrayList<String> ledpkgList;
+    /**
+     * borqs_india: handle custom led notification
+     */
+    private boolean notifyCustomLed(Notification notification){
+        if( notification == null || notification.contentView == null )
+            return false;
+        final String pkg = notification.contentView.getPackage();
+        if(mLightService == null || pkg == null || ledpkgList == null)
+            return false;
+        Log.i(TAG,"custom led notification for pkg:"+pkg);
+        if( ledpkgList.contains(pkg)){
+            try{
+                mLightService.setNotificationGreenLedBlink(NOTIFY_ON,NOTIFY_OFF);
+                return true;
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }else {
+            Log.i(TAG,"Unknown pkg:"+pkg);
+        }
+        return false;
     }
 
     // lock on mNotificationList

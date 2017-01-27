@@ -105,9 +105,9 @@
     <string name="kg_wrong_pin" msgid="1131306510833563801">"PIN incorrecto"</string>
     <string name="kg_too_many_failed_attempts_countdown" msgid="6358110221603297548">"Vuelve a intentarlo en <xliff:g id="NUMBER">%d</xliff:g> segundos."</string>
     <string name="kg_pattern_instructions" msgid="398978611683075868">"Dibuja tu patrón."</string>
-    <string name="kg_sim_pin_instructions" msgid="2319508550934557331">"Ingresa el PIN de la tarjeta SIM."</string>
+    <string name="kg_sim_pin_instructions" msgid="2319508550934557331">"Ingresa PIN SIM"</string>
     <string name="kg_pin_instructions" msgid="2377242233495111557">"Ingresa el PIN."</string>
-    <string name="kg_password_instructions" msgid="5753646556186936819">"Ingresa tu contraseña."</string>
+    <string name="kg_password_instructions" msgid="5753646556186936819">"contraseña"</string>
     <string name="kg_puk_enter_puk_hint" msgid="453227143861735537">"La tarjeta SIM está inhabilitada. Para continuar, ingresa el código PUK. Si quieres obtener más información, ponte en contacto con el proveedor."</string>
     <string name="kg_puk_enter_pin_hint" msgid="7871604527429602024">"Ingresa el código PIN deseado"</string>
     <string name="kg_enter_confirm_pin_hint" msgid="325676184762529976">"Confirmar código PIN deseado"</string>
@@ -154,4 +154,24 @@
     <string name="keyguard_transport_play_description" msgid="2924628863741150956">"Botón de reproducción"</string>
     <string name="keyguard_transport_stop_description" msgid="3084179324810575787">"Botón de detención"</string>
     <string name="keyguard_carrier_default" msgid="8700650403054042153">"Sin servicio"</string>
+
+    <string name="keyguard_charged_att">La batería está llena. Por favor, desconecta el dispositivo.</string>
+    <string name="keyguard_enter_puk_number">Ingresa el PUK</string>
+    <string name="kg_new_sim_pin_instructions">Nuevo PIN SIM</string>
+    <string name="kg_confrim_sim_pin_instructions">Confirmar PIN SIM</string>
+    <string name="kg_puk_wrong_puk">PUK incorrecto</string>
+    <string name="kg_puk_wrong_pin">PIN SIM incorrecto</string>
+
+    <!-- Add strign to be shown in the keyguard when airplane mode is On -->
+    <string name="keyguard_airplane_mode_label">Modo avión</string>
+    <!-- Hint text to unlock for slide lock screen -->
+    <string name="lockscreen_longpress_star_unlock">Deja presionado <![CDATA[ <img src="ic_star.png"/>]]>\t para desbloquear.</string>
+    <string name="kg_hint_text_to_release_key_to_unlock">Suelta \u0020 <![CDATA[ <img src="ic_star.png"/>]]> \u0020 para desbloquear</string>
+    <!-- Notification telling the user that the PIN1 they entered is valid -->
+    <string name="keyguard_pin_accepted">¡Código aceptado!</string>
+    <!-- Notification PIN1 is unblocked -->
+    <string name="pin1_unblock_success">PIN desbloqueado</string>
+    <string name="emergency_dialog_title">Emergencia</string>
+    <string name="emergency_dialog_not_valid_number">No es un número de emergencia</string>
+    <string name="emergency_dialog_valid_num_msg">"¿Quieres hacer una llamada de emergencia?"</string>
 </resources>
