@@ -48,12 +48,19 @@ public class SubsidyUtility {
 
     private static final String TAG = "SubsidyUtility";
     public static final String SUBSIDY_STATUS_SETTING = "subsidy_status";
+    public static final String SUBSIDY_SWITCH_SIM_SETTING = "subsidy_switch_sim";
 
     public static final String ACTION_SUBSIDY_LOCK_CLIENT =
         "org.codeaurora.intent.action.ACTION_LOCKSCREEN";
 
     public static final String ACTION_SUBSIDY_LOCK_INTERNAL =
         "org.codeaurora.intent.action.ACTION_LOCKSCREEN_INTERNAL";
+
+    public static final String ACTION_PRIMARY_CARD_CONFIG_CHANGED =
+        "org.codeaurora.intent.action.PRIMARY_CARD_CONFIG_CHANGED";
+
+    public static final String ACTION_PRIMARY_CARD_CONFIG_FAILED =
+        "org.codeaurora.intent.action.PRIMARY_CARD_CONFIG_FAILED";
 
     public static final String BROADCAST_PERMISSION =
         "com.codeaurora.permission.SUBSIDYLOCK";
@@ -65,6 +72,9 @@ public class SubsidyUtility {
     // Show Activation Screen [TYPE: BOOLEAN]
     public static final String EXTRA_INTENT_KEY_ACTIVATION_SCREEN =
         "INTENT_KEY_ACTIVATION_SCREEN";
+    // Show Switch Sim Screen [TYPE: BOOLEAN]
+    public static final String EXTRA_INTENT_KEY_SWITCH_SIM_SCREEN =
+        "INTENT_KEY_SWITCH_SIM_SCREEN";
     // Show "Enter Code" Screen [TYPE: BOOLEAN]
     public static final String EXTRA_INTENT_KEY_ENTER_CODE_SCREEN =
         "INTENT_KEY_ENTER_CODE_SCREEN";
@@ -195,5 +205,14 @@ public class SubsidyUtility {
     public static boolean isAirplaneMode(Context context) {
         return (Settings.Global.getInt(context.getContentResolver(),
                 Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
+    }
+
+    public static void writeSubsidySwitchSimSlot(Context context, int slot) {
+        try {
+            Settings.Secure.putInt(context.getContentResolver(),
+                    SubsidyUtility.SUBSIDY_SWITCH_SIM_SETTING, slot);
+        } catch (Exception e) {
+            Log.e(TAG, "Exception while writing subsidy sim slot " + e);
+        }
     }
 }

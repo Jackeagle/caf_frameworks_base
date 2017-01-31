@@ -143,6 +143,9 @@ public class SubsidyController {
                     SubsidyUtility.EXTRA_INTENT_KEY_ACTIVATION_SCREEN, false)) {
             mCurrentSubsidyState = new ActivateScreenState();
         } else if (intent.getBooleanExtra(
+                    SubsidyUtility.EXTRA_INTENT_KEY_SWITCH_SIM_SCREEN, false)) {
+            mCurrentSubsidyState = new SwitchSimScreenState();
+        } else if (intent.getBooleanExtra(
                     SubsidyUtility.EXTRA_INTENT_KEY_UNLOCK_SCREEN, false)) {
             mCurrentSubsidyState = new ApUnlockedState();
         } else if (intent.getBooleanExtra(
@@ -398,6 +401,35 @@ public class SubsidyController {
         @Override
         protected int getViewId() {
             return mViewId;
+        }
+    }
+
+    class SwitchSimScreenState extends ApLockedState {
+        public SwitchSimScreenState() {
+            Log.d(TAG, " In SwitchSimScreenState");
+
+            mLayoutId = R.layout.keyguard_subsidy_switchsim_view;
+            mViewId = R.id.keyguard_subsidy_switchsim_view;
+        }
+
+        @Override
+        protected int getLayoutId() {
+            return mLayoutId;
+        }
+
+        @Override
+        protected int getViewId() {
+            return mViewId;
+        }
+
+        public int getModifiedPrimarySimSlot(
+                Context context, int currentSlotID) {
+            int newSlodId =
+                    SubscriptionManager.INVALID_SIM_SLOT_INDEX;
+            if (currentSlotID >= 0) {
+                newSlodId = (currentSlotID == 0) ? 1 : 0;
+            }
+            return newSlodId;
         }
     }
 
