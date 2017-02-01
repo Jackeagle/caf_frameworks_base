@@ -472,7 +472,6 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
         if (oldTab != index) {
             //Requirement where focus should not be there on the tab
             // Request focus for the current tab widget child.
-            if(mContext.getPackageName().contains("com.android.cts.stub"))
                 getChildTabViewAt(index).requestFocus();
         }
     }
@@ -502,7 +501,7 @@ public class TabWidget extends LinearLayout implements OnFocusChangeListener {
         // Requirement where focus should not be there on the tab
         // child in the tab and fails as the child is not focusable
         // currently. Making the child focusable
-        child.setFocusable(false);
+        child.setFocusable(true);
         child.setClickable(true);
 
         super.addView(child);
