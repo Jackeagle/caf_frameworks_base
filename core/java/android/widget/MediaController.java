@@ -34,12 +34,11 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.SeekBar.OnSeekBarChangeListener;
-
+import android.os.SystemProperties;
 import com.android.internal.policy.PolicyManager;
 
 import java.util.Formatter;
 import java.util.Locale;
-
 /**
  * A view containing controls for a MediaPlayer. Typically contains the
  * buttons like "Play/Pause", "Rewind", "Fast Forward" and a progress
@@ -124,7 +123,7 @@ public class MediaController extends FrameLayout {
     }
 
     private void initFloatingWindow() {
-        mWindowManager = (WindowManager)mContext.getSystemService(Context.WINDOW_SERVICE);
+        mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
         mWindow = PolicyManager.makeNewWindow(mContext);
         mWindow.setWindowManager(mWindowManager, null, null);
         mWindow.requestFeature(Window.FEATURE_NO_TITLE);
@@ -132,7 +131,7 @@ public class MediaController extends FrameLayout {
         mDecor.setOnTouchListener(mTouchListener);
         mWindow.setContentView(this);
         mWindow.setBackgroundDrawableResource(android.R.color.transparent);
-        
+
         // While the media controller is up, the volume control keys should
         // affect the media stream type
         mWindow.setVolumeControlStream(AudioManager.STREAM_MUSIC);
@@ -201,7 +200,7 @@ public class MediaController extends FrameLayout {
             return false;
         }
     };
-    
+
     public void setMediaPlayer(MediaPlayerControl player) {
         mPlayer = player;
         updatePausePlay();
@@ -271,7 +270,7 @@ public class MediaController extends FrameLayout {
             }
         }
 
-        // By default these are hidden. They will be enabled when setPrevNextListeners() is called 
+        // By default these are hidden. They will be enabled when setPrevNextListeners() is called
         mNextButton = (ImageButton) v.findViewById(com.android.internal.R.id.next);
         if (mNextButton != null && !mFromXml && !mListenersSet) {
             mNextButton.setVisibility(View.GONE);
@@ -328,7 +327,7 @@ public class MediaController extends FrameLayout {
             // the buttons.
         }
     }
-    
+
     /**
      * Show the controller on screen. It will go away
      * automatically after 'timeout' milliseconds of inactivity.
@@ -343,13 +342,19 @@ public class MediaController extends FrameLayout {
             }
             disableUnsupportedButtons();
             updateFloatingWindowLayout();
-            mWindowManager.addView(mDecor, mDecorLayoutParams);
+            // Exception is seen during monkey test as it entering here when
+            // view is already registered.
+            try {
+                mWindowManager.addView(mDecor, mDecorLayoutParams);
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            }
             mShowing = true;
         }
         updatePausePlay();
-        
+
         // cause the progress bar to be updated even if mShowing
-        // was already true.  This happens, for example, if we're
+        // was already true. This happens, for example, if we're
         // paused with the progress bar showing the user hits play.
         mHandler.sendEmptyMessage(SHOW_PROGRESS);
 
@@ -416,6 +421,21 @@ public class MediaController extends FrameLayout {
         }
     }
 
+    /*
+     * Add short video seek "play to end" start
+     */
+    /** @hide */
+    public void setProgressToend() {
+        if (mPlayer == null) {
+            return;
+        }
+        int duration = mPlayer.getDuration();
+        mProgress.setProgress(1000);
+        mEndTime.setText(stringForTime(duration));
+        show(sDefaultTimeout);
+    }
+    // Add short video seek "play to end" end
+
     private int setProgress() {
         if (mPlayer == null || mDragging) {
             return 0;
@@ -457,14 +477,28 @@ public class MediaController extends FrameLayout {
         int keyCode = event.getKeyCode();
         final boolean uniqueDown = event.getRepeatCount() == 0
                 && event.getAction() == KeyEvent.ACTION_DOWN;
+        int subtype = SystemProperties.getInt("persist.subtype", 0);
+
         if (keyCode ==  KeyEvent.KEYCODE_HEADSETHOOK
                 || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
                 || keyCode == KeyEvent.KEYCODE_SPACE) {
             if (uniqueDown) {
+                // Add the effect of the button in the video start
+                if (subtype == 2) {
+                    mPauseButton.setBackgroundColor(0xFFFFC125);
+                }
+                // Add the effect of the button in the video  end
                 doPauseResume();
                 show(sDefaultTimeout);
                 if (mPauseButton != null) {
                     mPauseButton.requestFocus();
+                }
+            } else {
+                // Add the effect of the button in the video by start
+                if (subtype == 2) {
+                    mPauseButton.setBackground(null);
+                    mRewButton.setBackground(null);
+                    mFfwdButton.setBackground(null);
                 }
             }
             return true;
@@ -494,12 +528,95 @@ public class MediaController extends FrameLayout {
                 hide();
             }
             return true;
+        // Add the effect of the button in the video by start
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+            if (subtype == 2) {
+                if (mPrevButton.getVisibility() == View.VISIBLE) {
+                    if (uniqueDown) {
+                        mPrevButton.setBackgroundColor(0xFF24e5FF);
+                    } else {
+                        mPauseButton.setBackground(null);
+                        mPrevButton.setBackground(null);
+                        mNextButton.setBackground(null);
+                    }
+                    return super.dispatchKeyEvent(event);
+                }
+                if (mRewButton.getVisibility() == View.VISIBLE) {
+                    if (uniqueDown) {
+                        mRewButton.setBackgroundColor(0xFF24e5FF);
+                        moveToLeft();
+                    } else {
+                        mPauseButton.setBackground(null);
+                        mRewButton.setBackground(null);
+                        mFfwdButton.setBackground(null);
+                    }
+                    return super.dispatchKeyEvent(event);
+                }
+            }
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            if (subtype == 2) {
+                if (mNextButton.getVisibility() == View.VISIBLE) {
+                    if (uniqueDown) {
+                        mNextButton.setBackgroundColor(0xFF24e5FF);
+                    } else {
+                        mPauseButton.setBackground(null);
+                        mPrevButton.setBackground(null);
+                        mNextButton.setBackground(null);
+                    }
+                    return super.dispatchKeyEvent(event);
+                }
+                if (mFfwdButton.getVisibility() == View.VISIBLE) {
+                    if (uniqueDown) {
+                        mFfwdButton.setBackgroundColor(0xFF24e5FF);
+                        moveToRight();
+                    } else {
+                        mPauseButton.setBackground(null);
+                        mRewButton.setBackground(null);
+                        mFfwdButton.setBackground(null);
+                    }
+                    return super.dispatchKeyEvent(event);
+                }
+            }
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (subtype == 2) {
+                if (uniqueDown) {
+                    mPauseButton.setBackgroundColor(0xFF24e5FF);
+                    doPauseResume();
+                    show(sDefaultTimeout);
+                    if (mPauseButton != null) {
+                        mPauseButton.requestFocus();
+                    }
+                } else {
+                    mPauseButton.setBackground(null);
+                    mRewButton.setBackground(null);
+                    mFfwdButton.setBackground(null);
+                    mPrevButton.setBackground(null);
+                    mNextButton.setBackground(null);
+                }
+                return true;
+            }
         }
 
         show(sDefaultTimeout);
         return super.dispatchKeyEvent(event);
     }
 
+    // Add the effect of the button in the video start
+    private void moveToLeft() {
+        int pos = mPlayer.getCurrentPosition();
+        pos -= 5000; // milliseconds
+        mPlayer.seekTo(pos);
+        setProgress();
+        show(sDefaultTimeout);
+    }
+    private void moveToRight() {
+        int pos = mPlayer.getCurrentPosition();
+        pos += 15000; // milliseconds
+        mPlayer.seekTo(pos);
+        setProgress();
+        show(sDefaultTimeout);
+    }
+    // Add the effect of the button in the video end
     private View.OnClickListener mPauseListener = new View.OnClickListener() {
         public void onClick(View v) {
             doPauseResume();
