@@ -412,4 +412,6 @@
     <string name="kg_dismiss_button_description">Dismiss lock screen</string>
     <string name="kg_subsidy_title_progress_unknown">Configuring your phone</string>
     <string name="kg_subsidy_content_progress_unknown">Please wait&#8230;</string>
+    <string name="kg_subsidy_enable_data">Enable Data</string>
+    <string name="kg_subsidy_no_data_connection">No Data connection, To enable data, use options below</string>
 </resources>

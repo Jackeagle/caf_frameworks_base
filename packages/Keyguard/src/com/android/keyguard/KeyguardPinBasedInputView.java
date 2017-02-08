@@ -18,27 +18,15 @@ package com.android.keyguard;
 
 import android.content.Context;
 import android.graphics.Rect;
-import android.os.SystemProperties;
-import android.provider.Settings;
-import android.telephony.SubscriptionInfo;
-import android.telephony.SubscriptionManager;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.View;
-import java.util.regex.Pattern;
 
 /**
  * A Pin based Keyguard input view
  */
 public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView
         implements View.OnKeyListener {
-
-    // value for subsidy lock restricted state
-    private static final int SUBSIDYLOCK_LOCKED = 102;
-    private static final int SUBSIDYLOCK_RESTRICTED = 103;
-    private static final String SUBSIDY_STATUS = "subsidy_status";
-    private static final String SUBSIDY_LOCK_SYSTEM_PROPERY
-            = "ro.radio.subsidylock";
 
     protected PasswordTextView mPasswordEntry;
     private View mOkButton;
@@ -249,48 +237,4 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView
         }
         return false;
     }
-
-    protected boolean isSubsidyRestricted(int subId) {
-        int subsidyStatus  = Settings.Secure.getInt(
-                getContext().getContentResolver(),
-                SUBSIDY_STATUS, SUBSIDYLOCK_LOCKED);
-        boolean subsidyLocked = (subsidyStatus == SUBSIDYLOCK_LOCKED)
-                || (subsidyStatus == SUBSIDYLOCK_RESTRICTED);
-        SubscriptionInfo sir = SubscriptionManager.from(getContext())
-                .getActiveSubscriptionInfo(subId);
-        if (sir == null || (sir.getMcc() == 0 || sir.getMnc() == 0)) {
-            return false;
-        }
-        boolean isWhiteListed = isWhiteListed(
-                String.valueOf(sir.getMcc()), String.valueOf(sir.getMnc()));
-        return isSubSidyLockFeatureEnabled() && subsidyLocked && !isWhiteListed;
-    }
-
-    private static boolean isSubSidyLockFeatureEnabled() {
-        int prop = SystemProperties.getInt(SUBSIDY_LOCK_SYSTEM_PROPERY, 0);
-        return (prop == 1) || (prop == 2);
-    }
-
-    private boolean isWhiteListed(String mcc, String mnc) {
-        boolean mccAllowed = false;
-        boolean mncAllowed = false;
-        String[] mccWhiteList = getContext().getResources()
-                .getStringArray(R.array.mccs_white_listed);
-        String[] mncsWhiteList = getContext().getResources()
-                .getStringArray(R.array.mncs_white_listed);
-        for (String mccRegEx : mccWhiteList) {
-            mccAllowed |= Pattern.compile(mccRegEx).matcher(mcc).matches();
-            if (mccAllowed) {
-                break;
-            }
-        }
-        for (String mncRegEx : mncsWhiteList) {
-            mncAllowed |= Pattern.compile(mncRegEx).matcher(mnc).matches();
-            if (mncAllowed) {
-                break;
-            }
-        }
-        return mccAllowed && mncAllowed;
-    }
-
 }

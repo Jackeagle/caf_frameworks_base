@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,6 +33,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityManager;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
@@ -41,6 +42,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.widget.LockPatternUtils;
 
 /**
@@ -56,9 +58,11 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
     private View mEmergencyView;
     private TextView mProgressTitleView;
     private TextView mProgressContentView;
+    private TextView mNoDataText;
     private Button mUnlockBtn;
     private Context mContext;
-    private WifiSetupButton mSetupWifiButton;
+    private LinearLayout mSubsidySetupContainer;
+    private KeyguardSubsidySetupButton mEnableDataButton;
     private SubsidyController mController;
 
     public KeyguardSubsidyLockView(Context context) {
@@ -95,7 +99,7 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                 mContentView.setVisibility(View.GONE);
                 mEmergencyView.setVisibility(View.GONE);
                 mProgressView.setVisibility(View.VISIBLE);
-                setSetupWifiButtonVisibility(View.GONE);
+                setSubsidySetupContainerVisibility(View.GONE);
                 mController.getCurrentSubsidyState().setInProgressState(
                         true);
                 mContext.sendBroadcast(mController
@@ -162,9 +166,17 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
         super.onAttachedToWindow();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(
                 mInfoCallback);
-        mSetupWifiButton =
-                (WifiSetupButton) getRootView().findViewById(R.id.setup_wifi);
-        setSetupWifiButtonVisibility(View.VISIBLE);
+        mSubsidySetupContainer = (LinearLayout) getRootView()
+                .findViewById(R.id.subsidy_setup_container);
+        mEnableDataButton = (KeyguardSubsidySetupButton) getRootView()
+                .findViewById(R.id.enable_data);
+        mNoDataText = (TextView) getRootView()
+                .findViewById(R.id.no_data_connection);
+        mContext.registerReceiver(connectivityReceiver, new IntentFilter(
+                ConnectivityManager.CONNECTIVITY_ACTION));
+        setNoDataTextVisibility();
+        setEnableDataButtonVisibility();
+        setSubsidySetupContainerVisibility(View.VISIBLE);
     }
 
     @Override
@@ -172,7 +184,10 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
         super.onDetachedFromWindow();
         KeyguardUpdateMonitor.getInstance(mContext).removeCallback(
                 mInfoCallback);
-        mSetupWifiButton = null;
+        mContext.unregisterReceiver(connectivityReceiver);
+        mNoDataText = null;
+        mSubsidySetupContainer = null;
+        mEnableDataButton = null;
     }
 
     KeyguardUpdateMonitorCallback mInfoCallback =
@@ -186,13 +201,43 @@ public class KeyguardSubsidyLockView extends LinearLayout implements
                     mController.getCurrentSubsidyState()
                         .setInProgressState(false);
                 }
-                setSetupWifiButtonVisibility(View.VISIBLE);
+                setEnableDataButtonVisibility();
+                setNoDataTextVisibility();
+                setSubsidySetupContainerVisibility(View.VISIBLE);
             }
+                public void onSimStateChanged(int subId, int slotId,
+                        IccCardConstants.State simState) {
+                    mController.processDataConnectivityForSlot();
+                    setEnableDataButtonVisibility();
+                }
         };
 
-    public void setSetupWifiButtonVisibility(int isVisible) {
-        if (mSetupWifiButton != null) {
-            mSetupWifiButton.setVisibility(isVisible);
+    private final BroadcastReceiver connectivityReceiver =
+            new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    setNoDataTextVisibility();
+                }
+            };
+
+    public void setNoDataTextVisibility() {
+        if (mNoDataText != null) {
+            mNoDataText.setVisibility(SubsidyUtility
+                    .isDataConnectionActive(mContext) ? View.GONE
+                    : View.VISIBLE);
+        }
+    }
+
+    public void setSubsidySetupContainerVisibility(int isVisible) {
+        if (mSubsidySetupContainer != null) {
+            mSubsidySetupContainer.setVisibility(isVisible);
+        }
+    }
+
+    public void setEnableDataButtonVisibility() {
+        if (mEnableDataButton != null) {
+            int visibility = mController.isEnableDataButtonVisible(mContext);
+            mEnableDataButton.setVisibility(visibility);
         }
     }
 }

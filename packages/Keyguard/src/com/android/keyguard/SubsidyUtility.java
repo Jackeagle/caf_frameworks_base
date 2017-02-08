@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -34,9 +34,13 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.SystemProperties;
 import android.provider.Settings;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
 import android.util.Log;
 
 import com.android.keyguard.KeyguardConstants;
+
+import java.util.regex.Pattern;
 
 public class SubsidyUtility {
 
@@ -104,7 +108,7 @@ public class SubsidyUtility {
     };
 
     public static boolean isSubsidyLockFeatureEnabled(Context context) {
-        return SystemProperties.getInt("persist.radio.subsidylock", 0) == 1;
+        return SystemProperties.getInt("ro.radio.subsidylock", 0) == 1;
     }
 
     public static void writeSubsidyLockStatus(Context context, int state) {
@@ -147,5 +151,49 @@ public class SubsidyUtility {
         NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
         return activeNetwork != null
                 && activeNetwork.isConnected();
+    }
+
+    public static boolean isSubsidyRestricted(Context context, int subId) {
+        int subsidyStatus  = getSubsidyLockStatus(context);
+        boolean subsidyLocked = (subsidyStatus == SubsidyUtility.SubsidyLockState.AP_LOCKED)
+                || (subsidyStatus == SubsidyUtility.SubsidyLockState.AP_UNLOCKED);
+        return isSubsidyLockFeatureEnabled(null) && subsidyLocked && !isValidSim(context, subId);
+    }
+
+    public static boolean isValidSim(Context context, int subId) {
+        SubscriptionInfo sir = SubscriptionManager.from(context)
+                .getActiveSubscriptionInfo(subId);
+        if (sir == null || (sir.getMcc() == 0 || sir.getMnc() == 0)) {
+            return false;
+        }
+        return isWhiteListed(context,
+                String.valueOf(sir.getMcc()), String.valueOf(sir.getMnc()));
+    }
+
+    private static boolean isWhiteListed(Context context, String mcc, String mnc) {
+        boolean mccAllowed = false;
+        boolean mncAllowed = false;
+        String[] mccWhiteList = context.getResources()
+                .getStringArray(R.array.mccs_white_listed);
+        String[] mncsWhiteList = context.getResources()
+                .getStringArray(R.array.mncs_white_listed);
+        for (String mccRegEx : mccWhiteList) {
+            mccAllowed |= Pattern.compile(mccRegEx).matcher(mcc).matches();
+            if (mccAllowed) {
+                break;
+            }
+        }
+        for (String mncRegEx : mncsWhiteList) {
+            mncAllowed |= Pattern.compile(mncRegEx).matcher(mnc).matches();
+            if (mncAllowed) {
+                break;
+            }
+        }
+        return mccAllowed && mncAllowed;
+    }
+
+    public static boolean isAirplaneMode(Context context) {
+        return (Settings.Global.getInt(context.getContentResolver(),
+                Settings.Global.AIRPLANE_MODE_ON, 0) == 1);
     }
 }

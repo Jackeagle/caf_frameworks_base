@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,18 +31,27 @@ package com.android.keyguard;
 
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.provider.Settings;
+import android.telephony.TelephonyManager;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-public class WifiSetupButton extends Button {
+import java.lang.reflect.Method;
 
-    public WifiSetupButton(Context context) {
+public class KeyguardSubsidySetupButton extends Button {
+    private final String TAG = "WifiSetupAndDataEnableButton";
+    private final TelephonyManager mTelephonyManager;
+
+    public KeyguardSubsidySetupButton(Context context) {
         this(context, null);
     }
 
-    public WifiSetupButton(Context context, AttributeSet attrs) {
+    public KeyguardSubsidySetupButton(Context context, AttributeSet attrs) {
         super(context, attrs);
+        mTelephonyManager = TelephonyManager.from(context);
     }
 
     @Override
@@ -50,12 +59,28 @@ public class WifiSetupButton extends Button {
         super.onFinishInflate();
         setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
+                if(v.getId() == R.id.setup_wifi) {
                 Intent wifiIntent = new Intent(
                         SubsidyUtility.WIFI_SETUP_SCREEN_INTENT);
                 wifiIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 getContext().startActivity(wifiIntent);
+                } else if (v.getId() == R.id.enable_data) {
+                    boolean isAirplaneModeOn =
+                            SubsidyUtility.isAirplaneMode(getContext());
+                    if(isAirplaneModeOn) {
+                        // Disable Airplane mode first if enabled
+                        final ConnectivityManager connectivityManager =
+                                (ConnectivityManager) getContext()
+                                .getSystemService(Context.CONNECTIVITY_SERVICE);
+                        connectivityManager.setAirplaneMode(false);
+                    }
+                    // Enable default data subscription
+                    SubsidyController.getInstance(getContext()).enableMobileData();
+                    // Enable Data view is set to GONE
+                    v.setVisibility(View.GONE);
+                }
             }
         });
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -35,11 +35,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import com.android.internal.telephony.IccCardConstants;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.SubsidyUtility.SubsidyLockState;
 import com.android.settingslib.TetherUtil;
@@ -52,9 +56,13 @@ public class SubsidyController {
     private SubsidyState mPreviousSubsidyState;
     private Context mContext;
     private boolean mStopStateTransitions = false;
+    private TelephonyManager mTelephonyManager;
+    private boolean mIsSIMWhiteListed;
 
     private SubsidyController(Context context) {
         mContext = context;
+
+        mTelephonyManager = TelephonyManager.from(context);
 
         final IntentFilter subsidyLockFilter = new IntentFilter();
         subsidyLockFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
@@ -228,7 +236,6 @@ public class SubsidyController {
                     .getSystemService(Context.CONNECTIVITY_SERVICE);
             new Thread(new Runnable() {
                 public void run() {
-                    disableAirplaneMode(context, connectivityManager);
                     disableWifiTethering(context);
                     disableUsbTethering(context, connectivityManager);
                     disableBluetooth();
@@ -281,11 +288,6 @@ public class SubsidyController {
             } catch (Exception e) {
                 Log.e(TAG, "Exception while disabling bluetooth " + e);
             }
-        }
-
-        private void disableAirplaneMode(Context context,
-                ConnectivityManager cm) {
-            cm.setAirplaneMode(false);
         }
     }
 
@@ -513,6 +515,43 @@ public class SubsidyController {
         @Override
         protected int getViewId() {
             return 0;
+        }
+    }
+
+    public void processDataConnectivityForSlot() {
+        mIsSIMWhiteListed = false;
+        int count = mTelephonyManager.getPhoneCount();
+        for (int i = 0; i < count; i++) {
+            int[] subId = SubscriptionManager.getSubId(i);
+            if (subId != null && subId.length > 0) {
+                if (SubsidyUtility.isValidSim(mContext, subId[0])) {
+                    mIsSIMWhiteListed = true;
+                }
+            }
+        }
+    }
+
+    public int isEnableDataButtonVisible(Context context) {
+        if (mIsSIMWhiteListed) {
+            return (isMobileDataEnabled() && !SubsidyUtility
+                    .isAirplaneMode(context)) ? View.GONE : View.VISIBLE;
+        }
+        return View.GONE;
+    }
+
+    public boolean isMobileDataEnabled() {
+        if (mTelephonyManager != null) {
+            Log.w(TAG, "Telephony Manager is not null");
+            return mTelephonyManager.getDataEnabled();
+        }
+        return false;
+    }
+
+    public void enableMobileData() {
+        // Enable default data subscription
+        if (mTelephonyManager != null) {
+            Log.w(TAG, "Telephony Manager is not null");
+            mTelephonyManager.setDataEnabled(true);
         }
     }
 }
