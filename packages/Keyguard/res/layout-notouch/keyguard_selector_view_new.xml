@@ -83,7 +83,7 @@
             android:id="@+id/keyguard_selector_fade_container"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="294dp"/>
+            android:layout_marginTop="275dp"/>
         </FrameLayout>
 
     <!-- Layout to inform the user to release * to unlock -->
