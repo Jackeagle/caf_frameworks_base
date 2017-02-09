@@ -22,7 +22,12 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.text.method.DigitsKeyListener;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.inputmethod.EditorInfo;
+import android.view.KeyEvent;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 
 /**
@@ -58,7 +63,8 @@ public class KeyguardPINView extends KeyguardAbsKeyInputView
         super.onFinishInflate();
 
         final View ok = findViewById(R.id.key_enter);
-        if (ok != null) {
+        // Modify for keypad support start
+        if (ok != null && KeyguardService.isPhoneTypeTouch) {
             ok.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -70,6 +76,7 @@ public class KeyguardPINView extends KeyguardAbsKeyInputView
             });
             ok.setOnHoverListener(new LiftToActivateListener(getContext()));
         }
+        // Modify for keypad support end
 
         // The delete button is of the PIN keyboard itself in some (e.g. tablet) layouts,
         // not a separate view
@@ -105,6 +112,16 @@ public class KeyguardPINView extends KeyguardAbsKeyInputView
                 | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
 
         mPasswordEntry.requestFocus();
+
+        mPasswordEntry.setOnEditorActionListener(new EditText.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView tv, int actionId, KeyEvent kv) {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    verifyPasswordAndUnlock();
+                    return true;
+                }
+                return false;
+            } });
     }
 
     @Override

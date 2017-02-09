@@ -81,5 +81,12 @@
         <item name="android:paddingEnd">16dip</item>
         <item name="android:mirrorForRtl">true</item>
     </style>
-
+    <style name="widget_clock" parent="widget_big_thin">
+     <item name="android:textSize">35dp</item>
+     <item name="android:fontFamily">sans-serif-condensed</item>
+    </style>
+    <style name="widget_big_thin_child" parent="widget_big_thin">
+     <item name="android:textSize">38dp</item>
+     <item name="android:fontFamily">sans-serif-condensed</item>
+    </style>
 </resources>

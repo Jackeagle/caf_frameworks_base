@@ -16,6 +16,26 @@
  * limitations under the License.
  */
 
+/*
+ * BORQS Software Solutions Pvt Ltd. CONFIDENTIAL
+ * Copyright (c) 2016-17 All rights reserved.
+ *
+ * The source code contained or described herein and all documents
+ * related to the source code ("Material") are owned by BORQS Software
+ * Solutions Pvt Ltd. No part of the Material may be used,copied,
+ * reproduced, modified, published, uploaded,posted, transmitted,
+ * distributed, or disclosed in any way without BORQS Software
+ * Solutions Pvt Ltd. prior written permission.
+ *
+ * No license under any patent, copyright, trade secret or other
+ * intellectual property right is granted to or conferred upon you
+ * by disclosure or delivery of the Materials, either expressly, by
+ * implication, inducement, estoppel or otherwise. Any license
+ * under such intellectual property rights must be express and
+ * approved by BORQS Software Solutions Pvt Ltd. in writing.
+ *
+ */
+
 package com.android.server.am;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
@@ -352,6 +372,9 @@ public final class ActivityManagerService extends ActivityManagerNative
 
     // Threshold Pss to be compared against new background app's Pss
     private long mPenalisedThreshold;
+
+    // The Browser package name
+    private static final String BROWSER_PACKAGE_NAME = "com.android.browser";
 
     /**
      * Description of a request to start a new activity, which has been held
@@ -2554,9 +2577,14 @@ public final class ActivityManagerService extends ActivityManagerNative
             // should never happen).
             SparseArray<ProcessRecord> procs = mProcessNames.getMap().get(processName);
             if (procs == null) return null;
-            final int N = procs.size();
-            for (int i = 0; i < N; i++) {
-                if (UserHandle.isSameUser(procs.keyAt(i), uid)) return procs.valueAt(i);
+            final int procCount = procs.size();
+            for (int i = 0; i < procCount; i++) {
+                final int procUid = procs.keyAt(i);
+                if (UserHandle.isApp(procUid) || !UserHandle.isSameUser(procUid, uid)) {
+                    // Don't use an app process or different user process for system component.
+                    continue;
+                }
+                return procs.valueAt(i);
             }
         }
         ProcessRecord proc = mProcessNames.get(processName, uid);
@@ -5272,14 +5300,27 @@ public final class ActivityManagerService extends ActivityManagerNative
 
     @Override
     public final void activityResumed(IBinder token) {
+        boolean bDidResume = false;
         final long origId = Binder.clearCallingIdentity();
         synchronized(this) {
             ActivityStack stack = ActivityRecord.getStackLocked(token);
             if (stack != null) {
                 ActivityRecord.activityResumedLocked(token);
+                bDidResume = true ;
             }
         }
         Binder.restoreCallingIdentity(origId);
+        //BROWSER CUROSR : notify input reader to disable browser cursor pointer
+        if (bDidResume) {
+            if (getPackageForToken(token) != null && !getPackageForToken(token).contains(BROWSER_PACKAGE_NAME)) {
+                /* when browser is closed abromally, activity paused will not be called.
+                 * hence notifing input reader to disable browser cursor pointer
+                */
+                if (mWindowManager != null)
+                    mWindowManager.setIsCursorPointer(false);
+            }
+        }
+
     }
 
     @Override
@@ -12937,7 +12978,7 @@ public final class ActivityManagerService extends ActivityManagerNative
     // activity manager to announce its creation.
     public boolean bindBackupAgent(ApplicationInfo app, int backupMode) {
         if (DEBUG_BACKUP) Slog.v(TAG, "bindBackupAgent: app=" + app + " mode=" + backupMode);
-        enforceCallingPermission("android.permission.BACKUP", "bindBackupAgent");
+        enforceCallingPermission("android.permission.CONFIRM_FULL_BACKUP", "bindBackupAgent");
 
         synchronized(this) {
             // !!! TODO: currently no check here that we're already bound

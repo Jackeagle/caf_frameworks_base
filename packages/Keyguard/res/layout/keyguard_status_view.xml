@@ -35,26 +35,56 @@
         android:layout_height="match_parent"
         android:gravity="center_horizontal|top"
         android:contentDescription="@string/keyguard_accessibility_status">
-        <LinearLayout
+
+        <RelativeLayout
+            android:id="@+id/keyguard_status_container_layout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal|top"
-            android:orientation="vertical"
-            android:focusable="true">
+            android:layout_height="match_parent"
+            android:focusable="true" >
+
             <TextClock
                 android:id="@+id/clock_view"
+                style="@style/widget_big_thin_child"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal|top"
-                android:textColor="@color/clock_white"
-                android:singleLine="true"
-                style="@style/widget_big_thin"
+                android:layout_gravity="center_vertical"
+                android:layout_marginTop="@dimen/eca_overlap"
                 android:format12Hour="@string/keyguard_widget_12_hours_format"
                 android:format24Hour="@string/keyguard_widget_24_hours_format"
-                android:baselineAligned="true"
-                android:layout_marginBottom="@dimen/bottom_text_spacing_digital" />
+                android:singleLine="true"
+                android:textColor="@color/clock_white" />
 
-            <include layout="@layout/keyguard_status_area" />
-        </LinearLayout>
+            <TextClock
+                android:id="@+id/date_view"
+                style="@style/widget_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/clock_view"
+                android:textColor="@color/clock_white" />
+
+            <TextView
+                android:id="@+id/alarm_status"
+                style="@style/widget_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:drawableLeft="@drawable/ic_alarm_small"
+                android:drawablePadding="@dimen/kg_runway_lights_vertical_padding"
+                android:drawableStart="@drawable/ic_alarm_small"
+                android:textColor="@color/clock_gray"
+                android:visibility="invisible" />
+
+            <ImageButton
+                android:id="@+id/LEDSwitch"
+                android:layout_width="50dp"
+                android:layout_height="38dp"
+                android:layout_alignParentRight="true"
+                android:layout_below="@id/alarm_status"
+                android:layout_gravity="right"
+                android:background="@android:color/darker_gray"
+                android:padding="@dimen/kg_widget_view_height"
+                android:scaleType="center" />
+        </RelativeLayout>
+
     </com.android.keyguard.KeyguardStatusView>
 </com.android.keyguard.KeyguardWidgetFrame>

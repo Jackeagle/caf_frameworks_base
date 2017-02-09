@@ -37,7 +37,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import libcore.icu.LocaleData;
-
+import android.view.View;
 /**
  * Digital clock for the status bar.
  */
@@ -91,6 +91,7 @@ public class Clock extends TextView implements DemoMode {
 
         // Make sure we update to the current time
         updateClock();
+        setVisibility(View.GONE);
     }
 
     @Override

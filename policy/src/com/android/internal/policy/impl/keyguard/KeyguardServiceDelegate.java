@@ -323,5 +323,4 @@ public class KeyguardServiceDelegate {
         }
         mKeyguardState.bootCompleted = true;
     }
-
 }

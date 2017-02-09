@@ -211,7 +211,10 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     private KeyguardManager mKeyguardManager;
 
     private int mUiOptions = 0;
-
+    //Declaring action mode flag
+    private ActionMode mAmode;
+    //Group id to differeicate between actionmode and menu option items
+    private int groupid = Integer.MAX_VALUE;
     private boolean mInvalidatePanelMenuPosted;
     private int mInvalidatePanelMenuFeatures;
     private final Runnable mInvalidatePanelMenuRunnable = new Runnable() {
@@ -582,7 +585,36 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             closePanel(st, true);
             return;
         }
+        /* Check when actionmode is set
+           1. Remove all existing actionmode options from the menu
+           2. Repopulate the new action mode options to Menu depending upon
+              the current visiblity
+           3. set Default group options to invisible when actionmode is set
+        */
 
+        if (st.menu != null) {
+            if (mAmode != null) {
+                // remove all actionmode groups before adding new ones
+                st.menu.removeGroup(groupid);
+                //Make all visible item false  when  actionmode items are to be shown
+                for (int i=0;i<st.menu.size();i++) {
+                   if (st.menu.getItem(i)!=null)
+                       st.menu.getItem(i).setVisible(false);
+                }
+                for (int i = 0; i < mAmode.getMenu().size(); i++) {
+                    // check the visibility and then add to the menu object
+                    if (mAmode.getMenu().getItem(i).isVisible()) {
+                        st.menu.add(groupid, mAmode.getMenu().getItem(i)
+                                .getItemId(), Menu.NONE, mAmode.getMenu()
+                                .getItem(i).toString());
+                    }
+                }
+            } else {
+                 // Action Mode Menu option item to be disabled when Actionmode
+                // is not set
+                st.menu.setGroupVisible(groupid, false);
+            }
+        }
         final WindowManager wm = getWindowManager();
         if (wm == null) {
             return;
@@ -671,6 +703,9 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
 
         wm.addView(st.decorView, lp);
         st.isOpen = true;
+       if( st != null && st.menu != null && !st.menu.hasVisibleItems()) {
+          closePanel(st, true);
+        }
         // Log.v(TAG, "Adding main menu to window manager.");
     }
 
@@ -833,8 +868,9 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         // The panel key was released, so clear the chording key
         if (mPanelChordingKey != 0) {
             mPanelChordingKey = 0;
-
-            if (event.isCanceled() || (mDecor != null && mDecor.mActionMode != null)) {
+            //Removal of actionmode check since Actionmode functionality
+            //needs to  move to menu option.
+            if (event.isCanceled()) {
                 return;
             }
             
@@ -1959,8 +1995,14 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
 
             if (!isDestroyed()) {
                 final Callback cb = getCallback();
-                final boolean handled = cb != null && mFeatureId < 0 ? cb.dispatchKeyEvent(event)
-                        : super.dispatchKeyEvent(event);
+                boolean handled = false;
+                if (cb != null && mFeatureId < 0) {
+                     handled = cb.dispatchKeyEvent(event);
+                }
+                //check for panel visibility and then trigger the event
+                else if((mFeatureId !=0 ) || (mPreparedPanel != null)){
+                     handled = super.dispatchKeyEvent(event);
+                }
                 if (handled) {
                     return true;
                 }
@@ -2044,6 +2086,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 if (mActionMode != null) {
                     if (action == KeyEvent.ACTION_UP) {
                         mActionMode.finish();
+                        //object initilize to null when action mode is removed
+                        mAmode=null;
                     }
                     return true;
                 }
@@ -2052,6 +2096,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 if (mActionBar != null && mActionBar.hasExpandedActionView()) {
                     if (action == KeyEvent.ACTION_UP) {
                         mActionBar.collapseActionView();
+                        //object initilize to null when action mode is removed
+                        mAmode=null;
                     }
                     return true;
                 }
@@ -2372,8 +2418,10 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             ActionMode mode = null;
             if (getCallback() != null && !isDestroyed()) {
                 try {
-                    mode = getCallback().onWindowStartingActionMode(wrappedCallback);
-                } catch (AbstractMethodError ame) {
+                      mode = getCallback().onWindowStartingActionMode(wrappedCallback);
+                      //initialisation of mode when action mode is set
+                      mAmode = mode;
+                    } catch (AbstractMethodError ame) {
                     // Older apps might not implement this callback method.
                 }
             }
@@ -2420,8 +2468,9 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     if (callback.onCreateActionMode(mode, mode.getMenu())) {
                         mode.invalidate();
                         mActionModeView.initForMode(mode);
-                        mActionModeView.setVisibility(View.VISIBLE);
+                        mActionModeView.setVisibility(View.GONE);
                         mActionMode = mode;
+                        mAmode = mode;
                         if (mActionModePopup != null) {
                             post(mShowActionModePopup);
                         }
@@ -2757,6 +2806,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
 
             public void onDestroyActionMode(ActionMode mode) {
                 mWrapped.onDestroyActionMode(mode);
+                //OnDestroy actionmode object should be destroyed
+                mAmode = null;
                 if (mActionModePopup != null) {
                     removeCallbacks(mShowActionModePopup);
                     mActionModePopup.dismiss();

@@ -32,8 +32,10 @@ import android.text.TextWatcher;
 import android.text.method.DigitsKeyListener;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.TextView.OnEditorActionListener;
 
 import com.android.internal.telephony.ITelephony;
@@ -64,22 +66,28 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
         final int CONFIRM_PIN = 2;
         final int DONE = 3;
         protected int state = ENTER_PUK;
+        EditText editText = (EditText)findViewById(R.id.pinEntry);
 
         public void next() {
             int msg = 0;
+            String hintMsg = "";
             if (state == ENTER_PUK) {
                 if (checkPuk()) {
                     state = ENTER_PIN;
                     msg = R.string.kg_puk_enter_pin_hint;
+                    hintMsg = getContext().getString(R.string.kg_new_sim_pin_instructions);
                 } else {
                     msg = R.string.kg_invalid_sim_puk_hint;
+                    hintMsg = getContext().getString(R.string.kg_puk_wrong_puk);
                 }
             } else if (state == ENTER_PIN) {
                 if (checkPin()) {
                     state = CONFIRM_PIN;
                     msg = R.string.kg_enter_confirm_pin_hint;
+                    hintMsg = getContext().getString(R.string.kg_confrim_sim_pin_instructions);
                 } else {
                     msg = R.string.kg_invalid_sim_pin_hint;
+                    hintMsg = getContext().getString(R.string.kg_puk_wrong_pin);
                 }
             } else if (state == CONFIRM_PIN) {
                 if (confirmPin()) {
@@ -89,10 +97,12 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
                 } else {
                     state = ENTER_PIN; // try again?
                     msg = R.string.kg_invalid_confirm_pin_hint;
+                    hintMsg = getContext().getString(R.string.kg_puk_wrong_pin);
                 }
             }
             mPasswordEntry.setText(null);
             if (msg != 0) {
+                mPasswordEntry.setHint(hintMsg);
                 mSecurityMessageDisplay.setMessage(msg, true);
             }
         }
@@ -169,7 +179,8 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
         super.onFinishInflate();
 
         final View ok = findViewById(R.id.key_enter);
-        if (ok != null) {
+        // Modify for keypad support by  start
+        if (ok != null && KeyguardService.isPhoneTypeTouch) {
             ok.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -178,6 +189,7 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
                 }
             });
         }
+        // Modify for keypad support by end
 
         // The delete button is of the PIN keyboard itself in some (e.g. tablet) layouts,
         // not a separate view
@@ -338,6 +350,15 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
                             if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
                                 KeyguardUpdateMonitor.getInstance(getContext()).reportSimUnlocked();
                                 mCallback.dismiss(true);
+                                //Display message to user that the PUK entered is accepted.
+                                AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+                                builder.setMessage(getContext().getString(R.string.pin1_unblock_success));
+                                builder.setCancelable(false);
+                                builder.setNeutralButton(R.string.ok, null);
+                                AlertDialog pinAcceptedDialog = builder.create();
+                                pinAcceptedDialog.getWindow().setType(
+                                      WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+                                pinAcceptedDialog.show();
                             } else {
                                 mShowDefaultMessage = false;
                                 mRemainingAttempts = attemptsRemaining;
@@ -348,6 +369,10 @@ public class KeyguardSimPukView extends KeyguardAbsKeyInputView
                                     if (attemptsRemaining <= 2) {
                                         // this is getting critical - show dialog
                                         getPukRemainingAttemptsDialog(attemptsRemaining).show();
+                                    } else {
+                                        // show message
+                                        mSecurityMessageDisplay.setMessage(
+                                                getPukPasswordErrorMessage(attemptsRemaining), true);
                                     }
                                 } else {
                                     mSecurityMessageDisplay.setMessage(getContext().getString(

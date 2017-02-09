@@ -21,18 +21,22 @@ import android.animation.TimeAnimator;
 import android.animation.TimeAnimator.TimeListener;
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Color;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import com.android.systemui.R;
+import com.android.systemui.statusbar.policy.NotificationRowLayout;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.Iterator;
+
 
 public class PanelView extends FrameLayout {
     public static final boolean DEBUG = PanelBar.DEBUG;
@@ -436,6 +440,24 @@ public class PanelView extends FrameLayout {
                             if (!mJustPeeked) {
                                 PanelView.this.setExpandedHeightInternal(h);
                                 mBar.panelExpansionChanged(PanelView.this, mExpandedFraction);
+                                // Add SystemUI support keyboard start
+                                if (true) {
+                                    NotificationRowLayout row =
+                                            (NotificationRowLayout) PanelView.this
+                                                    .findViewById(R.id.latestItems);
+                                    ViewGroup group = row.getActions();
+                                    int index = row.getActionIndex();
+                                    if (null != group && group.getChildCount() > 0 && index >= 0) {
+                                        group.getChildAt(index).setBackgroundColor(
+                                                Color.TRANSPARENT);
+                                    }
+                                    View date =
+                                            PanelView.this.getRootView()
+                                                    .findViewById(R.id.datetime);
+                                    date.requestFocus();
+                                    date.setClickable(true);
+                                }
+                                // Add SystemUI support keyboard end
                             }
 
                             trackMovement(event);

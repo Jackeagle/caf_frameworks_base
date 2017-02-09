@@ -27,6 +27,7 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.IBinder;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.MotionEvent;
 
@@ -39,6 +40,11 @@ public class KeyguardService extends Service {
     static final String TAG = "KeyguardService";
     static final String PERMISSION = android.Manifest.permission.CONTROL_KEYGUARD;
     private KeyguardViewMediator mKeyguardViewMediator;
+    public static int vmcount=0;
+
+    private int mSubType=0;
+    private String mPlatform;
+    public static boolean isPhoneTypeTouch;
 
     @Override
     public void onCreate() {
@@ -47,6 +53,18 @@ public class KeyguardService extends Service {
                     KeyguardService.this, new LockPatternUtils(KeyguardService.this));
         }
         Log.v(TAG, "onCreate()");
+        isPhoneTypeTouch = getPhoneType();
+    }
+   public boolean getPhoneType() {
+        boolean mKeyguard = false;
+        mSubType = Integer.parseInt(SystemProperties.get("persist.subtype","0"));
+        mPlatform = SystemProperties.get("persist.hwplatform","UNDEFINED");
+
+        if (mSubType == 2 && mPlatform.equals("QRD"))
+            mKeyguard = false;
+        else
+            mKeyguard = true;
+        return mKeyguard;
     }
 
     @Override

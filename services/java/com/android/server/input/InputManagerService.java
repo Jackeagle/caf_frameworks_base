@@ -14,6 +14,26 @@
  * limitations under the License.
  */
 
+/*
+ * BORQS Software Solutions Pvt Ltd. CONFIDENTIAL
+ * Copyright (c) 2016-17 All rights reserved.
+ *
+ * The source code contained or described herein and all documents
+ * related to the source code ("Material") are owned by BORQS Software
+ * Solutions Pvt Ltd. No part of the Material may be used,copied,
+ * reproduced, modified, published, uploaded,posted, transmitted,
+ * distributed, or disclosed in any way without BORQS Software
+ * Solutions Pvt Ltd. prior written permission.
+ *
+ * No license under any patent, copyright, trade secret or other
+ * intellectual property right is granted to or conferred upon you
+ * by disclosure or delivery of the Materials, either expressly, by
+ * implication, inducement, estoppel or otherwise. Any license
+ * under such intellectual property rights must be express and
+ * approved by BORQS Software Solutions Pvt Ltd. in writing.
+ *
+ */
+
 package com.android.server.input;
 
 import com.android.internal.R;
@@ -156,6 +176,8 @@ public class InputManagerService extends IInputManager.Stub
             int physicalLeft, int physicalTop, int physicalRight, int physicalBottom,
             int deviceWidth, int deviceHeight);
 
+    // BROWSER_CURSOR Notifies Input reader if browser app is paused/resumed
+    private static native void setIfBrowserApp(int ptr, boolean bIsBrowserApp);
     private static native int nativeGetScanCodeState(int ptr,
             int deviceId, int sourceMask, int scanCode);
     private static native int nativeGetKeyCodeState(int ptr,
@@ -380,7 +402,16 @@ public class InputManagerService extends IInputManager.Stub
     public int getScanCodeState(int deviceId, int sourceMask, int scanCode) {
         return nativeGetScanCodeState(mPtr, deviceId, sourceMask, scanCode);
     }
-    
+
+   /**
+     * Notifies Input reader if browser app is paused/resumed
+     * @param bIsBrowserApp false if browser app paused and true if resumed
+     */
+    //BROWSER CURSOR
+    public void SetBrowseApp(boolean bIsBrowserApp) {
+        setIfBrowserApp(mPtr, bIsBrowserApp);
+    }
+
     /**
      * Gets the current state of a switch by switch code.
      * @param deviceId The input device id, or -1 to consult all devices.

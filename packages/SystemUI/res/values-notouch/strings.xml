@@ -1,0 +1,7 @@
+<resources>
+  <string name="no_notification">No notifications</string>
+   <string name="clear">Clear</string>
+   <string name="clearAll">Clear All</string>
+   <string name="my_notifications">My Notifications</string>
+   <string name="screenshot_saved_text">Press OK to view your screenshot.</string>
+</resources>

@@ -340,7 +340,9 @@ public class BatteryMeterView extends View implements DemoMode {
         c.drawRect(mFrame, mFramePaint);
 
         // fill 'er up
-        final int color = tracker.plugged ? mChargeColor : getColorForLevel(level);
+        // Changes made to show battery status color
+        //final int color = tracker.plugged ? mChargeColor : getColorForLevel(level);
+        final int color = getColorForLevel(level);
         mBatteryPaint.setColor(color);
 
         if (level >= FULL) {

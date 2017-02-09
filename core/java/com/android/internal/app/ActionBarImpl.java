@@ -248,7 +248,8 @@ public class ActionBarImpl extends ActionBar {
         }
 
         ScrollingTabContainerView tabScroller = new ScrollingTabContainerView(mContext);
-
+        //the Scrollable view will not have focus
+        tabScroller.setFocusable(false);
         if (mHasEmbeddedTabs) {
             tabScroller.setVisibility(View.VISIBLE);
             mActionView.setEmbeddedTabView(tabScroller);
@@ -453,7 +454,8 @@ public class ActionBarImpl extends ActionBar {
         if (mode.dispatchOnCreate()) {
             mode.invalidate();
             mContextView.initForMode(mode);
-            animateToMode(true);
+            //changes done to not show the top actionmode view
+            animateToMode(false);
             if (mSplitView != null && mContextDisplayMode == CONTEXT_DISPLAY_SPLIT) {
                 // TODO animate this
                 if (mSplitView.getVisibility() != View.VISIBLE) {

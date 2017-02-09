@@ -25,6 +25,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.DatePicker;
 import android.widget.DatePicker.OnDateChangedListener;
+import android.view.KeyEvent;
 
 import com.android.internal.R;
 
@@ -152,7 +153,6 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
 
     @Override
     protected void onStop() {
-        tryNotifyDateSet();
         super.onStop();
     }
 
@@ -177,6 +177,34 @@ public class DatePickerDialog extends AlertDialog implements OnClickListener,
             }
         }
     }
+
+    // Add DatePicker Focus for keypad support start
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if ((mDatePicker.getYearSpinner() != null)
+                    && (mDatePicker.getYearSpinner().hasFocus())) {
+                    if (getButton(BUTTON_POSITIVE) != null) {
+                        getButton(BUTTON_POSITIVE).requestFocus();
+                        return true;
+                    }
+                 }
+                 break;
+             case KeyEvent.KEYCODE_DPAD_LEFT:
+                if ((mDatePicker.getMonthSpinner() != null)
+                    && (mDatePicker.getMonthSpinner().hasFocus())) {
+                    if (getButton(BUTTON_POSITIVE) != null) {
+                        getButton(BUTTON_POSITIVE).requestFocus();
+                        return true;
+                    }
+                }
+                break;
+            default: break;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+    // Add DatePicker Focus for keypad support end
 
     @Override
     public Bundle onSaveInstanceState() {

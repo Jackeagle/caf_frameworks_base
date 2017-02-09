@@ -40,6 +40,7 @@ import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.SystemProperties;
+import android.os.PowerManager;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -83,6 +84,8 @@ public class KeyguardViewManager {
     private LockPatternUtils mLockPatternUtils;
     private int mPanelOrientation = 0;
 
+    private PowerManager.WakeLock mWakeLock;
+
     private KeyguardUpdateMonitorCallback mBackgroundChanger = new KeyguardUpdateMonitorCallback() {
         @Override
         public void onSetBackground(Bitmap bmp) {
@@ -111,6 +114,10 @@ public class KeyguardViewManager {
         mLockPatternUtils = lockPatternUtils;
         mPanelOrientation =
                 SystemProperties.getInt("persist.panel.orientation", 0) / 90;
+        // Instantiate power manager's wakelock object
+        PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
+        mWakeLock = pm.newWakeLock((PowerManager.FULL_WAKE_LOCK
+            | PowerManager.ON_AFTER_RELEASE), TAG);
     }
 
     /**
@@ -248,6 +255,8 @@ public class KeyguardViewManager {
             }
         }
 
+        private boolean mLongPressStarKey = false;
+
         @Override
         public boolean dispatchKeyEvent(KeyEvent event) {
             if (mKeyguardView != null) {
@@ -264,6 +273,40 @@ public class KeyguardViewManager {
                 if (mKeyguardView.dispatchKeyEvent(event)) {
                     return true;
                 }
+                // Add Long press * to unlock start
+                // Whenever Messaging application is behind the lockscreen
+                // Once user unlock the screen, focus will goto messaging application
+                // resulting the text deletion, so changed logic
+                // Only after long press * and keyup results in unlock the screen
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    if (event.getKeyCode() == KeyEvent.KEYCODE_STAR) {
+                        if (event.getAction() == KeyEvent.ACTION_DOWN
+                            && event.getRepeatCount() == 0) {
+                            mLongPressStarKey = false;
+                            return true;
+                        } else if ((event.getAction() == KeyEvent.ACTION_UP) && (mLongPressStarKey)) {
+                            //release wake lock since we have detected a keyup
+                            //for long press of "*"
+                            if (mWakeLock != null && mWakeLock.isHeld()) {
+                                mWakeLock.release();
+                            }
+                            mKeyguardView.handleStarKey();
+                            mLongPressStarKey = false;
+                            return true;
+                        } else if (event.getAction() == KeyEvent.ACTION_DOWN
+                            && event.isLongPress() ) {
+                            mLongPressStarKey = true;
+                            //acquire wake lock for long press of "*" unles a
+                            //keyup happens for the same
+                            if (mWakeLock != null) {
+                                mWakeLock.acquire();
+                            }
+                            mKeyguardView.changeHintText();
+                            return true;
+                        }
+                    }
+               }
+               // Add Long press * to unlock end
             }
             return super.dispatchKeyEvent(event);
         }

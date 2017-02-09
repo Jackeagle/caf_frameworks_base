@@ -132,6 +132,9 @@ public class SearchView extends LinearLayout implements CollapsibleActionView {
     private SearchableInfo mSearchable;
     private Bundle mAppSearchData;
 
+    private boolean mRequestSearchFocus = true;
+
+
     /*
      * SearchView can be set expanded before the IME is ready to be shown during
      * initial UI setup. The show operation is asynchronous to account for this.
@@ -1195,7 +1198,10 @@ public class SearchView extends LinearLayout implements CollapsibleActionView {
 
     private void onSearchClicked() {
         updateViewsVisibility(false);
+        if(mRequestSearchFocus){
         mQueryTextView.requestFocus();
+        }
+
         setImeVisibility(true);
         if (mOnSearchClickListener != null) {
             mOnSearchClickListener.onClick(this);
@@ -1763,4 +1769,21 @@ public class SearchView extends LinearLayout implements CollapsibleActionView {
         }
 
     }
+
+    /**
+     * @return search query view
+     * @hide
+     */
+    public SearchAutoComplete getSearchQueryView(){
+        return mQueryTextView;
+    }
+    /**
+     * update search focus status
+     * @param requestSearchFocus false not to set focus, true to set focus
+     * @hide
+     */
+    public void updateSearchFocus(boolean requestSearchFocus){
+        mRequestSearchFocus = requestSearchFocus;
+    }
+
 }

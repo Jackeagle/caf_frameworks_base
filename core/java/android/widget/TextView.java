@@ -140,6 +140,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
 
+import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
+import android.app.AppGlobals;
+import android.os.SystemProperties;
+import android.util.Log;
 /**
  * Displays text to the user and optionally allows them to edit it.  A TextView
  * is a complete text editor, however the basic class is configured to not
@@ -239,7 +244,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     // TODO: How can we get this from the XML instead of hardcoding it here?
     private static final int SIGNED = 2;
     private static final int DECIMAL = 4;
-
+ /**
+     * @hide
+    * **/
+    private static boolean mFlag;
     /**
      * Draw marquee text with fading edges as usual
      */
@@ -301,6 +309,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean mPreventDefaultMovement;
 
     private TextUtils.TruncateAt mEllipsize;
+
+    private boolean mEnableUiOptimization = false;
+    private static int mUiOptimizationChange = 0;
+    // BORQS : start system font sizes - START
+    private static final float FONT_SMALL = 0.85f;
+    private static final String sFONT_LARGE = "1.15f";
+    // BORQS : system font sizes - END
+    private static final String sPlayStorePkg = "com.android.vending";
+    private static final String sGmsPkg = "google";
 
     static class Drawables {
         final static int DRAWABLE_NONE = -1;
@@ -579,6 +596,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      */
     private Editor mEditor;
 
+    /**
+    @hide
+    * object needed for intilizing start and end
+    */
+    public Editor getEditor() {
+
+       return mEditor;
+
+    }
     /*
      * Kick-start the font cache for the zygote process (to pay the cost of
      * initializing freetype for our default font only once).
@@ -610,6 +636,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         boolean onEditorAction(TextView v, int actionId, KeyEvent event);
     }
 
+    boolean isUserApp(ApplicationInfo ai) {
+        int mask = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
+        return (ai.flags & mask) == 0;
+    }
+
     public TextView(Context context) {
         this(context, null);
     }
@@ -621,6 +652,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     @SuppressWarnings("deprecation")
     public TextView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+
+        mEnableUiOptimization = context.getResources().getBoolean(
+                com.android.internal.R.bool.config_ui_optimization);
+        mUiOptimizationChange = Integer.parseInt(SystemProperties.get("persist.sys.uioptimization","1"));
+
         mText = "";
 
         final Resources res = getResources();
@@ -1240,6 +1276,29 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (textColorHighlight != 0) {
             setHighlightColor(textColorHighlight);
         }
+        //BORQS: show the small font for 3rdparty apps and gms applications
+        if(mEnableUiOptimization) {
+            if( mUiOptimizationChange == 1) {
+                Float systemFont = Float.parseFloat(SystemProperties.get("persist.sys.fontScale",sFONT_LARGE));
+                if(systemFont != FONT_SMALL) {
+                    try {
+                        String packageName = context.getPackageName();
+
+                        ApplicationInfo appInfo = AppGlobals.getPackageManager().
+                                getApplicationInfo(packageName, PackageManager.GET_META_DATA, 0);
+                        if(isUserApp(appInfo) || packageName.contains(sGmsPkg) ||
+                            packageName.contains(sPlayStorePkg)) {
+                            if( !packageName.contains("com.android.cts.stub") ) {
+                                textSize = (int)(textSize * FONT_SMALL);
+                            }
+                        }
+                    } catch(Exception e){
+                        Log.e(LOG_TAG, "Failure while retrieve Application info", e);
+                    }
+                }
+            }
+        }
+
         setRawTextSize(textSize);
 
         if (allCaps) {
@@ -2528,9 +2587,39 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             r = Resources.getSystem();
         else
             r = c.getResources();
-
-        setRawTextSize(TypedValue.applyDimension(
-            unit, size, r.getDisplayMetrics()));
+        //BORQS: show the small font for 3rdparty apps and gms applications
+        if(mEnableUiOptimization) {
+            if( mUiOptimizationChange == 1) {
+                Float systemFont = Float.parseFloat(SystemProperties.get("persist.sys.fontScale",sFONT_LARGE));
+                if(systemFont != FONT_SMALL) {
+                    try {
+                        String packageName = c.getPackageName();
+                        ApplicationInfo appInfo = AppGlobals.getPackageManager().
+                                getApplicationInfo(packageName, PackageManager.GET_META_DATA, 0);
+                        if(isUserApp(appInfo) || packageName.contains(sGmsPkg) ||
+                            packageName.contains(sPlayStorePkg) ) {
+                            if(unit != TypedValue.COMPLEX_UNIT_SP) {
+                                setRawTextSize(TypedValue.applyDimension(
+                                unit, size, r.getDisplayMetrics()));
+                            } else {
+                                if( packageName.contains("com.android.cts.stub") ) {
+                                    setRawTextSize(TypedValue.applyDimension(
+                                    unit, size, r.getDisplayMetrics()));
+                                } else {
+                                    setRawTextSize(size * FONT_SMALL);
+                                }
+                            }
+                            return;
+                        }
+                    } catch(Exception e){
+                        Log.e(LOG_TAG, "Failure while retrieve Application info", e);
+                    }
+                }
+            }
+        } else {
+            setRawTextSize(TypedValue.applyDimension(
+                unit, size, r.getDisplayMetrics()));
+        }
     }
 
     private void setRawTextSize(float size) {
@@ -5317,6 +5406,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             boolean isInSelectionMode = mEditor != null && mEditor.mSelectionActionMode != null;
 
             if (isInSelectionMode) {
+               //Back key pressed should remove selection
+               setSelectionFlag(false);
                 if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                     KeyEvent.DispatcherState state = getKeyDispatcherState();
                     if (state != null) {
@@ -7630,6 +7721,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 Spannable sp = (Spannable) mText;
                 MetaKeyKeyListener.resetMetaState(sp);
             }
+            // XP5: 50465: text view with links
+            if( (mMovement != null) && (mMovement instanceof LinkMovementMethod) ) {
+               mMovement.onTakeFocus(this, (Spannable) mText, direction);
+            }
+            // XP5: 50645: text view with links
         }
 
         startStopMarquee(focused);
@@ -8194,6 +8290,25 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
     }
 
+
+   /**
+    ** @hide
+       flag determines the selectionmode
+    **/
+    public static boolean getSelectionFlag() {
+
+        return mFlag;
+
+    }
+   /**
+    ** @hide
+    ** flag to be set when selectionmode is trigger/stopped
+    **/
+    public static void setSelectionFlag(boolean flag) {
+
+       mFlag = flag;
+    }
+
     @Override
     public boolean performAccessibilityAction(int action, Bundle arguments) {
         switch (action) {
@@ -8302,6 +8417,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     static final int ID_COPY = android.R.id.copy;
     static final int ID_PASTE = android.R.id.paste;
 
+    static final int ID_CANCEL =  com.android.internal.R.id.cancelSel;
     /**
      * Called when a context menu option for the text view is selected.  Currently
      * this will be one of {@link android.R.id#selectAll}, {@link android.R.id#cut},
@@ -8330,6 +8446,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
             case ID_PASTE:
                 paste(min, max);
+                setSelectionFlag(false);
                 return true;
 
             case ID_CUT:
@@ -8340,6 +8457,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
             case ID_COPY:
                 setPrimaryClip(ClipData.newPlainText(null, getTransformedText(min, max)));
+                stopSelectionActionMode();
+                return true;
+
+           case ID_CANCEL:
                 stopSelectionActionMode();
                 return true;
         }
@@ -8357,14 +8478,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (super.performLongClick()) {
             handled = true;
         }
-
-        if (mEditor != null) {
-            handled |= mEditor.performLongClick(handled);
-        }
+        // longPress of Editor should not trigger Selectionmode
+        /*if (mEditor != null) {
+             handled |= mEditor.performLongClick(handled);
+        }*/
 
         if (handled) {
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-            if (mEditor != null) mEditor.mDiscardNextActionUp = true;
+          //if (mEditor != null) mEditor.mDiscardNextActionUp = true;
         }
 
         return handled;
@@ -8457,7 +8578,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @hide
      */
     protected void stopSelectionActionMode() {
-        mEditor.stopSelectionActionMode();
+       if (mEditor != null) {
+           setSelectionFlag(false);
+           mEditor.stopSelectionActionMode();
+        }
     }
 
     boolean canCut() {

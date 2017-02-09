@@ -82,7 +82,8 @@ public abstract class AbsActionBarView extends ViewGroup {
      * @param split true if the bar should split
      */
     public void setSplitActionBar(boolean split) {
-        mSplitActionBar = split;
+       //splitAction bar support disabled
+        mSplitActionBar = false;
     }
 
     /**
@@ -174,7 +175,8 @@ public abstract class AbsActionBarView extends ViewGroup {
 
     public boolean showOverflowMenu() {
         if (mActionMenuPresenter != null) {
-            return mActionMenuPresenter.showOverflowMenu();
+            //not to show overflow view
+            return false;
         }
         return false;
     }

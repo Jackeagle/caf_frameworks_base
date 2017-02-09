@@ -36,8 +36,9 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.text.method.DigitsKeyListener;
 import android.util.AttributeSet;
-import android.view.View;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView.OnEditorActionListener;
 
@@ -76,9 +77,6 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
     }
 
     public void resetState() {
-        if (mShowDefaultMessage) {
-            showDefaultMessage();
-        }
         mPasswordEntry.setEnabled(true);
     }
 
@@ -131,7 +129,8 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
         super.onFinishInflate();
 
         final View ok = findViewById(R.id.key_enter);
-        if (ok != null) {
+        // Modify for keypad support by start
+        if (ok != null && KeyguardService.isPhoneTypeTouch) {
             ok.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -140,14 +139,8 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                 }
             });
         }
-        if (mContext.getResources().getBoolean(R.bool.config_show_cancel_button)) {
-            showCancelButton();
-        } else {
-            final View cancel = findViewById(R.id.key_cancel);
-            if (cancel != null) {
-                cancel.setVisibility(INVISIBLE);
-            }
-        }
+        // Modify for keypad support end
+        showCancelButton();
 
         // The delete button is of the PIN keyboard itself in some (e.g. tablet) layouts,
         // not a separate view
@@ -300,6 +293,15 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                                 mSimUnlockProgressDialog.hide();
                             }
                             if (result == PhoneConstants.PIN_RESULT_SUCCESS) {
+                                //Display message to user that the PIN1 entered is accepted.
+                                AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+                                builder.setMessage(getContext().getString(R.string.keyguard_pin_accepted));
+                                builder.setCancelable(false);
+                                builder.setNeutralButton(R.string.ok, null);
+                                AlertDialog pinAcceptedDialog = builder.create();
+                                pinAcceptedDialog.getWindow().setType(
+                                      WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+                                pinAcceptedDialog.show();
                                 // before closing the keyguard, report back that the sim is unlocked
                                 // so it knows right away.
                                 KeyguardUpdateMonitor.getInstance(getContext()).reportSimUnlocked();
@@ -314,6 +316,13 @@ public class KeyguardSimPinView extends KeyguardAbsKeyInputView
                                     if (attemptsRemaining <= 2) {
                                         // this is getting critical - show dialog
                                         getSimRemainingAttemptsDialog(attemptsRemaining).show();
+                                        // show message
+                                        mSecurityMessageDisplay.setMessage(
+                                                getPinPasswordErrorMessage(attemptsRemaining), true);
+                                    } else {
+                                        // show message
+                                        mSecurityMessageDisplay.setMessage(
+                                                getPinPasswordErrorMessage(attemptsRemaining), true);
                                     }
                                 } else {
                                     // "PIN operation failed!" - no idea what this was and no way to

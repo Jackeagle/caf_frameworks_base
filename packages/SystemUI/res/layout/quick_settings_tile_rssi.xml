@@ -20,8 +20,8 @@
     android:layout_gravity="top">
     <FrameLayout
         android:id="@+id/rssi_images"
-        android:layout_marginTop="@dimen/qs_tile_margin_above_icon"
-        android:layout_marginBottom="@dimen/qs_tile_margin_below_icon"
+        android:layout_marginTop="17dp"
+        android:layout_marginBottom="7dp"
         android:layout_width="@dimen/qs_tile_icon_size"
         android:layout_height="@dimen/qs_tile_icon_size"
         android:layout_gravity="top|center_horizontal"
@@ -29,18 +29,21 @@
         >
         <ImageView
             android:id="@+id/rssi_image"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="bottom|end"
             />
         <ImageView
             android:id="@+id/rssi_overlay_image"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:layout_centerInParent="true"
+            android:layout_gravity="top|start"
             />
     </FrameLayout>
-    <ImageView
+    <!-- Redesign of quick setting tile.
+         The following image views are not required-->
+    <!--ImageView
             android:id="@+id/activity_in"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -55,7 +58,7 @@
             android:src="@drawable/ic_qs_signal_out"
             android:layout_toRightOf="@id/rssi_images"
             android:layout_alignBottom="@id/rssi_images"
-            />
+            /-->
     <TextView
         style="@style/TextAppearance.QuickSettings.TileView"
         android:id="@+id/rssi_textview"
@@ -67,5 +70,20 @@
         android:layout_centerHorizontal="true"
         android:layout_below="@id/rssi_images"
         android:textAllCaps="@bool/quick_settings_rssi_tile_capitalization"
+        />
+    <!-- Redesign of quick setting tile.
+         Data menu label added-->
+    <TextView
+        style="@style/TextAppearance.QuickSettings.TileView"
+        android:id="@+id/data_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:gravity="top|center_horizontal"
+        android:text="@string/quick_settings_rssi_label"
+        android:layout_centerHorizontal="true"
+        android:layout_below="@id/rssi_textview"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="8dp"
         />
 </RelativeLayout>

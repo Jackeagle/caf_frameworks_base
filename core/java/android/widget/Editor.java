@@ -939,7 +939,7 @@ public class Editor {
             }
             // Don't leave us in the middle of a batch edit.
             mTextView.onEndBatchEdit();
-
+            stopSelectionActionMode();
             if (mTextView instanceof ExtractEditText) {
                 // terminateTextSelectionMode removes selection, which we want to keep when
                 // ExtractEditText goes out of focus.
@@ -1008,27 +1008,34 @@ public class Editor {
     }
 
     void onWindowFocusChanged(boolean hasWindowFocus) {
-        if (hasWindowFocus) {
-            if (mBlink != null) {
-                mBlink.uncancel();
-                makeBlink();
+        /*
+         * When SelectionMode is set blink of cursor operation is avoided
+         * instead the highlight is shown
+         */
+        if (mTextView !=null && (!mTextView.getSelectionFlag())) {
+            if (hasWindowFocus) {
+                if (mBlink != null) {
+                    mBlink.uncancel();
+                    makeBlink();
+                }
+            } else {
+                if (mBlink != null) {
+                    mBlink.cancel();
+                }
+                if (mInputContentType != null) {
+                    mInputContentType.enterDown = false;
+                }
+                // Order matters! Must be done before onParentLostFocus to rely
+                // on isShowingUp
+                hideControllers();
+                if (mSuggestionsPopupWindow != null) {
+                    mSuggestionsPopupWindow.onParentLostFocus();
+                }
+                // Don't leave us in the middle of a batch edit. Same as in
+                // onFocusChanged
+                ensureEndedBatchEdit();
             }
-        } else {
-            if (mBlink != null) {
-                mBlink.cancel();
-            }
-            if (mInputContentType != null) {
-                mInputContentType.enterDown = false;
-            }
-            // Order matters! Must be done before onParentLostFocus to rely on isShowingUp
-            hideControllers();
-            if (mSuggestionsPopupWindow != null) {
-                mSuggestionsPopupWindow.onParentLostFocus();
-            }
-
-            // Don't leave us in the middle of a batch edit. Same as in onFocusChanged
-            ensureEndedBatchEdit();
-        }
+        } 
     }
 
     void onTouchEvent(MotionEvent event) {
@@ -1533,23 +1540,24 @@ public class Editor {
                     "TextView does not support text selection. Action mode cancelled.");
             return false;
         }
-
-        if (!mTextView.hasSelection()) {
+        //selection is not present for 5700
+        /*if (!mTextView.hasSelection()) {
             // There may already be a selection on device rotation
             if (!selectCurrentWord()) {
                 // No word found under cursor or text selection not permitted.
                 return false;
             }
-        }
+        }*/
 
         boolean willExtract = extractedTextModeWillBeStarted();
 
         // Do not start the action mode when extracted text will show up full screen, which would
         // immediately hide the newly created action bar and would be visually distracting.
-        if (!willExtract) {
+        //if (!willExtract) {
+        //5700 actionmode is moved to menu options
             ActionMode.Callback actionModeCallback = new SelectionActionModeCallback();
             mSelectionActionMode = mTextView.startActionMode(actionModeCallback);
-        }
+        //}
 
         final boolean selectionStarted = mSelectionActionMode != null || willExtract;
         if (selectionStarted && !mTextView.isTextSelectable() && mShowSoftInputOnFocus) {
@@ -2754,13 +2762,8 @@ public class Editor {
 
                 // Restore previous SuggestionSpans
                 final int realSuggestionLength = mTextView.getText().toString().length();
-                int lengthDifference = suggestion.length() - (spanEnd - spanStart);
-                final int realSuggestionDiff = realSuggestionLength - (spanEnd - spanStart);
-
-                if (realSuggestionDiff < lengthDifference) {
-                    lengthDifference = realSuggestionDiff;
-                }
-
+                final int lengthDifference = suggestion.length() - (spanEnd - spanStart);
+                //final int lengthDifference = realSuggestionLength - (spanEnd - spanStart);
                 for (int i = 0; i < length; i++) {
                     // Only spans that include the modified region make sense after replacement
                     // Spans partially included in the replaced region are removed, there is no
@@ -2772,23 +2775,28 @@ public class Editor {
                         int spansEnd = suggestionSpansEnds[i] + lengthDifference;
                         int realSpansEnd = spansEnd > nTextLen ? nTextLen : spansEnd;
                         mTextView.setSpan_internal(suggestionSpans[i], suggestionSpansStarts[i],
-                                realSpansEnd, suggestionSpansFlags[i]);
+                                suggestionSpansEnds[i] + lengthDifference, suggestionSpansFlags[i]);
                     }
                 }
 
                 // Move cursor at the end of the replaced word
                 final int newCursorPosition = spanEnd + lengthDifference;
-                // When the SpansEnd beyond the length of mTextView here should avoid it.
-                int textLen = mTextView.getText().length();
-                int realNewCursorPosition = newCursorPosition > textLen ? textLen
-                        : newCursorPosition;
-                mTextView.setCursorPosition_internal(realNewCursorPosition, realNewCursorPosition);
+                mTextView.setCursorPosition_internal(newCursorPosition, newCursorPosition);
             }
 
             hide();
         }
     }
 
+
+
+    /**
+     * @hide
+     * depending upon the enabled value insert or replace functionality is triggered
+     **/
+    public void setPaste() {
+        mTextView.onTextContextMenuItem(TextView.ID_PASTE);
+    }
     /**
      * An ActionMode Callback class that is used to provide actions while in text selection mode.
      *
@@ -2806,41 +2814,43 @@ public class Editor {
                     com.android.internal.R.string.textSelectionCABTitle));
             mode.setSubtitle(null);
             mode.setTitleOptionalHint(true);
-
-            menu.add(0, TextView.ID_SELECT_ALL, 0, com.android.internal.R.string.selectAll).
+          //5700 select all is triggered from application context
+         /*   menu.add(0, TextView.ID_SELECT_ALL, 0, com.android.internal.R.string.selectAll).
                     setIcon(styledAttributes.getResourceId(
                             R.styleable.SelectionModeDrawables_actionModeSelectAllDrawable, 0)).
                     setAlphabeticShortcut('a').
                     setShowAsAction(
                             MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
-
-            if (mTextView.canCut()) {
+           //Always show cut in menu option
+            if (mTextView.canCut()) {*/
                 menu.add(0, TextView.ID_CUT, 0, com.android.internal.R.string.cut).
                     setIcon(styledAttributes.getResourceId(
-                            R.styleable.SelectionModeDrawables_actionModeCutDrawable, 0)).
-                    setAlphabeticShortcut('x').
-                    setShowAsAction(
+                            R.styleable.SelectionModeDrawables_actionModeCutDrawable, 0))
+                    .setShowAsAction(
                             MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
-            }
-
-            if (mTextView.canCopy()) {
+            /*}
+           //5700 always show copy in menu option
+            if (mTextView.canCopy()) {*/
                 menu.add(0, TextView.ID_COPY, 0, com.android.internal.R.string.copy).
                     setIcon(styledAttributes.getResourceId(
-                            R.styleable.SelectionModeDrawables_actionModeCopyDrawable, 0)).
-                    setAlphabeticShortcut('c').
-                    setShowAsAction(
+                            R.styleable.SelectionModeDrawables_actionModeCopyDrawable, 0))
+                    .setShowAsAction(
                             MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
-            }
-
+            ///}
+            //Paste is triggered from application context
             if (mTextView.canPaste()) {
                 menu.add(0, TextView.ID_PASTE, 0, com.android.internal.R.string.paste).
                         setIcon(styledAttributes.getResourceId(
-                                R.styleable.SelectionModeDrawables_actionModePasteDrawable, 0)).
-                        setAlphabeticShortcut('v').
-                        setShowAsAction(
+                                R.styleable.SelectionModeDrawables_actionModePasteDrawable, 0))
+                        .setShowAsAction(
                                 MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
             }
-
+            //Added new menu options to cancel selection
+            menu.add(0, TextView.ID_CANCEL, 0, com.android.internal.R.string.cancelSel).
+                    setIcon(styledAttributes.getResourceId(
+                            R.styleable.SelectionModeDrawables_actionModeSelectAllDrawable, 0)).
+                    setShowAsAction(
+                            MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
             styledAttributes.recycle();
 
             if (mCustomSelectionActionModeCallback != null) {
@@ -2851,7 +2861,8 @@ public class Editor {
             }
 
             if (menu.hasVisibleItems() || mode.getCustomView() != null) {
-                getSelectionController().show();
+                // Selection is not shown
+                // getSelectionController().show();
                 mTextView.setHasTransientState(true);
                 return true;
             } else {
@@ -2949,8 +2960,8 @@ public class Editor {
             mReplaceTextView.setVisibility(canSuggest ? View.VISIBLE : View.GONE);
 
             if (!canPaste && !canSuggest) return;
-
-            super.show();
+            //5700 layout should not been shown
+            super.hide();
         }
 
         @Override

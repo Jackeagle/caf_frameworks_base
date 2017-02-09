@@ -45,7 +45,16 @@ public class ActionBarPolicy {
     }
 
     public boolean showsOverflowMenuButton() {
-        return true;
+        //BORQS : 0032674: Overflow menu shown eventhough hard menu key available
+        //Considering this device dimensions and it has permanent menu key,
+        //overflow menu being removed and shown in hard menu key
+        // Modify to auto show overflow menu button by liuzhihao 20140303 start
+        // return true;
+        return !ViewConfiguration.get(mContext).hasPermanentMenuKey() ||
+                ((mContext.getResources().getConfiguration().uiMode &
+                        Configuration.UI_MODE_TYPE_TELEVISION) ==
+                        Configuration.UI_MODE_TYPE_TELEVISION);
+        // Modify to auto show overflow menu button by liuzhihao 20140303 end
     }
 
     public int getEmbeddedMenuWidthLimit() {

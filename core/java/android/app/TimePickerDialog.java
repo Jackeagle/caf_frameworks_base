@@ -26,6 +26,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TimePicker;
 import android.widget.TimePicker.OnTimeChangedListener;
+// Add DatePicker Focus for keypad support start
+import android.view.KeyEvent;
+// Add DatePicker Focus for keypad support end
 
 /**
  * A dialog that prompts the user for the time of day using a {@link TimePicker}.
@@ -134,9 +137,44 @@ public class TimePickerDialog extends AlertDialog
 
     @Override
     protected void onStop() {
-        tryNotifyTimeSet();
         super.onStop();
     }
+
+    // Add DatePicker Focus for keypad support start
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (!mTimePicker.is24HourView()) {
+                    if ((mTimePicker.getAmPmSpinner() != null)
+                        && (mTimePicker.getAmPmSpinner().hasFocus())) {
+                       if (getButton(BUTTON_POSITIVE) != null) {
+                           getButton(BUTTON_POSITIVE).requestFocus();
+                           return true;
+                       }
+                    }
+                } else if ((mTimePicker.getMinuteSpinner() != null)
+                    && (mTimePicker.getMinuteSpinner().hasFocus())) {
+                    if (getButton(BUTTON_POSITIVE) != null) {
+                        getButton(BUTTON_POSITIVE).requestFocus();
+                        return true;
+                    }
+                }
+                break;
+             case KeyEvent.KEYCODE_DPAD_LEFT:
+                 if ((mTimePicker.getHourSpinner() != null)
+                    && (mTimePicker.getHourSpinner().hasFocus())) {
+                     if (getButton(BUTTON_POSITIVE) != null) {
+                        getButton(BUTTON_POSITIVE).requestFocus();
+                        return true;
+                    }
+                }
+                break;
+            default: break;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+    // Add DatePicker Focus for keypad support end
 
     @Override
     public Bundle onSaveInstanceState() {

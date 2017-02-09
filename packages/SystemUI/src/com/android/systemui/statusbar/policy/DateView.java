@@ -33,6 +33,7 @@ import java.util.Date;
 import java.util.Locale;
 
 import libcore.icu.ICU;
+import android.text.format.DateFormat;
 
 public class DateView extends TextView {
     private static final String TAG = "DateView";
@@ -87,16 +88,10 @@ public class DateView extends TextView {
     }
 
     protected void updateClock() {
-        if (mDateFormat == null) {
-            final String dateFormat = getContext().getString(R.string.system_ui_date_pattern);
-            final Locale l = Locale.getDefault();
-            final String fmt = ICU.getBestDateTimePattern(dateFormat, l.toString());
-            mDateFormat = new SimpleDateFormat(fmt, l);
-        }
-
-        mCurrentTime.setTime(System.currentTimeMillis());
-
-        final String text = mDateFormat.format(mCurrentTime);
+        Date now = new Date();
+        CharSequence dow = DateFormat.format("EEEE", now);
+        CharSequence date = DateFormat.format("MMMM d", now);
+        final String text = getContext().getString(R.string.status_bar_date_formatter, dow, date);
         if (!text.equals(mLastText)) {
             setText(text);
             mLastText = text;

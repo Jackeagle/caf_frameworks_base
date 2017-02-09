@@ -24,6 +24,7 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.TextView;
+import android.provider.Settings;
 
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.IccCardConstants.State;
@@ -147,10 +148,21 @@ public class CarrierText extends TextView {
             CharSequence plmn, CharSequence spn) {
         CharSequence carrierText = null;
         StatusMode status = getStatusForIccState(simState);
-
+        int flightModeStatus = Settings.Global.getInt(
+                    getContext().getContentResolver(),
+                    Settings.Global.AIRPLANE_MODE_ON, 0);
         switch (status) {
             case Normal:
-                carrierText = concatenate(plmn, spn);
+                if(flightModeStatus==1) {
+                // Airplane mode is ON, so changed carried text
+                // to "Airplane Mode"
+                    carrierText =  makeCarrierStringOnEmergencyCapable(
+                        getContext().
+                        getText(R.string.keyguard_airplane_mode_label),
+                        plmn);
+                } else {
+                    carrierText =  concatenate(plmn, spn);
+                }
                 break;
 
             case SimNotReady:
@@ -167,9 +179,19 @@ public class CarrierText extends TextView {
                 // This depends on mPlmn containing the text "Emergency calls only" when the radio
                 // has some connectivity. Otherwise, it should be null or empty and just show
                 // "No SIM card"
-                carrierText =  makeCarrierStringOnEmergencyCapable(
-                        getContext().getText(R.string.keyguard_missing_sim_message_short),
+                if(flightModeStatus==1) {
+                // Airplane mode is ON, so changed carried text
+                // to "Airplane Mode"
+                    carrierText =  makeCarrierStringOnEmergencyCapable(
+                        getContext().
+                        getText(R.string.keyguard_airplane_mode_label),
                         plmn);
+                } else {
+                    carrierText =  makeCarrierStringOnEmergencyCapable(
+                        getContext().
+                        getText(R.string.keyguard_missing_sim_message_short),
+                        plmn);
+                }
                 break;
 
             case SimPermDisabled:

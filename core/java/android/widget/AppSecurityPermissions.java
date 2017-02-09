@@ -507,6 +507,14 @@ public class AppSecurityPermissions {
                     lp.topMargin *= 2;
                 }
                 permListView.addView(view, lp);
+                // Add focus for permission list view start
+                if (true) {
+                    for (int k = 0; k < permListView.getChildCount(); k++) {
+                        permListView.getChildAt(k).setFocusable(true);
+
+                    }
+                }
+                // Add focus for permission list view end
             }
         }
     }

@@ -365,6 +365,8 @@
   <java-symbol type="dimen" name="notification_subtext_size" />
   <java-symbol type="dimen" name="immersive_mode_cling_width" />
 
+  <java-symbol type="string" name="torch_on_seccondary_msg" />
+  <java-symbol type="string" name="torch_on_primary_msg" /> 
   <java-symbol type="string" name="add_account_button_label" />
   <java-symbol type="string" name="addToDictionary" />
   <java-symbol type="string" name="action_bar_home_description" />
@@ -1140,6 +1142,7 @@
   <java-symbol type="drawable" name="cling_bg" />
   <java-symbol type="drawable" name="ic_lock_power_reboot" />
   <java-symbol type="drawable" name="ic_lock_profile" />
+  <java-symbol type="drawable" name="ic_flash_light" />
 
   <java-symbol type="layout" name="action_bar_home" />
   <java-symbol type="layout" name="action_bar_title_item" />
@@ -1891,4 +1894,15 @@
   <java-symbol type="integer" name="ascrollboost_pcdisbl" />
 
   <java-symbol type="bool" name="config_addVibrateWithRingtoneOption" />
+  <!--Cancel selection support -->
+  <java-symbol type="id" name="cancelSel"/>
+  <java-symbol type="string" name="cancelSel" />
+
+  <java-symbol type="bool" name="config_ui_optimization"/>
+
+
+  <!-- Modify config_defaultNotificationColor to green liyang 20131226 start -->
+  <java-symbol type="color" name="config_defaultNotificationColor_Green" />
+  <!-- Modify config_defaultNotificationColor to green liyang 20131226 start -->
+
 </resources>

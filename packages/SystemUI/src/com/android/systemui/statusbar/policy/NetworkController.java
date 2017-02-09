@@ -69,7 +69,9 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
     // telephony
     boolean mHspaDataDistinguishable;
     private TelephonyManager mPhone;
-    boolean mDataConnected;
+    /* To refresh signal cluster */
+    boolean mDataConnected = false;
+    boolean mLastDataConnected = false;
     IccCardConstants.State mSimState = IccCardConstants.State.READY;
     int mPhoneState = TelephonyManager.CALL_STATE_IDLE;
     int mDataNetType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
@@ -183,7 +185,7 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                 String contentDescription);
         void setMobileDataIndicators(boolean visible, int strengthIcon, int activityIcon,
                 int typeIcon, String contentDescription, String typeContentDescription,
-                int noSimIcon);
+                int noSimIcon, int dataState);
         void setIsAirplaneMode(boolean is, int airplaneIcon);
     }
 
@@ -329,6 +331,15 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                 mWifiIconId,
                 mWifiActivityIconId,
                 mContentDescriptionWifi);
+        cluster.setMobileDataIndicators(
+                mHasMobileDataFeature,
+                mPhoneSignalIconId,
+                mMobileActivityIconId,
+                mDataTypeIconId,
+                mContentDescriptionPhoneSignal,
+                mContentDescriptionDataType,
+                mNoSimIconId,
+                mDataState);
 
         if (mIsWimaxEnabled && mWimaxConnected) {
             // wimax is special
@@ -339,7 +350,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                     mDataTypeIconId,
                     mContentDescriptionWimax,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mDataState);
         } else {
             // normal mobile data
             cluster.setMobileDataIndicators(
@@ -349,7 +361,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                     mDataTypeIconId,
                     mContentDescriptionPhoneSignal,
                     mContentDescriptionDataType,
-                    mNoSimIconId);
+                    mNoSimIconId,
+                    mDataState);
             if (DEBUG) {
                 Log.d(TAG, "refreshSignalCluster - setMobileDataIndicators: "
                         + " mHasMobileDataFeature = " + String.valueOf(mHasMobileDataFeature)
@@ -1329,7 +1342,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
          || mLastLocale                     != mLocale
          || mLastSimIconId                  != mNoSimIconId
          || mLastMobileActivityIconId       != mMobileActivityIconId
-         || mLastServiceState.getVoiceNetworkType() != getVoiceNetworkType())
+         || mLastServiceState.getVoiceNetworkType() != getVoiceNetworkType()
+         || mLastDataConnected              != mDataConnected)
         {
             // NB: the mLast*s will be updated later
             for (SignalCluster cluster : mSignalClusters) {
@@ -1394,6 +1408,11 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                 TextView v = mCombinedLabelViews.get(i);
                 v.setText(combinedLabel);
             }
+        }
+
+        /* Store changed data connection state */
+        if (mLastDataConnected != mDataConnected) {
+            mLastDataConnected = mDataConnected;
         }
 
         // wifi label
@@ -1677,7 +1696,8 @@ public class NetworkController extends BroadcastReceiver implements DemoMode {
                             mDemoDataTypeIconId,
                             "Demo",
                             "Demo",
-                            mNoSimIconId);
+                            mNoSimIconId,
+                            mDataState);
                 }
             }
         }

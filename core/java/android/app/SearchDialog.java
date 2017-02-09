@@ -172,6 +172,19 @@ public class SearchDialog extends Dialog {
         mSearchView.setOnCloseListener(mOnCloseListener);
         mSearchView.setOnQueryTextListener(mOnQueryChangeListener);
         mSearchView.setOnSuggestionListener(mOnSuggestionSelectionListener);
+        // added for Messaging issue of after Back, unable to type Bug 54659 in XP5
+        mSearchView.setOnQueryTextFocusChangeListener( new View.OnFocusChangeListener() {
+
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if(!hasFocus)
+                {
+                    // if SearchView has lost focus, dismiss dialog
+                    onBackPressed();
+                }
+            }
+        });
+        // end of changes for Messaging search issue of after Back, unable to type Bug 54659 in XP5
         mSearchView.onActionViewExpanded();
 
         mCloseSearch = findViewById(com.android.internal.R.id.closeButton);

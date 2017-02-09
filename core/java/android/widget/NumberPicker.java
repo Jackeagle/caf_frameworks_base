@@ -948,17 +948,33 @@ public class NumberPicker extends LinearLayout {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
+            // Add fix keypad is unable to enter the text in numberpicker start
+            if (true) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    if (mInputText.hasFocus()) {
+                        removeAllCallbacks();
+                    } else {
+                        showSoftInput();
+                        mInputText.setFocusableInTouchMode(true);
+                        mInputText.setFocusable(true);
+                        mInputText.requestFocus();
+                        return true;
+                    }
+                }
+             } else {
                 removeAllCallbacks();
+             }
+             // Add fix keypad is unable to enter the text in numberpicker end
                 break;
             case KeyEvent.KEYCODE_DPAD_DOWN:
             case KeyEvent.KEYCODE_DPAD_UP:
-                if (!mHasSelectorWheel) {
-                    break;
-                }
-                switch (event.getAction()) {
-                    case KeyEvent.ACTION_DOWN:
-                        if (mWrapSelectorWheel || (keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
-                                ? getValue() < getMaxValue() : getValue() > getMinValue()) {
+                // Modify to Set date and time function for Calendar keypad support start
+                if (true){
+                    if (!mHasSelectorWheel) {
+                        break;
+                    }
+                    switch (event.getAction()) {
+                        case KeyEvent.ACTION_DOWN:
                             requestFocus();
                             mLastHandledDownDpadKeyCode = keyCode;
                             removeAllCallbacks();
@@ -966,14 +982,13 @@ public class NumberPicker extends LinearLayout {
                                 changeValueByOne(keyCode == KeyEvent.KEYCODE_DPAD_DOWN);
                             }
                             return true;
-                        }
-                        break;
-                    case KeyEvent.ACTION_UP:
-                        if (mLastHandledDownDpadKeyCode == keyCode) {
-                            mLastHandledDownDpadKeyCode = -1;
-                            return true;
-                        }
-                        break;
+                        case KeyEvent.ACTION_UP:
+                            if (mLastHandledDownDpadKeyCode == keyCode) {
+                                mLastHandledDownDpadKeyCode = -1;
+                                return true;
+                            }
+                            break;
+                    }
                 }
         }
         return super.dispatchKeyEvent(event);
@@ -1629,7 +1644,8 @@ public class NumberPicker extends LinearLayout {
      */
      private void changeValueByOne(boolean increment) {
         if (mHasSelectorWheel) {
-            mInputText.setVisibility(View.INVISIBLE);
+            //Commented because cursor jumps unnecessarily
+            //mInputText.setVisibility(View.INVISIBLE);
             if (!moveToFinalScrollerPosition(mFlingScroller)) {
                 moveToFinalScrollerPosition(mAdjustScroller);
             }

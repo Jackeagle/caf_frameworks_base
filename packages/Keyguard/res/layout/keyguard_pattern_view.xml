@@ -44,35 +44,30 @@
 
             <include layout="@layout/keyguard_message_area"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-               />
+                android:layout_height="wrap_content" />
 
-          <FrameLayout
-             android:id="@+id/keyguard_bouncer_frame"
-             android:background="@drawable/kg_bouncer_bg_white"
-             android:layout_width="match_parent"
-             android:layout_height="0dp"
-             android:layout_weight="1"
-             >
-            <com.android.internal.widget.LockPatternView
-                android:id="@+id/lockPatternView"
+            <FrameLayout
+                android:id="@+id/keyguard_bouncer_frame"
+                android:background="@drawable/kg_bouncer_bg_white"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dip"
-                android:layout_marginBottom="4dip"
-                android:layout_marginStart="8dip"
-                android:layout_gravity="center_horizontal"
-                android:gravity="center"
-                android:contentDescription="@string/keyguard_accessibility_pattern_area" />
-          </FrameLayout>
-          <include layout="@layout/keyguard_eca"
-              android:id="@+id/keyguard_selector_fade_container"
-              android:layout_width="match_parent"
-              android:layout_height="wrap_content"
-              android:orientation="vertical"
-              android:layout_gravity="bottom|center_horizontal"
-              android:gravity="center_horizontal" />
+                android:layout_height="0dp"
+                android:layout_weight="1" >
+                <com.android.internal.widget.LockPatternView
+                    android:id="@+id/lockPatternView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_gravity="center_horizontal"
+                    android:gravity="center"
+                    android:contentDescription="@string/keyguard_accessibility_pattern_area" />
+            </FrameLayout>
+            <include layout="@layout/keyguard_eca"
+                android:id="@+id/keyguard_selector_fade_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_gravity="bottom|center_horizontal"
+            android:gravity="center_horizontal" />
         </LinearLayout>
     </FrameLayout>
 

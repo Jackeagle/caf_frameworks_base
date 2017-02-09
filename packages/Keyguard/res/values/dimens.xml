@@ -71,7 +71,7 @@
     <dimen name="kg_status_clock_font_size">75dp</dimen>
 
     <!-- Size of the generic status lines keyguard's status view  -->
-    <dimen name="kg_status_line_font_size">12dp</dimen>
+    <dimen name="kg_status_line_font_size">14dp</dimen>
 
     <!-- Size of margin on the right of keyguard's status view -->
     <dimen name="kg_status_line_font_right_margin">16dp</dimen>
@@ -155,7 +155,7 @@
     <dimen name="eca_overlap">-10dip</dimen>
 
     <!-- Default clock parameters -->
-    <dimen name="bottom_text_spacing_digital">-8dp</dimen>
+    <dimen name="bottom_text_spacing_digital">-6dp</dimen>
     <dimen name="label_font_size">14dp</dimen>
     <dimen name="widget_label_font_size">14dp</dimen>
     <dimen name="widget_big_font_size">80dp</dimen>

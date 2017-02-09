@@ -81,8 +81,9 @@ public class ListView extends AbsListView {
     /**
      * When arrow scrolling, ListView will never scroll more than this factor
      * times the height of the list.
+     * Change for XP5 58132 issue. was 0.33f
      */
-    private static final float MAX_SCROLL_FACTOR = 0.33f;
+    private static final float MAX_SCROLL_FACTOR = 0.5f;
 
     /**
      * When arrow scrolling, need a certain amount of pixels to preview next

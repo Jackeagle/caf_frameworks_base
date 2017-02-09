@@ -68,7 +68,8 @@ public class ArrowKeyMovementMethod extends BaseMovementMethod implements Moveme
     @Override
     protected boolean left(TextView widget, Spannable buffer) {
         final Layout layout = widget.getLayout();
-        if (isSelecting(buffer)) {
+        //In Selectionmode the cursor should not be visible and the highlight should occur
+        if (isSelecting(buffer) || widget.getSelectionFlag()) {
             return Selection.extendLeft(buffer, layout);
         } else {
             return Selection.moveLeft(buffer, layout);
@@ -78,7 +79,8 @@ public class ArrowKeyMovementMethod extends BaseMovementMethod implements Moveme
     @Override
     protected boolean right(TextView widget, Spannable buffer) {
         final Layout layout = widget.getLayout();
-        if (isSelecting(buffer)) {
+        //In Selectionmode the cursor should not be visible and the highlight should occur
+        if (isSelecting(buffer) || widget.getSelectionFlag()) {
             return Selection.extendRight(buffer, layout);
         } else {
             return Selection.moveRight(buffer, layout);
@@ -88,7 +90,8 @@ public class ArrowKeyMovementMethod extends BaseMovementMethod implements Moveme
     @Override
     protected boolean up(TextView widget, Spannable buffer) {
         final Layout layout = widget.getLayout();
-        if (isSelecting(buffer)) {
+        //In Selectionmode the cursor should not be visible and the highlight should occur
+        if (isSelecting(buffer) || widget.getSelectionFlag()) {
             return Selection.extendUp(buffer, layout);
         } else {
             return Selection.moveUp(buffer, layout);
@@ -98,7 +101,8 @@ public class ArrowKeyMovementMethod extends BaseMovementMethod implements Moveme
     @Override
     protected boolean down(TextView widget, Spannable buffer) {
         final Layout layout = widget.getLayout();
-        if (isSelecting(buffer)) {
+        //In Selectionmode the cursor should not be visible and the highlight should occur
+        if (isSelecting(buffer) || widget.getSelectionFlag()) {
             return Selection.extendDown(buffer, layout);
         } else {
             return Selection.moveDown(buffer, layout);

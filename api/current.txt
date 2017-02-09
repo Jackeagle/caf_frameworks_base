@@ -21790,7 +21790,7 @@ package android.renderscript {
   }
 
   public class BaseObj {
-    method public synchronized void destroy();
+    method public void destroy();
     method public java.lang.String getName();
     method public void setName(java.lang.String);
   }
@@ -28769,6 +28769,7 @@ package android.view {
     field public static final deprecated int MEMORY_TYPE_HARDWARE = 1; // 0x1
     field public static final deprecated int MEMORY_TYPE_NORMAL = 0; // 0x0
     field public static final deprecated int MEMORY_TYPE_PUSH_BUFFERS = 3; // 0x3
+    field public static final int PRIVATE_FLAG_FORCE_SHOW_NAV_BAR = 32; // 0x20
     field public static final int ROTATION_ANIMATION_CHANGED = 4096; // 0x1000
     field public static final int ROTATION_ANIMATION_CROSSFADE = 1; // 0x1
     field public static final int ROTATION_ANIMATION_JUMPCUT = 2; // 0x2

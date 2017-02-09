@@ -296,6 +296,8 @@
        <item>@drawable/quickcontact_badge_overlay_light</item>
        <item>@drawable/quickcontact_badge_overlay_normal_light</item>
        <item>@drawable/quickcontact_badge_overlay_pressed_light</item>
+       <item>@drawable/ic_cab_done_holo_dark_custom</item>
+       <item>@drawable/ic_cab_done_holo_light_custom</item>
     </array>
 
     <!-- Do not translate. These are all of the color state list resources that should be

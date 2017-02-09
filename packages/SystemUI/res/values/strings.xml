@@ -172,7 +172,7 @@
     <!-- Notification title displayed when a screenshot is saved to the Gallery. [CHAR LIMIT=50] -->
     <string name="screenshot_saved_title">Screenshot captured.</string>
     <!-- Notification text displayed when a screenshot is saved to the Gallery. [CHAR LIMIT=100] -->
-    <string name="screenshot_saved_text">Touch to view your screenshot.</string>
+    <string name="screenshot_saved_text">Press OK to view your screenshot.</string>
     <!-- Notification title displayed when we fail to take a screenshot. [CHAR LIMIT=50] -->
     <string name="screenshot_failed_title">Couldn\'t capture screenshot.</string>
     <!-- Notification text displayed when we fail to take a screenshot. [CHAR LIMIT=100] -->
@@ -457,7 +457,7 @@
     <!-- QuickSettings: Battery Charged [CHAR LIMIT=NONE] -->
     <string name="quick_settings_battery_charged_label">Charged</string>
     <!-- QuickSettings: Bluetooth [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_bluetooth_label">Bluetooth</string>
+    <string name="quick_settings_bluetooth_label">Bluetooth On</string>
     <!-- QuickSettings: Bluetooth (Multiple) [CHAR LIMIT=NONE] -->
     <string name="quick_settings_bluetooth_multiple_devices_label">Bluetooth (<xliff:g id="number">%d</xliff:g> Devices)</string>
     <!-- QuickSettings: Bluetooth (Off) [CHAR LIMIT=NONE] -->
@@ -491,7 +491,7 @@
     <!-- QuickSettings: User [CHAR LIMIT=NONE] -->
     <string name="quick_settings_user_label">Owner</string>
     <!-- QuickSettings: Wifi [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_wifi_label">Wi-Fi</string>
+    <string name="quick_settings_wifi_label">Wi-Fi On</string>
     <!-- QuickSettings: Wifi (Not connected) [CHAR LIMIT=NONE] -->
     <string name="quick_settings_wifi_not_connected">Not Connected</string>
     <!-- QuickSettings: Wifi (No network) [CHAR LIMIT=NONE] -->
@@ -536,4 +536,15 @@
 
     <string name="roamingTextSearching">Searching for Service</string>
     <string name="quick_settings_dds_sub">Card <xliff:g id="number">%d</xliff:g> data</string>
+    <string name="no_clearable_notification">This notification can not be cleared</string>
+
+   <string name="no_notification">No notifications</string>
+   <string name="clear">Clear</string>
+   <string name="clearAll">Clear All</string>
+   <string name="my_notifications">My Notifications</string>
+
+   <string name="battery_full_title">Battery is Full.</string>
+   <string name="battery_full_subtitle">Please Unplug the Charger</string>
+   <string name="quick_settings_mobile_data_label">Data Menu</string>
+   <string name="accessibility_phone_four_bars">Phone four bars.</string>
 </resources>

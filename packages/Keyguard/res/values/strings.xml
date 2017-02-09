@@ -78,6 +78,7 @@
          charged, say that it is charged. -->
     <string name="keyguard_charged">Charged</string>
 
+    <string name="keyguard_charged_att">Battery is full.Please unplug the device.</string>
     <!-- When the lock screen is showing and the phone plugged in, and the battery
          is not fully charged, show the current charge %.  -->
     <string name="keyguard_plugged_in">Charging, <xliff:g id="number">%d</xliff:g><xliff:g id="percent">%%</xliff:g></string>
@@ -268,7 +269,7 @@
     <!-- Instructions for using the PIN unlock screen -->
     <string name="kg_pin_instructions">Enter PIN</string>
     <!-- Instructions for using the password unlock screen -->
-    <string name="kg_password_instructions">Enter Password</string>
+    <string name="kg_password_instructions">Password</string>
     <!-- Hint shown in the PUK screen that asks the user to enter the PUK code given to them by their provider -->
     <string name="kg_puk_enter_puk_hint">SIM is now disabled. Enter PUK code to continue. Contact carrier for details.</string>
     <!-- Hint shown in the PUK unlock screen PIN TextView -->
@@ -428,4 +429,21 @@
     <string name="unknown_artist_name">Unknown artist</string>
     <string name="unknown_title_name">Unknown title</string>
     <string name="unknown_album_name">Unknown album</string>
+
+    <string name="lockscreen_longpress_star_unlock">"Press &amp; hold <![CDATA[ <img src="ic_star.png"/>]]> to unlock."</string>
+    <string name="kg_hint_text_to_release_key_to_unlock">Release \u0020 <![CDATA[ <img src="ic_star.png"/>]]> \u0020 to unlock</string>
+
+    <!-- Add strign to be shown in the keyguard when airplane mode is On -->
+    <string name="keyguard_airplane_mode_label">Airplane mode</string>
+    <!-- Notification that PIN1 is unblocked -->
+    <string name="pin1_unblock_success">PIN is unblocked</string>
+    <string name="emergency_dialog_title">Emergency</string>
+    <string name="emergency_dialog_not_valid_number">Not an emergency number</string>
+    <string name="emergency_dialog_valid_num_msg">Do you want make Emergency call?</string>
+
+    <string name="keyguard_enter_puk_number">Enter PUK</string>
+    <string name="kg_new_sim_pin_instructions">New SIM PIN</string>
+    <string name="kg_confrim_sim_pin_instructions">Confirm SIM PIN</string>
+    <string name="kg_puk_wrong_puk">Wrong PUK</string>
+    <string name="kg_puk_wrong_pin">Wrong SIM PIN</string>
 </resources>

@@ -84,6 +84,9 @@ public abstract class AbsSeekBar extends ProgressBar {
         a.recycle();
 
         mScaledTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+
+        //Need default focus when launch from keypad
+        requestFocus();
     }
 
     /**

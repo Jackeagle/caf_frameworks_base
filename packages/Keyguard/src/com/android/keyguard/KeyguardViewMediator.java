@@ -61,7 +61,7 @@ import android.view.WindowManagerPolicy;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.widget.LockPatternUtils;
 
-
+import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
 /**
  * Mediates requests related to the keyguard.  This includes queries about the
  * state of the keyguard, power management events that effect whether the keyguard
@@ -185,6 +185,12 @@ public class KeyguardViewMediator {
      * we sleep.
      */
     private PowerManager.WakeLock mShowKeyguardWakeLock;
+
+    //<CDR-EAS-510> Start
+    private PowerManager.WakeLock mTimeoutWakeLock;
+    private boolean  mLockTimeoutFeatureEnabled = false;
+    private int mLockAfterTimeout = KEYGUARD_LOCK_AFTER_DELAY_DEFAULT;
+    //<CDR-EAS-510> End
 
     private KeyguardViewManager mKeyguardViewManager;
 
@@ -927,14 +933,16 @@ public class KeyguardViewMediator {
             return;
         }
 
-        if (mUserManager.getUsers(true).size() < 2
-                && mLockPatternUtils.isLockScreenDisabled() && !lockedOrMissing) {
+        if (mUserManager.getUsers(true).size() < 2 &&
+                 mLockPatternUtils.isLockScreenDisabled() &&  !lockedOrMissing) {
             if (DEBUG) Log.d(TAG, "doKeyguard: not showing because lockscreen is off");
             return;
         }
 
-        if (mLockPatternUtils.getActiveProfileLockMode() == Profile.LockMode.DISABLE) {
-            if (DEBUG) Log.d(TAG, "isKeyguardDisabled: keyguard is disabled by profile");
+        if (mUserManager.getUsers(true).size() < 2 && !lockedOrMissing &&
+                 KeyguardService.isPhoneTypeTouch) {
+            if (DEBUG) Log.d(TAG, "doKeyguard: not showing because lockscreen is off");
+            hideLocked();
             return;
         }
 
@@ -1395,6 +1403,17 @@ public class KeyguardViewMediator {
                 && mSearchManager.getAssistIntent(mContext, false, UserHandle.USER_CURRENT) != null;
     }
 
+    /** <CDR-EAS-510> Start
+     * This will return true if insecure lock screen is being shown in
+     * secure mode.
+     * Use case: We show slide to unlock till lock after timeout is
+     * reached.
+    */
+    boolean isInsecureShowingInSecureMode() {
+        return mLockPatternUtils.isSecure()
+          && mUpdateMonitor.getCurrentSecuritySelection() == SecurityMode.None;
+    }
+
     public static MultiUserAvatarCache getAvatarCache() {
         return sMultiUserAvatarCache;
     }
@@ -1412,4 +1431,32 @@ public class KeyguardViewMediator {
     public void onBootCompleted() {
         mUpdateMonitor.dispatchBootCompleted();
     }
+
+    //Delay of 300MS is necessary to avoid a ugly flicker causes when
+    //display timeout lock after timeout is same
+    private static final int DELAY_TIME = 300;
+    private Handler timeoutHandler = new Handler();
+    private Runnable mScreenLockTimeout = new Runnable(){
+        public void run() {
+            if(mLockPatternUtils.isSecure()){
+                if((mShowing && !isInsecureShowingInSecureMode()) ||
+                    (mLockPatternUtils.getDevicePolicyManager()
+                      .getMaximumTimeToLock(null)) <= 0) {
+                    return; //already being shown or policy is removed after
+                           //the intent got trigerred
+                }
+               if(mPM.isScreenOn()) {
+                   if(!isInsecureShowingInSecureMode()) {
+                      mUpdateMonitor.setTimeoutInProgress(false);
+                        doKeyguardLocked(null);
+                   }
+               } else {
+                   mUpdateMonitor.setTimeoutInProgress(false);
+                   doKeyguardLocked(null);
+               }
+           }
+           mTimeoutWakeLock.release();
+       }
+     };
+      /* <CDR-EAS-510> End */
 }

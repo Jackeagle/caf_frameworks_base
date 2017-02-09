@@ -82,6 +82,9 @@ import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.AdapterView;
 
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -672,6 +675,8 @@ public class Activity extends ContextThemeWrapper
     private static final String SAVED_DIALOGS_TAG = "android:savedDialogs";
     private static final String SAVED_DIALOG_KEY_PREFIX = "android:dialog_";
     private static final String SAVED_DIALOG_ARGS_KEY_PREFIX = "android:dialog_args_";
+    private ActionMode mMode = null;
+    private ActionMode.Callback mcallback =null;
 
     private static class ManagedDialog {
         Dialog mDialog;
@@ -2643,6 +2648,16 @@ public class Activity extends ContextThemeWrapper
                 if (onOptionsItemSelected(item)) {
                     return true;
                 }
+
+                //Null check done to check if callback exist
+                if (mcallback!=null) {
+                   //when actionmode item is clicked from menu option this will initiate the action
+                   //to be performed
+                   if(mcallback.onActionItemClicked(mMode,item)) {
+                      return true;
+                   }
+                }
+
                 if (mFragments.dispatchOptionsItemSelected(item)) {
                     return true;
                 }
@@ -5027,7 +5042,10 @@ public class Activity extends ContextThemeWrapper
      * @see ActionMode
      */
     public ActionMode startActionMode(ActionMode.Callback callback) {
-        return mWindow.getDecorView().startActionMode(callback);
+        //Initialised the callback/mode when actionmode is initialised
+        mcallback = callback;
+        mMode = mWindow.getDecorView().startActionMode(callback);
+        return mMode;
     }
 
     /**
@@ -5044,8 +5062,11 @@ public class Activity extends ContextThemeWrapper
     @Override
     public ActionMode onWindowStartingActionMode(ActionMode.Callback callback) {
         initActionBar();
+        mcallback = callback;
         if (mActionBar != null) {
-            return mActionBar.startActionMode(callback);
+          //initialisation of mode and callback to be called when onMenuclick
+          mMode = mActionBar.startActionMode(callback);
+          return mMode;
         }
         return null;
     }
@@ -5058,6 +5079,11 @@ public class Activity extends ContextThemeWrapper
      */
     @Override
     public void onActionModeStarted(ActionMode mode) {
+
+        // Applications can override this api and set the action mode
+        // this mode is required for onActionItemClicked api to trigger
+        // the action on Click
+        mMode = mode;
     }
 
     /**

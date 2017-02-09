@@ -35,12 +35,16 @@ import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.media.RemoteControlClient;
 import android.os.Looper;
 import android.os.Parcel;
@@ -55,14 +59,46 @@ import android.util.Log;
 import android.util.Slog;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.view.View;
 import android.view.ViewStub;
 import android.view.WindowManager;
 import android.widget.RemoteViews.OnClickHandler;
+import android.widget.ImageButton;
+import android.os.Handler;
+import android.content.BroadcastReceiver;
 
+import java.io.FileNotFoundException;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.List;
+
+
+import android.text.Html;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.ComponentName;
+import android.app.ActivityManager;
+import android.service.notification.StatusBarNotification;
+import android.app.INotificationManager;
+import android.os.ServiceManager;
+import android.service.notification.INotificationListener;
+import android.os.RemoteException;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.ComponentName;
+import android.database.Cursor;
+import android.app.ActivityManager;
+import android.net.Uri;
+import android.provider.CallLog;
+import android.os.Message;
+
+import java.util.StringTokenizer;
+import android.os.SystemProperties;
+import android.app.Notification;
 
 public class KeyguardHostView extends KeyguardViewBase {
     private static final String TAG = "KeyguardHostView";
@@ -128,6 +164,23 @@ public class KeyguardHostView extends KeyguardViewBase {
 
     private Runnable mPostBootCompletedRunnable;
 
+    //Handler/Textviews Objects need to show the notifications
+    private Handler mHd;
+    private INotificationManager mNm;
+    private TextView mMissedCount;
+    private TextView mVoiceCount;
+    private TextView mMsgCount;
+    private Notificationdata mNdata;
+    private  static String  APPLICATION_PHONE = "com.android.phone";
+    private  static String  APPLICATION_SMS = "com.android.mms";
+    private  static String  APPLICATION_PROCESS = "com.android.systemui";
+    private  static String  MAX_COUNT = "99+";
+    private  static final int APP_PHONE_COUNT = 1;
+    private  static final int APP_MSG_COUNT = 2;
+    private  static final int APP_ALL_COUNT = 3;
+    private  static final int APP_VOICE_COUNT = 4;
+    private  static String VOICE_MAIL = "voicemail";
+    private  static String VOICE_MAIL_SPANISH = "Correo de voz";
     /*package*/ interface UserSwitcherCallback {
         void hideSecurityView(int duration);
         void showSecurityView();
@@ -208,7 +261,7 @@ public class KeyguardHostView extends KeyguardViewBase {
             Log.v(TAG, "Keyguard secure camera disabled by DPM");
         }
     }
-
+    
     public void announceCurrentSecurityMethod() {
         View v = (View) getSecurityView(mCurrentSecuritySelection);
         if (v != null) {
@@ -304,17 +357,23 @@ public class KeyguardHostView extends KeyguardViewBase {
 
     private static final boolean isMusicPlaying(int playbackState) {
         // This should agree with the list in AudioService.isPlaystateActive()
-        switch (playbackState) {
-            case RemoteControlClient.PLAYSTATE_PLAYING:
-            case RemoteControlClient.PLAYSTATE_BUFFERING:
-            case RemoteControlClient.PLAYSTATE_FAST_FORWARDING:
-            case RemoteControlClient.PLAYSTATE_REWINDING:
-            case RemoteControlClient.PLAYSTATE_SKIPPING_BACKWARDS:
-            case RemoteControlClient.PLAYSTATE_SKIPPING_FORWARDS:
-                return true;
-            default:
-                return false;
-        }
+        //Modify remove the  playmusic interface in the lockscreen by zhangchen 20140116 start
+        if (!KeyguardService.isPhoneTypeTouch) {
+           return false;
+       } else {
+            switch (playbackState) {
+               case RemoteControlClient.PLAYSTATE_PLAYING:
+               case RemoteControlClient.PLAYSTATE_BUFFERING:
+               case RemoteControlClient.PLAYSTATE_FAST_FORWARDING:
+               case RemoteControlClient.PLAYSTATE_REWINDING:
+               case RemoteControlClient.PLAYSTATE_SKIPPING_BACKWARDS:
+               case RemoteControlClient.PLAYSTATE_SKIPPING_FORWARDS:
+                  return true;
+               default:
+                  return false;
+            }
+       }
+        //Modify remove the  playmusic interface in the lockscreen by zhangchen 20140116 end
     }
 
     private SlidingChallengeLayout mSlidingChallengeLayout;
@@ -354,9 +413,233 @@ public class KeyguardHostView extends KeyguardViewBase {
         return -1;
     }
 
+    private INotificationListener.Stub mListener = new INotificationListener.Stub() {
+        // Callbacks to listen to post of data on the notification
+        @Override
+        public void onNotificationPosted(StatusBarNotification notification)
+                throws RemoteException {
+            if (notification != null
+                    && (notification.getPackageName() != null && (notification
+                            .getPackageName().equals(APPLICATION_PHONE) || notification
+                            .getPackageName().equals(APPLICATION_SMS)))) {
+                //flag is true so that notificaiton query  happens
+                Runnable r = new QueryThread(notification,true);
+                new Thread(r).start();
+           }
+        }
+
+        // Callbacks to listen to remove of data on the notification
+        @Override
+        public void onNotificationRemoved(StatusBarNotification notification)
+                throws RemoteException {
+            if (notification != null
+                    && (notification.getPackageName().equals(APPLICATION_PHONE))) {
+                String voice_text = notification.getNotification().extras
+                        .getString(Notification.EXTRA_TITLE);
+                if (voice_text != null
+                        && (voice_text.contains(VOICE_MAIL) || voice_text
+                                .contains(VOICE_MAIL_SPANISH)))  {
+                    //reset the count to 0 if voicemail notification was cleared
+                    KeyguardService.vmcount = 0;
+                }
+            }
+        }
+    };
+
+    class Notificationdata {
+
+        private String missedcount;
+        private String msgcount;
+        private String voicecount;
+    }
+
+    private int getSmsMsgCount() {
+        int count = 0;
+        final Uri SMS_INBOX = Uri.parse("content://sms/inbox");
+        Cursor c = mContext.getContentResolver().query(SMS_INBOX,
+                new String[] { "address" }, "read = 0", null, null);
+        if (c != null) {
+            count = c.getCount();
+            c.close();
+        }
+        return count;
+    }
+
+    private int getMmsMsgCount() {
+        int count = 0;
+        final Uri MMS_INBOX = Uri.parse("content://mms/inbox");
+        Cursor mmscursor = mContext.getContentResolver().query(MMS_INBOX,
+                new String[] { "*" }, "read = 0", null, null);
+        if (null != mmscursor) {
+            count = mmscursor.getCount();
+            mmscursor.close();
+        }
+        return count;
+    }
+    class QueryThread extends Thread {
+
+        private StatusBarNotification sb;
+        private boolean isPhone;
+        public QueryThread(StatusBarNotification sb, boolean flag) {
+            this.sb = sb;
+            this.isPhone = flag;
+        }
+        @Override
+        public void run() {
+            Message msg = new Message();
+            Notificationdata nd = new Notificationdata();
+            // query Messaging db
+            if (sb == null || sb.getPackageName().equals(APPLICATION_SMS)) {
+                msg.what = APP_MSG_COUNT;
+                int totalcount = getSmsMsgCount() + getMmsMsgCount();
+                if (totalcount < 100) {
+                  if (totalcount == 0) {
+                      nd.msgcount = null;
+                  } else {
+                      nd.msgcount = String.valueOf(totalcount);
+                  }
+              } else {
+                  nd.msgcount = MAX_COUNT;
+              }
+            }
+            // query Call db
+            if (sb == null || sb.getPackageName().equals(APPLICATION_PHONE)) {
+                /* Flag determines whether to query notification or db
+                   when notifiction get posted the db insertion is asyn
+                   so the query of db doesnot give the right value */
+                if (!isPhone) {
+                    String[] projection = { CallLog.Calls.CACHED_NAME,
+                            CallLog.Calls.NUMBER };
+                    String where = CallLog.Calls.TYPE + "="
+                            + CallLog.Calls.MISSED_TYPE + " AND "
+                            + CallLog.Calls.IS_READ + " = 0";
+                    Cursor c = mContext.getContentResolver().query(
+                            CallLog.Calls.CONTENT_URI, projection, where, null,
+                            null);
+                    if (c != null) {
+                        msg.what = APP_PHONE_COUNT;
+                        if (c.getCount() < 100) {
+                            if (c.getCount() == 0) {
+                                nd.missedcount = null;
+                            } else {
+                                nd.missedcount = String.valueOf(c.getCount());
+                            }
+                        } else {
+                            nd.missedcount = MAX_COUNT;
+                        }
+                        c.close();
+                    }
+                    try {
+                        if (mContext != null && mNm != null) {
+                            StatusBarNotification[] active = mNm
+                                    .getActiveNotifications(mContext
+                                            .getApplicationInfo().packageName);
+                            if (active != null) {
+                                for (StatusBarNotification sbn : active) {
+                                    if (sbn != null
+                                            && sbn.getPackageName().equals(
+                                                    APPLICATION_PHONE)) {
+                                        String voice_text = sb
+                                                .getNotification().extras
+                                                .getString(Notification.EXTRA_TITLE);
+                                        if (voice_text != null
+                                                && (voice_text
+                                                        .contains(VOICE_MAIL) || voice_text
+                                                        .contains(VOICE_MAIL_SPANISH))) {
+                                            int count = Integer
+                                                    .parseInt(voice_text.substring(
+                                                            voice_text
+                                                                    .indexOf("(") + 1,
+                                                            voice_text
+                                                                    .indexOf(")")));
+                                            KeyguardService.vmcount = count;
+                                            msg.what = APP_VOICE_COUNT;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        Log.d(TAG, "exception" + e);
+                    }
+                } else {
+                    /* check for voice mail notification string ,parse
+                     * it and get the count and update the Count
+                     */
+                    String voice_text = sb.getNotification().extras
+                            .getString(Notification.EXTRA_TITLE);
+                    if (voice_text != null
+                            && (voice_text.contains(VOICE_MAIL) || voice_text
+                                    .contains(VOICE_MAIL_SPANISH))) {
+                        int count = 0;
+                        int index1 = voice_text.indexOf("(");
+                        int index2 = voice_text.indexOf(")");
+                        if ( index1 != -1 && index2 != -1) {
+                            count = Integer.parseInt(voice_text.substring(
+                                        index1 + 1, index2));
+                        }
+                        KeyguardService.vmcount = count;
+                        msg.what = APP_VOICE_COUNT;
+                    } else {
+                        msg.what = APP_PHONE_COUNT;
+                        if (sb.getNotification() != null
+                                && sb.getNotification().extras != null) {
+                            int count = 0;
+                            if (sb.getNotification().extras
+                                    .getString(Notification.EXTRA_SUB_TEXT) != null)
+                                count = Integer
+                                        .valueOf(sb.getNotification().extras
+                                                .getString(Notification.EXTRA_SUB_TEXT));
+                            if (count < 100) {
+                                if (count == 0) {
+                                    nd.missedcount = null;
+                                } else {
+                                    nd.missedcount = sb.getNotification().extras
+                                            .getString(Notification.EXTRA_SUB_TEXT);
+                                }
+                            } else {
+                                nd.missedcount = MAX_COUNT;
+                            }
+                        }
+                    }
+                }
+            }
+            // if all the notification views have to be set
+            if (sb == null) {
+                msg.what = APP_ALL_COUNT;
+            }
+            msg.obj = nd;
+            if (mHd != null)
+                mHd.sendMessage(msg);
+        };
+    }
+
     @Override
     protected void onFinishInflate() {
-        // Grab instances of and make any necessary changes to the main layouts. Create
+
+        mNm = INotificationManager.Stub.asInterface(ServiceManager
+                .getService(Context.NOTIFICATION_SERVICE));
+        // Statusbarservice object to be called while clearing a/all
+        // notification
+        try {
+            mNm.unregisterListener(mListener, ActivityManager.getCurrentUser());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            // register for a listener for which we get onNotificationPosted and
+            // onnotification removed callback
+            if (mNm != null)
+                mNm.registerListener(mListener,
+                        new ComponentName(APPLICATION_PROCESS, this.getClass()
+                                .getCanonicalName()), ActivityManager
+                                .getCurrentUser());
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        // Grab instances of and make any necessary changes to the main layouts.
+        // Create
         // view state manager and wire up necessary listeners / callbacks.
         View deleteDropTarget = findViewById(R.id.keyguard_widget_pager_delete_target);
         mAppWidgetContainer = (KeyguardWidgetPager) findViewById(R.id.app_widget_container);
@@ -458,8 +741,13 @@ public class KeyguardHostView extends KeyguardViewBase {
     }
 
     private boolean cameraDisabledByDpm() {
-        return mCameraDisabled
-                || (mDisabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_SECURE_CAMERA) != 0;
+            //other return google native default
+            String manageValue = SystemProperties.get("persist.sys.camera.managevalue","on");
+            if (manageValue.equals("on")) {
+                return mCameraDisabled || (mDisabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_SECURE_CAMERA) != 0;
+            } else {
+                return true;
+            }
     }
 
     private void updateSecurityViews() {
@@ -493,8 +781,97 @@ public class KeyguardHostView extends KeyguardViewBase {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        mHd = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                if (msg.obj != null) {
+                    mNdata = (Notificationdata) msg.obj;
+                }
+                switch (msg.what) {
+                case APP_PHONE_COUNT:
+                    if (mMissedCount != null) {
+                        if (mNdata != null && mNdata.missedcount != null) {
+                            mMissedCount
+                                    .setText(mNdata.missedcount);
+                            mMissedCount.setVisibility(View.VISIBLE);
+                        } else {
+                            mMissedCount.setVisibility(View.GONE);
+                        }
+                    }
+                    break;
+                case APP_MSG_COUNT:
+                    if (mMsgCount != null) {
+                        if (mNdata != null && mNdata.msgcount != null) {
+                            mMsgCount.setText(mNdata.msgcount);
+                            mMsgCount.setVisibility(View.VISIBLE);
+                        } else {
+                            mMsgCount.setVisibility(View.GONE);
+                        }
+                    }
+                    break;
+                case APP_ALL_COUNT:
+                    if (mMsgCount != null) {
+                        if (mNdata != null && mNdata.msgcount != null) {
+                            mMsgCount.setText(mNdata.msgcount);
+                            mMsgCount.setVisibility(View.VISIBLE);
+                        } else {
+                            mMsgCount.setVisibility(View.GONE);
+                        }
+                    }
+                    if (mMissedCount != null) {
+                        if (mNdata != null && mNdata.missedcount != null) {
+                            mMissedCount
+                                    .setText(mNdata.missedcount);
+                            mMissedCount.setVisibility(View.VISIBLE);
+                        } else {
+                            mMissedCount.setVisibility(View.GONE);
+                        }
+                    }
+                    //update the view with voicemail count
+                    if (mVoiceCount != null) {
+                        if (KeyguardService.vmcount != 0) {
+                           if (KeyguardService.vmcount > 100) {
+                                mVoiceCount.setText(MAX_COUNT);
+                            } else {
+                                mVoiceCount.setText(String
+                                        .valueOf(KeyguardService.vmcount));
+                            }
+                            mVoiceCount.setVisibility(View.VISIBLE);
+                        } else {
+                            mVoiceCount.setVisibility(View.GONE);
+                        }
+                    }
+                    break;
+                case APP_VOICE_COUNT:
+                    if (mVoiceCount != null) {
+                        if (KeyguardService.vmcount != 0) {
+                            if (KeyguardService.vmcount > 100) {
+                                mVoiceCount.setText(MAX_COUNT);
+                            } else {
+                                mVoiceCount.setText(String
+                                        .valueOf(KeyguardService.vmcount));
+                            }
+                            mVoiceCount.setVisibility(View.VISIBLE);
+                        } else {
+                            mVoiceCount.setVisibility(View.GONE);
+                        }
+                    }
+                    break;
+                default:
+                    break;
+                }
+
+            }
+
+        };
         mAppWidgetHost.startListening();
         KeyguardUpdateMonitor.getInstance(mContext).registerCallback(mUpdateMonitorCallbacks);
+        /* When the view gets attached a thread is triggered to query of all databases
+         * to update the view
+        */
+        //flag is false so that phone db query happens
+        Runnable r = new QueryThread(null,false);
+        new Thread(r).start();
     }
 
     @Override
@@ -776,7 +1153,9 @@ public class KeyguardHostView extends KeyguardViewBase {
             SecurityMode securityMode = mSecurityModel.getSecurityMode();
             // Allow an alternate, such as biometric unlock
             securityMode = mSecurityModel.getAlternateFor(securityMode);
-            if (SecurityMode.None == securityMode) {
+            //<CDR-EAS-510>
+            if (SecurityMode.None == securityMode ||
+                 KeyguardUpdateMonitor.getInstance(mContext).isTimeoutInProgress()) {
                 finish = true; // no security required
             } else {
                 showSecurityScreen(securityMode); // switch to the alternate security view
@@ -829,9 +1208,11 @@ public class KeyguardHostView extends KeyguardViewBase {
                     mViewMediatorCallback.keyguardDone(true);
                 }
             }
-        } else {
+        }//No need to show Bouncer Screen for XP5 since no
+         //widgets can be accessed from a locked phone.
+        /* else {
             mViewStateManager.showBouncer(true);
-        }
+        }*/
     }
 
     private static class MyOnClickHandler extends OnClickHandler {
@@ -960,10 +1341,36 @@ public class KeyguardHostView extends KeyguardViewBase {
             mSecurityViewContainer.addView(v);
             updateSecurityView(v);
             view = (KeyguardSecurityView)v;
+
+            if(securityMode == SecurityMode.None &&!KeyguardService.isPhoneTypeTouch) {
+                TextView unLockTextView =
+                    (TextView)v.findViewById(R.id.
+                    lockscreen_longpress_star_unlock_view);
+                Resources res = getResources();
+                if(res != null) {
+                    String text = String.format(
+                        res.getString(R.string.lockscreen_longpress_star_unlock));
+                    unLockTextView.setText(Html.fromHtml(text, new TextViewImageGetter(), null));
+                    TextView releaseUnLockTextView = (TextView)v.findViewById(R.id.
+                        kg_hint_text_to_release_key_to_unlock_view);
+                    String hintText = String.format(res.getString(R.string.
+                        kg_hint_text_to_release_key_to_unlock));
+                    releaseUnLockTextView.setText(
+                        Html.fromHtml(hintText, new TextViewImageGetter(), null));
+                }
+            }
+            // Retrieval of notification object views
+            View mView = v.findViewById(R.id.key_notify);
+            if (mView != null) {
+                mMissedCount = (TextView) mView.findViewById(R.id.missed_count);
+                mVoiceCount = (TextView) mView.findViewById(R.id.voice_count);
+                mMsgCount = (TextView) mView.findViewById(R.id.msg_count);
+            }
         }
 
         if (view instanceof KeyguardSelectorView) {
             KeyguardSelectorView selectorView = (KeyguardSelectorView) view;
+            mKeyguardSelectorView = selectorView;
             View carrierText = selectorView.findViewById(R.id.keyguard_selector_fade_container);
             selectorView.setCarrierArea(carrierText);
         }
@@ -979,7 +1386,16 @@ public class KeyguardHostView extends KeyguardViewBase {
      */
     private void showSecurityScreen(SecurityMode securityMode) {
         if (DEBUG) Log.d(TAG, "showSecurityScreen(" + securityMode + ")");
-
+        /** <CDR-EAS-510> Start */
+        //Moved the below snippet to top
+        boolean isSimOrAccount = securityMode == SecurityMode.SimPin
+                || securityMode == SecurityMode.SimPuk
+                || securityMode == SecurityMode.Account;
+        if(KeyguardUpdateMonitor.getInstance(mContext).isTimeoutInProgress()
+            && !isSimOrAccount) {
+            securityMode = SecurityMode.None;
+        }
+        /** <CDR-EAS-510> End */
         if (securityMode == mCurrentSecuritySelection) return;
 
         KeyguardSecurityView oldView = getSecurityView(mCurrentSecuritySelection);
@@ -987,9 +1403,6 @@ public class KeyguardHostView extends KeyguardViewBase {
 
         // Enter full screen mode if we're in SIM or Account screen
         boolean fullScreenEnabled = getResources().getBoolean(R.bool.kg_sim_puk_account_full_screen);
-        boolean isSimOrAccount = securityMode == SecurityMode.SimPin
-                || securityMode == SecurityMode.SimPuk
-                || securityMode == SecurityMode.Account;
         mAppWidgetContainer.setVisibility(
                 isSimOrAccount && fullScreenEnabled ? View.GONE : View.VISIBLE);
 
@@ -1035,6 +1448,10 @@ public class KeyguardHostView extends KeyguardViewBase {
             setBackButtonEnabled(true);
         }
         mCurrentSecuritySelection = securityMode;
+        /** <CDR-EAS-510> Start */
+        //This will just inform KeyguardUpdateMonitor about the current lock mode.
+        KeyguardUpdateMonitor.getInstance(mContext).setCurrentSecuritySelection(mCurrentSecuritySelection);
+        /** <CDR-EAS-510> End */
     }
 
     @Override
@@ -1108,12 +1525,20 @@ public class KeyguardHostView extends KeyguardViewBase {
             showSecurityScreen(securityMode);
         }
     }
-
+    //Modify remove numeric keypad in the Lockscreen by zhangchen 20131115 start -->
     private int getSecurityViewIdForMode(SecurityMode securityMode) {
         switch (securityMode) {
-            case None: return R.id.keyguard_selector_view;
+            case None:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_selector_view_new;
+                }
+                return R.id.keyguard_selector_view;
             case Pattern: return R.id.keyguard_pattern_view;
-            case PIN: return R.id.keyguard_pin_view;
+            case PIN:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_pin_view_new;
+                }
+                return R.id.keyguard_pin_view;
             case Password: return R.id.keyguard_password_view;
             case Biometric: return R.id.keyguard_face_unlock_view;
             case Account: return R.id.keyguard_account_view;
@@ -1121,10 +1546,16 @@ public class KeyguardHostView extends KeyguardViewBase {
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.id.msim_keyguard_sim_pin_view;
                 }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_sim_pin_view_new;
+                }
                 return R.id.keyguard_sim_pin_view;
             case SimPuk:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.id.msim_keyguard_sim_puk_view;
+                }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.id.keyguard_sim_puk_view_new;
                 }
                 return R.id.keyguard_sim_puk_view;
         }
@@ -1133,9 +1564,17 @@ public class KeyguardHostView extends KeyguardViewBase {
 
     private int getLayoutIdFor(SecurityMode securityMode) {
         switch (securityMode) {
-            case None: return R.layout.keyguard_selector_view;
+            case None:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_selector_view_new;
+                }
+                return R.layout.keyguard_selector_view;
             case Pattern: return R.layout.keyguard_pattern_view;
-            case PIN: return R.layout.keyguard_pin_view;
+            case PIN:
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_pin_view_new;
+                }
+                return R.layout.keyguard_pin_view;
             case Password: return R.layout.keyguard_password_view;
             case Biometric: return R.layout.keyguard_face_unlock_view;
             case Account: return R.layout.keyguard_account_view;
@@ -1143,17 +1582,23 @@ public class KeyguardHostView extends KeyguardViewBase {
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.layout.msim_keyguard_sim_pin_view;
                 }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_sim_pin_view_new;
+                }
                 return R.layout.keyguard_sim_pin_view;
             case SimPuk:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
                     return R.layout.msim_keyguard_sim_puk_view;
+                }
+                if (!KeyguardService.isPhoneTypeTouch) {
+                    return R.layout.keyguard_sim_puk_view_new;
                 }
                 return R.layout.keyguard_sim_puk_view;
             default:
                 return 0;
         }
     }
-
+    //Modify remove numeric keypad in the Lockscreen by zhangchen 20131115 end -->
     private boolean addWidget(int appId, int pageIndex, boolean updateDbIfFailed) {
         AppWidgetProviderInfo appWidgetInfo = mAppWidgetManager.getAppWidgetInfo(appId);
         if (appWidgetInfo != null) {
@@ -1289,6 +1734,7 @@ public class KeyguardHostView extends KeyguardViewBase {
     private void addDefaultStatusWidget(int index) {
         LayoutInflater inflater = LayoutInflater.from(mContext);
         View statusWidget = inflater.inflate(R.layout.keyguard_status_view, null, true);
+     
         mAppWidgetContainer.addWidget(statusWidget, index);
     }
 
@@ -1727,6 +2173,28 @@ public class KeyguardHostView extends KeyguardViewBase {
         }
         return false;
     }
+    //Add Long press * to unlock by zhangchen 20131115 start
+    public boolean handleStarKey() {
+        showNextSecurityScreenOrFinish(false);
+        return true;
+    }
+    //Add Long press * to unlock by zhangchen 20131115 end
+
+    /** Change the hint text to unlock when long press of "*" is detected */
+    public void changeHintText() {
+        if (!KeyguardService.isPhoneTypeTouch && mKeyguardSelectorView != null) {
+            FrameLayout unlockHintText =  (FrameLayout) mKeyguardSelectorView.
+                findViewById(R.id.keyguard_selector_unlock_hint);
+            if ( unlockHintText != null ) {
+                unlockHintText.setVisibility(View.VISIBLE);
+            }
+            FrameLayout selectorParentFrame =  (FrameLayout) mKeyguardSelectorView.
+                findViewById(R.id.keyguard_selector_parent_frame);
+            if ( selectorParentFrame != null ) {
+                selectorParentFrame.setVisibility(View.GONE);
+            }
+        }
+    }
 
     /**
      *  Dismisses the keyguard by going to the next screen or making it gone.
@@ -1759,4 +2227,24 @@ public class KeyguardHostView extends KeyguardViewBase {
         mActivityLauncher.launchCamera(getHandler(), null);
     }
 
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        final int action = ev.getAction();
+        if (action == MotionEvent.ACTION_DOWN){
+            mCallback.userActivity(0);
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    //This class fetch the image from drawable and return drawable
+    private class TextViewImageGetter implements Html.ImageGetter {
+
+        public Drawable getDrawable(String source) {
+            int id = R.drawable.ic_star;
+
+            Drawable d = getResources().getDrawable(id);
+            d.setBounds(0,0,d.getIntrinsicWidth(),d.getIntrinsicHeight());
+            return d;
+        }
+    }
 }

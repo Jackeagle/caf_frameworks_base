@@ -253,7 +253,13 @@ public class QuickContactBadge extends ImageView implements OnClickListener {
     }
 
     private void onContactUriChanged() {
-        setEnabled(isAssigned());
+        //Modify for support keypad start
+        if (true){
+            setEnabled(true);
+        } else {
+            setEnabled(isAssigned());
+        }
+        //Modify for support keypad end
     }
 
     @Override

@@ -555,7 +555,14 @@ public final class MenuItemImpl implements MenuItem {
                 throw new IllegalArgumentException("SHOW_AS_ACTION_ALWAYS, SHOW_AS_ACTION_IF_ROOM,"
                         + " and SHOW_AS_ACTION_NEVER are mutually exclusive.");
         }
-        mShowAsAction = actionEnum;
+        /*
+          fix for never showing items on the action bar.
+          -- AND operation done to retain other properties
+          like collapse/text operations in action bar view
+          --FFFC is used where "C" is an OR  between 8 and
+          4 which will retain the property
+        */
+        mShowAsAction = (actionEnum & 0XFFFC);
         mMenu.onItemActionRequestChanged(this);
     }
 

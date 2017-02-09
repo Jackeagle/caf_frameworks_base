@@ -548,7 +548,8 @@ public class ActionBarView extends AbsActionBarView {
     }
 
     public void setHomeButtonEnabled(boolean enable) {
-        setHomeButtonEnabled(enable, true);
+        // Setting the default Home enabled value to false
+        setHomeButtonEnabled(false, true);
     }
 
     private void setHomeButtonEnabled(boolean enable, boolean recordState) {
@@ -1398,7 +1399,8 @@ public class ActionBarView extends AbsActionBarView {
         }
 
         public void setShowUp(boolean isUp) {
-            mUpView.setVisibility(isUp ? VISIBLE : GONE);
+            //Default Arrow key Visibility is set to GONE
+            mUpView.setVisibility(GONE);
         }
 
         public void setShowIcon(boolean showIcon) {

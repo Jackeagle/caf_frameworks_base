@@ -1,0 +1,75 @@
+<!--
+ * BORQS Software Solutions Pvt Ltd. CONFIDENTIAL
+ * Copyright (c) 2014 All rights reserved.
+ *
+ * The source code contained or described herein and all documents
+ * related to the source code ("Material") are owned by BORQS Software
+ * Solutions Pvt Ltd. No part of the Material may be used,copied,
+ * reproduced, modified, published, uploaded,posted, transmitted,
+ * distributed, or disclosed in any way without BORQS Software
+ * Solutions Pvt Ltd. prior written permission.
+ *
+ * No license under any patent, copyright, trade secret or other
+ * intellectual property right is granted to or conferred upon you
+ * by disclosure or delivery of the Materials, either expressly, by
+ * implication, inducement, estoppel or otherwise. Any license
+ * under such intellectual property rights must be express and
+ * approved by BORQS Software Solutions Pvt Ltd. in writing.
+ *
+ *-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:orientation="vertical" >
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+
+        <ImageView
+            android:id="@android:id/icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:padding="4dp" />
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@android:id/icon"
+            android:ellipsize="marquee"
+            android:padding="4dp"
+            android:singleLine="true"
+            android:textSize="18sp" />
+
+        <DateTimeView
+            android:id="@+id/timestamp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@android:id/widget_frame"
+            android:layout_alignParentEnd="true"
+            android:layout_below="@+id/title"
+            android:layout_marginTop="-8dp"
+            android:padding="4dp"
+            android:textAlignment="viewEnd"
+            android:textAppearance="?android:attr/textAppearanceSmall" />
+
+        <TextView
+            android:id="@+id/subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/title"
+            android:layout_marginTop="-8dp"
+            android:layout_toLeftOf="@+id/timestamp"
+            android:layout_toRightOf="@android:id/icon"
+            android:ellipsize="marquee"
+            android:gravity="center_vertical"
+            android:padding="4dp"
+            android:singleLine="true"
+            android:textSize="14sp" />
+    </RelativeLayout>
+
+</LinearLayout>

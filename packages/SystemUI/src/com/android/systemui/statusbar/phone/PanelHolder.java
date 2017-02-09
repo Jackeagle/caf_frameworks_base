@@ -19,7 +19,9 @@ package com.android.systemui.statusbar.phone;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.util.EventLog;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.FrameLayout;
 
 import com.android.systemui.EventLogTags;
@@ -68,6 +70,27 @@ public class PanelHolder extends FrameLayout {
             }
         }
     }
+
+    // Add SystemUI support keyboard start
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_CLEAR:
+                case KeyEvent.KEYCODE_DEL:
+                case KeyEvent.KEYCODE_MENU:
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_DPAD_UP:
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    View v = getFocusedChild();
+                    return v.dispatchKeyEvent(event);
+            }
+        return super.dispatchKeyEvent(event);
+
+    }
+    // Add SystemUI support keyboard end
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {

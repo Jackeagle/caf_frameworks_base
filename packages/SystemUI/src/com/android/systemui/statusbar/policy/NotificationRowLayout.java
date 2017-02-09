@@ -20,9 +20,11 @@ import android.animation.LayoutTransition;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -49,6 +51,20 @@ public class NotificationRowLayout
     private static final int DISAPPEAR_ANIM_LEN = APPEAR_ANIM_LEN;
 
     boolean mAnimateBounds = true;
+
+    // Add SystemUI support keyboard start
+    private int mActionIndex = -1;
+    private ViewGroup mActions = null;
+    private View mFocusView;
+
+    public int getActionIndex() {
+        return mActionIndex;
+    }
+
+    public ViewGroup getActions() {
+        return mActions;
+    }
+    // Add SystemUI support keyboard end
 
     Rect mTmpRect = new Rect();
 
@@ -105,6 +121,162 @@ public class NotificationRowLayout
     public void setOnSizeChangedListener(OnSizeChangedListener l) {
         mOnSizeChangedListener = l;
     }
+
+    // Add SystemUI support keyboard start
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+
+        if (true) {
+            boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_CLEAR:
+                case KeyEvent.KEYCODE_DEL:
+                case KeyEvent.KEYCODE_STAR:
+                    View v1 = getFocusedChild();
+                    if (canChildBeDismissed(v1)) {
+                        mSwipeHelper.dismissChild(v1, 1880);
+                    }
+                    break;
+                case KeyEvent.KEYCODE_MENU:
+                    View v2 = getFocusedChild();
+
+                    if (!down) {
+
+                        int rowHeight =
+                                getContext().getResources().getDimensionPixelSize(
+                                        R.dimen.notification_row_min_height);
+                        ViewGroup.LayoutParams lp = v2.getLayoutParams();
+                        if (lp.height == ViewGroup.LayoutParams.WRAP_CONTENT) {
+                            lp.height = rowHeight;
+                            mActions =
+                                    (ViewGroup) v2.findViewById(com.android.internal.R.id.actions);
+                            if (null != mActions) {
+                                if (mActions.getChildCount() > 0) {
+                                    for (int i = 0; i < mActions.getChildCount(); i++) {
+                                        mActions.getChildAt(i)
+                                                .setBackgroundColor(Color.TRANSPARENT);
+                                    }
+
+                                }
+
+                            }
+
+                        } else {
+
+                            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+
+                        }
+                        v2.setLayoutParams(lp);
+                    }
+                    break;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    View v3 = getFocusedChild();
+                    mActions = (ViewGroup) v3.findViewById(com.android.internal.R.id.actions);
+                    if (!down) {
+
+                        if (null != mActions
+                                && (v3.getLayoutParams().height == ViewGroup.LayoutParams.WRAP_CONTENT)) {
+                            int actionCount = mActions.getChildCount();
+                            if (actionCount > 0) {
+                                if (mActionIndex == -1) {
+                                    mActions.getChildAt(0).setBackgroundColor(Color.RED);
+                                    mActionIndex = 0;
+                                    break;
+                                }
+
+                                if (mActionIndex - 1 >= 0) {
+                                    mActions.getChildAt(mActionIndex).setBackgroundColor(
+                                            Color.TRANSPARENT);
+                                    mActions.getChildAt(mActionIndex - 1).setBackgroundColor(
+                                            Color.RED);
+                                    mActionIndex--;
+                                } else {
+                                    mActions.getChildAt(0).setBackgroundColor(Color.TRANSPARENT);
+                                    mActions.getChildAt(actionCount - 1).setBackgroundColor(
+                                            Color.RED);
+                                    mActionIndex = actionCount - 1;
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    View v4 = getFocusedChild();
+                    mActions = (ViewGroup) v4.findViewById(com.android.internal.R.id.actions);
+                    if (!down) {
+                        if (null != mActions
+                                && (v4.getLayoutParams().height == ViewGroup.LayoutParams.WRAP_CONTENT)) {
+                            int actionCount = mActions.getChildCount();
+                            if (actionCount > 0) {
+                                if (mActionIndex == -1) {
+                                    mActions.getChildAt(0).setBackgroundColor(Color.RED);
+                                    mActionIndex = 0;
+                                    break;
+                                }
+
+                                if (mActionIndex + 1 <= actionCount - 1) {
+
+                                    mActions.getChildAt(mActionIndex).setBackgroundColor(
+                                            Color.TRANSPARENT);
+                                    mActions.getChildAt(mActionIndex + 1).setBackgroundColor(
+                                            Color.RED);
+                                    mActionIndex++;
+
+                                } else {
+
+                                    mActions.getChildAt(actionCount - 1).setBackgroundColor(
+                                            Color.TRANSPARENT);
+                                    mActions.getChildAt(0).setBackgroundColor(Color.RED);
+                                    mActionIndex = 0;
+
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                    if (!down) {
+                        View v5 = getFocusedChild();
+                        if (null != mActions && mActions.getChildCount() > 0 && mActionIndex >= 0
+                                && (v5.getLayoutParams().height == ViewGroup.LayoutParams.WRAP_CONTENT)) {
+
+                            mActions.getChildAt(mActionIndex).performClick();
+                            return true;
+                        }
+                    }
+                    break;
+
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    View v6 = getFocusedChild();
+                    View upView = v6.focusSearch(View.FOCUS_UP);
+                    if (null != mActions && mActions.getChildCount() > 0 && mActionIndex >= 0) {
+                        mActions.getChildAt(mActionIndex).setBackgroundColor(Color.TRANSPARENT);
+                    }
+                    if (null != upView) {
+
+                        mActionIndex = -1;
+                    }
+
+                    break;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    View v7 = getFocusedChild();
+                    View downView = v7.focusSearch(View.FOCUS_DOWN);
+                    if (null != mActions && mActions.getChildCount() > 0 && mActionIndex >= 0) {
+                        mActions.getChildAt(mActionIndex).setBackgroundColor(Color.TRANSPARENT);
+                    }
+                    if (null != downView) {
+                        mActionIndex = -1;
+                    }
+
+                    break;
+
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+    // Add SystemUI support keyboard end
 
     @Override
     public void onWindowFocusChanged(boolean hasWindowFocus) {

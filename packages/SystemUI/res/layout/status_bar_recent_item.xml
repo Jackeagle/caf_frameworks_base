@@ -25,7 +25,10 @@
     android:paddingTop="@dimen/status_bar_recents_item_padding"
     android:paddingBottom="@dimen/status_bar_recents_item_padding"
     android:clipChildren="false"
-    android:importantForAccessibility="no">
+    android:importantForAccessibility="no"
+    android:focusable="true"
+    android:focusableInTouchMode="false"
+    android:background="@drawable/recents_thumbnail_fg">
 
     <RelativeLayout android:id="@+id/recent_item"
         android:layout_gravity="center_horizontal"

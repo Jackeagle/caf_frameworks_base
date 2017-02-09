@@ -30,8 +30,10 @@ import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
@@ -40,6 +42,10 @@ import com.android.internal.widget.LockPatternView;
 
 import java.io.IOException;
 import java.util.List;
+import android.content.Intent;
+import android.net.Uri;
+import android.app.AlertDialog;
+import android.app.Activity;
 
 public class KeyguardPatternView extends LinearLayout implements KeyguardSecurityView {
 
@@ -87,6 +93,9 @@ public class KeyguardPatternView extends LinearLayout implements KeyguardSecurit
     private SecurityMessageDisplay mSecurityMessageDisplay;
     private View mEcaView;
     private Drawable mBouncerFrame;
+
+    // Intent action for launching the Emergency Dialer activity.
+    static final String ACTION_EMERGENCY_DIAL = "com.android.phone.EmergencyDialer.DIAL";
 
     enum FooterMode {
         Normal,
@@ -335,6 +344,7 @@ public class KeyguardPatternView extends LinearLayout implements KeyguardSecurit
             } catch (IOException e) {
                 // just skip the account if we are unable to query it
             } catch (AuthenticatorException e) {
+                mEnableFallback = true;
                 // just skip the account if we are unable to query it
             } finally {
                 mAccountIndex++;
@@ -408,5 +418,28 @@ public class KeyguardPatternView extends LinearLayout implements KeyguardSecurit
     public void hideBouncer(int duration) {
         KeyguardSecurityViewHelper.
                 hideBouncer(mSecurityMessageDisplay, mEcaView, mBouncerFrame, duration);
+    }
+
+    // Any numeric key press bring the Emergency dialer with number pressed
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        boolean isDown = event.getAction() == KeyEvent.ACTION_DOWN;
+
+        if(((keyCode >= KeyEvent.KEYCODE_0) && (keyCode <= KeyEvent.KEYCODE_9))) {
+            String keyPressed = new String(""+event.getNumber());
+            final boolean bypassHandler = true;
+            KeyguardUpdateMonitor.getInstance(mContext).reportEmergencyCallAction(bypassHandler);
+            Intent intent = new Intent(ACTION_EMERGENCY_DIAL);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            intent.setData(Uri.fromParts("tel", keyPressed, null));
+            getContext().startActivityAsUser(intent,
+                    new UserHandle(mLockPatternUtils.getCurrentUser()));
+                mCallback.userActivity(0);
+                return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 }

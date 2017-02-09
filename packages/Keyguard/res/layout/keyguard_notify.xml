@@ -1,0 +1,38 @@
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/alarm_lyt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal" >
+
+        <TextView
+            android:id="@+id/missed_count"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/ic_missed"
+            android:gravity="top"
+            android:textAlignment="center"
+            android:textSize="18dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/voice_count"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/ic_voice_mail"
+            android:gravity="top"
+            android:textAlignment="center"
+            android:textSize="18dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/msg_count"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/ic_message"
+            android:gravity="top"
+            android:textAlignment="center"
+            android:textSize="18dp"
+            android:visibility="gone" />
+    </LinearLayout>

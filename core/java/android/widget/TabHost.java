@@ -365,7 +365,26 @@ mTabHost.addTab(TAB_TAG_1, "Hello, world!", "Tab 1");
                 return true;
             }
         }
-        return handled;
+
+        /* KeyEvent DPAD_RIGHT should change the content of the tab
+          to the next tab and DPAD_LEFT should change the content
+          of the tab to the previous tab */
+
+        if ((event.getAction() == KeyEvent.ACTION_UP)
+               && (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+
+               if (mTabWidget.getSelectionChangedListener() != null)
+                   mTabWidget.getSelectionChangedListener().onTabSelectionChanged(
+                                                            mCurrentTab + 1, true);
+         } else if ((event.getAction() == KeyEvent.ACTION_UP)
+               && (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT)) {
+
+               if (mTabWidget.getSelectionChangedListener() != null)
+                   mTabWidget.getSelectionChangedListener().onTabSelectionChanged(
+                                                            mCurrentTab - 1, true);
+         }
+
+       return handled;
     }
 
 
