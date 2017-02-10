@@ -45,6 +45,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class RecentTasksLoader implements View.OnTouchListener {
     static final String TAG = "RecentTasksLoader";
+    private static final String QUICK_SETTINGS_PACKAGE = "com.featurephone.quicksettings";
     static final boolean DEBUG = PhoneStatusBar.DEBUG || false;
 
     private static final int DISPLAY_TASKS = 20;
@@ -467,6 +468,14 @@ public class RecentTasksLoader implements View.OnTouchListener {
 
                     // Don't load ourselves
                     if (intent.getComponent().getPackageName().equals(mContext.getPackageName())) {
+                        continue;
+                    }
+
+                    // Excluse Quicksettings from Recents.
+                    if (intent != null && intent.getComponent() != null
+                            && intent.getComponent().getPackageName() != null
+                            && intent.getComponent().getPackageName()
+                                    .equals(QUICK_SETTINGS_PACKAGE)) {
                         continue;
                     }
 
