@@ -392,7 +392,7 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
 
     const SkPaint::Align align = paint->getTextAlign();
 
-#ifdef REVERIE
+/*#ifdef REVERIE
     uint32_t noOfGids;
     int no;
     uint16_t * GIDS;
@@ -474,7 +474,7 @@ void Font::render(SkPaint* paint, const char* text, uint32_t start, uint32_t len
     }
 
     else
-#endif
+#endif*/
 
     while (glyphsCount < numGlyphs) {
         glyph_t glyph = GET_GLYPH(text);

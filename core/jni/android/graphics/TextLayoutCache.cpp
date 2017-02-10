@@ -702,9 +702,9 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
     ssize_t indexFontRun = isRTL ? count - 1 : 0;
     jfloat totalAdvance = *outTotalAdvance;
 
-#ifdef REVERIE
-    jfloat totalAdvance1 =totalAdvance;
-#endif
+//#ifdef REVERIE
+//    jfloat totalAdvance1 =totalAdvance;
+//#endif
 
     ScriptRun run;  // relative to chars
     while ((isRTL) ?
@@ -773,7 +773,7 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
 
     *outTotalAdvance = totalAdvance;
 
-#ifdef REVERIE
+/*#ifdef REVERIE
     int ii = 0;
     for(int i = 0; i < count; i++){
         if((chars[i] > 0x900 && chars[i] < 0xaff) || (chars[i] > 0xb80 &&
@@ -807,7 +807,7 @@ void TextLayoutShaper::computeRunValues(const SkPaint* paint, const UChar* conte
             scalarArray = NULL;
         }
     }
-#endif
+#endif*/
 
 #if DEBUG_GLYPHS
     ALOGD("         -- final totalAdvance = %f", totalAdvance);
@@ -842,7 +842,7 @@ bool TextLayoutShaper::isComplexScript(hb_script_t script) {
     case HB_SCRIPT_HAN:
     case HB_SCRIPT_KATAKANA:
     case HB_SCRIPT_HIRAGANA:
-#ifdef REVERIE
+/*#ifdef REVERIE
     case HB_SCRIPT_DEVANAGARI:
     case HB_SCRIPT_BENGALI:
     case HB_SCRIPT_GURMUKHI:
@@ -853,7 +853,7 @@ bool TextLayoutShaper::isComplexScript(hb_script_t script) {
     case HB_SCRIPT_MALAYALAM:
     case HB_SCRIPT_ORIYA:
     case HB_SCRIPT_THAI:
-#endif
+#endif*/
         return false;
     default:
         return true;

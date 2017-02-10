@@ -54,6 +54,20 @@ PRODUCT_PACKAGES := \
 
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_PACKAGES += \
-     fallback_fonts.xml \
-     $(PRODUCT_RENDERING_ENGINE_TTF_FILES)
+    fallback_fonts.xml \
+    DroidSansHindi.ttf \
+    DroidSansTamil.ttf \
+    DroidSansTelugu.ttf \
+    DroidSansGujarati.ttf \
+    DroidSansPunjabi.ttf \
+    DroidSansKannada.ttf \
+    DroidSansBengali.ttf \
+    DroidSansOdia.ttf 
+
 endif
+
+#ifeq ($(MULTI_LANG_ENGINE),REVERIE)
+#PRODUCT_PACKAGES += \
+#     fallback_fonts.xml \
+#     $(PRODUCT_RENDERING_ENGINE_TTF_FILES)
+#endif
