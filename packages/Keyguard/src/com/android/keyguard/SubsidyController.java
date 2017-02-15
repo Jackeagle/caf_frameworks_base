@@ -97,6 +97,9 @@ public class SubsidyController {
         if (state == SubsidyLockState.AP_UNLOCKED) {
             mCurrentSubsidyState = new ApUnlockedState();
         }
+        if (state == SubsidyLockState.DEVICE_UNLOCKED) {
+            mCurrentSubsidyState = new DeviceUnlockedState();
+        }
         if (mCurrentSubsidyState != null) {
             mCurrentSubsidyState.init(mContext);
         }
@@ -118,12 +121,6 @@ public class SubsidyController {
                                 .getInstance(mContext)
                                 .dispatchSubsidyLockStateChanged(
                                         mCurrentSubsidyState.isLocked());
-                    }
-                    if (isDeviceUnLocked()) {
-                        if (DEBUG) {
-                            Log.d(TAG, " UnRegistered From  SLC");
-                        }
-                        mContext.unregisterReceiver(mSubsidyLockReceiver);
                     }
                 }
             }
@@ -183,13 +180,8 @@ public class SubsidyController {
         if (DEBUG) {
             Log.d(TAG, " UnRegistered From  SLC");
         }
-        mContext.unregisterReceiver(mSubsidyLockReceiver);
         KeyguardUpdateMonitor.getInstance(mContext)
                    .dispatchSubsidyLockStateChanged(false);
-    }
-
-    private boolean isDeviceUnLocked() {
-        return mCurrentSubsidyState instanceof DeviceUnlockedState;
     }
 
     public void stopStateTransitions(boolean enable) {

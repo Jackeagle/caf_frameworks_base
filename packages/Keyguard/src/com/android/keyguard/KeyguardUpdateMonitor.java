@@ -1009,9 +1009,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         context.registerReceiver(mBroadcastReceiver, filter);
 
-        if (SubsidyUtility.isSubsidyLockFeatureEnabled(context)
-                && !(SubsidyUtility.getSubsidyLockStatus(context)
-                    == SubsidyUtility.SubsidyLockState.DEVICE_UNLOCKED)) {
+        if (SubsidyUtility.isSubsidyLockFeatureEnabled(context)) {
             mSubsidyController = SubsidyController.getInstance(context);
         }
 
