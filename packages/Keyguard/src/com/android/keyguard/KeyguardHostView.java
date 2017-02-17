@@ -168,7 +168,6 @@ public class KeyguardHostView extends KeyguardViewBase {
     private Handler mHd;
     private INotificationManager mNm;
     private TextView mMissedCount;
-    private TextView mVoiceCount;
     private TextView mMsgCount;
     private Notificationdata mNdata;
     private  static String  APPLICATION_PHONE = "com.android.phone";
@@ -178,9 +177,6 @@ public class KeyguardHostView extends KeyguardViewBase {
     private  static final int APP_PHONE_COUNT = 1;
     private  static final int APP_MSG_COUNT = 2;
     private  static final int APP_ALL_COUNT = 3;
-    private  static final int APP_VOICE_COUNT = 4;
-    private  static String VOICE_MAIL = "voicemail";
-    private  static String VOICE_MAIL_SPANISH = "Correo de voz";
     /*package*/ interface UserSwitcherCallback {
         void hideSecurityView(int duration);
         void showSecurityView();
@@ -432,17 +428,6 @@ public class KeyguardHostView extends KeyguardViewBase {
         @Override
         public void onNotificationRemoved(StatusBarNotification notification)
                 throws RemoteException {
-            if (notification != null
-                    && (notification.getPackageName().equals(APPLICATION_PHONE))) {
-                String voice_text = notification.getNotification().extras
-                        .getString(Notification.EXTRA_TITLE);
-                if (voice_text != null
-                        && (voice_text.contains(VOICE_MAIL) || voice_text
-                                .contains(VOICE_MAIL_SPANISH)))  {
-                    //reset the count to 0 if voicemail notification was cleared
-                    KeyguardService.vmcount = 0;
-                }
-            }
         }
     };
 
@@ -507,12 +492,13 @@ public class KeyguardHostView extends KeyguardViewBase {
                 /* Flag determines whether to query notification or db
                    when notifiction get posted the db insertion is asyn
                    so the query of db doesnot give the right value */
-                if (!isPhone) {
                     String[] projection = { CallLog.Calls.CACHED_NAME,
                             CallLog.Calls.NUMBER };
                     String where = CallLog.Calls.TYPE + "="
                             + CallLog.Calls.MISSED_TYPE + " AND "
                             + CallLog.Calls.IS_READ + " = 0";
+                    //Adding delay of 0.5 seconds to avoid reading of stale data from calllog DB.
+                    android.os.SystemClock.sleep(500);
                     Cursor c = mContext.getContentResolver().query(
                             CallLog.Calls.CONTENT_URI, projection, where, null,
                             null);
@@ -529,81 +515,6 @@ public class KeyguardHostView extends KeyguardViewBase {
                         }
                         c.close();
                     }
-                    try {
-                        if (mContext != null && mNm != null) {
-                            StatusBarNotification[] active = mNm
-                                    .getActiveNotifications(mContext
-                                            .getApplicationInfo().packageName);
-                            if (active != null) {
-                                for (StatusBarNotification sbn : active) {
-                                    if (sbn != null
-                                            && sbn.getPackageName().equals(
-                                                    APPLICATION_PHONE)) {
-                                        String voice_text = sb
-                                                .getNotification().extras
-                                                .getString(Notification.EXTRA_TITLE);
-                                        if (voice_text != null
-                                                && (voice_text
-                                                        .contains(VOICE_MAIL) || voice_text
-                                                        .contains(VOICE_MAIL_SPANISH))) {
-                                            int count = Integer
-                                                    .parseInt(voice_text.substring(
-                                                            voice_text
-                                                                    .indexOf("(") + 1,
-                                                            voice_text
-                                                                    .indexOf(")")));
-                                            KeyguardService.vmcount = count;
-                                            msg.what = APP_VOICE_COUNT;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Exception e) {
-                        Log.d(TAG, "exception" + e);
-                    }
-                } else {
-                    /* check for voice mail notification string ,parse
-                     * it and get the count and update the Count
-                     */
-                    String voice_text = sb.getNotification().extras
-                            .getString(Notification.EXTRA_TITLE);
-                    if (voice_text != null
-                            && (voice_text.contains(VOICE_MAIL) || voice_text
-                                    .contains(VOICE_MAIL_SPANISH))) {
-                        int count = 0;
-                        int index1 = voice_text.indexOf("(");
-                        int index2 = voice_text.indexOf(")");
-                        if ( index1 != -1 && index2 != -1) {
-                            count = Integer.parseInt(voice_text.substring(
-                                        index1 + 1, index2));
-                        }
-                        KeyguardService.vmcount = count;
-                        msg.what = APP_VOICE_COUNT;
-                    } else {
-                        msg.what = APP_PHONE_COUNT;
-                        if (sb.getNotification() != null
-                                && sb.getNotification().extras != null) {
-                            int count = 0;
-                            if (sb.getNotification().extras
-                                    .getString(Notification.EXTRA_SUB_TEXT) != null)
-                                count = Integer
-                                        .valueOf(sb.getNotification().extras
-                                                .getString(Notification.EXTRA_SUB_TEXT));
-                            if (count < 100) {
-                                if (count == 0) {
-                                    nd.missedcount = null;
-                                } else {
-                                    nd.missedcount = sb.getNotification().extras
-                                            .getString(Notification.EXTRA_SUB_TEXT);
-                                }
-                            } else {
-                                nd.missedcount = MAX_COUNT;
-                            }
-                        }
-                    }
-                }
             }
             // if all the notification views have to be set
             if (sb == null) {
@@ -825,35 +736,6 @@ public class KeyguardHostView extends KeyguardViewBase {
                             mMissedCount.setVisibility(View.VISIBLE);
                         } else {
                             mMissedCount.setVisibility(View.GONE);
-                        }
-                    }
-                    //update the view with voicemail count
-                    if (mVoiceCount != null) {
-                        if (KeyguardService.vmcount != 0) {
-                           if (KeyguardService.vmcount > 100) {
-                                mVoiceCount.setText(MAX_COUNT);
-                            } else {
-                                mVoiceCount.setText(String
-                                        .valueOf(KeyguardService.vmcount));
-                            }
-                            mVoiceCount.setVisibility(View.VISIBLE);
-                        } else {
-                            mVoiceCount.setVisibility(View.GONE);
-                        }
-                    }
-                    break;
-                case APP_VOICE_COUNT:
-                    if (mVoiceCount != null) {
-                        if (KeyguardService.vmcount != 0) {
-                            if (KeyguardService.vmcount > 100) {
-                                mVoiceCount.setText(MAX_COUNT);
-                            } else {
-                                mVoiceCount.setText(String
-                                        .valueOf(KeyguardService.vmcount));
-                            }
-                            mVoiceCount.setVisibility(View.VISIBLE);
-                        } else {
-                            mVoiceCount.setVisibility(View.GONE);
                         }
                     }
                     break;
@@ -1363,7 +1245,6 @@ public class KeyguardHostView extends KeyguardViewBase {
             View mView = v.findViewById(R.id.key_notify);
             if (mView != null) {
                 mMissedCount = (TextView) mView.findViewById(R.id.missed_count);
-                mVoiceCount = (TextView) mView.findViewById(R.id.voice_count);
                 mMsgCount = (TextView) mView.findViewById(R.id.msg_count);
             }
         }
