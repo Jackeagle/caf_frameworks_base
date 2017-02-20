@@ -118,13 +118,24 @@ public class KeyguardSubsidySwitchSimView extends LinearLayout implements
                 if (DEBUG) {
                     Log.d(TAG, " Switch Sim Button Pressed ");
                 }
-                int slotId =
+                int newSlotId =
                         ((SwitchSimScreenState) mController
                                 .getCurrentSubsidyState())
                                 .getModifiedPrimarySimSlot(mContext,
                                         mCurrentSlotId);
-                Log.d(TAG, "Switch sim onClick newSlotId = "+slotId);
-                SubsidyUtility.writeSubsidySwitchSimSlot(mContext, slotId);
+                Log.d(TAG, "Switch sim onClick newSlotId = "+newSlotId);
+                int existingSlotIdFromDB =
+                        SubsidyUtility.getSubsidySwitchSimSlot(mContext);
+                /* Condition when slotid in settings db is same as new slotid
+                 then reset DB value to -1 before writing the value. Hence
+                 content observer will be notified for the change.
+                 */
+                if (newSlotId == existingSlotIdFromDB) {
+                    Log.d(TAG, "Switch sim both are same, so reset");
+                    SubsidyUtility.writeSubsidySwitchSimSlot(mContext,
+                            SubscriptionManager.INVALID_SIM_SLOT_INDEX);
+                }
+                SubsidyUtility.writeSubsidySwitchSimSlot(mContext, newSlotId);
                 setProgressViewVisible(true);
             }
         });
@@ -254,6 +265,11 @@ public class KeyguardSubsidySwitchSimView extends LinearLayout implements
                             SubscriptionManager.INVALID_SIM_SLOT_INDEX);
                         Log.d(TAG, "PrimaryConfigChanged newSlotId = "+mCurrentSlotId);
                         updateSimSlotDrawable();
+                    } else if (intent.getAction().equals(SubsidyUtility
+                            .ACTION_PRIMARY_CARD_CONFIG_FAILED)) {
+                        Log.d(TAG, "receiver PRIMARY CONFIG FAILED, so reset");
+                        SubsidyUtility.writeSubsidySwitchSimSlot(mContext,
+                                SubscriptionManager.INVALID_SIM_SLOT_INDEX);
                     }
                     setProgressViewVisible(false);
                     resetSubsidySetupView();

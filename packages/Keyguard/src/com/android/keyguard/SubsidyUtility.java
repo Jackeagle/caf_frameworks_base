@@ -215,4 +215,16 @@ public class SubsidyUtility {
             Log.e(TAG, "Exception while writing subsidy sim slot " + e);
         }
     }
+
+    public static int getSubsidySwitchSimSlot(Context context) {
+        int slotId = SubscriptionManager.INVALID_SIM_SLOT_INDEX;
+        try {
+            slotId = Settings.Secure.getInt(context.getContentResolver(),
+                         SubsidyUtility.SUBSIDY_SWITCH_SIM_SETTING,
+                         SubscriptionManager.INVALID_SIM_SLOT_INDEX);
+        } catch (Exception e) {
+            Log.e(TAG, "Exception while read subsidy sim slot " + e);
+        }
+        return slotId;
+    }
 }
