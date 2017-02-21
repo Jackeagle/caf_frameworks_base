@@ -32,6 +32,7 @@ import android.content.IContentProvider;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageInfo;
 import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -66,6 +67,7 @@ import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -1238,6 +1240,8 @@ public final class Settings {
     // Lock ensures that when enabling/disabling the master location switch, we don't end up
     // with a partial enable/disable state in multi-threaded situations.
     private static final Object mLocationSettingsLock = new Object();
+    private static final boolean mIsBootOpt = Resources.getSystem().
+            getBoolean(com.android.internal.R.bool.config_boot_opt);
 
     public static class SettingNotFoundException extends AndroidException {
         public SettingNotFoundException(String msg) {
@@ -8525,6 +8529,26 @@ public final class Settings {
         if (packages == null) {
             return null;
         }
+        /*
+         * In boot-optimization case, find and return the first
+         * installed pre-scan package for the given uid
+         */
+        if (mIsBootOpt == true && !SystemProperties.get("sys.boot_completed").equals("1")) {
+            PackageManager pm = context.getPackageManager();
+            List<PackageInfo> apps = pm.getInstalledPackages(0);
+            boolean found = false;
+            int i, length = packages.length;
+            for ( i = 0; i < length; i++) {
+                for (PackageInfo packageInfo : apps) {
+                    if (packageInfo.packageName.equals(packages[i])) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+            if (found) return packages[i];
+        }
         return packages[0];
+        }
     }
-}
