@@ -939,13 +939,6 @@ public class KeyguardViewMediator {
             return;
         }
 
-        if (mUserManager.getUsers(true).size() < 2 && !lockedOrMissing &&
-                 KeyguardService.isPhoneTypeTouch) {
-            if (DEBUG) Log.d(TAG, "doKeyguard: not showing because lockscreen is off");
-            hideLocked();
-            return;
-        }
-
         if (DEBUG) Log.d(TAG, "doKeyguard: showing the lock screen");
         showLocked(options);
     }
