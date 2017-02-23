@@ -120,6 +120,14 @@ public class LocalePicker extends ListFragment {
          *	}
          */
         }
+        localeList.add("kn_IN");
+        localeList.add("ks_IN");
+        localeList.add("as_IN");
+        localeList.add("ml_IN");
+        localeList.add("gu_IN");
+        localeList.add("pa_IN");
+        localeList.add("or_IN");
+
         String[] locales = new String[localeList.size()];
         locales = localeList.toArray(locales);
 
