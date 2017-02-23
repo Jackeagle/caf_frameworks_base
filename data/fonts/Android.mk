@@ -41,8 +41,8 @@ $(eval $(call create-font-symlink,DroidSans-Bold.ttf,Roboto-Bold.ttf))
 ################################
 # On space-constrained devices, we include a subset of fonts:
 ifeq ($(SMALLER_FONT_FOOTPRINT),true)
-droidsans_fallback_src := DroidSans.ttf
-extra_font_files := DroidSans-Bold.ttf
+droidsans_fallback_src := DroidSansFallback.ttf
+extra_font_files := DroidSans.ttf DroidSans-Bold.ttf
 else
 include $(CLEAR_VARS)
 LOCAL_MODULE := DroidSansEthiopic-Regular.ttf
@@ -66,6 +66,7 @@ extra_font_files := \
 	DroidSans-Bold.ttf \
 	DroidSansEthiopic-Regular.ttf \
 	MTLmr3m.ttf
+endif  # SMALLER_FONT_FOOTPRINT
 
 ################################
 include $(CLEAR_VARS)
@@ -76,7 +77,6 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT)/fonts
 LOCAL_REQUIRED_MODULES := $(extra_font_files)
 include $(BUILD_PREBUILT)
-endif  # SMALLER_FONT_FOOTPRINT
 
 font_symlink_src :=
 font_symlink :=
@@ -108,8 +108,6 @@ font_src_files := \
     DroidSerif-BoldItalic.ttf \
     DroidSansMono.ttf \
     Clockopia.ttf \
-    DroidNaskh-Regular.ttf \
-    DroidNaskhUI-Regular.ttf \
     AndroidClock.ttf \
     AndroidClock_Highlight.ttf \
     AndroidClock_Solid.ttf
