@@ -22,7 +22,7 @@ PRODUCT_COPY_FILES += \
 endif
 
 PRODUCT_PACKAGES := \
-    DroidSans.ttf \
+    DroidSansFallback.ttf \
     Roboto-Regular.ttf \
     Roboto-Bold.ttf \
     Roboto-Italic.ttf \
