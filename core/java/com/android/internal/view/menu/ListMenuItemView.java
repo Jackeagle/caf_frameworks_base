@@ -30,7 +30,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.TextView;
-
+import android.text.TextUtils;
 /**
  * The item view for each item in the ListView-based MenuViews.
  */
@@ -99,6 +99,8 @@ public class ListMenuItemView extends LinearLayout implements MenuView.ItemView 
         
         setTitle(itemData.getTitleForItemView(this));
         setCheckable(itemData.isCheckable());
+        mTitleView.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        mTitleView.setSingleLine(true);
         setShortcut(itemData.shouldShowShortcut(), itemData.getShortcut());
         setIcon(itemData.getIcon());
         setEnabled(itemData.isEnabled());
