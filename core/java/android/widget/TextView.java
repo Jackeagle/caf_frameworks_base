@@ -8485,7 +8485,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         if (handled) {
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-          //if (mEditor != null) mEditor.mDiscardNextActionUp = true;
+          if (mEditor != null) mEditor.mDiscardNextActionUp = true;
         }
 
         return handled;

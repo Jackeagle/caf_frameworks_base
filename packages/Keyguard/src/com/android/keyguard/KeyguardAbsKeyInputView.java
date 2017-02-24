@@ -310,7 +310,7 @@ public abstract class KeyguardAbsKeyInputView extends LinearLayout
                     }
                     // Handling Enter key event.
                     return true;
-                case KeyEvent.KEYCODE_CLEAR:
+                case KeyEvent.KEYCODE_STAR:
                     if (isDown) {
                         KeyEvent delKey = new KeyEvent(event.getAction(), KeyEvent.KEYCODE_DEL);
                         dispatchKeyEvent(delKey);

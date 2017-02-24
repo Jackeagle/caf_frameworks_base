@@ -1230,14 +1230,35 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+   public boolean getPhoneType() {
+        boolean mIstouch = false;
+        int mSubType=0;
+        String mPlatform;
+        mSubType = Integer.parseInt(SystemProperties.get("persist.subtype","0"));
+        mPlatform = SystemProperties.get("persist.hwplatform","UNDEFINED");
+
+        if (mSubType == 2 && mPlatform.equals("QRD"))
+            mIstouch = false;
+        else
+            mIstouch = true;
+        return mIstouch;
+    }
+
     public void updateSettings() {
         ContentResolver resolver = mContext.getContentResolver();
         boolean updateRotation = false;
         synchronized (mLock) {
-            mEndcallBehavior = Settings.System.getIntForUser(resolver,
-                    Settings.System.END_BUTTON_BEHAVIOR,
-                    Settings.System.END_BUTTON_BEHAVIOR_DEFAULT,
-                    UserHandle.USER_CURRENT);
+            if(getPhoneType()){
+                mEndcallBehavior = Settings.System.getIntForUser(resolver,
+                        Settings.System.END_BUTTON_BEHAVIOR,
+                        Settings.System.END_BUTTON_BEHAVIOR_DEFAULT,
+                        UserHandle.USER_CURRENT);}
+            else {
+                mEndcallBehavior = Settings.System.getIntForUser(resolver,
+                        Settings.System.END_BUTTON_BEHAVIOR,
+                        Settings.System.END_BUTTON_BEHAVIOR_HOME,
+                        UserHandle.USER_CURRENT);
+            }
             mIncallPowerBehavior = Settings.Secure.getIntForUser(resolver,
                     Settings.Secure.INCALL_POWER_BUTTON_BEHAVIOR,
                     Settings.Secure.INCALL_POWER_BUTTON_BEHAVIOR_DEFAULT,
@@ -5349,7 +5370,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     boolean goHome(boolean isHomeTriggeredFromRedKey) {
         // Add the feature to control press endcall button enter to home by wanglei 20131230 start
-        if (true) {
+        if (isHomeTriggeredFromRedKey) {
         // Add the feature to control press endcall button enter to home by wanglei 20131230 end
             //This code prevent bringing home to front when screen is locked.
             if(!mKeyguardDelegate.isShowing()) {
@@ -5357,10 +5378,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     try {
                         ActivityManagerNative.getDefault().stopAppSwitches();
                     } catch (RemoteException e) {
-
+                    }
                     sendCloseSystemWindows();
                     startDockOrHome(isHomeTriggeredFromRedKey);
-                }
             }
         } else {
             // This code brings home to the front or, if it is already

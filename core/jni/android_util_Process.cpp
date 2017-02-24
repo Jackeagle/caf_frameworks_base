@@ -477,6 +477,13 @@ static jlong android_os_Process_getFreeMemory(JNIEnv* env, jobject clazz)
     return getFreeMemoryImpl(sums, sumsLen, 2);
 }
 
+static jlong android_os_Process_getCachedMemory(JNIEnv* env, jobject clazz)
+{
+    static const char* const sums[] = { "Cached:", NULL };
+    static const int sumsLen[] = { strlen("Cached:"), 0 };
+    return getFreeMemoryImpl(sums, sumsLen, 1);
+}
+
 static jlong android_os_Process_getTotalMemory(JNIEnv* env, jobject clazz)
 {
     static const char* const sums[] = { "MemTotal:", NULL };
@@ -1031,6 +1038,7 @@ static const JNINativeMethod methods[] = {
     {"sendSignal", "(II)V", (void*)android_os_Process_sendSignal},
     {"sendSignalQuiet", "(II)V", (void*)android_os_Process_sendSignalQuiet},
     {"getFreeMemory", "()J", (void*)android_os_Process_getFreeMemory},
+    {"getCachedMemory", "()J", (void*)android_os_Process_getCachedMemory},
     {"getTotalMemory", "()J", (void*)android_os_Process_getTotalMemory},
     {"readProcLines", "(Ljava/lang/String;[Ljava/lang/String;[J)V", (void*)android_os_Process_readProcLines},
     {"getPids", "(Ljava/lang/String;[I)[I", (void*)android_os_Process_getPids},

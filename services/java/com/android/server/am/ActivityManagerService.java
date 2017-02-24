@@ -61,6 +61,7 @@ import com.android.internal.os.BatteryStatsImpl;
 import com.android.internal.os.ProcessCpuTracker;
 import com.android.internal.os.TransferPipe;
 import com.android.internal.telephony.cat.AppInterface;
+import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FastXmlSerializer;
 import com.android.internal.util.MemInfoReader;
@@ -179,6 +180,7 @@ import android.os.SystemProperties;
 import android.os.UpdateLock;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.telephony.TelephonyManager;
 import android.text.format.DateUtils;
 import android.text.format.Time;
 import android.util.AtomicFile;
@@ -7028,6 +7030,23 @@ public final class ActivityManagerService extends ActivityManagerNative
         }
     }
 
+    private final void killFgProcessDuringIncomingCall(Intent intent, Long backUpAppAdjMemLevel) {
+        if ("RINGING".equals(intent.getStringExtra(PhoneConstants.STATE_KEY)) &&
+                Process.getCachedMemory() <= backUpAppAdjMemLevel && (Process.getFreeMemory()-Process.getCachedMemory()) <= backUpAppAdjMemLevel){
+            ActivityManager am = (ActivityManager)mContext.getSystemService(Context.ACTIVITY_SERVICE);
+            String fgTaskPackageName = am.getRunningTasks(1).get(0).topActivity.getPackageName();
+            PackageManager pm = mContext.getPackageManager();
+            try {
+                PackageInfo fgAppPackageInfo = pm.getPackageInfo(fgTaskPackageName, 0);
+                ProcessRecord fgProc = getProcessRecordLocked(fgAppPackageInfo.applicationInfo.processName, fgAppPackageInfo.applicationInfo.uid, true);
+                Slog.i(TAG, "Killing FG Process: " + fgProc.processName + " with Pid: " + fgProc.pid + " during incoming call as cached " + Process.getCachedMemory()
+                         + " is below " + backUpAppAdjMemLevel);
+                Process.killProcessQuiet(fgProc.pid);
+            } catch(NameNotFoundException nnfe) {
+                Slog.e(TAG, "Error in getPackageInfo");
+            }
+        }
+    }
     private void cleanUpRemovedTaskLocked(TaskRecord tr, int flags) {
         tr.disposeThumbnail();
         mRecentTasks.remove(tr);
@@ -12976,9 +12995,21 @@ public final class ActivityManagerService extends ActivityManagerNative
     // Cause the target app to be launched if necessary and its backup agent
     // instantiated.  The backup agent will invoke backupAgentCreated() on the
     // activity manager to announce its creation.
-    public boolean bindBackupAgent(ApplicationInfo app, int backupMode) {
-        if (DEBUG_BACKUP) Slog.v(TAG, "bindBackupAgent: app=" + app + " mode=" + backupMode);
+    public boolean bindBackupAgent(String packageName, int backupMode, int userId) {
+        if (DEBUG_BACKUP) Slog.v(TAG, "bindBackupAgent: app=" + packageName + " mode=" + backupMode);
         enforceCallingPermission("android.permission.CONFIRM_FULL_BACKUP", "bindBackupAgent");
+
+        IPackageManager pm = AppGlobals.getPackageManager();
+        ApplicationInfo app = null;
+        try {
+            app = pm.getApplicationInfo(packageName, 0, userId);
+        } catch (RemoteException e) {
+            // can't happen; package manager is process-local
+        }
+        if (app == null) {
+            Slog.w(TAG, "Unable to bind backup agent for " + packageName);
+            return false;
+        }
 
         synchronized(this) {
             // !!! TODO: currently no check here that we're already bound
@@ -13700,7 +13731,12 @@ public final class ActivityManagerService extends ActivityManagerNative
 
         final boolean replacePending =
                 (intent.getFlags()&Intent.FLAG_RECEIVER_REPLACE_PENDING) != 0;
-        
+
+        if("1".equals(SystemProperties.get("ro.am.make_inc_call_better", "0"))){
+            if (TelephonyManager.ACTION_PHONE_STATE_CHANGED.equals(intent.getAction()))
+                killFgProcessDuringIncomingCall(intent,mProcessList.getMemLevel(ProcessList.BACKUP_APP_ADJ));
+        }
+
         if (DEBUG_BROADCAST) Slog.v(TAG, "Enqueing broadcast: " + intent.getAction()
                 + " replacePending=" + replacePending);
         
