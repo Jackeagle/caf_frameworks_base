@@ -46,7 +46,6 @@
 
             android:gravity="center_vertical"
             android:textAppearance="?android:attr/textAppearanceLarge"
-            android:textSize="25dp"
             />
         <TextView android:id="@+id/status"
             android:layout_width="match_parent"
@@ -55,7 +54,6 @@
             android:minHeight="26dp"
 
             android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textSize="16dp"
             />
     </LinearLayout>
 </LinearLayout>
