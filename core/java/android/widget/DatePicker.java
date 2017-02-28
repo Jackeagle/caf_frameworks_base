@@ -231,7 +231,7 @@ public class DatePicker extends FrameLayout {
         mDaySpinnerInput = (EditText) mDaySpinner.findViewById(R.id.numberpicker_input);
 
         // Modify Datepicker and Timepicker focus highlight function start
-        if (true) {
+        if (!context.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
             mDaySpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
                 public void onFocusChange(View v, boolean hasFocus) {
                     if (hasFocus) {
@@ -253,7 +253,7 @@ public class DatePicker extends FrameLayout {
         mMonthSpinnerInput = (EditText) mMonthSpinner.findViewById(R.id.numberpicker_input);
 
         // Modify Datepicker and Timepicker focus highlight function start
-        if (true) {
+        if (!context.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
             mMonthSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
                 public void onFocusChange(View v, boolean hasFocus) {
                     if (hasFocus) {
@@ -272,7 +272,7 @@ public class DatePicker extends FrameLayout {
         mYearSpinnerInput = (EditText) mYearSpinner.findViewById(R.id.numberpicker_input);
 
         // Modify Datepicker and Timepicker focus highlight function start
-        if (true) {
+        if (!context.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
             mYearSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
                 public void onFocusChange(View v, boolean hasFocus) {
                     if (hasFocus) {

@@ -167,7 +167,7 @@ public class TimePicker extends FrameLayout {
         mHourSpinnerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
 
         // Modify Datepicker and Timepicker focus highlight function start
-        if (true) {
+        if (!context.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
             mHourSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
                 public void onFocusChange(View v, boolean hasFocus) {
                     if (hasFocus) {
@@ -218,7 +218,7 @@ public class TimePicker extends FrameLayout {
         mMinuteSpinnerInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
 
         // Modify Datepicker and Timepicker focus highlight function start
-        if (true) {
+        if (!context.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
             mMinuteSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
                 public void onFocusChange(View v, boolean hasFocus) {
                     if (hasFocus) {
@@ -267,7 +267,7 @@ public class TimePicker extends FrameLayout {
             mAmPmSpinnerInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
 
             // Modify Datepicker and Timepicker focus highlight function start
-            if (true) {
+            if (!context.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
                 mAmPmSpinner.setOnFocusChangeListener(new OnFocusChangeListener() {
                     public void onFocusChange(View v, boolean hasFocus) {
                         if (hasFocus) {
