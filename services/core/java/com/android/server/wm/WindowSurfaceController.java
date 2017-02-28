@@ -57,6 +57,12 @@ class WindowSurfaceController {
     private float mSurfaceW = 0;
     private float mSurfaceH = 0;
 
+    // Initialize identity matrix.
+    private float mMatrixLastDsdx = 1;
+    private float mMatrixLastDtdx = 0;
+    private float mMatrixLastDsdy = 0;
+    private float mMatrixLastDtdy = 1;
+
     private float mSurfaceAlpha = 0;
 
     private int mSurfaceLayer = 0;
@@ -266,6 +272,17 @@ class WindowSurfaceController {
 
     void setMatrixInTransaction(float dsdx, float dtdx, float dsdy, float dtdy,
             boolean recoveringMemory) {
+        final boolean matrixChanged = mMatrixLastDsdx != dsdx || mMatrixLastDtdx != dtdx ||
+                                      mMatrixLastDsdy != dsdy || mMatrixLastDtdy != dtdy;
+        if (!matrixChanged) {
+            return;
+        }
+
+        mMatrixLastDsdx = dsdx;
+        mMatrixLastDtdx = dtdx;
+        mMatrixLastDsdy = dsdy;
+        mMatrixLastDtdy = dtdy;
+
         try {
             if (SHOW_TRANSACTIONS) logSurface(
                     "MATRIX [" + dsdx + "," + dtdx + "," + dsdy + "," + dtdy + "]", null);
@@ -281,7 +298,6 @@ class WindowSurfaceController {
                 mAnimator.reclaimSomeSurfaceMemory("matrix", true);
             }
         }
-        return;
     }
 
     boolean setSizeInTransaction(int width, int height, boolean recoveringMemory) {
@@ -318,6 +334,10 @@ class WindowSurfaceController {
                 mSurfaceControl.setAlpha(alpha);
                 mSurfaceLayer = layer;
                 mSurfaceControl.setLayer(layer);
+                mMatrixLastDsdx = dsdx;
+                mMatrixLastDtdx = dtdx;
+                mMatrixLastDsdy = dsdy;
+                mMatrixLastDtdy = dtdy;
                 mSurfaceControl.setMatrix(
                         dsdx, dtdx, dsdy, dtdy);
 
