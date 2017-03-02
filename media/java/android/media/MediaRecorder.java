@@ -89,6 +89,7 @@ public class MediaRecorder
     private Surface mSurface;
 
     private String mPath;
+    private boolean mPrepared;
     private FileDescriptor mFd;
     private EventHandler mEventHandler;
     private OnErrorListener mOnErrorListener;
@@ -808,6 +809,23 @@ public class MediaRecorder
     {
         mFd = null;
         mPath = path;
+        if (mPath != null && mPrepared) {
+            RandomAccessFile file = null;
+            try {
+                file = new RandomAccessFile(mPath, "rws");
+                Log.d(TAG, "set next out put file: " + mPath);
+                _setOutputFile(file.getFD(), 0, 0);
+            } catch(Exception e) {
+
+            } finally {
+                try{
+                    if(file != null)
+                        file.close();
+                }catch(Exception e) {
+
+                }
+            }
+        }
     }
 
     // native implementation
@@ -840,6 +858,7 @@ public class MediaRecorder
         }
 
         _prepare();
+        mPrepared = true;
     }
 
     /**
