@@ -47,6 +47,10 @@ public class PhoneFallbackEventHandler implements FallbackEventHandler {
     SearchManager mSearchManager;
     TelephonyManager mTelephonyManager;
 
+    private static final String APPLICATION_CONTACTS = "com.android.contacts";
+    private static final String APPLICATION_DIALER = "com.android.dialer";
+
+
     public PhoneFallbackEventHandler(Context context) {
         mContext = context;
     }
@@ -113,7 +117,12 @@ public class PhoneFallbackEventHandler implements FallbackEventHandler {
                     break;
                 }
                 if (event.getRepeatCount() == 0) {
-                    dispatcher.startTracking(event, this);
+                    /** The below line is commented out since we do not want the
+                     *  the long press of this key event down in the hierarchy.
+                     *  If the key event has reached this level that means app
+                     *  is not interested to handle this key any more.
+                     */
+                    //dispatcher.startTracking(event, this);
                 } else if (event.isLongPress() && dispatcher.isTracking(event)) {
                     dispatcher.performedLongPress(event);
                     mView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
@@ -239,8 +248,22 @@ public class PhoneFallbackEventHandler implements FallbackEventHandler {
                 if (event.isTracking() && !event.isCanceled()) {
                     startCallActivity();
                 }
+                //The below block will get executed when the app is not
+                //interested to handle the event any more
+                if (getTelephonyManager().getCallState()
+                        == TelephonyManager.CALL_STATE_IDLE) {
+                    //There is no active call, so launch call log
+                    Intent intent = new Intent("com.android.phone.action.RECENT_CALLS");
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                    mContext.startActivity(intent);
+                    return true;
+                } else {
+                    //Else launch In-Call screen
+                    startCallActivity();
                 return true;
             }
+          }
         }
         return false;
     }
