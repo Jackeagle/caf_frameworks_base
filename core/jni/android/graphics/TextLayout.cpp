@@ -68,7 +68,7 @@ void TextLayout::getTextRunAdvances(SkPaint* paint, const jchar* chars, jint sta
                                     jint count, jint contextCount, jint dirFlags,
                                     jfloat* resultAdvances, jfloat* resultTotalAdvance) {
 
-#ifdef REVERIE
+/*#ifdef REVERIE
     int ii = 0;
     for(int i = 0; i < count; i++){
         if((chars[i + start] > 0x900 && chars[i + start] < 0xaff) || (chars[i + start] >0xb80 &&
@@ -104,7 +104,7 @@ void TextLayout::getTextRunAdvances(SkPaint* paint, const jchar* chars, jint sta
         }
         return;
     }
-#endif
+#endif*/
 
     sp<TextLayoutValue> value = TextLayoutEngine::getInstance().getValue(paint,
             chars, start, count, contextCount, dirFlags);
