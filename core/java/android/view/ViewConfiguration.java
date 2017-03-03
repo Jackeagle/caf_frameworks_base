@@ -25,6 +25,7 @@ import android.os.RemoteException;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.SparseArray;
+import android.os.SystemProperties;
 
 /**
  * Contains methods to standard constants used in the UI for timeouts, sizes, and distances.
@@ -65,8 +66,13 @@ public class ViewConfiguration {
 
     /**
      * Defines the time between successive key repeats in milliseconds.
+     * Default was 50. But the scroll is very slow -- about 20 fps.
+     * Hence, using a property, control key repeat delay to improve the
+     * scroll fps for keypad arrow scroll.
+     *
+     * private static final int KEY_REPEAT_DELAY = 50;
      */
-    private static final int KEY_REPEAT_DELAY = 50;
+    private static final int KEY_REPEAT_DELAY = SystemProperties.getInt("ro.sys.fw.key_repeat_delay",50);;
 
     /**
      * Defines the duration in milliseconds a user needs to hold down the
