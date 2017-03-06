@@ -6756,7 +6756,11 @@ public class WindowManagerService extends IWindowManager.Stub
             // Update the configuration based on available input devices, lid switch,
             // and platform configuration.
             config.touchscreen = Configuration.TOUCHSCREEN_NOTOUCH;
-            config.keyboard = Configuration.KEYBOARD_12KEY;
+            if(mContext.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
+                config.keyboard = Configuration.KEYBOARD_NOKEYS;
+            } else {
+                config.keyboard = Configuration.KEYBOARD_12KEY;
+            }
             config.navigation = Configuration.NAVIGATION_NONAV;
 
             int keyboardPresence = 0;
