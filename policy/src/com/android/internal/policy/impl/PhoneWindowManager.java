@@ -1230,25 +1230,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-   public boolean getPhoneType() {
-        boolean mIstouch = false;
-        int mSubType=0;
-        String mPlatform;
-        mSubType = Integer.parseInt(SystemProperties.get("persist.subtype","0"));
-        mPlatform = SystemProperties.get("persist.hwplatform","UNDEFINED");
-
-        if (mSubType == 2 && mPlatform.equals("QRD"))
-            mIstouch = false;
-        else
-            mIstouch = true;
-        return mIstouch;
-    }
-
     public void updateSettings() {
         ContentResolver resolver = mContext.getContentResolver();
         boolean updateRotation = false;
         synchronized (mLock) {
-            if(getPhoneType()){
+            if(mContext.getPackageManager().hasSystemFeature("android.hardware.touchscreen")){
                 mEndcallBehavior = Settings.System.getIntForUser(resolver,
                         Settings.System.END_BUTTON_BEHAVIOR,
                         Settings.System.END_BUTTON_BEHAVIOR_DEFAULT,

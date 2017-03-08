@@ -53,18 +53,7 @@ public class KeyguardService extends Service {
                     KeyguardService.this, new LockPatternUtils(KeyguardService.this));
         }
         Log.v(TAG, "onCreate()");
-        isPhoneTypeTouch = getPhoneType();
-    }
-   public boolean getPhoneType() {
-        boolean mKeyguard = false;
-        mSubType = Integer.parseInt(SystemProperties.get("persist.subtype","0"));
-        mPlatform = SystemProperties.get("persist.hwplatform","UNDEFINED");
-
-        if (mSubType == 2 && mPlatform.equals("QRD"))
-            mKeyguard = false;
-        else
-            mKeyguard = true;
-        return mKeyguard;
+        isPhoneTypeTouch = getBaseContext().getPackageManager().hasSystemFeature("android.hardware.touchscreen");
     }
 
     @Override
