@@ -546,9 +546,13 @@ public final class ClientSession extends ObexSession {
                         data = new byte[length - 7];
 
                         bytesReceived = mInput.read(data);
-                        while (bytesReceived != (length - 7)) {
-                            bytesReceived += mInput.read(data, bytesReceived, data.length
-                                    - bytesReceived);
+                        try {
+                            while (bytesReceived != (length - 7)) {
+                                bytesReceived += mInput.read(data, bytesReceived, data.length
+                                        - bytesReceived);
+                            }
+                        } catch(ArrayIndexOutOfBoundsException e) {
+                            throw new IOException(e);
                         }
                     } else {
                         return true;
@@ -557,8 +561,13 @@ public final class ClientSession extends ObexSession {
                     data = new byte[length - 3];
                     bytesReceived = mInput.read(data);
 
-                    while (bytesReceived != (length - 3)) {
-                        bytesReceived += mInput.read(data, bytesReceived, data.length - bytesReceived);
+                    try {
+                        while (bytesReceived != (length - 3)) {
+                            bytesReceived += mInput.read(data, bytesReceived,
+                                data.length - bytesReceived);
+                        }
+                    } catch(ArrayIndexOutOfBoundsException e) {
+                        throw new IOException(e);
                     }
                     if (opCode == ObexHelper.OBEX_OPCODE_ABORT) {
                         return true;
