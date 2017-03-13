@@ -2551,6 +2551,11 @@
     <integer name="animationboost_timeout_param">0</integer>
     <integer-array name="animationboost_param_value"/>
 
+    <!-- Whether cpu boost is enabled for pre-fling. -->
+    <bool name="config_enableCpuBoostForPreFling">false</bool>
+    <integer name="preflingboost_timeout_param">0</integer>
+    <integer-array name="preflingboost_param_value"/>
+
     <!-- Whether cpu boost is enabled for overscroller fling. -->
     <bool name="config_enableCpuBoostForOverScrollerFling">false</bool>
     <integer name="flingboost_timeout_param">0</integer>
@@ -2673,7 +2678,7 @@
     </integer-array>
 
     <!--  Enable framework to record video call data usage -->
-    <bool name="config_video_call_datausage_enable">true</bool>
+    <bool name="config_video_call_datausage_enable">false</bool>
     <!-- Enables the feature that can show/hide the operator name in statusbar.
         When true, the user can select to show/hide operator name through a
         checkbox in Settings. When false, there is no option to show operator
