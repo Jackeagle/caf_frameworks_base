@@ -2749,6 +2749,10 @@
     <!-- Do not translate. Default access point SSID used for tethering -->
     <string name="wifi_tether_configure_ssid_default" translatable="false">AndroidAP</string>
 
+    <!-- Do not translate. Default access point SSID used for eogre tethering -->
+    <string name="wifi_tether_configure_eogre_ssid_default" translatable="false">Jionet</string>
+
+
     <!-- A notification is shown the first time a connection is attempted on an app owned AP -->
     <!-- title for this message -->
     <string name="wifi_connect_alert_title">Allow connection?</string>
