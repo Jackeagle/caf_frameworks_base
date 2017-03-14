@@ -60,7 +60,7 @@ public class KeyguardService extends Service {
         mSubType = Integer.parseInt(SystemProperties.get("persist.subtype","0"));
         mPlatform = SystemProperties.get("persist.hwplatform","UNDEFINED");
 
-        if ((mSubType == 2 || mSubType == 0) && mPlatform.equals("QRD"))
+        if (mSubType == 2 && mPlatform.equals("QRD"))
             mKeyguard = false;
         else
             mKeyguard = true;
