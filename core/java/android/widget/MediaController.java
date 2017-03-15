@@ -595,6 +595,23 @@ public class MediaController extends FrameLayout {
                 }
                 return true;
             }
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            AudioManager lAudioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+            int liMaxVolume = lAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            int liVolumeIndex = lAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            if (liVolumeIndex < liMaxVolume) {
+                lAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, liVolumeIndex+1,
+                        AudioManager.FLAG_SHOW_UI);
+            }
+            return true;
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            AudioManager lAudioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+            int liVolumeIndex = lAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            if (liVolumeIndex > 0) {
+                lAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, liVolumeIndex-1,
+                        AudioManager.FLAG_SHOW_UI);
+            }
+            return true;
         }
 
         show(sDefaultTimeout);
@@ -609,6 +626,7 @@ public class MediaController extends FrameLayout {
         setProgress();
         show(sDefaultTimeout);
     }
+
     private void moveToRight() {
         int pos = mPlayer.getCurrentPosition();
         pos += 15000; // milliseconds
@@ -773,7 +791,7 @@ public class MediaController extends FrameLayout {
 
         if (mRoot != null) {
             installPrevNextListeners();
-            
+
             if (mNextButton != null && !mFromXml) {
                 mNextButton.setVisibility(View.VISIBLE);
             }
