@@ -183,6 +183,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static public final String SYSTEM_DIALOG_REASON_ASSIST = "assist";
     static public final String APPLICATION_HOME = "com.featurephone.launcher";
     static public final String APPLICATION_HOME_MAIN_ACTIVITY = "com.featurephone.launcher.LauncherActivity";
+    static private final String APPLICATION_CALL = "com.android.dialer";
+    static private final String APPLICATION_CALL_CLASS = "com.android.incallui.InCallActivity";
+    private static final String DEFAULT_VALUE = "1";
     //Intent extra to say whether Home got visibility due to RED key press
     private static final String INTENT_EXTRA_FOR_RED_KEY = "extra_for_red_key_press";
 
@@ -1230,25 +1233,29 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-   public boolean getPhoneType() {
-        boolean mIstouch = false;
-        int mSubType=0;
-        String mPlatform;
-        mSubType = Integer.parseInt(SystemProperties.get("persist.subtype","0"));
-        mPlatform = SystemProperties.get("persist.hwplatform","UNDEFINED");
+   private boolean isRuggedPhone() {
+        boolean isruggedphone = false;
+        int mSubType = Integer.parseInt(SystemProperties.get("persist.isruggedphone","0"));
 
-        if (mSubType == 2 && mPlatform.equals("QRD"))
-            mIstouch = false;
+        if (mSubType == 1)
+            isruggedphone = true;
         else
-            mIstouch = true;
-        return mIstouch;
+            isruggedphone = false;
+        return isruggedphone;
     }
+
+   private boolean isDeviceTouch(){
+       if(mContext.getPackageManager().hasSystemFeature("android.hardware.touchscreen"))
+           return true;
+       else
+           return false;
+   }
 
     public void updateSettings() {
         ContentResolver resolver = mContext.getContentResolver();
         boolean updateRotation = false;
         synchronized (mLock) {
-            if(getPhoneType()){
+            if(isDeviceTouch()){
                 mEndcallBehavior = Settings.System.getIntForUser(resolver,
                         Settings.System.END_BUTTON_BEHAVIOR,
                         Settings.System.END_BUTTON_BEHAVIOR_DEFAULT,
@@ -4312,12 +4319,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     boolean hungUp = false;
                     if (telephonyService != null) {
                         try {
-                            if (telephonyService.isRinging()) {
+                            if (telephonyService.isRinging()  &&
+                                   !isRuggedPhone() && !isDeviceTouch()) {
+                                hungUp = telephonyService.endCall();
+                            } if (telephonyService.isRinging() &&
+                                   (isRuggedPhone()|| isDeviceTouch())) {
                                 // Pressing Power while there's a ringing incoming
                                 // call should silence the ringer.
                                 telephonyService.silenceRinger();
-                            } else if ((mIncallPowerBehavior
-                                    & Settings.Secure.INCALL_POWER_BUTTON_BEHAVIOR_HANGUP) != 0
+                            } else if ((((mIncallPowerBehavior
+                                    & Settings.Secure.INCALL_POWER_BUTTON_BEHAVIOR_HANGUP) != 0)
+                                    ||(!mContext.getPackageManager().hasSystemFeature("android.hardware.touchscreen")))
                                     && telephonyService.isOffhook()) {
                                 // Otherwise, if "Power button ends call" is enabled,
                                 // the Power button will hang up any current active call.
@@ -4339,10 +4351,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                              // it is already in the process of turning the
                              // screen on.
                         } else {
+                                boolean status = false;
+                                if (!isRuggedPhone() && !isDeviceTouch()){
+                                    status = handleShortPressOnPowerKey();
+                               }
                             CharSequence emergencyDialerClass = "com.android.phone.EmergencyDialer";
                             if (mFocusedWindow != null &&
                                     mFocusedWindow.toString().contains(emergencyDialerClass)) {
                                 result = 1;
+                            } else if (status) {
+                                result = 0;
                             }
                         }
                     }
@@ -4494,6 +4512,86 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         return true;
     }
 
+    /**
+     * Handles short press of Power key.
+     *  1. Active CS call:-
+     *     a. If the the active In-Call Screen is foreground, then end the call
+     *        directly in short press of POWER key in ACTION_UP.
+     *     b. If they are in background and device is not locked, then bring the
+     *        in-call screen to foreground  in short press of POWER key in ACTION_UP.
+     *     c. If they are in background and device is locked, then end the active
+     *        call directly  in short press of POWER key in ACTION_UP.
+     *     d. Long press should not have any action rather it should behave as
+     *        short press.
+     *  2. There is no active CS call:-
+     *     a. If the device is locked or Home screen is visible, then short press
+     *        of POWER key in ACTION_UP should not do anything and long press
+     *        will show the power off dialogue
+     *     b. If the device is not locked and Home screen is not visible, that
+     *        means some other app is visible, then short press  of POWER key in
+     *        ACTION_UPwill take the user to home and long press should show
+     *        power off dialogue.
+     *   3. Short press of POWER key will never turn the display off.
+     *   4. Short press of POWER key will always turn on the display if the
+     *      display is turned off.
+     *
+     */
+      private boolean handleShortPressOnPowerKey(){
+        ITelephony telephonyService = getTelephonyService();
+        if (telephonyService == null) {
+            return false;
+        }
+        boolean retVal = false;
+        boolean isCallInProgress = false;
+        try {
+            if (telephonyService.isOffhook()) {
+                isCallInProgress = true;
+                // CS call is in progress
+                String currentFocusedWindow = mFocusedWindow != null ?
+                    mFocusedWindow.toString() : null;
+                if ((currentFocusedWindow != null) &&
+                    (currentFocusedWindow.contains(APPLICATION_CALL_CLASS))) {
+                   // Active CS In-Call screen is in foreground
+                   return telephonyService.endCall();
+                } else {
+                    // Active CS In-Call screen is in background
+                    if(mKeyguardDelegate.isShowing()) {
+                        // Device is locked, end the active CS call directly
+                        return telephonyService.endCall();
+                    } else {
+                       // Device is not locked, so bringing the CS In-Call screen to foreground
+                        Intent intent = new Intent();
+                        intent.setAction(intent.ACTION_MAIN);
+                        intent.setClassName(APPLICATION_CALL,APPLICATION_CALL_CLASS);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                        try {
+                            // close all the system dialog before bringing the
+                            // CS In-Call screen to foreground
+                            sendCloseSystemWindows();
+                            mContext.startActivity(intent);
+                            return true;
+                        } catch (ActivityNotFoundException ex) {
+                            Log.e(TAG, "Activity not found", ex);
+                            retVal = false;
+                        }
+                    }
+               }
+           }
+          } catch (RemoteException ex) {
+              Log.w(TAG, "ITelephony threw RemoteException", ex);
+               return false;
+          }
+          //There is no active CS call
+          if (!isCallInProgress) {
+              if((!mKeyguardDelegate.isShowing() && !isHomeVisible())) {
+                   if (goHome(true)) {
+                       return true;
+                   }
+              }
+          }
+      return retVal;
+    }
 
     /** {@inheritDoc} */
     @Override
@@ -5370,7 +5468,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     boolean goHome(boolean isHomeTriggeredFromRedKey) {
         // Add the feature to control press endcall button enter to home by wanglei 20131230 start
-        if (isHomeTriggeredFromRedKey) {
+        if (isHomeTriggeredFromRedKey && isRuggedPhone()) {
         // Add the feature to control press endcall button enter to home by wanglei 20131230 end
             //This code prevent bringing home to front when screen is locked.
             if(!mKeyguardDelegate.isShowing()) {
