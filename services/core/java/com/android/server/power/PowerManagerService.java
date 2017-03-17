@@ -166,6 +166,7 @@ public final class PowerManagerService extends SystemService
     // Power hints defined in hardware/libhardware/include/hardware/power.h.
     private static final int POWER_HINT_LOW_POWER = 5;
     private static final int POWER_HINT_VR_MODE = 7;
+    private static final int POWER_HINT_DISABLE_TOUCH = 9;
 
     // Power features defined in hardware/libhardware/include/hardware/power.h.
     private static final int POWER_FEATURE_DOUBLE_TAP_TO_WAKE = 1;
@@ -1287,6 +1288,7 @@ public final class PowerManagerService extends SystemService
                     break;
             }
 
+            powerHintInternal(POWER_HINT_DISABLE_TOUCH, mTheaterModeEnabled ? 1 : 0);
             mLastSleepTime = eventTime;
             mSandmanSummoned = true;
             setWakefulnessLocked(WAKEFULNESS_DOZING, reason);

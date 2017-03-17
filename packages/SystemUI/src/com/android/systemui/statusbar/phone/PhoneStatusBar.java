@@ -1464,13 +1464,17 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
     };
 
     private void awakenDreams() {
-        if (mDreamManager != null) {
+        if (mDreamManager != null && !isTheaterModeOn()) {
             try {
                 mDreamManager.awaken();
             } catch (RemoteException e) {
                 // fine, stay asleep then
             }
         }
+    }
+
+    private boolean isTheaterModeOn() {
+        return Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.THEATER_MODE_ON, 0) == 1;
     }
 
     private void prepareNavigationBarView() {
