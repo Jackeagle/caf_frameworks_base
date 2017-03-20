@@ -2421,16 +2421,16 @@ please see styles_device_defaults.xml.
     <!-- Dialog styles -->
 
     <style name="AlertDialog.Holo" parent="AlertDialog">
-        <item name="fullDark">@android:drawable/dialog_full_holo_dark</item>
-        <item name="topDark">@android:drawable/dialog_top_holo_dark</item>
-        <item name="centerDark">@android:drawable/dialog_middle_holo_dark</item>
-        <item name="bottomDark">@android:drawable/dialog_bottom_holo_dark</item>
-        <item name="fullBright">@android:drawable/dialog_full_holo_dark</item>
-        <item name="topBright">@android:drawable/dialog_top_holo_dark</item>
-        <item name="centerBright">@android:drawable/dialog_middle_holo_dark</item>
-        <item name="bottomBright">@android:drawable/dialog_bottom_holo_dark</item>
-        <item name="bottomMedium">@android:drawable/dialog_bottom_holo_dark</item>
-        <item name="centerMedium">@android:drawable/dialog_middle_holo_dark</item>
+        <item name="fullDark">@android:color/black</item>
+        <item name="topDark">@android:color/black</item>
+        <item name="centerDark">@android:color/black</item>
+        <item name="bottomDark">@android:color/black</item>
+        <item name="fullBright">@android:color/black</item>
+        <item name="topBright">@android:color/black</item>
+        <item name="centerBright">@android:color/black</item>
+        <item name="bottomBright">@android:color/black</item>
+        <item name="bottomMedium">@android:color/black</item>
+        <item name="centerMedium">@android:color/black</item>
         <item name="layout">@android:layout/alert_dialog_holo</item>
         <item name="listLayout">@android:layout/select_dialog_holo</item>
         <item name="progressLayout">@android:layout/progress_dialog_holo</item>
@@ -2441,16 +2441,16 @@ please see styles_device_defaults.xml.
     </style>
 
     <style name="AlertDialog.Holo.Light">
-        <item name="fullDark">@android:drawable/dialog_full_holo_light</item>
-        <item name="topDark">@android:drawable/dialog_top_holo_light</item>
-        <item name="centerDark">@android:drawable/dialog_middle_holo_light</item>
-        <item name="bottomDark">@android:drawable/dialog_bottom_holo_light</item>
-        <item name="fullBright">@android:drawable/dialog_full_holo_light</item>
-        <item name="topBright">@android:drawable/dialog_top_holo_light</item>
-        <item name="centerBright">@android:drawable/dialog_middle_holo_light</item>
-        <item name="bottomBright">@android:drawable/dialog_bottom_holo_light</item>
-        <item name="bottomMedium">@android:drawable/dialog_bottom_holo_light</item>
-        <item name="centerMedium">@android:drawable/dialog_middle_holo_light</item>
+        <item name="fullDark">@android:color/white</item>
+        <item name="topDark">@android:color/white</item>
+        <item name="centerDark">@android:color/white</item>
+        <item name="bottomDark">@android:color/white</item>
+        <item name="fullBright">@android:color/white</item>
+        <item name="topBright">@android:color/white</item>
+        <item name="centerBright">@android:color/white</item>
+        <item name="bottomBright">@android:color/white</item>
+        <item name="bottomMedium">@android:color/white</item>
+        <item name="centerMedium">@android:color/white</item>
     </style>
 
     <!-- Window title -->

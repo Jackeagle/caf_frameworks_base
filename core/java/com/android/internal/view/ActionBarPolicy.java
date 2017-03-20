@@ -23,6 +23,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.os.Build;
+import android.os.SystemProperties;
 import android.view.ViewConfiguration;
 
 /**
@@ -45,16 +46,18 @@ public class ActionBarPolicy {
     }
 
     public boolean showsOverflowMenuButton() {
-        //BORQS : 0032674: Overflow menu shown eventhough hard menu key available
+        //Overflow menu shown eventhough hard menu key available
         //Considering this device dimensions and it has permanent menu key,
         //overflow menu being removed and shown in hard menu key
-        // Modify to auto show overflow menu button by liuzhihao 20140303 start
-        // return true;
+        // Modify to show overflow menu button
+        if(SystemProperties.get("persist.sys.showbottomactionbar", "0").equals("1")) {
+            return true;
+        }
         return !ViewConfiguration.get(mContext).hasPermanentMenuKey() ||
                 ((mContext.getResources().getConfiguration().uiMode &
                         Configuration.UI_MODE_TYPE_TELEVISION) ==
                         Configuration.UI_MODE_TYPE_TELEVISION);
-        // Modify to auto show overflow menu button by liuzhihao 20140303 end
+        // Modify to show overflow menu button
     }
 
     public int getEmbeddedMenuWidthLimit() {

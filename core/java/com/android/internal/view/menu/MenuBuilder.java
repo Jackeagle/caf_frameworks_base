@@ -27,6 +27,7 @@ import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.util.SparseArray;
 import android.view.ActionProvider;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -41,6 +42,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import android.util.Log;
 
 /**
  * Implementation of the {@link android.view.Menu} interface for creating a
@@ -526,8 +528,20 @@ public class MenuBuilder implements Menu {
         if (mExpandedItem != null) {
             collapseItemActionView(mExpandedItem);
         }
-        mItems.clear();
-        
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            MenuItem backmenuitem = findItem(com.android.internal.R.id.back_button);
+            mItems.clear();
+            if(backmenuitem != null) {
+                Log.d(TAG,"clear(), NO BACK, so add");
+                MenuItem menuitem = findItem(com.android.internal.R.id.back_button);
+                if(menuitem == null) {
+                    mItems.add((MenuItemImpl)backmenuitem);
+                    Log.d(TAG, "adding BACK Menu item again");
+                }
+            }
+        } else {
+            mItems.clear();
+        }
         onItemsChanged(true);
     }
 

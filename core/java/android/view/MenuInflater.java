@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Xml;
@@ -364,6 +365,11 @@ public class MenuInflater {
             itemVisible = a.getBoolean(com.android.internal.R.styleable.MenuItem_visible, groupVisible);
             itemEnabled = a.getBoolean(com.android.internal.R.styleable.MenuItem_enabled, groupEnabled);
             itemShowAsAction = a.getInt(com.android.internal.R.styleable.MenuItem_showAsAction, -1);
+            //Change the Menu item as action, show if room available
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                itemShowAsAction = MenuItem.SHOW_AS_ACTION_WITH_TEXT | MenuItem.SHOW_AS_ACTION_IF_ROOM;
+                Log.d(LOG_TAG, "changed itemShowAsAction = "+itemShowAsAction);
+            }
             itemListenerMethodName = a.getString(com.android.internal.R.styleable.MenuItem_onClick);
             itemActionViewLayout = a.getResourceId(com.android.internal.R.styleable.MenuItem_actionLayout, 0);
             itemActionViewClassName = a.getString(com.android.internal.R.styleable.MenuItem_actionViewClass);

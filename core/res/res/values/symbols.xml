@@ -1905,4 +1905,6 @@
   <java-symbol type="color" name="config_defaultNotificationColor_Green" />
   <!-- Modify config_defaultNotificationColor to green liyang 20131226 start -->
 
+  <!-- Menu submenu indicator -->
+  <java-symbol type="layout" name="list_menu_item_submenu_indicator" />
 </resources>

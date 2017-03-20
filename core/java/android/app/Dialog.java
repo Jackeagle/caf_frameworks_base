@@ -31,6 +31,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.ActionMode;
@@ -167,7 +168,11 @@ public class Dialog implements DialogInterface, Window.Callback,
         mWindow = w;
         w.setCallback(this);
         w.setWindowManager(mWindowManager, null, null);
-        w.setGravity(Gravity.CENTER);
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            w.setGravity(Gravity.BOTTOM);
+        } else {
+            w.setGravity(Gravity.CENTER);
+        }
         mListenersHandler = new ListenersHandler(this);
     }
 

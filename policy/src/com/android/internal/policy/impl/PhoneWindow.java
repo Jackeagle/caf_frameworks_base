@@ -58,6 +58,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.util.AndroidRuntimeException;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
@@ -878,7 +879,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             final PanelFeatureState st = getPanelState(featureId, true);
             if (featureId == FEATURE_OPTIONS_PANEL && mActionBar != null &&
                     mActionBar.isOverflowReserved() &&
-                    !ViewConfiguration.get(getContext()).hasPermanentMenuKey()) {
+                    (!ViewConfiguration.get(getContext()).hasPermanentMenuKey() ||
+                    SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1"))) {
                 if (mActionBar.getVisibility() == View.VISIBLE) {
                     if (!mActionBar.isOverflowMenuShowing()) {
                         if (!isDestroyed() && preparePanel(st, event)) {
@@ -3177,14 +3179,22 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     }
 
                     boolean splitActionBar = false;
-                    final boolean splitWhenNarrow =
+                    boolean splitWhenNarrow =
                             (mUiOptions & ActivityInfo.UIOPTION_SPLIT_ACTION_BAR_WHEN_NARROW) != 0;
+                            //force to show split action bar
+                    if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                        splitWhenNarrow = true;
+                    }
                     if (splitWhenNarrow) {
                         splitActionBar = getContext().getResources().getBoolean(
                                 com.android.internal.R.bool.split_action_bar_is_narrow);
                     } else {
                         splitActionBar = getWindowStyle().getBoolean(
                                 com.android.internal.R.styleable.Window_windowSplitActionBar, false);
+                    }
+                    //force to show split action bar
+                    if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                        splitActionBar = true;
                     }
                     final ActionBarContainer splitView = (ActionBarContainer) findViewById(
                             com.android.internal.R.id.split_action_bar);
