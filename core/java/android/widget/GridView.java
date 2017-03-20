@@ -913,8 +913,9 @@ public class GridView extends AbsListView {
 
             sel = makeRow(mStackFromBottom ? rowEnd : rowStart, oldTop - verticalSpacing, false);
             referenceView = mReferenceView;
-
-            adjustForTopFadingEdge(referenceView, topSelectionPixel, bottomSelectionPixel);
+            if (referenceView != null) {
+                adjustForTopFadingEdge(referenceView, topSelectionPixel, bottomSelectionPixel);
+            }
         } else {
             /*
              * Keep selection where it was
