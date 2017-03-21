@@ -134,6 +134,42 @@ public class ListView extends AbsListView {
 
     // Keeps focused children visible through resizes
     private FocusSelector mFocusSelector;
+        /**
+     * The listener that receives notifications of current and next selection items.
+     */
+    OnItemSelectionMoveListener mOnItemSelectionMoveListener;
+
+    /**
+     * Interface definition for a callback to be invoked when the list selection
+     * is moving.
+     *@hide
+     */
+    public interface OnItemSelectionMoveListener {
+
+        /**
+         * Callback method to be invoked when view selection is about to move from
+         * current selected view to next preferred selection view
+         *
+         * @param currentSelection current selected view
+         * @param nextSelection next view candidate for selection
+         * @hide
+         */
+    public void onItemSelectionMoving(View currentSelection, View nextSelection);
+    }
+
+    /**
+     * Applications that need to expand item getting selection
+     * and collapse item loosing selection should set this listener and
+     * handle expand/collapse in their code.
+     * This should be called before setting adapter.
+     *
+     * @param listener The callback that will run
+     *@hide
+     */
+    public void setOnItemSelectionMoveListener(OnItemSelectionMoveListener listener) {
+        mOnItemSelectionMoveListener = listener;
+    }
+
 
     public ListView(Context context) {
         this(context, null);
@@ -1364,6 +1400,10 @@ public class ListView extends AbsListView {
         }
 
         if (tempIsSelected) {
+            // for first time selection handling in app post callback.
+            if (mOnItemSelectionMoveListener != null) {
+                mOnItemSelectionMoveListener.onItemSelectionMoving(null, temp);
+            }
             return temp;
         } else if (above != null) {
             return above;
@@ -2588,11 +2628,17 @@ public class ListView extends AbsListView {
             topView = getChildAt(topViewIndex);
             bottomView = selectedView;
             topSelected = true;
+            if (mOnItemSelectionMoveListener != null) {
+                mOnItemSelectionMoveListener.onItemSelectionMoving(selectedView, topView);
+            }
         } else {
             topViewIndex = selectedIndex;
             bottomViewIndex = nextSelectedIndex;
             topView = selectedView;
             bottomView = getChildAt(bottomViewIndex);
+            if (mOnItemSelectionMoveListener != null) {
+                mOnItemSelectionMoveListener.onItemSelectionMoving(selectedView, bottomView);
+            }
         }
 
         final int numChildren = getChildCount();
