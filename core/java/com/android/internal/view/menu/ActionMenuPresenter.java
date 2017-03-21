@@ -21,13 +21,16 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.transition.Transition;
 import android.transition.TransitionManager;
+import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.ActionProvider;
 import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.SoundEffectConstants;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.MeasureSpec;
 import android.view.ViewGroup;
@@ -40,6 +43,7 @@ import com.android.internal.view.ActionBarPolicy;
 import com.android.internal.view.menu.ActionMenuView.ActionMenuChildView;
 
 import java.util.ArrayList;
+import android.widget.Button;
 
 /**
  * MenuPresenter for building action menus as seen in the action bar and action modes.
@@ -47,6 +51,7 @@ import java.util.ArrayList;
 public class ActionMenuPresenter extends BaseMenuPresenter
         implements ActionProvider.SubUiVisibilityListener {
     private static final String TAG = "ActionMenuPresenter";
+    private static final boolean DEBUG = false;
 
     private View mOverflowButton;
     private boolean mReserveOverflow;
@@ -102,9 +107,15 @@ public class ActionMenuPresenter extends BaseMenuPresenter
         int width = mWidthLimit;
         if (mReserveOverflow) {
             if (mOverflowButton == null) {
-                mOverflowButton = new OverflowMenuButton(mSystemContext);
-                final int spec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
-                mOverflowButton.measure(spec, spec);
+                if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                    mOverflowButton = new OptionsMenuView(mSystemContext);
+                    final int spec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+                    mOverflowButton.measure(spec, spec);
+                } else {
+                    mOverflowButton = new OverflowMenuButton(mSystemContext);
+                    final int spec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+                    mOverflowButton.measure(spec, spec);
+                }
             }
             width -= mOverflowButton.getMeasuredWidth();
         } else {
@@ -243,7 +254,10 @@ public class ActionMenuPresenter extends BaseMenuPresenter
 
         if (hasOverflow) {
             if (mOverflowButton == null) {
-                mOverflowButton = new OverflowMenuButton(mSystemContext);
+                if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                    mOverflowButton = new OverflowMenuButton(mSystemContext);
+                } else
+                    mOverflowButton = new OverflowMenuButton(mSystemContext);
             }
             ViewGroup parent = (ViewGroup) mOverflowButton.getParent();
             if (parent != mMenuView) {
@@ -252,6 +266,29 @@ public class ActionMenuPresenter extends BaseMenuPresenter
                 }
                 ActionMenuView menuView = (ActionMenuView) mMenuView;
                 menuView.addView(mOverflowButton, menuView.generateOverflowButtonLayoutParams());
+                if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                    if(nonActionItems.size() == 1) {
+                     MenuItem rskMenuItem = mMenu.getNonActionItems().get(0);
+                        ((ActionMenuItemView)mOverflowButton).setText(rskMenuItem.getTitle());
+                        if (DEBUG) Log.d(TAG,"1 non action item, show as LSK::"+rskMenuItem.getTitle());
+                    } else if(nonActionItems.size() > 1) {
+                        if (DEBUG) Log.d(TAG,">1 non action item, LSK -> Options");
+                        ((ActionMenuItemView)mOverflowButton)
+                            .setText(com.android.internal.R.string.action_menu_overflow_icon_description);
+                    }
+                }
+            } else {
+                if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                    if((nonActionItems.size() > 1) && !isOverflowMenuShowing() && !isSubMenuShowing()) {
+                        if (DEBUG) Log.d(TAG, "change Select -> Options");
+                        ((ActionMenuItemView)mOverflowButton)
+                                .setText(com.android.internal.R.string.action_menu_overflow_icon_description);
+                    } else if(nonActionItems.size() == 1) {
+                        MenuItem lskMenuItem = mMenu.getNonActionItems().get(0);
+                        ((ActionMenuItemView)mOverflowButton).setText(lskMenuItem.getTitle());
+                        if (DEBUG) Log.d(TAG,"1 non action item, show as LSK::"+lskMenuItem.getTitle());
+                    }
+                }
             }
         } else if (mOverflowButton != null && mOverflowButton.getParent() == mMenuView) {
             ((ViewGroup) mMenuView).removeView(mOverflowButton);
@@ -283,6 +320,17 @@ public class ActionMenuPresenter extends BaseMenuPresenter
         mActionButtonPopup = new ActionButtonSubmenu(mContext, subMenu);
         mActionButtonPopup.setAnchorView(anchor);
         mActionButtonPopup.show();
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            if(mOverflowButton != null) {
+                if (DEBUG) Log.d(TAG,"onsubmenuselected,Options -> Select");
+                ((ActionMenuItemView)mOverflowButton).setText(com.android.internal.R.string.action_menu_select);
+            }
+            MenuItem menuitem = mMenu.findItem(com.android.internal.R.id.back_button);
+            if(menuitem != null) {
+                if (DEBUG) Log.d(TAG,"onsubmenuselected,Back -> Close");
+                menuitem.setTitle(com.android.internal.R.string.action_menu_close);
+            }
+        }
         super.onSubMenuSelected(subMenu);
         return true;
     }
@@ -318,6 +366,24 @@ public class ActionMenuPresenter extends BaseMenuPresenter
             // to indicate overflow is opening.
             super.onSubMenuSelected(null);
 
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                if (DEBUG) Log.d(TAG,"showoverflowmenu Back -> Close");
+                MenuItem menuitem = mMenu.findItem(com.android.internal.R.id.back_button);
+                if(menuitem != null) {
+                    menuitem.setTitle(com.android.internal.R.string.action_menu_close);
+                }
+                //Change Options text to Select
+                if((mMenu.getNonActionItems().size() > 1) && (mOverflowButton != null)) {
+                    if (DEBUG) Log.d(TAG,"showoverflowmenu Options -> Select");
+                    ((ActionMenuItemView)mOverflowButton).setText(com.android.internal.R.string.action_menu_select);
+                } else if(mMenu.getNonActionItems().size() == 1) {
+                    if (DEBUG) Log.d(TAG, "1 non Action item");
+                    MenuItem rskMenuItem = mMenu.getNonActionItems().get(0);
+                    mMenu.performItemAction(rskMenuItem, 0);
+                }
+                //if Close is being shown in the action bar, then
+                //Upon LSK key press, act as select.
+            }
             return true;
         }
         return false;
@@ -374,6 +440,13 @@ public class ActionMenuPresenter extends BaseMenuPresenter
      */
     public boolean isOverflowMenuShowing() {
         return mOverflowPopup != null && mOverflowPopup.isShowing();
+    }
+
+   /**
+     * @return true if the sub menu is currently showing
+     */
+    public boolean isSubMenuShowing() {
+        return mActionButtonPopup != null && mActionButtonPopup.isShowing();
     }
 
     public boolean isOverflowMenuShowPending() {
@@ -523,6 +596,24 @@ public class ActionMenuPresenter extends BaseMenuPresenter
 
     @Override
     public void onCloseMenu(MenuBuilder menu, boolean allMenusAreClosing) {
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            if (DEBUG) Log.d(TAG,"closing Menu, Close -> BACK");
+            MenuItem menuitem = mMenu.findItem(com.android.internal.R.id.back_button);
+            if(menuitem != null) {
+                menuitem.setTitle(com.android.internal.R.string.back_button_label);
+            }
+            if((isOverflowMenuShowing() || isSubMenuShowing()) && mOverflowButton != null) {
+                if (DEBUG) Log.d(TAG,"OnCloseMenu, Options -> Select");
+                ((ActionMenuItemView)mOverflowButton)
+                    .setText(com.android.internal.R.string.action_menu_select);
+            } else {
+                if(mMenu.getNonActionItems().size() > 1) {
+                if (DEBUG) Log.d(TAG,"onCloseMenu, Select -> Options");
+                ((ActionMenuItemView)mOverflowButton)
+                    .setText(com.android.internal.R.string.action_menu_overflow_icon_description);
+                }
+            }
+        }
         dismissPopupMenus();
         super.onCloseMenu(menu, allMenusAreClosing);
     }
@@ -666,6 +757,91 @@ public class ActionMenuPresenter extends BaseMenuPresenter
         }
     }
 
+    //This class shows the Options text in the splitactionbar
+    private class OptionsMenuView extends ActionMenuItemView implements ActionMenuChildView {
+        public OptionsMenuView(Context context) {
+            super(context, null, com.android.internal.R.attr.actionMenuTextAppearance);
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                setGravity(android.view.Gravity.CENTER);
+                setText(com.android.internal.R.string.action_menu_overflow_icon_description);
+            }
+
+            setClickable(true);
+            setVisibility(VISIBLE);
+            setEnabled(true);
+
+            setOnTouchListener(new ForwardingListener(this) {
+                @Override
+                public ListPopupWindow getPopup() {
+                    if (mOverflowPopup == null) {
+                        return null;
+                    }
+
+                    return mOverflowPopup.getPopup();
+                }
+
+                @Override
+                public boolean onForwardingStarted() {
+                    showOverflowMenu();
+                    return true;
+                }
+
+                @Override
+                public boolean onForwardingStopped() {
+                    // Displaying the popup occurs asynchronously, so wait for
+                    // the runnable to finish before deciding whether to stop
+                    // forwarding.
+                    if (mPostedOpenRunnable != null) {
+                        return false;
+                    }
+
+                    hideOverflowMenu();
+                    return true;
+                }
+            });
+        }
+
+        @Override
+        public boolean performClick() {
+            if (super.performClick()) {
+                return true;
+            }
+
+            playSoundEffect(SoundEffectConstants.CLICK);
+            showOverflowMenu();
+            return true;
+        }
+
+        @Override
+        public boolean needsDividerBefore() {
+            return false;
+        }
+
+        @Override
+        public boolean needsDividerAfter() {
+            return false;
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.AT_MOST) {
+                // Fill available height
+                heightMeasureSpec = MeasureSpec.makeMeasureSpec(
+                        MeasureSpec.getSize(heightMeasureSpec), MeasureSpec.EXACTLY);
+            }
+            // Fill available width
+            widthMeasureSpec = MeasureSpec.makeMeasureSpec(
+                        MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.UNSPECIFIED);
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
+
+        @Override
+        public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+            super.onInitializeAccessibilityNodeInfo(info);
+            info.setCanOpenPopup(true);
+        }
+    }
+
     private class OverflowPopup extends MenuPopupHelper {
         public OverflowPopup(Context context, MenuBuilder menu, View anchorView,
                 boolean overflowOnly) {
@@ -677,6 +853,18 @@ public class ActionMenuPresenter extends BaseMenuPresenter
         @Override
         public void onDismiss() {
             super.onDismiss();
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                if (DEBUG) Log.d(TAG,"closing mOverflowPopup, Close -> BACK");
+                MenuItem menuitem = mMenu.findItem(com.android.internal.R.id.back_button);
+                if(menuitem != null) {
+                    menuitem.setTitle(com.android.internal.R.string.back_button_label);
+                }
+                if(mMenu.getNonActionItems().size() > 1) {
+                if (DEBUG) Log.d(TAG,"Select -> Options");
+                ((ActionMenuItemView)mOverflowButton)
+                    .setText(com.android.internal.R.string.action_menu_overflow_icon_description);
+                }
+            }
             mMenu.close();
             mOverflowPopup = null;
         }
@@ -714,6 +902,32 @@ public class ActionMenuPresenter extends BaseMenuPresenter
             super.onDismiss();
             mActionButtonPopup = null;
             mOpenSubMenuId = 0;
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                if (DEBUG) Log.d(TAG,"closing mOverflowPopup, Close -> BACK");
+                MenuItem menuitem = mMenu.findItem(com.android.internal.R.id.back_button);
+                if(menuitem != null) {
+                    menuitem.setTitle(com.android.internal.R.string.back_button_label);
+                }
+                if(mMenu.getNonActionItems().size() > 1) {
+                    if (DEBUG) Log.d(TAG,"Select -> Options");
+                    ((ActionMenuItemView)mOverflowButton)
+                        .setText(com.android.internal.R.string.action_menu_overflow_icon_description);
+                }
+                // goback to overflow menu incase of submenu dismiss
+                showOverflowMenu();
+            }
+        }
+        @Override
+        public boolean onKey(View v, int keyCode, KeyEvent event) {
+            // if DPAD_LEFT is pressed in submenu then exit
+            if (event.getAction() == KeyEvent.ACTION_UP
+                    && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT)) {
+                if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                    dismiss();
+                    return true;
+                }
+            }
+            return super.onKey(v, keyCode, event);
         }
     }
 
@@ -754,6 +968,18 @@ public class ActionMenuPresenter extends BaseMenuPresenter
                 mOverflowPopup = mPopup;
             }
             mPostedOpenRunnable = null;
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                if(isOverflowMenuShowing() && mOverflowButton != null) {
+                    if (DEBUG) Log.d(TAG,"Options -> Select");
+                    ((ActionMenuItemView)mOverflowButton)
+                        .setText(com.android.internal.R.string.action_menu_select);
+                    MenuItem menuitem = mMenu.findItem(com.android.internal.R.id.back_button);
+                    if(menuitem != null) {
+                        menuitem.setTitle(com.android.internal.R.string.action_menu_close);
+                    }
+                    if (DEBUG) Log.d(TAG,"Back -> Close");
+                }
+            }
         }
     }
 }

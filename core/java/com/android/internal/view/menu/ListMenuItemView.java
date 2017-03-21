@@ -30,6 +30,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.TextView;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 /**
  * The item view for each item in the ListView-based MenuViews.
@@ -49,6 +50,7 @@ public class ListMenuItemView extends LinearLayout implements MenuView.ItemView 
     private Context mTextAppearanceContext;
     private boolean mPreserveIconSpacing;
     
+    private ImageView mSubMenuIconView;
     private int mMenuType;
     
     private LayoutInflater mInflater;
@@ -104,6 +106,11 @@ public class ListMenuItemView extends LinearLayout implements MenuView.ItemView 
         setShortcut(itemData.shouldShowShortcut(), itemData.getShortcut());
         setIcon(itemData.getIcon());
         setEnabled(itemData.isEnabled());
+        //NT show the icon if any menu item has submenu
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            setSubMenuIcon(itemData.hasSubMenu()
+                && (itemData.getActionProvider() == null));
+        }
     }
 
     public void setForceShowIcon(boolean forceShow) {
@@ -279,6 +286,33 @@ public class ListMenuItemView extends LinearLayout implements MenuView.ItemView 
 
         if (mItemData != null && mItemData.hasSubMenu()) {
             info.setCanOpenPopup(true);
+        }
+    }
+
+    //NT - To add sub menu icon
+    private void insertSubMenuIconView() {
+        //LayoutInflater inflater = getInflater();
+        mSubMenuIconView =
+                (ImageView) getInflater().inflate(com.android.internal.R.layout.list_menu_item_submenu_indicator,
+                this, false);
+        addView(mSubMenuIconView);
+    }
+
+    //NT - This method shows the icon for submenu
+    public void setSubMenuIcon(boolean showIcon) {
+        if (mSubMenuIconView == null) {
+            if (!showIcon) return;
+            insertSubMenuIconView();
+        }
+
+        if (showIcon) {
+            mSubMenuIconView.setImageResource(com.android.internal.R.drawable.ic_menu_send);
+
+            if (mSubMenuIconView.getVisibility() != VISIBLE) {
+                mSubMenuIconView.setVisibility(VISIBLE);
+            }
+        } else {
+            mSubMenuIconView.setVisibility(GONE);
         }
     }
 }

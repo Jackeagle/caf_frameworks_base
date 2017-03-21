@@ -50,6 +50,7 @@ import android.os.Looper;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.StrictMode;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
@@ -90,6 +91,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.codeaurora.Performance;
+import com.android.internal.R;
 
 /**
  * An activity is a single, focused thing that the user can do.  Almost all
@@ -2583,6 +2585,36 @@ public class Activity extends ContextThemeWrapper
      */
     public boolean onCreatePanelMenu(int featureId, Menu menu) {
         if (featureId == Window.FEATURE_OPTIONS_PANEL) {
+            if (DEBUG_LIFECYCLE) Slog.v(TAG, "onCreatePanelMenu:: add BACK");
+            //back_button_label
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                MenuItem findmenuitem = menu.findItem(com.android.internal.R.id.back_button);
+                if(findmenuitem == null) {
+                    if (DEBUG_LIFECYCLE) Slog.v(TAG, "onCreatePanelMenu:: NO BACK, so add");
+
+                    //if app does not requested Actionbar by setting theme.holo.noactionbar,
+                    //dont add BACK as menu item
+                    //or any floating dialog or activity is there dont add BACK as menu item
+                    if (DEBUG_LIFECYCLE) Slog.v(TAG, "onCreatePanelMenu::isFloating="+getWindow().isFloating());
+                    if((getWindow().isFloating()) || (!getWindow().hasFeature(Window.FEATURE_ACTION_BAR))) {
+                        if (DEBUG_LIFECYCLE) Slog.v(TAG, "Floating window/noactionbar");
+                    }
+                    else {
+                        MenuItem menuitem = menu.add(0, com.android.internal.R.id.back_button, 1000,
+                                com.android.internal.R.string.back_button_label);
+                        menuitem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+                        menuitem.setVisible(true);
+                        menuitem.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                                @Override
+                                public boolean onMenuItemClick(MenuItem item) {
+                                    if (DEBUG_LIFECYCLE) Slog.v(TAG, "onCreatePanelMenu:: onMenuItemClick BACK");
+                                    onBackPressed();
+                                    return true;
+                                }
+                            });
+                    }
+                }
+            }
             boolean show = onCreateOptionsMenu(menu);
             show |= mFragments.dispatchCreateOptionsMenu(menu, getMenuInflater());
             return show;
@@ -2779,6 +2811,34 @@ public class Activity extends ContextThemeWrapper
     public boolean onPrepareOptionsMenu(Menu menu) {
         if (mParent != null) {
             return mParent.onPrepareOptionsMenu(menu);
+        }
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            MenuItem findmenuitem = menu.findItem(com.android.internal.R.id.back_button);
+            if(findmenuitem == null) {
+                if (DEBUG_LIFECYCLE) Slog.v(TAG, "onPrepareOptionsMenu:: NO BACK, so add");
+
+                //if app does not requested Actionbar by setting theme.holo.noactionbar,
+                //dont add BACK as menu item
+                //or any floating dialog or activity is there dont add BACK as menu item
+                if (DEBUG_LIFECYCLE) Slog.v(TAG, "onPrepareOptionsMenu::isFloating="+getWindow().isFloating());
+                if((getWindow().isFloating()) || (!getWindow().hasFeature(Window.FEATURE_ACTION_BAR))) {
+                    if (DEBUG_LIFECYCLE) Slog.v(TAG, "Floating window/noactionbar");
+                }
+                else {
+                    MenuItem menuitem = menu.add(0, com.android.internal.R.id.back_button, 1000,
+                            com.android.internal.R.string.back_button_label);
+                    menuitem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+                    menuitem.setVisible(true);
+                    menuitem.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                            @Override
+                            public boolean onMenuItemClick(MenuItem item) {
+                                if (DEBUG_LIFECYCLE) Slog.v(TAG, "onPrepareOptionsMenu:: onMenuItemClick BACK");
+                                onBackPressed();
+                                return true;
+                            }
+                        });
+                }
+            }
         }
         return true;
     }

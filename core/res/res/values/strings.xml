@@ -4585,4 +4585,9 @@
     <string name="torch_on_primary_msg">Torch is ON</string>
     <string name="torch_on_seccondary_msg">Press and hold Torch key to turn it off</string>
     <!-- TORCH NOTIFICATION STRINGS END-->
+    <!-- SOFTKEYS support start-->
+    <string name="action_menu_overflow_icon_description">Options</string>
+    <string name="action_menu_close">Close</string>
+    <string name="action_menu_select">Select</string>
+    <!-- SOFTKEYS support end-->
 </resources>

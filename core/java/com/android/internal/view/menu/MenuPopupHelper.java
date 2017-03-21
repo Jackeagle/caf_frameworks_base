@@ -19,6 +19,8 @@ package com.android.internal.view.menu;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.Parcelable;
+import android.os.SystemProperties;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -178,8 +180,27 @@ public class MenuPopupHelper implements AdapterView.OnItemClickListener, View.On
     }
 
     public boolean onKey(View v, int keyCode, KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_MENU) {
-            dismiss();
+        if (event.getAction() == KeyEvent.ACTION_UP
+                && (keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                Log.d(TAG,"LSK, dont dismiss the menu, instead select the item");
+                int position = ((AdapterView)v).getSelectedItemPosition();
+                // Incase of DPAD_RIGHT if submenu is present then perform item click
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    if (mAdapter.getItem(position).hasSubMenu()) {
+                        mAdapter.mAdapterMenu.performItemAction(
+                                mAdapter.getItem(position), 0);
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } else {
+                   mAdapter.mAdapterMenu.performItemAction(mAdapter.getItem(position), 0);
+                }
+            } else {
+                dismiss();
+            }
             return true;
         }
         return false;

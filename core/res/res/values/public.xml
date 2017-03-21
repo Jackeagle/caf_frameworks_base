@@ -2087,4 +2087,8 @@
   <public type="style" name="Theme.DeviceDefault.NoActionBar.TranslucentDecor" id="0x010301e3" />
   <public type="style" name="Theme.DeviceDefault.Light.NoActionBar.TranslucentDecor" id="0x010301e4" />
 
+  <java-symbol type="string" name="back_button_label" />
+  <java-symbol type="string" name="action_menu_overflow_icon_description" />
+  <java-symbol type="string" name="action_menu_close" />
+  <java-symbol type="string" name="action_menu_select" />
 </resources>
