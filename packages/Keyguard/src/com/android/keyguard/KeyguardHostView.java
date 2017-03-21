@@ -1425,20 +1425,32 @@ public class KeyguardHostView extends KeyguardViewBase {
             case Account: return R.id.keyguard_account_view;
             case SimPin:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
-                    return R.id.msim_keyguard_sim_pin_view;
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.id.msim_keyguard_sim_pin_view_featurephone;
+                    } else {
+                        return R.id.msim_keyguard_sim_pin_view;
+                    }
+                } else {
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.id.keyguard_sim_pin_view_new;
+                    } else {
+                        return R.id.keyguard_sim_pin_view;
+                    }
                 }
-                if (!KeyguardService.isPhoneTypeTouch) {
-                    return R.id.keyguard_sim_pin_view_new;
-                }
-                return R.id.keyguard_sim_pin_view;
             case SimPuk:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
-                    return R.id.msim_keyguard_sim_puk_view;
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.id.msim_keyguard_sim_puk_view_featurephone;
+                    } else {
+                        return R.id.msim_keyguard_sim_puk_view;
+                    }
+                } else {
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.id.keyguard_sim_puk_view_new;
+                    } else {
+                        return R.id.keyguard_sim_puk_view;
+                    }
                 }
-                if (!KeyguardService.isPhoneTypeTouch) {
-                    return R.id.keyguard_sim_puk_view_new;
-                }
-                return R.id.keyguard_sim_puk_view;
         }
         return 0;
     }
@@ -1461,20 +1473,32 @@ public class KeyguardHostView extends KeyguardViewBase {
             case Account: return R.layout.keyguard_account_view;
             case SimPin:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
-                    return R.layout.msim_keyguard_sim_pin_view;
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.layout.msim_keyguard_sim_pin_view_featurephone;
+                    } else {
+                        return R.layout.msim_keyguard_sim_pin_view;
+                    }
+                } else {
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.layout.keyguard_sim_pin_view_new;
+                    } else {
+                        return R.layout.keyguard_sim_pin_view;
+                    }
                 }
-                if (!KeyguardService.isPhoneTypeTouch) {
-                    return R.layout.keyguard_sim_pin_view_new;
-                }
-                return R.layout.keyguard_sim_pin_view;
             case SimPuk:
                 if (KeyguardUpdateMonitor.sIsMultiSimEnabled) {
-                    return R.layout.msim_keyguard_sim_puk_view;
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                       return R.layout.msim_keyguard_sim_puk_view_featurephone;
+                    } else {
+                       return R.layout.msim_keyguard_sim_puk_view;
+                    }
+                } else {
+                    if (!KeyguardService.isPhoneTypeTouch) {
+                        return R.layout.keyguard_sim_puk_view_new;
+                    } else {
+                        return R.layout.keyguard_sim_puk_view;
+                    }
                 }
-                if (!KeyguardService.isPhoneTypeTouch) {
-                    return R.layout.keyguard_sim_puk_view_new;
-                }
-                return R.layout.keyguard_sim_puk_view;
             default:
                 return 0;
         }

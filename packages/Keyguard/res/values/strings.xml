@@ -443,6 +443,7 @@
 
     <string name="keyguard_enter_puk_number">Enter PUK</string>
     <string name="kg_new_sim_pin_instructions">New SIM PIN</string>
+    <string name="kg_puk_instructions">Enter PUK</string>
     <string name="kg_confrim_sim_pin_instructions">Confirm SIM PIN</string>
     <string name="kg_puk_wrong_puk">Wrong PUK</string>
     <string name="kg_puk_wrong_pin">Wrong SIM PIN</string>
