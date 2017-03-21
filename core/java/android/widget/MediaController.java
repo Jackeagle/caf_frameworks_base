@@ -523,7 +523,8 @@ public class MediaController extends FrameLayout {
                 || keyCode == KeyEvent.KEYCODE_CAMERA) {
             // don't show the controls for volume adjustment
             return super.dispatchKeyEvent(event);
-        } else if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU) {
+        } else if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
+                || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
             if (uniqueDown) {
                 hide();
             }
