@@ -2645,9 +2645,6 @@ public class Activity extends ContextThemeWrapper
                 if(titleCondensed != null) {
                     EventLog.writeEvent(50000, 0, titleCondensed.toString());
                 }
-                if (onOptionsItemSelected(item)) {
-                    return true;
-                }
 
                 //Null check done to check if callback exist
                 if (mcallback!=null) {
@@ -2657,6 +2654,11 @@ public class Activity extends ContextThemeWrapper
                       return true;
                    }
                 }
+
+                if (onOptionsItemSelected(item)) {
+                    return true;
+                }
+
 
                 if (mFragments.dispatchOptionsItemSelected(item)) {
                     return true;
