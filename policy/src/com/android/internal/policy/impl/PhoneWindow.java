@@ -578,6 +578,9 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             if (isXLarge && isHoneycombApp) {
                 return;
             }
+            if (SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+               return;
+            }
         }
 
         Callback cb = getCallback();
