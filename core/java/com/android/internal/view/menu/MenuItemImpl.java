@@ -568,7 +568,7 @@ public final class MenuItemImpl implements MenuItem {
                 mShowAsAction = (actionEnum&0XFFF8);
                 mShowAsAction = (mShowAsAction|0X0005);
             } else {
-                mShowAsAction = SHOW_AS_ACTION_NEVER;
+                mShowAsAction = (SHOW_AS_ACTION_NEVER|SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
             }
         } else {
             mShowAsAction = (actionEnum & 0XFFFC);
