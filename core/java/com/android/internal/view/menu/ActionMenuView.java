@@ -18,6 +18,7 @@ package com.android.internal.view.menu;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.TypedArray;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
@@ -26,6 +27,7 @@ import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.LinearLayout;
 import com.android.internal.R;
+import android.util.Log;
 
 /**
  * @hide
@@ -62,6 +64,9 @@ public class ActionMenuView extends LinearLayout implements MenuBuilder.ItemInvo
                 R.attr.actionBarStyle, 0);
         mMaxItemHeight = a.getDimensionPixelSize(R.styleable.ActionBar_height, 0);
         a.recycle();
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            setFocusable(false);
+        }
     }
 
     public void setPresenter(ActionMenuPresenter presenter) {
@@ -400,6 +405,47 @@ public class ActionMenuView extends LinearLayout implements MenuBuilder.ItemInvo
         int widthRemaining = right - left - getPaddingRight() - getPaddingLeft();
         boolean hasOverflow = false;
         final boolean isLayoutRtl = isLayoutRtl();
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+	    for (int i = 0; i < childCount; i++) {
+            final View v = getChildAt(i);
+            if (v.getVisibility() == GONE) {
+                continue;
+            }
+            LayoutParams p = (LayoutParams) v.getLayoutParams();
+            if (p.isOverflowButton) {
+                overflowWidth = v.getMeasuredWidth();
+                if (hasDividerBeforeChildAt(i)) {
+                    overflowWidth += dividerWidth;
+                }
+
+                int height = v.getMeasuredHeight();
+                int r;
+                int l;
+                //TODO: Need to check the behaviour on the RTL supported language ex:Urdu
+                if (!isLayoutRtl) {
+                    l = getPaddingLeft() + p.leftMargin;
+                    r = l + overflowWidth;
+                } else {
+                    r = getWidth() - getPaddingRight() - p.rightMargin;
+                    l = r - overflowWidth;
+                }
+                int t = midVertical - (height / 2);
+                int b = t + height;
+                v.layout(l, t, r, b);
+
+                widthRemaining -= overflowWidth;
+                hasOverflow = true;
+            } else {
+                final int size = v.getMeasuredWidth() + p.leftMargin + p.rightMargin;
+                nonOverflowWidth += size;
+                widthRemaining -= size;
+                if (hasDividerBeforeChildAt(i)) {
+                    nonOverflowWidth += dividerWidth;
+                }
+                nonOverflowCount++;
+            }
+        }
+		} else {
         for (int i = 0; i < childCount; i++) {
             final View v = getChildAt(i);
             if (v.getVisibility() == GONE) {
@@ -439,6 +485,8 @@ public class ActionMenuView extends LinearLayout implements MenuBuilder.ItemInvo
                 nonOverflowCount++;
             }
         }
+	}
+        Log.d(TAG, "onLayout::nonOverflowCount= "+nonOverflowCount);
 
         if (childCount == 1 && !hasOverflow) {
             // Center a single child
@@ -455,37 +503,73 @@ public class ActionMenuView extends LinearLayout implements MenuBuilder.ItemInvo
         final int spacerCount = nonOverflowCount - (hasOverflow ? 0 : 1);
         final int spacerSize = Math.max(0, spacerCount > 0 ? widthRemaining / spacerCount : 0);
 
-        if (isLayoutRtl) {
-            int startRight = getWidth() - getPaddingRight();
-            for (int i = 0; i < childCount; i++) {
-                final View v = getChildAt(i);
-                final LayoutParams lp = (LayoutParams) v.getLayoutParams();
-                if (v.getVisibility() == GONE || lp.isOverflowButton) {
-                    continue;
-                }
+        if (SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            if (!isLayoutRtl) {
+                int startRight = getWidth() - getPaddingRight();
+                for (int i = 0; i < childCount; i++) {
+                    final View v = getChildAt(i);
+                    final LayoutParams lp = (LayoutParams) v.getLayoutParams();
+                    if (v.getVisibility() == GONE || lp.isOverflowButton) {
+                        continue;
+                    }
 
-                startRight -= lp.rightMargin;
-                int width = v.getMeasuredWidth();
-                int height = v.getMeasuredHeight();
-                int t = midVertical - height / 2;
-                v.layout(startRight - width, t, startRight, t + height);
-                startRight -= width + lp.leftMargin + spacerSize;
+                    startRight -= lp.rightMargin;
+                    int width = v.getMeasuredWidth();
+                    int height = v.getMeasuredHeight();
+                    int t = midVertical - height / 2;
+                    v.layout(startRight - width, t, startRight, t + height);
+                    startRight -= width + lp.leftMargin + spacerSize;
+                }
+            } else {
+                int startLeft = getPaddingLeft();
+                for (int i = 0; i < childCount; i++) {
+                    final View v = getChildAt(i);
+                    final LayoutParams lp = (LayoutParams) v.getLayoutParams();
+                    if (v.getVisibility() == GONE || lp.isOverflowButton) {
+                        continue;
+                    }
+
+                    startLeft += lp.leftMargin;
+                    int width = v.getMeasuredWidth();
+                    int height = v.getMeasuredHeight();
+                    int t = midVertical - height / 2;
+                    v.layout(startLeft, t, startLeft + width, t + height);
+                    startLeft += width + lp.rightMargin + spacerSize;
+                }
             }
         } else {
-            int startLeft = getPaddingLeft();
-            for (int i = 0; i < childCount; i++) {
-                final View v = getChildAt(i);
-                final LayoutParams lp = (LayoutParams) v.getLayoutParams();
-                if (v.getVisibility() == GONE || lp.isOverflowButton) {
-                    continue;
-                }
+            if (isLayoutRtl) {
+                int startRight = getWidth() - getPaddingRight();
+                for (int i = 0; i < childCount; i++) {
+                    final View v = getChildAt(i);
+                    final LayoutParams lp = (LayoutParams) v.getLayoutParams();
+                    if (v.getVisibility() == GONE || lp.isOverflowButton) {
+                        continue;
+                    }
 
-                startLeft += lp.leftMargin;
-                int width = v.getMeasuredWidth();
-                int height = v.getMeasuredHeight();
-                int t = midVertical - height / 2;
-                v.layout(startLeft, t, startLeft + width, t + height);
-                startLeft += width + lp.rightMargin + spacerSize;
+                    startRight -= lp.rightMargin;
+                    int width = v.getMeasuredWidth();
+                    int height = v.getMeasuredHeight();
+                    int t = midVertical - height / 2;
+                    v.layout(startRight - width, t, startRight, t + height);
+                    startRight -= width + lp.leftMargin + spacerSize;
+                }
+            } else {
+                int startLeft = getPaddingLeft();
+                for (int i = 0; i < childCount; i++) {
+                    final View v = getChildAt(i);
+                    final LayoutParams lp = (LayoutParams) v.getLayoutParams();
+                    if (v.getVisibility() == GONE || lp.isOverflowButton) {
+                        continue;
+                    }
+
+                    startLeft += lp.leftMargin;
+                    int width = v.getMeasuredWidth();
+                    int height = v.getMeasuredHeight();
+                    int t = midVertical - height / 2;
+                    v.layout(startLeft, t, startLeft + width, t + height);
+                    startLeft += width + lp.rightMargin + spacerSize;
+                }
             }
         }
     }

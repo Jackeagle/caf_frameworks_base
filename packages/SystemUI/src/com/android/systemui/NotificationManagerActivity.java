@@ -81,6 +81,8 @@ public class NotificationManagerActivity extends Activity {
     private TextView tx;
     private IStatusBarService mBarService;
     private HistoricalNotificationInfo notifyInfo;
+    private  static String  APPLICATION_USB = "android";
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -343,8 +345,12 @@ public class NotificationManagerActivity extends Activity {
                                     + sbn.getNotification().extras
                                     .getString(Notification.EXTRA_SUB_TEXT));
                     }
-                    info.timestamp = sbn.getPostTime();
                     info.priority = sbn.getNotification().priority;
+                    if( info.pkg.equals(APPLICATION_USB)) {
+                        info.timestamp = sbn.getPostTime();
+                    } else {
+                        info.timestamp = sbn.getNotification().when;
+                    }
                     Log.d(TAG, info.timestamp + " " + info.pkg + " "
                             + info.title);
                 }
@@ -391,8 +397,14 @@ public class NotificationManagerActivity extends Activity {
                 ((ImageView) row.findViewById(android.R.id.icon))
                 .setVisibility(View.GONE);
             }
-            ((DateTimeView) row.findViewById(R.id.timestamp))
-            .setTime(info.timestamp);
+            if(info.timestamp != 0)
+            {
+                ((DateTimeView) row.findViewById(R.id.timestamp))
+                .setTime(info.timestamp);
+            } else {
+                ((DateTimeView) row.findViewById(R.id.timestamp))
+                .setVisibility(View.GONE);
+            }
             // bind caption
             ((TextView) row.findViewById(R.id.title)).setText(info.title);
             // set subtitle

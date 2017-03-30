@@ -22,6 +22,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.ActionProvider;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -562,7 +563,17 @@ public final class MenuItemImpl implements MenuItem {
           --FFFC is used where "C" is an OR  between 8 and
           4 which will retain the property
         */
-        mShowAsAction = (actionEnum & 0XFFFC);
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            if(getItemId() == com.android.internal.R.id.back_button) {
+                mShowAsAction = (actionEnum&0XFFF8);
+                mShowAsAction = (mShowAsAction|0X0005);
+            } else {
+                mShowAsAction = SHOW_AS_ACTION_NEVER;
+            }
+        } else {
+            mShowAsAction = (actionEnum & 0XFFFC);
+        }
+
         mMenu.onItemActionRequestChanged(this);
     }
 

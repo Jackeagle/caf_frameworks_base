@@ -132,6 +132,7 @@ public class WallpaperCropActivity extends Activity {
                     finish();
                 } else {
                     mSetWallpaperButton.setVisibility(View.VISIBLE);
+                    mSetWallpaperButton.requestFocus();
                 }
             }
         };

@@ -22,8 +22,10 @@ import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -78,6 +80,10 @@ public class ActionMenuItemView extends TextView
         setOnLongClickListener(this);
 
         mSavedPaddingLeft = -1;
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            setFocusable(false);
+            setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        }
     }
 
     @Override

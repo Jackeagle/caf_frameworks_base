@@ -28,6 +28,7 @@ import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -54,6 +55,7 @@ import android.widget.ScrollView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
 
+import android.util.Log;
 import java.lang.ref.WeakReference;
 
 public class AlertController {
@@ -204,6 +206,9 @@ public class AlertController {
                 com.android.internal.R.styleable.AlertDialog_listItemLayout,
                 com.android.internal.R.layout.select_dialog_item);
 
+        if(SystemProperties.get("persist.sys.showbottomactionbar", "0").equals("1")) {
+            mWindow.setGravity(Gravity.BOTTOM);
+        }
         a.recycle();
     }
     
@@ -382,11 +387,37 @@ public class AlertController {
     
     @SuppressWarnings({"UnusedDeclaration"})
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                event.startTracking();
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_MENU) {
+                event.startTracking();
+                return true;
+            }
+        }
         return mScrollView != null && mScrollView.executeKeyEvent(event);
     }
 
     @SuppressWarnings({"UnusedDeclaration"})
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.isTracking()
+                    && !event.isCanceled()) {
+                Button positiveButton = getButton(DialogInterface.BUTTON_POSITIVE);
+                if(positiveButton != null) {
+                    positiveButton.performClick();
+                }
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_MENU && event.isTracking()
+                    && !event.isCanceled()) {
+                Button negativeButton = getButton(DialogInterface.BUTTON_NEGATIVE);
+                if(negativeButton != null) {
+                    negativeButton.performClick();
+                }
+                return true;
+            }
+        }
         return mScrollView != null && mScrollView.executeKeyEvent(event);
     }
     
@@ -555,15 +586,29 @@ public class AlertController {
         mButtonNeutral = (Button) mWindow.findViewById(R.id.button3);
         mButtonNeutral.setOnClickListener(mButtonHandler);
 
-        if (TextUtils.isEmpty(mButtonNeutralText)) {
+        // Center button is invalid with softkeys enabled
+        if (SystemProperties.get("persist.sys.showbottomactionbar", "0").equals("1")) {
             mButtonNeutral.setVisibility(View.GONE);
-        } else {
-            mButtonNeutral.setText(mButtonNeutralText);
-            mButtonNeutral.setVisibility(View.VISIBLE);
+            mButtonNegative.setFocusable(false);
+            mButtonNegative.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);
+            mButtonPositive.setFocusable(false);
+            mButtonPositive.setGravity(Gravity.CENTER_VERTICAL|Gravity.END);
 
-            whichButtons = whichButtons | BIT_BUTTON_NEUTRAL;
+        } else {
+            if (TextUtils.isEmpty(mButtonNeutralText)) {
+                mButtonNeutral.setVisibility(View.GONE);
+            } else {
+                mButtonNeutral.setText(mButtonNeutralText);
+                mButtonNeutral.setVisibility(View.VISIBLE);
+
+                whichButtons = whichButtons | BIT_BUTTON_NEUTRAL;
+            }
         }
 
+        // Do not center buttons if only action is present
+        if (SystemProperties.get("persist.sys.showbottomactionbar", "0").equals("1")) {
+            return whichButtons != 0;
+        }
         if (shouldCenterSingleButton(mContext)) {
             /*
              * If we only have 1 button it should be centered on the layout and

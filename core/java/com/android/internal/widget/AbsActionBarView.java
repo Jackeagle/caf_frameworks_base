@@ -26,7 +26,9 @@ import android.animation.TimeInterpolator;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.TypedArray;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
@@ -82,8 +84,12 @@ public abstract class AbsActionBarView extends ViewGroup {
      * @param split true if the bar should split
      */
     public void setSplitActionBar(boolean split) {
-       //splitAction bar support disabled
-        mSplitActionBar = false;
+       //splitAction bar support enable
+        if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+            mSplitActionBar = true;
+        } else {
+            mSplitActionBar = false;
+        }
     }
 
     /**
@@ -176,7 +182,11 @@ public abstract class AbsActionBarView extends ViewGroup {
     public boolean showOverflowMenu() {
         if (mActionMenuPresenter != null) {
             //not to show overflow view
-            return false;
+            if(SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+                return mActionMenuPresenter.showOverflowMenu();
+            } else {
+                return false;
+            }
         }
         return false;
     }
