@@ -64,6 +64,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.Vibrator;
@@ -436,6 +437,19 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         }
     };
 
+    private boolean mIsSubsidyLockFeatureEnabled = false;
+
+    private boolean isSubsidyLocked() {
+        if (!mIsSubsidyLockFeatureEnabled) return false;
+        return mStatusBarKeyguardViewManager != null
+                && mStatusBarKeyguardViewManager.isSubsidyLockEnabled();
+    }
+
+    public static boolean isSubSidyLockFeatureEnabled() {
+        int propVal = SystemProperties.getInt(SUBSIDY_LOCK_SYSTEM_PROPERY, 0);
+        return (propVal == 1);
+    }
+
     private int mInteractingWindows;
     private boolean mAutohideSuspended;
     private int mStatusBarMode;
@@ -664,7 +678,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
                     Settings.System.getUriFor(SHOW_OPERATOR_NAME), true,
                     mShowOperatorNameObserver);
         }
-
+        mIsSubsidyLockFeatureEnabled = isSubSidyLockFeatureEnabled();
         addNavigationBar();
 
         // Lastly, call to the icon policy to install/update all the icons.
@@ -2227,7 +2241,8 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
     }
 
     boolean panelsEnabled() {
-        return (mDisabled1 & StatusBarManager.DISABLE_EXPAND) == 0 && !ONLY_CORE_APPS;
+        return (mDisabled1 & StatusBarManager.DISABLE_EXPAND) == 0 && !ONLY_CORE_APPS
+                && !isSubsidyLocked(); // disallow status bar expand when subsidy locked
     }
 
     void makeExpandedVisible(boolean force) {
