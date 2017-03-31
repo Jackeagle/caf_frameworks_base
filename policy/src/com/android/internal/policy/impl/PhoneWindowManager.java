@@ -2105,15 +2105,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         //Modify button light feature by liyang 20140213 start
-        /*if (mButtonLightEnabled && (down && repeatCount == 0 && (keyCode == KeyEvent.KEYCODE_HOME
+        if (mButtonLightEnabled && down && (keyCode == KeyEvent.KEYCODE_HOME
                 || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU
-                || keyCode == KeyEvent.KEYCODE_SEARCH))) {
+                || keyCode == KeyEvent.KEYCODE_SEARCH || keyCode == KeyEvent.KEYCODE_STAR)) {
             try {
                 mLight.setButtonLightEnabled(true);
             } catch(RemoteException e) {
                 Slog.e(TAG, "remote call for turn on button light failed.");
             }
-        }*/
+        }
 
         // If we think we might have a volume down & power key chord on the way
         // but we're not sure, then tell the dispatcher to wait a little while and
@@ -4306,13 +4306,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         interceptScreenshotChord();
                         interceptScreenshotLog();
 
-                        if (mButtonLightEnabled) {
+                        /*if (mButtonLightEnabled) {
                             try {
                                 mLight.setButtonLightEnabled(false);
                             } catch(RemoteException e) {
                                 Slog.e(TAG, "remote call for turn off button light failed.");
                             }
-                        }
+                        }*/
                     }
 
                     ITelephony telephonyService = getTelephonyService();
@@ -4792,6 +4792,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         synchronized (mLock) {
             updateOrientationListenerLp();
             updateLockScreenTimeout();
+        }
+        if (mButtonLightEnabled) {
+            try {
+                    mLight.setButtonLightEnabled(false);
+                } catch(RemoteException e) {
+                    Slog.e(TAG, "remote call for turn off button light failed.");
+                }
         }
     }
 
