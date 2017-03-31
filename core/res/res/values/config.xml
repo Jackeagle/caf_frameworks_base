@@ -1272,7 +1272,7 @@
     <integer name="config_button_light_bright_level">2</integer>
     <!-- Button back light brightness friendly time break. -->
     <integer name="config_button_light_timeout_msec">4000</integer>
-    <bool name="config_button_light_enabled">false</bool>
+    <bool name="config_button_light_enabled">true</bool>
 
     <string-array name="config_notificationScorers">
         <item>com.android.internal.notification.DemoContactNotificationScorer</item>
