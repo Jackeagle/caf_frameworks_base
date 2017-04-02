@@ -241,6 +241,9 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
     /** Allow some time inbetween the long press for back and recents. */
     private static final int LOCK_TO_APP_GESTURE_TOLERENCE = 200;
 
+    private static final String SUBSIDY_LOCK_SYSTEM_PROPERY
+            = "ro.radio.subsidylock";
+
     /**
      * A key that is used to retrieve the value of the checkbox
      * in Settings application that allows a user to add or remove
