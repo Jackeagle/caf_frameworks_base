@@ -36,8 +36,9 @@ import android.widget.FrameLayout;
 import android.widget.ListAdapter;
 import android.widget.ListPopupWindow;
 import android.widget.PopupWindow;
-
+import android.util.DisplayMetrics;
 import java.util.ArrayList;
+import android.view.WindowManager;
 
 /**
  * Presents a menu as a small, simple popup anchored to another view.
@@ -231,10 +232,15 @@ public class MenuPopupHelper implements AdapterView.OnItemClickListener, View.On
             itemView.measure(widthMeasureSpec, heightMeasureSpec);
 
             final int itemWidth = itemView.getMeasuredWidth();
+            DisplayMetrics displayMetrics = new DisplayMetrics();
+            ((WindowManager)mContext.getSystemService(Context.WINDOW_SERVICE)).
+                    getDefaultDisplay().getMetrics(displayMetrics);
+            int deviceWidth = displayMetrics.widthPixels;
             if (itemWidth >= mPopupMaxWidth) {
                 return mPopupMaxWidth;
             } else if (itemWidth > maxWidth) {
-                maxWidth = itemWidth;
+                maxWidth = deviceWidth -30;
+
             }
         }
 
