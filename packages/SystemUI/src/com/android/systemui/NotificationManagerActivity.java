@@ -190,6 +190,7 @@ public class NotificationManagerActivity extends Activity {
 
             if (infos.size() == 0) {
                 mAdapter.clear();
+                mAdapter.notifyDataSetChanged();
                 tx.setVisibility(View.VISIBLE);
                 tx.setText(R.string.no_notification);
                 tx.setGravity(Gravity.CENTER_VERTICAL
@@ -203,7 +204,7 @@ public class NotificationManagerActivity extends Activity {
             mAdapter.clear();
             mAdapter.addAll(infos);
             mAdapter.sort(mNotificationSorter);
-            invalidateOptionsMenu();
+            mAdapter.notifyDataSetChanged();
         } else {
             if(debug)
             Log.d(TAG, "=========================  notification not available");
