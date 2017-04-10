@@ -526,8 +526,13 @@ public final class PowerManagerService extends SystemService
         synchronized (mLock) {
             mWakeLockSuspendBlocker = createSuspendBlockerLocked("PowerManagerService.WakeLocks");
             mDisplaySuspendBlocker = createSuspendBlockerLocked("PowerManagerService.Display");
-            mDisplaySuspendBlocker.acquire();
-            mHoldingDisplaySuspendBlocker = true;
+            if (!mHeadless) {
+                mDisplaySuspendBlocker.acquire();
+                mHoldingDisplaySuspendBlocker = true;
+            } else {
+                mHoldingDisplaySuspendBlocker = false;
+            }
+
             mHalAutoSuspendModeEnabled = false;
             mHalInteractiveModeEnabled = true;
 
@@ -2283,12 +2288,16 @@ public final class PowerManagerService extends SystemService
 
         @Override
         public void acquireSuspendBlocker() {
-            mDisplaySuspendBlocker.acquire();
+            if (!mHeadless) {
+                mDisplaySuspendBlocker.acquire();
+            }
         }
 
         @Override
         public void releaseSuspendBlocker() {
-            mDisplaySuspendBlocker.release();
+            if (!mHeadless) {
+                mDisplaySuspendBlocker.release();
+            }
         }
 
         @Override
@@ -2326,9 +2335,11 @@ public final class PowerManagerService extends SystemService
             mWakeLockSuspendBlocker.acquire();
             mHoldingWakeLockSuspendBlocker = true;
         }
-        if (needDisplaySuspendBlocker && !mHoldingDisplaySuspendBlocker) {
-            mDisplaySuspendBlocker.acquire();
-            mHoldingDisplaySuspendBlocker = true;
+        if (!mHeadless) {
+            if (needDisplaySuspendBlocker && !mHoldingDisplaySuspendBlocker) {
+                mDisplaySuspendBlocker.acquire();
+                mHoldingDisplaySuspendBlocker = true;
+            }
         }
 
         // Inform the power HAL about interactive mode.
@@ -2352,9 +2363,11 @@ public final class PowerManagerService extends SystemService
             mWakeLockSuspendBlocker.release();
             mHoldingWakeLockSuspendBlocker = false;
         }
-        if (!needDisplaySuspendBlocker && mHoldingDisplaySuspendBlocker) {
-            mDisplaySuspendBlocker.release();
-            mHoldingDisplaySuspendBlocker = false;
+        if (!mHeadless) {
+            if (!needDisplaySuspendBlocker && mHoldingDisplaySuspendBlocker) {
+                mDisplaySuspendBlocker.release();
+                mHoldingDisplaySuspendBlocker = false;
+            }
         }
 
         // Enable auto-suspend if needed.
@@ -2368,6 +2381,9 @@ public final class PowerManagerService extends SystemService
      * We do so if the screen is on or is in transition between states.
      */
     private boolean needDisplaySuspendBlockerLocked() {
+        if (mHeadless)
+            return false;
+
         if (!mDisplayReady) {
             return true;
         }

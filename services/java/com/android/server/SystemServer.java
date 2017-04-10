@@ -657,7 +657,7 @@ public final class SystemServer {
             mActivityManagerService.setWindowManager(wm);
 
             inputManager.setWindowManagerCallbacks(wm.getInputMonitor());
-            if (!mHeadless) inputManager.start();
+            inputManager.start();
 
             // TODO: Use service dependencies instead.
             mDisplayManagerService.windowManagerAndInputReady();
