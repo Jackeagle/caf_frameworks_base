@@ -47,7 +47,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-
 /**
  * Startup class for the zygote process.
  *
@@ -234,9 +233,14 @@ public class ZygoteInit {
     }
 
     static void preload() {
+        new Thread(new Runnable(){
+            @Override
+            public void run() {
+                preloadResources();
+                preloadOpenGL();
+            }
+        }).start();
         preloadClasses();
-        preloadResources();
-        preloadOpenGL();
     }
 
     private static void preloadOpenGL() {
@@ -300,7 +304,6 @@ public class ZygoteInit {
                                 Log.v(TAG,
                                     " GC at " + Debug.getGlobalAllocSize());
                             }
-                            System.gc();
                             runtime.runFinalizationSync();
                             Debug.resetGlobalAllocSize();
                         }
@@ -320,7 +323,7 @@ public class ZygoteInit {
                         throw new RuntimeException(t);
                     }
                 }
-
+                System.gc();
                 Log.i(TAG, "...preloaded " + count + " classes in "
                         + (SystemClock.uptimeMillis()-startTime) + "ms.");
             } catch (IOException e) {
