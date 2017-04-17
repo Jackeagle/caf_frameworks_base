@@ -245,6 +245,12 @@ public class SurfaceControl {
      */
     public static final int BUILT_IN_DISPLAY_ID_HDMI = 1;
 
+    /**
+     * Built-in physical display id: Tertiary display.
+     * Use only with {@link SurfaceControl#getBuiltInDisplay(int)}.
+     */
+    public static final int BUILT_IN_DISPLAY_ID_TERTIARY = 3;
+
     /* Display power modes * /
 
     /**
