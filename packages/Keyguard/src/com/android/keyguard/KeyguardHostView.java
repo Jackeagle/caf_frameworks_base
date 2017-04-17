@@ -177,6 +177,8 @@ public class KeyguardHostView extends KeyguardViewBase {
     private  static final int APP_PHONE_COUNT = 1;
     private  static final int APP_MSG_COUNT = 2;
     private  static final int APP_ALL_COUNT = 3;
+    private  static final int MISSED_IMS_VOICE_TYPE = 23;
+    private  static final int MISSED_IMS_VIDEO_TYPE = 33;
     /*package*/ interface UserSwitcherCallback {
         void hideSecurityView(int duration);
         void showSecurityView();
@@ -494,9 +496,10 @@ public class KeyguardHostView extends KeyguardViewBase {
                    so the query of db doesnot give the right value */
                     String[] projection = { CallLog.Calls.CACHED_NAME,
                             CallLog.Calls.NUMBER };
-                    String where = CallLog.Calls.TYPE + "="
-                            + CallLog.Calls.MISSED_TYPE + " AND "
-                            + CallLog.Calls.IS_READ + " = 0";
+                    String where = "("+CallLog.Calls.TYPE + "=" + CallLog.Calls.MISSED_TYPE
+                            + " OR "+ CallLog.Calls.TYPE + "=" + MISSED_IMS_VOICE_TYPE
+                            + " OR "+ CallLog.Calls.TYPE + "=" + MISSED_IMS_VIDEO_TYPE
+                            +") AND " + CallLog.Calls.NEW + " = 1";
                     //Adding delay of 0.5 seconds to avoid reading of stale data from calllog DB.
                     android.os.SystemClock.sleep(500);
                     Cursor c = mContext.getContentResolver().query(
