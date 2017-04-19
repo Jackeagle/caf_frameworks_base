@@ -26,11 +26,13 @@ import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.Settings;
 import android.service.persistentdata.IPersistentDataBlockService;
 import android.service.persistentdata.PersistentDataBlockManager;
 import android.util.Slog;
 
 import com.android.internal.R;
+import com.android.internal.annotations.GuardedBy;
 
 import libcore.io.IoUtils;
 
@@ -52,15 +54,14 @@ import java.util.Arrays;
  * This data will live across factory resets not initiated via the Settings UI.
  * When a device is factory reset through Settings this data is wiped.
  *
- * Allows writing one block at a time. Namely, each time
- * {@link android.service.persistentdata.IPersistentDataBlockService}.write(byte[] data)
- * is called, it will overwite the data that was previously written on the block.
+ * Allows writing one block at a time. Namely, each time {@link IPersistentDataBlockService#write}
+ * is called, it will overwrite the data that was previously written on the block.
  *
  * Clients can query the size of the currently written block via
- * {@link android.service.persistentdata.IPersistentDataBlockService}.getTotalDataSize().
+ * {@link IPersistentDataBlockService#getDataBlockSize}
  *
- * Clients can any number of bytes from the currently written block up to its total size by invoking
- * {@link android.service.persistentdata.IPersistentDataBlockService}.read(byte[] data)
+ * Clients can read any number of bytes from the currently written block up to its total size by
+ * invoking {@link IPersistentDataBlockService#read}
  */
 public class PersistentDataBlockService extends SystemService {
     private static final String TAG = PersistentDataBlockService.class.getSimpleName();
@@ -83,6 +84,9 @@ public class PersistentDataBlockService extends SystemService {
 
     private int mAllowedUid = -1;
     private long mBlockDeviceSize;
+
+    @GuardedBy("mLock")
+    private boolean mIsWritable = true;
 
     public PersistentDataBlockService(Context context) {
         super(context);
@@ -155,6 +159,14 @@ public class PersistentDataBlockService extends SystemService {
                     "Only the Admin user is allowed to change OEM unlock state");
         }
     }
+
+    private void enforceUserRestriction(String userRestriction) {
+        if (UserManager.get(mContext).hasUserRestriction(userRestriction)) {
+            throw new SecurityException(
+                    "OEM unlock is disallowed by user restriction: " + userRestriction);
+        }
+    }
+
     private int getTotalDataSizeLocked(DataInputStream inputStream) throws IOException {
         // skip over checksum
         inputStream.skipBytes(DIGEST_SIZE_BYTES);
@@ -368,6 +380,11 @@ public class PersistentDataBlockService extends SystemService {
             headerAndData.put(data);
 
             synchronized (mLock) {
+                if (!mIsWritable) {
+                    IoUtils.closeQuietly(outputStream);
+                    return -1;
+                }
+
                 try {
                     byte[] checksum = new byte[DIGEST_SIZE_BYTES];
                     outputStream.write(checksum, 0, DIGEST_SIZE_BYTES);
@@ -442,19 +459,28 @@ public class PersistentDataBlockService extends SystemService {
 
                 if (ret < 0) {
                     Slog.e(TAG, "failed to wipe persistent partition");
+                } else {
+                    mIsWritable = false;
+                    Slog.i(TAG, "persistent partition now wiped and unwritable");
                 }
             }
         }
 
         @Override
-        public void setOemUnlockEnabled(boolean enabled) {
+        public void setOemUnlockEnabled(boolean enabled) throws SecurityException {
             // do not allow monkey to flip the flag
             if (ActivityManager.isUserAMonkey()) {
                 return;
             }
+
             enforceOemUnlockWritePermission();
             enforceIsAdmin();
 
+            if (enabled) {
+                // Do not allow oem unlock to be enabled if it's disallowed by a user restriction.
+                enforceUserRestriction(UserManager.DISALLOW_OEM_UNLOCK);
+                enforceUserRestriction(UserManager.DISALLOW_FACTORY_RESET);
+            }
             synchronized (mLock) {
                 doSetOemUnlockEnabledLocked(enabled);
                 computeAndWriteDigestLocked();

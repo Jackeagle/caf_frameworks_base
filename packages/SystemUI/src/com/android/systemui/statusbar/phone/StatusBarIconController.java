@@ -39,6 +39,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.systemui.BatteryMeterView;
+import com.android.systemui.BatteryLevelTextView;
 import com.android.systemui.FontSizeUtils;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
@@ -76,6 +77,7 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
     private View mNotificationIconAreaInner;
 
     private BatteryMeterView mBatteryMeterView;
+    private BatteryLevelTextView mBatteryLevelTextView;
     private BatteryMeterView mBatteryMeterViewKeyguard;
     private TextView mClock;
 
@@ -112,6 +114,8 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
 
     public StatusBarIconController(Context context, View statusBar, View keyguardStatusBar,
             PhoneStatusBar phoneStatusBar) {
+        super(context.getResources().getStringArray(
+                com.android.internal.R.array.config_statusBarIcons));
         mContext = context;
         mPhoneStatusBar = phoneStatusBar;
         mSystemIconArea = (LinearLayout) statusBar.findViewById(R.id.system_icon_area);
@@ -130,6 +134,8 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
         mStatusIconsKeyguard = (LinearLayout) keyguardStatusBar.findViewById(R.id.statusIcons);
 
         mBatteryMeterView = (BatteryMeterView) statusBar.findViewById(R.id.battery);
+        mBatteryLevelTextView =
+                (BatteryLevelTextView) statusBar.findViewById(R.id.battery_level_text);
         mBatteryMeterViewKeyguard = (BatteryMeterView) keyguardStatusBar.findViewById(R.id.battery);
         scaleBatteryMeterViews(context);
 
@@ -137,7 +143,6 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
         mDarkModeIconColorSingleTone = context.getColor(R.color.dark_mode_icon_color_single_tone);
         mLightModeIconColorSingleTone = context.getColor(R.color.light_mode_icon_color_single_tone);
         mHandler = new Handler();
-        defineSlots();
         loadDimens();
 
         TunerService.get(mContext).addTunable(this, ICON_BLACKLIST);
@@ -195,11 +200,6 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
                 com.android.internal.R.dimen.status_bar_icon_size);
         mIconHPadding = mContext.getResources().getDimensionPixelSize(
                 R.dimen.status_bar_icon_padding);
-    }
-
-    public void defineSlots() {
-        defineSlots(mContext.getResources().getStringArray(
-                com.android.internal.R.array.config_statusBarIcons));
     }
 
     private void addSystemIcon(int index, StatusBarIcon icon) {
@@ -338,11 +338,12 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
 
     public void dump(PrintWriter pw) {
         int N = mStatusIcons.getChildCount();
-        pw.println("  system icons: " + N);
+        pw.println("  icon views: " + N);
         for (int i=0; i<N; i++) {
             StatusBarIconView ic = (StatusBarIconView) mStatusIcons.getChildAt(i);
             pw.println("    [" + i + "] icon=" + ic);
         }
+        super.dump(pw);
     }
 
     public void dispatchDemoCommand(String command, Bundle args) {
@@ -530,6 +531,7 @@ public class StatusBarIconController extends StatusBarIconList implements Tunabl
         mBatteryMeterView.setDarkIntensity(
                 isInArea(mTintArea, mBatteryMeterView) ? mDarkIntensity : 0);
         mClock.setTextColor(getTint(mTintArea, mClock, mIconTint));
+        mBatteryLevelTextView.setTextColor(getTint(mTintArea, mClock, mIconTint));
     }
 
     public void appTransitionPending() {

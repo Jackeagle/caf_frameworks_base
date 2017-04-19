@@ -492,7 +492,7 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_HP;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_H;
+                    mSelectedQSDataTypeIcon[slot] = QS_DATA_H_PLUS;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_HP;
                 } else {
@@ -933,6 +933,21 @@ class TelephonyIcons {
             TelephonyIcons.ICON_LTE,
             true,
             TelephonyIcons.QS_DATA_LTE
+            );
+
+    static final MobileIconGroup LTE_PLUS = new MobileIconGroup(
+            "LTE+",
+            TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH,
+            TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH,
+            0, 0,
+            TelephonyIcons.TELEPHONY_NO_NETWORK,
+            TelephonyIcons.QS_TELEPHONY_NO_NETWORK,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
+            R.string.accessibility_data_connection_lte_plus,
+            TelephonyIcons.ICON_LTE_PLUS,
+            true,
+            TelephonyIcons.QS_DATA_LTE_PLUS
             );
 
     static final MobileIconGroup ROAMING = new MobileIconGroup(

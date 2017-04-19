@@ -35,13 +35,13 @@ import java.util.UUID;
  * each other.
  * <p>
  * The data structure is designed to have one owner process that can
- * read/write. There may be multiple client processes that can only read or
- * read/write depending how the data structure was configured when
- * instantiated. The owner process is the process that created the array.
- * The shared memory is pinned (not reclaimed by the system) until the
- * owning process dies or the data structure is closed. This class
- * is <strong>not</strong> thread safe. You should not interact with
- * an instance of this class once it is closed.
+ * read/write. There may be multiple client processes that can only read.
+ * The owner process is the process that created the array. The shared
+ * memory is pinned (not reclaimed by the system) until the owning process
+ * dies or the data structure is closed. This class is <strong>not</strong>
+ * thread safe. You should not interact with an instance of this class
+ * once it is closed. If you pass back to the owner process an instance
+ * it will be read only even in the owning process.
  * </p>
  *
  * @hide
@@ -51,10 +51,9 @@ public final class MemoryIntArray implements Parcelable, Closeable {
 
     private static final int MAX_SIZE = 1024;
 
-    private final int mOwnerPid;
-    private final boolean mClientWritable;
+    private final boolean mIsOwner;
     private final long mMemoryAddr;
-    private ParcelFileDescriptor mFd;
+    private int mFd;
 
     /**
      * Creates a new instance.
@@ -64,30 +63,24 @@ public final class MemoryIntArray implements Parcelable, Closeable {
      * @param clientWritable Whether other processes can write to the array.
      * @throws IOException If an error occurs while accessing the shared memory.
      */
-    public MemoryIntArray(int size, boolean clientWritable) throws IOException {
+    public MemoryIntArray(int size) throws IOException {
         if (size > MAX_SIZE) {
             throw new IllegalArgumentException("Max size is " + MAX_SIZE);
         }
-        mOwnerPid = Process.myPid();
-        mClientWritable = clientWritable;
+        mIsOwner = true;
         final String name = UUID.randomUUID().toString();
-        mFd = ParcelFileDescriptor.fromFd(nativeCreate(name, size));
-        mMemoryAddr = nativeOpen(mFd.getFd(), true, clientWritable);
+        mFd = nativeCreate(name, size);
+        mMemoryAddr = nativeOpen(mFd, mIsOwner);
     }
 
     private MemoryIntArray(Parcel parcel) throws IOException {
-        mOwnerPid = parcel.readInt();
-        mClientWritable = (parcel.readInt() == 1);
-        mFd = parcel.readParcelable(null);
-        if (mFd == null) {
+        mIsOwner = false;
+        ParcelFileDescriptor pfd = parcel.readParcelable(null);
+        if (pfd == null) {
             throw new IOException("No backing file descriptor");
         }
-        final long memoryAddress = parcel.readLong();
-        if (isOwner()) {
-            mMemoryAddr = memoryAddress;
-        } else {
-            mMemoryAddr = nativeOpen(mFd.getFd(), false, mClientWritable);
-        }
+        mFd = pfd.detachFd();
+        mMemoryAddr = nativeOpen(mFd, mIsOwner);
     }
 
     /**
@@ -95,7 +88,7 @@ public final class MemoryIntArray implements Parcelable, Closeable {
      */
     public boolean isWritable() {
         enforceNotClosed();
-        return isOwner() || mClientWritable;
+        return mIsOwner;
     }
 
     /**
@@ -108,7 +101,7 @@ public final class MemoryIntArray implements Parcelable, Closeable {
     public int get(int index) throws IOException {
         enforceNotClosed();
         enforceValidIndex(index);
-        return nativeGet(mFd.getFd(), mMemoryAddr, index, isOwner());
+        return nativeGet(mFd, mMemoryAddr, index);
     }
 
     /**
@@ -124,7 +117,7 @@ public final class MemoryIntArray implements Parcelable, Closeable {
         enforceNotClosed();
         enforceWritable();
         enforceValidIndex(index);
-        nativeSet(mFd.getFd(), mMemoryAddr, index, value, isOwner());
+        nativeSet(mFd, mMemoryAddr, index, value);
     }
 
     /**
@@ -134,7 +127,7 @@ public final class MemoryIntArray implements Parcelable, Closeable {
      */
     public int size() throws IOException {
         enforceNotClosed();
-        return nativeSize(mFd.getFd());
+        return nativeSize(mFd);
     }
 
     /**
@@ -145,9 +138,8 @@ public final class MemoryIntArray implements Parcelable, Closeable {
     @Override
     public void close() throws IOException {
         if (!isClosed()) {
-            ParcelFileDescriptor pfd = mFd;
-            mFd = null;
-            nativeClose(pfd.getFd(), mMemoryAddr, isOwner());
+            nativeClose(mFd, mMemoryAddr, mIsOwner);
+            mFd = -1;
         }
     }
 
@@ -155,7 +147,7 @@ public final class MemoryIntArray implements Parcelable, Closeable {
      * @return Whether this array is closed and shouldn't be used.
      */
     public boolean isClosed() {
-        return mFd == null;
+        return mFd == -1;
     }
 
     @Override
@@ -171,10 +163,12 @@ public final class MemoryIntArray implements Parcelable, Closeable {
 
     @Override
     public void writeToParcel(Parcel parcel, int flags) {
-        parcel.writeInt(mOwnerPid);
-        parcel.writeInt(mClientWritable ? 1 : 0);
-        parcel.writeParcelable(mFd, 0);
-        parcel.writeLong(mMemoryAddr);
+        ParcelFileDescriptor pfd = ParcelFileDescriptor.adoptFd(mFd);
+        try {
+            parcel.writeParcelable(pfd, flags & ~Parcelable.PARCELABLE_WRITE_RETURN_VALUE);
+        } finally {
+            pfd.detachFd();
+        }
     }
 
     @Override
@@ -189,23 +183,12 @@ public final class MemoryIntArray implements Parcelable, Closeable {
             return false;
         }
         MemoryIntArray other = (MemoryIntArray) obj;
-        if (mFd == null) {
-            if (other.mFd != null) {
-                return false;
-            }
-        } else if (mFd.getFd() != other.mFd.getFd()) {
-            return false;
-        }
-        return true;
+        return mFd == other.mFd;
     }
 
     @Override
     public int hashCode() {
-        return mFd != null ? mFd.hashCode() : 1;
-    }
-
-    private boolean isOwner() {
-        return mOwnerPid == Process.myPid();
+        return mFd;
     }
 
     private void enforceNotClosed() {
@@ -229,10 +212,10 @@ public final class MemoryIntArray implements Parcelable, Closeable {
     }
 
     private native int nativeCreate(String name, int size);
-    private native long nativeOpen(int fd, boolean owner, boolean writable);
+    private native long nativeOpen(int fd, boolean owner);
     private native void nativeClose(int fd, long memoryAddr, boolean owner);
-    private native int nativeGet(int fd, long memoryAddr, int index, boolean owner);
-    private native void nativeSet(int fd, long memoryAddr, int index, int value, boolean owner);
+    private native int nativeGet(int fd, long memoryAddr, int index);
+    private native void nativeSet(int fd, long memoryAddr, int index, int value);
     private native int nativeSize(int fd);
 
     /**
@@ -249,8 +232,7 @@ public final class MemoryIntArray implements Parcelable, Closeable {
             try {
                 return new MemoryIntArray(parcel);
             } catch (IOException ioe) {
-                Log.e(TAG, "Error unparceling MemoryIntArray");
-                return null;
+                throw new IllegalArgumentException("Error unparceling MemoryIntArray");
             }
         }
 

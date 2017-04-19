@@ -95,6 +95,10 @@ public class MobileSignalController extends SignalController<
     private int mStyle = STATUS_BAR_STYLE_ANDROID_DEFAULT;
     private DataEnabledSettingObserver mDataEnabledSettingObserver;
 
+    private int[] mCarrierOneThresholdValues = null;
+    private boolean mIsCarrierOneNetwork = false;
+    private String[] mCarrieroneMccMncs = null;
+
     // TODO: Reduce number of vars passed in, if we have the NetworkController, probably don't
     // need listener lists anymore.
     public MobileSignalController(Context context, Config config, boolean hasMobileData,
@@ -146,6 +150,10 @@ public class MobileSignalController extends SignalController<
         mLastState.iconGroup = mCurrentState.iconGroup = mDefaultIcons;
         // Get initial data sim state.
         updateDataSim();
+        mCarrieroneMccMncs = mContext.getResources().getStringArray(
+                R.array.config_carrier_one_networks);
+        mCarrierOneThresholdValues = mContext.getResources().getIntArray(
+                R.array.carrier_one_strength_threshold_values);
     }
 
     //TODO - Remove this when carrier pack is enabled for carrier one
@@ -287,6 +295,13 @@ public class MobileSignalController extends SignalController<
                 mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE, TelephonyIcons.LTE);
             } else {
                 mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE, TelephonyIcons.FOUR_G);
+                if (mConfig.hideLtePlus) {
+                    mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
+                            TelephonyIcons.FOUR_G);
+                } else {
+                    mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
+                            TelephonyIcons.FOUR_G_PLUS);
+                }
             }
             mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
                 TelephonyIcons.FOUR_G_PLUS);
@@ -296,7 +311,13 @@ public class MobileSignalController extends SignalController<
                 mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
                         TelephonyIcons.FOUR_G_PLUS);
             } else {
-                mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA, TelephonyIcons.LTE);
+            if (mConfig.hideLtePlus) {
+                mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
+                        TelephonyIcons.LTE);
+            } else {
+                mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_LTE_CA,
+                        TelephonyIcons.LTE_PLUS);
+                }
             }
         }
         mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_IWLAN, TelephonyIcons.WFC);
@@ -352,19 +373,24 @@ public class MobileSignalController extends SignalController<
         int typeIcon = showDataIcon ? icons.mDataType : 0;
         int dataActivityId = showMobileActivity() ? 0 : icons.mActivityId;
         int mobileActivityId = showMobileActivity() ? icons.mActivityId : 0;
-        int dataNetworkTypeInRoamingId = 0;
-        if (mStyle == STATUS_BAR_STYLE_EXTENDED && isRoaming()) {
-            dataNetworkTypeInRoamingId = mCurrentState.dataConnected ? typeIcon : 0;
-            typeIcon = TelephonyIcons.ROAMING_ICON;
-            qsTypeIcon = mCurrentState.dataConnected ? qsTypeIcon : 0;
+        int dataNetworkTypeId = 0;
+        if (mStyle == STATUS_BAR_STYLE_EXTENDED) {
+            if (isRoaming()) {
+                dataNetworkTypeId = mCurrentState.dataConnected ? icons.mDataType : 0;
+                typeIcon = TelephonyIcons.ROAMING_ICON;
+                qsTypeIcon = mCurrentState.dataConnected ? qsTypeIcon : 0;
+            } else {
+                dataNetworkTypeId = showDataIcon ? icons.mDataType : 0;
+                typeIcon = 0;
+            }
         }
         if( callback instanceof SignalCallbackExtended ) {
             ((SignalCallbackExtended)callback).setMobileDataIndicators(statusIcon, qsIcon, typeIcon,
                     qsTypeIcon, activityIn, activityOut, dataActivityId, mobileActivityId,
                     icons.mStackedDataIcon, icons.mStackedVoiceIcon,
                     dataContentDescription, description, icons.mIsWide,
-                    mSubscriptionInfo.getSubscriptionId(), dataNetworkTypeInRoamingId,
-                    getEmbmsIconId(), getImsIconId(), isImsRegisteredInWifi());
+                    mSubscriptionInfo.getSubscriptionId(), dataNetworkTypeId,
+                    getEmbmsIconId(), isMobileIms(), isImsRegisteredInWifi());
         } else {
             callback.setMobileDataIndicators(statusIcon, qsIcon, typeIcon, qsTypeIcon,
                     activityIn, activityOut, dataActivityId, mobileActivityId,
@@ -416,15 +442,26 @@ public class MobileSignalController extends SignalController<
         return false;
     }
 
-    private int getImsIconId() {
-        if (mStyle != STATUS_BAR_STYLE_EXTENDED || mServiceState == null ||
-                (mServiceState.getVoiceRegState() != ServiceState.STATE_IN_SERVICE)) {
-            return 0;
+    private boolean isMobileIms() {
+        if (mStyle != STATUS_BAR_STYLE_EXTENDED) {
+            return false;
         }
-        if (mCurrentState.imsRadioTechnology == ServiceState.RIL_RADIO_TECHNOLOGY_LTE) {
-            return R.drawable.volte;
+
+        List<SubscriptionInfo> subInfos = SubscriptionManager.from(mContext)
+                        .getActiveSubscriptionInfoList();
+        if (subInfos != null) {
+            for (SubscriptionInfo subInfo: subInfos) {
+                int subId = subInfo.getSubscriptionId();
+                if (mPhone != null
+                        && mPhone.isImsRegisteredForSubscriber(subId)
+                        && (!(isImsRegisteredInWifi()))) {
+                    return true;
+                }
+            }
+        } else {
+            Log.e(mTag, "Invalid SubscriptionInfo");
         }
-        return 0;
+        return false;
     }
 
     @Override
@@ -452,6 +489,15 @@ public class MobileSignalController extends SignalController<
             switch (mServiceState.getVoiceRegState()) {
                 case ServiceState.STATE_POWER_OFF:
                     return false;
+                case ServiceState.STATE_IN_SERVICE:
+                    if (mServiceState.getVoiceNetworkType() == TelephonyManager.NETWORK_TYPE_IWLAN
+                            && (mServiceState.getDataNetworkType() ==
+                            TelephonyManager.NETWORK_TYPE_IWLAN ||
+                            mServiceState.getDataRegState() != ServiceState.STATE_IN_SERVICE)) {
+                        return false;
+                    } else {
+                        return true;
+                    }
                 case ServiceState.STATE_OUT_OF_SERVICE:
                 case ServiceState.STATE_EMERGENCY_ONLY:
                     if (mContext.getResources().getBoolean(R.bool.config_showSignalForIWlan)) {
@@ -653,7 +699,7 @@ public class MobileSignalController extends SignalController<
                 mCurrentState.level = mSignalStrength.getCdmaLevel();
             } else {
                 mCurrentState.level = mSignalStrength.getLevel();
-                if (mConfig.showRsrpSignalLevelforLTE) {
+                if (mConfig.showRsrpSignalLevelforLTE && !mIsCarrierOneNetwork) {
                     int dataType = mServiceState.getDataNetworkType();
                     if (dataType == TelephonyManager.NETWORK_TYPE_LTE ||
                             dataType == TelephonyManager.NETWORK_TYPE_LTE_CA) {
@@ -703,6 +749,8 @@ public class MobileSignalController extends SignalController<
             mCurrentState.imsRadioTechnology = getImsRadioTechnology();
         }
 
+        mCurrentState.dataNetType = mDataNetType;
+
         notifyListenersIfNecessary();
     }
 
@@ -726,7 +774,7 @@ public class MobileSignalController extends SignalController<
         final boolean dataConnected = mCurrentState.dataConnected;
         final boolean roaming = isRoaming();
         final int voiceType = getVoiceNetworkType();
-        final int dataType =  getDataNetworkType();
+        final int dataType =  mDataNetType;
         int[][] sbIcons = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH;
         int[][] qsIcons = TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH;
         int[] contentDesc = AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH;
@@ -816,7 +864,10 @@ public class MobileSignalController extends SignalController<
             qsDataTypeIcon = TelephonyIcons.getQSDataTypeIcon(slotId);
         }
         if (roaming && !mContext.getResources().getBoolean(
-                    R.bool.show_roaming_and_network_icons) && !(mStyle == STATUS_BAR_STYLE_EXTENDED)) {
+                    R.bool.show_roaming_and_network_icons)
+                    && !(mStyle == STATUS_BAR_STYLE_EXTENDED)
+                    && !mContext.getResources().getBoolean(
+                    R.bool.config_always_hide_roaming_indicator)) {
             dataTypeIcon = TelephonyIcons.ROAMING_ICON;
             qsDataTypeIcon = TelephonyIcons.QS_DATA_R;
         }
@@ -991,7 +1042,26 @@ public class MobileSignalController extends SignalController<
                         ((signalStrength == null) ? "" : (" level=" + signalStrength.getLevel())));
             }
             mSignalStrength = signalStrength;
+
+            if (mIsCarrierOneNetwork && mSignalStrength != null &&
+                    mCarrierOneThresholdValues != null) {
+                mSignalStrength.setThreshRsrp(mCarrierOneThresholdValues);
+            }
             updateTelephony();
+        }
+
+        private boolean isCarrierOneOperatorRegistered(ServiceState state) {
+            String operatornumeric = state.getOperatorNumeric();
+            if (mCarrieroneMccMncs == null || mCarrieroneMccMncs.length == 0 ||
+                    TextUtils.isEmpty(operatornumeric)) {
+                return false;
+            }
+            for (String numeric : mCarrieroneMccMncs) {
+                if (operatornumeric.equals(numeric)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
@@ -1002,7 +1072,16 @@ public class MobileSignalController extends SignalController<
             }
             mServiceState = state;
             mDataNetType = state.getDataNetworkType();
+
+            mIsCarrierOneNetwork = isCarrierOneOperatorRegistered(mServiceState);
+            Log.d(mTag, "onServiceStateChanged mIsCarrierOneNetwork =" +
+                    mIsCarrierOneNetwork);
+
             updateNetworkName(mLastShowSpn, mLastSpn, mLastDataSpn, mLastShowPlmn, mLastPlmn);
+            if (mDataNetType == TelephonyManager.NETWORK_TYPE_LTE && mServiceState != null &&
+                    mServiceState.isUsingCarrierAggregation()) {
+                mDataNetType = TelephonyManager.NETWORK_TYPE_LTE_CA;
+            }
             updateTelephony();
         }
 
@@ -1036,7 +1115,11 @@ public class MobileSignalController extends SignalController<
             } else {
                 mDataState = state;
                 mDataNetType = networkType;
-                updateTelephony();
+            if (mDataNetType == TelephonyManager.NETWORK_TYPE_LTE && mServiceState != null &&
+                    mServiceState.isUsingCarrierAggregation()) {
+                mDataNetType = TelephonyManager.NETWORK_TYPE_LTE_CA;
+            }
+            updateTelephony();
             }
         }
 
@@ -1110,6 +1193,7 @@ public class MobileSignalController extends SignalController<
         int dataActivity;
         int voiceLevel;
         int imsRadioTechnology;
+        int dataNetType;
 
         @Override
         public void copyFrom(State s) {
@@ -1128,6 +1212,7 @@ public class MobileSignalController extends SignalController<
             dataActivity = state.dataActivity;
             voiceLevel = state.voiceLevel;
             imsRadioTechnology = state.imsRadioTechnology;
+            dataNetType = state.dataNetType;
         }
 
         @Override
@@ -1148,6 +1233,7 @@ public class MobileSignalController extends SignalController<
             builder.append("voiceLevel=").append(voiceLevel).append(',');
             builder.append("carrierNetworkChangeMode=").append(carrierNetworkChangeMode);
             builder.append("imsRadioTechnology=").append(imsRadioTechnology);
+            builder.append("dataNetType=").append(dataNetType);
         }
 
         @Override
@@ -1164,7 +1250,8 @@ public class MobileSignalController extends SignalController<
                     && ((MobileState) o).userSetup == userSetup
                     && ((MobileState) o).voiceLevel == voiceLevel
                     && ((MobileState) o).isDefault == isDefault
-                    && ((MobileState) o).imsRadioTechnology == imsRadioTechnology;
+                    && ((MobileState) o).imsRadioTechnology == imsRadioTechnology
+                    && ((MobileState) o).dataNetType == dataNetType;
         }
     }
 

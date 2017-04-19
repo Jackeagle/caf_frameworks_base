@@ -87,6 +87,8 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.WorkSource;
 import android.provider.Settings;
+import android.text.TextUtils;
+import android.util.EventLog;
 import android.util.Log;
 import android.util.Slog;
 
@@ -150,7 +152,7 @@ public class LocationManagerService extends ILocationManager.Stub {
     // used internally for synchronization
     private final Object mLock = new Object();
 
-    // --- fields below are final after systemReady() ---
+    // --- fields below are final after systemRunning() ---
     private LocationFudger mLocationFudger;
     private GeofenceManager mGeofenceManager;
     private PackageManager mPackageManager;
@@ -171,6 +173,7 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     // --- fields below are protected by mLock ---
     // Set of providers that are explicitly enabled
+    // Only used by passive, fused & test.  Network & GPS are controlled separately, and not listed.
     private final Set<String> mEnabledProviders = new HashSet<String>();
 
     // Set of providers that are explicitly disabled
@@ -239,12 +242,12 @@ public class LocationManagerService extends ILocationManager.Stub {
 
         if (D) Log.d(TAG, "Constructed");
 
-        // most startup is deferred until systemReady()
+        // most startup is deferred until systemRunning()
     }
 
     public void systemRunning() {
         synchronized (mLock) {
-            if (D) Log.d(TAG, "systemReady()");
+            if (D) Log.d(TAG, "systemRunning()");
 
             // fetch package manager
             mPackageManager = mContext.getPackageManager();
@@ -324,7 +327,11 @@ public class LocationManagerService extends ILocationManager.Stub {
                         || Intent.ACTION_MANAGED_PROFILE_REMOVED.equals(action)) {
                     updateUserProfiles(mCurrentUserId);
                 } else if (Intent.ACTION_SHUTDOWN.equals(action)) {
-                    shutdownComponents();
+                    // shutdown only if UserId indicates whole system, not just one user
+                    if(D) Log.d(TAG, "Shutdown received with UserId: " + getSendingUserId());
+                    if (getSendingUserId() == UserHandle.USER_ALL) {
+                        shutdownComponents();
+                    }
                 }
             }
         }, UserHandle.ALL, intentFilter, null, mLocationHandler);
@@ -2625,9 +2632,22 @@ public class LocationManagerService extends ILocationManager.Stub {
             if (mockProvider == null) {
                 throw new IllegalArgumentException("Provider \"" + provider + "\" unknown");
             }
+
+            // Ensure that the location is marked as being mock. There's some logic to do this in
+            // handleLocationChanged(), but it fails if loc has the wrong provider (bug 33091107).
+            Location mock = new Location(loc);
+            mock.setIsFromMockProvider(true);
+
+            if (!TextUtils.isEmpty(loc.getProvider()) && !provider.equals(loc.getProvider())) {
+                // The location has an explicit provider that is different from the mock provider
+                // name. The caller may be trying to fool us via bug 33091107.
+                EventLog.writeEvent(0x534e4554, "33091107", Binder.getCallingUid(),
+                        provider + "!=" + loc.getProvider());
+            }
+
             // clear calling identity so INSTALL_LOCATION_PROVIDER permission is not required
             long identity = Binder.clearCallingIdentity();
-            mockProvider.setLocation(loc);
+            mockProvider.setLocation(mock);
             Binder.restoreCallingIdentity(identity);
         }
     }

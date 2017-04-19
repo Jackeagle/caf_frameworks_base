@@ -19,6 +19,7 @@ package android.hardware.camera2;
 import android.annotation.RequiresPermission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.ActivityThread;
 import android.content.Context;
 import android.hardware.ICameraService;
 import android.hardware.ICameraServiceListener;
@@ -34,6 +35,8 @@ import android.os.Looper;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.ServiceSpecificException;
+import android.os.SystemProperties;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.ArrayMap;
 
@@ -267,6 +270,10 @@ public final class CameraManager {
      * @param cameraId The unique identifier of the camera device to open
      * @param callback The callback for the camera. Must not be null.
      * @param handler  The handler to invoke the callback on. Must not be null.
+     * @param uid      The UID of the application actually opening the camera.
+     *                 Must be USE_CALLING_UID unless the caller is a service
+     *                 that is trusted to open the device on behalf of an
+     *                 application and to forward the real UID.
      *
      * @throws CameraAccessException if the camera is disabled by device policy,
      * too many camera devices are already open, or the cameraId does not match
@@ -281,7 +288,7 @@ public final class CameraManager {
      * @see android.app.admin.DevicePolicyManager#setCameraDisabled
      */
     private CameraDevice openCameraDeviceUserAsync(String cameraId,
-            CameraDevice.StateCallback callback, Handler handler)
+            CameraDevice.StateCallback callback, Handler handler, final int uid)
             throws CameraAccessException {
         CameraCharacteristics characteristics = getCameraCharacteristics(cameraId);
         CameraDevice device = null;
@@ -317,7 +324,7 @@ public final class CameraManager {
                             "Camera service is currently unavailable");
                     }
                     cameraUser = cameraService.connectDevice(callbacks, id,
-                            mContext.getOpPackageName(), USE_CALLING_UID);
+                            mContext.getOpPackageName(), uid);
                 } else {
                     // Use legacy camera implementation for HAL1 devices
                     Log.i(TAG, "Using legacy camera HAL.");
@@ -434,6 +441,29 @@ public final class CameraManager {
             @NonNull final CameraDevice.StateCallback callback, @Nullable Handler handler)
             throws CameraAccessException {
 
+        openCameraForUid(cameraId, callback, handler, USE_CALLING_UID);
+    }
+
+    /**
+     * Open a connection to a camera with the given ID, on behalf of another application
+     * specified by clientUid.
+     *
+     * <p>The behavior of this method matches that of {@link #openCamera}, except that it allows
+     * the caller to specify the UID to use for permission/etc verification. This can only be
+     * done by services trusted by the camera subsystem to act on behalf of applications and
+     * to forward the real UID.</p>
+     *
+     * @param clientUid
+     *             The UID of the application on whose behalf the camera is being opened.
+     *             Must be USE_CALLING_UID unless the caller is a trusted service.
+     *
+     * @hide
+     */
+    public void openCameraForUid(@NonNull String cameraId,
+            @NonNull final CameraDevice.StateCallback callback, @Nullable Handler handler,
+            int clientUid)
+            throws CameraAccessException {
+
         if (cameraId == null) {
             throw new IllegalArgumentException("cameraId was null");
         } else if (callback == null) {
@@ -447,7 +477,7 @@ public final class CameraManager {
             }
         }
 
-        openCameraDeviceUserAsync(cameraId, callback, handler);
+        openCameraDeviceUserAsync(cameraId, callback, handler, clientUid);
     }
 
     /**
@@ -662,6 +692,25 @@ public final class CameraManager {
 
             try {
                 numCameras = cameraService.getNumberOfCameras(CAMERA_TYPE_ALL);
+                /* Force to expose only two cameras
+                 * if the package name does not falls in this bucket
+                 */
+                boolean exposeAuxCamera = false;
+                String packageName = ActivityThread.currentOpPackageName();
+                String packageList = SystemProperties.get("camera.aux.packagelist");
+                if (packageList.length() > 0) {
+                    TextUtils.StringSplitter splitter = new TextUtils.SimpleStringSplitter(',');
+                    splitter.setString(packageList);
+                    for (String str : splitter) {
+                        if (packageName.equals(str)) {
+                            exposeAuxCamera = true;
+                            break;
+                        }
+                    }
+                }
+                if (exposeAuxCamera == false && (numCameras > 2)) {
+                    numCameras = 2;
+                }
             } catch(ServiceSpecificException e) {
                 throwAsPublicException(e);
             } catch (RemoteException e) {
@@ -989,6 +1038,30 @@ public final class CameraManager {
         }
 
         private void onStatusChangedLocked(int status, String id) {
+            /* Force to ignore the last mono/aux camera status update
+             * if the package name does not falls in this bucket
+             */
+            boolean exposeMonoCamera = false;
+            String packageName = ActivityThread.currentOpPackageName();
+            String packageList = SystemProperties.get("camera.aux.packagelist");
+            if (packageList.length() > 0) {
+                TextUtils.StringSplitter splitter = new TextUtils.SimpleStringSplitter(',');
+                splitter.setString(packageList);
+                for (String str : splitter) {
+                    if (packageName.equals(str)) {
+                        exposeMonoCamera = true;
+                        break;
+                    }
+                }
+            }
+
+            if (exposeMonoCamera == false) {
+                if (Integer.parseInt(id) >= 2) {
+                    Log.w(TAG, "[soar.cts] ignore the status update of camera: " + id);
+                    return;
+                }
+            }
+
             if (DEBUG) {
                 Log.v(TAG,
                         String.format("Camera id %s has status changed to 0x%x", id, status));

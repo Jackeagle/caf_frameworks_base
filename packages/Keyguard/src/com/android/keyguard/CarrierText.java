@@ -51,6 +51,8 @@ public class CarrierText extends TextView {
 
     private static CharSequence mSeparator;
 
+    private static CharSequence mCarrierTextSeparator;
+
     private final boolean mIsEmergencyCallCapable;
 
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -58,6 +60,10 @@ public class CarrierText extends TextView {
     private WifiManager mWifiManager;
 
     private boolean[] mSimErrorState = new boolean[TelephonyManager.getDefault().getPhoneCount()];
+
+    private boolean[] mSimMissingState = new boolean[TelephonyManager.getDefault().getPhoneCount()];
+
+    private final boolean mDisplayNoSim;
 
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
         @Override
@@ -80,6 +86,12 @@ public class CarrierText extends TextView {
             }
 
             Log.d(TAG,"onSimStateChanged: " + getStatusForIccState(simState));
+
+            if (getStatusForIccState(simState) == StatusMode.SimMissing) {
+                mSimMissingState[slotId] = true;
+            } else {
+                mSimMissingState[slotId] = false;
+            }
             if (getStatusForIccState(simState) == StatusMode.SimIoError) {
                 mSimErrorState[slotId] = true;
                 updateCarrierText();
@@ -112,6 +124,7 @@ public class CarrierText extends TextView {
         super(context, attrs);
         mIsEmergencyCallCapable = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_voice_capable);
+        mDisplayNoSim = context.getResources().getBoolean(R.bool.config_carrier_display_no_sim);
         boolean useAllCaps;
         TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs, R.styleable.CarrierText, 0, 0);
@@ -154,6 +167,33 @@ public class CarrierText extends TextView {
         return text;
     }
 
+    /**
+     * Checks if there are abscent cards. Adds the text depending on the slot of the card
+     * @param text: current carrier text based on the sim state
+     * @param noSims: whether all sim missing
+     * @return text
+    */
+    private CharSequence updateCarrierTextWithSimMissing(CharSequence text, boolean noSims) {
+        CharSequence simMissingText = getContext().getText(
+            R.string.keyguard_missing_sim_message_RJIL);
+        // when all sim are missing, don't overwrite the current carrier text
+        if (noSims) {
+            return text;
+        }
+        for (int index = 0; index < mSimMissingState.length; index++) {
+            if (mSimMissingState[index]) {
+                if (index == 0) {
+                    // prepend "No Sim" when sim card is abscent in slot 0
+                    text = concatenate(simMissingText, text);
+                } else {
+                    // append "No Sim" when sim card is abscent in slot 1
+                    text = concatenate(text, simMissingText);
+                }
+            }
+        }
+        return text;
+    }
+
     protected void updateCarrierText() {
         boolean allSimsMissing = true;
         boolean anySimReadyAndInService = false;
@@ -185,11 +225,12 @@ public class CarrierText extends TextView {
         for (int i = 0; i < N; i++) {
             CharSequence networkClass = "";
             int subId = subs.get(i).getSubscriptionId();
+            int phoneId = SubscriptionManager.getPhoneId(subId);
             State simState = mKeyguardUpdateMonitor.getSimState(subId);
             boolean showRat = SubscriptionManager.getResourcesForSubId(mContext,
                     subId).getBoolean(com.android.internal.R.bool.config_display_rat);
             if (showRat) {
-                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(subId);
+                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(phoneId);
                 if (ss != null && (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
                         || ss.getVoiceRegState() == ServiceState.STATE_IN_SERVICE)) {
                     int networkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
@@ -205,7 +246,7 @@ public class CarrierText extends TextView {
                 }
             }
             CharSequence carrierName = subs.get(i).getCarrierName();
-            if (showLocale || showRat) {
+            if ((showLocale || showRat) && !TextUtils.isEmpty(carrierName)) {
                 String[] names = carrierName.toString().split(mSeparator.toString(), 2);
                 StringBuilder newCarrierName = new StringBuilder();
                 for (int j = 0; j < names.length; j++) {
@@ -237,7 +278,7 @@ public class CarrierText extends TextView {
                 displayText = concatenate(displayText, carrierTextForSimState);
             }
             if (simState == IccCardConstants.State.READY) {
-                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(subId);
+                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(phoneId);
                 if (ss != null && ss.getDataRegState() == ServiceState.STATE_IN_SERVICE) {
                     // hack for WFC (IWLAN) not turning off immediately once
                     // Wi-Fi is disassociated or disabled
@@ -327,6 +368,9 @@ public class CarrierText extends TextView {
         }
 
         displayText = updateCarrierTextWithSimIoError(displayText, allSimsMissing);
+        if (mDisplayNoSim) {
+            displayText = updateCarrierTextWithSimMissing(displayText, allSimsMissing);
+        }
         // APM (airplane mode) != no carrier state. There are carrier services
         // (e.g. WFC = Wi-Fi calling) which may operate in APM.
         if (!anySimReadyAndInService && WirelessUtils.isAirplaneModeOn(mContext)) {
@@ -340,6 +384,7 @@ public class CarrierText extends TextView {
         super.onFinishInflate();
         mSeparator = getResources().getString(
                 com.android.internal.R.string.kg_text_message_separator);
+        mCarrierTextSeparator = getResources().getString(R.string.carrier_text_separator);
         boolean shouldMarquee = KeyguardUpdateMonitor.getInstance(mContext).isDeviceInteractive();
         setSelected(shouldMarquee); // Allow marquee to work.
     }
@@ -482,7 +527,13 @@ public class CarrierText extends TextView {
         final boolean plmnValid = !TextUtils.isEmpty(plmn);
         final boolean spnValid = !TextUtils.isEmpty(spn);
         if (plmnValid && spnValid) {
-            return new StringBuilder().append(plmn).append(mSeparator).append(spn).toString();
+            if (isCarrierOneSupported()) {
+                return new StringBuilder().append(plmn)
+                        .append(mCarrierTextSeparator).append(spn).toString();
+            } else {
+                return new StringBuilder().append(plmn)
+                        .append(mSeparator).append(spn).toString();
+            }
         } else if (plmnValid) {
             return plmn;
         } else if (spnValid) {
@@ -490,6 +541,11 @@ public class CarrierText extends TextView {
         } else {
             return "";
         }
+    }
+
+    private static boolean isCarrierOneSupported() {
+        String property = SystemProperties.get("persist.radio.atel.carrier");
+        return "405854".equals(property);
     }
 
     private CharSequence getCarrierHelpTextForSimState(IccCardConstants.State simState,

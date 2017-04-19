@@ -46,11 +46,6 @@
     <string name="keyguard_sim_locked_message" msgid="6875773413306380902">"Kartica SIM je zaklenjena."</string>
     <string name="keyguard_sim_puk_locked_message" msgid="3747232467471801633">"Kartica SIM je zaklenjena s kodo PUK."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="7975221805033614426">"Odklepanje kartice SIM …"</string>
-    <string name="keyguard_accessibility_pattern_unlock" msgid="1490840706075246612">"Odklepanje z vzorcem."</string>
-    <string name="keyguard_accessibility_pin_unlock" msgid="2469687111784035046">"Odklepanje s kodo PIN."</string>
-    <string name="keyguard_accessibility_password_unlock" msgid="7675777623912155089">"Odklepanje z geslom."</string>
-    <string name="keyguard_accessibility_pattern_area" msgid="7679891324509597904">"Območje vzorca."</string>
-    <string name="keyguard_accessibility_slide_area" msgid="6736064494019979544">"Območje podrsanja."</string>
     <string name="keyguard_accessibility_pin_area" msgid="7903959476607833485">"Območje za kodo PIN"</string>
     <string name="keyguard_accessibility_sim_pin_area" msgid="3887780775111719336">"Območje za kodo PIN za SIM"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="1880823406954996207">"Območje za kodo PUK za SIM"</string>
@@ -95,12 +90,6 @@
     <string name="kg_failed_attempts_almost_at_login" product="tablet" msgid="3253575572118914370">"Vzorec za odklepanje ste <xliff:g id="NUMBER_0">%1$d</xliff:g>-krat napačno vnesli. Po nadaljnjih <xliff:g id="NUMBER_1">%2$d</xliff:g> neuspešnih poskusih boste pozvani, da tablični računalnik odklenete z e-poštnim računom.\n\nPoskusite znova čez <xliff:g id="NUMBER_2">%3$d</xliff:g> s."</string>
     <string name="kg_failed_attempts_almost_at_login" product="default" msgid="1437638152015574839">"Vzorec za odklepanje ste <xliff:g id="NUMBER_0">%1$d</xliff:g>-krat napačno vnesli. Po nadaljnjih <xliff:g id="NUMBER_1">%2$d</xliff:g> neuspešnih poskusih boste pozvani, da odklenete telefon z Googlovimi podatki za prijavo.\n\nPoskusite znova čez <xliff:g id="NUMBER_2">%3$d</xliff:g> s."</string>
     <string name="kg_password_wrong_pin_code_pukked" msgid="30531039455764924">"Napačna koda PIN kartice SIM. Zdaj se boste morali za odklenitev naprave obrniti na operaterja."</string>
-    <plurals name="kg_password_wrong_pin_code" formatted="false" msgid="6721575017538162249">
-      <item quantity="one">Napačna koda PIN kartice SIM. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskus.</item>
-      <item quantity="two">Napačna koda PIN kartice SIM. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskusa.</item>
-      <item quantity="few">Napačna koda PIN kartice SIM. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskuse.</item>
-      <item quantity="other">Napačna koda PIN kartice SIM. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskusov.</item>
-    </plurals>
     <string name="kg_password_wrong_puk_code_dead" msgid="7077536808291316208">"Kartica SIM ni več uporabna. Obrnite se na operaterja."</string>
     <plurals name="kg_password_wrong_puk_code" formatted="false" msgid="7576227366999858780">
       <item quantity="one">Napačna koda PUK kartice SIM. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskus. Potem bo kartica SIM postala trajno neuporabna.</item>
@@ -144,4 +133,16 @@
       <item quantity="other">Naprava ni bila odklenjena <xliff:g id="NUMBER_1">%d</xliff:g> ur. Potrdite geslo.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="2690661881608146617">"Ni prepoznano"</string>
+    <!-- Instructions telling the user that they entered the wrong SIM PIN while trying
+         to unlock the keyguard.  Displayed in a dialog box.  -->
+    <plurals name="kg_password_wrong_pin_code">
+        <item quantity="one">"Napačna koda PIN kartice SIM <xliff:g id="slotid">%d</xliff:g>. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskus."</item>
+        <item quantity="other">"Napačna koda PIN kartice SIM <xliff:g id="slotid">%d</xliff:g>. Na voljo imate še <xliff:g id="NUMBER_1">%d</xliff:g> poskusov."</item>
+    </plurals>
+
+    <!-- Instructions telling the user remaining times when enter SIM PIN view.  -->
+    <plurals name="kg_password_default_pin_message">
+        <item quantity="one">"Vnesite kodo PIN<xliff:g id="slotid">%d</xliff:g> za kartico SIM. Na voljo imate še <xliff:g id="number">%d</xliff:g>poskusov, nato pa se boste morali obrniti na operaterja, da odklene napravo."</item>
+        <item quantity="other">"Vnesite kodo PIN za kartico SIM<xliff:g id="slotid">%d</xliff:g>. Na voljo imate še <xliff:g id="number">%d</xliff:g> poskusov."</item>
+    </plurals>
 </resources>

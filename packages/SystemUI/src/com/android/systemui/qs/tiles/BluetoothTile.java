@@ -16,6 +16,7 @@
 
 package com.android.systemui.qs.tiles;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
@@ -90,11 +91,11 @@ public class BluetoothTile extends QSTile<QSTile.BooleanState>  {
             mHost.startActivityDismissingKeyguard(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
             return;
         }
+        showDetail(true);
         if (!mState.value) {
             mState.value = true;
             mController.setBluetoothEnabled(true);
         }
-        showDetail(true);
     }
 
     @Override
@@ -111,6 +112,9 @@ public class BluetoothTile extends QSTile<QSTile.BooleanState>  {
         state.autoMirrorDrawable = false;
         state.minimalContentDescription =
                 mContext.getString(R.string.accessibility_quick_settings_bluetooth);
+        if (mController.getBluetoothState() == BluetoothAdapter.STATE_ON) {
+            fireToggleStateChanged(true);
+        }
         if (enabled) {
             state.label = null;
             if (connected) {
@@ -205,6 +209,12 @@ public class BluetoothTile extends QSTile<QSTile.BooleanState>  {
         @Override
         public Boolean getToggleState() {
             return mState.value;
+        }
+
+        @Override
+        public boolean getToggleEnabled() {
+            return mController.getBluetoothState() == BluetoothAdapter.STATE_OFF
+                    || mController.getBluetoothState() == BluetoothAdapter.STATE_ON;
         }
 
         @Override

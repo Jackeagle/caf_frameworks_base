@@ -524,8 +524,13 @@ public final class ShutdownThread extends Thread {
                     AlarmManager.POWER_OFF_ALARM_HANDLED);
         }
 
-        AlarmManager.writePowerOffAlarmFile(AlarmManager.POWER_OFF_ALARM_TIMEZONE_FILE,
-                SystemProperties.get("persist.sys.timezone"));
+        // If it is factory data reset, value in POWER_OFF_ALARM_TIMEZONE_FILE will be cleared.
+        if (mReboot && PowerManager.REBOOT_RECOVERY.equals(mReason)) {
+            AlarmManager.writePowerOffAlarmFile(AlarmManager.POWER_OFF_ALARM_TIMEZONE_FILE, "");
+        } else {
+            AlarmManager.writePowerOffAlarmFile(AlarmManager.POWER_OFF_ALARM_TIMEZONE_FILE,
+                    SystemProperties.get("persist.sys.timezone"));
+        }
         rebootOrShutdown(mContext, mReboot, mReason);
     }
 
@@ -575,7 +580,8 @@ public final class ShutdownThread extends Thread {
                 }
 
                 try {
-                    bluetoothOff = bluetooth == null || !bluetooth.isEnabled();
+                    bluetoothOff = bluetooth == null ||
+                            bluetooth.getState() == BluetoothAdapter.STATE_OFF;
                     if (!bluetoothOff) {
                         Log.w(TAG, "Disabling Bluetooth...");
                         bluetooth.disable(false);  // disable but don't persist new state
@@ -609,7 +615,7 @@ public final class ShutdownThread extends Thread {
 
                     if (!bluetoothOff) {
                         try {
-                            bluetoothOff = !bluetooth.isEnabled();
+                            bluetoothOff = bluetooth.getState() == BluetoothAdapter.STATE_OFF;
                         } catch (RemoteException ex) {
                             Log.e(TAG, "RemoteException during bluetooth shutdown", ex);
                             bluetoothOff = true;
@@ -777,6 +783,14 @@ public final class ShutdownThread extends Thread {
         }
         if (!done[0]) {
             Log.w(TAG, "Timed out waiting for uncrypt.");
+            final int uncryptTimeoutError = 100;
+            String timeoutMessage = String.format("uncrypt_time: %d\n" + "uncrypt_error: %d\n",
+                    MAX_UNCRYPT_WAIT_TIME / 1000, uncryptTimeoutError);
+            try {
+                FileUtils.stringToFile(RecoverySystem.UNCRYPT_STATUS_FILE, timeoutMessage);
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to write timeout message to uncrypt status", e);
+            }
         }
     }
 }

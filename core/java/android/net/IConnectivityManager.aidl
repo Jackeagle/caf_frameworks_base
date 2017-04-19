@@ -26,6 +26,7 @@ import android.net.NetworkQuotaInfo;
 import android.net.NetworkRequest;
 import android.net.NetworkState;
 import android.net.ProxyInfo;
+import android.net.wifi.WifiDevice;
 import android.os.IBinder;
 import android.os.Messenger;
 import android.os.ParcelFileDescriptor;
@@ -35,6 +36,8 @@ import com.android.internal.net.LegacyVpnInfo;
 import com.android.internal.net.VpnConfig;
 import com.android.internal.net.VpnInfo;
 import com.android.internal.net.VpnProfile;
+
+import java.util.List;
 
 /**
  * Interface that answers queries about, and allows changing, the
@@ -97,6 +100,8 @@ interface IConnectivityManager
 
     int setUsbTethering(boolean enable);
 
+    List<WifiDevice> getTetherConnectedSta();
+
     void reportInetCondition(int networkType, int percentage);
 
     void reportNetworkConnectivity(in Network network, boolean hasConnectivity);
@@ -156,9 +161,12 @@ interface IConnectivityManager
     void pendingListenForNetwork(in NetworkCapabilities networkCapabilities,
             in PendingIntent operation);
 
+    void requestLinkProperties(in NetworkRequest networkRequest);
+    void requestNetworkCapabilities(in NetworkRequest networkRequest);
     void releaseNetworkRequest(in NetworkRequest networkRequest);
 
     void setAcceptUnvalidated(in Network network, boolean accept, boolean always);
+    void setAvoidUnvalidated(in Network network);
 
     int getRestoreDefaultNetworkDelay(int networkType);
 

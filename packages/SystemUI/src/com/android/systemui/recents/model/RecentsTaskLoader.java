@@ -200,6 +200,10 @@ class BackgroundTaskLoader implements Runnable {
 
                             if (cachedThumbnailData.thumbnail == null) {
                                 cachedThumbnailData.thumbnail = mDefaultThumbnail;
+                            } else {
+                                // Kick off an early upload of the bitmap to GL so
+                                // that this won't jank the first frame it's drawn in.
+                                cachedThumbnailData.thumbnail.prepareToDraw();
                             }
 
                             // When svelte, we trim the memory to just the visible thumbnails when
@@ -229,7 +233,9 @@ class BackgroundTaskLoader implements Runnable {
                     synchronized(mLoadQueue) {
                         try {
                             mWaitingOnLoadQueue = true;
-                            mLoadQueue.wait();
+                            while(mLoadQueue.isEmpty()) {
+                                mLoadQueue.wait();
+                            }
                             mWaitingOnLoadQueue = false;
                         } catch (InterruptedException ie) {
                             ie.printStackTrace();

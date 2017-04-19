@@ -179,6 +179,7 @@ public class CallLog {
          * <li>{@link #VOICEMAIL_TYPE}</li>
          * <li>{@link #REJECTED_TYPE}</li>
          * <li>{@link #BLOCKED_TYPE}</li>
+         * <li>{@link #ANSWERED_EXTERNALLY_TYPE}</li>
          * </ul>
          * </p>
          */
@@ -200,28 +201,38 @@ public class CallLog {
          * Call log type for a call which was answered on another device.  Used in situations where
          * a call rings on multiple devices simultaneously and it ended up being answered on a
          * device other than the current one.
-         * @hide
          */
         public static final int ANSWERED_EXTERNALLY_TYPE = 7;
-        /** Call log type for outgoing IMS calls. */
-        private static final int OUTGOING_IMS_TYPE = 9;
-        /** Call log type for missed IMS calls. */
-        private static final int MISSED_IMS_TYPE = 10;
+        /**
+         * Call log type for incoming IMS calls.
+         * @hide
+         */
+        public static final int INCOMING_IMS_TYPE = 1000;
+        /**
+         * Call log type for outgoing IMS calls.
+         * @hide
+         */
+        public static final int OUTGOING_IMS_TYPE = 1001;
+        /**
+         * Call log type for missed IMS calls.
+         * @hide
+         */
+        public static final int MISSED_IMS_TYPE = 1002;
         /**
          * Call log type for incoming WiFi calls.
          * @hide
          */
-        public static final int INCOMING_WIFI_TYPE = 20;
+        public static final int INCOMING_WIFI_TYPE = 1003;
         /**
          * Call log type for outgoing WiFi calls.
          * @hide
          */
-        public static final int OUTGOING_WIFI_TYPE = 21;
+        public static final int OUTGOING_WIFI_TYPE = 1004;
         /**
          * Call log type for missed WiFi calls.
          * @hide
          */
-        public static final int MISSED_WIFI_TYPE = 22;
+        public static final int MISSED_WIFI_TYPE = 1005;
 
         /**
          * Bit-mask describing features of the call (e.g. video).
@@ -233,11 +244,14 @@ public class CallLog {
         /** Call had video. */
         public static final int FEATURES_VIDEO = 0x1;
 
-        /**
-         * Call was pulled externally.
+        /** Call was pulled externally. */
+        public static final int FEATURES_PULLED_EXTERNALLY = 0x2;
+
+        /** Call had enriched data.
+         *
          * @hide
          */
-        public static final int FEATURES_PULLED_EXTERNALLY = 0x2;
+        public static final int FEATURES_ENRICHED = 0x100;
 
         /**
          * The phone number as the user entered it.
@@ -306,8 +320,10 @@ public class CallLog {
 
         /**
          * The cached name associated with the phone number, if it exists.
-         * This value is not guaranteed to be current, if the contact information
-         * associated with this number has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT</P>
          */
         public static final String CACHED_NAME = "name";
@@ -315,8 +331,10 @@ public class CallLog {
         /**
          * The cached number type (Home, Work, etc) associated with the
          * phone number, if it exists.
-         * This value is not guaranteed to be current, if the contact information
-         * associated with this number has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: INTEGER</P>
          */
         public static final String CACHED_NUMBER_TYPE = "numbertype";
@@ -324,8 +342,10 @@ public class CallLog {
         /**
          * The cached number label, for a custom number type, associated with the
          * phone number, if it exists.
-         * This value is not guaranteed to be current, if the contact information
-         * associated with this number has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT</P>
          */
         public static final String CACHED_NUMBER_LABEL = "numberlabel";
@@ -361,40 +381,50 @@ public class CallLog {
 
         /**
          * The cached URI to look up the contact associated with the phone number, if it exists.
-         * This value may not be current if the contact information associated with this number
-         * has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT</P>
          */
         public static final String CACHED_LOOKUP_URI = "lookup_uri";
 
         /**
          * The cached phone number of the contact which matches this entry, if it exists.
-         * This value may not be current if the contact information associated with this number
-         * has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT</P>
          */
         public static final String CACHED_MATCHED_NUMBER = "matched_number";
 
         /**
          * The cached normalized(E164) version of the phone number, if it exists.
-         * This value may not be current if the contact information associated with this number
-         * has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT</P>
          */
         public static final String CACHED_NORMALIZED_NUMBER = "normalized_number";
 
         /**
          * The cached photo id of the picture associated with the phone number, if it exists.
-         * This value may not be current if the contact information associated with this number
-         * has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: INTEGER (long)</P>
          */
         public static final String CACHED_PHOTO_ID = "photo_id";
 
         /**
          * The cached photo URI of the picture associated with the phone number, if it exists.
-         * This value may not be current if the contact information associated with this number
-         * has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT (URI)</P>
          */
         public static final String CACHED_PHOTO_URI = "photo_uri";
@@ -402,9 +432,10 @@ public class CallLog {
         /**
          * The cached phone number, formatted with formatting rules based on the country the
          * user was in when the call was made or received.
-         * This value is not guaranteed to be present, and may not be current if the contact
-         * information associated with this number
-         * has changed.
+         *
+         * <p>This value is typically filled in by the dialer app for the caching purpose,
+         * so it's not guaranteed to be present, and may not be current if the contact
+         * information associated with this number has changed.
          * <P>Type: TEXT</P>
          */
         public static final String CACHED_FORMATTED_NUMBER = "formatted_number";
