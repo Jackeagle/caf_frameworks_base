@@ -471,6 +471,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // Default display does not rotate, apps that require non-default orientation will have to
     // have the orientation emulated.
     private boolean mForceDefaultOrientation = false;
+    private int mDefaultOrientation = Surface.ROTATION_0;
 
     int mUserRotationMode = WindowManagerPolicy.USER_ROTATION_FREE;
     int mUserRotation = Surface.ROTATION_0;
@@ -2046,6 +2047,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 // $ adb shell setprop config.override_forced_orient true
                 // $ adb shell wm size reset
                 !"true".equals(SystemProperties.get("config.override_forced_orient"));
+        String defaultOrientation = SystemProperties.get("ro.default.orientation", "0");
+        if("0".equals(defaultOrientation)) {
+            mDefaultOrientation = Surface.ROTATION_0;
+        } else if("90".equals(defaultOrientation)) {
+            mDefaultOrientation = Surface.ROTATION_90;
+        } else if("180".equals(defaultOrientation)) {
+            mDefaultOrientation = Surface.ROTATION_180;
+        } else if("270".equals(defaultOrientation)) {
+            mDefaultOrientation = Surface.ROTATION_270;
+        } else {
+            mDefaultOrientation = Surface.ROTATION_0;
+        }
     }
 
     /**
@@ -6999,7 +7012,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     if (preferredRotation >= 0) {
                         return preferredRotation;
                     }
-                    return Surface.ROTATION_0;
+                    return mDefaultOrientation;
             }
         }
     }

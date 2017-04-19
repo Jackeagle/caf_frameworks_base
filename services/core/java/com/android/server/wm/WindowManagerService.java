@@ -1070,6 +1070,18 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         showEmulatorDisplayOverlayIfNeeded();
+        String defaultOrientation = SystemProperties.get("ro.default.orientation", "0");
+        if("0".equals(defaultOrientation)) {
+            mRotation = Surface.ROTATION_0;
+        } else if("90".equals(defaultOrientation)) {
+            mRotation = Surface.ROTATION_90;
+        } else if("180".equals(defaultOrientation)) {
+            mRotation = Surface.ROTATION_180;
+        } else if("270".equals(defaultOrientation)) {
+            mRotation = Surface.ROTATION_270;
+        } else {
+            mRotation = Surface.ROTATION_0;
+        }
     }
 
     public InputMonitor getInputMonitor() {
