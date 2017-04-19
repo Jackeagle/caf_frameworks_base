@@ -128,6 +128,14 @@ public class LocalePicker extends ListFragment {
         localeList.add("pa_IN");
         localeList.add("or_IN");
         localeList.add("ur_IN");
+        localeList.add("sd_IN");
+        localeList.add("sa_IN");
+        localeList.add("doi_IN");
+        localeList.add("brx_IN");
+        localeList.add("mni_IN");
+        localeList.add("sat_IN");
+        localeList.add("kok_IN");
+        localeList.add("mai_IN");
 
         String[] locales = new String[localeList.size()];
         locales = localeList.toArray(locales);
@@ -141,9 +149,15 @@ public class LocalePicker extends ListFragment {
         for (int i = 0 ; i < origSize; i++ ) {
             final String s = locales[i];
             final int len = s.length();
-            if (len == 5) {
-                String language = s.substring(0, 2);
-                String country = s.substring(3, 5);
+            if (len == 5 || len == 6) {
+                String language, country;
+                if (len == 5) {
+                    language = s.substring(0, 2);
+                    country = s.substring(3, 5);
+                } else {
+                   language = s.substring(0, 3);
+                   country = s.substring(4, 6);
+                }
                 final Locale l = new Locale(language, country);
 
                 if (finalSize == 0) {

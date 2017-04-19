@@ -1738,6 +1738,9 @@ public class TextUtils {
     public static int getLayoutDirectionFromLocale(Locale locale) {
         if (locale != null && !locale.equals(Locale.ROOT)) {
             final String scriptSubtag = ICU.getScript(ICU.addLikelySubtags(locale.toString()));
+            if (locale.toString().equals("sd_IN") || locale.toString().equals("doi_IN")) {
+                return View.LAYOUT_DIRECTION_LTR;
+            }
             if (scriptSubtag == null) return getLayoutDirectionFromFirstChar(locale);
 
             if (scriptSubtag.equalsIgnoreCase(ARAB_SCRIPT_SUBTAG) ||
