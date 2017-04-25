@@ -836,6 +836,24 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             st = getPanelState(Window.FEATURE_OPTIONS_PANEL, false);
             if (st != null) {
                 st.isPrepared = false;
+            if (st.menu != null) {
+            if (mAmode != null) {
+                st.menu.removeGroup(groupid);
+                for (int i=0;i<st.menu.size();i++) {
+                   if (st.menu.getItem(i)!=null)
+                       st.menu.getItem(i).setVisible(false);
+                }
+                for (int i = 0; i < mAmode.getMenu().size(); i++) {
+                    if (mAmode.getMenu().getItem(i).isVisible()) {
+                        st.menu.add(groupid, mAmode.getMenu().getItem(i)
+                                .getItemId(), Menu.NONE, mAmode.getMenu()
+                                .getItem(i).toString());
+                    }
+                }
+            } else {
+                st.menu.setGroupVisible(groupid, false);
+              }
+            }
                 preparePanel(st, null);
             }
         }
