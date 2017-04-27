@@ -338,6 +338,7 @@ public class Ringtone {
                 default:
                     Log.d("OmaDrm MultiPlayer", "Error: " + what + "," + extra);
                     mLocalPlayer.release();
+                    mLocalPlayer = null;
                     if (!playFallbackRingtone()) {
                         Log.w(TAG, "Problem playing ringtone: " );
                     }
