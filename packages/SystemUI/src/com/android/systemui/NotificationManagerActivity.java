@@ -82,6 +82,7 @@ public class NotificationManagerActivity extends Activity {
     private IStatusBarService mBarService;
     private HistoricalNotificationInfo notifyInfo;
     private boolean mAddClearAll;
+    private  int mlistsize = 0;
     private  static String  APPLICATION_USB = "android";
 
 
@@ -189,6 +190,7 @@ public class NotificationManagerActivity extends Activity {
                     + infos.size());
 
             if (infos.size() == 0) {
+                mlistsize = 0;
                 mAdapter.clear();
                 mAdapter.notifyDataSetChanged();
                 tx.setVisibility(View.VISIBLE);
@@ -199,16 +201,18 @@ public class NotificationManagerActivity extends Activity {
             }
             // when new notification arrives we refresh the list. if menu option
             // is open close the list
+            if(mlistsize !=  infos.size())
             ((Activity) mContext).closeOptionsMenu();
             tx.setVisibility(View.GONE);
             mAdapter.clear();
             mAdapter.addAll(infos);
             mAdapter.sort(mNotificationSorter);
             mAdapter.notifyDataSetChanged();
+            mlistsize = infos.size();
         } else {
             if(debug)
             Log.d(TAG, "=========================  notification not available");
-
+            mlistsize = 0;
             tx.setText(R.string.no_notification);
             tx.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
         }
