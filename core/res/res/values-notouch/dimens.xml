@@ -172,7 +172,7 @@
     <dimen name="alert_dialog_button_bar_height">32dip</dimen>
 
     <!-- Default height of an action bar. was 48dip -->
-    <dimen name="action_bar_default_height">30dip</dimen>
+    <dimen name="action_bar_default_height">31dip</dimen>
     <!-- Vertical padding around action bar icons. was 8dip -->
     <dimen name="action_bar_icon_vertical_padding">2dip</dimen>
     <!-- Text size for action bar titles. was 18dp -->

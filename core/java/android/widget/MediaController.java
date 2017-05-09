@@ -36,7 +36,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.os.SystemProperties;
 import com.android.internal.policy.PolicyManager;
-
+import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import java.util.Formatter;
 import java.util.Locale;
 /**
@@ -477,14 +477,13 @@ public class MediaController extends FrameLayout {
         int keyCode = event.getKeyCode();
         final boolean uniqueDown = event.getRepeatCount() == 0
                 && event.getAction() == KeyEvent.ACTION_DOWN;
-        int subtype = SystemProperties.getInt("persist.isruggedphone", 0);
-
+        boolean isPhoneTypeTouch =  mContext.getPackageManager().hasSystemFeature("android.hardware.touchscreen");
         if (keyCode ==  KeyEvent.KEYCODE_HEADSETHOOK
                 || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
                 || keyCode == KeyEvent.KEYCODE_SPACE) {
             if (uniqueDown) {
                 // Add the effect of the button in the video start
-                if (subtype == 1) {
+                if (!isPhoneTypeTouch) {
                     mPauseButton.setBackgroundColor(0xFFFFC125);
                 }
                 // Add the effect of the button in the video  end
@@ -495,7 +494,7 @@ public class MediaController extends FrameLayout {
                 }
             } else {
                 // Add the effect of the button in the video by start
-                if (subtype == 1) {
+                if (!isPhoneTypeTouch) {
                     mPauseButton.setBackground(null);
                     mRewButton.setBackground(null);
                     mFfwdButton.setBackground(null);
@@ -531,7 +530,7 @@ public class MediaController extends FrameLayout {
             return true;
         // Add the effect of the button in the video by start
         } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            if (subtype == 1) {
+            if (!isPhoneTypeTouch) {
                 if (mPrevButton.getVisibility() == View.VISIBLE) {
                     if (uniqueDown) {
                         mPrevButton.setBackgroundColor(0xFF24e5FF);
@@ -555,7 +554,7 @@ public class MediaController extends FrameLayout {
                 }
             }
         } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            if (subtype == 1) {
+            if (!isPhoneTypeTouch) {
                 if (mNextButton.getVisibility() == View.VISIBLE) {
                     if (uniqueDown) {
                         mNextButton.setBackgroundColor(0xFF24e5FF);
@@ -579,7 +578,7 @@ public class MediaController extends FrameLayout {
                 }
             }
         } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            if (subtype == 1) {
+            if (!isPhoneTypeTouch) {
                 if (uniqueDown) {
                     mPauseButton.setBackgroundColor(0xFF24e5FF);
                     doPauseResume();

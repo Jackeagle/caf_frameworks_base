@@ -187,6 +187,7 @@ public class Ringtone {
 
         // try opening uri locally before delegating to remote player
         mLocalPlayer = new MediaPlayer();
+        mLocalPlayer.setOnErrorListener(errorListener);
         try {
             mLocalPlayer.setDataSource(mContext, mUri);
             mLocalPlayer.setAudioStreamType(mStreamType);
@@ -203,7 +204,6 @@ public class Ringtone {
                 Log.w(TAG, "Remote playback not allowed: " + e);
             }
         }
-
         if (LOGD) {
             if (mLocalPlayer != null) {
                 Log.d(TAG, "Successfully created local player");
@@ -310,6 +310,7 @@ public class Ringtone {
                         mLocalPlayer.prepare();
                         mLocalPlayer.start();
                         afd.close();
+                        Log.i(TAG, "Playing fallback ringtone!");
                         return true;
                     } else {
                         Log.e(TAG, "Could not load fallback ringtone");
@@ -330,4 +331,20 @@ public class Ringtone {
     void setTitle(String title) {
         mTitle = title;
     }
+
+    MediaPlayer.OnErrorListener errorListener = new MediaPlayer.OnErrorListener() {
+            public boolean onError(MediaPlayer mp, int what, int extra) {
+                switch (what) {
+                default:
+                    Log.d("OmaDrm MultiPlayer", "Error: " + what + "," + extra);
+                    mLocalPlayer.release();
+                    mLocalPlayer = null;
+                    if (!playFallbackRingtone()) {
+                        Log.w(TAG, "Problem playing ringtone: " );
+                    }
+                    break;
+                }
+                return false;
+            }
+        };
 }

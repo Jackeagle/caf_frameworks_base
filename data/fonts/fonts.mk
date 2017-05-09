@@ -62,7 +62,8 @@ PRODUCT_PACKAGES += \
     DroidSansPunjabi.ttf \
     DroidSansKannada.ttf \
     DroidSansBengali.ttf \
-    DroidSansOdia.ttf 
+    DroidSansOdia.ttf \
+    DroidSansSantali.ttf
 
 endif
 

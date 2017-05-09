@@ -578,6 +578,9 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             if (isXLarge && isHoneycombApp) {
                 return;
             }
+            if (SystemProperties.get("persist.sys.showbottomactionbar","0").equals("1")) {
+               return;
+            }
         }
 
         Callback cb = getCallback();
@@ -833,6 +836,24 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             st = getPanelState(Window.FEATURE_OPTIONS_PANEL, false);
             if (st != null) {
                 st.isPrepared = false;
+            if (st.menu != null) {
+            if (mAmode != null) {
+                st.menu.removeGroup(groupid);
+                for (int i=0;i<st.menu.size();i++) {
+                   if (st.menu.getItem(i)!=null)
+                       st.menu.getItem(i).setVisible(false);
+                }
+                for (int i = 0; i < mAmode.getMenu().size(); i++) {
+                    if (mAmode.getMenu().getItem(i).isVisible()) {
+                        st.menu.add(groupid, mAmode.getMenu().getItem(i)
+                                .getItemId(), Menu.NONE, mAmode.getMenu()
+                                .getItem(i).toString());
+                    }
+                }
+            } else {
+                st.menu.setGroupVisible(groupid, false);
+              }
+            }
                 preparePanel(st, null);
             }
         }
@@ -1077,6 +1098,27 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     // forget it. This is a lingering event that no longer matters.
                     if (st.menu != null && !st.refreshMenuContent &&
                             cb.onPreparePanel(FEATURE_OPTIONS_PANEL, st.createdPanelView, st.menu)) {
+                        if (mAmode != null) {
+                        // remove all actionmode groups before adding new ones
+                        st.menu.removeGroup(groupid);
+                       //Make all visible item false  when  actionmode items are to be shown
+                        for (int i=0;i<st.menu.size();i++) {
+                            if (st.menu.getItem(i)!=null)
+                            st.menu.getItem(i).setVisible(false);
+                        }
+                       for (int i = 0; i < mAmode.getMenu().size(); i++) {
+                       // check the visibility and then add to the menu object
+                           if (mAmode.getMenu().getItem(i).isVisible()) {
+                               st.menu.add(groupid, mAmode.getMenu().getItem(i)
+                                   .getItemId(), Menu.NONE, mAmode.getMenu()
+                                   .getItem(i).toString());
+                       }
+                    }
+                }    else {
+                 // Action Mode Menu option item to be disabled when Actionmode
+                // is not set
+                st.menu.setGroupVisible(groupid, false);
+            }
                         cb.onMenuOpened(FEATURE_ACTION_BAR, st.menu);
                         mActionBar.showOverflowMenu();
                     }

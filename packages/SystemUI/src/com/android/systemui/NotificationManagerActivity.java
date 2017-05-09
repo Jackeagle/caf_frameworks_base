@@ -81,6 +81,8 @@ public class NotificationManagerActivity extends Activity {
     private TextView tx;
     private IStatusBarService mBarService;
     private HistoricalNotificationInfo notifyInfo;
+    private boolean mAddClearAll;
+    private  int mlistsize = 0;
     private  static String  APPLICATION_USB = "android";
 
 
@@ -117,6 +119,7 @@ public class NotificationManagerActivity extends Activity {
         // Construct the adapter to fill the ListView
         mAdapter = new NotificationHistoryAdapter(mContext);
         listView.setAdapter(mAdapter);
+        invalidateOptionsMenu();
     }
 
     @Override
@@ -187,7 +190,9 @@ public class NotificationManagerActivity extends Activity {
                     + infos.size());
 
             if (infos.size() == 0) {
+                mlistsize = 0;
                 mAdapter.clear();
+                mAdapter.notifyDataSetChanged();
                 tx.setVisibility(View.VISIBLE);
                 tx.setText(R.string.no_notification);
                 tx.setGravity(Gravity.CENTER_VERTICAL
@@ -196,16 +201,18 @@ public class NotificationManagerActivity extends Activity {
             }
             // when new notification arrives we refresh the list. if menu option
             // is open close the list
+            if(mlistsize !=  infos.size())
             ((Activity) mContext).closeOptionsMenu();
             tx.setVisibility(View.GONE);
             mAdapter.clear();
             mAdapter.addAll(infos);
-
             mAdapter.sort(mNotificationSorter);
+            mAdapter.notifyDataSetChanged();
+            mlistsize = infos.size();
         } else {
             if(debug)
             Log.d(TAG, "=========================  notification not available");
-
+            mlistsize = 0;
             tx.setText(R.string.no_notification);
             tx.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
         }
@@ -289,6 +296,7 @@ public class NotificationManagerActivity extends Activity {
     }
 
     private List<HistoricalNotificationInfo> loadNotifications() {
+        mAddClearAll = false;
         final int currentUserId = ActivityManager.getCurrentUser();
         try {
             StatusBarNotification[] active = mNoMan
@@ -301,6 +309,13 @@ public class NotificationManagerActivity extends Activity {
                 final HistoricalNotificationInfo info = new HistoricalNotificationInfo();
                 info.pkg = sbn.getPackageName();
                 info.clearflag = sbn.isClearable();
+                // if any of the notification can be cleared. Assume we can add
+                // "clear all" menu.
+                if (!mAddClearAll) {
+                    if (info.clearflag) {
+                        mAddClearAll = true;
+                    }
+                }
                 info.tag = sbn.getTag();
                 info.Id = sbn.getId();
                 info.user = sbn.getUserId();
@@ -421,30 +436,55 @@ public class NotificationManagerActivity extends Activity {
     }
 
     @Override
-    public boolean onMenuOpened(int featureId, Menu menu) {
-        // TODO Auto-generated method stub
-        menu.clear();
-        int i = 0;
-        notifyInfo = (HistoricalNotificationInfo) listView.getSelectedItem();
-        // to show notification action in menu options
-        if ( notifyInfo != null) {
+    public boolean onCreateOptionsMenu(Menu menu) {
+
+        // to show "Options" in bottom we need atleast two items.
+        // Hence add "clear" and "clear all" options by default.
+        // Actual menu items will be decided at onMenuOpened.
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        boolean hasNotifications = false;
+        if (mAdapter.getCount() >0) {
+            hasNotifications = true;
+        }
+        // if list adapter has no items
+        if (!hasNotifications) {
+            menu.clear();
+            menu.add(R.string.clear).setEnabled(false);
+            menu.add(R.string.clearAll).setEnabled(false);
+        }
+        // if list adapter has some items
+        else {
+            menu.clear();
+            notifyInfo = (HistoricalNotificationInfo) listView.getSelectedItem();
+            // to show notification action in menu options
+            if (notifyInfo != null) {
                 if (notifyInfo.notification != null
                         && notifyInfo.notification.actions != null) {
-                    for (i = 0; i < notifyInfo.notification.actions.length; i++) {
+                    for (int i = 0; i < notifyInfo.notification.actions.length; i++) {
                         menu.add(Menu.NONE, i, Menu.NONE,
-                                notifyInfo.notification.actions[i].title);
+                        notifyInfo.notification.actions[i].title);
                     }
                 }
+                // Add clear based on current notification
                 if (notifyInfo.clearflag) {
                     menu.add(R.string.clear);
+                } else {
+                    menu.add(R.string.clear).setEnabled(false);
+                }
+                // for "clear all" consider all notifications
+                if (mAddClearAll) {
                     menu.add(R.string.clearAll);
                 }
+                else {
+                    menu.add(R.string.clearAll).setEnabled(false);
+                }
+            }
         }
-
-        if(menu.size() == 0){
-            return false;
-        }
-        return super.onMenuOpened(featureId, menu);
+        return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
@@ -454,6 +494,7 @@ public class NotificationManagerActivity extends Activity {
             try {
                 mBarService.onNotificationClear(notifyInfo.pkg, notifyInfo.tag,
                         notifyInfo.Id);
+            mAdapter.notifyDataSetChanged();
                 return true;
             } catch (Exception e) {
                 Log.d(TAG, "" + e.toString());
@@ -464,9 +505,9 @@ public class NotificationManagerActivity extends Activity {
                 for (int i = 0; i < activenotify.size(); i++) {
                     if (activenotify.get(i).clearflag) {
                         mBarService.onClearAllNotifications();
-                        return true;
                     }
                 }
+                mAdapter.notifyDataSetChanged();
                 return true;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -476,6 +517,7 @@ public class NotificationManagerActivity extends Activity {
         try {
             notifyInfo.notification.actions[item.getItemId()].actionIntent
             .send(mContext, 0, intent);
+            mAdapter.notifyDataSetChanged();
             return true;
         } catch (Exception e) {
         }

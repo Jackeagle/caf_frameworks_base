@@ -356,8 +356,7 @@ public class VolumePreference extends SeekBarDialogPreference implements
 
         public void onProgressChanged(SeekBar seekBar, int progress,
                 boolean fromTouch) {
-            int subtype = SystemProperties.getInt("persist.isruggedphone", 0);
-            if (subtype == 1) {
+            if (!mContext.getPackageManager().hasSystemFeature("android.hardware.touchscreen")) {
                 // first set the volume so that when volume changed from 0 to index 1
                 // volume index is set before starting ringtone playback
                 postSetVolume(progress);

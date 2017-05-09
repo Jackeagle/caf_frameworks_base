@@ -991,7 +991,7 @@ please see themes_device_defaults.xml.
         <item name="listPreferredItemPaddingEnd">6dip</item>
 
         <!-- @hide was 58-->
-        <item name="searchResultListItemHeight">32dip</item>
+        <item name="searchResultListItemHeight">40dip</item>
         <item name="listDivider">@drawable/list_divider_holo_dark</item>
         <item name="listSeparatorTextViewStyle">@android:style/Widget.Holo.TextView.ListSeparator</item>
 

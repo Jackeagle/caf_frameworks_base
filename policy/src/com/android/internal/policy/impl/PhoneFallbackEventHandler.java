@@ -256,7 +256,11 @@ public class PhoneFallbackEventHandler implements FallbackEventHandler {
                     Intent intent = new Intent("com.android.phone.action.RECENT_CALLS");
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                    try {
                     mContext.startActivity(intent);
+                    } catch (ActivityNotFoundException e) {
+                          Slog.w(TAG, "No activity found for com.android.phone.action.RECENT_CALLS");
+                    }
                     return true;
                 } else {
                     //Else launch In-Call screen
