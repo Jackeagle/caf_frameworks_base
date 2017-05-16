@@ -590,6 +590,7 @@ public final class SystemServer {
 
         boolean isEmulator = SystemProperties.get("ro.kernel.qemu").equals("1");
         boolean enableWigig = SystemProperties.getBoolean("persist.wigig.enable", false);
+        final boolean enableOptimazation = SystemProperties.getBoolean("persist.optimization.enable", false);
 
         try {
             Slog.i(TAG, "Reading configuration...");
@@ -599,7 +600,9 @@ public final class SystemServer {
             ServiceManager.addService("scheduling_policy", new SchedulingPolicyService());
             Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
 
-            mSystemServiceManager.startService(TelecomLoaderService.class);
+            if (!enableOptimazation) {
+                mSystemServiceManager.startService(TelecomLoaderService.class);
+            }
 
             traceBeginAndSlog("StartTelephonyRegistry");
             telephonyRegistry = new TelephonyRegistry(context);
@@ -630,12 +633,14 @@ public final class SystemServer {
             mActivityManagerService.installSystemProviders();
             Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
 
-            traceBeginAndSlog("StartVibratorService");
-            vibrator = new VibratorService(context);
-            ServiceManager.addService("vibrator", vibrator);
-            Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
+            if (!enableOptimazation) {
+                traceBeginAndSlog("StartVibratorService");
+                vibrator = new VibratorService(context);
+                ServiceManager.addService("vibrator", vibrator);
+                Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
+            }
 
-            if (!disableConsumerIr) {
+            if (!enableOptimazation && !disableConsumerIr) {
                 traceBeginAndSlog("StartConsumerIrService");
                 consumerIr = new ConsumerIrService(context);
                 ServiceManager.addService(Context.CONSUMER_IR_SERVICE, consumerIr);
@@ -879,7 +884,7 @@ public final class SystemServer {
                     mSystemServiceManager.startService("com.android.server.wifi.RttService");
                 }
 
-                if (enableWigig) {
+                if (!enableOptimazation && enableWigig) {
                     try {
                         Slog.i(TAG, "Wigig Service");
                         PathClassLoader wigigClassLoader =
@@ -932,7 +937,7 @@ public final class SystemServer {
                 Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
             }
 
-            if (!disableNonCoreServices) {
+            if (!enableOptimazation && !disableNonCoreServices) {
                 traceBeginAndSlog("StartUpdateLockService");
                 try {
                     ServiceManager.addService(Context.UPDATE_LOCK_SERVICE,
@@ -1011,7 +1016,7 @@ public final class SystemServer {
             mSystemServiceManager.startService(AudioService.Lifecycle.class);
             Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
 
-            if (!disableNonCoreServices) {
+            if (!enableOptimazation && !disableNonCoreServices) {
                 mSystemServiceManager.startService(DockObserver.class);
 
 		if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
@@ -1088,16 +1093,18 @@ public final class SystemServer {
                     mSystemServiceManager.startService(APPWIDGET_SERVICE_CLASS);
                 }
 
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
+                if (!enableOptimazation &&  mPackageManager.hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS)) {
                     mSystemServiceManager.startService(VOICE_RECOGNITION_MANAGER_SERVICE_CLASS);
                 }
 
-                if (GestureLauncherService.isGestureLauncherEnabled(context.getResources())) {
+                if (!enableOptimazation &&  GestureLauncherService.isGestureLauncherEnabled(context.getResources())) {
                     Slog.i(TAG, "Gesture Launcher Service");
                     mSystemServiceManager.startService(GestureLauncherService.class);
                 }
-                mSystemServiceManager.startService(SensorNotificationService.class);
-                mSystemServiceManager.startService(ContextHubSystemService.class);
+                if (!enableOptimazation) {
+                    mSystemServiceManager.startService(SensorNotificationService.class);
+                    mSystemServiceManager.startService(ContextHubSystemService.class);
+                }
             }
 
             traceBeginAndSlog("StartDiskStatsService");
@@ -1217,7 +1224,7 @@ public final class SystemServer {
                     mSystemServiceManager.startService(TrustManagerService.class);
                 }
 
-                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
+                if (!enableOptimazation && mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)) {
                     mSystemServiceManager.startService(FingerprintService.class);
                 }
 
@@ -1274,10 +1281,12 @@ public final class SystemServer {
         // It is now time to start up the app processes...
 
         Trace.traceBegin(Trace.TRACE_TAG_SYSTEM_SERVER, "MakeVibratorServiceReady");
-        try {
-            vibrator.systemReady();
-        } catch (Throwable e) {
-            reportWtf("making Vibrator Service ready", e);
+        if (!enableOptimazation) {
+            try {
+                vibrator.systemReady();
+            } catch (Throwable e) {
+                reportWtf("making Vibrator Service ready", e);
+            }
         }
         Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
 
@@ -1300,7 +1309,7 @@ public final class SystemServer {
 
         // Wigig services are not registered as system services because of class loader
         // limitations, send boot phase notification separately
-        if (enableWigig) {
+        if (!enableOptimazation && enableWigig) {
             try {
                 Slog.i(TAG, "calling onBootPhase for Wigig Services");
                 Class wigigP2pClass = wigigP2pService.getClass();

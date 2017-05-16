@@ -189,13 +189,19 @@ public class ZygoteInit {
     private static final int ROOT_UID = 0;
     private static final int ROOT_GID = 0;
 
+    private static Thread CThread = new Thread(new Runnable() {
+           @Override
+           public void run() {
+           Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "PreloadClasses");
+           preloadClasses();
+           Trace.traceEnd(Trace.TRACE_TAG_DALVIK);
+        }
+    });
+
     static void preload() {
         Log.d(TAG, "begin preload");
         Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "BeginIcuCachePinning");
         beginIcuCachePinning();
-        Trace.traceEnd(Trace.TRACE_TAG_DALVIK);
-        Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "PreloadClasses");
-        preloadClasses();
         Trace.traceEnd(Trace.TRACE_TAG_DALVIK);
         Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "PreloadResources");
         preloadResources();
@@ -712,7 +718,6 @@ public class ZygoteInit {
     public static void main(String argv[]) {
         // Mark zygote start. This ensures that thread creation will throw
         // an error.
-        ZygoteHooks.startZygoteNoThreadCreation();
 
         try {
             Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "ZygoteInit");
@@ -743,6 +748,13 @@ public class ZygoteInit {
             Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "ZygotePreload");
             EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_START,
                 SystemClock.uptimeMillis());
+
+            try {
+                CThread.start();
+            } catch (Exception e) {
+                Log.e(TAG, "async preload class failed");
+            }
+
             preload();
             EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_END,
                 SystemClock.uptimeMillis());
@@ -765,7 +777,6 @@ public class ZygoteInit {
             // Zygote process unmounts root storage spaces.
             Zygote.nativeUnmountStorageOnInit();
 
-            ZygoteHooks.stopZygoteNoThreadCreation();
 
             if (startSystemServer) {
                 startSystemServer(abiList, socketName);
