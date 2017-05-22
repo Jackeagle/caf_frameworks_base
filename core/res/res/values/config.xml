@@ -2855,6 +2855,11 @@
     <!-- Default data warning level in mb -->
     <integer name="default_data_warning_level_mb">2048</integer>
 
+    <!-- When true, indicates that the vendor's IMS implementation requires a workaround when
+     sending a request to enable or disable the camera while the video session is also
+     paused. -->
+    <bool name="config_useVideoPauseWorkaround">false</bool>
+
     <!-- Whether to send a custom package name with the PSD.-->
     <bool name="config_sendPackageName">false</bool>
 
@@ -2900,4 +2905,7 @@
     <!-- Volume level of in-call notification tone playback,
          relative to the overall voice call stream volume [0..100] -->
     <integer name="config_inCallNotificationVolumeRelative">67</integer>
+
+    <!-- Configuartion to support SIM contact batch operation.-->
+    <bool name="config_sim_phonebook_batch_operation">true</bool>
 </resources>
