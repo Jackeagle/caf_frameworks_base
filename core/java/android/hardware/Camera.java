@@ -264,6 +264,7 @@ public class Camera {
                 }
             }
         }
+        exposeAuxCamera = true;
         int numberOfCameras = _getNumberOfCameras();
         if (exposeAuxCamera == false && (numberOfCameras > 2)) {
             numberOfCameras = 2;
