@@ -35,6 +35,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.os.Bundle;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -108,9 +109,18 @@ public class SubsidyController {
     private final BroadcastReceiver mSubsidyLockReceiver =
         new BroadcastReceiver() {
             public void onReceive(Context context, Intent intent) {
-                if (DEBUG) {
-                    Log.d(TAG, "Received intent for SubsidyLock feature " +  intent);
+
+                Log.d(TAG, "Received intent for SubsidyLock feature");
+
+                Bundle bundle = intent.getExtras();
+                if (null != bundle) {
+                    for (String key : bundle.keySet()) {
+                         Log.d(TAG, "Intent "+String.format("%s", key));
+                    }
+                } else {
+                    Log.d(TAG, "Received intent bundle is null");
                 }
+
                 if (!mStopStateTransitions) {
                     boolean isValid = processIntent(intent);
                     Log.d(TAG, "Received different intent = "+ isValid);
@@ -289,6 +299,8 @@ public class SubsidyController {
     class ConfiguringScreenState extends SubsidyState {
 
         public ConfiguringScreenState() {
+            Log.d(TAG, " In ConfiguringScreenState");
+
             mLayoutId = R.layout.keyguard_subsidy_configuring_view;
             mViewId = R.id.keyguard_subsidy_configuring_view;
         }

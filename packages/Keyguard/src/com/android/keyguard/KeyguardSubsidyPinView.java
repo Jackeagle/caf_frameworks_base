@@ -133,15 +133,6 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
     public void showUsabilityHint() {
     }
 
-    @Override
-    public void onPause() {
-        // dismiss the dialog.
-        if (mUnlockProgressDialog != null) {
-            mUnlockProgressDialog.dismiss();
-            mUnlockProgressDialog = null;
-        }
-    }
-
     private Dialog getUnlockProgressDialog() {
         if (mUnlockProgressDialog == null) {
             mUnlockProgressDialog = new ProgressDialog(mContext);
@@ -324,10 +315,10 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                 }
                 final boolean result = extTelephony
                     .supplyNetworkDepersonalization(mPin, "", slotId);
-                if (DEBUG) {
-                    Log.v(TAG, "supplyNetworkDepersonalization returned: "
-                            + result);
-                }
+
+                Log.v(TAG, "supplyNetworkDepersonalization returned: "
+                        + result);
+
                 post(new Runnable() {
                     public void run() {
                         onUnlockResponse(result);
@@ -392,6 +383,11 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                     setEnableDataButtonVisibility();
                     setNoDataTextVisibility();
                     setSubsidySetupContainerVisibility(View.VISIBLE);
+                    // dismiss the dialog.
+                    if (mUnlockProgressDialog != null) {
+                        mUnlockProgressDialog.dismiss();
+                        mUnlockProgressDialog = null;
+                    }
                 }
                 public void onSimStateChanged(int subId, int slotId,
                         IccCardConstants.State simState) {
