@@ -121,7 +121,9 @@ bool PointerController::getBoundsLocked(float* outMinX, float* outMinY,
         break;
     default:
         *outMaxX = mLocked.displayWidth - 1;
-        *outMaxY = mLocked.displayHeight - 1;
+        // Restricting mouse cursor from floating on the softkey menu in Browser and
+        // HTMLViewer app.
+        *outMaxY = mLocked.displayHeight - 33;
         break;
     }
     return true;
