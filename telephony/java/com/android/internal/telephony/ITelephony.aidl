@@ -498,6 +498,8 @@ interface ITelephony {
       */
     boolean isConcurrentVoiceAndDataAllowed(int subId);
 
+    Bundle getVisualVoicemailSettings(String callingPackage, int subId);
+
     String getVisualVoicemailPackageName(String callingPackage, int subId);
 
     // Not oneway, caller needs to make sure the vaule is set before receiving a SMS
@@ -1318,4 +1320,15 @@ interface ITelephony {
      * @hide
      */
     boolean getEmergencyCallbackMode(int subId);
+
+    /**
+     * Get ATR (Answer To Reset; as per ISO/IEC 7816-4) from SIM card
+     */
+    byte[] getAtr();
+
+    /**
+     * Get ATR (Answer To Reset; as per ISO/IEC 7816-4) from SIM card
+     * for a particular subId.
+     */
+    byte[] getAtrUsingSubId(int subId);
 }

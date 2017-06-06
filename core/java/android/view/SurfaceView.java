@@ -31,7 +31,7 @@ import android.graphics.Rect;
 import android.graphics.Region;
 import android.os.Build;
 import android.os.Handler;
-import android.os.Message;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -120,31 +120,10 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
     final Rect mTmpRect = new Rect();
     final Configuration mConfiguration = new Configuration();
 
-    static final int KEEP_SCREEN_ON_MSG = 1;
-    static final int DRAW_FINISHED_MSG = 2;
-
     int mSubLayer = APPLICATION_MEDIA_SUBLAYER;
 
     boolean mIsCreating = false;
     private volatile boolean mRtHandlingPositionUpdates = false;
-
-    final Handler mHandler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case KEEP_SCREEN_ON_MSG: {
-                    setKeepScreenOn(msg.arg1 != 0);
-                } break;
-                case DRAW_FINISHED_MSG: {
-                    mDrawFinished = true;
-                    if (mAttachedToWindow) {
-                        notifyDrawFinished();
-                        invalidate();
-                    }
-                } break;
-            }
-        }
-    };
 
     private final ViewTreeObserver.OnScrollChangedListener mScrollChangedListener
             = new ViewTreeObserver.OnScrollChangedListener() {
@@ -245,8 +224,8 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         super.onAttachedToWindow();
 
         getViewRootImpl().addWindowStoppedCallback(this);
+        mWindowStopped = false;
 
-        mParent.requestTransparentRegion(this);
         mViewVisibility = getVisibility() == VISIBLE;
         updateRequestedVisibility();
 
@@ -351,7 +330,7 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
 
     @Override
     public boolean gatherTransparentRegion(Region region) {
-        if (isAboveParent()) {
+        if (isAboveParent() || !mDrawFinished) {
             return super.gatherTransparentRegion(region);
         }
 
@@ -677,8 +656,16 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                 } finally {
                     mIsCreating = false;
                     if (mSurfaceControl != null && !mSurfaceCreated) {
-                        mSurfaceControl.destroy();
-                        mSurfaceControl = null;
+                        mSurface.release();
+                        // If we are not in the stopped state, then the destruction of the Surface
+                        // represents a visual change we need to display, and we should go ahead
+                        // and destroy the SurfaceControl. However if we are in the stopped state,
+                        // we can just leave the Surface around so it can be a part of animations,
+                        // and we let the life-time be tied to the parent surface.
+                        if (!mWindowStopped) {
+                            mSurfaceControl.destroy();
+                            mSurfaceControl = null;
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -711,6 +698,10 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                     mTranslator.translateRectInAppWindowToScreen(mScreenRect);
                 }
 
+                if (mSurfaceControl == null) {
+                    return;
+                }
+
                 if (!isHardwareAccelerated() || !mRtHandlingPositionUpdates) {
                     try {
                         if (DEBUG) Log.d(TAG, String.format("%d updateSurfacePosition UI, " +
@@ -737,7 +728,14 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
             mDeferredDestroySurfaceControl = null;
         }
 
-        mHandler.sendEmptyMessage(DRAW_FINISHED_MSG);
+        runOnUiThread(() -> {
+            mDrawFinished = true;
+            if (mAttachedToWindow) {
+                mParent.requestTransparentRegion(SurfaceView.this);
+                notifyDrawFinished();
+                invalidate();
+            }
+        });
     }
 
     private void setParentSpaceRectangle(Rect position, long frameNumber) {
@@ -850,7 +848,7 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
      */
     @Deprecated
     public void setWindowType(int type) {
-        if (getContext().getApplicationInfo().targetSdkVersion > Build.VERSION_CODES.N_MR1) {
+        if (getContext().getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.O) {
             throw new UnsupportedOperationException(
                     "SurfaceView#setWindowType() has never been a public API.");
         }
@@ -864,6 +862,15 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         }
         Log.e(TAG, "SurfaceView#setWindowType(int) is deprecated and now does nothing. "
                 + "type=" + type, new Throwable());
+    }
+
+    private void runOnUiThread(Runnable runnable) {
+        Handler handler = getHandler();
+        if (handler != null && handler.getLooper() != Looper.myLooper()) {
+            handler.post(runnable);
+        } else {
+            runnable.run();
+        }
     }
 
     /**
@@ -946,9 +953,7 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
 
         @Override
         public void setKeepScreenOn(boolean screenOn) {
-            Message msg = mHandler.obtainMessage(KEEP_SCREEN_ON_MSG);
-            msg.arg1 = screenOn ? 1 : 0;
-            mHandler.sendMessage(msg);
+            runOnUiThread(() -> SurfaceView.this.setKeepScreenOn(screenOn));
         }
 
         /**

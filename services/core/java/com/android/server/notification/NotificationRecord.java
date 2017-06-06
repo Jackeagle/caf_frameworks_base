@@ -85,6 +85,7 @@ public final class NotificationRecord {
     // to communicate with the ranking module.
     private float mContactAffinity;
     private boolean mRecentlyIntrusive;
+    private long mLastIntrusive;
 
     // is this notification currently being intercepted by Zen Mode?
     private boolean mIntercept;
@@ -152,7 +153,7 @@ public final class NotificationRecord {
                   final ApplicationInfo applicationInfo =
                         mContext.getPackageManager().getApplicationInfoAsUser(sbn.getPackageName(),
                                 0, UserHandle.getUserId(sbn.getUid()));
-                if (applicationInfo.targetSdkVersion <= Build.VERSION_CODES.N_MR1) {
+                if (applicationInfo.targetSdkVersion < Build.VERSION_CODES.O) {
                     return true;
                 }
             }
@@ -392,7 +393,8 @@ public final class NotificationRecord {
         }
         pw.println(prefix + "contentView=" + notification.contentView);
         pw.println(prefix + String.format("color=0x%08x", notification.color));
-        pw.println(prefix + "timeout=" + TimeUtils.formatForLogging(notification.getTimeout()));
+        pw.println(prefix + "timeout="
+                + TimeUtils.formatForLogging(notification.getTimeoutAfter()));
         if (notification.actions != null && notification.actions.length > 0) {
             pw.println(prefix + "actions={");
             final int N = notification.actions.length;
@@ -530,10 +532,17 @@ public final class NotificationRecord {
 
     public void setRecentlyIntrusive(boolean recentlyIntrusive) {
         mRecentlyIntrusive = recentlyIntrusive;
+        if (recentlyIntrusive) {
+            mLastIntrusive = System.currentTimeMillis();
+        }
     }
 
     public boolean isRecentlyIntrusive() {
         return mRecentlyIntrusive;
+    }
+
+    public long getLastIntrusive() {
+        return mLastIntrusive;
     }
 
     public void setPackagePriority(int packagePriority) {

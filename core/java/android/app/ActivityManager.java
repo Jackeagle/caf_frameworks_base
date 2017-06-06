@@ -122,11 +122,17 @@ public class ActivityManager {
 
     private static int gMaxRecentTasks = -1;
 
-    private static final int NUM_ALLOWED_PIP_ACTIONS = 3;
-
     private final Context mContext;
 
     private static volatile boolean sSystemReady = false;
+
+
+    private static final int FIRST_START_FATAL_ERROR_CODE = -100;
+    private static final int LAST_START_FATAL_ERROR_CODE = -1;
+    private static final int FIRST_START_SUCCESS_CODE = 0;
+    private static final int LAST_START_SUCCESS_CODE = 99;
+    private static final int FIRST_START_NON_FATAL_ERROR_CODE = 100;
+    private static final int LAST_START_NON_FATAL_ERROR_CODE = 199;
 
     /**
      * System property to enable task snapshots.
@@ -221,53 +227,56 @@ public class ActivityManager {
      */
     public static final String META_HOME_ALTERNATE = "android.app.home.alternate";
 
+    // NOTE: Before adding a new start result, please reference the defined ranges to ensure the
+    // result is properly categorized.
+
     /**
      * Result for IActivityManager.startVoiceActivity: active session is currently hidden.
      * @hide
      */
-    public static final int START_VOICE_HIDDEN_SESSION = -10;
+    public static final int START_VOICE_HIDDEN_SESSION = FIRST_START_FATAL_ERROR_CODE;
 
     /**
      * Result for IActivityManager.startVoiceActivity: active session does not match
      * the requesting token.
      * @hide
      */
-    public static final int START_VOICE_NOT_ACTIVE_SESSION = -9;
+    public static final int START_VOICE_NOT_ACTIVE_SESSION = FIRST_START_FATAL_ERROR_CODE + 1;
 
     /**
      * Result for IActivityManager.startActivity: trying to start a background user
      * activity that shouldn't be displayed for all users.
      * @hide
      */
-    public static final int START_NOT_CURRENT_USER_ACTIVITY = -8;
+    public static final int START_NOT_CURRENT_USER_ACTIVITY = FIRST_START_FATAL_ERROR_CODE + 2;
 
     /**
      * Result for IActivityManager.startActivity: trying to start an activity under voice
      * control when that activity does not support the VOICE category.
      * @hide
      */
-    public static final int START_NOT_VOICE_COMPATIBLE = -7;
+    public static final int START_NOT_VOICE_COMPATIBLE = FIRST_START_FATAL_ERROR_CODE + 3;
 
     /**
      * Result for IActivityManager.startActivity: an error where the
      * start had to be canceled.
      * @hide
      */
-    public static final int START_CANCELED = -6;
+    public static final int START_CANCELED = FIRST_START_FATAL_ERROR_CODE + 4;
 
     /**
      * Result for IActivityManager.startActivity: an error where the
      * thing being started is not an activity.
      * @hide
      */
-    public static final int START_NOT_ACTIVITY = -5;
+    public static final int START_NOT_ACTIVITY = FIRST_START_FATAL_ERROR_CODE + 5;
 
     /**
      * Result for IActivityManager.startActivity: an error where the
      * caller does not have permission to start the activity.
      * @hide
      */
-    public static final int START_PERMISSION_DENIED = -4;
+    public static final int START_PERMISSION_DENIED = FIRST_START_FATAL_ERROR_CODE + 6;
 
     /**
      * Result for IActivityManager.startActivity: an error where the
@@ -275,49 +284,49 @@ public class ActivityManager {
      * a result.
      * @hide
      */
-    public static final int START_FORWARD_AND_REQUEST_CONFLICT = -3;
+    public static final int START_FORWARD_AND_REQUEST_CONFLICT = FIRST_START_FATAL_ERROR_CODE + 7;
 
     /**
      * Result for IActivityManager.startActivity: an error where the
      * requested class is not found.
      * @hide
      */
-    public static final int START_CLASS_NOT_FOUND = -2;
+    public static final int START_CLASS_NOT_FOUND = FIRST_START_FATAL_ERROR_CODE + 8;
 
     /**
      * Result for IActivityManager.startActivity: an error where the
      * given Intent could not be resolved to an activity.
      * @hide
      */
-    public static final int START_INTENT_NOT_RESOLVED = -1;
+    public static final int START_INTENT_NOT_RESOLVED = FIRST_START_FATAL_ERROR_CODE + 9;
 
     /**
      * Result for IActivityManaqer.startActivity: the activity was started
      * successfully as normal.
      * @hide
      */
-    public static final int START_SUCCESS = 0;
+    public static final int START_SUCCESS = FIRST_START_SUCCESS_CODE;
 
     /**
      * Result for IActivityManaqer.startActivity: the caller asked that the Intent not
      * be executed if it is the recipient, and that is indeed the case.
      * @hide
      */
-    public static final int START_RETURN_INTENT_TO_CALLER = 1;
+    public static final int START_RETURN_INTENT_TO_CALLER = FIRST_START_SUCCESS_CODE + 1;
 
     /**
      * Result for IActivityManaqer.startActivity: activity wasn't really started, but
      * a task was simply brought to the foreground.
      * @hide
      */
-    public static final int START_TASK_TO_FRONT = 2;
+    public static final int START_TASK_TO_FRONT = FIRST_START_SUCCESS_CODE + 2;
 
     /**
      * Result for IActivityManaqer.startActivity: activity wasn't really started, but
      * the given Intent was given to the existing top activity.
      * @hide
      */
-    public static final int START_DELIVERED_TO_TOP = 3;
+    public static final int START_DELIVERED_TO_TOP = FIRST_START_SUCCESS_CODE + 3;
 
     /**
      * Result for IActivityManaqer.startActivity: request was canceled because
@@ -325,14 +334,15 @@ public class ActivityManager {
      * (such as pressing home) is performed.
      * @hide
      */
-    public static final int START_SWITCHES_CANCELED = 4;
+    public static final int START_SWITCHES_CANCELED = FIRST_START_NON_FATAL_ERROR_CODE;
 
     /**
      * Result for IActivityManaqer.startActivity: a new activity was attempted to be started
      * while in Lock Task Mode.
      * @hide
      */
-    public static final int START_RETURN_LOCK_TASK_MODE_VIOLATION = 5;
+    public static final int START_RETURN_LOCK_TASK_MODE_VIOLATION =
+            FIRST_START_NON_FATAL_ERROR_CODE + 1;
 
     /**
      * Flag for IActivityManaqer.startActivity: do special start mode where
@@ -460,42 +470,45 @@ public class ActivityManager {
     /** @hide Process is important to the user, but not something they are aware of. */
     public static final int PROCESS_STATE_IMPORTANT_BACKGROUND = 7;
 
+    /** @hide Process is in the background transient so we will try to keep running. */
+    public static final int PROCESS_STATE_TRANSIENT_BACKGROUND = 8;
+
     /** @hide Process is in the background running a backup/restore operation. */
-    public static final int PROCESS_STATE_BACKUP = 8;
+    public static final int PROCESS_STATE_BACKUP = 9;
 
     /** @hide Process is in the background, but it can't restore its state so we want
      * to try to avoid killing it. */
-    public static final int PROCESS_STATE_HEAVY_WEIGHT = 9;
+    public static final int PROCESS_STATE_HEAVY_WEIGHT = 10;
 
     /** @hide Process is in the background running a service.  Unlike oom_adj, this level
      * is used for both the normal running in background state and the executing
      * operations state. */
-    public static final int PROCESS_STATE_SERVICE = 10;
+    public static final int PROCESS_STATE_SERVICE = 11;
 
     /** @hide Process is in the background running a receiver.   Note that from the
      * perspective of oom_adj receivers run at a higher foreground level, but for our
      * prioritization here that is not necessary and putting them below services means
      * many fewer changes in some process states as they receive broadcasts. */
-    public static final int PROCESS_STATE_RECEIVER = 11;
+    public static final int PROCESS_STATE_RECEIVER = 12;
 
     /** @hide Process is in the background but hosts the home activity. */
-    public static final int PROCESS_STATE_HOME = 12;
+    public static final int PROCESS_STATE_HOME = 13;
 
     /** @hide Process is in the background but hosts the last shown activity. */
-    public static final int PROCESS_STATE_LAST_ACTIVITY = 13;
+    public static final int PROCESS_STATE_LAST_ACTIVITY = 14;
 
     /** @hide Process is being cached for later use and contains activities. */
-    public static final int PROCESS_STATE_CACHED_ACTIVITY = 14;
+    public static final int PROCESS_STATE_CACHED_ACTIVITY = 15;
 
     /** @hide Process is being cached for later use and is a client of another cached
      * process that contains activities. */
-    public static final int PROCESS_STATE_CACHED_ACTIVITY_CLIENT = 15;
+    public static final int PROCESS_STATE_CACHED_ACTIVITY_CLIENT = 16;
 
     /** @hide Process is being cached for later use and is empty. */
-    public static final int PROCESS_STATE_CACHED_EMPTY = 16;
+    public static final int PROCESS_STATE_CACHED_EMPTY = 17;
 
     /** @hide Process does not exist. */
-    public static final int PROCESS_STATE_NONEXISTENT = 17;
+    public static final int PROCESS_STATE_NONEXISTENT = 18;
 
     /** @hide The lowest process state number */
     public static final int MIN_PROCESS_STATE = PROCESS_STATE_PERSISTENT;
@@ -505,7 +518,7 @@ public class ActivityManager {
 
     /** @hide Should this process state be considered a background state? */
     public static final boolean isProcStateBackground(int procState) {
-        return procState >= PROCESS_STATE_BACKUP;
+        return procState >= PROCESS_STATE_TRANSIENT_BACKGROUND;
     }
 
     /** @hide requestType for assist context: only basic information. */
@@ -562,6 +575,22 @@ public class ActivityManager {
 
     /*package*/ ActivityManager(Context context, Handler handler) {
         mContext = context;
+    }
+
+    /**
+     * Returns whether the launch was successful.
+     * @hide
+     */
+    public static final boolean isStartResultSuccessful(int result) {
+        return FIRST_START_SUCCESS_CODE <= result && result <= LAST_START_SUCCESS_CODE;
+    }
+
+    /**
+     * Returns whether the launch result was a fatal error.
+     * @hide
+     */
+    public static final boolean isStartResultFatalError(int result) {
+        return FIRST_START_FATAL_ERROR_CODE <= result && result <= LAST_START_FATAL_ERROR_CODE;
     }
 
     /**
@@ -1126,12 +1155,10 @@ public class ActivityManager {
                     com.android.internal.R.bool.config_supportsSplitScreenMultiWindow);
     }
 
-    /**
-     * Return the maximum number of actions that will be displayed in the picture-in-picture UI when
-     * the user interacts with the activity currently in picture-in-picture mode.
-     */
+    /** @removed */
+    @Deprecated
     public static int getMaxNumPictureInPictureActions() {
-        return NUM_ALLOWED_PIP_ACTIONS;
+        return 3;
     }
 
     /**
@@ -3141,10 +3168,15 @@ public class ActivityManager {
          * before {@link Build.VERSION_CODES#O}.  Since the {@link Build.VERSION_CODES#O} SDK,
          * the value of {@link #IMPORTANCE_PERCEPTIBLE} has been fixed.
          *
-         * @deprecated Use {@link #IMPORTANCE_PERCEPTIBLE} instead.
+         * <p>The system will return this value instead of {@link #IMPORTANCE_PERCEPTIBLE}
+         * on Android versions below {@link Build.VERSION_CODES#O}.
+         *
+         * <p>On Android version {@link Build.VERSION_CODES#O} and later, this value will still be
+         * returned for apps with the target API level below {@link Build.VERSION_CODES#O}.
+         * For apps targeting version {@link Build.VERSION_CODES#O} and later,
+         * the correct value {@link #IMPORTANCE_PERCEPTIBLE} will be returned.
          */
-        @Deprecated
-        public static final int IMPORTANCE_PERCEPTIBLE_DEPRECATED = 130;
+        public static final int IMPORTANCE_PERCEPTIBLE_PRE_26 = 130;
 
         /**
          * Constant for {@link #importance}: This process is not something the user
@@ -3158,11 +3190,17 @@ public class ActivityManager {
          * before {@link Build.VERSION_CODES#O}.  Since the {@link Build.VERSION_CODES#O} SDK,
          * the value of {@link #IMPORTANCE_CANT_SAVE_STATE} has been fixed.
          *
-         * @deprecated Use {@link #IMPORTANCE_CANT_SAVE_STATE} instead.
+         * <p>The system will return this value instead of {@link #IMPORTANCE_CANT_SAVE_STATE}
+         * on Android versions below {@link Build.VERSION_CODES#O}.
+         *
+         * <p>On Android version {@link Build.VERSION_CODES#O} after, this value will still be
+         * returned for apps with the target API level below {@link Build.VERSION_CODES#O}.
+         * For apps targeting version {@link Build.VERSION_CODES#O} and later,
+         * the correct value {@link #IMPORTANCE_CANT_SAVE_STATE} will be returned.
+         *
          * @hide
          */
-        @Deprecated
-        public static final int IMPORTANCE_CANT_SAVE_STATE_DEPRECATED = 170;
+        public static final int IMPORTANCE_CANT_SAVE_STATE_PRE_26 = 170;
 
         /**
          * Constant for {@link #importance}: This process is running an
@@ -3220,7 +3258,7 @@ public class ActivityManager {
                 return IMPORTANCE_SERVICE;
             } else if (procState > PROCESS_STATE_HEAVY_WEIGHT) {
                 return IMPORTANCE_CANT_SAVE_STATE;
-            } else if (procState >= PROCESS_STATE_IMPORTANT_BACKGROUND) {
+            } else if (procState >= PROCESS_STATE_TRANSIENT_BACKGROUND) {
                 return IMPORTANCE_PERCEPTIBLE;
             } else if (procState >= PROCESS_STATE_IMPORTANT_FOREGROUND) {
                 return IMPORTANCE_VISIBLE;
@@ -3242,15 +3280,25 @@ public class ActivityManager {
          */
         public static @Importance int procStateToImportanceForClient(int procState,
                 Context clientContext) {
+            return procStateToImportanceForTargetSdk(procState,
+                    clientContext.getApplicationInfo().targetSdkVersion);
+        }
+
+        /**
+         * See {@link #procStateToImportanceForClient}.
+         * @hide
+         */
+        public static @Importance int procStateToImportanceForTargetSdk(int procState,
+                int targetSdkVersion) {
             final int importance = procStateToImportance(procState);
 
             // For pre O apps, convert to the old, wrong values.
-            if (clientContext.getApplicationInfo().targetSdkVersion < VERSION_CODES.O) {
+            if (targetSdkVersion < VERSION_CODES.O) {
                 switch (importance) {
                     case IMPORTANCE_PERCEPTIBLE:
-                        return IMPORTANCE_PERCEPTIBLE_DEPRECATED;
+                        return IMPORTANCE_PERCEPTIBLE_PRE_26;
                     case IMPORTANCE_CANT_SAVE_STATE:
-                        return IMPORTANCE_CANT_SAVE_STATE_DEPRECATED;
+                        return IMPORTANCE_CANT_SAVE_STATE_PRE_26;
                 }
             }
             return importance;
@@ -3267,7 +3315,7 @@ public class ActivityManager {
             } else if (importance > IMPORTANCE_CANT_SAVE_STATE) {
                 return PROCESS_STATE_HEAVY_WEIGHT;
             } else if (importance >= IMPORTANCE_PERCEPTIBLE) {
-                return PROCESS_STATE_IMPORTANT_BACKGROUND;
+                return PROCESS_STATE_TRANSIENT_BACKGROUND;
             } else if (importance >= IMPORTANCE_VISIBLE) {
                 return PROCESS_STATE_IMPORTANT_FOREGROUND;
             } else if (importance >= IMPORTANCE_TOP_SLEEPING) {

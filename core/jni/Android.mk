@@ -32,6 +32,7 @@ LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 LOCAL_CFLAGS += -DU_USING_ICU_NAMESPACE=0
 
 LOCAL_SRC_FILES:= \
+    android_util_SeempLog.cpp \
     AndroidRuntime.cpp \
     com_android_internal_content_NativeLibraryHelper.cpp \
     com_google_android_gles_jni_EGLImpl.cpp \
@@ -97,6 +98,7 @@ LOCAL_SRC_FILES:= \
     android_os_Trace.cpp \
     android_os_UEventObserver.cpp \
     android_os_VintfObject.cpp \
+    android_os_VintfRuntimeInfo.cpp \
     android_net_LocalSocketImpl.cpp \
     android_net_NetUtils.cpp \
     android_net_TrafficStats.cpp \
@@ -161,6 +163,7 @@ LOCAL_SRC_FILES:= \
     android_hardware_camera2_legacy_LegacyCameraDevice.cpp \
     android_hardware_camera2_legacy_PerfMeasurement.cpp \
     android_hardware_camera2_DngCreator.cpp \
+    android_hardware_display_DisplayViewport.cpp \
     android_hardware_HardwareBuffer.cpp \
     android_hardware_Radio.cpp \
     android_hardware_SensorManager.cpp \
@@ -317,6 +320,13 @@ LOCAL_CFLAGS += -Wall -Werror -Wno-error=deprecated-declarations -Wunused -Wunre
 # -Wno-c++11-extensions: Clang warns about Skia using the C++11 override keyword, but this project
 #                        is not being compiled with that level. Remove once this has changed.
 LOCAL_CLANG_CFLAGS += -Wno-c++11-extensions
+
+ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+LOCAL_CFLAGS += -D__ANDROID_DEBUGGABLE__
+endif
+ifneq (,$(filter true, $(PRODUCT_FULL_TREBLE)))
+LOCAL_CFLAGS += -D__ANDROID_TREBLE__
+endif
 
 include $(BUILD_SHARED_LIBRARY)
 

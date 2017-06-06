@@ -28,6 +28,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.Trace;
 import android.util.Log;
 import android.util.LruCache;
 
@@ -48,6 +49,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * A Task load queue
  */
 class TaskResourceLoadQueue {
+
     ConcurrentLinkedQueue<Task> mQueue = new ConcurrentLinkedQueue<Task>();
 
     /** Adds a new task to the load queue */
@@ -101,32 +103,41 @@ class BackgroundTaskLoader implements Runnable {
     Bitmap mDefaultThumbnail;
     BitmapDrawable mDefaultIcon;
 
+    boolean mStarted;
     boolean mCancelled;
     boolean mWaitingOnLoadQueue;
+
+    private final OnIdleChangedListener mOnIdleChangedListener;
 
     /** Constructor, creates a new loading thread that loads task resources in the background */
     public BackgroundTaskLoader(TaskResourceLoadQueue loadQueue,
             TaskKeyLruCache<Drawable> iconCache, Bitmap defaultThumbnail,
-            BitmapDrawable defaultIcon) {
+            BitmapDrawable defaultIcon, OnIdleChangedListener onIdleChangedListener) {
         mLoadQueue = loadQueue;
         mIconCache = iconCache;
         mDefaultThumbnail = defaultThumbnail;
         mDefaultIcon = defaultIcon;
         mMainThreadHandler = new Handler();
+        mOnIdleChangedListener = onIdleChangedListener;
         mLoadThread = new HandlerThread("Recents-TaskResourceLoader",
                 android.os.Process.THREAD_PRIORITY_BACKGROUND);
         mLoadThread.start();
         mLoadThreadHandler = new Handler(mLoadThread.getLooper());
-        mLoadThreadHandler.post(this);
     }
 
     /** Restarts the loader thread */
     void start(Context context) {
         mContext = context;
         mCancelled = false;
-        // Notify the load thread to start loading
-        synchronized(mLoadThread) {
-            mLoadThread.notifyAll();
+        if (!mStarted) {
+            // Start loading on the load thread
+            mStarted = true;
+            mLoadThreadHandler.post(this);
+        } else {
+            // Notify the load thread to start loading again
+            synchronized (mLoadThread) {
+                mLoadThread.notifyAll();
+            }
         }
     }
 
@@ -161,50 +172,7 @@ class BackgroundTaskLoader implements Runnable {
                 // If we've stopped the loader, then fall through to the above logic to wait on
                 // the load thread
                 if (ssp != null) {
-                    // Load the next item from the queue
-                    final Task t = mLoadQueue.nextTask();
-                    if (t != null) {
-                        Drawable cachedIcon = mIconCache.get(t.key);
-
-                        // Load the icon if it is stale or we haven't cached one yet
-                        if (cachedIcon == null) {
-                            cachedIcon = ssp.getBadgedTaskDescriptionIcon(t.taskDescription,
-                                    t.key.userId, mContext.getResources());
-
-                            if (cachedIcon == null) {
-                                ActivityInfo info = ssp.getActivityInfo(
-                                        t.key.getComponent(), t.key.userId);
-                                if (info != null) {
-                                    if (DEBUG) Log.d(TAG, "Loading icon: " + t.key);
-                                    cachedIcon = ssp.getBadgedActivityIcon(info, t.key.userId);
-                                }
-                            }
-
-                            if (cachedIcon == null) {
-                                cachedIcon = mDefaultIcon;
-                            }
-
-                            // At this point, even if we can't load the icon, we will set the
-                            // default icon.
-                            mIconCache.put(t.key, cachedIcon);
-                        }
-
-                        if (DEBUG) Log.d(TAG, "Loading thumbnail: " + t.key);
-                        ThumbnailData cachedThumbnailData = ssp.getTaskThumbnail(t.key.id,
-                                true /* reducedResolution */);
-
-                        if (cachedThumbnailData.thumbnail == null) {
-                            cachedThumbnailData.thumbnail = mDefaultThumbnail;
-                        }
-
-                        if (!mCancelled) {
-                            // Notify that the task data has changed
-                            final Drawable newIcon = cachedIcon;
-                            final ThumbnailData newThumbnailData = cachedThumbnailData;
-                            mMainThreadHandler.post(
-                                    () -> t.notifyTaskDataLoaded(newThumbnailData, newIcon));
-                        }
-                    }
+                    processLoadQueueItem(ssp);
                 }
 
                 // If there are no other items in the list, then just wait until something is added
@@ -212,7 +180,11 @@ class BackgroundTaskLoader implements Runnable {
                     synchronized(mLoadQueue) {
                         try {
                             mWaitingOnLoadQueue = true;
+                            mMainThreadHandler.post(
+                                    () -> mOnIdleChangedListener.onIdleChanged(true));
                             mLoadQueue.wait();
+                            mMainThreadHandler.post(
+                                    () -> mOnIdleChangedListener.onIdleChanged(false));
                             mWaitingOnLoadQueue = false;
                         } catch (InterruptedException ie) {
                             ie.printStackTrace();
@@ -221,6 +193,61 @@ class BackgroundTaskLoader implements Runnable {
                 }
             }
         }
+    }
+
+    /**
+     * This needs to be in a separate method to work around an surprising interpreter behavior:
+     * The register will keep the local reference to cachedThumbnailData even if it falls out of
+     * scope. Putting it into a method fixes this issue.
+     */
+    private void processLoadQueueItem(SystemServicesProxy ssp) {
+        // Load the next item from the queue
+        final Task t = mLoadQueue.nextTask();
+        if (t != null) {
+            Drawable cachedIcon = mIconCache.get(t.key);
+
+            // Load the icon if it is stale or we haven't cached one yet
+            if (cachedIcon == null) {
+                cachedIcon = ssp.getBadgedTaskDescriptionIcon(t.taskDescription,
+                        t.key.userId, mContext.getResources());
+
+                if (cachedIcon == null) {
+                    ActivityInfo info = ssp.getActivityInfo(
+                            t.key.getComponent(), t.key.userId);
+                    if (info != null) {
+                        if (DEBUG) Log.d(TAG, "Loading icon: " + t.key);
+                        cachedIcon = ssp.getBadgedActivityIcon(info, t.key.userId);
+                    }
+                }
+
+                if (cachedIcon == null) {
+                    cachedIcon = mDefaultIcon;
+                }
+
+                // At this point, even if we can't load the icon, we will set the
+                // default icon.
+                mIconCache.put(t.key, cachedIcon);
+            }
+
+            if (DEBUG) Log.d(TAG, "Loading thumbnail: " + t.key);
+            final ThumbnailData cachedThumbnailData = ssp.getTaskThumbnail(t.key.id,
+                    true /* reducedResolution */);
+
+            if (cachedThumbnailData.thumbnail == null) {
+                cachedThumbnailData.thumbnail = mDefaultThumbnail;
+            }
+
+            if (!mCancelled) {
+                // Notify that the task data has changed
+                final Drawable finalIcon = cachedIcon;
+                mMainThreadHandler.post(
+                        () -> t.notifyTaskDataLoaded(cachedThumbnailData, finalIcon));
+            }
+        }
+    }
+
+    interface OnIdleChangedListener {
+        void onIdleChanged(boolean idle);
     }
 }
 
@@ -290,15 +317,16 @@ public class RecentsTaskLoader {
 
         // Initialize the proxy, cache and loaders
         int numRecentTasks = ActivityManager.getMaxRecentTasksStatic();
+        mHighResThumbnailLoader = new HighResThumbnailLoader(Recents.getSystemServices(),
+                Looper.getMainLooper());
         mLoadQueue = new TaskResourceLoadQueue();
         mIconCache = new TaskKeyLruCache<>(iconCacheSize, mClearActivityInfoOnEviction);
         mActivityLabelCache = new TaskKeyLruCache<>(numRecentTasks, mClearActivityInfoOnEviction);
         mContentDescriptionCache = new TaskKeyLruCache<>(numRecentTasks,
                 mClearActivityInfoOnEviction);
         mActivityInfoCache = new LruCache(numRecentTasks);
-        mLoader = new BackgroundTaskLoader(mLoadQueue, mIconCache, mDefaultThumbnail, mDefaultIcon);
-        mHighResThumbnailLoader = new HighResThumbnailLoader(Recents.getSystemServices(),
-                Looper.getMainLooper());
+        mLoader = new BackgroundTaskLoader(mLoadQueue, mIconCache, mDefaultThumbnail, mDefaultIcon,
+                mHighResThumbnailLoader::setTaskLoadQueueIdle);
     }
 
     /** Returns the size of the app icon cache. */
@@ -330,7 +358,12 @@ public class RecentsTaskLoader {
     /** Preloads recents tasks using the specified plan to store the output. */
     public synchronized void preloadTasks(RecentsTaskLoadPlan plan, int runningTaskId,
             boolean includeFrontMostExcludedTask) {
-        plan.preloadPlan(this, runningTaskId, includeFrontMostExcludedTask);
+        try {
+            Trace.beginSection("preloadPlan");
+            plan.preloadPlan(this, runningTaskId, includeFrontMostExcludedTask);
+        } finally {
+            Trace.endSection();
+        }
     }
 
     /** Begins loading the heavy task data according to the specified options. */
@@ -352,9 +385,6 @@ public class RecentsTaskLoader {
         mTempCache.evictAll();
         if (!opts.onlyLoadForCache) {
             mNumVisibleTasksLoaded = opts.numVisibleTasks;
-
-            // Start the loader
-            mLoader.start(context);
         }
     }
 
@@ -600,6 +630,13 @@ public class RecentsTaskLoader {
     }
 
     /**
+     * Starts loading tasks.
+     */
+    public void startLoader(Context ctx) {
+        mLoader.start(ctx);
+    }
+
+    /**
      * Stops the task loader and clears all queued, pending task loads.
      */
     private void stopLoader() {
@@ -630,6 +667,9 @@ public class RecentsTaskLoader {
         writer.print(prefix); writer.println(TAG);
         writer.print(prefix); writer.println("Icon Cache");
         mIconCache.dump(innerPrefix, writer);
+        writer.print(prefix); writer.println("Thumbnail Cache");
         mThumbnailCache.dump(innerPrefix, writer);
+        writer.print(prefix); writer.println("Temp Thumbnail Cache");
+        mTempCache.dump(innerPrefix, writer);
     }
 }

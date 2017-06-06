@@ -186,7 +186,7 @@ class ActivityStarter {
     private IVoiceInteractionSession mVoiceSession;
     private IVoiceInteractor mVoiceInteractor;
 
-    private boolean mUsingVrCompatibilityDisplay;
+    private boolean mUsingVr2dDisplay;
 
     private void reset() {
         mStartActivity = null;
@@ -226,14 +226,14 @@ class ActivityStarter {
         mVoiceSession = null;
         mVoiceInteractor = null;
 
-        mUsingVrCompatibilityDisplay = false;
+        mUsingVr2dDisplay = false;
     }
 
     ActivityStarter(ActivityManagerService service, ActivityStackSupervisor supervisor) {
         mService = service;
         mSupervisor = supervisor;
         mInterceptor = new ActivityStartInterceptor(mService, mSupervisor);
-        mUsingVrCompatibilityDisplay = false;
+        mUsingVr2dDisplay = false;
     }
 
     final int startActivityLocked(IApplicationThread caller, Intent intent, Intent ephemeralIntent,
@@ -245,6 +245,9 @@ class ActivityStarter {
             ActivityRecord[] outActivity, ActivityStackSupervisor.ActivityContainer container,
             TaskRecord inTask) {
         int err = ActivityManager.START_SUCCESS;
+        // Pull the optional Ephemeral Installer-only bundle out of the options early.
+        final Bundle verificationBundle
+                = options != null ? options.popAppVerificationBundle() : null;
 
         ProcessRecord callerApp = null;
         if (caller != null) {
@@ -466,7 +469,7 @@ class ActivityStarter {
         // app [on install success].
         if (rInfo != null && rInfo.auxiliaryInfo != null) {
             intent = createLaunchIntent(rInfo.auxiliaryInfo, ephemeralIntent,
-                    callingPackage, resolvedType, userId);
+                    callingPackage, verificationBundle, resolvedType, userId);
             resolvedType = null;
             callingUid = realCallingUid;
             callingPid = realCallingPid;
@@ -522,23 +525,27 @@ class ActivityStarter {
      * Creates a launch intent for the given auxiliary resolution data.
      */
     private @NonNull Intent createLaunchIntent(@NonNull AuxiliaryResolveInfo auxiliaryResponse,
-            Intent originalIntent, String callingPackage, String resolvedType, int userId) {
+            Intent originalIntent, String callingPackage, Bundle verificationBundle,
+            String resolvedType, int userId) {
         if (auxiliaryResponse.needsPhaseTwo) {
             // request phase two resolution
             mService.getPackageManagerInternalLocked().requestInstantAppResolutionPhaseTwo(
-                    auxiliaryResponse, originalIntent, resolvedType, callingPackage, userId);
+                    auxiliaryResponse, originalIntent, resolvedType, callingPackage,
+                    verificationBundle, userId);
         }
-        return InstantAppResolver.buildEphemeralInstallerIntent(originalIntent,
-            callingPackage, resolvedType, userId, auxiliaryResponse.packageName,
-            auxiliaryResponse.splitName, auxiliaryResponse.versionCode,
-            auxiliaryResponse.token, auxiliaryResponse.needsPhaseTwo);
+        return InstantAppResolver.buildEphemeralInstallerIntent(
+                Intent.ACTION_INSTALL_INSTANT_APP_PACKAGE, originalIntent,
+                auxiliaryResponse.failureIntent, callingPackage, verificationBundle,
+                resolvedType, userId, auxiliaryResponse.packageName, auxiliaryResponse.splitName,
+                auxiliaryResponse.versionCode, auxiliaryResponse.token,
+                auxiliaryResponse.needsPhaseTwo);
     }
 
     void postStartActivityProcessing(
             ActivityRecord r, int result, int prevFocusedStackId, ActivityRecord sourceRecord,
             ActivityStack targetStack) {
 
-        if (result < START_SUCCESS) {
+        if (ActivityManager.isStartResultFatalError(result)) {
             return;
         }
 
@@ -570,12 +577,15 @@ class ActivityStarter {
             return;
         }
 
-        if (startedActivityStackId == PINNED_STACK_ID
-                && (result == START_TASK_TO_FRONT || result == START_DELIVERED_TO_TOP)) {
+        boolean clearedTask = (mLaunchFlags & (FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK))
+                == (FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK) && (mReuseTask != null);
+        if (startedActivityStackId == PINNED_STACK_ID && (result == START_TASK_TO_FRONT
+                || result == START_DELIVERED_TO_TOP || clearedTask)) {
             // The activity was already running in the pinned stack so it wasn't started, but either
             // brought to the front or the new intent was delivered to it since it was already in
             // front. Notify anyone interested in this piece of information.
-            mService.mTaskChangeNotificationController.notifyPinnedActivityRestartAttempt();
+            mService.mTaskChangeNotificationController.notifyPinnedActivityRestartAttempt(
+                    clearedTask);
             return;
         }
     }
@@ -628,7 +638,6 @@ class ActivityStarter {
         if (componentSpecified
                 && intent.getData() != null
                 && Intent.ACTION_VIEW.equals(intent.getAction())
-                && intent.hasCategory(Intent.CATEGORY_BROWSABLE)
                 && mService.getPackageManagerInternalLocked()
                         .isInstantAppInstallerComponent(intent.getComponent())) {
             // intercept intents targeted directly to the ephemeral installer the
@@ -948,7 +957,8 @@ class ActivityStarter {
             // If we are not able to proceed, disassociate the activity from the task. Leaving an
             // activity in an incomplete state can lead to issues, such as performing operations
             // without a window container.
-            if (result != START_SUCCESS && mStartActivity.getTask() != null) {
+            if (!ActivityManager.isStartResultSuccessful(result)
+                    && mStartActivity.getTask() != null) {
                 mStartActivity.getTask().removeActivity(mStartActivity);
             }
             mService.mWindowManager.continueSurfaceLayout();
@@ -1040,7 +1050,13 @@ class ActivityStarter {
             sendPowerHintForLaunchStartIfNeeded(false /* forceSend */);
 
             reusedActivity = setTargetStackAndMoveToFrontIfNeeded(reusedActivity);
-            if (outActivity != null && outActivity.length > 0) {
+
+            final ActivityRecord outResult =
+                    outActivity != null && outActivity.length > 0 ? outActivity[0] : null;
+
+            // When there is a reused activity and the current result is a trampoline activity,
+            // set the reused activity as the result.
+            if (outResult != null && (outResult.finishing || outResult.noDisplay)) {
                 outActivity[0] = reusedActivity;
             }
 
@@ -1057,6 +1073,9 @@ class ActivityStarter {
                 // We didn't do anything...  but it was needed (a.k.a., client don't use that
                 // intent!)  And for paranoia, make sure we have correctly resumed the top activity.
                 resumeTargetStackIfNeeded();
+                if (outActivity != null && outActivity.length > 0) {
+                    outActivity[0] = reusedActivity;
+                }
                 return START_TASK_TO_FRONT;
             }
         }
@@ -1471,12 +1490,12 @@ class ActivityStarter {
         }
 
         // Get the virtual display id from ActivityManagerService.
-        int displayId = mService.mVrCompatibilityDisplayId;
+        int displayId = mService.mVr2dDisplayId;
         if (displayId != INVALID_DISPLAY) {
             if (DEBUG_STACK) {
                 Slog.d(TAG, "getSourceDisplayId :" + displayId);
             }
-            mUsingVrCompatibilityDisplay = true;
+            mUsingVr2dDisplay = true;
             return displayId;
         }
 
@@ -2100,8 +2119,8 @@ class ActivityStarter {
             return mSupervisor.getValidLaunchStackOnDisplay(launchDisplayId, r);
         }
 
-        // If we are using Vr compatibility display, find the virtual display stack.
-        if (mUsingVrCompatibilityDisplay) {
+        // If we are using Vr2d display, find the virtual display stack.
+        if (mUsingVr2dDisplay) {
             ActivityStack as = mSupervisor.getValidLaunchStackOnDisplay(mSourceDisplayId, r);
             if (DEBUG_STACK) {
                 Slog.v(TAG, "Launch stack for app: " + r.toString() +

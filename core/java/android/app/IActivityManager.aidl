@@ -34,7 +34,7 @@ import android.app.IUidObserver;
 import android.app.IUserSwitchObserver;
 import android.app.Notification;
 import android.app.PendingIntent;
-import android.app.PictureInPictureArgs;
+import android.app.PictureInPictureParams;
 import android.app.ProfilerInfo;
 import android.app.WaitResult;
 import android.app.assist.AssistContent;
@@ -200,7 +200,7 @@ interface IActivityManager {
     void setRequestedOrientation(in IBinder token, int requestedOrientation);
     int getRequestedOrientation(in IBinder token);
     void unbindFinished(in IBinder token, in Intent service, boolean doRebind);
-    void setProcessForeground(in IBinder token, int pid, boolean isForeground);
+    void setProcessImportant(in IBinder token, int pid, boolean isForeground, String reason);
     void setServiceForeground(in ComponentName className, in IBinder token,
             int id, in Notification notification, int flags);
     boolean moveActivityTaskToBack(in IBinder token, boolean nonRoot);
@@ -236,8 +236,8 @@ interface IActivityManager {
     Debug.MemoryInfo[] getProcessMemoryInfo(in int[] pids);
     void killApplicationProcess(in String processName, int uid);
     int startActivityIntentSender(in IApplicationThread caller,
-            in IntentSender intent, in Intent fillInIntent, in String resolvedType,
-            in IBinder resultTo, in String resultWho, int requestCode,
+            in IIntentSender target, in IBinder whitelistToken, in Intent fillInIntent,
+            in String resolvedType, in IBinder resultTo, in String resultWho, int requestCode,
             int flagsMask, int flagsValues, in Bundle options);
     void overridePendingTransition(in IBinder token, in String packageName,
             int enterAnim, int exitAnim);
@@ -500,8 +500,9 @@ interface IActivityManager {
     boolean isInMultiWindowMode(in IBinder token);
     boolean isInPictureInPictureMode(in IBinder token);
     void killPackageDependents(in String packageName, int userId);
-    boolean enterPictureInPictureMode(in IBinder token, in PictureInPictureArgs args);
-    void setPictureInPictureArgs(in IBinder token, in PictureInPictureArgs args);
+    boolean enterPictureInPictureMode(in IBinder token, in PictureInPictureParams params);
+    void setPictureInPictureParams(in IBinder token, in PictureInPictureParams params);
+    int getMaxNumPictureInPictureActions(in IBinder token);
     void activityRelaunched(in IBinder token);
     IBinder getUriPermissionOwnerForActivity(in IBinder activityToken);
     /**
@@ -561,8 +562,8 @@ interface IActivityManager {
     void notifyLockedProfile(int userId);
     void startConfirmDeviceCredentialIntent(in Intent intent, in Bundle options);
     void sendIdleJobTrigger();
-    int sendIntentSender(in IIntentSender target, int code, in Intent intent,
-            in String resolvedType, in IIntentReceiver finishedReceiver,
+    int sendIntentSender(in IIntentSender target, in IBinder whitelistToken, int code,
+            in Intent intent, in String resolvedType, in IIntentReceiver finishedReceiver,
             in String requiredPermission, in Bundle options);
 
 
@@ -593,7 +594,7 @@ interface IActivityManager {
     void unregisterTaskStackListener(ITaskStackListener listener);
     void moveStackToDisplay(int stackId, int displayId);
     boolean requestAutofillData(in IResultReceiver receiver, in Bundle receiverExtras,
-                                in IBinder activityToken);
+                                in IBinder activityToken, int flags);
     void dismissKeyguard(in IBinder token, in IKeyguardDismissCallback callback);
     int restartUserInBackground(int userId);
 
@@ -604,7 +605,7 @@ interface IActivityManager {
     void cancelTaskThumbnailTransition(int taskId);
 
     /**
-     * @param taskId the id of the task to retrieve the snapshots for
+     * @param taskId the id of the task to retrieve the sAutoapshots for
      * @param reducedResolution if set, if the snapshot needs to be loaded from disk, this will load
      *                          a reduced resolution of it, which is much faster
      * @return a graphic buffer representing a screenshot of a task

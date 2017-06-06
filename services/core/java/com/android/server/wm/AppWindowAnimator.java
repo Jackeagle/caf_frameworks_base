@@ -78,6 +78,9 @@ public class AppWindowAnimator {
     // requires that the duration of the two animations are the same.
     SurfaceControl thumbnail;
     int thumbnailTransactionSeq;
+    // TODO(b/62029108): combine both members into a private one. Create a member function to set
+    // the thumbnail layer to +1 to the highest layer position and replace all setter instances
+    // with this function. Remove all unnecessary calls to both variables in other classes.
     int thumbnailLayer;
     int thumbnailForceAboveLayer;
     Animation thumbnailAnimation;
@@ -411,7 +414,9 @@ public class AppWindowAnimator {
         }
 
         if (DEBUG_ANIM) Slog.v(TAG, "Animation done in " + mAppToken
-                + ": reportedVisible=" + mAppToken.reportedVisible);
+                + ": reportedVisible=" + mAppToken.reportedVisible
+                + " okToDisplay=" + mService.okToDisplay()
+                + " startingDisplayed=" + mAppToken.startingDisplayed);
 
         transformation.clear();
 

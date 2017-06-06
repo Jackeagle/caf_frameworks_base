@@ -639,6 +639,11 @@ public abstract class LayoutInflater {
                 }
             }
 
+            Object lastContext = mConstructorArgs[0];
+            if (mConstructorArgs[0] == null) {
+                // Fill in the context if not already within inflation.
+                mConstructorArgs[0] = mContext;
+            }
             Object[] args = mConstructorArgs;
             args[1] = attrs;
 
@@ -648,6 +653,7 @@ public abstract class LayoutInflater {
                 final ViewStub viewStub = (ViewStub) view;
                 viewStub.setLayoutInflater(cloneInContext((Context) args[0]));
             }
+            mConstructorArgs[0] = lastContext;
             return view;
 
         } catch (NoSuchMethodException e) {
@@ -917,8 +923,11 @@ public abstract class LayoutInflater {
                             + " include tag: <include layout=\"@layout/layoutID\" />");
                 }
 
-                // Attempt to resolve the "?attr/name" string to an identifier.
-                layout = context.getResources().getIdentifier(value.substring(1), null, null);
+                // Attempt to resolve the "?attr/name" string to an attribute
+                // within the default (e.g. application) package.
+                layout = context.getResources().getIdentifier(
+                        value.substring(1), "attr", context.getPackageName());
+
             }
 
             // The layout might be referencing a theme attribute.

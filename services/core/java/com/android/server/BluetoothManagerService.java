@@ -18,6 +18,8 @@ package com.android.server;
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.app.AppGlobals;
+import android.app.AppOpsManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.IBluetooth;
@@ -37,11 +39,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.UserInfo;
 import android.database.ContentObserver;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -50,8 +52,8 @@ import android.os.Message;
 import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
-import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.UserManagerInternal;
@@ -61,15 +63,15 @@ import android.provider.Settings.SettingNotFoundException;
 import android.util.Slog;
 
 import com.android.internal.util.DumpUtils;
-import com.android.server.pm.PackageManagerService;
+import com.android.server.pm.UserRestrictionsUtils;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 class BluetoothManagerService extends IBluetoothManager.Stub {
@@ -91,6 +93,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private static final String REASON_SYSTEM_BOOT = "system boot";
     private static final String REASON_UNEXPECTED = "unexpected crash";
     private static final String REASON_USER_SWITCH = "user switch";
+    private static final String REASON_RESTORE_USER_SETTING = "restore user setting";
 
     private static final int TIMEOUT_BIND_MS = 3000; //Maximum msec to wait for a bind
     //Maximum msec to wait for service restart
@@ -119,8 +122,11 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private static final int MESSAGE_USER_UNLOCKED = 301;
     private static final int MESSAGE_ADD_PROXY_DELAYED = 400;
     private static final int MESSAGE_BIND_PROFILE_SERVICE = 401;
+    private static final int MESSAGE_RESTORE_USER_SETTING = 500;
 
-    private static final int MAX_SAVE_RETRIES = 3;
+    private static final int RESTORE_SETTING_TO_ON = 1;
+    private static final int RESTORE_SETTING_TO_OFF = 0;
+
     private static final int MAX_ERROR_RESTART_RETRIES = 6;
 
     // Bluetooth persisted setting is off
@@ -223,22 +229,25 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         @Override
         public void onUserRestrictionsChanged(int userId, Bundle newRestrictions,
                 Bundle prevRestrictions) {
-            if (!newRestrictions.containsKey(UserManager.DISALLOW_BLUETOOTH)
-                    && !prevRestrictions.containsKey(UserManager.DISALLOW_BLUETOOTH)) {
-                // The relevant restriction has not changed - do nothing.
-                return;
+            if (!UserRestrictionsUtils.restrictionsChanged(prevRestrictions, newRestrictions,
+                    UserManager.DISALLOW_BLUETOOTH, UserManager.DISALLOW_BLUETOOTH_SHARING)) {
+                return; // No relevant changes, nothing to do.
             }
-            final boolean bluetoothDisallowed =
-                    newRestrictions.getBoolean(UserManager.DISALLOW_BLUETOOTH);
-            if ((mEnable || mEnableExternal) && bluetoothDisallowed) {
+
+            final boolean disallowed = newRestrictions.getBoolean(UserManager.DISALLOW_BLUETOOTH);
+
+            // DISALLOW_BLUETOOTH is a global restriction that can only be set by DO or PO on the
+            // system user, so we only look at the system user.
+            if (userId == UserHandle.USER_SYSTEM && disallowed && (mEnable || mEnableExternal)) {
                 try {
-                    disable(null, true);
+                    disable(null /* packageName */, true /* persist */);
                 } catch (RemoteException e) {
-                    Slog.w(TAG, "Exception when disabling Bluetooth from UserRestrictionsListener",
-                            e);
+                    Slog.w(TAG, "Exception when disabling Bluetooth", e);
                 }
             }
-            updateOppLauncherComponentState(bluetoothDisallowed);
+            final boolean sharingDisallowed = disallowed
+                    || newRestrictions.getBoolean(UserManager.DISALLOW_BLUETOOTH_SHARING);
+            updateOppLauncherComponentState(userId, sharingDisallowed);
         }
     };
 
@@ -316,6 +325,26 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 } else {
                     if (DBG) Slog.e(TAG, "No Bluetooth Adapter address parameter found");
                 }
+            } else if (Intent.ACTION_SETTING_RESTORED.equals(action)) {
+                final String name = intent.getStringExtra(Intent.EXTRA_SETTING_NAME);
+                if (Settings.Global.BLUETOOTH_ON.equals(name)) {
+                    // The Bluetooth On state may be changed during system restore.
+                    final String prevValue = intent.getStringExtra(
+                            Intent.EXTRA_SETTING_PREVIOUS_VALUE);
+                    final String newValue = intent.getStringExtra(
+                            Intent.EXTRA_SETTING_NEW_VALUE);
+
+                    if (DBG) Slog.d(TAG, "ACTION_SETTING_RESTORED with BLUETOOTH_ON, prevValue=" +
+                                    prevValue + ", newValue=" + newValue);
+
+                    if ((newValue != null) && (prevValue != null) && !prevValue.equals(newValue)) {
+                        Message msg = mHandler.obtainMessage(MESSAGE_RESTORE_USER_SETTING,
+                                                             newValue.equals("0") ?
+                                                             RESTORE_SETTING_TO_OFF :
+                                                             RESTORE_SETTING_TO_ON, 0);
+                        mHandler.sendMessage(msg);
+                    }
+                }
             }
         }
     };
@@ -348,12 +377,14 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         registerForBleScanModeChange();
         mCallbacks = new RemoteCallbackList<IBluetoothManagerCallback>();
         mStateChangeCallbacks = new RemoteCallbackList<IBluetoothStateChangeCallback>();
-        IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
+        filter.addAction(BluetoothAdapter.ACTION_BLUETOOTH_ADDRESS_CHANGED);
+        filter.addAction(Intent.ACTION_SETTING_RESTORED);
         filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
         mContext.registerReceiver(mReceiver, filter);
-        filter = new IntentFilter(BluetoothAdapter.ACTION_BLUETOOTH_ADDRESS_CHANGED);
-        filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
-        mContext.registerReceiver(mReceiver, filter);
+
         loadStoredNameAndAddress();
         if (isBluetoothPersistedStateOn()) {
             if (DBG) Slog.d(TAG, "Startup: Bluetooth persisted state is ON.");
@@ -775,6 +806,10 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         return true;
     }
 
+    private boolean isStrictOpEnable() {
+        return SystemProperties.getBoolean("persist.sys.strict_op_enable", false);
+    }
+
     public boolean enable(String packageName) throws RemoteException {
         final int callingUid = Binder.getCallingUid();
         final boolean callerSystem = UserHandle.getAppId(callingUid) == Process.SYSTEM_UID;
@@ -801,7 +836,19 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 return false;
             }
         }
-
+        if (isStrictOpEnable()) {
+            AppOpsManager mAppOpsManager = mContext.getSystemService(AppOpsManager.class);
+            String packages = mContext.getPackageManager().getNameForUid(Binder.getCallingUid());
+            if ((Binder.getCallingUid() >= Process.FIRST_APPLICATION_UID)
+                    && (packages.indexOf("android.uid.systemui") != 0)
+                    && (packages.indexOf("android.uid.system") != 0)) {
+                int result = mAppOpsManager.noteOp(AppOpsManager.OP_BLUETOOTH_ADMIN,
+                        Binder.getCallingUid(), packages);
+                if (result == AppOpsManager.MODE_IGNORED) {
+                    return false;
+                }
+            }
+        }
         if (DBG) {
             Slog.d(TAG,"enable(" + packageName + "):  mBluetooth =" + mBluetooth +
                     " mBinding = " + mBinding + " mState = " +
@@ -994,11 +1041,6 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 LocalServices.getService(UserManagerInternal.class);
         userManagerInternal.addUserRestrictionsListener(mUserRestrictionsListener);
         final boolean isBluetoothDisallowed = isBluetoothDisallowed();
-        PackageManagerService packageManagerService =
-                (PackageManagerService) ServiceManager.getService("package");
-        if (packageManagerService != null && !packageManagerService.isOnlyCoreApps()) {
-            updateOppLauncherComponentState(isBluetoothDisallowed);
-        }
         if (isBluetoothDisallowed) {
             return;
         }
@@ -1424,6 +1466,20 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     }
                     break;
 
+                case MESSAGE_RESTORE_USER_SETTING:
+                    try {
+                        if ((msg.arg1 == RESTORE_SETTING_TO_OFF) && mEnable) {
+                            if (DBG) Slog.d(TAG, "Restore Bluetooth state to disabled");
+                            disable(REASON_RESTORE_USER_SETTING, true);
+                        } else if ((msg.arg1 == RESTORE_SETTING_TO_ON) && !mEnable) {
+                            if (DBG) Slog.d(TAG, "Restore Bluetooth state to enabled");
+                            enable(REASON_RESTORE_USER_SETTING);
+                        }
+                    } catch (RemoteException e) {
+                        Slog.e(TAG,"Unable to change Bluetooth On setting", e);
+                    }
+                    break;
+
                 case MESSAGE_REGISTER_ADAPTER:
                 {
                     IBluetoothManagerCallback callback = (IBluetoothManagerCallback) msg.obj;
@@ -1495,16 +1551,6 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                             Message getMsg = mHandler.obtainMessage(MESSAGE_GET_NAME_AND_ADDRESS);
                             mHandler.sendMessage(getMsg);
                             if (mGetNameAddressOnly) return;
-                        }
-
-                        try {
-                            boolean enableHciSnoopLog = (Settings.Secure.getInt(mContentResolver,
-                                Settings.Secure.BLUETOOTH_HCI_LOG, 0) == 1);
-                            if (!mBluetooth.configHciSnoopLog(enableHciSnoopLog)) {
-                                Slog.e(TAG,"IBluetooth.configHciSnoopLog return false");
-                            }
-                        } catch (RemoteException e) {
-                            Slog.e(TAG,"Unable to call configHciSnoopLog", e);
                         }
 
                         //Register callback object
@@ -1669,7 +1715,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     mHandler.removeMessages(MESSAGE_USER_SWITCHED);
 
                     /* disable and enable BT when detect a user switch */
-                    if (mEnable && mBluetooth != null) {
+                    if (mBluetooth != null && isEnabled()) {
                         try {
                             mBluetoothLock.readLock().lock();
                             if (mBluetooth != null) {
@@ -1738,6 +1784,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                         mState = BluetoothAdapter.STATE_OFF;
                         // enable
                         addActiveLog(REASON_USER_SWITCH, true);
+                        // mEnable flag could have been reset on disableBLE. Reenable it.
+                        mEnable = true;
                         handleEnable(mQuietEnable);
                     } else if (mBinding || mBluetooth != null) {
                         Message userMsg = mHandler.obtainMessage(MESSAGE_USER_SWITCHED);
@@ -1866,6 +1914,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, prevState);
         intent.putExtra(BluetoothAdapter.EXTRA_STATE, newState);
         intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+        intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
         mContext.sendBroadcastAsUser(intent, UserHandle.ALL, BLUETOOTH_PERM);
     }
 
@@ -1940,6 +1989,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, prevState);
             intent.putExtra(BluetoothAdapter.EXTRA_STATE, newState);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+            intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
             mContext.sendBroadcastAsUser(intent, UserHandle.ALL, BLUETOOTH_PERM);
         }
     }
@@ -2074,21 +2124,21 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
 
     /**
      * Disables BluetoothOppLauncherActivity component, so the Bluetooth sharing option is not
-     * offered to the user if Bluetooth is disallowed. Puts the component to its default state if
-     * Bluetooth is not disallowed.
+     * offered to the user if Bluetooth or sharing is disallowed. Puts the component to its default
+     * state if Bluetooth is not disallowed.
      *
-     * @param bluetoothDisallowed whether the {@link UserManager.DISALLOW_BLUETOOTH} user
-     * restriction was set.
+     * @param userId user to disable bluetooth sharing for.
+     * @param bluetoothSharingDisallowed whether bluetooth sharing is disallowed.
      */
-    private void updateOppLauncherComponentState(boolean bluetoothDisallowed) {
+    private void updateOppLauncherComponentState(int userId, boolean bluetoothSharingDisallowed) {
         final ComponentName oppLauncherComponent = new ComponentName("com.android.bluetooth",
                 "com.android.bluetooth.opp.BluetoothOppLauncherActivity");
-        final int newState = bluetoothDisallowed
+        final int newState = bluetoothSharingDisallowed
                 ? PackageManager.COMPONENT_ENABLED_STATE_DISABLED
                 : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
         try {
-            mContext.getPackageManager()
-                    .setComponentEnabledSetting(oppLauncherComponent, newState, 0);
+            final IPackageManager imp = AppGlobals.getPackageManager();
+            imp.setComponentEnabledSetting(oppLauncherComponent, newState, 0 /* flags */, userId);
         } catch (Exception e) {
             // The component was not found, do nothing.
         }

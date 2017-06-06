@@ -139,6 +139,8 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
     // Will be cleared once the client retrieves the new bounds via getBoundsForNewConfiguration().
     private final Rect mBoundsAfterRotation = new Rect();
 
+    Rect mPreAnimationBounds = new Rect();
+
     TaskStack(WindowManagerService service, int stackId) {
         mService = service;
         mStackId = stackId;
@@ -336,6 +338,8 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
         } else {
             mBoundsAnimationSourceHintBounds.setEmpty();
         }
+
+        mPreAnimationBounds.set(mBounds);
     }
 
     /**
@@ -734,7 +738,8 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
 
         // When the home stack is resizable, should always have the same stack and task bounds
         if (mStackId == HOME_STACK_ID) {
-            if (findHomeTask().isResizeable()) {
+            final Task homeTask = findHomeTask();
+            if (homeTask != null && homeTask.isResizeable()) {
                 // Calculate the home stack bounds when in docked mode and the home stack is
                 // resizeable.
                 getDisplayContent().mDividerControllerLocked
@@ -1484,7 +1489,7 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
     }
 
     void onAllWindowsDrawn() {
-        if (!mBoundsAnimating) {
+        if (!mBoundsAnimating && !mBoundsAnimatingRequested) {
             return;
         }
 
@@ -1530,10 +1535,17 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
         // Hold the lock since this is called from the BoundsAnimator running on the UiThread
         synchronized (mService.mWindowMap) {
             mBoundsAnimating = false;
+            for (int i = 0; i < mChildren.size(); i++) {
+                final Task t = mChildren.get(i);
+                t.clearPreserveNonFloatingState();
+            }
             mService.requestTraversal();
         }
 
         if (mStackId == PINNED_STACK_ID) {
+            // Update to the final bounds if requested. This is done here instead of in the bounds
+            // animator to allow us to coordinate this after we notify the PiP mode changed
+
             final PinnedStackWindowController controller =
                     (PinnedStackWindowController) getController();
             if (schedulePipModeChangedCallback && controller != null) {
@@ -1543,8 +1555,6 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
                         mBoundsAnimationTarget);
             }
 
-            // Update to the final bounds if requested. This is done here instead of in the bounds
-            // animator to allow us to coordinate this after we notify the PiP mode changed
             if (finalStackSize != null) {
                 setPinnedStackSize(finalStackSize, null);
             }
@@ -1584,8 +1594,12 @@ public class TaskStack extends WindowContainer<Task> implements DimLayer.DimLaye
         return mBoundsAnimating;
     }
 
+    public boolean lastAnimatingBoundsWasToFullscreen() {
+        return mBoundsAnimatingToFullscreen;
+    }
+
     public boolean isAnimatingBoundsToFullscreen() {
-        return mBoundsAnimating && mBoundsAnimatingToFullscreen;
+        return isAnimatingBounds() && lastAnimatingBoundsWasToFullscreen();
     }
 
     public boolean pinnedStackResizeDisallowed() {

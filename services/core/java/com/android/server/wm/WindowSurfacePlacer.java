@@ -15,6 +15,7 @@ import static com.android.server.wm.AppTransition.TRANSIT_FLAG_KEYGUARD_GOING_AW
 import static com.android.server.wm.AppTransition.TRANSIT_FLAG_KEYGUARD_GOING_AWAY_WITH_WALLPAPER;
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_GOING_AWAY;
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_GOING_AWAY_ON_WALLPAPER;
+import static com.android.server.wm.AppTransition.TRANSIT_NONE;
 import static com.android.server.wm.AppTransition.TRANSIT_TASK_CLOSE;
 import static com.android.server.wm.AppTransition.TRANSIT_TASK_IN_PLACE;
 import static com.android.server.wm.AppTransition.TRANSIT_TASK_OPEN;
@@ -41,6 +42,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.os.Binder;
 import android.os.Debug;
 import android.os.Trace;
 import android.util.ArraySet;
@@ -579,6 +581,11 @@ class WindowSurfacePlacer {
 
     private int maybeUpdateTransitToWallpaper(int transit, boolean openingAppHasWallpaper,
             boolean closingAppHasWallpaper) {
+        // Given no app transition pass it through instead of a wallpaper transition
+        if (transit == TRANSIT_NONE) {
+            return TRANSIT_NONE;
+        }
+
         // if wallpaper is animating in or out set oldWallpaper to null else to wallpaper
         final WindowState wallpaperTarget = mWallpaperControllerLocked.getWallpaperTarget();
         final WindowState oldWallpaper = mWallpaperControllerLocked.isWallpaperTargetAnimating()
@@ -683,9 +690,11 @@ class WindowSurfacePlacer {
             final DisplayInfo displayInfo = displayContent.getDisplayInfo();
 
             // Create a new surface for the thumbnail
+            WindowState window = appToken.findMainWindow();
             SurfaceControl surfaceControl = new SurfaceControl(mService.mFxSession,
                     "thumbnail anim", dirty.width(), dirty.height(),
-                    PixelFormat.TRANSLUCENT, SurfaceControl.HIDDEN);
+                    PixelFormat.TRANSLUCENT, SurfaceControl.HIDDEN,
+                    appToken.windowType, window.mOwnerUid);
             surfaceControl.setLayerStack(display.getLayerStack());
             if (SHOW_TRANSACTIONS) {
                 Slog.i(TAG, "  THUMBNAIL " + surfaceControl + ": CREATE");

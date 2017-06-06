@@ -203,6 +203,7 @@ import android.view.WindowManagerGlobal;
 import android.view.WindowManagerInternal;
 import android.view.WindowManagerPolicy;
 import android.view.WindowManagerPolicy.PointerEventListener;
+import android.view.WindowManagerPolicy.ScreenOffListener;
 import android.view.animation.Animation;
 import android.view.inputmethod.InputMethodManagerInternal;
 
@@ -1239,7 +1240,8 @@ public class WindowManagerService extends IWindowManager.Stub
                         return WindowManagerGlobal.ADD_BAD_APP_TOKEN;
                     }
                 }
-                token = new WindowToken(this, attrs.token, type, false, displayContent,
+                final IBinder binder = attrs.token != null ? attrs.token : client.asBinder();
+                token = new WindowToken(this, binder, type, false, displayContent,
                         session.mCanAddInternalSystemWindow);
             } else if (rootType >= FIRST_APPLICATION_WINDOW && rootType <= LAST_APPLICATION_WINDOW) {
                 atoken = token.asAppWindowToken();
@@ -1310,7 +1312,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 // It is not valid to use an app token with other system types; we will
                 // instead make a new token for it (as if null had been passed in for the token).
                 attrs.token = null;
-                token = new WindowToken(this, null, type, false, displayContent,
+                token = new WindowToken(this, client.asBinder(), type, false, displayContent,
                         session.mCanAddInternalSystemWindow);
             }
 
@@ -1520,7 +1522,7 @@ public class WindowManagerService extends IWindowManager.Stub
         // Try using the target SDK of the root window
         if (attachedWindow != null) {
             return attachedWindow.mAppToken != null
-                    && attachedWindow.mAppToken.mTargetSdk > Build.VERSION_CODES.N_MR1;
+                    && attachedWindow.mAppToken.mTargetSdk >= Build.VERSION_CODES.O;
         } else {
             // Otherwise, look at the package
             try {
@@ -1531,7 +1533,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     throw new SecurityException("Package " + packageName + " not in UID "
                             + callingUid);
                 }
-                if (appInfo.targetSdkVersion > Build.VERSION_CODES.N_MR1) {
+                if (appInfo.targetSdkVersion >= Build.VERSION_CODES.O) {
                     return true;
                 }
             } catch (PackageManager.NameNotFoundException e) {
@@ -1684,6 +1686,10 @@ public class WindowManagerService extends IWindowManager.Stub
                 // re-factor.
                 atoken.firstWindowDrawn = false;
                 atoken.clearAllDrawn();
+                final TaskStack stack = atoken.getStack();
+                if (stack != null) {
+                    stack.mExitingAppTokens.remove(atoken);
+                }
             }
         }
 
@@ -1951,6 +1957,16 @@ public class WindowManagerService extends IWindowManager.Stub
             if (viewVisibility == View.VISIBLE &&
                     (win.mAppToken == null || win.mAttrs.type == TYPE_APPLICATION_STARTING
                             || !win.mAppToken.isClientHidden())) {
+
+                // We are about to create a surface, but we didn't run a layout yet. So better run
+                // a layout now that we already know the right size, as a resize call will make the
+                // surface transaction blocking until next vsync and slow us down.
+                // TODO: Ideally we'd create the surface after running layout a bit further down,
+                // but moving this seems to be too risky at this point in the release.
+                if (win.mLayoutSeq == -1) {
+                    win.setDisplayLayoutNeeded();
+                    mWindowPlacerLocked.performSurfacePlacement(true);
+                }
                 result = win.relayoutVisibleWindow(mergedConfiguration, result, attrChanges,
                         oldVisibility);
                 try {
@@ -2082,6 +2098,7 @@ public class WindowManagerService extends IWindowManager.Stub
             outFrame.set(win.mCompatFrame);
             outOverscanInsets.set(win.mOverscanInsets);
             outContentInsets.set(win.mContentInsets);
+            win.mLastRelayoutContentInsets.set(win.mContentInsets);
             outVisibleInsets.set(win.mVisibleInsets);
             outStableInsets.set(win.mStableInsets);
             outOutsets.set(win.mOutsets);
@@ -2141,7 +2158,12 @@ public class WindowManagerService extends IWindowManager.Stub
             if (mInputMethodWindow == win) {
                 setInputMethodWindowLocked(null);
             }
-            win.destroyOrSaveSurface();
+            boolean stopped = win.mAppToken != null ? win.mAppToken.mAppStopped : false;
+            // We set mDestroying=true so AppWindowToken#notifyAppStopped in-to destroy surfaces
+            // will later actually destroy the surface if we do not do so here. Normally we leave
+            // this to the exit animation.
+            win.mDestroying = true;
+            win.destroySurface(false, stopped);
         }
         // TODO(multidisplay): Magnification is supported only for the default display.
         if (mAccessibilityController != null && win.getDisplayId() == DEFAULT_DISPLAY) {
@@ -2756,44 +2778,6 @@ public class WindowManagerService extends IWindowManager.Stub
         mDockedStackCreateBounds = bounds;
     }
 
-    /**
-     * @param useExistingStackBounds Apply {@param aspectRatio} to the existing target stack bounds
-     *                               if possible
-     */
-    public Rect getPictureInPictureBounds(int displayId, float aspectRatio,
-            boolean useExistingStackBounds) {
-        synchronized (mWindowMap) {
-            if (!mSupportsPictureInPicture) {
-                return null;
-            }
-
-            final Rect stackBounds;
-            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
-            if (displayContent == null) {
-                return null;
-            }
-
-            final PinnedStackController pinnedStackController =
-                    displayContent.getPinnedStackController();
-            final TaskStack stack = displayContent.getStackById(PINNED_STACK_ID);
-            if (stack != null && useExistingStackBounds) {
-                // If the stack exists, then use its final bounds to calculate the new aspect ratio
-                // bounds.
-                stackBounds = new Rect();
-                stack.getAnimationOrCurrentBounds(stackBounds);
-            } else {
-                // Otherwise, just calculate the aspect ratio bounds from the default bounds
-                stackBounds = pinnedStackController.getDefaultBounds();
-            }
-
-            if (pinnedStackController.isValidPictureInPictureAspectRatio(aspectRatio)) {
-                return pinnedStackController.transformBoundsToAspectRatio(stackBounds, aspectRatio);
-            } else {
-                return stackBounds;
-            }
-        }
-    }
-
     public boolean isValidPictureInPictureAspectRatio(int displayId, float aspectRatio) {
         final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
         return displayContent.getPinnedStackController().isValidPictureInPictureAspectRatio(
@@ -2825,6 +2809,11 @@ public class WindowManagerService extends IWindowManager.Stub
     @Override
     public void notifyKeyguardTrustedChanged() {
         mH.sendEmptyMessage(H.NOTIFY_KEYGUARD_TRUSTED_CHANGED);
+    }
+
+    @Override
+    public void screenTurningOff(ScreenOffListener listener) {
+        mTaskSnapshotController.screenTurningOff(listener);
     }
 
     /**
@@ -3352,6 +3341,13 @@ public class WindowManagerService extends IWindowManager.Stub
         performEnableScreen();
     }
 
+    /**
+     * Called when System UI has been started.
+     */
+    public void onSystemUiStarted() {
+        mPolicy.onSystemUiStarted();
+    }
+
     private void performEnableScreen() {
         synchronized(mWindowMap) {
             if (DEBUG_BOOT) Slog.i(TAG_WM, "performEnableScreen: mDisplayEnabled=" + mDisplayEnabled
@@ -3364,6 +3360,10 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
             if (!mSystemBooted && !mShowingBootMessages) {
+                return;
+            }
+
+            if (!mShowingBootMessages && !mPolicy.canDismissBootAnimation()) {
                 return;
             }
 
@@ -3380,7 +3380,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 try {
                     IBinder surfaceFlinger = ServiceManager.getService("SurfaceFlinger");
                     if (surfaceFlinger != null) {
-                        //Slog.i(TAG_WM, "******* TELLING SURFACE FLINGER WE ARE BOOTED!");
+                        Slog.i(TAG_WM, "******* TELLING SURFACE FLINGER WE ARE BOOTED!");
                         Parcel data = Parcel.obtain();
                         data.writeInterfaceToken("android.ui.ISurfaceComposer");
                         surfaceFlinger.transact(IBinder.FIRST_CALL_TRANSACTION, // BOOT_FINISHED
@@ -4313,7 +4313,10 @@ public class WindowManagerService extends IWindowManager.Stub
                     if (mWaitingForConfig) {
                         mWaitingForConfig = false;
                         mLastFinishedFreezeSource = "config-unchanged";
-                        mRoot.getDisplayContent(displayId).setLayoutNeeded();
+                        final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                        if (dc != null) {
+                            dc.setLayoutNeeded();
+                        }
                         mWindowPlacerLocked.performSurfacePlacement();
                     }
                 }

@@ -77,8 +77,9 @@ final class DefaultPermissionGrantPolicy {
     private static final String TAG = "DefaultPermGrantPolicy"; // must be <= 23 chars
     private static final boolean DEBUG = false;
 
-    private static final int DEFAULT_FLAGS = PackageManager.MATCH_DIRECT_BOOT_AWARE
-            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
+    private static final int DEFAULT_FLAGS =
+            PackageManager.MATCH_DIRECT_BOOT_AWARE | PackageManager.MATCH_DIRECT_BOOT_UNAWARE
+                    | PackageManager.MATCH_UNINSTALLED_PACKAGES;
 
     private static final String AUDIO_MIME_TYPE = "audio/mpeg";
 
@@ -724,6 +725,9 @@ final class DefaultPermissionGrantPolicy {
             grantRuntimePermissionsLPw(smsPackage, PHONE_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(smsPackage, CONTACTS_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(smsPackage, SMS_PERMISSIONS, userId);
+            grantRuntimePermissionsLPw(smsPackage, STORAGE_PERMISSIONS, userId);
+            grantRuntimePermissionsLPw(smsPackage, MICROPHONE_PERMISSIONS, userId);
+            grantRuntimePermissionsLPw(smsPackage, CAMERA_PERMISSIONS, userId);
         }
     }
 
@@ -737,6 +741,9 @@ final class DefaultPermissionGrantPolicy {
             grantRuntimePermissionsLPw(smsPackage, PHONE_PERMISSIONS, false, true, userId);
             grantRuntimePermissionsLPw(smsPackage, CONTACTS_PERMISSIONS, false, true, userId);
             grantRuntimePermissionsLPw(smsPackage, SMS_PERMISSIONS, false, true, userId);
+            grantRuntimePermissionsLPw(smsPackage, STORAGE_PERMISSIONS, false, true, userId);
+            grantRuntimePermissionsLPw(smsPackage, MICROPHONE_PERMISSIONS, false, true, userId);
+            grantRuntimePermissionsLPw(smsPackage, CAMERA_PERMISSIONS, false, true, userId);
         }
     }
 

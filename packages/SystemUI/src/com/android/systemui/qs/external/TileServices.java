@@ -204,7 +204,7 @@ public class TileServices extends IQSService.Stub {
         if (customTile != null) {
             verifyCaller(customTile);
             customTile.onDialogShown();
-            mHost.collapsePanels();
+            mHost.forceCollapsePanels();
             mServices.get(customTile).setShowingDialog(true);
         }
     }
@@ -224,7 +224,7 @@ public class TileServices extends IQSService.Stub {
         CustomTile customTile = getTileForToken(token);
         if (customTile != null) {
             verifyCaller(customTile);
-            mHost.collapsePanels();
+            mHost.forceCollapsePanels();
         }
     }
 
@@ -313,7 +313,7 @@ public class TileServices extends IQSService.Stub {
         public void onReceive(Context context, Intent intent) {
             if (TileService.ACTION_REQUEST_LISTENING.equals(intent.getAction())) {
                 requestListening(
-                        (ComponentName) intent.getParcelableExtra(TileService.EXTRA_COMPONENT));
+                        (ComponentName) intent.getParcelableExtra(Intent.EXTRA_COMPONENT_NAME));
             }
         }
     };

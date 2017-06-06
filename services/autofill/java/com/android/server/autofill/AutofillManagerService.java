@@ -19,15 +19,17 @@ package com.android.server.autofill;
 import static android.Manifest.permission.MANAGE_AUTO_FILL;
 import static android.content.Context.AUTOFILL_MANAGER_SERVICE;
 
-import static com.android.server.autofill.Helper.DEBUG;
-import static com.android.server.autofill.Helper.VERBOSE;
+import static com.android.server.autofill.Helper.sDebug;
+import static com.android.server.autofill.Helper.sPartitionMaxCount;
+import static com.android.server.autofill.Helper.sVerbose;
 import static com.android.server.autofill.Helper.bundleToString;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
-import android.app.ActivityManagerInternal;
+import android.app.ActivityThread;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -38,6 +40,7 @@ import android.database.ContentObserver;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -50,16 +53,17 @@ import android.os.UserManagerInternal;
 import android.provider.Settings;
 import android.service.autofill.FillEventHistory;
 import android.util.LocalLog;
-import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.view.autofill.AutofillId;
+import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillValue;
 import android.view.autofill.IAutoFillManager;
 import android.view.autofill.IAutoFillManagerClient;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.content.PackageMonitor;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.util.DumpUtils;
@@ -73,6 +77,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Entry point service for autofill management.
@@ -114,11 +119,7 @@ public final class AutofillManagerService extends SystemService {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(intent.getAction())) {
-                final String reason = intent.getStringExtra("reason");
-                if (VERBOSE) {
-                    Slog.v(TAG, "close system dialogs: " + reason);
-                }
-                mUi.hideAll();
+                mUi.hideAll(null);
             }
         }
     };
@@ -126,7 +127,11 @@ public final class AutofillManagerService extends SystemService {
     public AutofillManagerService(Context context) {
         super(context);
         mContext = context;
-        mUi = new AutoFillUI(mContext);
+        mUi = new AutoFillUI(ActivityThread.currentActivityThread().getSystemUiContext());
+
+        final boolean debug = Build.IS_DEBUGGABLE;
+        Slog.i(TAG, "Setting debug to " + debug);
+        setDebugLocked(debug);
 
         final IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
@@ -140,6 +145,9 @@ public final class AutofillManagerService extends SystemService {
             final int userId = users.get(i).id;
             final boolean disabled = umi.getUserRestriction(userId, UserManager.DISALLOW_AUTOFILL);
             if (disabled) {
+                if (disabled) {
+                    Slog.i(TAG, "Disabling Autofill for user " + userId);
+                }
                 mDisabledUsers.put(userId, disabled);
             }
         }
@@ -150,16 +158,94 @@ public final class AutofillManagerService extends SystemService {
                 final boolean disabledBefore = mDisabledUsers.get(userId);
                 if (disabledBefore == disabledNow) {
                     // Nothing changed, do nothing.
-                    if (DEBUG) {
-                        Slog.d(TAG, "Restriction not changed for user " + userId + ": "
+                    if (sDebug) {
+                        Slog.d(TAG, "Autofill restriction did not change for user " + userId + ": "
                                 + bundleToString(newRestrictions));
                         return;
                     }
                 }
+                Slog.i(TAG, "Updating Autofill for user " + userId + ": disabled=" + disabledNow);
                 mDisabledUsers.put(userId, disabledNow);
                 updateCachedServiceLocked(userId, disabledNow);
             }
         });
+        startTrackingPackageChanges();
+    }
+
+    private void startTrackingPackageChanges() {
+        PackageMonitor monitor = new PackageMonitor() {
+            @Override
+            public void onSomePackagesChanged() {
+                synchronized (mLock) {
+                    updateCachedServiceLocked(getChangingUserId());
+                }
+            }
+
+            @Override
+            public void onPackageUpdateFinished(String packageName, int uid) {
+                synchronized (mLock) {
+                    final String activePackageName = getActiveAutofillServicePackageName();
+                    if (packageName.equals(activePackageName)) {
+                        removeCachedServiceLocked(getChangingUserId());
+                    }
+                }
+            }
+
+            @Override
+            public void onPackageRemoved(String packageName, int uid) {
+                synchronized (mLock) {
+                    final int userId = getChangingUserId();
+                    final AutofillManagerServiceImpl userState = peekServiceForUserLocked(userId);
+                    if (userState != null) {
+                        final ComponentName componentName = userState.getServiceComponentName();
+                        if (componentName != null) {
+                            if (packageName.equals(componentName.getPackageName())) {
+                                handleActiveAutofillServiceRemoved(userId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public boolean onHandleForceStop(Intent intent, String[] packages,
+                    int uid, boolean doit) {
+                synchronized (mLock) {
+                    final String activePackageName = getActiveAutofillServicePackageName();
+                    for (String pkg : packages) {
+                        if (pkg.equals(activePackageName)) {
+                            if (!doit) {
+                                return true;
+                            }
+                            removeCachedServiceLocked(getChangingUserId());
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private void handleActiveAutofillServiceRemoved(int userId) {
+                removeCachedServiceLocked(userId);
+                Settings.Secure.putStringForUser(mContext.getContentResolver(),
+                        Settings.Secure.AUTOFILL_SERVICE, null, userId);
+            }
+
+            private String getActiveAutofillServicePackageName() {
+                final int userId = getChangingUserId();
+                final AutofillManagerServiceImpl userState = peekServiceForUserLocked(userId);
+                if (userState == null) {
+                    return null;
+                }
+                final ComponentName serviceComponent = userState.getServiceComponentName();
+                if (serviceComponent == null) {
+                    return null;
+                }
+                return serviceComponent.getPackageName();
+            }
+        };
+
+        // package changes
+        monitor.register(mContext, null,  UserHandle.ALL, true);
     }
 
     @Override
@@ -219,24 +305,6 @@ public final class AutofillManagerService extends SystemService {
     }
 
     // Called by Shell command.
-    void requestSaveForUser(int userId) {
-        Slog.i(TAG, "requestSaveForUser(): " + userId);
-        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
-        final IBinder activityToken = getTopActivityForUser();
-        if (activityToken != null) {
-            synchronized (mLock) {
-                final AutofillManagerServiceImpl service = peekServiceForUserLocked(userId);
-                if (service == null) {
-                    Log.w(TAG, "handleSaveForUser(): no cached service for userId " + userId);
-                    return;
-                }
-
-                service.requestSaveForUserLocked(activityToken);
-            }
-        }
-    }
-
-    // Called by Shell command.
     void destroySessions(int userId, IResultReceiver receiver) {
         Slog.i(TAG, "destroySessions() for userId " + userId);
         mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
@@ -266,6 +334,7 @@ public final class AutofillManagerService extends SystemService {
     void listSessions(int userId, IResultReceiver receiver) {
         Slog.i(TAG, "listSessions() for userId " + userId);
         mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+
         final Bundle resultData = new Bundle();
         final ArrayList<String> sessions = new ArrayList<>();
 
@@ -295,6 +364,7 @@ public final class AutofillManagerService extends SystemService {
     void reset() {
         Slog.i(TAG, "reset()");
         mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+
         synchronized (mLock) {
             final int size = mServicesCache.size();
             for (int i = 0; i < size; i++) {
@@ -302,6 +372,64 @@ public final class AutofillManagerService extends SystemService {
             }
             mServicesCache.clear();
         }
+    }
+
+    // Called by Shell command.
+    void setLogLevel(int level) {
+        Slog.i(TAG, "setLogLevel(): " + level);
+        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+
+        boolean debug = false;
+        boolean verbose = false;
+        if (level == AutofillManager.FLAG_ADD_CLIENT_VERBOSE) {
+            debug = verbose = true;
+        } else if (level == AutofillManager.FLAG_ADD_CLIENT_DEBUG) {
+            debug = true;
+        }
+        synchronized (mLock) {
+            setDebugLocked(debug);
+            setVerboseLocked(verbose);
+        }
+    }
+
+    // Called by Shell command.
+    int getLogLevel() {
+        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+
+        synchronized (mLock) {
+            if (sVerbose) return AutofillManager.FLAG_ADD_CLIENT_VERBOSE;
+            if (sDebug) return AutofillManager.FLAG_ADD_CLIENT_DEBUG;
+            return 0;
+        }
+    }
+
+    // Called by Shell command.
+    public int getMaxPartitions() {
+        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+
+        synchronized (mLock) {
+            return sPartitionMaxCount;
+        }
+    }
+
+    // Called by Shell command.
+    public void setMaxPartitions(int max) {
+        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+        Slog.i(TAG, "setMaxPartitions(): " + max);
+        synchronized (mLock) {
+            sPartitionMaxCount = max;
+        }
+    }
+
+    private void setDebugLocked(boolean debug) {
+        com.android.server.autofill.Helper.sDebug = debug;
+        android.view.autofill.Helper.sDebug = debug;
+    }
+
+
+    private void setVerboseLocked(boolean verbose) {
+        com.android.server.autofill.Helper.sVerbose = verbose;
+        android.view.autofill.Helper.sVerbose = verbose;
     }
 
     /**
@@ -326,38 +454,40 @@ public final class AutofillManagerService extends SystemService {
      * Updates a cached service for a given user.
      */
     private void updateCachedServiceLocked(int userId, boolean disabled) {
-        AutofillManagerServiceImpl service = peekServiceForUserLocked(userId);
+        AutofillManagerServiceImpl service = getServiceForUserLocked(userId);
         if (service != null) {
             service.updateLocked(disabled);
+            if (!service.isEnabled()) {
+                removeCachedServiceLocked(userId);
+            }
         }
-    }
-
-    private IBinder getTopActivityForUser() {
-        final List<IBinder> topActivities = LocalServices
-                .getService(ActivityManagerInternal.class).getTopVisibleActivities();
-        if (VERBOSE) {
-            Slog.v(TAG, "Top activities (" + topActivities.size() + "): " + topActivities);
-        }
-        if (topActivities.isEmpty()) {
-            Slog.w(TAG, "Could not get top activity");
-            return null;
-        }
-        return topActivities.get(0);
     }
 
     final class AutoFillManagerServiceStub extends IAutoFillManager.Stub {
         @Override
-        public boolean addClient(IAutoFillManagerClient client, int userId) {
+        public int addClient(IAutoFillManagerClient client, int userId) {
             synchronized (mLock) {
-                return getServiceForUserLocked(userId).addClientLocked(client);
+                int flags = 0;
+                if (getServiceForUserLocked(userId).addClientLocked(client)) {
+                    flags |= AutofillManager.FLAG_ADD_CLIENT_ENABLED;
+                }
+                if (sDebug) {
+                    flags |= AutofillManager.FLAG_ADD_CLIENT_DEBUG;
+                }
+                if (sVerbose) {
+                    flags |= AutofillManager.FLAG_ADD_CLIENT_VERBOSE;
+                }
+                return flags;
             }
         }
 
         @Override
-        public void setAuthenticationResult(Bundle data, int sessionId, int userId) {
+        public void setAuthenticationResult(Bundle data, int sessionId, int authenticationId,
+                int userId) {
             synchronized (mLock) {
                 final AutofillManagerServiceImpl service = getServiceForUserLocked(userId);
-                service.setAuthenticationResultLocked(data, sessionId, getCallingUid());
+                service.setAuthenticationResultLocked(data, sessionId, authenticationId,
+                        getCallingUid());
             }
         }
 
@@ -370,9 +500,9 @@ public final class AutofillManagerService extends SystemService {
         }
 
         @Override
-        public int startSession(IBinder activityToken, IBinder windowToken, IBinder appCallback,
-                AutofillId autofillId, Rect bounds, AutofillValue value, int userId,
-                boolean hasCallback, int flags, String packageName) {
+        public int startSession(IBinder activityToken, IBinder appCallback, AutofillId autofillId,
+                Rect bounds, AutofillValue value, int userId, boolean hasCallback, int flags,
+                String packageName) {
 
             activityToken = Preconditions.checkNotNull(activityToken, "activityToken");
             appCallback = Preconditions.checkNotNull(appCallback, "appCallback");
@@ -389,8 +519,8 @@ public final class AutofillManagerService extends SystemService {
 
             synchronized (mLock) {
                 final AutofillManagerServiceImpl service = getServiceForUserLocked(userId);
-                return service.startSessionLocked(activityToken, getCallingUid(), windowToken,
-                        appCallback, autofillId, bounds, value, hasCallback, flags, packageName);
+                return service.startSessionLocked(activityToken, getCallingUid(), appCallback,
+                        autofillId, bounds, value, hasCallback, flags, packageName);
             }
         }
 
@@ -428,28 +558,36 @@ public final class AutofillManagerService extends SystemService {
         }
 
         @Override
-        public void setWindow(int sessionId, IBinder windowToken) throws RemoteException {
-            windowToken = Preconditions.checkNotNull(windowToken, "windowToken");
-
+        public void updateSession(int sessionId, AutofillId autoFillId, Rect bounds,
+                AutofillValue value, int action, int flags, int userId) {
             synchronized (mLock) {
-                final AutofillManagerServiceImpl service = mServicesCache.get(
-                        UserHandle.getCallingUserId());
+                final AutofillManagerServiceImpl service = peekServiceForUserLocked(userId);
                 if (service != null) {
-                    service.setWindow(sessionId, getCallingUid(), windowToken);
+                    service.updateSessionLocked(sessionId, getCallingUid(), autoFillId, bounds,
+                            value, action, flags);
                 }
             }
         }
 
         @Override
-        public void updateSession(int sessionId, AutofillId id, Rect bounds,
-                AutofillValue value, int flags, int userId) {
+        public int updateOrRestartSession(IBinder activityToken, IBinder appCallback,
+                AutofillId autoFillId, Rect bounds, AutofillValue value, int userId,
+                boolean hasCallback, int flags, String packageName, int sessionId, int action) {
+            boolean restart = false;
             synchronized (mLock) {
                 final AutofillManagerServiceImpl service = peekServiceForUserLocked(userId);
                 if (service != null) {
-                    service.updateSessionLocked(sessionId, getCallingUid(), id, bounds, value,
-                            flags);
+                    restart = service.updateSessionLocked(sessionId, getCallingUid(), autoFillId,
+                            bounds, value, action, flags);
                 }
             }
+            if (restart) {
+                return startSession(activityToken, appCallback, autoFillId, bounds, value, userId,
+                        hasCallback, flags, packageName);
+            }
+
+            // Nothing changed...
+            return sessionId;
         }
 
         @Override
@@ -483,26 +621,80 @@ public final class AutofillManagerService extends SystemService {
         }
 
         @Override
+        public boolean isServiceSupported(int userId) {
+            synchronized (mLock) {
+                return !mDisabledUsers.get(userId);
+            }
+        }
+
+        @Override
+        public boolean isServiceEnabled(int userId, String packageName) {
+            synchronized (mLock) {
+                final AutofillManagerServiceImpl service = peekServiceForUserLocked(userId);
+                if (service == null) return false;
+                return Objects.equals(packageName, service.getPackageName());
+            }
+        }
+
+        @Override
         public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
             if (!DumpUtils.checkDumpPermission(mContext, TAG, pw)) return;
-            synchronized (mLock) {
-                pw.print("Disabled users: "); pw.println(mDisabledUsers);
-                final int size = mServicesCache.size();
-                pw.print("Cached services: ");
-                if (size == 0) {
-                    pw.println("none");
-                } else {
-                    pw.println(size);
-                    for (int i = 0; i < size; i++) {
-                        pw.print("\nService at index "); pw.println(i);
-                        final AutofillManagerServiceImpl impl = mServicesCache.valueAt(i);
-                        impl.dumpLocked("  ", pw);
+
+            boolean showHistory = true;
+            boolean uiOnly = false;
+            if (args != null) {
+                for (String arg : args) {
+                    switch(arg) {
+                        case "--no-history":
+                            showHistory = false;
+                            break;
+                        case "--ui-only":
+                            uiOnly = true;
+                            break;
+                        case "--help":
+                            pw.println("Usage: dumpsys autofill [--ui-only|--no-history]");
+                            return;
+                        default:
+                            Slog.w(TAG, "Ignoring invalid dump arg: " + arg);
                     }
                 }
-                mUi.dump(pw);
             }
-            pw.println("Requests history:");
-            mRequestsHistory.reverseDump(fd, pw, args);
+
+            if (uiOnly) {
+                mUi.dump(pw);
+                return;
+            }
+
+            boolean oldDebug = sDebug;
+            try {
+                synchronized (mLock) {
+                    oldDebug = sDebug;
+                    setDebugLocked(true);
+                    pw.print("Debug mode: "); pw.println(oldDebug);
+                    pw.print("Verbose mode: "); pw.println(sVerbose);
+                    pw.print("Disabled users: "); pw.println(mDisabledUsers);
+                    pw.print("Max partitions per session: "); pw.println(sPartitionMaxCount);
+                    final int size = mServicesCache.size();
+                    pw.print("Cached services: ");
+                    if (size == 0) {
+                        pw.println("none");
+                    } else {
+                        pw.println(size);
+                        for (int i = 0; i < size; i++) {
+                            pw.print("\nService at index "); pw.println(i);
+                            final AutofillManagerServiceImpl impl = mServicesCache.valueAt(i);
+                            impl.dumpLocked("  ", pw);
+                        }
+                    }
+                    mUi.dump(pw);
+                }
+                if (showHistory) {
+                    pw.println("Requests history:");
+                    mRequestsHistory.reverseDump(fd, pw, args);
+                }
+            } finally {
+                setDebugLocked(oldDebug);
+            }
         }
 
         @Override
@@ -519,10 +711,13 @@ public final class AutofillManagerService extends SystemService {
             ContentResolver resolver = mContext.getContentResolver();
             resolver.registerContentObserver(Settings.Secure.getUriFor(
                     Settings.Secure.AUTOFILL_SERVICE), false, this, UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.USER_SETUP_COMPLETE), false, this, UserHandle.USER_ALL);
         }
 
         @Override
         public void onChange(boolean selfChange, Uri uri, int userId) {
+            if (sVerbose) Slog.v(TAG, "onChange(): uri=" + uri + ", userId=" + userId);
             synchronized (mLock) {
                 updateCachedServiceLocked(userId);
             }

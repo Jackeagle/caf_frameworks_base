@@ -35,41 +35,41 @@ oneway interface IAutoFillManagerClient {
     /**
      * Notifies the client when the autofill enabled state changed.
      */
-    void setState(boolean enabled);
+    void setState(boolean enabled, boolean resetSession, boolean resetClient);
 
     /**
       * Autofills the activity with the contents of a dataset.
       */
-    void autofill(int sessionId, in IBinder windowToken, in List<AutofillId> ids,
-            in List<AutofillValue> values);
+    void autofill(int sessionId, in List<AutofillId> ids, in List<AutofillValue> values);
 
     /**
       * Authenticates a fill response or a data set.
       */
-    void authenticate(int sessionId, in IntentSender intent, in Intent fillInIntent);
+    void authenticate(int sessionId, int authenticationId, in IntentSender intent,
+            in Intent fillInIntent);
 
     /**
       * Sets the views to track. If saveOnAllViewsInvisible is set and all these view are invisible
       * the session is finished automatically.
       */
-    void setTrackedViews(int sessionId, in List<AutofillId> ids,
-            boolean saveOnAllViewsInvisible);
+    void setTrackedViews(int sessionId, in @nullable AutofillId[] savableIds,
+            boolean saveOnAllViewsInvisible, in @nullable AutofillId[] fillableIds);
 
     /**
      * Requests showing the fill UI.
      */
-    void requestShowFillUi(int sessionId, in IBinder windowToken, in AutofillId id, int width,
-            int height, in Rect anchorBounds, in IAutofillWindowPresenter presenter);
+    void requestShowFillUi(int sessionId, in AutofillId id, int width, int height,
+    in Rect anchorBounds, in IAutofillWindowPresenter presenter);
 
     /**
      * Requests hiding the fill UI.
      */
-    void requestHideFillUi(int sessionId, in IBinder windowToken, in AutofillId id);
+    void requestHideFillUi(int sessionId, in AutofillId id);
 
     /**
      * Notifies no fill UI will be shown.
      */
-    void notifyNoFillUi(int sessionId, in IBinder windowToken, in AutofillId id);
+    void notifyNoFillUi(int sessionId, in AutofillId id);
 
     /**
      * Starts the provided intent sender

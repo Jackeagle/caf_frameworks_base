@@ -296,7 +296,11 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
     @Override
     public void onDraw(Canvas c) {
         super.onDraw(c);
-        mBackgroundFallback.draw(mContentRoot, c, mWindow.mContentParent);
+
+        // When we are resizing, we need the fallback background to cover the area where we have our
+        // system bar background views as the navigation bar will be hidden during resizing.
+        mBackgroundFallback.draw(isResizing() ? this : mContentRoot, mContentRoot, c,
+                mWindow.mContentParent);
     }
 
     @Override
@@ -1498,7 +1502,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
         final Window.Callback cb = mWindow.getCallback();
         if (cb != null && !mWindow.isDestroyed() && mFeatureId < 0) {
-            cb.onBeforeAttachedToWindow();
             cb.onAttachedToWindow();
         }
 
@@ -1756,8 +1759,9 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
             mFloatingActionMode.finish();
         }
         cleanupFloatingActionModeViews();
+        mFloatingToolbar = new FloatingToolbar(mContext, mWindow);
         final FloatingActionMode mode =
-                new FloatingActionMode(mContext, callback, originatingView);
+                new FloatingActionMode(mContext, callback, originatingView, mFloatingToolbar);
         mFloatingActionModeOriginatingView = originatingView;
         mFloatingToolbarPreDrawListener =
             new ViewTreeObserver.OnPreDrawListener() {
@@ -1772,8 +1776,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
     private void setHandledFloatingActionMode(ActionMode mode) {
         mFloatingActionMode = mode;
-        mFloatingToolbar = new FloatingToolbar(mContext, mWindow);
-        ((FloatingActionMode) mFloatingActionMode).setFloatingToolbar(mFloatingToolbar);
         mFloatingActionMode.invalidate();  // Will show the floating toolbar if necessary.
         mFloatingActionModeOriginatingView.getViewTreeObserver()
             .addOnPreDrawListener(mFloatingToolbarPreDrawListener);

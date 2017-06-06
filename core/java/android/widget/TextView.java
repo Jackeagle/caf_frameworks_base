@@ -35,6 +35,7 @@ import android.annotation.XmlRes;
 import android.app.Activity;
 import android.app.assist.AssistStructure;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
@@ -125,6 +126,7 @@ import android.view.ContextMenu;
 import android.view.DragEvent;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -393,6 +395,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private boolean mPreDrawListenerDetached;
 
     private TextClassifier mTextClassifier;
+
+    // A flag to prevent repeated movements from escaping the enclosing text view. The idea here is
+    // that if a user is holding down a movement key to traverse text, we shouldn't also traverse
+    // the view hierarchy. On the other hand, if the user is using the movement key to traverse
+    // views (i.e. the first movement was to traverse out of this view, or this view was traversed
+    // into by the user holding the movement key down) then we shouldn't prevent the focus from
+    // changing.
+    private boolean mPreventDefaultMovement;
 
     private TextUtils.TruncateAt mEllipsize;
 
@@ -736,17 +746,17 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     // Default value for the step size in pixels.
     private static final int DEFAULT_AUTO_SIZE_GRANULARITY_IN_PX = 1;
     // Use this to specify that any of the auto-size configuration int values have not been set.
-    private static final int UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE = -1;
+    private static final float UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE = -1f;
     // Auto-size text type.
     private int mAutoSizeTextType = AUTO_SIZE_TEXT_TYPE_NONE;
     // Specify if auto-size text is needed.
     private boolean mNeedsAutoSizeText = false;
     // Step size for auto-sizing in pixels.
-    private int mAutoSizeStepGranularityInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
+    private float mAutoSizeStepGranularityInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
     // Minimum text size for auto-sizing in pixels.
-    private int mAutoSizeMinTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
+    private float mAutoSizeMinTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
     // Maximum text size for auto-sizing in pixels.
-    private int mAutoSizeMaxTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
+    private float mAutoSizeMaxTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
     // Contains a (specified or computed) distinct sorted set of text sizes in pixels to pick from
     // when auto-sizing text.
     private int[] mAutoSizeTextSizesInPx = EmptyArray.INT;
@@ -903,10 +913,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         break;
 
                     case com.android.internal.R.styleable.TextAppearance_fontFamily:
-                        try {
-                            fontTypeface = appearance.getFont(attr);
-                        } catch (UnsupportedOperationException | Resources.NotFoundException e) {
-                            // Expected if it is not a font resource.
+                        if (!context.isRestricted()) {
+                            try {
+                                fontTypeface = appearance.getFont(attr);
+                            } catch (UnsupportedOperationException
+                                    | Resources.NotFoundException e) {
+                                // Expected if it is not a font resource.
+                            }
                         }
                         if (fontTypeface == null) {
                             fontFamily = appearance.getString(attr);
@@ -974,9 +987,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         CharSequence text = "";
         CharSequence hint = null;
         boolean password = false;
-        int autoSizeMinTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
-        int autoSizeMaxTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
-        int autoSizeStepGranularityInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
+        float autoSizeMinTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
+        float autoSizeMaxTextSizeInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
+        float autoSizeStepGranularityInPx = UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE;
         int inputType = EditorInfo.TYPE_NULL;
         a = theme.obtainStyledAttributes(
                     attrs, com.android.internal.R.styleable.TextView, defStyleAttr, defStyleRes);
@@ -1220,11 +1233,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     break;
 
                 case com.android.internal.R.styleable.TextView_fontFamily:
-                    try {
-                        fontTypeface = a.getFont(attr);
-                    } catch (UnsupportedOperationException | Resources.NotFoundException e) {
-                        // Expected if it is not a resource reference or if it is a reference to
-                        // another resource type.
+                    if (!context.isRestricted()) {
+                        try {
+                            fontTypeface = a.getFont(attr);
+                        } catch (UnsupportedOperationException | Resources.NotFoundException e) {
+                            // Expected if it is not a resource reference or if it is a reference to
+                            // another resource type.
+                        }
                     }
                     if (fontTypeface == null) {
                         fontFamily = a.getString(attr);
@@ -1348,17 +1363,17 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     break;
 
                 case com.android.internal.R.styleable.TextView_autoSizeStepGranularity:
-                    autoSizeStepGranularityInPx = a.getDimensionPixelSize(attr,
+                    autoSizeStepGranularityInPx = a.getDimension(attr,
                         UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE);
                     break;
 
                 case com.android.internal.R.styleable.TextView_autoSizeMinTextSize:
-                    autoSizeMinTextSizeInPx = a.getDimensionPixelSize(attr,
+                    autoSizeMinTextSizeInPx = a.getDimension(attr,
                         UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE);
                     break;
 
                 case com.android.internal.R.styleable.TextView_autoSizeMaxTextSize:
-                    autoSizeMaxTextSizeInPx = a.getDimensionPixelSize(attr,
+                    autoSizeMaxTextSizeInPx = a.getDimension(attr,
                         UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE);
                     break;
 
@@ -1624,12 +1639,22 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         boolean canInputOrMove = (mMovement != null || getKeyListener() != null);
         boolean clickable = canInputOrMove || isClickable();
         boolean longClickable = canInputOrMove || isLongClickable();
+        int focusable = getFocusable();
 
         n = a.getIndexCount();
         for (int i = 0; i < n; i++) {
             int attr = a.getIndex(i);
 
             switch (attr) {
+                case com.android.internal.R.styleable.View_focusable:
+                    TypedValue val = new TypedValue();
+                    if (a.getValue(attr, val)) {
+                        focusable = (val.type == TypedValue.TYPE_INT_BOOLEAN)
+                                ? (val.data == 0 ? NOT_FOCUSABLE : FOCUSABLE)
+                                : val.data;
+                    }
+                    break;
+
                 case com.android.internal.R.styleable.View_clickable:
                     clickable = a.getBoolean(attr, clickable);
                     break;
@@ -1641,6 +1666,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
         a.recycle();
 
+        // Some apps were relying on the undefined behavior of focusable winning over
+        // focusableInTouchMode != focusable in TextViews if both were specified in XML (usually
+        // when starting with EditText and setting only focusable=false). To keep those apps from
+        // breaking, re-apply the focusable attribute here.
+        if (focusable != getFocusable()) {
+            setFocusable(focusable);
+        }
         setClickable(clickable);
         setLongClickable(longClickable);
 
@@ -1660,14 +1692,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
 
                     if (autoSizeMinTextSizeInPx == UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE) {
-                        autoSizeMinTextSizeInPx = (int) TypedValue.applyDimension(
+                        autoSizeMinTextSizeInPx = TypedValue.applyDimension(
                                 TypedValue.COMPLEX_UNIT_SP,
                                 DEFAULT_AUTO_SIZE_MIN_TEXT_SIZE_IN_SP,
                                 displayMetrics);
                     }
 
                     if (autoSizeMaxTextSizeInPx == UNSET_AUTO_SIZE_UNIFORM_CONFIGURATION_VALUE) {
-                        autoSizeMaxTextSizeInPx = (int) TypedValue.applyDimension(
+                        autoSizeMaxTextSizeInPx = TypedValue.applyDimension(
                                 TypedValue.COMPLEX_UNIT_SP,
                                 DEFAULT_AUTO_SIZE_MAX_TEXT_SIZE_IN_SP,
                                 displayMetrics);
@@ -1712,11 +1744,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     break;
                 case AUTO_SIZE_TEXT_TYPE_UNIFORM:
                     final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-                    final int autoSizeMinTextSizeInPx = (int) TypedValue.applyDimension(
+                    final float autoSizeMinTextSizeInPx = TypedValue.applyDimension(
                             TypedValue.COMPLEX_UNIT_SP,
                             DEFAULT_AUTO_SIZE_MIN_TEXT_SIZE_IN_SP,
                             displayMetrics);
-                    final int autoSizeMaxTextSizeInPx = (int) TypedValue.applyDimension(
+                    final float autoSizeMaxTextSizeInPx = TypedValue.applyDimension(
                             TypedValue.COMPLEX_UNIT_SP,
                             DEFAULT_AUTO_SIZE_MAX_TEXT_SIZE_IN_SP,
                             displayMetrics);
@@ -1765,11 +1797,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             int autoSizeMaxTextSize, int autoSizeStepGranularity, int unit) {
         if (supportsAutoSizeText()) {
             final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-            final int autoSizeMinTextSizeInPx = (int) TypedValue.applyDimension(
+            final float autoSizeMinTextSizeInPx = TypedValue.applyDimension(
                     unit, autoSizeMinTextSize, displayMetrics);
-            final int autoSizeMaxTextSizeInPx = (int) TypedValue.applyDimension(
+            final float autoSizeMaxTextSizeInPx = TypedValue.applyDimension(
                     unit, autoSizeMaxTextSize, displayMetrics);
-            final int autoSizeStepGranularityInPx = (int) TypedValue.applyDimension(
+            final float autoSizeStepGranularityInPx = TypedValue.applyDimension(
                     unit, autoSizeStepGranularity, displayMetrics);
 
             validateAndSetAutoSizeTextTypeUniformConfiguration(autoSizeMinTextSizeInPx,
@@ -1811,8 +1843,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
                     // Convert all to sizes to pixels.
                     for (int i = 0; i < presetSizesLength; i++) {
-                        presetSizesInPx[i] = (int) TypedValue.applyDimension(unit, presetSizes[i],
-                            displayMetrics);
+                        presetSizesInPx[i] = Math.round(TypedValue.applyDimension(unit,
+                            presetSizes[i], displayMetrics));
                     }
                 }
 
@@ -1854,7 +1886,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAutoSizeTextTypeUniformWithConfiguration(int, int, int, int)
      */
     public int getAutoSizeStepGranularity() {
-        return mAutoSizeStepGranularityInPx;
+        return Math.round(mAutoSizeStepGranularityInPx);
     }
 
     /**
@@ -1867,7 +1899,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAutoSizeTextTypeUniformWithPresetSizes(int[], int)
      */
     public int getAutoSizeMinTextSize() {
-        return mAutoSizeMinTextSizeInPx;
+        return Math.round(mAutoSizeMinTextSizeInPx);
     }
 
     /**
@@ -1880,7 +1912,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #setAutoSizeTextTypeUniformWithPresetSizes(int[], int)
      */
     public int getAutoSizeMaxTextSize() {
-        return mAutoSizeMaxTextSizeInPx;
+        return Math.round(mAutoSizeMaxTextSizeInPx);
     }
 
     /**
@@ -1923,8 +1955,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @throws IllegalArgumentException if any of the params are invalid
      */
-    private void validateAndSetAutoSizeTextTypeUniformConfiguration(int autoSizeMinTextSizeInPx,
-            int autoSizeMaxTextSizeInPx, int autoSizeStepGranularityInPx) {
+    private void validateAndSetAutoSizeTextTypeUniformConfiguration(float autoSizeMinTextSizeInPx,
+            float autoSizeMaxTextSizeInPx, float autoSizeStepGranularityInPx) {
         // First validate.
         if (autoSizeMinTextSizeInPx <= 0) {
             throw new IllegalArgumentException("Minimum auto-size text size ("
@@ -1990,18 +2022,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 // Calculate sizes to choose from based on the current auto-size configuration.
                 int autoSizeValuesLength = (int) Math.ceil(
                         (mAutoSizeMaxTextSizeInPx - mAutoSizeMinTextSizeInPx)
-                                / (float) mAutoSizeStepGranularityInPx);
+                                / mAutoSizeStepGranularityInPx);
                 // Also reserve a slot for the max size if it fits.
                 if ((mAutoSizeMaxTextSizeInPx - mAutoSizeMinTextSizeInPx)
                         % mAutoSizeStepGranularityInPx == 0) {
                     autoSizeValuesLength++;
                 }
-                mAutoSizeTextSizesInPx = new int[autoSizeValuesLength];
-                int sizeToAdd = mAutoSizeMinTextSizeInPx;
+                int[] autoSizeTextSizesInPx = new int[autoSizeValuesLength];
+                float sizeToAdd = mAutoSizeMinTextSizeInPx;
                 for (int i = 0; i < autoSizeValuesLength; i++) {
-                    mAutoSizeTextSizesInPx[i] = sizeToAdd;
+                    autoSizeTextSizesInPx[i] = Math.round(sizeToAdd);
                     sizeToAdd += mAutoSizeStepGranularityInPx;
                 }
+                mAutoSizeTextSizesInPx = cleanupAutoSizePresetSizes(autoSizeTextSizesInPx);
             }
 
             mNeedsAutoSizeText = true;
@@ -3371,10 +3404,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         Typeface fontTypeface = null;
         String fontFamily = null;
-        try {
-            fontTypeface = ta.getFont(R.styleable.TextAppearance_fontFamily);
-        } catch (UnsupportedOperationException | Resources.NotFoundException e) {
-            // Expected if it is not a font resource.
+        if (!context.isRestricted()) {
+            try {
+                fontTypeface = ta.getFont(R.styleable.TextAppearance_fontFamily);
+            } catch (UnsupportedOperationException | Resources.NotFoundException e) {
+                // Expected if it is not a font resource.
+            }
         }
         if (fontTypeface == null) {
             fontFamily = ta.getString(R.styleable.TextAppearance_fontFamily);
@@ -3886,26 +3921,42 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * are invalid. If a specified axis name is not defined in the font, the settings will be
      * ignored.
      *
+     * <p>
+     * Examples,
+     * <ul>
+     * <li>Set font width to 150.
      * <pre>
-     *   textView.setFontVariationSettings("'wdth' 1.0");
-     *   textView.setFontVariationSettings("'AX  ' 1.8, 'FB  ' 2.0");
+     * <code>
+     *   TextView textView = (TextView) findViewById(R.id.textView);
+     *   textView.setFontVariationSettings("'wdth' 150");
+     * </code>
      * </pre>
+     * </li>
+     *
+     * <li>Set the font slant to 20 degrees and ask for italic style.
+     * <pre>
+     * <code>
+     *   TextView textView = (TextView) findViewById(R.id.textView);
+     *   textView.setFontVariationSettings("'slnt' 20, 'ital' 1");
+     * </code>
+     * </pre>
+     * </p>
+     * </li>
+     * </ul>
      *
      * @param fontVariationSettings font variation settings. You can pass null or empty string as
      *                              no variation settings.
-     *
      * @return true if the given settings is effective to at least one font file underlying this
      *         TextView. This function also returns true for empty settings string. Otherwise
      *         returns false.
      *
-     * @throws FontVariationAxis.InvalidFormatException
-     *         If given string is not a valid font variation settings format.
+     * @throws IllegalArgumentException If given string is not a valid font variation settings
+     *                                  format.
      *
      * @see #getFontVariationSettings()
-     * @see Paint#getFontVariationSettings() Paint.getFontVariationSettings()
+     * @see FontVariationAxis
      */
-    public boolean setFontVariationSettings(@Nullable String fontVariationSettings)
-            throws FontVariationAxis.InvalidFormatException {
+    public boolean setFontVariationSettings(@Nullable String fontVariationSettings) {
         final String existingSettings = mTextPaint.getFontVariationSettings();
         if (fontVariationSettings == existingSettings
                 || (fontVariationSettings != null
@@ -5337,7 +5388,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             sendAfterTextChanged((Editable) text);
         } else {
             // Always notify AutoFillManager - it will return right away if autofill is disabled.
-            notifyAutoFillManagerAfterTextChanged();
+            notifyAutoFillManagerAfterTextChangedIfNeeded();
         }
 
         // SelectionModifierCursorController depends on textCanBeSelected, which depends on text
@@ -7137,6 +7188,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             return KEY_EVENT_NOT_HANDLED;
         }
 
+        // If this is the initial keydown, we don't want to prevent a movement away from this view.
+        // While this shouldn't be necessary because any time we're preventing default movement we
+        // should be restricting the focus to remain within this view, thus we'll also receive
+        // the key up event, occasionally key up events will get dropped and we don't want to
+        // prevent the user from traversing out of this on the next key down.
+        if (event.getRepeatCount() == 0 && !KeyEvent.isModifierKey(keyCode)) {
+            mPreventDefaultMovement = false;
+        }
+
         switch (keyCode) {
             case KeyEvent.KEYCODE_ENTER:
                 if (event.hasNoModifiers()) {
@@ -7268,16 +7328,23 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
             if (doDown) {
                 if (mMovement.onKeyDown(this, (Spannable) mText, keyCode, event)) {
+                    if (event.getRepeatCount() == 0 && !KeyEvent.isModifierKey(keyCode)) {
+                        mPreventDefaultMovement = true;
+                    }
                     return KEY_DOWN_HANDLED_BY_MOVEMENT_METHOD;
                 }
             }
-            // Consume arrows to prevent focus leaving the editor.
-            if (isDirectionalNavigationKey(keyCode)) {
+            // Consume arrows from keyboard devices to prevent focus leaving the editor.
+            // DPAD/JOY devices (Gamepads, TV remotes) often lack a TAB key so allow those
+            // to move focus with arrows.
+            if (event.getSource() == InputDevice.SOURCE_KEYBOARD
+                    && isDirectionalNavigationKey(keyCode)) {
                 return KEY_EVENT_HANDLED;
             }
         }
 
-        return KEY_EVENT_NOT_HANDLED;
+        return mPreventDefaultMovement && !KeyEvent.isModifierKey(keyCode)
+                ? KEY_EVENT_HANDLED : KEY_EVENT_NOT_HANDLED;
     }
 
     /**
@@ -7308,6 +7375,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (!isEnabled()) {
             return super.onKeyUp(keyCode, event);
+        }
+
+        if (!KeyEvent.isModifierKey(keyCode)) {
+            mPreventDefaultMovement = false;
         }
 
         switch (keyCode) {
@@ -8186,6 +8257,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * Automatically computes and sets the text size.
      */
     private void autoSizeText() {
+        if (getMeasuredWidth() <= 0 || getMeasuredHeight() <= 0) return;
         final int maxWidth = getWidth() - getTotalPaddingLeft() - getTotalPaddingRight();
         final int maxHeight = getHeight() - getExtendedPaddingBottom() - getExtendedPaddingTop();
 
@@ -9280,12 +9352,17 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         // Always notify AutoFillManager - it will return right away if autofill is disabled.
-        notifyAutoFillManagerAfterTextChanged();
+        notifyAutoFillManagerAfterTextChangedIfNeeded();
 
         hideErrorIfUnchanged();
     }
 
-    private void notifyAutoFillManagerAfterTextChanged() {
+    private void notifyAutoFillManagerAfterTextChangedIfNeeded() {
+        // It is important to not check whether the view is important for autofill
+        // since the user can trigger autofill manually on not important views.
+        if (!isAutofillable()) {
+            return;
+        }
         final AutofillManager afm = mContext.getSystemService(AutofillManager.class);
         if (afm != null) {
             if (DEBUG_AUTOFILL) {
@@ -9293,6 +9370,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
             afm.notifyValueChanged(TextView.this);
         }
+    }
+
+    private boolean isAutofillable() {
+        // It is important to not check whether the view is important for autofill
+        // since the user can trigger autofill manually on not important views.
+        return getAutofillType() != AUTOFILL_TYPE_NONE;
     }
 
     void updateAfterEdit() {
@@ -10072,7 +10155,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             if (lineCount <= 1) {
                 // Simple case: this is a single line.
                 final CharSequence text = getText();
-                structure.setText(text, getSelectionStart(), getSelectionEnd());
+                if (forAutofill) {
+                    structure.setText(text);
+                } else {
+                    structure.setText(text, getSelectionStart(), getSelectionEnd());
+                }
             } else {
                 // Complex case: multi-line, could be scrolled or within a scroll container
                 // so some lines are not visible.
@@ -10108,9 +10195,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 if (expandedBottomLine >= lineCount) {
                     expandedBottomLine = lineCount - 1;
                 }
+
                 // Convert lines into character offsets.
                 int expandedTopChar = layout.getLineStart(expandedTopLine);
                 int expandedBottomChar = layout.getLineEnd(expandedBottomLine);
+
                 // Take into account selection -- if there is a selection, we need to expand
                 // the text we are returning to include that selection.
                 final int selStart = getSelectionStart();
@@ -10123,54 +10212,66 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         expandedBottomChar = selEnd;
                     }
                 }
+
                 // Get the text and trim it to the range we are reporting.
                 CharSequence text = getText();
                 if (expandedTopChar > 0 || expandedBottomChar < text.length()) {
                     text = text.subSequence(expandedTopChar, expandedBottomChar);
                 }
-                structure.setText(text, selStart - expandedTopChar, selEnd - expandedTopChar);
-                final int[] lineOffsets = new int[bottomLine - topLine + 1];
-                final int[] lineBaselines = new int[bottomLine - topLine + 1];
-                final int baselineOffset = getBaselineOffset();
-                for (int i = topLine; i <= bottomLine; i++) {
-                    lineOffsets[i - topLine] = layout.getLineStart(i);
-                    lineBaselines[i - topLine] = layout.getLineBaseline(i) + baselineOffset;
+
+                if (forAutofill) {
+                    structure.setText(text);
+                } else {
+                    structure.setText(text, selStart - expandedTopChar, selEnd - expandedTopChar);
+
+                    final int[] lineOffsets = new int[bottomLine - topLine + 1];
+                    final int[] lineBaselines = new int[bottomLine - topLine + 1];
+                    final int baselineOffset = getBaselineOffset();
+                    for (int i = topLine; i <= bottomLine; i++) {
+                        lineOffsets[i - topLine] = layout.getLineStart(i);
+                        lineBaselines[i - topLine] = layout.getLineBaseline(i) + baselineOffset;
+                    }
+                    structure.setTextLines(lineOffsets, lineBaselines);
                 }
-                structure.setTextLines(lineOffsets, lineBaselines);
             }
 
-            // Extract style information that applies to the TextView as a whole.
-            int style = 0;
-            int typefaceStyle = getTypefaceStyle();
-            if ((typefaceStyle & Typeface.BOLD) != 0) {
-                style |= AssistStructure.ViewNode.TEXT_STYLE_BOLD;
-            }
-            if ((typefaceStyle & Typeface.ITALIC) != 0) {
-                style |= AssistStructure.ViewNode.TEXT_STYLE_ITALIC;
-            }
+            if (!forAutofill) {
+                // Extract style information that applies to the TextView as a whole.
+                int style = 0;
+                int typefaceStyle = getTypefaceStyle();
+                if ((typefaceStyle & Typeface.BOLD) != 0) {
+                    style |= AssistStructure.ViewNode.TEXT_STYLE_BOLD;
+                }
+                if ((typefaceStyle & Typeface.ITALIC) != 0) {
+                    style |= AssistStructure.ViewNode.TEXT_STYLE_ITALIC;
+                }
 
-            // Global styles can also be set via TextView.setPaintFlags().
-            int paintFlags = mTextPaint.getFlags();
-            if ((paintFlags & Paint.FAKE_BOLD_TEXT_FLAG) != 0) {
-                style |= AssistStructure.ViewNode.TEXT_STYLE_BOLD;
-            }
-            if ((paintFlags & Paint.UNDERLINE_TEXT_FLAG) != 0) {
-                style |= AssistStructure.ViewNode.TEXT_STYLE_UNDERLINE;
-            }
-            if ((paintFlags & Paint.STRIKE_THRU_TEXT_FLAG) != 0) {
-                style |= AssistStructure.ViewNode.TEXT_STYLE_STRIKE_THRU;
-            }
+                // Global styles can also be set via TextView.setPaintFlags().
+                int paintFlags = mTextPaint.getFlags();
+                if ((paintFlags & Paint.FAKE_BOLD_TEXT_FLAG) != 0) {
+                    style |= AssistStructure.ViewNode.TEXT_STYLE_BOLD;
+                }
+                if ((paintFlags & Paint.UNDERLINE_TEXT_FLAG) != 0) {
+                    style |= AssistStructure.ViewNode.TEXT_STYLE_UNDERLINE;
+                }
+                if ((paintFlags & Paint.STRIKE_THRU_TEXT_FLAG) != 0) {
+                    style |= AssistStructure.ViewNode.TEXT_STYLE_STRIKE_THRU;
+                }
 
-            // TextView does not have its own text background color. A background is either part
-            // of the View (and can be any drawable) or a BackgroundColorSpan inside the text.
-            structure.setTextStyle(getTextSize(), getCurrentTextColor(),
-                    AssistStructure.ViewNode.TEXT_COLOR_UNDEFINED /* bgColor */, style);
+                // TextView does not have its own text background color. A background is either part
+                // of the View (and can be any drawable) or a BackgroundColorSpan inside the text.
+                structure.setTextStyle(getTextSize(), getCurrentTextColor(),
+                        AssistStructure.ViewNode.TEXT_COLOR_UNDEFINED /* bgColor */, style);
+            }
         }
         structure.setHint(getHint());
         structure.setInputType(getInputType());
     }
 
     boolean canRequestAutofill() {
+        if (!isAutofillable()) {
+            return false;
+        }
         final AutofillManager afm = mContext.getSystemService(AutofillManager.class);
         if (afm != null) {
             return afm.isEnabled();
@@ -10318,14 +10419,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     positionInfoStartIndex + positionInfoLength,
                     viewportToContentHorizontalOffset(), viewportToContentVerticalOffset());
             CursorAnchorInfo cursorAnchorInfo = builder.setMatrix(null).build();
-            int[] locationOnScreen = getLocationOnScreen();
             for (int i = 0; i < positionInfoLength; i++) {
                 int flags = cursorAnchorInfo.getCharacterBoundsFlags(positionInfoStartIndex + i);
                 if ((flags & FLAG_HAS_VISIBLE_REGION) == FLAG_HAS_VISIBLE_REGION) {
                     RectF bounds = cursorAnchorInfo
                             .getCharacterBounds(positionInfoStartIndex + i);
                     if (bounds != null) {
-                        bounds.offset(locationOnScreen[0], locationOnScreen[1]);
+                        mapRectFromViewToScreenCoords(bounds, true);
                         boundingRects[i] = bounds;
                     }
                 }
@@ -10512,7 +10612,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         Selection.setSelection((Spannable) text, start, end);
                         // Make sure selection mode is engaged.
                         if (mEditor != null) {
-                            mEditor.startSelectionActionMode();
+                            mEditor.startSelectionActionModeAsync(false);
                         }
                         return true;
                     }
@@ -10675,7 +10775,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         switch (id) {
             case ID_SELECT_ALL:
+                final boolean hadSelection = hasSelection();
                 selectAllText();
+                if (mEditor != null && hadSelection) {
+                    mEditor.invalidateActionModeAsync();
+                }
                 return true;
 
             case ID_UNDO:
@@ -10976,6 +11080,26 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         .hasPrimaryClip());
     }
 
+    boolean canPasteAsPlainText() {
+        if (!canPaste()) {
+            return false;
+        }
+
+        final ClipData clipData =
+                ((ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE))
+                        .getPrimaryClip();
+        final ClipDescription description = clipData.getDescription();
+        final boolean isPlainType = description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN);
+        final CharSequence text = clipData.getItemAt(0).getText();
+        if (isPlainType && (text instanceof Spanned)) {
+            Spanned spanned = (Spanned) text;
+            if (TextUtils.hasStyleSpan(spanned)) {
+                return true;
+            }
+        }
+        return description.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML);
+    }
+
     boolean canProcessText() {
         if (getId() == View.NO_ID) {
             return false;
@@ -11106,8 +11230,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 return true;
 
             case DragEvent.ACTION_DRAG_LOCATION:
-                final int offset = getOffsetForPosition(event.getX(), event.getY());
-                Selection.setSelection((Spannable) mText, offset);
+                if (mText instanceof Spannable) {
+                    final int offset = getOffsetForPosition(event.getX(), event.getY());
+                    Selection.setSelection((Spannable) mText, offset);
+                }
                 return true;
 
             case DragEvent.ACTION_DROP:
@@ -11737,7 +11863,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         + " before=" + before + " after=" + after + ": " + buffer);
             }
 
-            if (AccessibilityManager.getInstance(mContext).isEnabled()) {
+            if (AccessibilityManager.getInstance(mContext).isEnabled()
+                    && !isPasswordInputType(getInputType()) && !hasPasswordTransformationMethod()) {
                 mBeforeText = buffer.toString();
             }
 

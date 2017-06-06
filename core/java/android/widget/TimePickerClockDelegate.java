@@ -137,6 +137,7 @@ class TimePickerClockDelegate extends TimePicker.AbstractTimePickerDelegate {
         final int layoutResourceId = a.getResourceId(R.styleable.TimePicker_internalLayout,
                 R.layout.time_picker_material);
         final View mainView = inflater.inflate(layoutResourceId, delegator);
+        mainView.setSaveFromParentEnabled(false);
         mRadialTimePickerHeader = mainView.findViewById(R.id.time_header);
         mRadialTimePickerHeader.setOnTouchListener(new NearestTouchDelegate());
 
@@ -248,7 +249,7 @@ class TimePickerClockDelegate extends TimePicker.AbstractTimePickerDelegate {
             mRadialTimePickerHeader.setVisibility(View.GONE);
             mTextInputPickerHeader.setVisibility(View.VISIBLE);
             mTextInputPickerView.setVisibility(View.VISIBLE);
-            mRadialTimePickerModeButton.setImageResource(R.drawable.btn_event_material);
+            mRadialTimePickerModeButton.setImageResource(R.drawable.btn_clock_material);
             mRadialTimePickerModeButton.setContentDescription(
                     mRadialTimePickerModeEnabledDescription);
             mRadialPickerModeEnabled = false;

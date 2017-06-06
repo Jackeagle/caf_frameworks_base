@@ -1,9 +1,5 @@
 package com.android.systemui.statusbar.policy;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -15,14 +11,10 @@ import android.telephony.TelephonyManager;
 import android.test.suitebuilder.annotation.SmallTest;
 
 import com.android.settingslib.net.DataUsageController;
-import com.android.systemui.statusbar.phone.SignalDrawable;
-import com.android.systemui.statusbar.policy.NetworkController.IconState;
 
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -33,7 +25,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         setupDefaultSignal();
 
         verifyDataIndicators(TelephonyIcons.ICON_3G,
-                TelephonyIcons.QS_DATA_3G);
+                TelephonyIcons.ICON_3G);
     }
 
     @Test
@@ -43,7 +35,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_GSM);
 
         verifyDataIndicators(TelephonyIcons.ICON_G,
-                TelephonyIcons.QS_DATA_G);
+                TelephonyIcons.ICON_G);
     }
 
     @Test
@@ -53,7 +45,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_CDMA);
 
         verifyDataIndicators(TelephonyIcons.ICON_1X,
-                TelephonyIcons.QS_DATA_1X);
+                TelephonyIcons.ICON_1X);
     }
 
     @Test
@@ -63,7 +55,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_EDGE);
 
         verifyDataIndicators(TelephonyIcons.ICON_E,
-                TelephonyIcons.QS_DATA_E);
+                TelephonyIcons.ICON_E);
     }
 
     @Test
@@ -73,7 +65,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_LTE);
 
         verifyDataIndicators(TelephonyIcons.ICON_LTE,
-                TelephonyIcons.QS_DATA_LTE);
+                TelephonyIcons.ICON_LTE);
     }
 
     @Test
@@ -83,7 +75,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_HSPA);
 
         verifyDataIndicators(TelephonyIcons.ICON_H,
-                TelephonyIcons.QS_DATA_H);
+                TelephonyIcons.ICON_H);
     }
 
     @Test
@@ -112,7 +104,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_LTE);
 
         verifyDataIndicators(TelephonyIcons.ICON_4G,
-                TelephonyIcons.QS_DATA_4G);
+                TelephonyIcons.ICON_4G);
     }
 
     @Ignore("Flaky")
@@ -124,11 +116,8 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         updateDataConnectionState(TelephonyManager.DATA_DISCONNECTED, 0);
         setConnectivity(NetworkCapabilities.TRANSPORT_CELLULAR, false, false);
 
-        ArgumentCaptor<IconState> iconArg = ArgumentCaptor.forClass(IconState.class);
-        Mockito.verify(mCallbackHandler, Mockito.atLeastOnce()).setMobileDataIndicators(
-                iconArg.capture(), anyInt(), anyBoolean(), anyBoolean(), any(), anyInt(),
-                anyBoolean(), anyBoolean());
-        assertEquals(SignalDrawable.STATE_CUT, SignalDrawable.getState(iconArg.getValue().icon));
+        verifyDataIndicators(TelephonyIcons.ICON_DATA_DISABLED,
+                TelephonyIcons.ICON_DATA_DISABLED);
     }
 
     @Test
@@ -140,14 +129,9 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         setConnectivity(NetworkCapabilities.TRANSPORT_CELLULAR, false, false);
         when(mMockProvisionController.isUserSetup(anyInt())).thenReturn(false);
         mUserCallback.onUserSetupChanged();
-        waitForIdleSync();
 
         // Don't show the X until the device is setup.
-        ArgumentCaptor<IconState> iconArg = ArgumentCaptor.forClass(IconState.class);
-        Mockito.verify(mCallbackHandler, Mockito.atLeastOnce()).setMobileDataIndicators(
-                iconArg.capture(), anyInt(), anyBoolean(), anyBoolean(), any(), anyInt(),
-                anyBoolean(), anyBoolean());
-        assertNotEquals(SignalDrawable.STATE_CUT, SignalDrawable.getState(iconArg.getValue().icon));
+        verifyDataIndicators(0, 0);
     }
 
     @Test
@@ -164,7 +148,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         mNetworkController.handleConfigurationChanged();
 
         verifyDataIndicators(TelephonyIcons.ICON_4G,
-                TelephonyIcons.QS_DATA_4G);
+                TelephonyIcons.ICON_4G);
     }
 
     @Test
@@ -174,13 +158,13 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_LTE);
 
         verifyDataIndicators(TelephonyIcons.ICON_LTE,
-                TelephonyIcons.QS_DATA_LTE);
+                TelephonyIcons.ICON_LTE);
 
         when(mServiceState.getDataNetworkType())
                 .thenReturn(TelephonyManager.NETWORK_TYPE_HSPA);
         updateServiceState();
         verifyDataIndicators(TelephonyIcons.ICON_H,
-                TelephonyIcons.QS_DATA_H);
+                TelephonyIcons.ICON_H);
     }
 
     @Test
@@ -197,12 +181,12 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         updateDataActivity(direction);
 
         verifyLastMobileDataIndicators(true, DEFAULT_SIGNAL_STRENGTH, DEFAULT_ICON, true,
-                in, out);
+                DEFAULT_QS_SIGNAL_STRENGTH, DEFAULT_QS_ICON, in, out);
     }
 
     private void verifyDataIndicators(int dataIcon, int qsDataIcon) {
         verifyLastMobileDataIndicators(true, DEFAULT_SIGNAL_STRENGTH, dataIcon,
-                true, false,
+                true, DEFAULT_QS_SIGNAL_STRENGTH, qsDataIcon, false,
                 false);
     }
 

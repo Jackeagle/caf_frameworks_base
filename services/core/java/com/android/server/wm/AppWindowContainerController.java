@@ -19,6 +19,7 @@ package com.android.server.wm;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
 import static com.android.server.wm.AppTransition.TRANSIT_UNSET;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ADD_REMOVE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
@@ -36,7 +37,6 @@ import android.graphics.Rect;
 import android.os.Debug;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.Trace;
 import android.util.Slog;
 import android.view.IApplicationToken;
@@ -99,18 +99,27 @@ public class AppWindowContainerController
     private final Runnable mRemoveStartingWindow = () -> {
         StartingSurface surface = null;
         synchronized (mWindowMap) {
+            if (mContainer == null) {
+                if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "mContainer was null while trying to"
+                        + " remove starting window");
+                return;
+            }
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Remove starting " + mContainer
                     + ": startingWindow=" + mContainer.startingWindow
                     + " startingView=" + mContainer.startingSurface);
-            if (mContainer == null) {
-                return;
-            }
-            if (mContainer.startingWindow != null) {
+            if (mContainer.startingData != null) {
                 surface = mContainer.startingSurface;
                 mContainer.startingData = null;
                 mContainer.startingSurface = null;
                 mContainer.startingWindow = null;
                 mContainer.startingDisplayed = false;
+                if (surface == null && DEBUG_STARTING_WINDOW) {
+                    Slog.v(TAG_WM, "startingWindow was set but startingSurface==null, couldn't "
+                            + "remove");
+                }
+            } else if (DEBUG_STARTING_WINDOW) {
+                Slog.v(TAG_WM, "Tried to remove starting window but startingWindow was null:"
+                        + mContainer);
             }
         }
         if (surface != null) {
@@ -128,6 +137,8 @@ public class AppWindowContainerController
 
         synchronized (mWindowMap) {
             if (mContainer == null) {
+                if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "mContainer was null while trying to"
+                        + " add starting window");
                 return;
             }
             startingData = mContainer.startingData;
@@ -136,6 +147,8 @@ public class AppWindowContainerController
 
         if (startingData == null) {
             // Animation has been canceled... do nothing.
+            if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "startingData was nulled out before handling"
+                    + " mAddStartingWindow: " + mContainer);
             return;
         }
 
@@ -151,18 +164,16 @@ public class AppWindowContainerController
         if (surface != null) {
             boolean abort = false;
             synchronized(mWindowMap) {
+                // If the window was successfully added, then
+                // we need to remove it.
                 if (container.removed || container.startingData == null) {
-                    // If the window was successfully added, then
-                    // we need to remove it.
-                    if (container.startingWindow != null) {
-                        if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM,
-                                "Aborted starting " + container
-                                        + ": removed=" + container.removed
-                                        + " startingData=" + container.startingData);
-                        container.startingWindow = null;
-                        container.startingData = null;
-                        abort = true;
-                    }
+                    if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM,
+                            "Aborted starting " + container
+                                    + ": removed=" + container.removed
+                                    + " startingData=" + container.startingData);
+                    container.startingWindow = null;
+                    container.startingData = null;
+                    abort = true;
                 } else {
                     container.startingSurface = surface;
                 }
@@ -175,6 +186,8 @@ public class AppWindowContainerController
             if (abort) {
                 surface.remove();
             }
+        } else if (DEBUG_STARTING_WINDOW) {
+            Slog.v(TAG_WM, "Surface returned was null: " + mContainer);
         }
     };
 
@@ -319,7 +332,7 @@ public class AppWindowContainerController
                         + " token: " + mToken);
                 return;
             }
-            mContainer.setDisablePreviewSnapshots(disable);
+            mContainer.setDisablePreviewScreenshots(disable);
         }
     }
 
@@ -332,6 +345,24 @@ public class AppWindowContainerController
             }
 
             final AppWindowToken wtoken = mContainer;
+
+            // Don't set visibility to false if we were already not visible. This prevents WM from
+            // adding the app to the closing app list which doesn't make sense for something that is
+            // already not visible. However, set visibility to true even if we are already visible.
+            // This makes sure the app is added to the opening apps list so that the right
+            // transition can be selected.
+            // TODO: Probably a good idea to separate the concept of opening/closing apps from the
+            // concept of setting visibility...
+            if (!visible && wtoken.hiddenRequested) {
+
+                if (!deferHidingClient && wtoken.mDeferHidingClient) {
+                    // We previously deferred telling the client to hide itself when visibility was
+                    // initially set to false. Now we would like it to hide, so go ahead and set it.
+                    wtoken.mDeferHidingClient = deferHidingClient;
+                    wtoken.setClientHidden(true);
+                }
+                return;
+            }
 
             if (DEBUG_APP_TRANSITIONS || DEBUG_ORIENTATION) Slog.v(TAG_WM, "setAppVisibility("
                     + mToken + ", visible=" + visible + "): " + mService.mAppTransition
@@ -448,10 +479,12 @@ public class AppWindowContainerController
     public boolean addStartingWindow(String pkg, int theme, CompatibilityInfo compatInfo,
             CharSequence nonLocalizedLabel, int labelRes, int icon, int logo, int windowFlags,
             IBinder transferFrom, boolean newTask, boolean taskSwitch, boolean processRunning,
-            boolean allowTaskSnapshot) {
+            boolean allowTaskSnapshot, boolean activityCreated) {
         synchronized(mWindowMap) {
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "setAppStartingWindow: token=" + mToken
-                    + " pkg=" + pkg + " transferFrom=" + transferFrom);
+                    + " pkg=" + pkg + " transferFrom=" + transferFrom + " newTask=" + newTask
+                    + " taskSwitch=" + taskSwitch + " processRunning=" + processRunning
+                    + " allowTaskSnapshot=" + allowTaskSnapshot);
 
             if (mContainer == null) {
                 Slog.w(TAG_WM, "Attempted to set icon of non-existing app token: " + mToken);
@@ -476,7 +509,7 @@ public class AppWindowContainerController
             }
 
             final int type = getStartingWindowType(newTask, taskSwitch, processRunning,
-                    allowTaskSnapshot);
+                    allowTaskSnapshot, activityCreated);
 
             if (type == STARTING_WINDOW_TYPE_SNAPSHOT) {
                 return createSnapshot();
@@ -537,7 +570,7 @@ public class AppWindowContainerController
                 return false;
             }
 
-            if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Creating StartingData");
+            if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Creating SplashScreenStartingData");
             mContainer.startingData = new SplashScreenStartingData(mService, pkg, theme,
                     compatInfo, nonLocalizedLabel, labelRes, icon, logo, windowFlags,
                     mContainer.getMergedOverrideConfiguration());
@@ -547,8 +580,9 @@ public class AppWindowContainerController
     }
 
     private int getStartingWindowType(boolean newTask, boolean taskSwitch, boolean processRunning,
-            boolean allowTaskSnapshot) {
-        if (newTask || !processRunning) {
+            boolean allowTaskSnapshot, boolean activityCreated) {
+        if (newTask || !processRunning
+                || (taskSwitch && !activityCreated)) {
             return STARTING_WINDOW_TYPE_SPLASH_SCREEN;
         } else if (taskSwitch && allowTaskSnapshot) {
             return STARTING_WINDOW_TYPE_SNAPSHOT;
@@ -574,6 +608,7 @@ public class AppWindowContainerController
             return false;
         }
 
+        if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Creating SnapshotStartingData");
         mContainer.startingData = new SnapshotStartingData(mService, snapshot);
         scheduleAddStartingWindow();
         return true;
@@ -583,6 +618,8 @@ public class AppWindowContainerController
         synchronized (mWindowMap) {
             if (mHandler.hasCallbacks(mRemoveStartingWindow)) {
                 // Already scheduled.
+                if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Trying to remove starting window but "
+                        + "already scheduled");
                 return;
             }
 
@@ -597,8 +634,7 @@ public class AppWindowContainerController
                 return;
             }
 
-            if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, Debug.getCallers(1)
-                    + ": Schedule remove starting " + mContainer
+            if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Schedule remove starting " + mContainer
                     + " startingWindow=" + mContainer.startingWindow);
             mHandler.post(mRemoveStartingWindow);
         }

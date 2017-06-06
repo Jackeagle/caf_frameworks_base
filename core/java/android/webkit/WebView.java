@@ -98,7 +98,7 @@ import java.util.Map;
  * invoke the Browser application with a URL Intent rather than show it
  * with a WebView. For example:
  * <pre>
- * Uri uri = Uri.parse("http://www.example.com");
+ * Uri uri = Uri.parse("https://www.example.com");
  * Intent intent = new Intent(Intent.ACTION_VIEW, uri);
  * startActivity(intent);
  * </pre>
@@ -116,7 +116,7 @@ import java.util.Map;
  * <pre>
  * // Simplest usage: note that an exception will NOT be thrown
  * // if there is an error loading this page (see below).
- * webview.loadUrl("http://slashdot.org/");
+ * webview.loadUrl("https://example.com/");
  *
  * // OR, you can also load from an HTML string:
  * String summary = "&lt;html>&lt;body>You scored &lt;b>192&lt;/b> points.&lt;/body>&lt;/html>";
@@ -175,7 +175,7 @@ import java.util.Map;
  *   }
  * });
  *
- * webview.loadUrl("http://developer.android.com/");
+ * webview.loadUrl("https://developer.android.com/");
  * </pre>
  *
  * <h3>Zoom</h3>
@@ -2255,6 +2255,7 @@ public class WebView extends AbsoluteLayout
 
     /**
      * Sets the {@link TextClassifier} for this WebView.
+     * @hide
      */
     public void setTextClassifier(@Nullable TextClassifier textClassifier) {
         mProvider.setTextClassifier(textClassifier);
@@ -2263,6 +2264,7 @@ public class WebView extends AbsoluteLayout
     /**
      * Returns the {@link TextClassifier} used by this WebView.
      * If no TextClassifier has been set, this WebView uses the default set by the system.
+     * @hide
      */
     @NonNull
     public TextClassifier getTextClassifier() {
@@ -2506,6 +2508,7 @@ public class WebView extends AbsoluteLayout
         super.onDetachedFromWindowInternal();
     }
 
+    /** @hide */
     @Override
     public void onMovedToDisplay(int displayId, Configuration config) {
         mProvider.getViewDelegate().onMovedToDisplay(displayId, config);
@@ -2651,19 +2654,23 @@ public class WebView extends AbsoluteLayout
      *       {@link ViewStructure#setAutofillHints(String[])}.
      *   <li>The {@code type} attribute of {@code INPUT} tags maps to
      *       {@link ViewStructure#setInputType(int)}.
-     *   <li>The {@code value} attribute maps to {@link ViewStructure#setText(CharSequence)}.
+     *   <li>The {@code value} attribute of {@code INPUT} tags maps to
+     *       {@link ViewStructure#setText(CharSequence)}.
+     *   <li>If the view is editalbe, the {@link ViewStructure#setAutofillType(int)} and
+     *   {@link ViewStructure#setAutofillValue(AutofillValue)} must be set.
      *   <li>The {@code placeholder} attribute maps to {@link ViewStructure#setHint(CharSequence)}.
-     *   <li>{@link ViewStructure#setDataIsSensitive(boolean)} whould only be called with
-     *       {@code true} for form fields whose {@code value} attribute was not pre-loaded.
      *   <li>Other HTML attributes can be represented through
      *   {@link ViewStructure#setHtmlInfo(android.view.ViewStructure.HtmlInfo)}.
      * </ol>
      *
+     * <p>It should also call {@code structure.setDataIsSensitive(false)} for fields whose value
+     * were not dynamically changed (for example, through Javascript).
+     *
      * <p>Example1: an HTML form with 2 fields for username and password.
      *
      * <pre class="prettyprint">
-     *    <input type="text" name="username" id="user" value="mr.sparkle" autocomplete="username" placeholder="Email or username">
-     *    <input type="password" name="password" id="pass" autocomplete="current-password" placeholder="Password">
+     *    &lt;input type="text" name="username" id="user" value="Type your username" autocomplete="username" placeholder="Email or username"&gt;
+     *    &lt;input type="password" name="password" id="pass" autocomplete="current-password" placeholder="Password"&gt;
      * </pre>
      *
      * <p>Would map to:
@@ -2671,38 +2678,40 @@ public class WebView extends AbsoluteLayout
      * <pre class="prettyprint">
      *     int index = structure.addChildCount(2);
      *     ViewStructure username = structure.newChild(index);
-     *     username.setAutofillId(structure, 1); // id 1 - first child
+     *     username.setAutofillId(structure.getAutofillId(), 1); // id 1 - first child
      *     username.setClassName("input");
      *     username.setInputType("android.widget.EditText");
      *     username.setAutofillHints("username");
-     *     username.setHtmlInfo(child.newHtmlInfoBuilder("input")
+     *     username.setHtmlInfo(username.newHtmlInfoBuilder("input")
+     *         .addAttribute("type", "text")
      *         .addAttribute("name", "username")
      *         .addAttribute("id", "user")
      *         .build());
      *     username.setHint("Email or username");
      *     username.setAutofillType(View.AUTOFILL_TYPE_TEXT);
-     *     username.setAutofillValue(AutofillValue.forText("mr.sparkle"));
-     *     username.setText("mr.sparkle");
-     *     username.setDataIsSensitive(true); // Contains real username, which is sensitive
+     *     username.setAutofillValue(AutofillValue.forText("Type your username"));
+     *     username.setText("Type your username");
+     *     // Value of the field is not sensitive because it was not dynamically changed:
+     *     username.setDataIsSensitive(false);
      *
      *     ViewStructure password = structure.newChild(index + 1);
      *     username.setAutofillId(structure, 2); // id 2 - second child
      *     password.setInputType("android.widget.EditText");
      *     password.setInputType(InputType.TYPE_TEXT_VARIATION_PASSWORD);
      *     password.setAutofillHints("current-password");
-     *     password.setHtmlInfo(child.newHtmlInfoBuilder("input")
+     *     password.setHtmlInfo(password.newHtmlInfoBuilder("input")
+     *         .addAttribute("type", "password")
      *         .addAttribute("name", "password")
      *         .addAttribute("id", "pass")
      *         .build());
      *     password.setHint("Password");
      *     password.setAutofillType(View.AUTOFILL_TYPE_TEXT);
-     *     password.setDataIsSensitive(false); // Value is not set
      * </pre>
      *
      * <p>Example2: an IFRAME tag.
      *
      * <pre class="prettyprint">
-     *    <iframe src="http://example.com/login"/>
+     *    &lt;iframe src="https://example.com/login"/&gt;
      * </pre>
      *
      * <p>Would map to:
@@ -2710,8 +2719,9 @@ public class WebView extends AbsoluteLayout
      * <pre class="prettyprint">
      *     int index = structure.addChildCount(1);
      *     ViewStructure iframe = structure.newChildFor(index);
-     *     iframe.setHtmlInfo(child.newHtmlInfoBuilder("iframe")
-     *         .addAttribute("url", "http://example.com/login")
+     *     iframe.setAutofillId(structure.getAutofillId(), 1);
+     *     iframe.setHtmlInfo(iframe.newHtmlInfoBuilder("iframe")
+     *         .addAttribute("src", "https://example.com/login")
      *         .build());
      * </pre>
      */

@@ -22,7 +22,6 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -36,11 +35,10 @@ import android.util.SparseIntArray;
 import com.android.systemui.Prefs;
 import com.android.systemui.R;
 import com.android.systemui.recents.Recents;
-import com.android.systemui.recents.RecentsConfiguration;
 import com.android.systemui.recents.RecentsDebugFlags;
 import com.android.systemui.recents.misc.SystemServicesProxy;
-
 import com.android.systemui.recents.views.grid.TaskGridLayoutAlgorithm;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -86,7 +84,7 @@ public class RecentsTaskLoadPlan {
         mCurrentQuietProfiles.clear();
 
         if (currentUserId == UserHandle.USER_CURRENT) {
-            currentUserId = ActivityManager.getCurrentUser();
+            currentUserId = SystemServicesProxy.getInstance(mContext).getCurrentUser();
         }
         UserManager userManager = (UserManager) mContext.getSystemService(Context.USER_SERVICE);
         List<UserInfo> profiles = userManager.getProfiles(currentUserId);
@@ -217,8 +215,8 @@ public class RecentsTaskLoadPlan {
             affiliatedTasks.put(taskKey.id, taskKey);
         }
         if (newLastStackActiveTime != -1) {
-            Settings.Secure.putLongForUser(mContext.getContentResolver(),
-                    Secure.OVERVIEW_LAST_STACK_ACTIVE_TIME, newLastStackActiveTime, currentUserId);
+            Recents.getSystemServices().updateOverviewLastStackActiveTimeAsync(
+                    newLastStackActiveTime, currentUserId);
         }
 
         // Initialize the stacks
@@ -315,9 +313,8 @@ public class RecentsTaskLoadPlan {
             for (int i = 0; i < users.size(); i++) {
                 int userId = users.get(i).id;
                 if (userId != currentUserId) {
-                    Settings.Secure.putLongForUser(mContext.getContentResolver(),
-                            Secure.OVERVIEW_LAST_STACK_ACTIVE_TIME, legacyLastStackActiveTime,
-                            userId);
+                    Recents.getSystemServices().updateOverviewLastStackActiveTimeAsync(
+                            legacyLastStackActiveTime, userId);
                 }
             }
             return legacyLastStackActiveTime;

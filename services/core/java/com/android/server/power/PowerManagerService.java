@@ -65,6 +65,7 @@ import android.service.vr.IVrManager;
 import android.service.vr.IVrStateCallbacks;
 import android.util.EventLog;
 import android.util.KeyValueListParser;
+import android.util.Log;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -91,6 +92,10 @@ import com.android.server.am.BatteryStatsService;
 import com.android.server.lights.Light;
 import com.android.server.lights.LightsManager;
 import com.android.server.power.BatterySaverPolicy.ServiceType;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import libcore.util.Objects;
 
 import java.io.FileDescriptor;
@@ -191,6 +196,12 @@ public final class PowerManagerService extends SystemService
     // System property indicating that the screen should remain off until an explicit user action
     private static final String SYSTEM_PROPERTY_QUIESCENT = "ro.boot.quiescent";
 
+    // Possible reasons for shutting down for use in data/misc/reboot/last_shutdown_reason
+    private static final String REASON_SHUTDOWN = "shutdown";
+    private static final String REASON_REBOOT = "reboot";
+    private static final String REASON_USERREQUESTED = "userrequested";
+    private static final String REASON_THERMAL_SHUTDOWN = "thermal-shutdown";
+
     private static final String TRACE_SCREEN_ON = "Screen turning on";
 
     /** If turning screen on takes more than this long, we show a warning on logcat. */
@@ -203,6 +214,9 @@ public final class PowerManagerService extends SystemService
     private static final int HALT_MODE_SHUTDOWN = 0;
     private static final int HALT_MODE_REBOOT = 1;
     private static final int HALT_MODE_REBOOT_SAFE_MODE = 2;
+
+    // File location for last reboot reason
+    private static final String LAST_REBOOT_LOCATION = "/data/misc/reboot/last_reboot_reason";
 
     private final Context mContext;
     private final ServiceThread mHandlerThread;
@@ -1926,7 +1940,8 @@ public final class PowerManagerService extends SystemService
                         && mLastUserActivityTimeNoChangeLights >= mLastWakeTime) {
                     nextTimeout = mLastUserActivityTimeNoChangeLights + screenOffTimeout;
                     if (now < nextTimeout) {
-                        if (mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_BRIGHT) {
+                        if (mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_BRIGHT
+                                || mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_VR) {
                             mUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
                         } else if (mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_DIM) {
                             mUserActivitySummary = USER_ACTIVITY_SCREEN_DIM;
@@ -3108,10 +3123,6 @@ public final class PowerManagerService extends SystemService
         if (reason == null) {
             reason = "";
         }
-        if (reason.equals(PowerManager.REBOOT_RECOVERY)
-                || reason.equals(PowerManager.REBOOT_RECOVERY_UPDATE)) {
-            reason = "recovery";
-        }
 
         // If the reason is "quiescent", it means that the boot process should proceed
         // without turning on the screen/lights.
@@ -3120,6 +3131,15 @@ public final class PowerManagerService extends SystemService
         if (reason.equals(PowerManager.REBOOT_QUIESCENT)) {
             sQuiescent = true;
             reason = "";
+        } else if (reason.endsWith("," + PowerManager.REBOOT_QUIESCENT)) {
+            sQuiescent = true;
+            reason = reason.substring(0,
+                    reason.length() - PowerManager.REBOOT_QUIESCENT.length() - 1);
+        }
+
+        if (reason.equals(PowerManager.REBOOT_RECOVERY)
+                || reason.equals(PowerManager.REBOOT_RECOVERY_UPDATE)) {
+            reason = "recovery";
         }
 
         if (sQuiescent) {
@@ -4340,6 +4360,25 @@ public final class PowerManagerService extends SystemService
         }
 
         /**
+         * Gets the reason for the last time the phone had to reboot.
+         *
+         * @return The reason the phone last shut down as an int or
+         * {@link PowerManager.SHUTDOWN_REASON_UNKNOWN} if the file could not be opened.
+         */
+        @Override // Binder call
+        public int getLastShutdownReason() {
+            mContext.enforceCallingOrSelfPermission(
+                    android.Manifest.permission.DEVICE_POWER, null);
+
+            final long ident = Binder.clearCallingIdentity();
+            try {
+                return getLastShutdownReasonInternal(new File(LAST_REBOOT_LOCATION));
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        }
+
+        /**
          * Reboots the device.
          *
          * @param confirm If true, shows a reboot confirmation dialog.
@@ -4566,6 +4605,31 @@ public final class PowerManagerService extends SystemService
         }
     }
 
+    @VisibleForTesting
+    int getLastShutdownReasonInternal(File lastRebootReason) {
+        String line = "";
+        try (BufferedReader bufferedReader = new BufferedReader(new FileReader(lastRebootReason))){
+            line = bufferedReader.readLine();
+        } catch (IOException e) {
+            Slog.e(TAG, "Failed to read last_reboot_reason file", e);
+        }
+        if (line == null) {
+            return PowerManager.SHUTDOWN_REASON_UNKNOWN;
+        }
+        switch (line) {
+            case REASON_SHUTDOWN:
+                return PowerManager.SHUTDOWN_REASON_SHUTDOWN;
+            case REASON_REBOOT:
+                return PowerManager.SHUTDOWN_REASON_REBOOT;
+            case REASON_USERREQUESTED:
+                return PowerManager.SHUTDOWN_REASON_USER_REQUESTED;
+            case REASON_THERMAL_SHUTDOWN:
+                return PowerManager.SHUTDOWN_REASON_THERMAL_SHUTDOWN;
+            default:
+                return PowerManager.SHUTDOWN_REASON_UNKNOWN;
+        }
+    }
+
     private final class LocalService extends PowerManagerInternal {
         @Override
         public void setScreenBrightnessOverrideFromWindowManager(int screenBrightness) {
@@ -4574,12 +4638,6 @@ public final class PowerManagerService extends SystemService
                 screenBrightness = PowerManager.BRIGHTNESS_DEFAULT;
             }
             setScreenBrightnessOverrideFromWindowManagerInternal(screenBrightness);
-        }
-
-        @Override
-        public void setButtonBrightnessOverrideFromWindowManager(int screenBrightness) {
-            // Do nothing.
-            // Button lights are not currently supported in the new implementation.
         }
 
         @Override

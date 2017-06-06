@@ -724,6 +724,19 @@ public final class Settings {
             "android.settings.APPLICATION_DETAILS_SETTINGS";
 
     /**
+     * Activity Action: Show list of applications that have been running
+     * foreground services (to the user "running in the background").
+     * <p>
+     * Input: Extras "packages" is a string array of package names.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_FOREGROUND_SERVICES_SETTINGS =
+            "android.settings.FOREGROUND_SERVICES_SETTINGS";
+
+    /**
      * Activity Action: Show screen for controlling which apps can ignore battery optimizations.
      * <p>
      * Input: Nothing.
@@ -1397,6 +1410,26 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_ENTERPRISE_PRIVACY_SETTINGS
             = "android.settings.ENTERPRISE_PRIVACY_SETTINGS";
+
+    /**
+     * Activity Action: Show screen that let user select its Autofill Service.
+     * <p>
+     * Input: Intent's data URI set with an application name, using the
+     * "package" schema (like "package:com.my.app").
+     *
+     * <p>
+     * Output: {@link android.app.Activity#RESULT_OK} if user selected an Autofill Service belonging
+     * to the caller package.
+     *
+     * <p>
+     * <b>NOTE: </b> applications should call
+     * {@link android.view.autofill.AutofillManager#hasEnabledAutofillServices()} and
+     * {@link android.view.autofill.AutofillManager#isAutofillSupported()} first, and only
+     * broadcast this intent if they return {@code false} and {@code true} respectively.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_SET_AUTOFILL_SERVICE =
+            "android.settings.REQUEST_SET_AUTOFILL_SERVICE";
 
     // End of Intent actions for Settings
 
@@ -2162,6 +2195,7 @@ public final class Settings {
         /** @hide */
         public static String getStringForUser(ContentResolver resolver, String name,
                 int userHandle) {
+            android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -2189,6 +2223,7 @@ public final class Settings {
         /** @hide */
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
                 int userHandle) {
+            android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -5143,13 +5178,6 @@ public final class Settings {
         public static final String AUTOFILL_SERVICE = "autofill_service";
 
         /**
-         * bluetooth HCI snoop log configuration
-         * @hide
-         */
-        public static final String BLUETOOTH_HCI_LOG =
-                "bluetooth_hci_log";
-
-        /**
          * @deprecated Use {@link android.provider.Settings.Global#DEVICE_PROVISIONED} instead
          */
         @Deprecated
@@ -5553,76 +5581,6 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_HIGH_TEXT_CONTRAST_ENABLED =
                 "high_text_contrast_enabled";
-
-        /**
-         * If injection of accessibility enhancing JavaScript screen-reader
-         * is enabled.
-         * <p>
-         *   Note: The JavaScript based screen-reader is served by the
-         *   Google infrastructure and enable users with disabilities to
-         *   efficiently navigate in and explore web content.
-         * </p>
-         * <p>
-         *   This property represents a boolean value.
-         * </p>
-         * @hide
-         */
-        public static final String ACCESSIBILITY_SCRIPT_INJECTION =
-            "accessibility_script_injection";
-
-        /**
-         * The URL for the injected JavaScript based screen-reader used
-         * for providing accessibility of content in WebView.
-         * <p>
-         *   Note: The JavaScript based screen-reader is served by the
-         *   Google infrastructure and enable users with disabilities to
-         *   efficiently navigate in and explore web content.
-         * </p>
-         * <p>
-         *   This property represents a string value.
-         * </p>
-         * @hide
-         */
-        public static final String ACCESSIBILITY_SCREEN_READER_URL =
-            "accessibility_script_injection_url";
-
-        /**
-         * Key bindings for navigation in built-in accessibility support for web content.
-         * <p>
-         *   Note: These key bindings are for the built-in accessibility navigation for
-         *   web content which is used as a fall back solution if JavaScript in a WebView
-         *   is not enabled or the user has not opted-in script injection from Google.
-         * </p>
-         * <p>
-         *   The bindings are separated by semi-colon. A binding is a mapping from
-         *   a key to a sequence of actions (for more details look at
-         *   android.webkit.AccessibilityInjector). A key is represented as the hexademical
-         *   string representation of an integer obtained from a meta state (optional) shifted
-         *   sixteen times left and bitwise ored with a key code. An action is represented
-         *   as a hexademical string representation of an integer where the first two digits
-         *   are navigation action index, the second, the third, and the fourth digit pairs
-         *   represent the action arguments. The separate actions in a binding are colon
-         *   separated. The key and the action sequence it maps to are separated by equals.
-         * </p>
-         * <p>
-         *   For example, the binding below maps the DPAD right button to traverse the
-         *   current navigation axis once without firing an accessibility event and to
-         *   perform the same traversal again but to fire an event:
-         *   <code>
-         *     0x16=0x01000100:0x01000101;
-         *   </code>
-         * </p>
-         * <p>
-         *   The goal of this binding is to enable dynamic rebinding of keys to
-         *   navigation actions for web content without requiring a framework change.
-         * </p>
-         * <p>
-         *   This property represents a string value.
-         * </p>
-         * @hide
-         */
-        public static final String ACCESSIBILITY_WEB_CONTENT_KEY_BINDINGS =
-            "accessibility_web_content_key_bindings";
 
         /**
          * Setting that specifies whether the display magnification is enabled via a system-wide
@@ -6672,6 +6630,13 @@ public final class Settings {
         public static final String PAYMENT_SERVICE_SEARCH_URI = "payment_service_search_uri";
 
         /**
+         * This is the query URI for finding a auto fill service to install.
+         *
+         * @hide
+         */
+        public static final String AUTOFILL_SERVICE_SEARCH_URI = "autofill_service_search_uri";
+
+        /**
          * If enabled, apps should try to skip any introductory hints on first launch. This might
          * apply to users that are already familiar with the environment or temporary users.
          * <p>
@@ -6819,7 +6784,8 @@ public final class Settings {
          * Represented as milliseconds from midnight (e.g. 79200000 == 10pm).
          * @hide
          */
-        public static final String NIGHT_DISPLAY_CUSTOM_START_TIME = "night_display_custom_start_time";
+        public static final String NIGHT_DISPLAY_CUSTOM_START_TIME =
+                "night_display_custom_start_time";
 
         /**
          * Custom time when Night display is scheduled to deactivate.
@@ -6827,6 +6793,14 @@ public final class Settings {
          * @hide
          */
         public static final String NIGHT_DISPLAY_CUSTOM_END_TIME = "night_display_custom_end_time";
+
+        /**
+         * Time in milliseconds (since epoch) when Night display was last activated. Use to decide
+         * whether to apply the current activated state after a reboot or user change.
+         * @hide
+         */
+        public static final String NIGHT_DISPLAY_LAST_ACTIVATED_TIME =
+                "night_display_last_activated_time";
 
         /**
          * Names of the service components that the current user has explicitly allowed to
@@ -6974,6 +6948,13 @@ public final class Settings {
         public static final String CMAS_ADDITIONAL_BROADCAST_PKG = "cmas_additional_broadcast_pkg";
 
         /**
+         * Whether the launcher should show any notification badges.
+         * The value is boolean (1 or 0).
+         * @hide
+         */
+        public static final String NOTIFICATION_BADGING = "notification_badging";
+
+        /**
          * This are the settings to be backed up.
          *
          * NOTE: Settings are backed up and restored in the order they appear
@@ -6993,9 +6974,8 @@ public final class Settings {
             ACCESSIBILITY_DISPLAY_DALTONIZER_ENABLED,
             ACCESSIBILITY_DISPLAY_MAGNIFICATION_ENABLED,
             ACCESSIBILITY_DISPLAY_MAGNIFICATION_NAVBAR_ENABLED,
+            AUTOFILL_SERVICE,
             ACCESSIBILITY_DISPLAY_MAGNIFICATION_SCALE,
-            ACCESSIBILITY_SCRIPT_INJECTION,
-            ACCESSIBILITY_WEB_CONTENT_KEY_BINDINGS,
             ENABLED_ACCESSIBILITY_SERVICES,
             ENABLED_NOTIFICATION_LISTENERS,
             ENABLED_VR_LISTENERS,
@@ -7055,6 +7035,7 @@ public final class Settings {
             NIGHT_DISPLAY_CUSTOM_END_TIME,
             NIGHT_DISPLAY_COLOR_TEMPERATURE,
             NIGHT_DISPLAY_AUTO_MODE,
+            NIGHT_DISPLAY_LAST_ACTIVATED_TIME,
             NIGHT_DISPLAY_ACTIVATED,
             SYNC_PARENT_SOUNDS,
             CAMERA_DOUBLE_TWIST_TO_FLIP_ENABLED,
@@ -7068,7 +7049,8 @@ public final class Settings {
             AUTOMATIC_STORAGE_MANAGER_DAYS_TO_RETAIN,
             ASSIST_GESTURE_ENABLED,
             ASSIST_GESTURE_SENSITIVITY,
-            VR_DISPLAY_MODE
+            VR_DISPLAY_MODE,
+            NOTIFICATION_BADGING
         };
 
         /**
@@ -7116,6 +7098,12 @@ public final class Settings {
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_FOREGROUND_COLOR);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_TYPEFACE);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_FONT_SCALE);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_WINDOW_COLOR);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_DISPLAY_DALTONIZER_ENABLED);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_DISPLAY_DALTONIZER);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_AUTOCLICK_DELAY);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_AUTOCLICK_ENABLED);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_LARGE_POINTER_ICON);
 
             INSTANT_APP_SETTINGS.add(DEFAULT_INPUT_METHOD);
             INSTANT_APP_SETTINGS.add(ENABLED_INPUT_METHODS);
@@ -7762,13 +7750,36 @@ public final class Settings {
                 "location_background_throttle_interval_ms";
 
         /**
+         * Most frequent location update interval in milliseconds that proximity alert is allowed
+         * to request.
+         * @hide
+         */
+        public static final String LOCATION_BACKGROUND_THROTTLE_PROXIMITY_ALERT_INTERVAL_MS =
+                "location_background_throttle_proximity_alert_interval_ms";
+
+        /**
          * Packages that are whitelisted for background throttling (throttling will not be applied).
          * @hide
          */
         public static final String LOCATION_BACKGROUND_THROTTLE_PACKAGE_WHITELIST =
             "location_background_throttle_package_whitelist";
 
-       /**
+        /**
+         * The interval in milliseconds at which wifi scan requests will be throttled when they are
+         * coming from the background.
+         * @hide
+         */
+        public static final String WIFI_SCAN_BACKGROUND_THROTTLE_INTERVAL_MS =
+                "wifi_scan_background_throttle_interval_ms";
+
+        /**
+         * Packages that are whitelisted to be exempt for wifi background throttling.
+         * @hide
+         */
+        public static final String WIFI_SCAN_BACKGROUND_THROTTLE_PACKAGE_WHITELIST =
+                "wifi_scan_background_throttle_package_whitelist";
+
+        /**
         * Whether TV will switch to MHL port when a mobile device is plugged in.
         * (0 = false, 1 = true)
         * @hide
@@ -8314,6 +8325,17 @@ public final class Settings {
         public static final String WIFI_WAKEUP_ENABLED = "wifi_wakeup_enabled";
 
         /**
+         * Value to specify if Wi-Fi Wakeup is available.
+         *
+         * Wi-Fi Wakeup will only operate if it's available
+         * and {@link #WIFI_WAKEUP_ENABLED} is true.
+         *
+         * Type: int (0 for false, 1 for true)
+         * @hide
+         */
+        public static final String WIFI_WAKEUP_AVAILABLE = "wifi_wakeup_available";
+
+        /**
          * Value to specify whether network quality scores and badging should be shown in the UI.
          *
          * Type: int (0 for false, 1 for true)
@@ -8352,16 +8374,6 @@ public final class Settings {
                 "network_recommendations_package";
 
         /**
-         * Value to specify if the Wi-Fi Framework should defer to
-         * {@link com.android.server.NetworkScoreService} for evaluating saved open networks.
-         *
-         * Type: int (0 for false, 1 for true)
-         * @hide
-         */
-        @SystemApi
-        public static final String CURATE_SAVED_OPEN_NETWORKS = "curate_saved_open_networks";
-
-        /**
          * The package name of the application that connect and secures high quality open wifi
          * networks automatically.
          *
@@ -8376,6 +8388,7 @@ public final class Settings {
          *
          * Type: long
          * @hide
+         * @deprecated to be removed
          */
         public static final String NETWORK_RECOMMENDATION_REQUEST_TIMEOUT_MS =
                 "network_recommendation_request_timeout_ms";
@@ -8982,6 +8995,12 @@ public final class Settings {
         public static final String
                 BLUETOOTH_A2DP_SRC_PRIORITY_PREFIX = "bluetooth_a2dp_src_priority_";
         /** {@hide} */
+        public static final String BLUETOOTH_A2DP_SUPPORTS_OPTIONAL_CODECS_PREFIX =
+                "bluetooth_a2dp_supports_optional_codecs_";
+        /** {@hide} */
+        public static final String BLUETOOTH_A2DP_OPTIONAL_CODECS_ENABLED_PREFIX =
+                "bluetooth_a2dp_optional_codecs_enabled_";
+        /** {@hide} */
         public static final String
                 BLUETOOTH_INPUT_DEVICE_PRIORITY_PREFIX = "bluetooth_input_device_priority_";
         /** {@hide} */
@@ -9004,13 +9023,30 @@ public final class Settings {
          * Activity manager specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          *
-         * "enforce_bg_check=true,max_cached_processes=24"
+         * "gc_timeout=5000,max_cached_processes=24"
          *
          * The following keys are supported:
          *
          * <pre>
-         * enforce_bg_check                     (boolean)
          * max_cached_processes                 (int)
+         * background_settle_time               (long)
+         * foreground_service_ui_min_time       (long)
+         * content_provider_retain_time         (long)
+         * gc_timeout                           (long)
+         * gc_min_interval                      (long)
+         * full_pss_min_interval                (long)
+         * full_pss_lowered_interval            (long)
+         * power_check_delay                    (long)
+         * wake_lock_min_check_duration         (long)
+         * cpu_min_check_duration               (long)
+         * service_usage_interaction_time       (long)
+         * usage_stats_interaction_interval     (long)
+         * service_restart_duration             (long)
+         * service_reset_run_duration           (long)
+         * service_restart_duration_factor      (int)
+         * service_min_restart_time_between     (long)
+         * service_max_inactivity               (long)
+         * service_bg_start_timeout             (long)
          * </pre>
          *
          * <p>
@@ -9207,6 +9243,23 @@ public final class Settings {
         public static final String SHORTCUT_MANAGER_CONSTANTS = "shortcut_manager_constants";
 
         /**
+         * DevicePolicyManager specific settings.
+         * This is encoded as a key=value list, separated by commas. Ex:
+         *
+         * <pre>
+         * das_died_service_reconnect_backoff_sec       (long)
+         * das_died_service_reconnect_backoff_increase  (float)
+         * das_died_service_reconnect_max_backoff_sec   (long)
+         * </pre>
+         *
+         * <p>
+         * Type: string
+         * @hide
+         * see also com.android.server.devicepolicy.DevicePolicyConstants
+         */
+        public static final String DEVICE_POLICY_CONSTANTS = "device_policy_constants";
+
+        /**
          * Get the key that retrieves a bluetooth headset's priority.
          * @hide
          */
@@ -9228,6 +9281,25 @@ public final class Settings {
          */
         public static final String getBluetoothA2dpSrcPriorityKey(String address) {
             return BLUETOOTH_A2DP_SRC_PRIORITY_PREFIX + address.toUpperCase(Locale.ROOT);
+        }
+
+        /**
+         * Get the key that retrieves a bluetooth a2dp device's ability to support optional codecs.
+         * @hide
+         */
+        public static final String getBluetoothA2dpSupportsOptionalCodecsKey(String address) {
+            return BLUETOOTH_A2DP_SUPPORTS_OPTIONAL_CODECS_PREFIX +
+                    address.toUpperCase(Locale.ROOT);
+        }
+
+        /**
+         * Get the key that retrieves whether a bluetooth a2dp device should have optional codecs
+         * enabled.
+         * @hide
+         */
+        public static final String getBluetoothA2dpOptionalCodecsEnabledKey(String address) {
+            return BLUETOOTH_A2DP_OPTIONAL_CODECS_ENABLED_PREFIX +
+                    address.toUpperCase(Locale.ROOT);
         }
 
         /**
@@ -9877,7 +9949,6 @@ public final class Settings {
             CHARGING_SOUNDS_ENABLED,
             USB_MASS_STORAGE_ENABLED,
             NETWORK_RECOMMENDATIONS_ENABLED,
-            CURATE_SAVED_OPEN_NETWORKS,
             WIFI_WAKEUP_ENABLED,
             WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
             USE_OPEN_WIFI_PACKAGE,
@@ -9886,7 +9957,8 @@ public final class Settings {
             CALL_AUTO_RETRY,
             DOCK_AUDIO_MEDIA_ENABLED,
             ENCODED_SURROUND_OUTPUT,
-            LOW_POWER_MODE_TRIGGER_LEVEL
+            LOW_POWER_MODE_TRIGGER_LEVEL,
+            BLUETOOTH_ON
         };
 
         private static final ContentProviderHolder sProviderHolder =
@@ -10372,6 +10444,15 @@ public final class Settings {
          * @hide
          */
         public static final String MAX_NOTIFICATION_ENQUEUE_RATE = "max_notification_enqueue_rate";
+
+        /**
+         * Displays toasts when an app posts a notification that does not specify a valid channel.
+         *
+         * The value 1 - enable, 0 - disable
+         * @hide
+         */
+        public static final String SHOW_NOTIFICATION_CHANNEL_WARNINGS =
+                "show_notification_channel_warnings";
 
         /**
          * Whether cell is enabled/disabled

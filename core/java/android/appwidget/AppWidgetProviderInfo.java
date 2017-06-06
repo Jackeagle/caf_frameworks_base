@@ -20,6 +20,7 @@ import android.annotation.NonNull;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.res.ResourceId;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Parcel;
@@ -368,11 +369,11 @@ public class AppWidgetProviderInfo implements Parcelable {
         try {
             Resources resources = context.getPackageManager().getResourcesForApplication(
                     providerInfo.applicationInfo);
-            if (resourceId > 0) {
-                if (density <= 0) {
-                    density = context.getResources().getDisplayMetrics().densityDpi;
+            if (ResourceId.isValid(resourceId)) {
+                if (density < 0) {
+                    density = 0;
                 }
-                return resources.getDrawableForDensity(resourceId, density);
+                return resources.getDrawableForDensity(resourceId, density, null);
             }
         } catch (PackageManager.NameNotFoundException | Resources.NotFoundException e) {
             /* ignore */

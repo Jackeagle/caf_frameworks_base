@@ -143,7 +143,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     // that is or contains a default-focus view.
     private View mDefaultFocus;
     // The last child of this ViewGroup which held focus within the current cluster
-    private View mFocusedInCluster;
+    View mFocusedInCluster;
 
     /**
      * A Transformation used when drawing children, to
@@ -807,10 +807,6 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         return mDefaultFocus != null || super.hasDefaultFocus();
     }
 
-    void setFocusedInCluster(View child) {
-        mFocusedInCluster = child;
-    }
-
     /**
      * Removes {@code child} (and associated focusedInCluster chain) from the cluster containing
      * it.
@@ -826,8 +822,11 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         ViewParent parent = this;
         do {
             ((ViewGroup) parent).mFocusedInCluster = null;
+            if (parent == top) {
+                break;
+            }
             parent = parent.getParent();
-        } while (parent != top && parent instanceof ViewGroup);
+        } while (parent instanceof ViewGroup);
     }
 
     @Override
@@ -3442,12 +3441,13 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * default {@link View} implementation.
      */
     @Override
-    public void dispatchProvideAutofillStructure(ViewStructure structure, int flags) {
+    public void dispatchProvideAutofillStructure(ViewStructure structure,
+            @AutofillFlags int flags) {
         super.dispatchProvideAutofillStructure(structure, flags);
-        if (isAutofillBlocked() || structure.getChildCount() != 0) {
+        if (structure.getChildCount() != 0) {
             return;
         }
-        final ChildListForAutoFill children = getChildrenForAutofill();
+        final ChildListForAutoFill children = getChildrenForAutofill(flags);
         final int childrenCount = children.size();
         structure.setChildCount(childrenCount);
         for (int i = 0; i < childrenCount; i++) {
@@ -3463,14 +3463,14 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * level descendants that are important for autofill. The returned
      * child list object is pooled and the caller must recycle it once done.
      * @hide */
-    private @NonNull ChildListForAutoFill getChildrenForAutofill() {
+    private @NonNull ChildListForAutoFill getChildrenForAutofill(@AutofillFlags int flags) {
         final ChildListForAutoFill children = ChildListForAutoFill.obtain();
-        populateChildrenForAutofill(children);
+        populateChildrenForAutofill(children, flags);
         return children;
     }
 
     /** @hide */
-    private void populateChildrenForAutofill(ArrayList<View> list) {
+    private void populateChildrenForAutofill(ArrayList<View> list, @AutofillFlags int flags) {
         final int childrenCount = mChildrenCount;
         if (childrenCount <= 0) {
             return;
@@ -3482,10 +3482,11 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             final int childIndex = getAndVerifyPreorderedIndex(childrenCount, i, customOrder);
             final View child = (preorderedList == null)
                     ? mChildren[childIndex] : preorderedList.get(childIndex);
-            if (child.isImportantForAutofill()) {
+            if ((flags & AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS) != 0
+                    || child.isImportantForAutofill()) {
                 list.add(child);
             } else if (child instanceof ViewGroup) {
-                ((ViewGroup) child).populateChildrenForAutofill(list);
+                ((ViewGroup) child).populateChildrenForAutofill(list, flags);
             }
         }
     }
@@ -5413,6 +5414,9 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         if (mDefaultFocus != null) {
             clearDefaultFocus(mDefaultFocus);
         }
+        if (mFocusedInCluster != null) {
+            clearFocusedInCluster(mFocusedInCluster);
+        }
         if (clearChildFocus) {
             clearChildFocus(focused);
             if (!rootViewRequestFocus()) {
@@ -5817,34 +5821,6 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
 
             return mParent;
-        }
-
-        return null;
-    }
-
-    /**
-     * Quick invalidation method that simply transforms the dirty rect into the parent's
-     * coordinate system, pruning the invalidation if the parent has already been invalidated.
-     *
-     * @hide
-     */
-    protected ViewParent damageChildInParent(int left, int top, final Rect dirty) {
-        if ((mPrivateFlags & PFLAG_DRAWN) != 0
-                || (mPrivateFlags & PFLAG_DRAWING_CACHE_VALID) != 0) {
-            dirty.offset(left - mScrollX, top - mScrollY);
-            if ((mGroupFlags & FLAG_CLIP_CHILDREN) == 0) {
-                dirty.union(0, 0, mRight - mLeft, mBottom - mTop);
-            }
-
-            if ((mGroupFlags & FLAG_CLIP_CHILDREN) == 0 ||
-                    dirty.intersect(0, 0, mRight - mLeft, mBottom - mTop)) {
-
-                if (!getMatrix().isIdentity()) {
-                    transformRect(dirty);
-                }
-
-                return mParent;
-            }
         }
 
         return null;
@@ -7740,13 +7716,14 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                         mMarginFlags |= RIGHT_MARGIN_UNDEFINED_MASK;
                         rightMargin = DEFAULT_MARGIN_RESOLVED;
                     }
-                    startMargin = a.getDimensionPixelSize(
-                            R.styleable.ViewGroup_MarginLayout_layout_marginStart,
-                            DEFAULT_MARGIN_RELATIVE);
-                    endMargin = a.getDimensionPixelSize(
-                            R.styleable.ViewGroup_MarginLayout_layout_marginEnd,
-                            DEFAULT_MARGIN_RELATIVE);
                 }
+
+                startMargin = a.getDimensionPixelSize(
+                        R.styleable.ViewGroup_MarginLayout_layout_marginStart,
+                        DEFAULT_MARGIN_RELATIVE);
+                endMargin = a.getDimensionPixelSize(
+                        R.styleable.ViewGroup_MarginLayout_layout_marginEnd,
+                        DEFAULT_MARGIN_RELATIVE);
 
                 if (verticalMargin >= 0) {
                     topMargin = verticalMargin;

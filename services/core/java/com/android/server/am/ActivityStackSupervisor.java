@@ -110,7 +110,6 @@ import android.app.ActivityManager.StackInfo;
 import android.app.ActivityOptions;
 import android.app.AppOpsManager;
 import android.app.IActivityContainerCallback;
-import android.app.ITaskStackListener;
 import android.app.ProfilerInfo;
 import android.app.ResultInfo;
 import android.app.StatusBarManager;
@@ -157,11 +156,11 @@ import android.provider.MediaStore;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.service.voice.IVoiceInteractionSession;
-import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.EventLog;
 import android.util.IntArray;
+import android.util.MergedConfiguration;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -1128,7 +1127,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         mActivitiesWaitingForVisibleActivity.remove(r);
 
         for (int i = mWaitingForActivityVisible.size() - 1; i >= 0; --i) {
-            if (mWaitingForActivityVisible.get(i).matches(r)) {
+            if (mWaitingForActivityVisible.get(i).matches(r.realActivity)) {
                 mWaitingForActivityVisible.remove(i);
             }
         }
@@ -1142,7 +1141,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         boolean changed = false;
         for (int i = mWaitingForActivityVisible.size() - 1; i >= 0; --i) {
             final WaitInfo w = mWaitingForActivityVisible.get(i);
-            if (w.matches(r)) {
+            if (w.matches(r.realActivity)) {
                 final WaitResult result = w.getResult();
                 changed = true;
                 result.timeout = false;
@@ -1334,7 +1333,13 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         }
 
         r.startFreezingScreenLocked(app, 0);
-        r.setVisibility(true);
+        if (r.getStack().checkKeyguardVisibility(r, true /* shouldBeVisible */, true /* isTop */)) {
+            // We only set the visibility to true if the activity is allowed to be visible based on
+            // keyguard state. This avoids setting this into motion in window manager that is later
+            // cancelled due to later calls to ensure visible activities that set visibility back to
+            // false.
+            r.setVisibility(true);
+        }
 
         // schedule launch ticks to collect information about slow apps.
         r.startLaunchTickingLocked();
@@ -1357,6 +1362,15 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
         if (mKeyguardController.isKeyguardLocked()) {
             r.notifyUnknownVisibilityLaunched();
+        }
+        final int applicationInfoUid =
+                (r.info.applicationInfo != null) ? r.info.applicationInfo.uid : -1;
+        if ((r.userId != app.userId) || (r.appInfo.uid != applicationInfoUid)) {
+            Slog.wtf(TAG,
+                    "User ID for activity changing for " + r
+                            + " appInfo.uid=" + r.appInfo.uid
+                            + " info.ai.uid=" + applicationInfoUid
+                            + " old=" + r.app + " new=" + app);
         }
 
         r.app = app;
@@ -1443,17 +1457,16 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             // a Binder interface which would create a new Configuration. Consequently we have to
             // always create a new Configuration here.
 
-            final Configuration globalConfiguration =
-                new Configuration(mService.getGlobalConfiguration());
-            r.setLastReportedGlobalConfiguration(globalConfiguration);
-            final Configuration mergedOverrideConfiguration =
-                new Configuration(r.getMergedOverrideConfiguration());
-            r.setLastReportedMergedOverrideConfiguration(mergedOverrideConfiguration);
+            final MergedConfiguration mergedConfiguration = new MergedConfiguration(
+                    mService.getGlobalConfiguration(), r.getMergedOverrideConfiguration());
+            r.setLastReportedConfiguration(mergedConfiguration);
 
             app.thread.scheduleLaunchActivity(new Intent(r.intent), r.appToken,
                     System.identityHashCode(r), r.info,
-                    globalConfiguration,
-                    mergedOverrideConfiguration, r.compat,
+                    // TODO: Have this take the merged configuration instead of separate global and
+                    // override configs.
+                    mergedConfiguration.getGlobalConfiguration(),
+                    mergedConfiguration.getOverrideConfiguration(), r.compat,
                     r.launchedFromPackage, task.voiceInteractor, app.repProcState, r.icicle,
                     r.persistentState, results, newIntents, !andResume,
                     mService.isNextTransitionForward(), profilerInfo);
@@ -1493,6 +1506,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
             // This is the first time we failed -- restart process and
             // retry.
+            r.launchFailed = true;
             app.activities.remove(r);
             throw e;
         }
@@ -2505,7 +2519,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                                 tempRect /* outStackBounds */,
                                 otherTaskRect /* outTempTaskBounds */, true /* ignoreVisibility */);
 
-                        resizeStackLocked(i, tempRect,
+                        resizeStackLocked(i, !tempRect.isEmpty() ? tempRect : null,
                                 !otherTaskRect.isEmpty() ? otherTaskRect : tempOtherTaskBounds,
                                 tempOtherTaskInsetBounds, preserveWindows,
                                 true /* allowResizeInDockedMode */, deferResume);
@@ -2972,19 +2986,23 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             mWindowManager.continueSurfaceLayout();
         }
 
-        // The task might have already been running and its visibility needs to be synchronized
-        // with the visibility of the stack / windows.
+        // Calculate the default bounds (don't use existing stack bounds as we may have just created
+        // the stack, and schedule the start of the animation into PiP (the bounds animator that
+        // is triggered by this is posted on another thread)
+        final Rect destBounds = stack.getPictureInPictureBounds(aspectRatio,
+                false /* useExistingStackBounds */);
+        stack.animateResizePinnedStack(sourceHintBounds, destBounds, -1 /* animationDuration */,
+                true /* fromFullscreen */);
+
+        // Update the visibility of all activities after the they have been reparented to the new
+        // stack.  This MUST run after the animation above is scheduled to ensure that the windows
+        // drawn signal is scheduled after the bounds animation start call on the bounds animator
+        // thread.
         ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
         resumeFocusedStackTopActivityLocked();
 
-        // Calculate the default bounds (don't use existing stack bounds as we may have just created
-        // the stack
-        final Rect destBounds = mWindowManager.getPictureInPictureBounds(DEFAULT_DISPLAY,
-                aspectRatio, false /* useExistingStackBounds */);
-
-        stack.animateResizePinnedStack(sourceHintBounds, destBounds, -1 /* animationDuration */,
-                true /* schedulePipModeChangedOnAnimationEnd */);
-        mService.mTaskChangeNotificationController.notifyActivityPinned(r.packageName);
+        mService.mTaskChangeNotificationController.notifyActivityPinned(r.packageName,
+                r.getTask().taskId);
     }
 
     /** Move activity with its stack to front and make the stack focused. */
@@ -3045,11 +3063,15 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                     if (!mTmpFindTaskResult.matchedByRootAffinity) {
                         return mTmpFindTaskResult.r;
                     } else if (mTmpFindTaskResult.r.getDisplayId() == displayId) {
+                        // Note: since the traversing through the stacks is top down, the floating
+                        // tasks should always have lower priority than any affinity-matching tasks
+                        // in the fullscreen stacks
                         affinityMatch = mTmpFindTaskResult.r;
                     }
                 }
             }
         }
+
         if (DEBUG_TASKS && affinityMatch == null) Slog.d(TAG_TASKS, "No task found");
         return affinityMatch;
     }
@@ -3498,6 +3520,23 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         return mService.mUserController.isCurrentProfileLocked(userId);
     }
 
+    /**
+     * Returns whether a stopping activity is present that should be stopped after visible, rather
+     * than idle.
+     * @return {@code true} if such activity is present. {@code false} otherwise.
+     */
+    boolean isStoppingNoHistoryActivity() {
+        // Activities that are marked as nohistory should be stopped immediately after the resumed
+        // activity has become visible.
+        for (ActivityRecord record : mStoppingActivities) {
+            if (record.isNoHistory()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     final ArrayList<ActivityRecord> processStoppingActivitiesLocked(ActivityRecord idleActivity,
             boolean remove, boolean processPausingActivities) {
         ArrayList<ActivityRecord> stops = null;
@@ -3944,10 +3983,11 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     }
 
     private StackInfo getStackInfoLocked(ActivityStack stack) {
-        final ActivityDisplay display = mActivityDisplays.get(DEFAULT_DISPLAY);
+        final int displayId = stack.mDisplayId;
+        final ActivityDisplay display = mActivityDisplays.get(displayId);
         StackInfo info = new StackInfo();
         stack.getWindowContainerBounds(info.bounds);
-        info.displayId = DEFAULT_DISPLAY;
+        info.displayId = displayId;
         info.stackId = stack.mStackId;
         info.userId = stack.mCurrentUser;
         info.visible = stack.shouldBeVisible(null) == STACK_VISIBLE;
@@ -4701,7 +4741,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             checkEmbeddedAllowedInner(userId, pendingIntent.key.requestIntent,
                     pendingIntent.key.requestResolvedType);
 
-            return pendingIntent.sendInner(0, null, null, null, null, null, null, 0,
+            return pendingIntent.sendInner(0, null, null, null, null, null, null, null, 0,
                     FORCE_NEW_TASK_FLAGS, FORCE_NEW_TASK_FLAGS, null, this);
         }
 
@@ -4958,10 +4998,11 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
         VirtualActivityDisplay(int width, int height, int density) {
             DisplayManagerGlobal dm = DisplayManagerGlobal.getInstance();
-            mVirtualDisplay = dm.createVirtualDisplay(mService.mContext, null,
-                    VIRTUAL_DISPLAY_BASE_NAME, width, height, density, null,
+            mVirtualDisplay = dm.createVirtualDisplay(mService.mContext, null /* projection */,
+                    VIRTUAL_DISPLAY_BASE_NAME, width, height, density, null /* surface */,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC |
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY, null, null);
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY, null /* callback */,
+                    null /* handler */, null /* uniqueId */);
 
             init(mVirtualDisplay.getDisplay());
 
@@ -5140,10 +5181,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             this.mResult = result;
         }
 
-        public boolean matches(ActivityRecord record) {
-            return mTargetComponent == null ||
-                    (TextUtils.equals(mTargetComponent.getPackageName(), record.info.packageName)
-                            && TextUtils.equals(mTargetComponent.getClassName(), record.info.name));
+        public boolean matches(ComponentName targetComponent) {
+            return mTargetComponent == null || mTargetComponent.equals(targetComponent);
         }
 
         public WaitResult getResult() {

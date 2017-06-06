@@ -336,8 +336,12 @@ public class AccessPoint implements Comparable<AccessPoint> {
             builder.append(',').append(securityToString(security, pskType));
         }
         builder.append(",level=").append(getLevel());
-        builder.append(",rankingScore=").append(mRankingScore);
-        builder.append(",badge=").append(mBadge);
+        if (mRankingScore != Integer.MIN_VALUE) {
+            builder.append(",rankingScore=").append(mRankingScore);
+        }
+        if (mBadge != NetworkBadging.BADGING_NONE) {
+            builder.append(",badge=").append(mBadge);
+        }
         builder.append(",metered=").append(isMetered());
 
         return builder.append(')').toString();
@@ -517,7 +521,8 @@ public class AccessPoint implements Comparable<AccessPoint> {
     public boolean isMetered() {
         return mIsScoredNetworkMetered
                 || (mConfig != null && mConfig.meteredHint)
-                || (mInfo != null && mInfo.getMeteredHint());
+                || (mInfo != null && mInfo.getMeteredHint()
+                || (mNetworkInfo != null && mNetworkInfo.isMetered()));
     }
 
     public NetworkInfo getNetworkInfo() {
@@ -994,9 +999,11 @@ public class AccessPoint implements Comparable<AccessPoint> {
             if (mRssi != info.getRssi()) {
                 mRssi = info.getRssi();
                 updated = true;
+            } else if (mNetworkInfo != null && networkInfo != null
+                    && mNetworkInfo.getDetailedState() != networkInfo.getDetailedState()) {
+                updated = true;
             }
             mInfo = info;
-            // TODO(b/37289220): compare NetworkInfo states and set updated = true if necessary
             mNetworkInfo = networkInfo;
         } else if (mInfo != null) {
             updated = true;

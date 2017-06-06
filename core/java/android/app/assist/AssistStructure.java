@@ -18,6 +18,8 @@ import android.os.PooledStringReader;
 import android.os.PooledStringWriter;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.service.autofill.FillContext;
+import android.service.autofill.FillRequest;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -29,10 +31,12 @@ import android.view.ViewStructure.HtmlInfo.Builder;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.view.autofill.AutofillId;
+import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillValue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Assist data automatically created by the platform's implementation of Assist and Autofill.
@@ -62,6 +66,7 @@ public class AssistStructure implements Parcelable {
 
     ComponentName mActivityComponent;
     private boolean mIsHomeActivity;
+    private int mFlags;
 
     final ArrayList<WindowNode> mWindowNodes = new ArrayList<>();
 
@@ -184,6 +189,7 @@ public class AssistStructure implements Parcelable {
             mSanitizeOnWrite = as.mSanitizeOnWrite;
             mWriteStructure = as.waitForReady();
             ComponentName.writeToParcel(as.mActivityComponent, out);
+            out.writeInt(as.mFlags);
             out.writeLong(as.mAcquisitionStartTime);
             out.writeLong(as.mAcquisitionEndTime);
             mNumWindows = as.mWindowNodes.size();
@@ -338,6 +344,7 @@ public class AssistStructure implements Parcelable {
         void go() {
             fetchData();
             mActivityComponent = ComponentName.readFromParcel(mCurParcel);
+            mFlags = mCurParcel.readInt();
             mAcquisitionStartTime = mCurParcel.readLong();
             mAcquisitionEndTime = mCurParcel.readLong();
             final int N = mCurParcel.readInt();
@@ -473,7 +480,7 @@ public class AssistStructure implements Parcelable {
         final int mDisplayId;
         final ViewNode mRoot;
 
-        WindowNode(AssistStructure assist, ViewRootImpl root, boolean forAutoFill) {
+        WindowNode(AssistStructure assist, ViewRootImpl root, boolean forAutoFill, int flags) {
             View view = root.getView();
             Rect rect = new Rect();
             view.getBoundsOnScreen(rect);
@@ -488,8 +495,9 @@ public class AssistStructure implements Parcelable {
             ViewNodeBuilder builder = new ViewNodeBuilder(assist, mRoot, false);
             if ((root.getWindowFlags() & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
                 if (forAutoFill) {
-                    // NOTE: flags are currently not supported, hence 0
-                    view.onProvideAutofillStructure(builder, 0);
+                    final int autofillFlags = (flags & FillRequest.FLAG_MANUAL_REQUEST) != 0
+                            ? View.AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS : 0;
+                    view.onProvideAutofillStructure(builder, autofillFlags);
                 } else {
                     // This is a secure window, so it doesn't want a screenshot, and that
                     // means we should also not copy out its view hierarchy for Assist
@@ -499,8 +507,9 @@ public class AssistStructure implements Parcelable {
                 }
             }
             if (forAutoFill) {
-                // NOTE: flags are currently not supported, hence 0
-                view.dispatchProvideAutofillStructure(builder, 0);
+                final int autofillFlags = (flags & FillRequest.FLAG_MANUAL_REQUEST) != 0
+                        ? View.AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS : 0;
+                view.dispatchProvideAutofillStructure(builder, autofillFlags);
             } else {
                 view.dispatchProvideStructure(builder);
             }
@@ -853,10 +862,10 @@ public class AssistStructure implements Parcelable {
                 out.writeInt(mAutofillType);
                 out.writeStringArray(mAutofillHints);
                 final AutofillValue sanitizedValue;
-                if (mAutofillOverlay != null && mAutofillOverlay.value != null) {
-                    sanitizedValue = mAutofillOverlay.value;
-                } else if (writeSensitive) {
+                if (writeSensitive) {
                     sanitizedValue = mAutofillValue;
+                } else if (mAutofillOverlay != null && mAutofillOverlay.value != null) {
+                    sanitizedValue = mAutofillOverlay.value;
                 } else {
                     sanitizedValue = null;
                 }
@@ -1096,6 +1105,9 @@ public class AssistStructure implements Parcelable {
          * Returns the transformation that has been applied to this view, such as a translation
          * or scaling.  The returned Matrix object is owned by ViewNode; do not modify it.
          * Returns null if there is no transformation applied to the view.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public Matrix getTransformation() {
             return mMatrix;
@@ -1105,6 +1117,9 @@ public class AssistStructure implements Parcelable {
          * Returns the visual elevation of the view, used for shadowing and other visual
          * characterstics, as set by {@link ViewStructure#setElevation
          * ViewStructure.setElevation(float)}.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public float getElevation() {
             return mElevation;
@@ -1114,6 +1129,9 @@ public class AssistStructure implements Parcelable {
          * Returns the alpha transformation of the view, used to reduce the overall opacity
          * of the view's contents, as set by {@link ViewStructure#setAlpha
          * ViewStructure.setAlpha(float)}.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public float getAlpha() {
             return mAlpha;
@@ -1282,6 +1300,9 @@ public class AssistStructure implements Parcelable {
 
         /**
          * If {@link #getText()} is non-null, this is where the current selection starts.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public int getTextSelectionStart() {
             return mText != null ? mText.mTextSelectionStart : -1;
@@ -1291,6 +1312,9 @@ public class AssistStructure implements Parcelable {
          * If {@link #getText()} is non-null, this is where the current selection starts.
          * If there is no selection, returns the same value as {@link #getTextSelectionStart()},
          * indicating the cursor position.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public int getTextSelectionEnd() {
             return mText != null ? mText.mTextSelectionEnd : -1;
@@ -1312,6 +1336,9 @@ public class AssistStructure implements Parcelable {
          * If there is no text background color, {@link #TEXT_COLOR_UNDEFINED} is returned.
          * Note that the text may also contain style spans that modify the color of specific
          * parts of the text.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public int getTextBackgroundColor() {
             return mText != null ? mText.mTextBackgroundColor : TEXT_COLOR_UNDEFINED;
@@ -1322,6 +1349,9 @@ public class AssistStructure implements Parcelable {
          * with it.
          * Note that the text may also contain style spans that modify the size of specific
          * parts of the text.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public float getTextSize() {
             return mText != null ? mText.mTextSize : 0;
@@ -1334,6 +1364,9 @@ public class AssistStructure implements Parcelable {
          * {@link #TEXT_STYLE_UNDERLINE}.
          * Note that the text may also contain style spans that modify the style of specific
          * parts of the text.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public int getTextStyle() {
             return mText != null ? mText.mTextStyle : 0;
@@ -1344,6 +1377,9 @@ public class AssistStructure implements Parcelable {
          * in the array is a formatted line of text, and the value it contains is the offset
          * into the text string where that line starts.  May return null if there is no line
          * information.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public int[] getTextLineCharOffsets() {
             return mText != null ? mText.mLineCharOffsets : null;
@@ -1354,6 +1390,9 @@ public class AssistStructure implements Parcelable {
          * in the array is a formatted line of text, and the value it contains is the baseline
          * where that text appears in the view.  May return null if there is no line
          * information.
+         *
+         * <p>It's only relevant when the {@link AssistStructure} is used for Assist purposes,
+         * not for Autofill purposes.
          */
         public int[] getTextLineBaselines() {
             return mText != null ? mText.mLineBaselines : null;
@@ -1552,14 +1591,14 @@ public class AssistStructure implements Parcelable {
         @Override
         public void setText(CharSequence text) {
             ViewNodeText t = getNodeText();
-            t.mText = text;
+            t.mText = TextUtils.trimNoCopySpans(text);
             t.mTextSelectionStart = t.mTextSelectionEnd = -1;
         }
 
         @Override
         public void setText(CharSequence text, int selectionStart, int selectionEnd) {
             ViewNodeText t = getNodeText();
-            t.mText = text;
+            t.mText = TextUtils.trimNoCopySpans(text);
             t.mTextSelectionStart = selectionStart;
             t.mTextSelectionEnd = selectionEnd;
         }
@@ -1643,11 +1682,6 @@ public class AssistStructure implements Parcelable {
         }
 
         @Override
-        public void setAutofillId(@NonNull ViewStructure parent, int virtualId) {
-            mNode.mAutofillId = new AutofillId(parent.getAutofillId(), virtualId);
-        }
-
-        @Override
         public ViewStructure newChild(int index) {
             ViewNode node = new ViewNode();
             mNode.mChildren[index] = node;
@@ -1685,8 +1719,13 @@ public class AssistStructure implements Parcelable {
         }
 
         @Override
-        public void setAutofillId(int viewId) {
-            mNode.mAutofillId = new AutofillId(viewId);
+        public void setAutofillId(@NonNull AutofillId id) {
+            mNode.mAutofillId = id;
+        }
+
+        @Override
+        public void setAutofillId(@NonNull AutofillId parentId, int virtualId) {
+            mNode.mAutofillId = new AutofillId(parentId, virtualId);
         }
 
         @Override
@@ -1722,13 +1761,6 @@ public class AssistStructure implements Parcelable {
         @Override
         public void setDataIsSensitive(boolean sensitive) {
             mNode.mSanitized = !sensitive;
-        }
-
-        @Override
-        public void setUrl(String url) {
-            if (url == null) return;
-
-            setWebDomain(url);
         }
 
         @Override
@@ -1783,7 +1815,7 @@ public class AssistStructure implements Parcelable {
         }
 
         @Override
-        public ArrayList<Pair<String, String>> getAttributes() {
+        public List<Pair<String, String>> getAttributes() {
             if (mAttributes == null && mNames != null) {
                 mAttributes = new ArrayList<>(mNames.length);
                 for (int i = 0; i < mNames.length; i++) {
@@ -1864,20 +1896,22 @@ public class AssistStructure implements Parcelable {
     }
 
     /** @hide */
-    public AssistStructure(Activity activity, boolean forAutoFill) {
+    public AssistStructure(Activity activity, boolean forAutoFill, int flags) {
         mHaveData = true;
         mActivityComponent = activity.getComponentName();
+        mFlags = flags;
         ArrayList<ViewRootImpl> views = WindowManagerGlobal.getInstance().getRootViews(
                 activity.getActivityToken());
         for (int i=0; i<views.size(); i++) {
             ViewRootImpl root = views.get(i);
-            mWindowNodes.add(new WindowNode(this, root, forAutoFill));
+            mWindowNodes.add(new WindowNode(this, root, forAutoFill, flags));
         }
     }
 
     public AssistStructure() {
         mHaveData = true;
         mActivityComponent = null;
+        mFlags = 0;
     }
 
     /** @hide */
@@ -1897,23 +1931,24 @@ public class AssistStructure implements Parcelable {
     }
 
     /** @hide */
-    public void dump() {
+    public void dump(boolean showSensitive) {
         if (mActivityComponent == null) {
             Log.i(TAG, "dump(): calling ensureData() first");
             ensureData();
         }
         Log.i(TAG, "Activity: " + mActivityComponent.flattenToShortString());
         Log.i(TAG, "Sanitize on write: " + mSanitizeOnWrite);
+        Log.i(TAG, "Flags: " + mFlags);
         final int N = getWindowNodeCount();
         for (int i=0; i<N; i++) {
             WindowNode node = getWindowNodeAt(i);
             Log.i(TAG, "Window #" + i + " [" + node.getLeft() + "," + node.getTop()
                     + " " + node.getWidth() + "x" + node.getHeight() + "]" + " " + node.getTitle());
-            dump("  ", node.getRootViewNode());
+            dump("  ", node.getRootViewNode(), showSensitive);
         }
     }
 
-    void dump(String prefix, ViewNode node) {
+    void dump(String prefix, ViewNode node, boolean showSensitive) {
         Log.i(TAG, prefix + "View [" + node.getLeft() + "," + node.getTop()
                 + " " + node.getWidth() + "x" + node.getHeight() + "]" + " " + node.getClassName());
         int id = node.getId();
@@ -1952,12 +1987,15 @@ public class AssistStructure implements Parcelable {
         }
         CharSequence text = node.getText();
         if (text != null) {
+            final String safeText = node.isSanitized() || showSensitive ? text.toString()
+                    : "REDACTED[" + text.length() + " chars]";
             Log.i(TAG, prefix + "  Text (sel " + node.getTextSelectionStart() + "-"
-                    + node.getTextSelectionEnd() + "): " + text);
+                    + node.getTextSelectionEnd() + "): " + safeText);
             Log.i(TAG, prefix + "  Text size: " + node.getTextSize() + " , style: #"
                     + node.getTextStyle());
             Log.i(TAG, prefix + "  Text color fg: #" + Integer.toHexString(node.getTextColor())
                     + ", bg: #" + Integer.toHexString(node.getTextBackgroundColor()));
+            Log.i(TAG, prefix + "  Input type: " + node.getInputType());
         }
         String webDomain = node.getWebDomain();
         if (webDomain != null) {
@@ -1991,7 +2029,6 @@ public class AssistStructure implements Parcelable {
             Log.i(TAG, prefix + "Autofill info: id= " + autofillId
                     + ", type=" + node.getAutofillType()
                     + ", options=" + Arrays.toString(node.getAutofillOptions())
-                    + ", inputType=" + node.getInputType()
                     + ", hints=" + Arrays.toString(node.getAutofillHints())
                     + ", value=" + node.getAutofillValue()
                     + ", sanitized=" + node.isSanitized());
@@ -2003,7 +2040,7 @@ public class AssistStructure implements Parcelable {
             String cprefix = prefix + "    ";
             for (int i=0; i<NCHILDREN; i++) {
                 ViewNode cnode = node.getChildAt(i);
-                dump(cprefix, cnode);
+                dump(cprefix, cnode, showSensitive);
             }
         }
     }
@@ -2016,10 +2053,16 @@ public class AssistStructure implements Parcelable {
         return mActivityComponent;
     }
 
+    /** @hide */
+    public int getFlags() {
+        return mFlags;
+    }
+
     /**
      * Returns whether the activity associated with this AssistStructure was the home activity
-     * at the time the assist data was acquired.
+     * (Launcher) at the time the assist data was acquired.
      * @return Whether the activity was the home activity.
+     * @see android.content.Intent#CATEGORY_HOME
      */
     public boolean isHomeActivity() {
         return mIsHomeActivity;

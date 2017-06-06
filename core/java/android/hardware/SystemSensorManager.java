@@ -16,12 +16,10 @@
 
 package android.hardware;
 
-import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.MemoryFile;
@@ -51,8 +49,9 @@ import java.util.Map;
  */
 public class SystemSensorManager extends SensorManager {
     //TODO: disable extra logging before release
-    private static boolean DEBUG_DYNAMIC_SENSOR = true;
-    private static int MIN_DIRECT_CHANNEL_BUFFER_SIZE = 104;
+    private static final boolean DEBUG_DYNAMIC_SENSOR = true;
+    private static final int MIN_DIRECT_CHANNEL_BUFFER_SIZE = 104;
+    private static final int MAX_LISTENER_COUNT = 128;
 
     private static native void nativeClassInit();
     private static native long nativeCreate(String opPackageName);
@@ -144,6 +143,7 @@ public class SystemSensorManager extends SensorManager {
     @Override
     protected boolean registerListenerImpl(SensorEventListener listener, Sensor sensor,
             int delayUs, Handler handler, int maxBatchReportLatencyUs, int reservedFlags) {
+        android.util.SeempLog.record_sensor_rate(381, sensor, delayUs);
         if (listener == null || sensor == null) {
             Log.e(TAG, "sensor or listener is null");
             return false;
@@ -156,6 +156,11 @@ public class SystemSensorManager extends SensorManager {
         if (maxBatchReportLatencyUs < 0 || delayUs < 0) {
             Log.e(TAG, "maxBatchReportLatencyUs and delayUs should be non-negative");
             return false;
+        }
+        if (mSensorListeners.size() >= MAX_LISTENER_COUNT) {
+            throw new IllegalStateException("register failed, " +
+                "the sensor listeners size has exceeded the maximum limit " +
+                MAX_LISTENER_COUNT);
         }
 
         // Invariants to preserve:
@@ -185,6 +190,7 @@ public class SystemSensorManager extends SensorManager {
     /** @hide */
     @Override
     protected void unregisterListenerImpl(SensorEventListener listener, Sensor sensor) {
+        android.util.SeempLog.record_sensor(382, sensor);
         // Trigger Sensors should use the cancelTriggerSensor call.
         if (sensor != null && sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT) {
             return;
@@ -215,6 +221,12 @@ public class SystemSensorManager extends SensorManager {
         if (listener == null) throw new IllegalArgumentException("listener cannot be null");
 
         if (sensor.getReportingMode() != Sensor.REPORTING_MODE_ONE_SHOT) return false;
+
+        if (mTriggerListeners.size() >= MAX_LISTENER_COUNT) {
+            throw new IllegalStateException("request failed, " +
+                    "the trigger listeners size has exceeded the maximum limit " +
+                    MAX_LISTENER_COUNT);
+        }
 
         synchronized (mTriggerListeners) {
             TriggerEventQueue queue = mTriggerListeners.get(listener);
@@ -285,17 +297,22 @@ public class SystemSensorManager extends SensorManager {
                 }
                 // Initialize a client for data_injection.
                 if (sInjectEventQueue == null) {
-                    sInjectEventQueue = new InjectEventQueue(mMainLooper, this,
-                            mContext.getPackageName());
+                    try {
+                        sInjectEventQueue = new InjectEventQueue(
+                                mMainLooper, this, mContext.getPackageName());
+                    } catch (RuntimeException e) {
+                        Log.e(TAG, "Cannot create InjectEventQueue: " + e);
+                    }
                 }
+                return sInjectEventQueue != null;
             } else {
                 // If data injection is being disabled clean up the native resources.
                 if (sInjectEventQueue != null) {
                     sInjectEventQueue.dispose();
                     sInjectEventQueue = null;
                 }
+                return true;
             }
-            return true;
         }
     }
 
@@ -322,7 +339,10 @@ public class SystemSensorManager extends SensorManager {
 
         if (sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT) {
             synchronized(mTriggerListeners) {
-                for (TriggerEventListener l: mTriggerListeners.keySet()) {
+                HashMap<TriggerEventListener, TriggerEventQueue> triggerListeners =
+                    new HashMap<TriggerEventListener, TriggerEventQueue>(mTriggerListeners);
+
+                for (TriggerEventListener l: triggerListeners.keySet()) {
                     if (DEBUG_DYNAMIC_SENSOR){
                         Log.i(TAG, "removed trigger listener" + l.toString() +
                                    " due to sensor disconnection");
@@ -332,7 +352,10 @@ public class SystemSensorManager extends SensorManager {
             }
         } else {
             synchronized(mSensorListeners) {
-                for (SensorEventListener l: mSensorListeners.keySet()) {
+                HashMap<SensorEventListener, SensorEventQueue> sensorListeners =
+                    new HashMap<SensorEventListener, SensorEventQueue>(mSensorListeners);
+
+                for (SensorEventListener l: sensorListeners.keySet()) {
                     if (DEBUG_DYNAMIC_SENSOR){
                         Log.i(TAG, "removed event listener" + l.toString() +
                                    " due to sensor disconnection");
@@ -568,9 +591,9 @@ public class SystemSensorManager extends SensorManager {
                         "Width if HaradwareBuffer must be greater than "
                         + MIN_DIRECT_CHANNEL_BUFFER_SIZE);
             }
-            if ((hardwareBuffer.getUsage() & HardwareBuffer.USAGE0_SENSOR_DIRECT_DATA) == 0) {
+            if ((hardwareBuffer.getUsage() & HardwareBuffer.USAGE_SENSOR_DIRECT_DATA) == 0) {
                 throw new IllegalArgumentException(
-                        "HardwareBuffer must set usage flag USAGE0_SENSOR_DIRECT_DATA");
+                        "HardwareBuffer must set usage flag USAGE_SENSOR_DIRECT_DATA");
             }
             size = hardwareBuffer.getWidth();
             id = nativeCreateDirectChannel(

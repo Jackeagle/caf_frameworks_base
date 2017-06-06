@@ -16,6 +16,8 @@
 
 package com.android.server.am;
 
+import static com.android.internal.os.BatteryStatsImpl.ExternalStatsSync.UPDATE_CPU;
+
 import android.annotation.Nullable;
 import android.bluetooth.BluetoothActivityEnergyInfo;
 import android.bluetooth.BluetoothAdapter;
@@ -966,6 +968,14 @@ public final class BatteryStatsService extends IBatteryStats.Stub
     }
 
     @Override
+    public void noteBleScanResults(WorkSource ws, int numNewResults) {
+        enforceCallingPermission();
+        synchronized (mStats) {
+            mStats.noteBluetoothScanResultsFromSourceLocked(ws, numNewResults);
+        }
+    }
+
+    @Override
     public void noteWifiControllerActivity(WifiActivityEnergyInfo info) {
         enforceCallingPermission();
 
@@ -1541,7 +1551,9 @@ public final class BatteryStatsService extends IBatteryStats.Stub
                         BatteryStats.HistoryItem.EVENT_COLLECT_EXTERNAL_STATS,
                         reason, 0);
 
-                mStats.updateCpuTimeLocked();
+                if ((updateFlags & UPDATE_CPU) != 0) {
+                    mStats.updateCpuTimeLocked(true /* updateCpuFreqData */);
+                }
                 mStats.updateKernelWakelocksLocked();
                 mStats.updateKernelMemoryBandwidthLocked();
 

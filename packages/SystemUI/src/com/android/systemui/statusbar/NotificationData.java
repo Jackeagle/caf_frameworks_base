@@ -83,6 +83,7 @@ public class NotificationData {
         public List<SnoozeCriterion> snoozeCriteria;
         private int mCachedContrastColor = COLOR_INVALID;
         private int mCachedContrastColorIsFor = COLOR_INVALID;
+        private InflationTask mRunningTask = null;
 
         public Entry(StatusBarNotification n) {
             this.key = n.getKey();
@@ -199,16 +200,47 @@ public class NotificationData {
             }
         }
 
-        public int getContrastedColor(Context context, boolean ambient) {
-            int rawColor = ambient ? Notification.COLOR_DEFAULT :
+        public int getContrastedColor(Context context, boolean isLowPriority,
+                int backgroundColor) {
+            int rawColor = isLowPriority ? Notification.COLOR_DEFAULT :
                     notification.getNotification().color;
             if (mCachedContrastColorIsFor == rawColor && mCachedContrastColor != COLOR_INVALID) {
                 return mCachedContrastColor;
             }
-            final int contrasted = NotificationColorUtil.resolveContrastColor(context, rawColor);
+            final int contrasted = NotificationColorUtil.resolveContrastColor(context, rawColor,
+                    backgroundColor);
             mCachedContrastColorIsFor = rawColor;
             mCachedContrastColor = contrasted;
             return mCachedContrastColor;
+        }
+
+        /**
+         * Abort all existing inflation tasks
+         */
+        public void abortTask() {
+            if (mRunningTask != null) {
+                mRunningTask.abort();
+                mRunningTask = null;
+            }
+        }
+
+        public void setInflationTask(InflationTask abortableTask) {
+            // abort any existing inflation
+            InflationTask existing = mRunningTask;
+            abortTask();
+            mRunningTask = abortableTask;
+            if (existing != null && mRunningTask != null) {
+                mRunningTask.supersedeTask(existing);
+            }
+        }
+
+        public void onInflationTaskFinished() {
+           mRunningTask = null;
+        }
+
+        @VisibleForTesting
+        public InflationTask getRunningTask() {
+            return mRunningTask;
         }
     }
 
@@ -302,12 +334,12 @@ public class NotificationData {
         return mEntries.get(key);
     }
 
-    public void add(Entry entry, RankingMap ranking) {
+    public void add(Entry entry) {
         synchronized (mEntries) {
             mEntries.put(entry.notification.getKey(), entry);
         }
         mGroupManager.onEntryAdded(entry);
-        updateRankingAndSort(ranking);
+        updateRankingAndSort(mRankingMap);
     }
 
     public Entry remove(String key, RankingMap ranking) {

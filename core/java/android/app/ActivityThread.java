@@ -51,7 +51,6 @@ import android.database.sqlite.SQLiteDebug;
 import android.database.sqlite.SQLiteDebug.DbStats;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Typeface;
 import android.hardware.display.DisplayManagerGlobal;
 import android.net.ConnectivityManager;
 import android.net.IConnectivityManager;
@@ -90,6 +89,7 @@ import android.provider.CalendarContract;
 import android.provider.CallLog;
 import android.provider.ContactsContract;
 import android.provider.Downloads;
+import android.provider.FontsContract;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.security.net.config.NetworkSecurityConfigProvider;
@@ -670,6 +670,7 @@ public final class ActivityThread {
         IBinder requestToken;
         int requestType;
         int sessionId;
+        int flags;
     }
 
     static final class ActivityConfigChangeData {
@@ -1288,12 +1289,13 @@ public final class ActivityThread {
 
         @Override
         public void requestAssistContextExtras(IBinder activityToken, IBinder requestToken,
-                int requestType, int sessionId) {
+                int requestType, int sessionId, int flags) {
             RequestAssistContextExtras cmd = new RequestAssistContextExtras();
             cmd.activityToken = activityToken;
             cmd.requestToken = requestToken;
             cmd.requestType = requestType;
             cmd.sessionId = sessionId;
+            cmd.flags = flags;
             sendMessage(H.REQUEST_ASSIST_CONTEXT_EXTRAS, cmd);
         }
 
@@ -3030,7 +3032,7 @@ public final class ActivityThread {
                 referrer = r.activity.onProvideReferrer();
             }
             if (cmd.requestType == ActivityManager.ASSIST_CONTEXT_FULL || forAutofill) {
-                structure = new AssistStructure(r.activity, forAutofill);
+                structure = new AssistStructure(r.activity, forAutofill, cmd.flags);
                 Intent activityIntent = r.activity.getIntent();
                 boolean notSecure = r.window == null ||
                         (r.window.getAttributes().flags
@@ -3565,6 +3567,7 @@ public final class ActivityThread {
             try {
                 if (localLOGV) Slog.v(TAG, "Destroying service " + s);
                 s.onDestroy();
+                s.detachAndCleanUp();
                 Context context = s.getBaseContext();
                 if (context instanceof ContextImpl) {
                     final String who = s.getClassName();
@@ -4273,9 +4276,19 @@ public final class ActivityThread {
             View.mDebugViewAttributes = debugViewAttributes;
 
             // request all activities to relaunch for the changes to take place
-            for (Map.Entry<IBinder, ActivityClientRecord> entry : mActivities.entrySet()) {
-                requestRelaunchActivity(entry.getKey(), null, null, 0, false, null, null, false,
-                        false /* preserveWindow */);
+            requestRelaunchAllActivities();
+        }
+    }
+
+    private void requestRelaunchAllActivities() {
+        for (Map.Entry<IBinder, ActivityClientRecord> entry : mActivities.entrySet()) {
+            final Activity activity = entry.getValue().activity;
+            if (!activity.mFinished) {
+                try {
+                    ActivityManager.getService().requestActivityRelaunch(entry.getKey());
+                } catch (RemoteException e) {
+                    throw e.rethrowFromSystemServer();
+                }
             }
         }
     }
@@ -5082,24 +5095,26 @@ public final class ActivityThread {
         // caused by other sources, such as overlays. That means we want to be as conservative
         // about code changes as possible. Take the diff of the old ApplicationInfo and the new
         // to see if anything needs to change.
+        LoadedApk apk;
+        LoadedApk resApk;
+        // Update all affected loaded packages with new package information
         synchronized (mResourcesManager) {
-            // Update all affected loaded packages with new package information
             WeakReference<LoadedApk> ref = mPackages.get(ai.packageName);
-            LoadedApk apk = ref != null ? ref.get() : null;
-            if (apk != null) {
-                final ArrayList<String> oldPaths = new ArrayList<>();
-                LoadedApk.makePaths(this, apk.getApplicationInfo(), oldPaths);
-                apk.updateApplicationInfo(ai, oldPaths);
-            }
-
-            ref = mResourcePackages.get(ai.packageName);
             apk = ref != null ? ref.get() : null;
-            if (apk != null) {
-                final ArrayList<String> oldPaths = new ArrayList<>();
-                LoadedApk.makePaths(this, apk.getApplicationInfo(), oldPaths);
-                apk.updateApplicationInfo(ai, oldPaths);
-            }
-
+            ref = mResourcePackages.get(ai.packageName);
+            resApk = ref != null ? ref.get() : null;
+        }
+        if (apk != null) {
+            final ArrayList<String> oldPaths = new ArrayList<>();
+            LoadedApk.makePaths(this, apk.getApplicationInfo(), oldPaths);
+            apk.updateApplicationInfo(ai, oldPaths);
+        }
+        if (resApk != null) {
+            final ArrayList<String> oldPaths = new ArrayList<>();
+            LoadedApk.makePaths(this, resApk.getApplicationInfo(), oldPaths);
+            resApk.updateApplicationInfo(ai, oldPaths);
+        }
+        synchronized (mResourcesManager) {
             // Update all affected Resources objects to use new ResourcesImpl
             mResourcesManager.applyNewResourceDirsLocked(ai.sourceDir, ai.resourceDirs);
         }
@@ -5114,14 +5129,7 @@ public final class ActivityThread {
         newConfig.assetsSeq = (mConfiguration != null ? mConfiguration.assetsSeq : 0) + 1;
         handleConfigurationChanged(newConfig, null);
 
-        // Schedule all activities to reload
-        for (final Map.Entry<IBinder, ActivityClientRecord> entry : mActivities.entrySet()) {
-            final Activity activity = entry.getValue().activity;
-            if (!activity.mFinished) {
-                requestRelaunchActivity(entry.getKey(), null, null, 0, false, null, null, false,
-                        false);
-            }
-        }
+        requestRelaunchAllActivities();
     }
 
     static void freeTextLayoutCachesIfNeeded(int configDiff) {
@@ -5793,7 +5801,7 @@ public final class ActivityThread {
         }
 
         // Preload fonts resources
-        Typeface.setApplicationContext(appContext);
+        FontsContract.setApplicationContextForResources(appContext);
         try {
             final ApplicationInfo info =
                     getPackageManager().getApplicationInfo(

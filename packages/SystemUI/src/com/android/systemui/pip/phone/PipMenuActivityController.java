@@ -27,6 +27,7 @@ import android.content.Intent;
 import android.content.pm.ParceledListSlice;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.Debug;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Messenger;
@@ -36,6 +37,9 @@ import android.util.Log;
 import android.view.IWindowManager;
 
 import com.android.systemui.pip.phone.PipMediaController.ActionListener;
+import com.android.systemui.recents.events.EventBus;
+import com.android.systemui.recents.events.component.HidePipMenuEvent;
+import com.android.systemui.recents.misc.ReferenceCountedTrigger;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -119,6 +123,7 @@ public class PipMenuActivityController {
     // The dismiss fraction update is sent frequently, so use a temporary bundle for the message
     private Bundle mTmpDismissFractionData = new Bundle();
 
+    private ReferenceCountedTrigger mOnAttachDecrementTrigger;
     private boolean mStartActivityRequested;
     private Messenger mToActivityMessenger;
     private Messenger mMessenger = new Messenger(new Handler() {
@@ -132,9 +137,6 @@ public class PipMenuActivityController {
                 }
                 case MESSAGE_EXPAND_PIP: {
                     mListeners.forEach(l -> l.onPipExpand());
-                    // Preemptively mark the menu as invisible once we expand the PiP, but don't
-                    // resize as we will be animating the stack
-                    onMenuStateChanged(MENU_STATE_NONE, false /* resize */);
                     break;
                 }
                 case MESSAGE_MINIMIZE_PIP: {
@@ -143,9 +145,6 @@ public class PipMenuActivityController {
                 }
                 case MESSAGE_DISMISS_PIP: {
                     mListeners.forEach(l -> l.onPipDismiss());
-                    // Preemptively mark the menu as invisible once we dismiss the PiP, but don't
-                    // resize as we'll be removing the stack in place
-                    onMenuStateChanged(MENU_STATE_NONE, false /* resize */);
                     break;
                 }
                 case MESSAGE_SHOW_MENU: {
@@ -163,6 +162,10 @@ public class PipMenuActivityController {
                 case MESSAGE_UPDATE_ACTIVITY_CALLBACK: {
                     mToActivityMessenger = msg.replyTo;
                     mStartActivityRequested = false;
+                    if (mOnAttachDecrementTrigger != null) {
+                        mOnAttachDecrementTrigger.decrement();
+                        mOnAttachDecrementTrigger = null;
+                    }
                     // Mark the menu as invisible once the activity finishes as well
                     if (mToActivityMessenger == null) {
                         onMenuStateChanged(MENU_STATE_NONE, true /* resize */);
@@ -187,6 +190,8 @@ public class PipMenuActivityController {
         mActivityManager = activityManager;
         mMediaController = mediaController;
         mInputConsumerController = inputConsumerController;
+
+        EventBus.getDefault().register(this);
     }
 
     public void onActivityPinned() {
@@ -194,6 +199,19 @@ public class PipMenuActivityController {
             // If the menu is not visible, then re-register the input consumer if it is not already
             // registered
             mInputConsumerController.registerInputConsumer();
+        }
+    }
+
+    public void onPinnedStackAnimationEnded() {
+        // Note: Only active menu activities care about this event
+        if (mToActivityMessenger != null) {
+            Message m = Message.obtain();
+            m.what = PipMenuActivity.MESSAGE_ANIMATION_ENDED;
+            try {
+                mToActivityMessenger.send(m);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Could not notify menu pinned animation ended", e);
+            }
         }
     }
 
@@ -237,7 +255,9 @@ public class PipMenuActivityController {
     public void showMenu(int menuState, Rect stackBounds, Rect movementBounds,
             boolean allowMenuTimeout) {
         if (DEBUG) {
-            Log.d(TAG, "showMenu() hasActivity=" + (mToActivityMessenger != null));
+            Log.d(TAG, "showMenu() state=" + menuState
+                    + " hasActivity=" + (mToActivityMessenger != null)
+                    + " callers=\n" + Debug.getCallers(5, "    "));
         }
         if (mToActivityMessenger != null) {
             Bundle data = new Bundle();
@@ -281,7 +301,9 @@ public class PipMenuActivityController {
      */
     public void hideMenu() {
         if (DEBUG) {
-            Log.d(TAG, "hideMenu() hasActivity=" + (mToActivityMessenger != null));
+            Log.d(TAG, "hideMenu() state=" + mMenuState
+                    + " hasActivity=" + (mToActivityMessenger != null)
+                    + " callers=\n" + Debug.getCallers(5, "    "));
         }
         if (mToActivityMessenger != null) {
             Message m = Message.obtain();
@@ -295,10 +317,12 @@ public class PipMenuActivityController {
     }
 
     /**
-     * @return the current menu state.
+     * Preemptively mark the menu as invisible, used when we are directly manipulating the pinned
+     * stack and don't want to trigger a resize which can animate the stack in a conflicting way
+     * (ie. when manually expanding or dismissing).
      */
-    public int getMenuState() {
-        return mMenuState;
+    public void hideMenuWithoutResize() {
+        onMenuStateChanged(MENU_STATE_NONE, false /* resize */);
     }
 
     /**
@@ -417,6 +441,15 @@ public class PipMenuActivityController {
             }
         }
         mMenuState = menuState;
+    }
+
+    public final void onBusEvent(HidePipMenuEvent event) {
+        if (mStartActivityRequested) {
+            // If the menu has been start-requested, but not actually started, then we defer the
+            // trigger callback until the menu has started and called back to the controller
+            mOnAttachDecrementTrigger = event.getAnimationTrigger();
+            mOnAttachDecrementTrigger.increment();
+        }
     }
 
     public void dump(PrintWriter pw, String prefix) {

@@ -43,6 +43,7 @@ import android.testing.AndroidTestingRunner;
 import android.view.Display;
 
 import com.android.internal.hardware.AmbientDisplayConfiguration;
+import com.android.systemui.SysuiTestCase;
 import com.android.systemui.util.wakelock.WakeLockFake;
 
 import android.testing.UiThreadTest;
@@ -54,7 +55,7 @@ import org.junit.runner.RunWith;
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
 @UiThreadTest
-public class DozeMachineTest {
+public class DozeMachineTest extends SysuiTestCase {
 
     DozeMachine mMachine;
 
@@ -106,7 +107,7 @@ public class DozeMachineTest {
     public void testPulseDone_goesToDoze() {
         when(mConfigMock.alwaysOnEnabled(anyInt())).thenReturn(false);
         mMachine.requestState(INITIALIZED);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSING);
 
         mMachine.requestState(DOZE_PULSE_DONE);
@@ -119,7 +120,7 @@ public class DozeMachineTest {
     public void testPulseDone_goesToAoD() {
         when(mConfigMock.alwaysOnEnabled(anyInt())).thenReturn(true);
         mMachine.requestState(INITIALIZED);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSING);
 
         mMachine.requestState(DOZE_PULSE_DONE);
@@ -163,7 +164,7 @@ public class DozeMachineTest {
     public void testWakeLock_heldInPulseStates() {
         mMachine.requestState(INITIALIZED);
 
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         assertTrue(mWakeLockFake.isHeld());
 
         mMachine.requestState(DOZE_PULSING);
@@ -186,7 +187,7 @@ public class DozeMachineTest {
         mMachine.requestState(INITIALIZED);
 
         mMachine.requestState(DOZE);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSING);
         mMachine.requestState(DOZE_PULSE_DONE);
 
@@ -198,9 +199,9 @@ public class DozeMachineTest {
         mMachine.requestState(INITIALIZED);
 
         mMachine.requestState(DOZE);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSING);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSE_DONE);
     }
 
@@ -209,7 +210,7 @@ public class DozeMachineTest {
         mMachine.requestState(INITIALIZED);
 
         mMachine.requestState(DOZE);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSE_DONE);
     }
 
@@ -235,7 +236,7 @@ public class DozeMachineTest {
     public void testScreen_onInPulse() {
         mMachine.requestState(INITIALIZED);
 
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
         mMachine.requestState(DOZE_PULSING);
 
         assertEquals(Display.STATE_DOZE, mServiceFake.screenState);
@@ -246,7 +247,7 @@ public class DozeMachineTest {
         mMachine.requestState(INITIALIZED);
 
         mMachine.requestState(DOZE);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
 
         assertEquals(Display.STATE_OFF, mServiceFake.screenState);
     }
@@ -256,7 +257,7 @@ public class DozeMachineTest {
         mMachine.requestState(INITIALIZED);
 
         mMachine.requestState(DOZE_AOD);
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
 
         assertEquals(Display.STATE_DOZE, mServiceFake.screenState);
     }
@@ -270,9 +271,40 @@ public class DozeMachineTest {
             return null;
         }).when(mPartMock).transitionTo(any(), eq(DOZE_REQUEST_PULSE));
 
-        mMachine.requestState(DOZE_REQUEST_PULSE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
 
         assertEquals(DOZE_PULSING, mMachine.getState());
+    }
+
+    @Test
+    public void testPulseReason_getMatchesRequest() {
+        mMachine.requestState(INITIALIZED);
+        mMachine.requestState(DOZE);
+        mMachine.requestPulse(DozeLog.PULSE_REASON_SENSOR_DOUBLE_TAP);
+
+        assertEquals(DozeLog.PULSE_REASON_SENSOR_DOUBLE_TAP, mMachine.getPulseReason());
+    }
+
+    @Test
+    public void testPulseReason_getFromTransition() {
+        mMachine.requestState(INITIALIZED);
+        mMachine.requestState(DOZE);
+        doAnswer(inv -> {
+            DozeMachine.State newState = inv.getArgument(1);
+            if (newState == DOZE_REQUEST_PULSE
+                    || newState == DOZE_PULSING
+                    || newState == DOZE_PULSE_DONE) {
+                assertEquals(DozeLog.PULSE_REASON_NOTIFICATION, mMachine.getPulseReason());
+            } else {
+                assertTrue("unexpected state " + newState,
+                        newState == DOZE || newState == DOZE_AOD);
+            }
+            return null;
+        }).when(mPartMock).transitionTo(any(), any());
+
+        mMachine.requestPulse(DozeLog.PULSE_REASON_NOTIFICATION);
+        mMachine.requestState(DOZE_PULSING);
+        mMachine.requestState(DOZE_PULSE_DONE);
     }
 
     @Test

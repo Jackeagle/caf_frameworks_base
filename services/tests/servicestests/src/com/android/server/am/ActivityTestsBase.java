@@ -151,14 +151,22 @@ public class ActivityTestsBase {
      * setup not available in the test environment. Also specifies an injector for
      */
     protected static class TestActivityStackSupervisor extends ActivityStackSupervisor {
+        private final ActivityDisplay mDisplay;
+
         public TestActivityStackSupervisor(ActivityManagerService service, Looper looper) {
             super(service, looper);
             mWindowManager = prepareMockWindowManager();
+            mDisplay = new ActivityDisplay();
         }
 
         // No home stack is set.
         @Override
         void moveHomeStackToFront(String reason) {
+        }
+
+        @Override
+        boolean moveHomeStackTaskToTop(String reason) {
+            return true;
         }
 
         // Invoked during {@link ActivityStack} creation.
@@ -180,9 +188,8 @@ public class ActivityTestsBase {
 
         public <T extends ActivityStack> T createTestStack(ActivityManagerService service,
                 int stackId, boolean onTop) {
-            final ActivityDisplay display = new ActivityDisplay();
             final TestActivityContainer container =
-                    new TestActivityContainer(service, stackId, display, onTop);
+                    new TestActivityContainer(service, stackId, mDisplay, onTop);
             mActivityContainers.put(stackId, container);
             return (T) container.getStack();
         }
@@ -225,9 +232,17 @@ public class ActivityTestsBase {
                 if (mStack == null) {
                     final RecentTasks recents =
                             new RecentTasks(mService, mService.mStackSupervisor);
-                    mStack = mStackId == ActivityManager.StackId.PINNED_STACK_ID
-                    ? new PinnedActivityStack(this, recents, mOnTop)
-                    : new TestActivityStack(this, recents, mOnTop);
+                    if (mStackId == ActivityManager.StackId.PINNED_STACK_ID) {
+                        mStack = new PinnedActivityStack(this, recents, mOnTop) {
+                            @Override
+                            Rect getPictureInPictureBounds(float aspectRatio,
+                                    boolean useExistingStackBounds) {
+                                return new Rect(50, 50, 100, 100);
+                            }
+                        };
+                    } else {
+                        mStack = new TestActivityStack(this, recents, mOnTop);
+                    }
                 }
 
                 return mStack;

@@ -70,6 +70,8 @@ public class NotificationShelf extends ActivatableNotificationView implements
     private float mMaxShelfEnd;
     private int mRelativeOffset;
     private boolean mInteractive;
+    private float mOpenedAmount;
+    private boolean mNoAnimationsInThisFrame;
     private boolean mAnimationsEnabled = true;
 
     public NotificationShelf(Context context, AttributeSet attrs) {
@@ -200,7 +202,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
         //  find the first view that doesn't overlap with the shelf
         int notificationIndex = 0;
         int notGoneIndex = 0;
-        int colorOfViewBeforeLast = 0;
+        int colorOfViewBeforeLast = NO_COLOR;
         boolean backgroundForceHidden = false;
         if (mHideBackground && !mShelfState.hasItemsInStableShelf) {
             backgroundForceHidden = true;
@@ -225,7 +227,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
             }
             ExpandableNotificationRow row = (ExpandableNotificationRow) child;
             float notificationClipEnd;
-            boolean aboveShelf = row.getTranslationZ() > baseZHeight;
+            boolean aboveShelf = ViewState.getFinalTranslationZ(row) > baseZHeight;
             boolean isLastChild = child == lastChild;
             float rowTranslationY = row.getTranslationY();
             if (isLastChild || aboveShelf || backgroundForceHidden) {
@@ -254,7 +256,10 @@ public class NotificationShelf extends ActivatableNotificationView implements
                 colorTwoBefore = previousColor;
                 transitionAmount = inShelfAmount;
             }
-            if (isLastChild && colorOfViewBeforeLast != NO_COLOR) {
+            if (isLastChild) {
+                if (colorOfViewBeforeLast == NO_COLOR) {
+                    colorOfViewBeforeLast = ownColorUntinted;
+                }
                 row.setOverrideTintColor(colorOfViewBeforeLast, inShelfAmount);
             } else {
                 colorOfViewBeforeLast = ownColorUntinted;
@@ -279,10 +284,15 @@ public class NotificationShelf extends ActivatableNotificationView implements
     private void updateNotificationClipHeight(ExpandableNotificationRow row,
             float notificationClipEnd) {
         float viewEnd = row.getTranslationY() + row.getActualHeight();
+        boolean isPinned = row.isPinned() || row.isHeadsUpAnimatingAway();
         if (viewEnd > notificationClipEnd
-                && (mAmbientState.isShadeExpanded()
-                        || (!row.isPinned() && !row.isHeadsUpAnimatingAway()))) {
-            row.setClipBottomAmount((int) (viewEnd - notificationClipEnd));
+                && (mAmbientState.isShadeExpanded() || !isPinned)) {
+            int clipBottomAmount = (int) (viewEnd - notificationClipEnd);
+            if (isPinned) {
+                clipBottomAmount = Math.min(row.getIntrinsicHeight() - row.getCollapsedHeight(),
+                        clipBottomAmount);
+            }
+            row.setClipBottomAmount(clipBottomAmount);
         } else {
             row.setClipBottomAmount(0);
         }
@@ -308,8 +318,9 @@ public class NotificationShelf extends ActivatableNotificationView implements
         float fullTransitionAmount;
         float iconTransitionAmount;
         float shelfStart = getTranslationY();
-        if (viewEnd >= shelfStart && (mAmbientState.isShadeExpanded()
-                || (!row.isPinned() && !row.isHeadsUpAnimatingAway()))) {
+        if (viewEnd >= shelfStart && (!mAmbientState.isUnlockHintRunning() || row.isInShelf())
+                && (mAmbientState.isShadeExpanded()
+                        || (!row.isPinned() && !row.isHeadsUpAnimatingAway()))) {
             if (viewStart < shelfStart) {
 
                 float fullAmount = (shelfStart - viewStart) / fullHeight;
@@ -346,7 +357,8 @@ public class NotificationShelf extends ActivatableNotificationView implements
         }
         float clampedAmount = iconTransitionAmount > 0.5f ? 1.0f : 0.0f;
         if (clampedAmount == fullTransitionAmount) {
-            iconState.useFullTransitionAmount = scrollingFast || expandingAnimated
+            iconState.noAnimations = scrollingFast || expandingAnimated;
+            iconState.useFullTransitionAmount = iconState.noAnimations
                 || (!ICON_ANMATIONS_WHILE_SCROLLING && fullTransitionAmount == 0.0f && scrolling);
             iconState.useLinearTransitionAmount = !ICON_ANMATIONS_WHILE_SCROLLING
                     && fullTransitionAmount == 0.0f && !mAmbientState.isExpansionChanging();
@@ -357,6 +369,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
                 && !ViewState.isAnimatingY(icon))) {
             iconState.cancelAnimations(icon);
             iconState.useFullTransitionAmount = true;
+            iconState.noAnimations = true;
         }
         float transitionAmount;
         if (isLastChild || !USE_ANIMATIONS_WHEN_OPENING || iconState.useFullTransitionAmount
@@ -365,14 +378,16 @@ public class NotificationShelf extends ActivatableNotificationView implements
         } else {
             // We take the clamped position instead
             transitionAmount = clampedAmount;
-            iconState.needsCannedAnimation = iconState.clampedAppearAmount != clampedAmount;
+            iconState.needsCannedAnimation = iconState.clampedAppearAmount != clampedAmount
+                    && !mNoAnimationsInThisFrame;
         }
         iconState.iconAppearAmount = !USE_ANIMATIONS_WHEN_OPENING
                     || iconState.useFullTransitionAmount
                 ? fullTransitionAmount
                 : transitionAmount;
         iconState.clampedAppearAmount = clampedAmount;
-        float contentTransformationAmount = isLastChild || iconState.translateContent
+        float contentTransformationAmount = !row.isAboveShelf()
+                    && (isLastChild || iconState.translateContent)
                 ? iconTransitionAmount
                 : 0.0f;
         row.setContentTransformationAmount(contentTransformationAmount, isLastChild);
@@ -425,7 +440,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
         if (iconState != null) {
             iconState.scaleX = newSize / icon.getHeight() / icon.getIconScale();
             iconState.scaleY = iconState.scaleX;
-            iconState.hidden = transitionAmount == 0.0f;
+            iconState.hidden = transitionAmount == 0.0f && !iconState.isAnimating(icon);
             iconState.alpha = alpha;
             iconState.yTranslation = iconYTranslation;
             if (stayingInShelf) {
@@ -503,6 +518,8 @@ public class NotificationShelf extends ActivatableNotificationView implements
     }
 
     private void setOpenedAmount(float openedAmount) {
+        mNoAnimationsInThisFrame = openedAmount == 1.0f && mOpenedAmount == 0.0f;
+        mOpenedAmount = openedAmount;
         if (!mAmbientState.isPanelFullWidth()) {
             // We don't do a transformation at all, lets just assume we are fully opened
             openedAmount = 1.0f;

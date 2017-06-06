@@ -175,6 +175,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
         implements PendingIntent.OnFinished {
     private static final String TAG = ConnectivityService.class.getSimpleName();
 
+    public static final String DIAG_ARG = "--diag";
+    public static final String SHORT_ARG = "--short";
+
     private static final boolean DBG = true;
     private static final boolean VDBG = false;
 
@@ -1852,7 +1855,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         final IndentingPrintWriter pw = new IndentingPrintWriter(writer, "  ");
         if (!DumpUtils.checkDumpPermission(mContext, TAG, pw)) return;
 
-        if (argsContain(args, "--diag")) {
+        if (argsContain(args, DIAG_ARG)) {
             dumpNetworkDiagnostics(pw);
             return;
         }
@@ -1938,7 +1941,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             pw.decreaseIndent();
         }
 
-        if (argsContain(args, "--short") == false) {
+        if (argsContain(args, SHORT_ARG) == false) {
             pw.println();
             synchronized (mValidationLogs) {
                 pw.println("mValidationLogs (most recent first):");
@@ -2634,6 +2637,17 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mHandler.sendMessageDelayed(
                 mHandler.obtainMessage(EVENT_PROMPT_UNVALIDATED, nai.network),
                 PROMPT_UNVALIDATED_DELAY_MS);
+    }
+
+    @Override
+    public void startCaptivePortalApp(Network network) {
+        enforceConnectivityInternalPermission();
+        mHandler.post(() -> {
+            NetworkAgentInfo nai = getNetworkAgentInfoForNetwork(network);
+            if (nai == null) return;
+            if (!nai.networkCapabilities.hasCapability(NET_CAPABILITY_CAPTIVE_PORTAL)) return;
+            nai.networkMonitor.sendMessage(NetworkMonitor.CMD_LAUNCH_CAPTIVE_PORTAL_APP);
+        });
     }
 
     public boolean avoidBadWifi() {

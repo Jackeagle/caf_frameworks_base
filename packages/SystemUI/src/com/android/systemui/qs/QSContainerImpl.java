@@ -39,6 +39,9 @@ public class QSContainerImpl extends FrameLayout {
     protected float mQsExpansion;
     private QSCustomizer mQSCustomizer;
     private QSFooter mQSFooter;
+    private int mGutterHeight;
+    private View mBackground;
+    private float mFullElevation;
 
     public QSContainerImpl(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -52,6 +55,9 @@ public class QSContainerImpl extends FrameLayout {
         mHeader = findViewById(R.id.header);
         mQSCustomizer = findViewById(R.id.qs_customize);
         mQSFooter = findViewById(R.id.qs_footer);
+        mBackground = findViewById(R.id.qs_background);
+        mGutterHeight = getContext().getResources().getDimensionPixelSize(R.dimen.qs_gutter_height);
+        mFullElevation = mQSPanel.getElevation();
     }
 
     @Override
@@ -78,7 +84,7 @@ public class QSContainerImpl extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        updateBottom();
+        updateExpansion();
     }
 
     /**
@@ -89,26 +95,47 @@ public class QSContainerImpl extends FrameLayout {
      */
     public void setHeightOverride(int heightOverride) {
         mHeightOverride = heightOverride;
-        updateBottom();
+        updateExpansion();
     }
 
-    public void updateBottom() {
+    public void updateExpansion() {
         int height = calculateContainerHeight();
-        setBottom(getTop() + height);
+        int gutterHeight = Math.round(mQsExpansion * mGutterHeight);
+        setBottom(getTop() + height + gutterHeight);
         mQSDetail.setBottom(getTop() + height);
+        mBackground.setBottom(getTop() + height);
         // Pin QS Footer to the bottom of the panel.
         mQSFooter.setTranslationY(height - mQSFooter.getHeight());
+
+        float elevation = mQsExpansion * mFullElevation;
+        mQSDetail.setElevation(elevation);
+        mBackground.setElevation(elevation);
+        mQSFooter.setElevation(elevation);
+        mQSPanel.setElevation(elevation);
     }
 
     protected int calculateContainerHeight() {
         int heightOverride = mHeightOverride != -1 ? mHeightOverride : getMeasuredHeight();
         return mQSCustomizer.isCustomizing() ? mQSCustomizer.getHeight()
-                : (int) (mQsExpansion * (heightOverride - mHeader.getHeight()))
+                : Math.round(mQsExpansion * (heightOverride - mHeader.getHeight()))
                 + mHeader.getHeight();
     }
 
     public void setExpansion(float expansion) {
         mQsExpansion = expansion;
-        updateBottom();
+        updateExpansion();
+    }
+
+    public void setGutterEnabled(boolean gutterEnabled) {
+        if (gutterEnabled == (mGutterHeight != 0)) {
+            return;
+        }
+        if (gutterEnabled) {
+            mGutterHeight = getContext().getResources().getDimensionPixelSize(
+                    R.dimen.qs_gutter_height);
+        } else {
+            mGutterHeight = 0;
+        }
+        updateExpansion();
     }
 }

@@ -23,7 +23,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 
-import android.content.pm.ActivityInfo;
 import android.os.PowerSaveState;
 import org.mockito.invocation.InvocationOnMock;
 
@@ -199,7 +198,7 @@ class TestWindowManagerPolicy implements WindowManagerPolicy {
         final com.android.server.wm.WindowState window;
         final AppWindowToken atoken;
         synchronized (sWm.mWindowMap) {
-            atoken = WindowTestsBase.sDisplayContent.getAppWindowToken(appToken);
+            atoken = sWm.mRoot.getAppWindowToken(appToken);
             window = WindowTestsBase.createWindow(null, TYPE_APPLICATION_STARTING, atoken,
                     "Starting window");
             atoken.startingWindow = window;
@@ -363,6 +362,11 @@ class TestWindowManagerPolicy implements WindowManagerPolicy {
 
     @Override
     public void screenTurnedOn() {
+
+    }
+
+    @Override
+    public void screenTurningOff(ScreenOffListener screenOffListener) {
 
     }
 
@@ -633,5 +637,14 @@ class TestWindowManagerPolicy implements WindowManagerPolicy {
     @Override
     public void setRecentsVisibilityLw(boolean visible) {
 
-   }
+    }
+
+    @Override
+    public void onSystemUiStarted() {
+    }
+
+    @Override
+    public boolean canDismissBootAnimation() {
+        return true;
+    }
 }

@@ -838,7 +838,10 @@
     <string name="description_direction_left">"Slide left for <xliff:g id="target_description" example="Unlock">%s</xliff:g>.</string>
 
     <!-- Zen mode: Priority only introduction message on first use -->
-    <string name="zen_priority_introduction">You won’t be disturbed by sounds and vibrations, except from alarms, reminders, events, and callers you specify.</string>
+    <string name="zen_priority_introduction">You won’t be disturbed by sounds and vibrations, except from alarms, reminders, events, and callers you specify. You'll still hear anything you choose to play including music, videos, and games.</string>
+
+    <!-- Zen mode: Alarms only introduction message on first use -->
+    <string name="zen_alarms_introduction">You won’t be disturbed by sounds and vibrations, except from alarms. You'll still hear anything you choose to play including music, videos, and games.</string>
 
     <!-- Zen mode: Priority only customization button label -->
     <string name="zen_priority_customize_button">Customize</string>
@@ -1211,7 +1214,7 @@
     <string name="zen_mode_and_condition"><xliff:g id="zen_mode" example="Priority interruptions only">%1$s</xliff:g>. <xliff:g id="exit_condition" example="For one hour">%2$s</xliff:g></string>
 
     <!-- Button label for ending zen mode in the volume dialog -->
-    <string name="volume_zen_end_now">End now</string>
+    <string name="volume_zen_end_now">Turn off now</string>
 
     <!-- Content description for accessibility (not shown on the screen): volume dialog expand button. [CHAR LIMIT=NONE] -->
     <string name="accessibility_volume_expand">Expand</string>
@@ -1505,6 +1508,8 @@
     <string name="snooze_option_30_min">30 minutes</string>
     <!-- Notification: Menu row: Snooze options: 1 hour option. [CHAR LIMIT=50]-->
     <string name="snooze_option_1_hour">1 hour</string>
+    <!-- Notification: Menu row: Snooze options: 1 hour option. [CHAR LIMIT=50]-->
+    <string name="snooze_option_2_hour">2 hours</string>
     <!-- Notification: Menu row: Snooze undo button label. [CHAR LIMIT=50]-->
     <string name="snooze_undo">UNDO</string>
 
@@ -1861,10 +1866,6 @@
         not appear on production builds ever. -->
     <string name="tuner_doze" translatable="false">Ambient Display</string>
 
-    <!-- Ambient display, Sensors wake up device of the tuner. Non-translatable since it should
-        not appear on production builds ever. -->
-    <string name="tuner_doze_sensors_wake_up_fully" translatable="false">Wake up device on double tap or lift</string>
-
     <!-- Ambient display always-on of the tuner. Non-translatable since it should
         not appear on production builds ever. -->
     <string name="tuner_doze_always_on" translatable="false">Always on</string>
@@ -1892,15 +1893,6 @@
 
     <!-- PiP BTW notification description. [CHAR LIMIT=NONE] -->
     <string name="pip_notification_message">If you don’t want <xliff:g id="name" example="Google Maps">%s</xliff:g> to use this feature, tap to open settings and turn it off.</string>
-
-    <!-- PiP section of the tuner. [CHAR LIMIT=NONE] -->
-    <string name="picture_in_picture" translatable="false">Picture-in-Picture</string>
-
-    <!-- PiP minimize title. [CHAR LIMIT=NONE]-->
-    <string name="pip_minimize_title" translatable="false">Minimize</string>
-
-    <!-- PiP minimize description. [CHAR LIMIT=NONE] -->
-    <string name="pip_minimize_description" translatable="false">Drag or fling the PIP to the edges of the screen to minimize it.</string>
 
     <!-- Button to play the current media on picture-in-picture (PIP) [CHAR LIMIT=30] -->
     <string name="pip_play">Play</string>
@@ -2033,4 +2025,12 @@
     <string name="China_Unicom">China Unicom</string>
     <string name="China_Telecom">China Telecom</string>
     <string name="China_Mobile_HD">China Mobile (HD)</string>
+
+    <!-- Title of the "running foreground services" dialog. [CHAR LIMIT=NONE] -->
+    <string name="running_foreground_services_title">Apps running in background</string>
+
+    <!-- Descriptive text of an item in the "running foreground services" dialog, telling the
+        user what will happen when they tap on that item (which is an application that has
+        been identified for them as running). [CHAR LIMIT=NONE] -->
+    <string name="running_foreground_services_msg">Tap for details on battery and data usage</string>
 </resources>

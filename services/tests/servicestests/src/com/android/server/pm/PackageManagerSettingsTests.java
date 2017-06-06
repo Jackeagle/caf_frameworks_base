@@ -25,21 +25,22 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
-import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageParser;
 import android.content.pm.PackageUserState;
 import android.content.pm.UserInfo;
-import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManagerInternal;
+import android.security.keystore.ArrayUtils;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.runner.AndroidJUnit4;
 import android.test.suitebuilder.annotation.SmallTest;
@@ -49,26 +50,18 @@ import android.util.Log;
 import android.util.LongSparseArray;
 
 import com.android.internal.os.AtomicFile;
-import com.android.internal.util.FastPrintWriter;
 import com.android.server.LocalServices;
 
-import org.hamcrest.core.IsNot;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 @RunWith(AndroidJUnit4.class)
@@ -539,6 +532,41 @@ public class PackageManagerSettingsTests {
                 false /*notLaunched*/, false /*stopped*/, true /*installed*/);
     }
 
+    @Test
+    public void testInsertPackageSetting() {
+        final PackageSetting ps = createPackageSetting(0 /*sharedUserId*/, 0 /*pkgFlags*/);
+        final PackageParser.Package pkg = new PackageParser.Package(PACKAGE_NAME);
+        pkg.applicationInfo.setCodePath(ps.codePathString);
+        pkg.applicationInfo.setResourcePath(ps.resourcePathString);
+        final Settings settings =
+                new Settings(InstrumentationRegistry.getContext().getFilesDir(), new Object());
+        pkg.usesStaticLibraries = new ArrayList<>(
+                Arrays.asList("foo.bar1", "foo.bar2", "foo.bar3"));
+        pkg.usesStaticLibrariesVersions = new int[] {2, 4, 6};
+        settings.insertPackageSettingLPw(ps, pkg);
+        assertEquals(pkg, ps.pkg);
+        assertArrayEquals(pkg.usesStaticLibraries.toArray(new String[0]), ps.usesStaticLibraries);
+        assertArrayEquals(pkg.usesStaticLibrariesVersions, ps.usesStaticLibrariesVersions);
+
+        pkg.usesStaticLibraries = null;
+        pkg.usesStaticLibrariesVersions = null;
+        settings.insertPackageSettingLPw(ps, pkg);
+        assertEquals(pkg, ps.pkg);
+        assertNull("Actual: " + Arrays.toString(ps.usesStaticLibraries), ps.usesStaticLibraries);
+        assertNull("Actual: " + Arrays.toString(ps.usesStaticLibrariesVersions),
+                ps.usesStaticLibrariesVersions);
+    }
+
+    private <T> void assertArrayEquals(T[] a, T[] b) {
+        assertTrue("Expected: " + Arrays.toString(a) + ", actual: " + Arrays.toString(b),
+                Arrays.equals(a, b));
+    }
+
+    private void assertArrayEquals(int[] a, int[] b) {
+        assertTrue("Expected: " + Arrays.toString(a) + ", actual: " + Arrays.toString(b),
+                Arrays.equals(a, b));
+    }
+
     private void verifyUserState(PackageUserState userState, PackageUserState oldUserState,
             boolean userStateChanged) {
         verifyUserState(userState, oldUserState, userStateChanged, false /*notLaunched*/,
@@ -547,7 +575,6 @@ public class PackageManagerSettingsTests {
 
     private void verifyUserState(PackageUserState userState, PackageUserState oldUserState,
             boolean userStateChanged, boolean notLaunched, boolean stopped, boolean installed) {
-        assertThat(userState.blockUninstall, is(false));
         assertThat(userState.enabled, is(0));
         assertThat(userState.hidden, is(false));
         assertThat(userState.installed, is(installed));
@@ -783,31 +810,14 @@ public class PackageManagerSettingsTests {
 
     @Before
     public void createUserManagerServiceRef() throws ReflectiveOperationException {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(new Runnable() {
-            @Override
-            public void run() {
-                Constructor<UserManagerService> umsc;
-                try {
-                    // unregister the user manager from the local service
-                    Method removeServiceForTest = LocalServices.class.getDeclaredMethod(
-                            "removeServiceForTest", Class.class);
-                    removeServiceForTest.invoke(null, UserManagerInternal.class);
-
-                    // now create a new user manager [which registers again with the local service]
-                    umsc = UserManagerService.class.getDeclaredConstructor(
-                            Context.class,
-                            PackageManagerService.class,
-                            Object.class,
-                            File.class);
-                    umsc.setAccessible(true);
-                    UserManagerService ums = umsc.newInstance(InstrumentationRegistry.getContext(),
-                            null /*PackageManagerService*/, new Object() /*packagesLock*/,
-                            new File(InstrumentationRegistry.getContext().getFilesDir(), "user"));
-                } catch (SecurityException
-                        | ReflectiveOperationException
-                        | IllegalArgumentException e) {
-                    fail("Could not create user manager service; " + e);
-                }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync((Runnable) () -> {
+            try {
+                // unregister the user manager from the local service
+                LocalServices.removeServiceForTest(UserManagerInternal.class);
+                new UserManagerService(InstrumentationRegistry.getContext());
+            } catch (Exception e) {
+                e.printStackTrace();
+                fail("Could not create user manager service; " + e);
             }
         });
     }

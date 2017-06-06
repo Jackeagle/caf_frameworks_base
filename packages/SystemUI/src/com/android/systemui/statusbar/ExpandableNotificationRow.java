@@ -16,7 +16,7 @@
 
 package com.android.systemui.statusbar;
 
-import static com.android.systemui.statusbar.notification.NotificationInflater.InflationExceptionHandler;
+import static com.android.systemui.statusbar.notification.NotificationInflater.InflationCallback;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -24,6 +24,8 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.annotation.Nullable;
 import android.content.Context;
+import android.content.res.Resources;
+import android.content.res.Configuration;
 import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.ColorDrawable;
@@ -47,6 +49,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.RemoteViews;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.util.NotificationColorUtil;
@@ -61,7 +64,6 @@ import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.MenuItem;
 import com.android.systemui.statusbar.NotificationGuts.GutsContent;
 import com.android.systemui.statusbar.notification.HybridNotificationView;
-import com.android.systemui.statusbar.notification.InflationException;
 import com.android.systemui.statusbar.notification.NotificationInflater;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
@@ -84,6 +86,12 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private static final int COLORED_DIVIDER_ALPHA = 0x7B;
     private static final int MENU_VIEW_INDEX = 0;
 
+    public interface LayoutListener {
+        public void onLayout();
+    }
+
+    private LayoutListener mLayoutListener;
+    private boolean mLowPriorityStateUpdated;
     private final NotificationInflater mNotificationInflater;
     private int mIconTransformContentShift;
     private int mIconTransformContentShiftNoIcon;
@@ -227,6 +235,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private boolean mUseIncreasedHeadsUpHeight;
     private float mTranslationWhenRemoved;
     private boolean mWasChildInGroupWhenRemoved;
+    private int mNotificationColorAmbient;
 
     @Override
     public boolean isGroupExpansionChanging() {
@@ -314,14 +323,13 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
-    public void updateNotification(NotificationData.Entry entry) throws InflationException {
+    public void updateNotification(NotificationData.Entry entry) {
         mEntry = entry;
         mStatusBarNotification = entry.notification;
         mNotificationInflater.inflateNotificationViews();
-        onNotificationUpdated();
     }
 
-    private void onNotificationUpdated() {
+    public void onNotificationUpdated() {
         for (NotificationContentView l : mLayouts) {
             l.onNotificationUpdated(mEntry);
         }
@@ -356,9 +364,18 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 NotificationColorUtil.getInstance(mContext));
         int color = StatusBarIconView.NO_COLOR;
         if (colorize) {
-            color = mEntry.getContrastedColor(mContext, mIsLowPriority && !isExpanded());
+            color = mEntry.getContrastedColor(mContext, mIsLowPriority && !isExpanded(),
+                    getBackgroundColorWithoutTint());
         }
         expandedIcon.setStaticDrawableColor(color);
+    }
+
+    @Override
+    public boolean isDimmable() {
+        if (!getShowingLayout().isDimmable()) {
+            return false;
+        }
+        return super.isDimmable();
     }
 
     private void updateLimits() {
@@ -482,9 +499,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         boolean childInGroup = StatusBar.ENABLE_CHILD_NOTIFICATIONS && isChildInGroup;
         mNotificationParent = childInGroup ? parent : null;
         mPrivateLayout.setIsChildInGroup(childInGroup);
-        if (mNotificationInflater.setIsChildInGroup(childInGroup)) {
-            onNotificationUpdated();
-        }
+        mNotificationInflater.setIsChildInGroup(childInGroup);
         resetBackgroundAlpha();
         updateBackgroundForGroupState();
         updateClickAndFocus();
@@ -799,10 +814,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     public void onDensityOrFontScaleChanged() {
         initDimens();
-        if (mIsSummaryWithChildren) {
-            if (mChildrenContainer != null) {
-                mChildrenContainer.reInflateViews(mExpandClickListener, mEntry.notification);
-            }
+        // Let's update our childrencontainer. This is intentionally not guarded with
+        // mIsSummaryWithChildren since we might have had children but not anymore.
+        if (mChildrenContainer != null) {
+            mChildrenContainer.reInflateViews(mExpandClickListener, mEntry.notification);
         }
         if (mGuts != null) {
             View oldGuts = mGuts;
@@ -826,6 +841,13 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
         mNotificationInflater.onDensityOrFontScaleChanged();
         onNotificationUpdated();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        if (mMenuRow.getMenuView() != null) {
+            mMenuRow.onConfigurationChanged();
+        }
     }
 
     public void setContentBackground(int customBackgroundColor, boolean animate,
@@ -854,11 +876,18 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     private void updateNotificationColor() {
         mNotificationColor = NotificationColorUtil.resolveContrastColor(mContext,
+                getStatusBarNotification().getNotification().color,
+                getBackgroundColorWithoutTint());
+        mNotificationColorAmbient = NotificationColorUtil.resolveAmbientColor(mContext,
                 getStatusBarNotification().getNotification().color);
     }
 
     public HybridNotificationView getSingleLineView() {
         return mPrivateLayout.getSingleLineView();
+    }
+
+    public HybridNotificationView getAmbientSingleLineView() {
+        return getShowingLayout().getAmbientSingleLineChild();
     }
 
     public boolean isOnKeyguard() {
@@ -1093,6 +1122,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
+
+    public void setLowPriorityStateUpdated(boolean lowPriorityStateUpdated) {
+        mLowPriorityStateUpdated = lowPriorityStateUpdated;
+    }
+
+    public boolean hasLowPriorityStateUpdated() {
+        return mLowPriorityStateUpdated;
+    }
+
     public boolean isLowPriority() {
         return mIsLowPriority;
     }
@@ -1111,12 +1149,21 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mNotificationInflater.setRemoteViewClickHandler(remoteViewClickHandler);
     }
 
-    public void setInflateExceptionHandler(InflationExceptionHandler inflateExceptionHandler) {
-        mNotificationInflater.setInflateExceptionHandler(inflateExceptionHandler);
+    public void setInflationCallback(InflationCallback callback) {
+        mNotificationInflater.setInflationCallback(callback);
     }
 
     public void setNeedsRedaction(boolean needsRedaction) {
         mNotificationInflater.setRedactAmbient(needsRedaction);
+    }
+
+    @VisibleForTesting
+    public NotificationInflater getNotificationInflater() {
+        return mNotificationInflater;
+    }
+
+    public int getNotificationColorAmbient() {
+        return mNotificationColorAmbient;
     }
 
     public interface ExpansionLogger {
@@ -1331,6 +1378,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     @Override
     public void setDark(boolean dark, boolean fade, long delay) {
         super.setDark(dark, fade, delay);
+        if (!mIsHeadsUp) {
+            // Only fade the showing view of the pulsing notification.
+            fade = false;
+        }
         final NotificationContentView showing = getShowingLayout();
         if (showing != null) {
             showing.setDark(dark, fade, delay);
@@ -1417,9 +1468,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     public void setUserLocked(boolean userLocked) {
         mUserLocked = userLocked;
         mPrivateLayout.setUserExpanding(userLocked);
-        if (mIsSummaryWithChildren) {
+        // This is intentionally not guarded with mIsSummaryWithChildren since we might have had
+        // children but not anymore.
+        if (mChildrenContainer != null) {
             mChildrenContainer.setUserLocked(userLocked);
-            if (userLocked || !isGroupExpanded()) {
+            if (mIsSummaryWithChildren && (userLocked || !isGroupExpanded())) {
                 updateBackgroundForGroupState();
             }
         }
@@ -1497,13 +1550,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             return mGuts.getIntrinsicHeight();
         } else if ((isChildInGroup() && !isGroupExpanded())) {
             return mPrivateLayout.getMinHeight();
-        } else if (mShowAmbient) {
-            return getAmbientHeight();
         } else if (mSensitive && mHideSensitiveForIntrinsicHeight) {
             return getMinHeight();
-        } else if (mIsSummaryWithChildren && !mOnKeyguard) {
+        } else if (mIsSummaryWithChildren && (!mOnKeyguard || mShowAmbient)) {
             return mChildrenContainer.getIntrinsicHeight();
-        } else if (!mOnKeyguard && (mIsHeadsUp || mHeadsupDisappearRunning)) {
+        } else if (isHeadsUpAllowed() && (mIsHeadsUp || mHeadsupDisappearRunning)) {
             if (isPinned() || mHeadsupDisappearRunning) {
                 return getPinnedHeadsUpHeight(true /* atLeastMinHeight */);
             } else if (isExpanded()) {
@@ -1516,6 +1567,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         } else {
             return getCollapsedHeight();
         }
+    }
+
+    private boolean isHeadsUpAllowed() {
+        return !mOnKeyguard && !mShowAmbient;
     }
 
     @Override
@@ -1568,6 +1623,14 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mIsSystemChildExpanded = expanded;
     }
 
+    public void setLayoutListener(LayoutListener listener) {
+        mLayoutListener = listener;
+    }
+
+    public void removeListener() {
+        mLayoutListener = null;
+    }
+
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
@@ -1576,6 +1639,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mMenuRow.onHeightUpdate();
         }
         updateContentShiftHeight();
+        if (mLayoutListener != null) {
+            mLayoutListener.onLayout();
+        }
     }
 
     /**
@@ -1837,22 +1903,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     public int getMinHeight() {
         if (mGuts != null && mGuts.isExposed()) {
             return mGuts.getIntrinsicHeight();
-        } else if (!mOnKeyguard && mIsHeadsUp && mHeadsUpManager.isTrackingHeadsUp()) {
+        } else if (isHeadsUpAllowed() && mIsHeadsUp && mHeadsUpManager.isTrackingHeadsUp()) {
                 return getPinnedHeadsUpHeight(false /* atLeastMinHeight */);
         } else if (mIsSummaryWithChildren && !isGroupExpanded() && !mShowingPublic) {
             return mChildrenContainer.getMinHeight();
-        } else if (!mOnKeyguard && mIsHeadsUp) {
+        } else if (isHeadsUpAllowed() && mIsHeadsUp) {
             return mHeadsUpHeight;
         }
         NotificationContentView showingLayout = getShowingLayout();
         return showingLayout.getMinHeight();
-    }
-
-    private int getAmbientHeight() {
-        NotificationContentView showingLayout = getShowingLayout();
-        return showingLayout.getAmbientChild() != null
-                ? showingLayout.getAmbientChild().getHeight()
-                : getCollapsedHeight();
     }
 
     @Override
@@ -2089,8 +2148,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     public void setShowAmbient(boolean showAmbient) {
         if (showAmbient != mShowAmbient) {
             mShowAmbient = showAmbient;
+            if (mChildrenContainer != null) {
+                mChildrenContainer.notifyShowAmbientChanged();
+            }
             notifyHeightChanged(false /* needsAnimation */);
         }
+    }
+
+    public boolean isShowingAmbient() {
+        return mShowAmbient;
     }
 
     public void setAboveShelf(boolean aboveShelf) {
@@ -2134,5 +2200,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 row.startChildAnimation(mOverallState, properties);
             }
         }
+    }
+
+    @VisibleForTesting
+    protected void setChildrenContainer(NotificationChildrenContainer childrenContainer) {
+        mChildrenContainer = childrenContainer;
     }
 }

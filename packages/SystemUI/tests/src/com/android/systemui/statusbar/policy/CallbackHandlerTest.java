@@ -20,6 +20,7 @@ import android.support.test.runner.AndroidJUnit4;
 import android.telephony.SubscriptionInfo;
 import android.test.suitebuilder.annotation.SmallTest;
 import com.android.systemui.R;
+import com.android.systemui.SysuiTestCase;
 import com.android.systemui.statusbar.policy.NetworkController.EmergencyListener;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkController.SignalCallback;
@@ -40,7 +41,7 @@ import static org.mockito.Matchers.eq;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
-public class CallbackHandlerTest {
+public class CallbackHandlerTest extends SysuiTestCase {
 
     private CallbackHandler mHandler;
     private HandlerThread mHandlerThread;
@@ -110,34 +111,41 @@ public class CallbackHandlerTest {
         String typeDescription = "Test 1";
         String description = "Test 2";
         int type = R.drawable.stat_sys_data_fully_connected_1x;
-        int qsType = R.drawable.ic_qs_signal_1x;
+        int qsType = type;
         boolean wide = true;
         int subId = 5;
         boolean roaming = true;
-        boolean isEmergency = true;
-        mHandler.setMobileDataIndicators(status, type, in, out, 0, 0, 0, typeDescription,
-                subId, roaming, isEmergency);
+
+        mHandler.setMobileDataIndicators(status, qs, type, qsType, in, out, 0, 0, 0,
+                typeDescription, description, wide, subId, roaming);
         waitForCallbacks();
 
         ArgumentCaptor<IconState> statusArg = ArgumentCaptor.forClass(IconState.class);
+        ArgumentCaptor<IconState> qsArg = ArgumentCaptor.forClass(IconState.class);
         ArgumentCaptor<Integer> typeIconArg = ArgumentCaptor.forClass(Integer.class);
+        ArgumentCaptor<Integer> qsTypeIconArg = ArgumentCaptor.forClass(Integer.class);
         ArgumentCaptor<Boolean> inArg = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<Boolean> outArg = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<String> typeContentArg = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> descArg = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Boolean> wideArg = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<Integer> subIdArg = ArgumentCaptor.forClass(Integer.class);
         Mockito.verify(mSignalCallback).setMobileDataIndicators(statusArg.capture(),
-                typeIconArg.capture(), inArg.capture(),
-                outArg.capture(),
+                qsArg.capture(), typeIconArg.capture(), qsTypeIconArg.capture(), inArg.capture(),
+                outArg.capture(), ArgumentCaptor.forClass(Integer.class).capture(),
                 ArgumentCaptor.forClass(Integer.class).capture(),
                 ArgumentCaptor.forClass(Integer.class).capture(),
-                ArgumentCaptor.forClass(Integer.class).capture(),
-                typeContentArg.capture(),
-                subIdArg.capture(), eq(roaming), eq(isEmergency));
+                typeContentArg.capture(), descArg.capture(), wideArg.capture(),
+                subIdArg.capture(), eq(roaming));
         assertEquals(status, statusArg.getValue());
+        assertEquals(qs, qsArg.getValue());
         assertEquals(type, (int) typeIconArg.getValue());
+        assertEquals(qsType, (int) qsTypeIconArg.getValue());
         assertEquals(in, (boolean) inArg.getValue());
         assertEquals(out, (boolean) outArg.getValue());
         assertEquals(typeDescription, typeContentArg.getValue());
+        assertEquals(description, descArg.getValue());
+        assertEquals(wide, (boolean) wideArg.getValue());
         assertEquals(subId, (int) subIdArg.getValue());
     }
 

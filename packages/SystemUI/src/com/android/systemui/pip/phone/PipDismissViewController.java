@@ -21,6 +21,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -69,6 +70,13 @@ public class PipDismissViewController {
             // Create a new view for the dismiss target
             LayoutInflater inflater = LayoutInflater.from(mContext);
             mDismissView = inflater.inflate(R.layout.pip_dismiss_view, null);
+            mDismissView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+            mDismissView.forceHasOverlappingRendering(false);
+
+            // Set the gradient background
+            Drawable gradient = mContext.getResources().getDrawable(R.drawable.pip_dismiss_scrim);
+            gradient.setAlpha((int) (255 * 0.85f));
+            mDismissView.setBackground(gradient);
 
             // Adjust bottom margins of the text
             View text = mDismissView.findViewById(R.id.pip_dismiss_text);
@@ -77,14 +85,16 @@ public class PipDismissViewController {
 
             // Add the target to the window
             LayoutParams lp =  new LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, gradientHeight,
+                    LayoutParams.MATCH_PARENT, gradientHeight,
                     0, windowSize.y - gradientHeight,
-                    LayoutParams.TYPE_SYSTEM_DIALOG,
+                    LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
                     LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                            | LayoutParams.FLAG_LAYOUT_NO_LIMITS
                             | LayoutParams.FLAG_NOT_TOUCHABLE
-                            | LayoutParams.FLAG_NOT_FOCUSABLE,
+                            | LayoutParams.FLAG_NOT_FOCUSABLE
+                            | LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT);
+            lp.setTitle("pip-dismiss-overlay");
+            lp.privateFlags |= WindowManager.LayoutParams.PRIVATE_FLAG_SHOW_FOR_ALL_USERS;
             lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
             mWindowManager.addView(mDismissView, lp);
         }

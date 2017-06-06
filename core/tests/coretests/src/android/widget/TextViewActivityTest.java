@@ -28,6 +28,7 @@ import static android.widget.espresso.TextViewActions.longPressAndDragOnText;
 import static android.widget.espresso.TextViewActions.longPressOnTextAtIndex;
 import static android.widget.espresso.TextViewAssertions.hasInsertionPointerAtIndex;
 import static android.widget.espresso.TextViewAssertions.hasSelection;
+import static android.widget.espresso.TextViewAssertions.doesNotHaveStyledText;
 import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarItemIndex;
 import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarIsDisplayed;
 import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarIsNotDisplayed;
@@ -47,6 +48,10 @@ import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.is;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.support.test.espresso.NoMatchingViewException;
+import android.support.test.espresso.ViewAssertion;
 import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -684,6 +689,51 @@ public class TextViewActivityTest extends ActivityInstrumentationTestCase2<TextV
         assertFalse(textView.hasTransientState());
     }
 
+    public void testResetMenuItemTitle() throws Exception {
+        getActivity().getSystemService(TextClassificationManager.class).setTextClassifier(null);
+        final TextView textView = (TextView) getActivity().findViewById(R.id.textview);
+        final int itemId = 1;
+        final String title1 = " AFIGBO";
+        final int index = title1.indexOf('I');
+        final String title2 = title1.substring(index);
+        final String[] title = new String[]{title1};
+        textView.post(() -> textView.setCustomSelectionActionModeCallback(
+                new ActionMode.Callback() {
+                    @Override
+                    public boolean onCreateActionMode(ActionMode actionMode, Menu menu) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onPrepareActionMode(ActionMode actionMode, Menu menu) {
+                        menu.removeItem(itemId);
+                        menu.add(Menu.NONE /* group */, itemId, 0 /* order */, title[0]);
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onActionItemClicked(ActionMode actionMode, MenuItem menuItem) {
+                        return false;
+                    }
+
+                    @Override
+                    public void onDestroyActionMode(ActionMode actionMode) {
+                    }
+                }));
+        onView(withId(R.id.textview)).perform(replaceText(title1));
+        onView(withId(R.id.textview)).perform(longPressOnTextAtIndex(index));
+        sleepForFloatingToolbarPopup();
+        assertFloatingToolbarContainsItem(title1);
+
+        // Change the menu item title.
+        title[0] = title2;
+        // Change the selection to invalidate the action mode without restarting it.
+        onHandleView(com.android.internal.R.id.selection_start_handle)
+                .perform(dragHandle(textView, Handle.SELECTION_START, index));
+        sleepForFloatingToolbarPopup();
+        assertFloatingToolbarContainsItem(title2);
+    }
+
     public void testAssistItemIsAtIndexZero() throws Exception {
         getActivity().getSystemService(TextClassificationManager.class).setTextClassifier(null);
         final TextView textView = (TextView) getActivity().findViewById(R.id.textview);
@@ -708,7 +758,8 @@ public class TextViewActivityTest extends ActivityInstrumentationTestCase2<TextV
                     }
 
                     @Override
-                    public void onDestroyActionMode(ActionMode actionMode) {}
+                    public void onDestroyActionMode(ActionMode actionMode) {
+                    }
                 }));
         final String text = "droid@android.com";
 
@@ -716,5 +767,51 @@ public class TextViewActivityTest extends ActivityInstrumentationTestCase2<TextV
         onView(withId(R.id.textview)).perform(longPressOnTextAtIndex(text.indexOf('@')));
         sleepForFloatingToolbarPopup();
         assertFloatingToolbarItemIndex(android.R.id.textAssist, 0);
+    }
+
+    public void testPastePlainText_menuAction() throws Exception {
+        initializeClipboardWithText(TextStyle.STYLED);
+
+        onView(withId(R.id.textview)).perform(replaceText(""));
+        onView(withId(R.id.textview)).perform(longClick());
+        sleepForFloatingToolbarPopup();
+        clickFloatingToolbarItem(
+                getActivity().getString(com.android.internal.R.string.paste_as_plain_text));
+        getInstrumentation().waitForIdleSync();
+
+        onView(withId(R.id.textview)).check(matches(withText("styledtext")));
+        onView(withId(R.id.textview)).check(doesNotHaveStyledText());
+    }
+
+    public void testPastePlainText_noMenuItemForPlainText() {
+        initializeClipboardWithText(TextStyle.PLAIN);
+
+        onView(withId(R.id.textview)).perform(replaceText(""));
+        onView(withId(R.id.textview)).perform(longClick());
+        sleepForFloatingToolbarPopup();
+
+        assertFloatingToolbarDoesNotContainItem(
+                getActivity().getString(com.android.internal.R.string.paste_as_plain_text));
+    }
+
+    private void initializeClipboardWithText(TextStyle textStyle) {
+        final ClipData clip;
+        switch (textStyle) {
+            case STYLED:
+                clip = ClipData.newHtmlText("html", "styledtext", "<b>styledtext</b>");
+                break;
+            case PLAIN:
+                clip = ClipData.newPlainText("plain", "plaintext");
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid text style");
+        }
+        getActivity().getWindow().getDecorView().post(() ->
+            getActivity().getSystemService(ClipboardManager.class).setPrimaryClip( clip));
+        getInstrumentation().waitForIdleSync();
+    }
+
+    private enum TextStyle {
+        PLAIN, STYLED
     }
 }

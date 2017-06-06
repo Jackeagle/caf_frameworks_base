@@ -56,6 +56,7 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
+import android.app.ActivityThread;
 import android.app.AlertDialog;
 import android.app.AppGlobals;
 import android.app.AppOpsManager;
@@ -212,6 +213,7 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
             Context.BIND_AUTO_CREATE
             | Context.BIND_NOT_VISIBLE
             | Context.BIND_NOT_FOREGROUND
+            | Context.BIND_IMPORTANT_BACKGROUND
             | Context.BIND_SHOWING_UI;
 
     /**
@@ -3561,7 +3563,6 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
     private void showInputMethodMenu(boolean showAuxSubtypes) {
         if (DEBUG) Slog.v(TAG, "Show switching menu. showAuxSubtypes=" + showAuxSubtypes);
 
-        final Context context = mContext;
         final boolean isScreenLocked = isScreenLocked();
 
         final String lastInputMethodId = mSettings.getSelectedInputMethod();
@@ -3609,7 +3610,8 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                 }
             }
 
-            final Context settingsContext = new ContextThemeWrapper(context,
+            final Context settingsContext = new ContextThemeWrapper(
+                    ActivityThread.currentActivityThread().getSystemUiContext(),
                     com.android.internal.R.style.Theme_DeviceDefault_Settings);
 
             mDialogBuilder = new AlertDialog.Builder(settingsContext);

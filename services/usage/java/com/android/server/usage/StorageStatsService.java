@@ -16,6 +16,8 @@
 
 package com.android.server.usage;
 
+import static com.android.internal.util.ArrayUtils.defeatNullable;
+
 import android.app.AppOpsManager;
 import android.app.usage.ExternalStorageStats;
 import android.app.usage.IStorageStatsManager;
@@ -29,6 +31,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.PackageStats;
 import android.content.pm.UserInfo;
 import android.net.TrafficStats;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.Environment;
 import android.os.FileUtils;
@@ -112,9 +115,12 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
         mStorage.registerListener(new StorageEventListener() {
             @Override
             public void onVolumeStateChanged(VolumeInfo vol, int oldState, int newState) {
-                if ((vol.type == VolumeInfo.TYPE_PRIVATE)
-                        && (newState == VolumeInfo.STATE_MOUNTED)) {
-                    invalidateMounts();
+                switch (vol.type) {
+                    case VolumeInfo.TYPE_PRIVATE:
+                    case VolumeInfo.TYPE_EMULATED:
+                        if (newState == VolumeInfo.STATE_MOUNTED) {
+                            invalidateMounts();
+                        }
                 }
             }
         });
@@ -157,7 +163,7 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
 
     @Override
     public long getTotalBytes(String volumeUuid, String callingPackage) {
-        enforcePermission(Binder.getCallingUid(), callingPackage);
+        // NOTE: No permissions required
 
         if (volumeUuid == StorageManager.UUID_PRIVATE_INTERNAL) {
             return FileUtils.roundStorageSize(mStorage.getPrimaryStorageSize());
@@ -173,28 +179,30 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
 
     @Override
     public long getFreeBytes(String volumeUuid, String callingPackage) {
-        enforcePermission(Binder.getCallingUid(), callingPackage);
+        // NOTE: No permissions required
 
         long cacheBytes = 0;
         final long token = Binder.clearCallingIdentity();
         try {
-            for (UserInfo user : mUser.getUsers()) {
-                final StorageStats stats = queryStatsForUser(volumeUuid, user.id, null);
-                cacheBytes += stats.cacheBytes;
+            if (isQuotaSupported(volumeUuid, callingPackage)) {
+                for (UserInfo user : mUser.getUsers()) {
+                    final StorageStats stats = queryStatsForUser(volumeUuid, user.id, null);
+                    cacheBytes += stats.cacheBytes;
+                }
             }
         } finally {
             Binder.restoreCallingIdentity(token);
         }
 
         if (volumeUuid == StorageManager.UUID_PRIVATE_INTERNAL) {
-            return Environment.getDataDirectory().getUsableSpace() + cacheBytes;
+            return Environment.getDataDirectory().getFreeSpace() + cacheBytes;
         } else {
             final VolumeInfo vol = mStorage.findVolumeByUuid(volumeUuid);
             if (vol == null) {
                 throw new ParcelableException(
                         new IOException("Failed to find storage device for UUID " + volumeUuid));
             }
-            return vol.getPath().getUsableSpace() + cacheBytes;
+            return vol.getPath().getFreeSpace() + cacheBytes;
         }
     }
 
@@ -213,7 +221,6 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
     @Override
     public StorageStats queryStatsForPackage(String volumeUuid, String packageName, int userId,
             String callingPackage) {
-        enforcePermission(Binder.getCallingUid(), callingPackage);
         if (userId != UserHandle.getCallingUserId()) {
             mContext.enforceCallingOrSelfPermission(
                     android.Manifest.permission.INTERACT_ACROSS_USERS, TAG);
@@ -227,7 +234,13 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
             throw new ParcelableException(e);
         }
 
-        if (mPackage.getPackagesForUid(appInfo.uid).length == 1) {
+        if (Binder.getCallingUid() == appInfo.uid) {
+            // No permissions required when asking about themselves
+        } else {
+            enforcePermission(Binder.getCallingUid(), callingPackage);
+        }
+
+        if (defeatNullable(mPackage.getPackagesForUid(appInfo.uid)).length == 1) {
             // Only one package inside UID means we can fast-path
             return queryStatsForUid(volumeUuid, appInfo.uid, callingPackage);
         } else {
@@ -257,16 +270,21 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
 
     @Override
     public StorageStats queryStatsForUid(String volumeUuid, int uid, String callingPackage) {
-        enforcePermission(Binder.getCallingUid(), callingPackage);
-        if (UserHandle.getUserId(uid) != UserHandle.getCallingUserId()) {
+        final int userId = UserHandle.getUserId(uid);
+        final int appId = UserHandle.getAppId(uid);
+
+        if (userId != UserHandle.getCallingUserId()) {
             mContext.enforceCallingOrSelfPermission(
                     android.Manifest.permission.INTERACT_ACROSS_USERS, TAG);
         }
 
-        final int userId = UserHandle.getUserId(uid);
-        final int appId = UserHandle.getAppId(uid);
+        if (Binder.getCallingUid() == uid) {
+            // No permissions required when asking about themselves
+        } else {
+            enforcePermission(Binder.getCallingUid(), callingPackage);
+        }
 
-        final String[] packageNames = mPackage.getPackagesForUid(uid);
+        final String[] packageNames = defeatNullable(mPackage.getPackagesForUid(uid));
         final long[] ceDataInodes = new long[packageNames.length];
         String[] codePaths = new String[0];
 
@@ -304,11 +322,13 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
 
     @Override
     public StorageStats queryStatsForUser(String volumeUuid, int userId, String callingPackage) {
-        enforcePermission(Binder.getCallingUid(), callingPackage);
         if (userId != UserHandle.getCallingUserId()) {
             mContext.enforceCallingOrSelfPermission(
                     android.Manifest.permission.INTERACT_ACROSS_USERS, TAG);
         }
+
+        // Always require permission to see user-level stats
+        enforcePermission(Binder.getCallingUid(), callingPackage);
 
         final int[] appIds = getAppIds(userId);
         final PackageStats stats = new PackageStats(TAG);
@@ -329,11 +349,13 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
     @Override
     public ExternalStorageStats queryExternalStatsForUser(String volumeUuid, int userId,
             String callingPackage) {
-        enforcePermission(Binder.getCallingUid(), callingPackage);
         if (userId != UserHandle.getCallingUserId()) {
             mContext.enforceCallingOrSelfPermission(
                     android.Manifest.permission.INTERACT_ACROSS_USERS, TAG);
         }
+
+        // Always require permission to see user-level stats
+        enforcePermission(Binder.getCallingUid(), callingPackage);
 
         final int[] appIds = getAppIds(userId);
         final long[] stats;
@@ -446,6 +468,7 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
                     if (bytesDelta > mMinimumThresholdBytes) {
                         mPreviousBytes = mStats.getAvailableBytes();
                         recalculateQuotas(getInitializedStrategy());
+                        notifySignificantDelta();
                     }
                     sendEmptyMessageDelayed(MSG_CHECK_STORAGE_DELTA, DELAY_IN_MILLIS);
                     break;
@@ -496,5 +519,14 @@ public class StorageStatsService extends IStorageStatsManager.Stub {
     static boolean isCacheQuotaCalculationsEnabled(ContentResolver resolver) {
         return Settings.Global.getInt(
                 resolver, Settings.Global.ENABLE_CACHE_QUOTA_CALCULATION, 1) != 0;
+    }
+
+    /**
+     * Hacky way of notifying that disk space has changed significantly; we do
+     * this to cause "available space" values to be requeried.
+     */
+    void notifySignificantDelta() {
+        mContext.getContentResolver().notifyChange(
+                Uri.parse("content://com.android.externalstorage.documents/"), null, false);
     }
 }

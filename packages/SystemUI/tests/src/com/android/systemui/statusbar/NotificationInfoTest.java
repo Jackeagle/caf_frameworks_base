@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar;
 
+import static android.print.PrintManager.PRINT_SPOOLER_PACKAGE_NAME;
+
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNull;
@@ -74,6 +76,8 @@ import java.util.concurrent.CountDownLatch;
 @UiThreadTest
 public class NotificationInfoTest extends SysuiTestCase {
     private static final String TEST_PACKAGE_NAME = "test_package";
+    private static final String TEST_SYSTEM_PACKAGE_NAME = PRINT_SPOOLER_PACKAGE_NAME;
+    private static final int TEST_UID = 1;
     private static final String TEST_CHANNEL = "test_channel";
     private static final String TEST_CHANNEL_NAME = "TEST CHANNEL NAME";
 
@@ -94,15 +98,22 @@ public class NotificationInfoTest extends SysuiTestCase {
         // PackageManager must return a packageInfo and applicationInfo.
         final PackageInfo packageInfo = new PackageInfo();
         packageInfo.packageName = TEST_PACKAGE_NAME;
-        when(mMockPackageManager.getPackageInfo(anyString(), anyInt())).thenReturn(packageInfo);
+        when(mMockPackageManager.getPackageInfo(eq(TEST_PACKAGE_NAME), anyInt()))
+                .thenReturn(packageInfo);
         final ApplicationInfo applicationInfo = new ApplicationInfo();
-        applicationInfo.uid = 1;  // non-zero
+        applicationInfo.uid = TEST_UID;  // non-zero
         when(mMockPackageManager.getApplicationInfo(anyString(), anyInt())).thenReturn(
                 applicationInfo);
+        final PackageInfo systemPackageInfo = new PackageInfo();
+        systemPackageInfo.packageName = TEST_SYSTEM_PACKAGE_NAME;
+        when(mMockPackageManager.getPackageInfo(eq(TEST_SYSTEM_PACKAGE_NAME), anyInt()))
+                .thenReturn(systemPackageInfo);
+        when(mMockPackageManager.getPackageInfo(eq("android"), anyInt()))
+                .thenReturn(packageInfo);
 
         // Package has one channel by default.
         when(mMockINotificationManager.getNumNotificationChannelsForPackage(
-                eq(TEST_PACKAGE_NAME), anyInt(), anyBoolean())).thenReturn(1);
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), anyBoolean())).thenReturn(1);
 
         // Some test channels.
         mNotificationChannel = new NotificationChannel(
@@ -185,7 +196,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         final NotificationChannelGroup notificationChannelGroup =
                 new NotificationChannelGroup("test_group_id", "Test Group Name");
         when(mMockINotificationManager.getNotificationChannelGroupForPackage(
-                eq("test_group_id"), eq(TEST_PACKAGE_NAME), anyInt()))
+                eq("test_group_id"), eq(TEST_PACKAGE_NAME), eq(TEST_UID)))
                 .thenReturn(notificationChannelGroup);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
                 TEST_PACKAGE_NAME, Arrays.asList(mNotificationChannel),
@@ -207,6 +218,30 @@ public class NotificationInfoTest extends SysuiTestCase {
                 null, null);
         final TextView textView = (TextView) mNotificationInfo.findViewById(R.id.channel_name);
         assertEquals(TEST_CHANNEL_NAME, textView.getText());
+    }
+
+    @Test
+    public void testBindNotification_DefaultChannelDoesNotUseChannelName() throws Exception {
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_PACKAGE_NAME, Arrays.asList(mDefaultNotificationChannel),
+                mNotificationChannel.getImportance(), mSbn, null, null, null,
+                null, null);
+        final TextView textView = (TextView) mNotificationInfo.findViewById(R.id.channel_name);
+        assertEquals(mContext.getString(R.string.notification_header_default_channel),
+                textView.getText());
+    }
+
+    @Test
+    public void testBindNotification_DefaultChannelUsesNameWhenMoreThanOneChannelExists()
+            throws Exception {
+        when(mMockINotificationManager.getNumNotificationChannelsForPackage(
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), anyBoolean())).thenReturn(2);
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_PACKAGE_NAME, Arrays.asList(mDefaultNotificationChannel),
+                mNotificationChannel.getImportance(), mSbn, null, null, null,
+                null, null);
+        final TextView textView = (TextView) mNotificationInfo.findViewById(R.id.channel_name);
+        assertEquals(mDefaultNotificationChannel.getName(), textView.getText());
     }
 
     @Test
@@ -285,7 +320,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_SettingsTextWithMultipleChannels() throws Exception {
         when(mMockINotificationManager.getNumNotificationChannelsForPackage(
-                eq(TEST_PACKAGE_NAME), anyInt(), anyBoolean())).thenReturn(2);
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), anyBoolean())).thenReturn(2);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
                 TEST_PACKAGE_NAME, Arrays.asList(mNotificationChannel),
                 mNotificationChannel.getImportance(), mSbn,
@@ -325,6 +360,21 @@ public class NotificationInfoTest extends SysuiTestCase {
     }
 
     @Test
+    public void testBindNotification_NumChannelsTextDisplaysWhenMoreThanOneChannelExists()
+            throws Exception {
+        when(mMockINotificationManager.getNumNotificationChannelsForPackage(
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), anyBoolean())).thenReturn(2);
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_PACKAGE_NAME, Arrays.asList(mDefaultNotificationChannel),
+                mNotificationChannel.getImportance(), mSbn, null, null,
+                null, null, null);
+        final TextView numChannelsView =
+                (TextView) mNotificationInfo.findViewById(R.id.num_channels_desc);
+        assertEquals(numChannelsView.getVisibility(), View.VISIBLE);
+        assertEquals(getNumChannelsDescString(2), numChannelsView.getText());
+    }
+
+    @Test
     public void testBindNotification_NumChannelsTextDisplaysWhenNotDefaultChannel()
             throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
@@ -341,7 +391,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testBindNotification_NumChannelsTextScalesWithNumberOfChannels()
             throws Exception {
         when(mMockINotificationManager.getNumNotificationChannelsForPackage(
-                eq(TEST_PACKAGE_NAME), anyInt(), anyBoolean())).thenReturn(2);
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), anyBoolean())).thenReturn(2);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
                 TEST_PACKAGE_NAME, Arrays.asList(mNotificationChannel),
                 mNotificationChannel.getImportance(), mSbn, null, null, null,
@@ -472,7 +522,7 @@ public class NotificationInfoTest extends SysuiTestCase {
                 mNotificationChannel.getImportance(), mSbn, null, null, null,
                 null, null);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                anyString(), anyInt(), any());
+                anyString(), eq(TEST_UID), any());
     }
 
     @Test
@@ -486,7 +536,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
         enabledSwitch.setChecked(false);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                anyString(), anyInt(), any());
+                anyString(), eq(TEST_UID), any());
     }
 
     @Test
@@ -497,9 +547,9 @@ public class NotificationInfoTest extends SysuiTestCase {
                 mNotificationChannel.getImportance(), mSbn, null, null, null,
                 null, null);
 
-        mNotificationInfo.handleCloseControls(true);
+        mNotificationInfo.handleCloseControls(true, false);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                anyString(), anyInt(), any());
+                anyString(), eq(TEST_UID), any());
     }
 
     @Test
@@ -511,9 +561,9 @@ public class NotificationInfoTest extends SysuiTestCase {
                 mNotificationChannel.getImportance(), mSbn, null, null, null,
                 null, null);
 
-        mNotificationInfo.handleCloseControls(true);
+        mNotificationInfo.handleCloseControls(true, false);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                anyString(), anyInt(), any());
+                anyString(), eq(TEST_UID), any());
     }
 
     @Test
@@ -565,15 +615,54 @@ public class NotificationInfoTest extends SysuiTestCase {
     }
 
     @Test
+    public void testEnabledSwitchInvisibleIfNonBlockableSystemChannel() throws Exception {
+        mNotificationChannel.setImportance(NotificationManager.IMPORTANCE_LOW);
+        mNotificationChannel.setBlockableSystem(false);
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_SYSTEM_PACKAGE_NAME, Arrays.asList(mNotificationChannel),
+                mNotificationChannel.getImportance(), mSbn, null, null, null,
+                null, null);
+
+        Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
+        assertEquals(View.INVISIBLE, enabledSwitch.getVisibility());
+    }
+
+    @Test
+    public void testEnabledSwitchVisibleIfBlockableSystemChannel() throws Exception {
+        mNotificationChannel.setImportance(NotificationManager.IMPORTANCE_LOW);
+        mNotificationChannel.setBlockableSystem(true);
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_SYSTEM_PACKAGE_NAME, Arrays.asList(mNotificationChannel),
+                mNotificationChannel.getImportance(), mSbn, null, null, null,
+                null, null);
+
+        Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
+        assertEquals(View.VISIBLE, enabledSwitch.getVisibility());
+    }
+
+    @Test
+    public void testEnabledSwitchInvisibleIfMultiChannelSummary() throws Exception {
+        mNotificationChannel.setImportance(NotificationManager.IMPORTANCE_LOW);
+        mNotificationChannel.setBlockableSystem(true);
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_PACKAGE_NAME, Arrays.asList(mNotificationChannel, mDefaultNotificationChannel),
+                mNotificationChannel.getImportance(), mSbn, null, null, null,
+                null, Collections.singleton(TEST_PACKAGE_NAME));
+
+        Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
+        assertEquals(View.INVISIBLE, enabledSwitch.getVisibility());
+    }
+
+    @Test
     public void testNonBlockableAppDoesNotBecomeBlocked() throws Exception {
         mNotificationChannel.setImportance(NotificationManager.IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
                 TEST_PACKAGE_NAME, Arrays.asList(mNotificationChannel),
                 mNotificationChannel.getImportance(), mSbn, null, null, null,
                 null, Collections.singleton(TEST_PACKAGE_NAME));
-        mNotificationInfo.handleCloseControls(true);
+        mNotificationInfo.handleCloseControls(true, false);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                anyString(), anyInt(), any());
+                anyString(), eq(TEST_UID), any());
     }
 
     @Test
@@ -586,12 +675,12 @@ public class NotificationInfoTest extends SysuiTestCase {
 
         Switch enabledSwitch = mNotificationInfo.findViewById(R.id.channel_enabled_switch);
         enabledSwitch.setChecked(false);
-        mNotificationInfo.handleCloseControls(true);
+        mNotificationInfo.handleCloseControls(true, false);
 
         ArgumentCaptor<NotificationChannel> updated =
                 ArgumentCaptor.forClass(NotificationChannel.class);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
-                anyString(), anyInt(), updated.capture());
+                anyString(), eq(TEST_UID), updated.capture());
         assertTrue((updated.getValue().getUserLockedFields()
                 & NotificationChannel.USER_LOCKED_IMPORTANCE) != 0);
     }
@@ -606,9 +695,9 @@ public class NotificationInfoTest extends SysuiTestCase {
 
         Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
         enabledSwitch.setChecked(false);
-        mNotificationInfo.handleCloseControls(false);
+        mNotificationInfo.handleCloseControls(false, false);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                eq(TEST_PACKAGE_NAME), anyInt(), eq(mNotificationChannel));
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
 
     @Test
@@ -623,9 +712,9 @@ public class NotificationInfoTest extends SysuiTestCase {
 
         Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
         enabledSwitch.setChecked(false);
-        mNotificationInfo.handleCloseControls(true);
+        mNotificationInfo.handleCloseControls(true, false);
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
-                eq(TEST_PACKAGE_NAME), anyInt(), eq(mNotificationChannel));
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
 
     @Test
@@ -641,9 +730,9 @@ public class NotificationInfoTest extends SysuiTestCase {
 
         Switch enabledSwitch = (Switch) mNotificationInfo.findViewById(R.id.channel_enabled_switch);
         enabledSwitch.setChecked(false);
-        mNotificationInfo.handleCloseControls(true);
+        mNotificationInfo.handleCloseControls(true, false);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
-                eq(TEST_PACKAGE_NAME), anyInt(), eq(mNotificationChannel));
+                eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
 
     @Test
@@ -777,5 +866,10 @@ public class NotificationInfoTest extends SysuiTestCase {
         //unblock
         enabledSwitch.setChecked(true);
         assertEquals(View.VISIBLE, settingsLink.getVisibility());
+    }
+
+    @Test
+    public void testWillBeRemovedReturnsFalseBeforeBind() throws Exception {
+        assertFalse(mNotificationInfo.willBeRemoved());
     }
 }

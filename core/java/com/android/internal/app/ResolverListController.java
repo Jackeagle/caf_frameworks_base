@@ -97,7 +97,16 @@ public class ResolverListController {
             final List<ResolveInfo> infos = mpm.queryIntentActivities(intent,
                     PackageManager.MATCH_DEFAULT_ONLY
                             | (shouldGetResolvedFilter ? PackageManager.GET_RESOLVED_FILTER : 0)
-                            | (shouldGetActivityMetadata ? PackageManager.GET_META_DATA : 0));
+                            | (shouldGetActivityMetadata ? PackageManager.GET_META_DATA : 0)
+                            | PackageManager.MATCH_INSTANT);
+            // Remove any activities that are not exported.
+            int totalSize = infos.size();
+            for (int j = totalSize - 1; j >= 0 ; j--) {
+                ResolveInfo info = infos.get(j);
+                if (info.activityInfo != null && !info.activityInfo.exported) {
+                    infos.remove(j);
+                }
+            }
             if (infos != null) {
                 if (resolvedComponents == null) {
                     resolvedComponents = new ArrayList<>();

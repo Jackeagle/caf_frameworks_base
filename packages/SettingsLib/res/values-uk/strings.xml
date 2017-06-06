@@ -56,6 +56,8 @@
     <string name="bluetooth_profile_pan_nap" msgid="8429049285027482959">"Надання доступу до Інтернету"</string>
     <string name="bluetooth_profile_map" msgid="5465271250454324383">"Доступ до повідомлень"</string>
     <string name="bluetooth_profile_sap" msgid="5764222021851283125">"Доступ до SIM-карти"</string>
+    <string name="bluetooth_profile_a2dp_high_quality" msgid="2221025895896419505">"Використовувати аудіо високої якості: <xliff:g id="CODEC_NAME">%1$s</xliff:g>"</string>
+    <string name="bluetooth_profile_a2dp_high_quality_unknown_codec" msgid="5860996587596508755">"Використовувати аудіо високої якості"</string>
     <string name="bluetooth_a2dp_profile_summary_connected" msgid="963376081347721598">"Підключено до аудіоджерела"</string>
     <string name="bluetooth_headset_profile_summary_connected" msgid="7661070206715520671">"Підключено до звуку телеф."</string>
     <string name="bluetooth_opp_profile_summary_connected" msgid="2611913495968309066">"Підключ. до сервера передачі файлів"</string>
@@ -101,10 +103,10 @@
     <string name="launch_defaults_some" msgid="313159469856372621">"Налаштовано деякі значення за умовчанням"</string>
     <string name="launch_defaults_none" msgid="4241129108140034876">"Немає значень за умовчанням"</string>
     <string name="tts_settings" msgid="8186971894801348327">"Налашт. синтезу мовлення"</string>
-    <string name="tts_settings_title" msgid="1237820681016639683">"Вивід синтезу мовлення з тексту"</string>
+    <string name="tts_settings_title" msgid="1237820681016639683">"Синтез мовлення"</string>
     <string name="tts_default_rate_title" msgid="6030550998379310088">"Темп мовлення"</string>
     <string name="tts_default_rate_summary" msgid="4061815292287182801">"Швидкість відтворення тексту"</string>
-    <string name="tts_default_pitch_title" msgid="6135942113172488671">"Вис. зв."</string>
+    <string name="tts_default_pitch_title" msgid="6135942113172488671">"Тон"</string>
     <string name="tts_default_pitch_summary" msgid="1944885882882650009">"Впливає на тон синтезованого мовлення"</string>
     <string name="tts_default_lang_title" msgid="8018087612299820556">"Мова"</string>
     <string name="tts_lang_use_system" msgid="2679252467416513208">"Використовувати мову системи"</string>
@@ -270,6 +272,10 @@
     <string name="app_process_limit_title" msgid="4280600650253107163">"Обмеження фон. процесів"</string>
     <string name="show_all_anrs" msgid="28462979638729082">"Показувати всі ANR"</string>
     <string name="show_all_anrs_summary" msgid="641908614413544127">"Сповіщати, коли додаток не відповідає"</string>
+    <!-- no translation found for show_notification_channel_warnings (1399948193466922683) -->
+    <skip />
+    <!-- no translation found for show_notification_channel_warnings_summary (5536803251863694895) -->
+    <skip />
     <string name="force_allow_on_external" msgid="3215759785081916381">"Примусово записувати додатки в зовнішню пам’ять"</string>
     <string name="force_allow_on_external_summary" msgid="3640752408258034689">"Можна записувати додатки в зовнішню пам’ять, незалежно від значень у маніфесті"</string>
     <string name="force_resizable_activities" msgid="8615764378147824985">"Примусово масштабувати активність"</string>
@@ -300,7 +306,7 @@
     <string name="select_webview_provider_title" msgid="4628592979751918907">"Застосування WebView"</string>
     <string name="select_webview_provider_dialog_title" msgid="4370551378720004872">"Налаштувати застосування WebView"</string>
     <string name="select_webview_provider_toast_text" msgid="5466970498308266359">"Ця опція більше не дійсна. Повторіть спробу."</string>
-    <string name="convert_to_file_encryption" msgid="3060156730651061223">"Конвертувати в зашифрований файл"</string>
+    <string name="convert_to_file_encryption" msgid="3060156730651061223">"Перехід до шифрування файлів"</string>
     <string name="convert_to_file_encryption_enabled" msgid="2861258671151428346">"Конвертація…"</string>
     <string name="convert_to_file_encryption_done" msgid="7859766358000523953">"Уже конвертовано в зашифрований файл"</string>
     <string name="title_convert_fbe" msgid="1263622876196444453">"Конвертація в зашифрований файл"</string>
@@ -325,7 +331,7 @@
     <string name="power_charging_duration" msgid="4676999980973411875">"<xliff:g id="LEVEL">%1$s</xliff:g> – <xliff:g id="TIME">%2$s</xliff:g> до повного заряду"</string>
     <string name="power_charging_duration_short" msgid="1098603958472207920">"<xliff:g id="LEVEL">%1$s</xliff:g> – <xliff:g id="TIME">%2$s</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="196130600938058547">"Невідомо"</string>
-    <string name="battery_info_status_charging" msgid="1705179948350365604">"Зарядж-ся"</string>
+    <string name="battery_info_status_charging" msgid="1705179948350365604">"Заряджається"</string>
     <string name="battery_info_status_charging_lower" msgid="8689770213898117994">"заряджається"</string>
     <string name="battery_info_status_discharging" msgid="310932812698268588">"Не заряджається"</string>
     <string name="battery_info_status_not_charging" msgid="2820070506621483576">"Не заряджається"</string>

@@ -24,6 +24,7 @@ import android.annotation.TestApi;
 import android.app.ActivityManager.TaskSnapshot;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
+import android.graphics.Bitmap.Config;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.ArraySet;
@@ -38,6 +39,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 
 /**
  * Persists {@link TaskSnapshot}s to disk.
@@ -54,11 +56,16 @@ class TaskSnapshotPersister {
     private static final int QUALITY = 95;
     private static final String PROTO_EXTENSION = ".proto";
     private static final String BITMAP_EXTENSION = ".jpg";
+    private static final int MAX_STORE_QUEUE_DEPTH = 2;
 
     @GuardedBy("mLock")
     private final ArrayDeque<WriteQueueItem> mWriteQueue = new ArrayDeque<>();
     @GuardedBy("mLock")
+    private final ArrayDeque<StoreWriteQueueItem> mStoreQueueItems = new ArrayDeque<>();
+    @GuardedBy("mLock")
     private boolean mQueueIdling;
+    @GuardedBy("mLock")
+    private boolean mPaused;
     private boolean mStarted;
     private final Object mLock = new Object();
     private final DirectoryResolver mDirectoryResolver;
@@ -126,6 +133,15 @@ class TaskSnapshotPersister {
         }
     }
 
+    void setPaused(boolean paused) {
+        synchronized (mLock) {
+            mPaused = paused;
+            if (!paused) {
+                mLock.notifyAll();
+            }
+        }
+    }
+
     @TestApi
     void waitForQueueEmpty() {
         while (true) {
@@ -141,7 +157,20 @@ class TaskSnapshotPersister {
     @GuardedBy("mLock")
     private void sendToQueueLocked(WriteQueueItem item) {
         mWriteQueue.offer(item);
-        mLock.notifyAll();
+        item.onQueuedLocked();
+        ensureStoreQueueDepthLocked();
+        if (!mPaused) {
+            mLock.notifyAll();
+        }
+    }
+
+    @GuardedBy("mLock")
+    private void ensureStoreQueueDepthLocked() {
+        while (mStoreQueueItems.size() > MAX_STORE_QUEUE_DEPTH) {
+            final StoreWriteQueueItem item = mStoreQueueItems.poll();
+            mWriteQueue.remove(item);
+            Slog.i(TAG, "Queue is too deep! Purged item with taskid=" + item.mTaskId);
+        }
     }
 
     private File getDirectory(int userId) {
@@ -184,18 +213,26 @@ class TaskSnapshotPersister {
             while (true) {
                 WriteQueueItem next;
                 synchronized (mLock) {
-                    next = mWriteQueue.poll();
+                    if (mPaused) {
+                        next = null;
+                    } else {
+                        next = mWriteQueue.poll();
+                        if (next != null) {
+                            next.onDequeuedLocked();
+                        }
+                    }
                 }
                 if (next != null) {
                     next.write();
                     SystemClock.sleep(DELAY_MS);
                 }
                 synchronized (mLock) {
-                    if (!mWriteQueue.isEmpty()) {
+                    final boolean writeQueueEmpty = mWriteQueue.isEmpty();
+                    if (!writeQueueEmpty && !mPaused) {
                         continue;
                     }
                     try {
-                        mQueueIdling = true;
+                        mQueueIdling = writeQueueEmpty;
                         mLock.wait();
                         mQueueIdling = false;
                     } catch (InterruptedException e) {
@@ -207,6 +244,18 @@ class TaskSnapshotPersister {
 
     private abstract class WriteQueueItem {
         abstract void write();
+
+        /**
+         * Called when this queue item has been put into the queue.
+         */
+        void onQueuedLocked() {
+        }
+
+        /**
+         * Called when this queue item has been taken out of the queue.
+         */
+        void onDequeuedLocked() {
+        }
     }
 
     private class StoreWriteQueueItem extends WriteQueueItem {
@@ -218,6 +267,16 @@ class TaskSnapshotPersister {
             mTaskId = taskId;
             mUserId = userId;
             mSnapshot = snapshot;
+        }
+
+        @Override
+        void onQueuedLocked() {
+            mStoreQueueItems.offer(this);
+        }
+
+        @Override
+        void onDequeuedLocked() {
+            mStoreQueueItems.remove(this);
         }
 
         @Override
@@ -266,12 +325,13 @@ class TaskSnapshotPersister {
             final File file = getBitmapFile(mTaskId, mUserId);
             final File reducedFile = getReducedResolutionBitmapFile(mTaskId, mUserId);
             final Bitmap bitmap = Bitmap.createHardwareBitmap(mSnapshot.getSnapshot());
-            final Bitmap reduced = Bitmap.createScaledBitmap(bitmap,
+            final Bitmap swBitmap = bitmap.copy(Config.ARGB_8888, false /* isMutable */);
+            final Bitmap reduced = Bitmap.createScaledBitmap(swBitmap,
                     (int) (bitmap.getWidth() * REDUCED_SCALE),
                     (int) (bitmap.getHeight() * REDUCED_SCALE), true /* filter */);
             try {
                 FileOutputStream fos = new FileOutputStream(file);
-                bitmap.compress(JPEG, QUALITY, fos);
+                swBitmap.compress(JPEG, QUALITY, fos);
                 fos.close();
                 FileOutputStream reducedFos = new FileOutputStream(reducedFile);
                 reduced.compress(JPEG, QUALITY, reducedFos);

@@ -34,6 +34,7 @@ import android.content.Context;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.os.Debug;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.util.Log;
@@ -54,6 +55,7 @@ import java.io.PrintWriter;
 public class PipMotionHelper {
 
     private static final String TAG = "PipMotionHelper";
+    private static final boolean DEBUG = false;
 
     private static final RectEvaluator RECT_EVALUATOR = new RectEvaluator(new Rect());
 
@@ -77,6 +79,7 @@ public class PipMotionHelper {
     private SurfaceFlingerVsyncChoreographer mVsyncChoreographer;
     private Handler mHandler;
 
+    private PipMenuActivityController mMenuController;
     private PipSnapAlgorithm mSnapAlgorithm;
     private FlingAnimationUtils mFlingAnimationUtils;
 
@@ -93,10 +96,12 @@ public class PipMotionHelper {
             };
 
     public PipMotionHelper(Context context, IActivityManager activityManager,
-            PipSnapAlgorithm snapAlgorithm, FlingAnimationUtils flingAnimationUtils) {
+            PipMenuActivityController menuController, PipSnapAlgorithm snapAlgorithm,
+            FlingAnimationUtils flingAnimationUtils) {
         mContext = context;
         mHandler = BackgroundThread.getHandler();
         mActivityManager = activityManager;
+        mMenuController = menuController;
         mSnapAlgorithm = snapAlgorithm;
         mFlingAnimationUtils = flingAnimationUtils;
         mVsyncChoreographer = new SurfaceFlingerVsyncChoreographer(mHandler, mContext.getDisplay(),
@@ -140,14 +145,30 @@ public class PipMotionHelper {
      * Resizes the pinned stack back to fullscreen.
      */
     void expandPip() {
+        expandPip(false /* skipAnimation */);
+    }
+
+    /**
+     * Resizes the pinned stack back to fullscreen.
+     */
+    void expandPip(boolean skipAnimation) {
+        if (DEBUG) {
+            Log.d(TAG, "expandPip: skipAnimation=" + skipAnimation
+                    + " callers=\n" + Debug.getCallers(5, "    "));
+        }
         cancelAnimations();
+        mMenuController.hideMenuWithoutResize();
         mHandler.post(() -> {
             try {
-                mActivityManager.resizeStack(PINNED_STACK_ID, null /* bounds */,
-                        true /* allowResizeInDockedMode */, true /* preserveWindows */,
-                        true /* animate */, EXPAND_STACK_TO_FULLSCREEN_DURATION);
+                if (skipAnimation) {
+                    mActivityManager.moveTasksToFullscreenStack(PINNED_STACK_ID, true /* onTop */);
+                } else {
+                    mActivityManager.resizeStack(PINNED_STACK_ID, null /* bounds */,
+                            true /* allowResizeInDockedMode */, true /* preserveWindows */,
+                            true /* animate */, EXPAND_STACK_TO_FULLSCREEN_DURATION);
+                }
             } catch (RemoteException e) {
-                Log.e(TAG, "Error showing PiP menu activity", e);
+                Log.e(TAG, "Error expanding PiP activity", e);
             }
         });
     }
@@ -156,7 +177,11 @@ public class PipMotionHelper {
      * Dismisses the pinned stack.
      */
     void dismissPip() {
+        if (DEBUG) {
+            Log.d(TAG, "dismissPip: callers=\n" + Debug.getCallers(5, "    "));
+        }
         cancelAnimations();
+        mMenuController.hideMenuWithoutResize();
         mHandler.post(() -> {
             try {
                 mActivityManager.removeStack(PINNED_STACK_ID);
@@ -403,6 +428,10 @@ public class PipMotionHelper {
      * Directly resizes the PiP to the given {@param bounds}.
      */
     private void resizePipUnchecked(Rect toBounds) {
+        if (DEBUG) {
+            Log.d(TAG, "resizePipUnchecked: toBounds=" + toBounds
+                    + " callers=\n" + Debug.getCallers(5, "    "));
+        }
         if (!toBounds.equals(mBounds)) {
             mVsyncChoreographer.scheduleAtSfVsync(() -> {
                 try {
@@ -419,6 +448,10 @@ public class PipMotionHelper {
      * Directly resizes the PiP to the given {@param bounds}.
      */
     private void resizeAndAnimatePipUnchecked(Rect toBounds, int duration) {
+        if (DEBUG) {
+            Log.d(TAG, "resizeAndAnimatePipUnchecked: toBounds=" + toBounds
+                    + " duration=" + duration + " callers=\n" + Debug.getCallers(5, "    "));
+        }
         if (!toBounds.equals(mBounds)) {
             mHandler.post(() -> {
                 try {
@@ -462,6 +495,26 @@ public class PipMotionHelper {
             // just animate downwards.
             return new Point(pipBounds.left, (int) bottomBound);
         }
+    }
+
+    /**
+     * @return whether the gesture it towards the dismiss area based on the velocity when
+     *         dismissing.
+     */
+    public boolean isGestureToDismissArea(Rect pipBounds, float velX, float velY,
+            boolean isFling) {
+        Point endpoint = getDismissEndPoint(pipBounds, velX, velY, isFling);
+        // Center the point
+        endpoint.x += pipBounds.width() / 2;
+        endpoint.y += pipBounds.height() / 2;
+
+        // The dismiss area is the middle third of the screen, half the PIP's height from the bottom
+        Point size = new Point();
+        mContext.getDisplay().getRealSize(size);
+        final int left = size.x / 3;
+        Rect dismissArea = new Rect(left, size.y - (pipBounds.height() / 2), left * 2,
+                size.y + pipBounds.height());
+        return dismissArea.contains(endpoint.x, endpoint.y);
     }
 
     /**

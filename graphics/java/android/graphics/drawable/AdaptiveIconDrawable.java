@@ -78,12 +78,13 @@ public class AdaptiveIconDrawable extends Drawable implements Drawable.Callback 
      * Mask path is defined inside device configuration in following dimension: [100 x 100]
      * @hide
      */
+    @TestApi
     public static final float MASK_SIZE = 100f;
 
     /**
      * Launcher icons design guideline
      */
-    private static final float SAFEZONE_SCALE = 72f/66f;
+    private static final float SAFEZONE_SCALE = 66f/72f;
 
     /**
      * All four sides of the layers are padded with extra inset so as to provide
@@ -179,7 +180,6 @@ public class AdaptiveIconDrawable extends Drawable implements Drawable.Callback 
      *
      * @param backgroundDrawable drawable that should be rendered in the background
      * @param foregroundDrawable drawable that should be rendered in the foreground
-     * @hide
      */
     public AdaptiveIconDrawable(Drawable backgroundDrawable,
             Drawable foregroundDrawable) {
@@ -676,12 +676,7 @@ public class AdaptiveIconDrawable extends Drawable implements Drawable.Callback 
 
     @Override
     public int getAlpha() {
-        final Drawable dr = getFirstNonNullDrawable();
-        if (dr != null) {
-            return dr.getAlpha();
-        } else {
-            return super.getAlpha();
-        }
+        return PixelFormat.TRANSLUCENT;
     }
 
     @Override
@@ -717,17 +712,6 @@ public class AdaptiveIconDrawable extends Drawable implements Drawable.Callback 
                 dr.setTintMode(tintMode);
             }
         }
-    }
-
-    private Drawable getFirstNonNullDrawable() {
-        final ChildDrawable[] array = mLayerState.mChildren;
-        for (int i = 0; i < mLayerState.N_CHILDREN; i++) {
-            final Drawable dr = array[i].mDrawable;
-            if (dr != null) {
-                return dr;
-            }
-        }
-        return null;
     }
 
     public void setOpacity(int opacity) {

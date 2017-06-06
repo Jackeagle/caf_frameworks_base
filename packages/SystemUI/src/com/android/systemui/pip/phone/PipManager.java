@@ -16,13 +16,16 @@
 
 package com.android.systemui.pip.phone;
 
+import static android.app.ActivityManager.StackId.PINNED_STACK_ID;
 import static android.view.Display.DEFAULT_DISPLAY;
 
 import android.app.ActivityManager;
+import android.app.ActivityManager.StackInfo;
 import android.app.IActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ParceledListSlice;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.RemoteException;
@@ -33,6 +36,8 @@ import android.view.IWindowManager;
 import android.view.WindowManagerGlobal;
 
 import com.android.systemui.pip.BasePipManager;
+import com.android.systemui.recents.events.EventBus;
+import com.android.systemui.recents.events.component.ExpandPipEvent;
 import com.android.systemui.recents.misc.SystemServicesProxy;
 import com.android.systemui.recents.misc.SystemServicesProxy.TaskStackListener;
 import com.android.systemui.statusbar.CommandQueue;
@@ -65,22 +70,23 @@ public class PipManager implements BasePipManager {
      */
     TaskStackListener mTaskStackListener = new TaskStackListener() {
         @Override
-        public void onActivityPinned(String packageName) {
-            if (!checkCurrentUserId(false /* debug */)) {
+        public void onActivityPinned(String packageName, int taskId) {
+            if (!checkCurrentUserId(mContext, false /* debug */)) {
                 return;
             }
 
             mTouchHandler.onActivityPinned();
             mMediaController.onActivityPinned();
             mMenuController.onActivityPinned();
-            mNotificationController.onActivityPinned(packageName);
+            mNotificationController.onActivityPinned(packageName,
+                    true /* deferUntilAnimationEnds */);
 
             SystemServicesProxy.getInstance(mContext).setPipVisibility(true);
         }
 
         @Override
         public void onActivityUnpinned() {
-            if (!checkCurrentUserId(false /* debug */)) {
+            if (!checkCurrentUserId(mContext, false /* debug */)) {
                 return;
             }
 
@@ -103,15 +109,17 @@ public class PipManager implements BasePipManager {
             // Re-enable touches after the animation completes
             mTouchHandler.setTouchEnabled(true);
             mTouchHandler.onPinnedStackAnimationEnded();
+            mMenuController.onPinnedStackAnimationEnded();
+            mNotificationController.onPinnedStackAnimationEnded();
         }
 
         @Override
-        public void onPinnedActivityRestartAttempt() {
-            if (!checkCurrentUserId(false /* debug */)) {
+        public void onPinnedActivityRestartAttempt(boolean clearedTask) {
+            if (!checkCurrentUserId(mContext, false /* debug */)) {
                 return;
             }
 
-            mTouchHandler.getMotionHelper().expandPip();
+            mTouchHandler.getMotionHelper().expandPip(clearedTask /* skipAnimation */);
         }
     };
 
@@ -183,13 +191,34 @@ public class PipManager implements BasePipManager {
                 mInputConsumerController);
         mNotificationController = new PipNotificationController(context, mActivityManager,
                 mTouchHandler.getMotionHelper());
+        EventBus.getDefault().register(this);
     }
 
     /**
      * Updates the PIP per configuration changed.
      */
-    public void onConfigurationChanged() {
+    public void onConfigurationChanged(Configuration newConfig) {
         mTouchHandler.onConfigurationChanged();
+    }
+
+    /**
+     * Expands the PIP.
+     */
+    public final void onBusEvent(ExpandPipEvent event) {
+        if (event.clearThumbnailWindows) {
+            try {
+                StackInfo stackInfo = mActivityManager.getStackInfo(PINNED_STACK_ID);
+                if (stackInfo != null && stackInfo.taskIds != null) {
+                    SystemServicesProxy ssp = SystemServicesProxy.getInstance(mContext);
+                    for (int taskId : stackInfo.taskIds) {
+                        ssp.cancelThumbnailTransition(taskId);
+                    }
+                }
+            } catch (RemoteException e) {
+                // Do nothing
+            }
+        }
+        mTouchHandler.getMotionHelper().expandPip(false /* skipAnimation */);
     }
 
     /**

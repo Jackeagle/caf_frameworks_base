@@ -54,10 +54,13 @@ import java.io.PrintWriter;
  * Manages all the touch handling for PIP on the Phone, including moving, dismissing and expanding
  * the PIP.
  */
-public class PipTouchHandler implements TunerService.Tunable {
+public class PipTouchHandler {
     private static final String TAG = "PipTouchHandler";
 
-    private static final String TUNER_KEY_MINIMIZE = "pip_minimize";
+    // Allow the PIP to be dragged to the edge of the screen to be minimized.
+    private static final boolean ENABLE_MINIMIZE = false;
+    // Allow the PIP to be flung from anywhere on the screen to the bottom to be dismissed.
+    private static final boolean ENABLE_FLING_DISMISS = false;
 
     // These values are used for metrics and should never change
     private static final int METRIC_VALUE_DISMISSED_BY_TAP = 0;
@@ -111,9 +114,6 @@ public class PipTouchHandler implements TunerService.Tunable {
                     updateDismissFraction();
                 }
             };
-
-    // Allow the PIP to be dragged to the edge of the screen to be minimized.
-    private boolean mEnableMinimize = false;
 
     // Behaviour states
     private int mMenuState;
@@ -188,13 +188,10 @@ public class PipTouchHandler implements TunerService.Tunable {
         mGestures = new PipTouchGesture[] {
                 mDefaultMovementGesture
         };
-        mMotionHelper = new PipMotionHelper(mContext, mActivityManager, mSnapAlgorithm,
-                mFlingAnimationUtils);
+        mMotionHelper = new PipMotionHelper(mContext, mActivityManager, mMenuController,
+                mSnapAlgorithm, mFlingAnimationUtils);
         mExpandedShortestEdgeSize = context.getResources().getDimensionPixelSize(
                 R.dimen.pip_expanded_shortest_edge_size);
-
-        // Register any tuner settings changes
-        Dependency.get(TunerService.class).addTunable(this, TUNER_KEY_MINIMIZE);
 
         // Register the listener for input consumer touch events
         inputConsumerController.setTouchListener(this::handleTouchEvent);
@@ -221,7 +218,7 @@ public class PipTouchHandler implements TunerService.Tunable {
         if (mIsMinimized) {
             setMinimizedStateInternal(false);
         }
-        mDismissViewController.destroyDismissTarget();
+        cleanUpDismissTarget();
         mShowPipMenuOnAnimationEnd = true;
     }
 
@@ -233,20 +230,6 @@ public class PipTouchHandler implements TunerService.Tunable {
             mMenuController.showMenu(MENU_STATE_CLOSE, mMotionHelper.getBounds(),
                     mMovementBounds, true /* allowMenuTimeout */);
             mShowPipMenuOnAnimationEnd = false;
-        }
-    }
-
-    @Override
-    public void onTuningChanged(String key, String newValue) {
-        if (newValue == null) {
-            // Reset back to default
-            mEnableMinimize = false;
-            return;
-        }
-        switch (key) {
-            case TUNER_KEY_MINIMIZE:
-                mEnableMinimize = Integer.parseInt(newValue) != 0;
-                break;
         }
     }
 
@@ -332,6 +315,12 @@ public class PipTouchHandler implements TunerService.Tunable {
         mAccessibilityManager.setPictureInPictureActionReplacingConnection(isRegistered
                 ? new PipAccessibilityInteractionConnection(mMotionHelper,
                         this::onAccessibilityShowMenu, mHandler) : null);
+
+        if (!isRegistered && mTouchState.isUserInteracting()) {
+            // If the input consumer is unregistered while the user is interacting, then we may not
+            // get the final TOUCH_UP event, so clean up the dismiss target as well
+            cleanUpDismissTarget();
+        }
     }
 
     private void onAccessibilityShowMenu() {
@@ -443,7 +432,7 @@ public class PipTouchHandler implements TunerService.Tunable {
      * Sets the minimized state.
      */
     void setMinimizedStateInternal(boolean isMinimized) {
-        if (!mEnableMinimize) {
+        if (!ENABLE_MINIMIZE) {
             return;
         }
         setMinimizedState(isMinimized, false /* fromController */);
@@ -453,7 +442,7 @@ public class PipTouchHandler implements TunerService.Tunable {
      * Sets the minimized state.
      */
     void setMinimizedState(boolean isMinimized, boolean fromController) {
-        if (!mEnableMinimize) {
+        if (!ENABLE_MINIMIZE) {
             return;
         }
         if (mIsMinimized != isMinimized) {
@@ -495,14 +484,15 @@ public class PipTouchHandler implements TunerService.Tunable {
             // Try and restore the PiP to the closest edge, using the saved snap fraction
             // if possible
             if (resize) {
-                // This is a very special case: when the menu is expanded and visible, navigating to
-                // another activity can trigger auto-enter PiP, and if the revealed activity has a
-                // forced rotation set, then the controller will get updated with the new rotation
-                // of the display. However, at the same time, SystemUI will try to hide the menu by
-                // creating an animation to the normal bounds which are now stale.  In such a case
-                // we defer the animation to the normal bounds until after the next
-                // onMovementBoundsChanged() call to get the bounds in the new orientation
                 if (mDeferResizeToNormalBoundsUntilRotation == -1) {
+                    // This is a very special case: when the menu is expanded and visible,
+                    // navigating to another activity can trigger auto-enter PiP, and if the
+                    // revealed activity has a forced rotation set, then the controller will get
+                    // updated with the new rotation of the display. However, at the same time,
+                    // SystemUI will try to hide the menu by creating an animation to the normal
+                    // bounds which are now stale.  In such a case we defer the animation to the
+                    // normal bounds until after the next onMovementBoundsChanged() call to get the
+                    // bounds in the new orientation
                     try {
                         int displayRotation = mPinnedStackController.getDisplayRotation();
                         if (mDisplayRotation != displayRotation) {
@@ -521,6 +511,9 @@ public class PipTouchHandler implements TunerService.Tunable {
                     mSavedSnapFraction = -1f;
                 }
             } else {
+                // If resizing is not allowed, then the PiP should be frozen until the transition
+                // ends as well
+                setTouchEnabled(false);
                 mSavedSnapFraction = -1f;
             }
         }
@@ -576,11 +569,11 @@ public class PipTouchHandler implements TunerService.Tunable {
 
             if (touchState.startedDragging()) {
                 mSavedSnapFraction = -1f;
-            }
 
-            if (touchState.startedDragging() && ENABLE_DISMISS_DRAG_TO_EDGE) {
-                mHandler.removeCallbacks(mShowDismissAffordance);
-                mDismissViewController.showDismissTarget();
+                if (ENABLE_DISMISS_DRAG_TO_EDGE) {
+                    mHandler.removeCallbacks(mShowDismissAffordance);
+                    mDismissViewController.showDismissTarget();
+                }
             }
 
             if (touchState.isDragging()) {
@@ -589,7 +582,7 @@ public class PipTouchHandler implements TunerService.Tunable {
                 final PointF lastDelta = touchState.getLastTouchDelta();
                 float left = mTmpBounds.left + lastDelta.x;
                 float top = mTmpBounds.top + lastDelta.y;
-                if (!touchState.allowDraggingOffscreen() || !mEnableMinimize) {
+                if (!touchState.allowDraggingOffscreen() || !ENABLE_MINIMIZE) {
                     left = Math.max(mMovementBounds.left, Math.min(mMovementBounds.right, left));
                 }
                 if (ENABLE_DISMISS_DRAG_TO_EDGE) {
@@ -623,6 +616,12 @@ public class PipTouchHandler implements TunerService.Tunable {
 
         @Override
         public boolean onUp(PipTouchState touchState) {
+            if (ENABLE_DISMISS_DRAG_TO_EDGE) {
+                // Clean up the dismiss target regardless of the touch state in case the touch
+                // enabled state changes while the user is interacting
+                cleanUpDismissTarget();
+            }
+
             if (!touchState.isUserInteracting()) {
                 return false;
             }
@@ -631,28 +630,28 @@ public class PipTouchHandler implements TunerService.Tunable {
             final boolean isHorizontal = Math.abs(vel.x) > Math.abs(vel.y);
             final float velocity = PointF.length(vel.x, vel.y);
             final boolean isFling = velocity > mFlingAnimationUtils.getMinVelocityPxPerSecond();
-            final boolean isFlingToBot = isFling
-                    && !isHorizontal && mMovementWithinDismiss && vel.y > 0;
+            final boolean isUpWithinDimiss = ENABLE_FLING_DISMISS
+                    && touchState.getLastTouchPosition().y >= mMovementBounds.bottom
+                    && mMotionHelper.isGestureToDismissArea(mMotionHelper.getBounds(), vel.x,
+                            vel.y, isFling);
+            final boolean isFlingToBot = isFling && vel.y > 0 && !isHorizontal
+                    && (mMovementWithinDismiss || isUpWithinDimiss);
             if (ENABLE_DISMISS_DRAG_TO_EDGE) {
-                try {
-                    mHandler.removeCallbacks(mShowDismissAffordance);
-                    if (mMotionHelper.shouldDismissPip() || isFlingToBot) {
-                        mMotionHelper.animateDismiss(mMotionHelper.getBounds(), vel.x,
-                            vel.y, mUpdateScrimListener);
-                        MetricsLogger.action(mContext,
-                                MetricsEvent.ACTION_PICTURE_IN_PICTURE_DISMISSED,
-                                METRIC_VALUE_DISMISSED_BY_DRAG);
-                        return true;
-                    }
-                } finally {
-                    mDismissViewController.destroyDismissTarget();
+                // Check if the user dragged or flung the PiP offscreen to dismiss it
+                if (mMotionHelper.shouldDismissPip() || isFlingToBot) {
+                    mMotionHelper.animateDismiss(mMotionHelper.getBounds(), vel.x,
+                        vel.y, mUpdateScrimListener);
+                    MetricsLogger.action(mContext,
+                            MetricsEvent.ACTION_PICTURE_IN_PICTURE_DISMISSED,
+                            METRIC_VALUE_DISMISSED_BY_DRAG);
+                    return true;
                 }
             }
 
             if (touchState.isDragging()) {
                 final boolean isFlingToEdge = isFling && isHorizontal && mMovementWithinMinimize
                         && (mStartedOnLeft ? vel.x < 0 : vel.x > 0);
-                if (mEnableMinimize &&
+                if (ENABLE_MINIMIZE &&
                         !mIsMinimized && (mMotionHelper.shouldMinimizePip() || isFlingToEdge)) {
                     // Pip should be minimized
                     setMinimizedStateInternal(true);
@@ -722,6 +721,14 @@ public class PipTouchHandler implements TunerService.Tunable {
                 : mNormalMovementBounds;
     }
 
+    /**
+     * Removes the dismiss target and cancels any pending callbacks to show it.
+     */
+    private void cleanUpDismissTarget() {
+        mHandler.removeCallbacks(mShowDismissAffordance);
+        mDismissViewController.destroyDismissTarget();
+    }
+
     public void dump(PrintWriter pw, String prefix) {
         final String innerPrefix = prefix + "  ";
         pw.println(prefix + TAG);
@@ -736,7 +743,7 @@ public class PipTouchHandler implements TunerService.Tunable {
         pw.println(innerPrefix + "mImeHeight=" + mImeHeight);
         pw.println(innerPrefix + "mSavedSnapFraction=" + mSavedSnapFraction);
         pw.println(innerPrefix + "mEnableDragToEdgeDismiss=" + ENABLE_DISMISS_DRAG_TO_EDGE);
-        pw.println(innerPrefix + "mEnableMinimize=" + mEnableMinimize);
+        pw.println(innerPrefix + "mEnableMinimize=" + ENABLE_MINIMIZE);
         mSnapAlgorithm.dump(pw, innerPrefix);
         mTouchState.dump(pw, innerPrefix);
         mMotionHelper.dump(pw, innerPrefix);

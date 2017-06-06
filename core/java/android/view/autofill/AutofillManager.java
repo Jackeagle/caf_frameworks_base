@@ -16,8 +16,9 @@
 
 package android.view.autofill;
 
-import static android.view.autofill.Helper.DEBUG;
-import static android.view.autofill.Helper.VERBOSE;
+import static android.service.autofill.FillRequest.FLAG_MANUAL_REQUEST;
+import static android.view.autofill.Helper.sDebug;
+import static android.view.autofill.Helper.sVerbose;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -28,7 +29,6 @@ import android.content.IntentSender;
 import android.graphics.Rect;
 import android.metrics.LogMaker;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.service.autofill.AutofillService;
@@ -38,7 +38,6 @@ import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
-import android.view.WindowManagerGlobal;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.logging.MetricsLogger;
@@ -47,6 +46,7 @@ import com.android.internal.logging.nano.MetricsProto;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -94,24 +94,63 @@ public final class AutofillManager {
      * <p>
      * Type: {@link android.os.Bundle}
      */
-    public static final String EXTRA_DATA_EXTRAS = "android.view.autofill.extra.DATA_EXTRAS";
+    public static final String EXTRA_CLIENT_STATE =
+            "android.view.autofill.extra.CLIENT_STATE";
 
     static final String SESSION_ID_TAG = "android:sessionId";
     static final String LAST_AUTOFILLED_DATA_TAG = "android:lastAutoFilledData";
 
+    /** @hide */ public static final int ACTION_START_SESSION = 1;
+    /** @hide */ public static final int ACTION_VIEW_ENTERED =  2;
+    /** @hide */ public static final int ACTION_VIEW_EXITED = 3;
+    /** @hide */ public static final int ACTION_VALUE_CHANGED = 4;
+
+
+    /** @hide */ public static final int FLAG_ADD_CLIENT_ENABLED = 0x1;
+    /** @hide */ public static final int FLAG_ADD_CLIENT_DEBUG = 0x2;
+    /** @hide */ public static final int FLAG_ADD_CLIENT_VERBOSE = 0x4;
+
+    /** Which bits in an authentication id are used for the dataset id */
+    private static final int AUTHENTICATION_ID_DATASET_ID_MASK = 0xFFFF;
+    /** How many bits in an authentication id are used for the dataset id */
+    private static final int AUTHENTICATION_ID_DATASET_ID_SHIFT = 16;
+    /** @hide The index for an undefined data set */
+    public static final int AUTHENTICATION_ID_DATASET_ID_UNDEFINED = 0xFFFF;
+
     /**
-     * @deprecated Use {@link android.service.autofill.FillRequest#FLAG_MANUAL_REQUEST}
+     * Makes an authentication id from a request id and a dataset id.
+     *
+     * @param requestId The request id.
+     * @param datasetId The dataset id.
+     * @return The authentication id.
      * @hide
      */
-    // TODO(b/37563972): remove (and change value of private flags)
-    @Deprecated
-    public static final int FLAG_MANUAL_REQUEST = 0x1;
+    public static int makeAuthenticationId(int requestId, int datasetId) {
+        return (requestId << AUTHENTICATION_ID_DATASET_ID_SHIFT)
+                | (datasetId & AUTHENTICATION_ID_DATASET_ID_MASK);
+    }
 
-    // TODO(b/37563972): start from 0x1 once FLAG_MANUAL_REQUEST is gone
-    /** @hide */ public static final int FLAG_START_SESSION = 0x80000000;
-    /** @hide */ public static final int FLAG_VIEW_ENTERED =  0x40000000;
-    /** @hide */ public static final int FLAG_VIEW_EXITED =   0x20000000;
-    /** @hide */ public static final int FLAG_VALUE_CHANGED = 0x10000000;
+    /**
+     * Gets the request id from an authentication id.
+     *
+     * @param authRequestId The authentication id.
+     * @return The request id.
+     * @hide
+     */
+    public static int getRequestIdFromAuthenticationId(int authRequestId) {
+        return (authRequestId >> AUTHENTICATION_ID_DATASET_ID_SHIFT);
+    }
+
+    /**
+     * Gets the dataset id from an authentication id.
+     *
+     * @param authRequestId The authentication id.
+     * @return The dataset id.
+     * @hide
+     */
+    public static int getDatasetIdFromAuthenticationId(int authRequestId) {
+        return (authRequestId & AUTHENTICATION_ID_DATASET_ID_MASK);
+    }
 
     private final MetricsLogger mMetricsLogger = new MetricsLogger();
 
@@ -147,15 +186,21 @@ public final class AutofillManager {
     @GuardedBy("mLock")
     @Nullable private TrackedViews mTrackedViews;
 
+    /** Views that are only tracked because they are fillable and could be anchoring the UI. */
+    @GuardedBy("mLock")
+    @Nullable private ArraySet<AutofillId> mFillableIds;
+
     /** @hide */
     public interface AutofillClient {
         /**
          * Asks the client to start an authentication flow.
          *
+         * @param authenticationId A unique id of the authentication operation.
          * @param intent The authentication intent.
          * @param fillInIntent The authentication fill-in intent.
          */
-        void autofillCallbackAuthenticate(IntentSender intent, Intent fillInIntent);
+        void autofillCallbackAuthenticate(int authenticationId, IntentSender intent,
+                Intent fillInIntent);
 
         /**
          * Tells the client this manager has state to be reset.
@@ -183,11 +228,11 @@ public final class AutofillManager {
         boolean autofillCallbackRequestHideFillUi();
 
         /**
-         * Checks if the view is currently attached and visible.
+         * Checks if views are currently attached and visible.
          *
-         * @return {@code true} iff the view is attached or visible
+         * @return And array with {@code true} iff the view is attached or visible
          */
-        boolean getViewVisibility(int viewId);
+        @NonNull boolean[] getViewVisibility(@NonNull int[] viewId);
 
         /**
          * Checks is the client is currently visible as understood by autofill.
@@ -195,6 +240,24 @@ public final class AutofillManager {
          * @return {@code true} if the client is currently visible
          */
         boolean isVisibleForAutofill();
+
+        /**
+         * Finds views by traversing the hierarchies of the client.
+         *
+         * @param viewIds The accessibility ids of the views to find
+         *
+         * @return And array containing the views (empty if no views found).
+         */
+        @NonNull View[] findViewsByAccessibilityIdTraversal(@NonNull int[] viewIds);
+
+        /**
+         * Finds a view by traversing the hierarchies of the client.
+         *
+         * @param viewId The accessibility id of the views to find
+         *
+         * @return The view, or {@code null} if not found
+         */
+        @Nullable View findViewByAccessibilityIdTraversal(int viewId);
     }
 
     /**
@@ -239,7 +302,7 @@ public final class AutofillManager {
                             Log.w(TAG, "Session " + mSessionId + " could not be restored");
                             mSessionId = NO_SESSION;
                         } else {
-                            if (DEBUG) {
+                            if (sDebug) {
                                 Log.d(TAG, "session " + mSessionId + " was restored");
                             }
 
@@ -254,30 +317,6 @@ public final class AutofillManager {
     }
 
     /**
-     * Set window future popup windows should be attached to.
-     *
-     * @param windowToken The window the popup windows should be attached to
-     *
-     * {@hide}
-     */
-    public void onAttachedToWindow(@NonNull IBinder windowToken) {
-        if (!hasAutofillFeature()) {
-            return;
-        }
-        synchronized (mLock) {
-            if (mSessionId == NO_SESSION) {
-                return;
-            }
-
-            try {
-                mService.setWindow(mSessionId, windowToken);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Could not attach window to session " + mSessionId);
-            }
-        }
-    }
-
-    /**
      * Called once the client becomes visible.
      *
      * @see AutofillClient#isVisibleForAutofill()
@@ -287,7 +326,7 @@ public final class AutofillManager {
     public void onVisibleForAutofill() {
         synchronized (mLock) {
             if (mEnabled && mSessionId != NO_SESSION && mTrackedViews != null) {
-                mTrackedViews.onVisibleForAutofill();
+                mTrackedViews.onVisibleForAutofillLocked();
             }
         }
     }
@@ -349,57 +388,44 @@ public final class AutofillManager {
     /**
      * Explicitly requests a new autofill context.
      *
-     * <p>Normally, the autofill context is automatically started when autofillable views are
-     * focused, but this method should be used in the cases where it must be explicitly requested,
-     * like a view that provides a contextual menu allowing users to autofill the activity.
+     * <p>Normally, the autofill context is automatically started if necessary when
+     * {@link #notifyViewEntered(View)} is called, but this method should be used in the
+     * cases where it must be explicitly started. For example, when the view offers an AUTOFILL
+     * option on its contextual overflow menu, and the user selects it.
      *
      * @param view view requesting the new autofill context.
      */
     public void requestAutofill(@NonNull View view) {
-        if (!hasAutofillFeature()) {
-            return;
-        }
-        synchronized (mLock) {
-            ensureServiceClientAddedIfNeededLocked();
-
-            if (!mEnabled) {
-                return;
-            }
-
-            final AutofillId id = getAutofillId(view);
-            final AutofillValue value = view.getAutofillValue();
-
-            startSessionLocked(id, view.getWindowToken(), null, value, FLAG_MANUAL_REQUEST);
-        }
+        notifyViewEntered(view, FLAG_MANUAL_REQUEST);
     }
 
     /**
      * Explicitly requests a new autofill context for virtual views.
      *
-     * <p>Normally, the autofill context is automatically started when autofillable views are
-     * focused, but this method should be used in the cases where it must be explicitly requested,
-     * like a virtual view that provides a contextual menu allowing users to autofill the activity.
+     * <p>Normally, the autofill context is automatically started if necessary when
+     * {@link #notifyViewEntered(View, int, Rect)} is called, but this method should be used in the
+     * cases where it must be explicitly started. For example, when the virtual view offers an
+     * AUTOFILL option on its contextual overflow menu, and the user selects it.
      *
-     * @param view the {@link View} whose descendant is the virtual view.
-     * @param childId id identifying the virtual child inside the view.
-     * @param bounds child boundaries, relative to the top window.
+     * <p>The virtual view boundaries must be absolute screen coordinates. For example, if the
+     * parent view uses {@code bounds} to draw the virtual view inside its Canvas,
+     * the absolute bounds could be calculated by:
+     *
+     * <pre class="prettyprint">
+     *   int offset[] = new int[2];
+     *   getLocationOnScreen(offset);
+     *   Rect absBounds = new Rect(bounds.left + offset[0],
+     *       bounds.top + offset[1],
+     *       bounds.right + offset[0], bounds.bottom + offset[1]);
+     * </pre>
+     *
+     * @param view the virtual view parent.
+     * @param virtualId id identifying the virtual child inside the parent view.
+     * @param absBounds absolute boundaries of the virtual view in the screen.
      */
-    public void requestAutofill(@NonNull View view, int childId, @NonNull Rect bounds) {
-        if (!hasAutofillFeature()) {
-            return;
-        }
-        synchronized (mLock) {
-            ensureServiceClientAddedIfNeededLocked();
-
-            if (!mEnabled) {
-                return;
-            }
-
-            final AutofillId id = getAutofillId(view, childId);
-            startSessionLocked(id, view.getWindowToken(), bounds, null, FLAG_MANUAL_REQUEST);
-        }
+    public void requestAutofill(@NonNull View view, int virtualId, @NonNull Rect absBounds) {
+        notifyViewEntered(view, virtualId, absBounds, FLAG_MANUAL_REQUEST);
     }
-
 
     /**
      * Called when a {@link View} that supports autofill is entered.
@@ -407,6 +433,10 @@ public final class AutofillManager {
      * @param view {@link View} that was entered.
      */
     public void notifyViewEntered(@NonNull View view) {
+        notifyViewEntered(view, 0);
+    }
+
+    private void notifyViewEntered(@NonNull View view, int flags) {
         if (!hasAutofillFeature()) {
             return;
         }
@@ -424,10 +454,10 @@ public final class AutofillManager {
 
                 if (mSessionId == NO_SESSION) {
                     // Starts new session.
-                    startSessionLocked(id, view.getWindowToken(), null, value, 0);
+                    startSessionLocked(id, null, value, flags);
                 } else {
                     // Update focus on existing session.
-                    updateSessionLocked(id, null, value, FLAG_VIEW_ENTERED);
+                    updateSessionLocked(id, null, value, ACTION_VIEW_ENTERED, flags);
                 }
             }
         }
@@ -453,7 +483,7 @@ public final class AutofillManager {
                 final AutofillId id = getAutofillId(view);
 
                 // Update focus on existing session.
-                updateSessionLocked(id, null, null, FLAG_VIEW_EXITED);
+                updateSessionLocked(id, null, null, ACTION_VIEW_EXITED, 0);
             }
         }
     }
@@ -468,8 +498,17 @@ public final class AutofillManager {
      */
     public void notifyViewVisibilityChange(@NonNull View view, boolean isVisible) {
         synchronized (mLock) {
-            if (mEnabled && mSessionId != NO_SESSION && mTrackedViews != null) {
-                mTrackedViews.notifyViewVisibilityChange(view, isVisible);
+            if (mEnabled && mSessionId != NO_SESSION) {
+                if (!isVisible && mFillableIds != null) {
+                    final AutofillId id = view.getAutofillId();
+                    if (mFillableIds.contains(id)) {
+                        if (sDebug) Log.d(TAG, "Hidding UI when view " + id + " became invisible");
+                        requestHideFillUi(id, view);
+                    }
+                }
+                if (mTrackedViews != null) {
+                    mTrackedViews.notifyViewVisibilityChange(view, isVisible);
+                }
             }
         }
     }
@@ -477,11 +516,27 @@ public final class AutofillManager {
     /**
      * Called when a virtual view that supports autofill is entered.
      *
-     * @param view the {@link View} whose descendant is the virtual view.
-     * @param childId id identifying the virtual child inside the view.
-     * @param bounds child boundaries, relative to the top window.
+     * <p>The virtual view boundaries must be absolute screen coordinates. For example, if the
+     * parent, non-virtual view uses {@code bounds} to draw the virtual view inside its Canvas,
+     * the absolute bounds could be calculated by:
+     *
+     * <pre class="prettyprint">
+     *   int offset[] = new int[2];
+     *   getLocationOnScreen(offset);
+     *   Rect absBounds = new Rect(bounds.left + offset[0],
+     *       bounds.top + offset[1],
+     *       bounds.right + offset[0], bounds.bottom + offset[1]);
+     * </pre>
+     *
+     * @param view the virtual view parent.
+     * @param virtualId id identifying the virtual child inside the parent view.
+     * @param absBounds absolute boundaries of the virtual view in the screen.
      */
-    public void notifyViewEntered(@NonNull View view, int childId, @NonNull Rect bounds) {
+    public void notifyViewEntered(@NonNull View view, int virtualId, @NonNull Rect absBounds) {
+        notifyViewEntered(view, virtualId, absBounds, 0);
+    }
+
+    private void notifyViewEntered(View view, int virtualId, Rect bounds, int flags) {
         if (!hasAutofillFeature()) {
             return;
         }
@@ -494,20 +549,20 @@ public final class AutofillManager {
                     callback = mCallback;
                 }
             } else {
-                final AutofillId id = getAutofillId(view, childId);
+                final AutofillId id = getAutofillId(view, virtualId);
 
                 if (mSessionId == NO_SESSION) {
                     // Starts new session.
-                    startSessionLocked(id, view.getWindowToken(), bounds, null, 0);
+                    startSessionLocked(id, bounds, null, flags);
                 } else {
                     // Update focus on existing session.
-                    updateSessionLocked(id, bounds, null, FLAG_VIEW_ENTERED);
+                    updateSessionLocked(id, bounds, null, ACTION_VIEW_ENTERED, flags);
                 }
             }
         }
 
         if (callback != null) {
-            callback.onAutofillEvent(view, childId,
+            callback.onAutofillEvent(view, virtualId,
                     AutofillCallback.EVENT_INPUT_UNAVAILABLE);
         }
     }
@@ -515,10 +570,10 @@ public final class AutofillManager {
     /**
      * Called when a virtual view that supports autofill is exited.
      *
-     * @param view the {@link View} whose descendant is the virtual view.
-     * @param childId id identifying the virtual child inside the view.
+     * @param view the virtual view parent.
+     * @param virtualId id identifying the virtual child inside the parent view.
      */
-    public void notifyViewExited(@NonNull View view, int childId) {
+    public void notifyViewExited(@NonNull View view, int virtualId) {
         if (!hasAutofillFeature()) {
             return;
         }
@@ -526,10 +581,10 @@ public final class AutofillManager {
             ensureServiceClientAddedIfNeededLocked();
 
             if (mEnabled && mSessionId != NO_SESSION) {
-                final AutofillId id = getAutofillId(view, childId);
+                final AutofillId id = getAutofillId(view, virtualId);
 
                 // Update focus on existing session.
-                updateSessionLocked(id, null, null, FLAG_VIEW_EXITED);
+                updateSessionLocked(id, null, null, ACTION_VIEW_EXITED, 0);
             }
         }
     }
@@ -581,18 +636,18 @@ public final class AutofillManager {
                 value = view.getAutofillValue();
             }
 
-            updateSessionLocked(id, null, value, FLAG_VALUE_CHANGED);
+            updateSessionLocked(id, null, value, ACTION_VALUE_CHANGED, 0);
         }
     }
 
     /**
-     * Called to indicate the value of an autofillable virtual {@link View} changed.
+     * Called to indicate the value of an autofillable virtual view has changed.
      *
-     * @param view the {@link View} whose descendant is the virtual view.
-     * @param childId id identifying the virtual child inside the parent view.
+     * @param view the virtual view parent.
+     * @param virtualId id identifying the virtual child inside the parent view.
      * @param value new value of the child.
      */
-    public void notifyValueChanged(View view, int childId, AutofillValue value) {
+    public void notifyValueChanged(View view, int virtualId, AutofillValue value) {
         if (!hasAutofillFeature()) {
             return;
         }
@@ -601,8 +656,8 @@ public final class AutofillManager {
                 return;
             }
 
-            final AutofillId id = getAutofillId(view, childId);
-            updateSessionLocked(id, null, value, FLAG_VALUE_CHANGED);
+            final AutofillId id = getAutofillId(view, virtualId);
+            updateSessionLocked(id, null, value, ACTION_VALUE_CHANGED, 0);
         }
     }
 
@@ -644,16 +699,54 @@ public final class AutofillManager {
         }
     }
 
+    /** @hide */
+    public void disableOwnedAutofillServices() {
+        disableAutofillServices();
+    }
+
     /**
      * If the app calling this API has enabled autofill services they
      * will be disabled.
      */
-    public void disableOwnedAutofillServices() {
+    public void disableAutofillServices() {
         if (!hasAutofillFeature()) {
             return;
         }
         try {
             mService.disableOwnedAutofillServices(mContext.getUserId());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns {@code true} if the calling application provides a {@link AutofillService} that is
+     * enabled for the current user, or {@code false} otherwise.
+     */
+    public boolean hasEnabledAutofillServices() {
+        if (mService == null) return false;
+
+        try {
+            return mService.isServiceEnabled(mContext.getUserId(), mContext.getPackageName());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns {@code true} if Autofill is supported for this user.
+     *
+     * <p>Autofill is typically supported, but it could be unsupported in cases like:
+     * <ol>
+     *     <li>Low-end devices.
+     *     <li>Device policy rules that forbid its usage.
+     * </ol>
+     */
+    public boolean isAutofillSupported() {
+        if (mService == null) return false;
+
+        try {
+            return mService.isServiceSupported(mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -667,7 +760,7 @@ public final class AutofillManager {
     }
 
     /** @hide */
-    public void onAuthenticationResult(Intent data) {
+    public void onAuthenticationResult(int authenticationId, Intent data) {
         if (!hasAutofillFeature()) {
             return;
         }
@@ -676,7 +769,7 @@ public final class AutofillManager {
         // set the EXTRA_AUTHENTICATION_RESULT extra, but it could cause weird results if the
         // service set the extra and returned RESULT_CANCELED...
 
-        if (DEBUG) Log.d(TAG, "onAuthenticationResult(): d=" + data);
+        if (sDebug) Log.d(TAG, "onAuthenticationResult(): d=" + data);
 
         synchronized (mLock) {
             if (mSessionId == NO_SESSION || data == null) {
@@ -686,7 +779,8 @@ public final class AutofillManager {
             final Bundle responseData = new Bundle();
             responseData.putParcelable(EXTRA_AUTHENTICATION_RESULT, result);
             try {
-                mService.setAuthenticationResult(responseData, mSessionId, mContext.getUserId());
+                mService.setAuthenticationResult(responseData, mSessionId, authenticationId,
+                        mContext.getUserId());
             } catch (RemoteException e) {
                 Log.e(TAG, "Error delivering authentication result", e);
             }
@@ -697,22 +791,22 @@ public final class AutofillManager {
         return new AutofillId(view.getAccessibilityViewId());
     }
 
-    private static AutofillId getAutofillId(View parent, int childId) {
-        return new AutofillId(parent.getAccessibilityViewId(), childId);
+    private static AutofillId getAutofillId(View parent, int virtualId) {
+        return new AutofillId(parent.getAccessibilityViewId(), virtualId);
     }
 
-    private void startSessionLocked(@NonNull AutofillId id, @NonNull IBinder windowToken,
-            @NonNull Rect bounds, @NonNull AutofillValue value, int flags) {
-        if (DEBUG) {
-            Log.d(TAG, "startSessionLocked(): id=" + id + ", bounds=" + bounds + ", value=" + value
+    private void startSessionLocked(@NonNull AutofillId id, @NonNull Rect bounds,
+            @NonNull AutofillValue value, int flags) {
+        if (sVerbose) {
+            Log.v(TAG, "startSessionLocked(): id=" + id + ", bounds=" + bounds + ", value=" + value
                     + ", flags=" + flags);
         }
 
         try {
-            mSessionId = mService.startSession(mContext.getActivityToken(), windowToken,
+            mSessionId = mService.startSession(mContext.getActivityToken(),
                     mServiceClient.asBinder(), id, bounds, value, mContext.getUserId(),
                     mCallback != null, flags, mContext.getOpPackageName());
-            AutofillClient client = getClientLocked();
+            final AutofillClient client = getClientLocked();
             if (client != null) {
                 client.autofillCallbackResetableStateAvailable();
             }
@@ -722,9 +816,7 @@ public final class AutofillManager {
     }
 
     private void finishSessionLocked() {
-        if (DEBUG) {
-            Log.d(TAG, "finishSessionLocked()");
-        }
+        if (sVerbose) Log.v(TAG, "finishSessionLocked()");
 
         try {
             mService.finishSession(mSessionId, mContext.getUserId());
@@ -737,9 +829,7 @@ public final class AutofillManager {
     }
 
     private void cancelSessionLocked() {
-        if (DEBUG) {
-            Log.d(TAG, "cancelSessionLocked()");
-        }
+        if (sVerbose) Log.v(TAG, "cancelSessionLocked()");
 
         try {
             mService.cancelSession(mSessionId, mContext.getUserId());
@@ -747,20 +837,41 @@ public final class AutofillManager {
             throw e.rethrowFromSystemServer();
         }
 
-        mTrackedViews = null;
-        mSessionId = NO_SESSION;
+        resetSessionLocked();
     }
 
-    private void updateSessionLocked(AutofillId id, Rect bounds, AutofillValue value, int flags) {
-        if (DEBUG) {
-            if (VERBOSE || (flags & FLAG_VIEW_EXITED) != 0) {
-                Log.d(TAG, "updateSessionLocked(): id=" + id + ", bounds=" + bounds
-                        + ", value=" + value + ", flags=" + flags);
-            }
+    private void resetSessionLocked() {
+        mSessionId = NO_SESSION;
+        mTrackedViews = null;
+    }
+
+    private void updateSessionLocked(AutofillId id, Rect bounds, AutofillValue value, int action,
+            int flags) {
+        if (sVerbose && action != ACTION_VIEW_EXITED) {
+            Log.v(TAG, "updateSessionLocked(): id=" + id + ", bounds=" + bounds
+                    + ", value=" + value + ", action=" + action + ", flags=" + flags);
         }
 
+        boolean restartIfNecessary = (flags & FLAG_MANUAL_REQUEST) != 0;
+
         try {
-            mService.updateSession(mSessionId, id, bounds, value, flags, mContext.getUserId());
+            if (restartIfNecessary) {
+                final int newId = mService.updateOrRestartSession(mContext.getActivityToken(),
+                        mServiceClient.asBinder(), id, bounds, value, mContext.getUserId(),
+                        mCallback != null, flags, mContext.getOpPackageName(), mSessionId, action);
+                if (newId != mSessionId) {
+                    if (sDebug) Log.d(TAG, "Session restarted: " + mSessionId + "=>" + newId);
+                    mSessionId = newId;
+                    final AutofillClient client = getClientLocked();
+                    if (client != null) {
+                        client.autofillCallbackResetableStateAvailable();
+                    }
+                }
+            } else {
+                mService.updateSession(mSessionId, id, bounds, value, action, flags,
+                        mContext.getUserId());
+            }
+
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -774,7 +885,10 @@ public final class AutofillManager {
         if (mServiceClient == null) {
             mServiceClient = new AutofillManagerClient(this);
             try {
-                mEnabled = mService.addClient(mServiceClient, mContext.getUserId());
+                final int flags = mService.addClient(mServiceClient, mContext.getUserId());
+                mEnabled = (flags & FLAG_ADD_CLIENT_ENABLED) != 0;
+                sDebug = (flags & FLAG_ADD_CLIENT_DEBUG) != 0;
+                sVerbose = (flags & FLAG_ADD_CLIENT_VERBOSE) != 0;
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -828,9 +942,9 @@ public final class AutofillManager {
         }
     }
 
-    private void requestShowFillUi(int sessionId, IBinder windowToken, AutofillId id, int width,
-            int height, Rect anchorBounds, IAutofillWindowPresenter presenter) {
-        final View anchor = findAchorView(windowToken, id);
+    private void requestShowFillUi(int sessionId, AutofillId id, int width, int height,
+            Rect anchorBounds, IAutofillWindowPresenter presenter) {
+        final View anchor = findView(id);
         if (anchor == null) {
             return;
         }
@@ -859,20 +973,29 @@ public final class AutofillManager {
         }
     }
 
-    private void authenticate(int sessionId, IntentSender intent, Intent fillInIntent) {
+    private void authenticate(int sessionId, int authenticationId, IntentSender intent,
+            Intent fillInIntent) {
         synchronized (mLock) {
             if (sessionId == mSessionId) {
                 AutofillClient client = getClientLocked();
                 if (client != null) {
-                    client.autofillCallbackAuthenticate(intent, fillInIntent);
+                    client.autofillCallbackAuthenticate(authenticationId, intent, fillInIntent);
                 }
             }
         }
     }
 
-    private void setState(boolean enabled) {
+    private void setState(boolean enabled, boolean resetSession, boolean resetClient) {
         synchronized (mLock) {
             mEnabled = enabled;
+            if (!mEnabled || resetSession) {
+                // Reset the session state
+                resetSessionLocked();
+            }
+            if (resetClient) {
+                // Reset connection to system
+                mServiceClient = null;
+            }
         }
     }
 
@@ -895,27 +1018,27 @@ public final class AutofillManager {
         }
     }
 
-    private void autofill(int sessionId, IBinder windowToken, List<AutofillId> ids,
-            List<AutofillValue> values) {
+    private void autofill(int sessionId, List<AutofillId> ids, List<AutofillValue> values) {
         synchronized (mLock) {
             if (sessionId != mSessionId) {
                 return;
             }
 
-            final View root = WindowManagerGlobal.getInstance().getWindowView(windowToken);
-            if (root == null) {
+            final AutofillClient client = getClientLocked();
+            if (client == null) {
                 return;
             }
 
             final int itemCount = ids.size();
             int numApplied = 0;
             ArrayMap<View, SparseArray<AutofillValue>> virtualValues = null;
+            final View[] views = client.findViewsByAccessibilityIdTraversal(getViewIds(ids));
 
             for (int i = 0; i < itemCount; i++) {
                 final AutofillId id = ids.get(i);
                 final AutofillValue value = values.get(i);
                 final int viewId = id.getViewId();
-                final View view = root.findViewByAccessibilityIdTraversal(viewId);
+                final View view = views[i];
                 if (view == null) {
                     Log.w(TAG, "autofill(): no View with id " + viewId);
                     continue;
@@ -973,9 +1096,10 @@ public final class AutofillManager {
      *
      * @param trackedIds The views to be tracked
      * @param saveOnAllViewsInvisible Finish the session once all tracked views are invisible.
+     * @param fillableIds Views that might anchor FillUI.
      */
-    private void setTrackedViews(int sessionId, List<AutofillId> trackedIds,
-            boolean saveOnAllViewsInvisible) {
+    private void setTrackedViews(int sessionId, @Nullable AutofillId[] trackedIds,
+            boolean saveOnAllViewsInvisible, @Nullable AutofillId[] fillableIds) {
         synchronized (mLock) {
             if (mEnabled && mSessionId == sessionId) {
                 if (saveOnAllViewsInvisible) {
@@ -983,22 +1107,43 @@ public final class AutofillManager {
                 } else {
                     mTrackedViews = null;
                 }
+                if (fillableIds != null) {
+                    if (mFillableIds == null) {
+                        mFillableIds = new ArraySet<>(fillableIds.length);
+                    }
+                    for (AutofillId id : fillableIds) {
+                        mFillableIds.add(id);
+                    }
+                    if (sVerbose) {
+                        Log.v(TAG, "setTrackedViews(): fillableIds=" + fillableIds
+                                + ", mFillableIds" + mFillableIds);
+                    }
+                }
             }
         }
     }
 
-    private void requestHideFillUi(int sessionId, IBinder windowToken, AutofillId id) {
-        final View anchor = findAchorView(windowToken, id);
+    private void requestHideFillUi(AutofillId id) {
+        final View anchor = findView(id);
+        if (sVerbose) Log.v(TAG, "requestHideFillUi(" + id + "): anchor = " + anchor);
+        if (anchor == null) {
+            return;
+        }
+        requestHideFillUi(id, anchor);
+    }
+
+    private void requestHideFillUi(AutofillId id, View anchor) {
 
         AutofillCallback callback = null;
         synchronized (mLock) {
-            if (mSessionId == sessionId) {
-                AutofillClient client = getClientLocked();
-
-                if (client != null) {
-                    if (client.autofillCallbackRequestHideFillUi() && mCallback != null) {
-                        callback = mCallback;
-                    }
+            // We do not check the session id for two reasons:
+            // 1. If local and remote session id are off sync the UI would be stuck shown
+            // 2. There is a race between the user state being destroyed due the fill
+            //    service being uninstalled and the UI being dismissed.
+            AutofillClient client = getClientLocked();
+            if (client != null) {
+                if (client.autofillCallbackRequestHideFillUi() && mCallback != null) {
+                    callback = mCallback;
                 }
             }
         }
@@ -1013,8 +1158,11 @@ public final class AutofillManager {
         }
     }
 
-    private void notifyNoFillUi(int sessionId, IBinder windowToken, AutofillId id) {
-        final View anchor = findAchorView(windowToken, id);
+    private void notifyNoFillUi(int sessionId, AutofillId id) {
+        final View anchor = findView(id);
+        if (anchor == null) {
+            return;
+        }
 
         AutofillCallback callback = null;
         synchronized (mLock) {
@@ -1034,21 +1182,54 @@ public final class AutofillManager {
         }
     }
 
-    private View findAchorView(IBinder windowToken, AutofillId id) {
-        final View root = WindowManagerGlobal.getInstance().getWindowView(windowToken);
-        if (root == null) {
-            Log.w(TAG, "no window with token " + windowToken);
-            return null;
+    /**
+     * Get an array of viewIds from a List of {@link AutofillId}.
+     *
+     * @param autofillIds The autofill ids to convert
+     *
+     * @return The array of viewIds.
+     */
+    // TODO: move to Helper as static method
+    @NonNull private int[] getViewIds(@NonNull AutofillId[] autofillIds) {
+        final int numIds = autofillIds.length;
+        final int[] viewIds = new int[numIds];
+        for (int i = 0; i < numIds; i++) {
+            viewIds[i] = autofillIds[i].getViewId();
         }
-        final View view = root.findViewByAccessibilityIdTraversal(id.getViewId());
-        if (view == null) {
-            Log.w(TAG, "no view with id " + id);
-            return null;
-        }
-        return view;
+
+        return viewIds;
     }
 
-    private boolean hasAutofillFeature() {
+    // TODO: move to Helper as static method
+    @NonNull private int[] getViewIds(@NonNull List<AutofillId> autofillIds) {
+        final int numIds = autofillIds.size();
+        final int[] viewIds = new int[numIds];
+        for (int i = 0; i < numIds; i++) {
+            viewIds[i] = autofillIds.get(i).getViewId();
+        }
+
+        return viewIds;
+    }
+
+    /**
+     * Find a single view by its id.
+     *
+     * @param autofillId The autofill id of the view
+     *
+     * @return The view or {@code null} if view was not found
+     */
+    private View findView(@NonNull AutofillId autofillId) {
+        final AutofillClient client = getClientLocked();
+
+        if (client == null) {
+            return null;
+        }
+
+        return client.findViewByAccessibilityIdTraversal(autofillId.getViewId());
+    }
+
+    /** @hide */
+    public boolean hasAutofillFeature() {
         return mService != null;
     }
 
@@ -1070,6 +1251,7 @@ public final class AutofillManager {
          *
          * @return {@code true} iff set is not empty and value is in set
          */
+        // TODO: move to Helper as static method
         private <T> boolean isInSet(@Nullable ArraySet<T> set, T value) {
             return set != null && set.contains(value);
         }
@@ -1083,6 +1265,7 @@ public final class AutofillManager {
          * @return The set including the new value. If set was {@code null}, a set containing only
          *         the new value.
          */
+        // TODO: move to Helper as static method
         @NonNull
         private <T> ArraySet<T> addToSet(@Nullable ArraySet<T> set, T valueToAdd) {
             if (set == null) {
@@ -1103,6 +1286,7 @@ public final class AutofillManager {
          * @return The set without the removed value. {@code null} if set was null, or is empty
          *         after removal.
          */
+        // TODO: move to Helper as static method
         @Nullable
         private <T> ArraySet<T> removeFromSet(@Nullable ArraySet<T> set, T valueToRemove) {
             if (set == null) {
@@ -1123,22 +1307,23 @@ public final class AutofillManager {
          *
          * @param trackedIds The views to be tracked
          */
-        TrackedViews(@NonNull List<AutofillId> trackedIds) {
-            mVisibleTrackedIds = null;
-            mInvisibleTrackedIds = null;
+        TrackedViews(@Nullable AutofillId[] trackedIds) {
+            final AutofillClient client = getClientLocked();
+            if (trackedIds != null && client != null) {
+                final boolean[] isVisible;
 
-            AutofillClient client = getClientLocked();
-            if (trackedIds != null) {
-                int numIds = trackedIds.size();
+                if (client.isVisibleForAutofill()) {
+                    isVisible = client.getViewVisibility(getViewIds(trackedIds));
+                } else {
+                    // All false
+                    isVisible = new boolean[trackedIds.length];
+                }
+
+                final int numIds = trackedIds.length;
                 for (int i = 0; i < numIds; i++) {
-                    AutofillId id = trackedIds.get(i);
+                    final AutofillId id = trackedIds[i];
 
-                    boolean isVisible = true;
-                    if (client != null && client.isVisibleForAutofill()) {
-                        isVisible = client.getViewVisibility(id.getViewId());
-                    }
-
-                    if (isVisible) {
+                    if (isVisible[i]) {
                         mVisibleTrackedIds = addToSet(mVisibleTrackedIds, id);
                     } else {
                         mInvisibleTrackedIds = addToSet(mInvisibleTrackedIds, id);
@@ -1146,8 +1331,8 @@ public final class AutofillManager {
                 }
             }
 
-            if (DEBUG) {
-                Log.d(TAG, "TrackedViews(trackedIds=" + trackedIds + "): "
+            if (sVerbose) {
+                Log.v(TAG, "TrackedViews(trackedIds=" + trackedIds + "): "
                         + " mVisibleTrackedIds=" + mVisibleTrackedIds
                         + " mInvisibleTrackedIds=" + mInvisibleTrackedIds);
             }
@@ -1167,7 +1352,7 @@ public final class AutofillManager {
             AutofillId id = getAutofillId(view);
             AutofillClient client = getClientLocked();
 
-            if (DEBUG) {
+            if (sDebug) {
                 Log.d(TAG, "notifyViewVisibilityChange(): id=" + id + " isVisible="
                         + isVisible);
             }
@@ -1187,6 +1372,9 @@ public final class AutofillManager {
             }
 
             if (mVisibleTrackedIds == null) {
+                if (sVerbose) {
+                    Log.v(TAG, "No more visible ids. Invisibile = " + mInvisibleTrackedIds);
+                }
                 finishSessionLocked();
             }
         }
@@ -1196,20 +1384,27 @@ public final class AutofillManager {
          *
          * @see AutofillClient#isVisibleForAutofill()
          */
-        void onVisibleForAutofill() {
-            // The visibility of the views might have changed while the client was not started,
+        void onVisibleForAutofillLocked() {
+            // The visibility of the views might have changed while the client was not be visible,
             // hence update the visibility state for all views.
             AutofillClient client = getClientLocked();
             ArraySet<AutofillId> updatedVisibleTrackedIds = null;
             ArraySet<AutofillId> updatedInvisibleTrackedIds = null;
             if (client != null) {
                 if (mInvisibleTrackedIds != null) {
-                    for (AutofillId id : mInvisibleTrackedIds) {
-                        if (client.getViewVisibility(id.getViewId())) {
+                    final ArrayList<AutofillId> orderedInvisibleIds =
+                            new ArrayList<>(mInvisibleTrackedIds);
+                    final boolean[] isVisible = client.getViewVisibility(
+                            getViewIds(orderedInvisibleIds));
+
+                    final int numInvisibleTrackedIds = orderedInvisibleIds.size();
+                    for (int i = 0; i < numInvisibleTrackedIds; i++) {
+                        final AutofillId id = orderedInvisibleIds.get(i);
+                        if (isVisible[i]) {
                             updatedVisibleTrackedIds = addToSet(updatedVisibleTrackedIds, id);
 
-                            if (DEBUG) {
-                                Log.i(TAG, "onVisibleForAutofill() " + id + " became visible");
+                            if (sDebug) {
+                                Log.d(TAG, "onVisibleForAutofill() " + id + " became visible");
                             }
                         } else {
                             updatedInvisibleTrackedIds = addToSet(updatedInvisibleTrackedIds, id);
@@ -1218,14 +1413,22 @@ public final class AutofillManager {
                 }
 
                 if (mVisibleTrackedIds != null) {
-                    for (AutofillId id : mVisibleTrackedIds) {
-                        if (client.getViewVisibility(id.getViewId())) {
+                    final ArrayList<AutofillId> orderedVisibleIds =
+                            new ArrayList<>(mVisibleTrackedIds);
+                    final boolean[] isVisible = client.getViewVisibility(
+                            getViewIds(orderedVisibleIds));
+
+                    final int numVisibleTrackedIds = orderedVisibleIds.size();
+                    for (int i = 0; i < numVisibleTrackedIds; i++) {
+                        final AutofillId id = orderedVisibleIds.get(i);
+
+                        if (isVisible[i]) {
                             updatedVisibleTrackedIds = addToSet(updatedVisibleTrackedIds, id);
                         } else {
                             updatedInvisibleTrackedIds = addToSet(updatedInvisibleTrackedIds, id);
 
-                            if (DEBUG) {
-                                Log.i(TAG, "onVisibleForAutofill() " + id + " became invisible");
+                            if (sDebug) {
+                                Log.d(TAG, "onVisibleForAutofill() " + id + " became invisible");
                             }
                         }
                     }
@@ -1293,11 +1496,12 @@ public final class AutofillManager {
          * Called after a change in the autofill state associated with a virtual view.
          *
          * @param view parent view associated with the change.
-         * @param childId id identifying the virtual child inside the parent view.
+         * @param virtualId id identifying the virtual child inside the parent view.
          *
          * @param event currently either {@link #EVENT_INPUT_SHOWN} or {@link #EVENT_INPUT_HIDDEN}.
          */
-        public void onAutofillEvent(@NonNull View view, int childId, @AutofillEventType int event) {
+        public void onAutofillEvent(@NonNull View view, int virtualId,
+                @AutofillEventType int event) {
         }
     }
 
@@ -1309,58 +1513,57 @@ public final class AutofillManager {
         }
 
         @Override
-        public void setState(boolean enabled) {
+        public void setState(boolean enabled, boolean resetSession, boolean resetClient) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
-                afm.mContext.getMainThreadHandler().post(() -> afm.setState(enabled));
+                afm.mContext.getMainThreadHandler().post(
+                        () -> afm.setState(enabled, resetSession, resetClient));
             }
         }
 
         @Override
-        public void autofill(int sessionId, IBinder windowToken, List<AutofillId> ids,
-                List<AutofillValue> values) {
+        public void autofill(int sessionId, List<AutofillId> ids, List<AutofillValue> values) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
                 afm.mContext.getMainThreadHandler().post(
-                        () -> afm.autofill(sessionId, windowToken, ids, values));
+                        () -> afm.autofill(sessionId, ids, values));
             }
         }
 
         @Override
-        public void authenticate(int sessionId, IntentSender intent, Intent fillInIntent) {
+        public void authenticate(int sessionId, int authenticationId, IntentSender intent,
+                Intent fillInIntent) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
                 afm.mContext.getMainThreadHandler().post(
-                        () -> afm.authenticate(sessionId, intent, fillInIntent));
+                        () -> afm.authenticate(sessionId, authenticationId, intent, fillInIntent));
             }
         }
 
         @Override
-        public void requestShowFillUi(int sessionId, IBinder windowToken, AutofillId id,
-                int width, int height, Rect anchorBounds, IAutofillWindowPresenter presenter) {
+        public void requestShowFillUi(int sessionId, AutofillId id, int width, int height,
+                Rect anchorBounds, IAutofillWindowPresenter presenter) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
                 afm.mContext.getMainThreadHandler().post(
-                        () -> afm.requestShowFillUi(sessionId, windowToken, id, width, height,
-                                anchorBounds, presenter));
+                        () -> afm.requestShowFillUi(sessionId, id, width, height, anchorBounds,
+                                presenter));
             }
         }
 
         @Override
-        public void requestHideFillUi(int sessionId, IBinder windowToken, AutofillId id) {
+        public void requestHideFillUi(int sessionId, AutofillId id) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
-                afm.mContext.getMainThreadHandler().post(
-                        () -> afm.requestHideFillUi(sessionId, windowToken, id));
+                afm.mContext.getMainThreadHandler().post(() -> afm.requestHideFillUi(id));
             }
         }
 
         @Override
-        public void notifyNoFillUi(int sessionId, IBinder windowToken, AutofillId id) {
+        public void notifyNoFillUi(int sessionId, AutofillId id) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
-                afm.mContext.getMainThreadHandler().post(
-                        () -> afm.notifyNoFillUi(sessionId, windowToken, id));
+                afm.mContext.getMainThreadHandler().post(() -> afm.notifyNoFillUi(sessionId, id));
             }
         }
 
@@ -1379,12 +1582,12 @@ public final class AutofillManager {
         }
 
         @Override
-        public void setTrackedViews(int sessionId, List<AutofillId> ids,
-                boolean saveOnAllViewsInvisible) {
+        public void setTrackedViews(int sessionId, AutofillId[] ids,
+                boolean saveOnAllViewsInvisible, AutofillId[] fillableIds) {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
-                afm.mContext.getMainThreadHandler().post(
-                        () -> afm.setTrackedViews(sessionId, ids, saveOnAllViewsInvisible)
+                afm.mContext.getMainThreadHandler().post(() ->
+                        afm.setTrackedViews(sessionId, ids, saveOnAllViewsInvisible, fillableIds)
                 );
             }
         }

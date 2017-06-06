@@ -16,20 +16,42 @@
 
 package com.android.server.autofill;
 
+import android.annotation.Nullable;
 import android.os.Bundle;
+import android.util.ArraySet;
+import android.view.autofill.AutofillId;
 
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
 
-final class Helper {
+public final class Helper {
 
-    // TODO(b/36141126): set to false and remove guard from places that should always be on
-    static final boolean DEBUG = true;
-    static final boolean VERBOSE = false;
+    /**
+     * Defines a logging flag that can be dynamically changed at runtime using
+     * {@code cmd autofill set log_level debug}.
+     */
+    public static boolean sDebug = false;
+
+    /**
+     * Defines a logging flag that can be dynamically changed at runtime using
+     * {@code cmd autofill set log_level verbose}.
+     */
+    public static boolean sVerbose = false;
+
+    /**
+     * Maximum number of partitions that can be allowed in a session.
+     *
+     * <p>Can be modified using {@code cmd autofill set max_partitions}.
+     */
+    static int sPartitionMaxCount = 10;
+
+    private Helper() {
+        throw new UnsupportedOperationException("contains static members only");
+    }
 
     static void append(StringBuilder builder, Bundle bundle) {
-        if (bundle == null || !DEBUG) {
+        if (bundle == null || !sVerbose) {
             builder.append("null");
             return;
         }
@@ -50,7 +72,14 @@ final class Helper {
         return builder.toString();
     }
 
-    private Helper() {
-        throw new UnsupportedOperationException("contains static members only");
+    @Nullable
+    static AutofillId[] toArray(@Nullable ArraySet<AutofillId> set) {
+        if (set == null) return null;
+
+        final AutofillId[] array = new AutofillId[set.size()];
+        for (int i = 0; i < set.size(); i++) {
+            array[i] = set.valueAt(i);
+        }
+        return array;
     }
 }

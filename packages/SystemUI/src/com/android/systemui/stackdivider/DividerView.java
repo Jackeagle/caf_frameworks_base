@@ -160,7 +160,7 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     private boolean mHomeStackResizable;
     private boolean mAdjustedForIme;
     private DividerState mState;
-    private SurfaceFlingerVsyncChoreographer mSfChoreographer;
+    private final SurfaceFlingerVsyncChoreographer mSfChoreographer;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -250,20 +250,22 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     };
 
     public DividerView(Context context) {
-        super(context);
+        this(context, null);
     }
 
     public DividerView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, 0);
     }
 
     public DividerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+        this(context, attrs, defStyleAttr, 0);
     }
 
     public DividerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr,
             int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        mSfChoreographer = new SurfaceFlingerVsyncChoreographer(mHandler, context.getDisplay(),
+                Choreographer.getInstance());
     }
 
     @Override
@@ -313,8 +315,6 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         EventBus.getDefault().register(this);
-        mSfChoreographer = new SurfaceFlingerVsyncChoreographer(mHandler, getDisplay(),
-                Choreographer.getInstance());
     }
 
     @Override
@@ -725,14 +725,21 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             mMinimizedSnapAlgorithm = null;
             mDockedStackMinimized = minimized;
             initializeSnapAlgorithm();
-            if (!mIsInMinimizeInteraction && minimized) {
-                mIsInMinimizeInteraction = true;
-                mDividerPositionBeforeMinimized = DockedDividerUtils.calculateMiddlePosition(
-                        isHorizontalDivision(), mStableInsets, mDisplayWidth, mDisplayHeight,
-                        mDividerSize);
+            if (mIsInMinimizeInteraction != minimized) {
+                if (minimized) {
+                    mIsInMinimizeInteraction = true;
+                    mDividerPositionBeforeMinimized = DockedDividerUtils.calculateMiddlePosition(
+                            isHorizontalDivision(), mStableInsets, mDisplayWidth, mDisplayHeight,
+                            mDividerSize);
 
-                int position = mMinimizedSnapAlgorithm.getMiddleTarget().position;
-                resizeStack(position, position, mMinimizedSnapAlgorithm.getMiddleTarget());
+                    int position = mMinimizedSnapAlgorithm.getMiddleTarget().position;
+                    resizeStack(position, position, mMinimizedSnapAlgorithm.getMiddleTarget());
+                } else {
+                    resizeStack(mDividerPositionBeforeMinimized, mDividerPositionBeforeMinimized,
+                            mSnapAlgorithm.calculateNonDismissingSnapTarget(
+                                    mDividerPositionBeforeMinimized));
+                    mIsInMinimizeInteraction = false;
+                }
             }
         }
     }
@@ -767,17 +774,22 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             mDockedStackMinimized = minimized;
         } else if (mDockedStackMinimized != minimized) {
             mIsInMinimizeInteraction = true;
-            if (minimized) {
+            if (minimized && (mCurrentAnimator == null || !mCurrentAnimator.isRunning())
+                    && (mDividerPositionBeforeMinimized <= 0 || !mAdjustedForIme)) {
                 mDividerPositionBeforeMinimized = getCurrentPosition();
             }
             mMinimizedSnapAlgorithm = null;
             mDockedStackMinimized = minimized;
             initializeSnapAlgorithm();
-            stopDragging(getCurrentPosition(), minimized ?
-                            mMinimizedSnapAlgorithm.getMiddleTarget() :
-                            mSnapAlgorithm.calculateNonDismissingSnapTarget(
+            stopDragging(minimized
+                            ? mDividerPositionBeforeMinimized
+                            : getCurrentPosition(),
+                    minimized
+                            ? mMinimizedSnapAlgorithm.getMiddleTarget()
+                            : mSnapAlgorithm.calculateNonDismissingSnapTarget(
                                     mDividerPositionBeforeMinimized),
                     animDuration, Interpolators.FAST_OUT_SLOW_IN, 0);
+            setAdjustedForIme(false, animDuration);
         }
         if (!minimized) {
             mBackground.animate().withEndAction(mResetBackgroundRunnable);
@@ -820,6 +832,9 @@ public class DividerView extends FrameLayout implements OnTouchListener,
                 .setDuration(animDuration)
                 .start();
         mAdjustedForIme = adjustedForIme;
+        if (mHomeStackResizable && adjustedForIme) {
+            mDividerPositionBeforeMinimized = getCurrentPosition();
+        }
     }
 
     private void resetBackground() {
@@ -1151,7 +1166,7 @@ public class DividerView extends FrameLayout implements OnTouchListener,
      */
     public int growsRecents() {
         boolean result = mGrowRecents
-                && mWindowManagerProxy.getDockSide() == WindowManager.DOCKED_TOP
+                && mDockSide == WindowManager.DOCKED_TOP
                 && getCurrentPosition() == getSnapAlgorithm().getLastSplitTarget().position;
         if (result) {
             return getSnapAlgorithm().getMiddleTarget().position;
@@ -1161,7 +1176,7 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     }
 
     public final void onBusEvent(RecentsActivityStartingEvent recentsActivityStartingEvent) {
-        if (mGrowRecents && getWindowManagerProxy().getDockSide() == WindowManager.DOCKED_TOP
+        if (mGrowRecents && mDockSide == WindowManager.DOCKED_TOP
                 && getSnapAlgorithm().getMiddleTarget() != getSnapAlgorithm().getLastSplitTarget()
                 && getCurrentPosition() == getSnapAlgorithm().getLastSplitTarget().position) {
             mState.growAfterRecentsDrawn = true;

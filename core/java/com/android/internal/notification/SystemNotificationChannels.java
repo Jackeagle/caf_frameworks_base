@@ -40,11 +40,13 @@ public class SystemNotificationChannels {
     public static String UPDATES = "UPDATES";
     public static String NETWORK_STATUS = "NETWORK_STATUS";
     public static String NETWORK_ALERTS = "NETWORK_ALERTS";
+    public static String NETWORK_AVAILABLE = "NETWORK_AVAILABLE";
     public static String VPN = "VPN";
     public static String DEVICE_ADMIN = "DEVICE_ADMIN";
     public static String ALERTS = "ALERTS";
     public static String RETAIL_MODE = "RETAIL_MODE";
     public static String USB = "USB";
+    public static String FOREGROUND_SERVICE = "FOREGROUND_SERVICE";
 
     public static void createAll(Context context) {
         final NotificationManager nm = context.getSystemService(NotificationManager.class);
@@ -98,6 +100,11 @@ public class SystemNotificationChannels {
         channelsList.add(networkAlertsChannel);
 
         channelsList.add(new NotificationChannel(
+                NETWORK_AVAILABLE,
+                context.getString(R.string.notification_channel_network_available),
+                NotificationManager.IMPORTANCE_LOW));
+
+        channelsList.add(new NotificationChannel(
                 VPN,
                 context.getString(R.string.notification_channel_vpn),
                 NotificationManager.IMPORTANCE_LOW));
@@ -123,6 +130,11 @@ public class SystemNotificationChannels {
         channelsList.add(new NotificationChannel(
                 USB,
                 context.getString(R.string.notification_channel_usb),
+                NotificationManager.IMPORTANCE_MIN));
+
+        channelsList.add(new NotificationChannel(
+                FOREGROUND_SERVICE,
+                context.getString(R.string.notification_channel_foreground_service),
                 NotificationManager.IMPORTANCE_MIN));
 
         nm.createNotificationChannels(channelsList);
