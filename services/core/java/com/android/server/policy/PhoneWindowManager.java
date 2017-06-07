@@ -7070,8 +7070,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mSystemBooted = true;
         }
         startedWakingUp();
-        screenTurningOn(null);
-        screenTurnedOn();
+        if (!mHeadless) {
+            screenTurningOn(null);
+            screenTurnedOn();
+        }
     }
 
     ProgressDialog mBootMsgDialog = null;
