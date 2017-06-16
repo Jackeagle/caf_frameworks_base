@@ -17,21 +17,23 @@
 package com.android.server.wm;
 
 import static android.app.ActivityManager.ENABLE_TASK_SNAPSHOTS;
-import static android.graphics.GraphicBuffer.USAGE_HW_TEXTURE;
-import static android.graphics.GraphicBuffer.USAGE_SW_READ_NEVER;
-import static android.graphics.GraphicBuffer.USAGE_SW_WRITE_RARELY;
-import static android.graphics.PixelFormat.RGBA_8888;
+import static android.graphics.Bitmap.Config.ARGB_8888;
+import static android.graphics.Bitmap.Config.HARDWARE;
 
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityManager.StackId;
 import android.app.ActivityManager.TaskSnapshot;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
 import android.os.Environment;
 import android.os.Handler;
 import android.util.ArraySet;
+import android.view.DisplayListCanvas;
+import android.view.RenderNode;
+import android.view.ThreadedRenderer;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManagerPolicy.ScreenOffListener;
 import android.view.WindowManagerPolicy.StartingSurface;
@@ -42,7 +44,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wm.TaskSnapshotSurface.SystemBarBackgroundPainter;
 
 import java.io.PrintWriter;
-import java.util.function.Consumer;
 
 /**
  * When an app token becomes invisible, we take a snapshot (bitmap) of the corresponding task and
@@ -240,22 +241,25 @@ class TaskSnapshotController {
         final int color = task.getTaskDescription().getBackgroundColor();
         final int statusBarColor = task.getTaskDescription().getStatusBarColor();
         final int navigationBarColor = task.getTaskDescription().getNavigationBarColor();
-        final GraphicBuffer buffer = GraphicBuffer.create(mainWindow.getFrameLw().width(),
-                mainWindow.getFrameLw().height(),
-                RGBA_8888, USAGE_HW_TEXTURE | USAGE_SW_WRITE_RARELY | USAGE_SW_READ_NEVER);
-        if (buffer == null) {
-            return null;
-        }
-        final Canvas c = buffer.lockCanvas();
-        c.drawColor(color);
         final LayoutParams attrs = mainWindow.getAttrs();
         final SystemBarBackgroundPainter decorPainter = new SystemBarBackgroundPainter(attrs.flags,
                 attrs.privateFlags, attrs.systemUiVisibility, statusBarColor, navigationBarColor);
+        final int width = mainWindow.getFrameLw().width();
+        final int height = mainWindow.getFrameLw().height();
+
+        final RenderNode node = RenderNode.create("TaskSnapshotController", null);
+        node.setLeftTopRightBottom(0, 0, width, height);
+        node.setClipToBounds(false);
+        final DisplayListCanvas c = node.start(width, height);
+        c.drawColor(color);
         decorPainter.setInsets(mainWindow.mContentInsets, mainWindow.mStableInsets);
         decorPainter.drawDecors(c, null /* statusBarExcludeFrame */);
-        buffer.unlockCanvasAndPost(c);
-        return new TaskSnapshot(buffer, topChild.getConfiguration().orientation,
-                mainWindow.mStableInsets, false /* reduced */, 1.0f /* scale */);
+        node.end(c);
+        final Bitmap hwBitmap = ThreadedRenderer.createHardwareBitmap(node, width, height);
+
+        return new TaskSnapshot(hwBitmap.createGraphicBufferHandle(),
+                topChild.getConfiguration().orientation, mainWindow.mStableInsets,
+                false /* reduced */, 1.0f /* scale */);
     }
 
     /**

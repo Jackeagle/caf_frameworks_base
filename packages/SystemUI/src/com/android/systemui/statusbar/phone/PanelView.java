@@ -55,6 +55,7 @@ public abstract class PanelView extends FrameLayout {
     private long mDownTime;
     private float mMinExpandHeight;
     private LockscreenGestureLogger mLockscreenGestureLogger = new LockscreenGestureLogger();
+    private boolean mPanelUpdateWhenAnimatorEnds;
 
     private final void logf(String fmt, Object... args) {
         Log.v(TAG, (mViewName != null ? (mViewName + ": ") : "") + String.format(fmt, args));
@@ -224,6 +225,7 @@ public abstract class PanelView extends FrameLayout {
             if (mTracking) {
                 onTrackingStopped(true /* expanded */);
             }
+            notifyExpandingFinished();
         }
     }
 
@@ -506,7 +508,7 @@ public abstract class PanelView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
-        if (mInstantExpanding || !mNotificationsDragEnabled
+        if (mInstantExpanding || !mNotificationsDragEnabled || mTouchDisabled
                 || (mMotionAborted && event.getActionMasked() != MotionEvent.ACTION_DOWN)) {
             return false;
         }
@@ -757,14 +759,14 @@ public abstract class PanelView extends FrameLayout {
                 if (clearAllExpandHack && !mCancelled) {
                     setExpandedHeightInternal(getMaxPanelHeight());
                 }
-                mHeightAnimator = null;
+                setAnimator(null);
                 if (!mCancelled) {
                     notifyExpandingFinished();
                 }
                 notifyBarPanelExpansionChanged();
             }
         });
-        mHeightAnimator = animator;
+        setAnimator(animator);
         animator.start();
     }
 
@@ -801,15 +803,28 @@ public abstract class PanelView extends FrameLayout {
     protected void requestPanelHeightUpdate() {
         float currentMaxPanelHeight = getMaxPanelHeight();
 
-        // If the user isn't actively poking us, let's update the height
-        if ((!mTracking || isTrackingBlocked())
-                && mHeightAnimator == null
-                && !isFullyCollapsed()
-                && currentMaxPanelHeight != mExpandedHeight
-                && mPeekAnimator == null
-                && !mPeekTouching) {
-            setExpandedHeight(currentMaxPanelHeight);
+        if (isFullyCollapsed()) {
+            return;
         }
+
+        if (currentMaxPanelHeight == mExpandedHeight) {
+            return;
+        }
+
+        if (mPeekAnimator != null || mPeekTouching) {
+            return;
+        }
+
+        if (mTracking && !isTrackingBlocked()) {
+            return;
+        }
+
+        if (mHeightAnimator != null) {
+            mPanelUpdateWhenAnimatorEnds = true;
+            return;
+        }
+
+        setExpandedHeight(currentMaxPanelHeight);
     }
 
     public void setExpandedHeightInternal(float h) {
@@ -1061,7 +1076,7 @@ public abstract class PanelView extends FrameLayout {
             @Override
             public void onAnimationEnd(Animator animation) {
                 if (mCancelled) {
-                    mHeightAnimator = null;
+                    setAnimator(null);
                     onAnimationFinished.run();
                 } else {
                     startUnlockHintAnimationPhase2(onAnimationFinished);
@@ -1069,7 +1084,7 @@ public abstract class PanelView extends FrameLayout {
             }
         });
         animator.start();
-        mHeightAnimator = animator;
+        setAnimator(animator);
         mKeyguardBottomArea.getIndicationArea().animate()
                 .translationY(-mHintDistance)
                 .setDuration(250)
@@ -1087,6 +1102,14 @@ public abstract class PanelView extends FrameLayout {
                 .start();
     }
 
+    private void setAnimator(ValueAnimator animator) {
+        mHeightAnimator = animator;
+        if (animator == null && mPanelUpdateWhenAnimatorEnds) {
+            mPanelUpdateWhenAnimatorEnds = false;
+            requestPanelHeightUpdate();
+        }
+    }
+
     /**
      * Phase 2: Bounce down.
      */
@@ -1097,13 +1120,13 @@ public abstract class PanelView extends FrameLayout {
         animator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                mHeightAnimator = null;
+                setAnimator(null);
                 onAnimationFinished.run();
                 notifyBarPanelExpansionChanged();
             }
         });
         animator.start();
-        mHeightAnimator = animator;
+        setAnimator(animator);
     }
 
     private ValueAnimator createHeightAnimator(float targetHeight) {
