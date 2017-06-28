@@ -6542,7 +6542,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 	 {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (Intent.ACTION_SCREEN_ON.equals(intent.getAction()) {
+            if (Intent.ACTION_SCREEN_ON.equals(intent.getAction())) {
                 int state = intent.getIntExtra("state", 0);
                 // Turn on the connected TV and switch HDMI input if we're a HDMI playback device.
                 final HdmiControl hdmiControl = getHdmiControl();
