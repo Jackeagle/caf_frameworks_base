@@ -1989,11 +1989,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         filter = new IntentFilter(Intent.ACTION_USER_SWITCHED);
         context.registerReceiver(mMultiuserReceiver, filter);
 
-        // register for screen-on-off broadcasts
-        filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        context.registerReceiver(mScreenOnReceiver, filter);
-
         // monitor for system gestures
         mSystemGestures = new SystemGesturesPointerEventListener(context,
                 new SystemGesturesPointerEventListener.Callbacks() {
@@ -6537,22 +6532,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
         }
     }
-
-    BroadcastReceiver mScreenOnReceiver = new BroadcastReceiver()
-	 {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (Intent.ACTION_SCREEN_ON.equals(intent.getAction()) {
-                int state = intent.getIntExtra("state", 0);
-                // Turn on the connected TV and switch HDMI input if we're a HDMI playback device.
-                final HdmiControl hdmiControl = getHdmiControl();
-				if (hdmiControl != null) {
-                    Slog.i(TAG, "mScreenOnReceiver::turnOnTV()");
-                    hdmiControl.turnOnTv();
-                 }
-             }
-          }
-    };
 
     // Called on the PowerManager's Notifier thread.
     @Override
