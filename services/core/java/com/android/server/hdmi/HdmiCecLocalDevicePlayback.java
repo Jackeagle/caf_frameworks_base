@@ -65,7 +65,7 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
     HdmiCecLocalDevicePlayback(HdmiControlService service) {
         super(service, HdmiDeviceInfo.DEVICE_PLAYBACK);
 
-        mAutoTvOff = mService.readBooleanSetting(Global.HDMI_CONTROL_AUTO_DEVICE_OFF_ENABLED, false);
+        mAutoTvOff = mService.readBooleanSetting(Global.HDMI_CONTROL_AUTO_DEVICE_OFF_ENABLED, true);
 
         // The option is false by default. Update settings db as well to have the right
         // initial setting on UI.
@@ -203,7 +203,7 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
     private ActiveWakeLock getWakeLock() {
         assertRunOnServiceThread();
         if (mWakeLock == null) {
-            if (SystemProperties.getBoolean(Constants.PROPERTY_KEEP_AWAKE, true)) {
+            if (SystemProperties.getBoolean(Constants.PROPERTY_KEEP_AWAKE, false)) {
                 mWakeLock = new SystemWakeLock();
             } else {
                 // Create a dummy lock object that doesn't do anything about wake lock,

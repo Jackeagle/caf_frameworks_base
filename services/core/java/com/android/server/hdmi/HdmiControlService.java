@@ -369,7 +369,7 @@ public final class HdmiControlService extends SystemService {
 
     private static List<Integer> getIntList(String string) {
         ArrayList<Integer> list = new ArrayList<>();
-        TextUtils.SimpleStringSplitter splitter = new TextUtils.SimpleStringSplitter(',');
+        TextUtils.SimpleStringSplitter splitter = new TextUtils.SimpleStringSplitter(';');
         splitter.setString(string);
         for (String item : splitter) {
             try {
