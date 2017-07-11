@@ -4357,7 +4357,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                }
                             CharSequence emergencyDialerClass = "com.android.phone.EmergencyDialer";
                             if (mFocusedWindow != null &&
-                                    mFocusedWindow.toString().contains(emergencyDialerClass)) {
+                                    (mFocusedWindow.toString().contains(emergencyDialerClass) || isCallingAppRunning(mContext))) {
                                 result = 1;
                             } else if (status) {
                                 result = 0;
@@ -4584,7 +4584,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
           }
           //There is no active CS call
           if (!isCallInProgress) {
-              if((!mKeyguardDelegate.isShowing() && !isHomeVisible())) {
+              if((!mKeyguardDelegate.isShowing() && !isHomeVisible()) && !(isCallingAppRunning(mContext))) {
                    if (goHome(true)) {
                        return true;
                    }
@@ -5998,5 +5998,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         pw.print(prefix); pw.print("mUndockedHdmiRotation="); pw.println(mUndockedHdmiRotation);
         mStatusBarController.dump(pw, prefix);
         mNavigationBarController.dump(pw, prefix);
+    }
+
+    public boolean isCallingAppRunning(Context ctx) {
+        ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningTaskInfo> taskInfo = am.getRunningTasks(1);
+        ComponentName componentInfo = taskInfo.get(0).topActivity;
+        componentInfo.getPackageName();
+        if("com.whatsapp".toLowerCase().contains(componentInfo.getPackageName().toString())) {
+            return true;
+        }
+        return false;
     }
 }
