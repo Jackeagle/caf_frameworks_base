@@ -16,6 +16,8 @@
 
 package com.android.internal.policy.impl;
 
+import android.content.ComponentName;
+import android.app.ActivityManager;
 import android.app.KeyguardManager;
 import android.app.SearchManager;
 import android.content.ActivityNotFoundException;
@@ -34,6 +36,8 @@ import android.view.View;
 import android.view.HapticFeedbackConstants;
 import android.view.FallbackEventHandler;
 import android.view.KeyEvent;
+import java.util.List;
+
 
 public class PhoneFallbackEventHandler implements FallbackEventHandler {
     private static String TAG = "PhoneFallbackEventHandler";
@@ -242,6 +246,9 @@ public class PhoneFallbackEventHandler implements FallbackEventHandler {
             }
 
             case KeyEvent.KEYCODE_CALL: {
+                if(isCallingAppRunning(mContext)) {
+                   return true;
+                }
                 if (getKeyguardManager().inKeyguardRestrictedInputMode()) {
                     break;
                 }
@@ -329,5 +336,16 @@ public class PhoneFallbackEventHandler implements FallbackEventHandler {
             Slog.w(TAG, "Unable to find IAudioService for media key event.");
         }
     }
-}
 
+    public boolean isCallingAppRunning(Context ctx) {
+        ActivityManager am = (ActivityManager) ctx.getSystemService(mContext.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningTaskInfo> taskInfo = am.getRunningTasks(1);
+
+        ComponentName componentInfo = taskInfo.get(0).topActivity;
+        componentInfo.getPackageName();
+        if("com.whatsapp".toLowerCase().contains(componentInfo.getPackageName().toString())) {
+            return true;
+        }
+       return false;
+    }
+}
