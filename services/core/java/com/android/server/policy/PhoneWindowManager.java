@@ -720,6 +720,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     ShortcutManager mShortcutManager;
     PowerManager.WakeLock mBroadcastWakeLock;
     PowerManager.WakeLock mPowerKeyWakeLock;
+    PowerManager.WakeLock mConCam_WakeLock;
+    private boolean mConCam_powerKeyPressed = false;
+
     boolean mHavePendingMediaKeyRepeatWithWakeLock;
 
     private int mCurrentUserId;
@@ -1620,6 +1623,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 "PhoneWindowManager.mBroadcastWakeLock");
         mPowerKeyWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 "PhoneWindowManager.mPowerKeyWakeLock");
+        mConCam_WakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                "PhoneWindowManager.mConCam_WakeLock");
+
         mEnableShiftMenuBugReports = "1".equals(SystemProperties.get("ro.debuggable"));
         mSupportAutoRotation = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_supportAutoRotation);
@@ -5625,12 +5631,44 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mContext.sendBroadcastAsUser(errorIntent, UserHandle.CURRENT);
     }
 
+    private int ConCam_HandleKey(KeyEvent event) {
+        final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        final int keyCode = event.getKeyCode();
+        int result = 0;
+
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_POWER: {
+                mConCam_powerKeyPressed = down;
+                if (!mConCam_WakeLock.isHeld() && down) {
+                        Log.i(TAG, "acquire ConCam wakelock");
+                        mConCam_WakeLock.acquire();
+                }
+                break;
+            }
+            case KeyEvent.KEYCODE_VOLUME_DOWN: {
+                // powerkey held and volume key released
+                if (mConCam_WakeLock.isHeld() && mConCam_powerKeyPressed && !down) {
+                        Log.i(TAG, "release ConCam wakelock");
+                        mConCam_WakeLock.release();
+                }
+                break;
+            }
+        }
+
+        return result;
+    }
+
     /** {@inheritDoc} */
     @Override
     public int interceptKeyBeforeQueueing(KeyEvent event, int policyFlags) {
         if (!mSystemBooted) {
             // If we have not yet booted, don't let key events do anything.
             return 0;
+        }
+
+        // For ConCam handle keys custom
+        if (mHeadless) {
+            return ConCam_HandleKey(event);
         }
 
         final boolean interactive = (policyFlags & FLAG_INTERACTIVE) != 0;
@@ -5659,7 +5697,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         int result;
         boolean isWakeKey = (policyFlags & WindowManagerPolicy.FLAG_WAKE) != 0
                 || event.isWakeKey();
-        if ((interactive && !mHeadless ) || (isInjected && !isWakeKey)) {
+        if ((interactive) || (isInjected && !isWakeKey)) {
             // When the device is interactive or the key is injected pass the
             // key to the application.
             result = ACTION_PASS_TO_USER;
@@ -7032,8 +7070,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mSystemBooted = true;
         }
         startedWakingUp();
-        screenTurningOn(null);
-        screenTurnedOn();
+        if (!mHeadless) {
+            screenTurningOn(null);
+            screenTurnedOn();
+        }
     }
 
     ProgressDialog mBootMsgDialog = null;
