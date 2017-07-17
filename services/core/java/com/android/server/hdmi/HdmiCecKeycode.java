@@ -384,7 +384,8 @@ final class HdmiCecKeycode {
             new KeycodeEntry(UNSUPPORTED_KEYCODE, CEC_KEYCODE_POWER_ON_FUNCTION, false),
             // RESERVED
             new KeycodeEntry(KeyEvent.KEYCODE_PROG_BLUE, CEC_KEYCODE_F1_BLUE),
-            new KeycodeEntry(KeyEvent.KEYCODE_PROG_RED, CEC_KEYCODE_F2_RED),
+            // Map TV remote red key with record keyevent
+            new KeycodeEntry(KeyEvent.KEYCODE_MEDIA_RECORD, CEC_KEYCODE_F2_RED),
             new KeycodeEntry(KeyEvent.KEYCODE_PROG_GREEN, CEC_KEYCODE_F3_GREEN),
             new KeycodeEntry(KeyEvent.KEYCODE_PROG_YELLOW, CEC_KEYCODE_F4_YELLOW),
             new KeycodeEntry(KeyEvent.KEYCODE_F5, CEC_KEYCODE_F5),
