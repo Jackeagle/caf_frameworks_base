@@ -6597,6 +6597,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                  }
              }
           }
+    };
 
     BroadcastReceiver mWifiDisplayReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -6613,7 +6614,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 updateRotation(true);
             }
         }
->>>>>>> 8b1c6ee17ec5b231a1cdd258dab1118c74ce191c
     };
 
     // Called on the PowerManager's Notifier thread.
