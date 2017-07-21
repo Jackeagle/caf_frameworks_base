@@ -135,7 +135,7 @@ key 111   FORWARD_DEL
 key 113   VOLUME_MUTE
 key 114   VOLUME_DOWN
 key 115   VOLUME_UP
-key 116   POWER             WAKE
+key 116   ENDCALL            WAKE
 key 117   NUMPAD_EQUALS
 # key 118 "KEY_KPPLUSMINUS"
 key 119   BREAK

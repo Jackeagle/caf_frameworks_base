@@ -4052,7 +4052,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         if (SystemProperties.getInt("sys.quickboot.enable", 0) == 1) {
 
-            if (keyCode == KeyEvent.KEYCODE_POWER && !isScreenOn) {
+            if ((keyCode == KeyEvent.KEYCODE_POWER || keyCode == KeyEvent.KEYCODE_ENDCALL) && !isScreenOn) {
                 if(down){
                     acquireQuickBootWakeLock();
                     mHandler.postDelayed(mQuickBootPowerLongPress, mLongPressPoweronTime);
@@ -4076,7 +4076,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                                 mKeyguardDelegate.isShowingAndNotHidden() :
                                                 mKeyguardDelegate.isShowing()));
 
-        if (keyCode == KeyEvent.KEYCODE_POWER) {
+        if (keyCode == KeyEvent.KEYCODE_POWER || keyCode == KeyEvent.KEYCODE_ENDCALL) {
             policyFlags |= WindowManagerPolicy.FLAG_WAKE;
         }
         final boolean isWakeKey = (policyFlags & (WindowManagerPolicy.FLAG_WAKE
@@ -4208,93 +4208,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             }
 
-            case KeyEvent.KEYCODE_ENDCALL: {
-                result &= ~ACTION_PASS_TO_USER;
-
-                // Modify for home and endcall control by liuzhihao 20140118 start
-                if (mSystemUIHasFocus && down) {
-                    mSystemUIHasFocus = false;
-                    result = 1;
-                }
-
-                // Modify for home and endcall control by liuzhihao 20140118 end
-                ITelephony telephonyService = getTelephonyService();
-                boolean hungUp = false;
-                if (down) {
-                    if (telephonyService != null) {
-                        try {
-                            hungUp = telephonyService.endCall();
-                        } catch (RemoteException ex) {
-                            Log.w(TAG, "ITelephony threw RemoteException", ex);
-                        }
-                    }
-                   //Disable power key behavior for
-                    //END_CALL button when monkey is running. Avoiding possible
-                    //scenario of powering off phone when monkey is running.
-                    if(!ActivityManager.isUserAMonkey()) {
-                    interceptPowerKeyDown(!isScreenOn || hungUp);
-                    }
-                    //end.
-                } else {
-                    if (interceptPowerKeyUp(canceled)) {
-                        try {
-                            if (telephonyService != null && telephonyService.isOffhook()) {
-                                //BORQS INDIA-START
-                                //Check whenever calling screen in background
-                                //then bring the incall screen to front otherwise
-                                //end the call
-                                //Off-hook:At least one call exists that is dialing,
-                                //active, or on hold, and no calls are ringing or
-                                //waiting.
-                                //If Statusbar expanded then, collapse the statusbar
-                                //and show the incall screen
-                                StatusBarManager mStatusBarManager = (StatusBarManager)mContext.getSystemService(Context.STATUS_BAR_SERVICE);
-                                mStatusBarManager.collapsePanels();
-                                String currentFocusedWindow = mFocusedWindow.toString();
-                                CharSequence inCallActivityClass = "com.android.incallui.InCallActivity";
-                                if ((currentFocusedWindow != null) &&
-                                    !(currentFocusedWindow.contains(inCallActivityClass))) {
-                                    Intent intent = new Intent();
-                                    intent.setAction(intent.ACTION_MAIN);
-                                    intent.setClassName("com.android.dialer",
-                                        "com.android.incallui.InCallActivity");
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                                        | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-                                            mContext.startActivity(intent);
-                                            break;
-                                }
-                                //BORQS INDIA-END
-                                hungUp = telephonyService.endCall();
-                       } 
-                       //If there is any incoming calls then end the call
-                            //When user press ENDCALL key
-                            else if (telephonyService != null && telephonyService.isRinging()) {
-                                hungUp = telephonyService.endCall();
-                            } 
-                        //Otherwise launch the HOME
-                        if ((mEndcallBehavior
-                                & Settings.System.END_BUTTON_BEHAVIOR_HOME) != 0) {
-                            if (goHome(true)) {
-                                break;
-                            }
-                        } 
-                      }
-                        catch (RemoteException ex) {
-                            Log.w(TAG, "Telephony manager threw RemoteException", ex);
-                        } catch (Exception ex) {
-                            Log.w(TAG, "General Exception", ex);
-                        }
-
-                        if ((mEndcallBehavior
-                                & Settings.System.END_BUTTON_BEHAVIOR_SLEEP) != 0) {
-                            result = (result & ~ACTION_WAKE_UP) | ACTION_GO_TO_SLEEP;
-                        }
-                    }
-                }
-                break;
-            }
-
+            case KeyEvent.KEYCODE_ENDCALL:
             case KeyEvent.KEYCODE_POWER: {
+
+                if(isCallingAppRunning(mContext)) {
+                    result &= ACTION_PASS_TO_USER;
+                    return result;
+                }
                 result &= ~ACTION_PASS_TO_USER;
                 if (down) {
                     mImmersiveModeConfirmation.onPowerKeyDown(isScreenOn, event.getDownTime(),
