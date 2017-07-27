@@ -63,6 +63,10 @@
 
 #include "audioplay.h"
 
+#define USE_CAMERA_DATA
+#define TEST_WIDTH 1920
+#define TEST_HEIGHT 1080
+
 namespace android {
 
 static const char OEM_BOOTANIMATION_FILE[] = "/oem/media/bootanimation.zip";
@@ -103,14 +107,23 @@ static const std::vector<std::string> PLAY_SOUND_BOOTREASON_BLACKLIST {
 // ---------------------------------------------------------------------------
 
 BootAnimation::BootAnimation() : Thread(false), mClockEnabled(true), mTimeIsAccurate(false),
-        mTimeFormat12Hour(false), mTimeCheckThread(NULL) {
+        mTimeFormat12Hour(false), mTimeCheckThread(NULL),
+        mProgram(0), mYTexture(0), mUVTexture(0), mVideoWidth(0), mVideoHeight(0), mEarlycameraFd(-1) {
     mSession = new SurfaceComposerClient();
 
     // If the system has already booted, the animation is not being used for a boot.
     mSystemBoot = !property_get_bool(BOOT_COMPLETED_PROP_NAME, 0);
+    mEarlycameraFd = openEarlyCameraDevice();
+    if(mEarlycameraFd < 0){
+        ALOGE("open earlycamera_display_open failed %s",strerror(errno));
+    }
 }
 
-BootAnimation::~BootAnimation() {}
+BootAnimation::~BootAnimation() {
+    if(mEarlycameraFd > 0) {
+        close(mEarlycameraFd);
+   }
+}
 
 void BootAnimation::onFirstRef() {
     status_t err = mSession->linkToComposerDeath(this);
@@ -340,6 +353,7 @@ status_t BootAnimation::readyToRun() {
     mDisplay = display;
     mContext = context;
     mSurface = surface;
+    mConfig = config;
     mWidth = w;
     mHeight = h;
     mFlingerSurfaceControl = control;
@@ -367,14 +381,27 @@ status_t BootAnimation::readyToRun() {
 bool BootAnimation::threadLoop()
 {
     bool r;
+#ifdef USE_CAMERA_DATA
+    static bool notifyLK = true;
+    if(notifyLK) {
+        notifyLKEarlyCameraPauseDisplay();
+        notifyLK = false;
+        earlyCameraFrameInit(TEST_WIDTH, TEST_HEIGHT);
+    }
+#endif
     // We have no bootanimation file, so we use the stock android logo
     // animation.
-    if (mZipFileName.isEmpty()) {
-        r = android();
-    } else {
-        r = movie();
-    }
+    do {
+        if(showCamera()) {
+            camera();
+        } else if (mZipFileName.isEmpty()) {
+            r = android();
+        } else {
+            r = movie();
+        }
+    } while (!exitPending());
 
+    earlyCameraFrameDeinit();
     eglMakeCurrent(mDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroyContext(mDisplay, mContext);
     eglDestroySurface(mDisplay, mSurface);
@@ -441,7 +468,9 @@ bool BootAnimation::android()
         const nsecs_t sleepTime = 83333 - ns2us(systemTime() - now);
         if (sleepTime > 0)
             usleep(sleepTime);
-
+        if(showCamera()) {
+            break;
+        }
         checkExit();
     } while (!exitPending());
 
@@ -455,7 +484,7 @@ void BootAnimation::checkExit() {
     char value[PROPERTY_VALUE_MAX];
     property_get(EXIT_PROP_NAME, value, "0");
     int exitnow = atoi(value);
-    if (exitnow) {
+    if (exitnow && !showCamera()) {
         requestExit();
     }
 }
@@ -1218,6 +1247,405 @@ status_t BootAnimation::TimeCheckThread::readyToRun() {
     }
 
     return NO_ERROR;
+}
+
+GLuint BootAnimation::loadShader(int iShaderType, const char* source)
+{
+    GLuint  iShader = glCreateShader(iShaderType);
+    GLint compiled;
+    if(iShader != 0) {
+        glShaderSource(iShader, 1, &source, NULL);
+        glCompileShader(iShader);
+        glGetShaderiv(iShader, GL_COMPILE_STATUS, &compiled);
+        if (compiled == 0) {
+            ALOGE("Could not compile shader %d", iShaderType);
+            glDeleteShader(iShader);
+            iShader = 0;
+        }
+    }
+    return iShader;
+}
+
+GLuint BootAnimation::createProgram()
+{
+    const char* VERTEX_SHADER =
+        "attribute vec4 vPosition;\n" \
+        "attribute vec2 a_texCoord;\n" \
+        "varying vec2 tc;\n" \
+        "void main() {\n" \
+        "gl_Position = vPosition;" \
+        "tc = a_texCoord;\n" \
+        "}\n";
+    const char* FRAGMENT_BIND_UV_SHADER =
+        "precision mediump float;\n" \
+        "uniform sampler2D tex_y;\n" \
+        "uniform sampler2D tex_uv;\n" \
+        "varying vec2 tc;\n" \
+        "void main() {\n" \
+        "vec3 yuv;\n" \
+        "vec3 rgb;\n" \
+        "vec2 tmp = vec2(1.0 - tc.y, 1.0 - tc.x);"
+        "yuv.x = texture2D(tex_y, tmp).r;\n" \
+        "yuv.x = yuv.x < 0.764f ? yuv.x + 0.235f : 1.0f;\n"\
+        "yuv.y = texture2D(tex_uv, tmp).r - 0.5;\n" \
+        "yuv.z = texture2D(tex_uv, tmp).a - 0.5;\n" \
+        "rgb = mat3( 1,       1,         1,\n" \
+        "        0,     -0.344,  1.772,\n" \
+        "        1.402, -0.714,   0) * yuv;\n" \
+        "gl_FragColor = vec4(rgb.z, rgb.y, rgb.x, 1);\n" \
+        "}\n";
+    GLuint iVertexShader = loadShader(GL_VERTEX_SHADER, VERTEX_SHADER);
+    GLuint iPixelShader = loadShader(GL_FRAGMENT_SHADER, FRAGMENT_BIND_UV_SHADER);
+    GLuint program = glCreateProgram();
+    GLint linkStatus;
+    ALOGE("createProgram iVertexShader = %u, iPixelShader = %u, program = %u",
+        iVertexShader, iPixelShader, program);
+    if(program != 0) {
+        glAttachShader(program, iVertexShader);
+        glAttachShader(program, iPixelShader);
+        glLinkProgram(program);
+        glDeleteShader(iVertexShader);
+        glDeleteShader(iPixelShader);
+        glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
+        if (linkStatus != GL_TRUE) {
+            ALOGE("createProgram the program link failed");
+            glDeleteProgram(program);
+            program = 0;
+        }
+    }
+    ALOGE("createProgram return program = %u", program);
+    checkGlError("createProgram");
+    return program;
+}
+
+void BootAnimation::destroyCameraProgram()
+{
+    if(mYTexture != 0) {
+        glDeleteTextures(1, &mYTexture);
+        mYTexture = 0;
+    }
+    if(mUVTexture != 0) {
+        glDeleteTextures(1, &mUVTexture);
+        mUVTexture = 0;
+    }
+    glDeleteProgram(mProgram);
+    mVideoWidth = 0;
+    mVideoHeight = 0;
+}
+
+void BootAnimation::initCameraProgram()
+{
+    mProgram = createProgram();
+    mPositionHandle = glGetAttribLocation(mProgram, "vPosition");
+    mCoordHandle = glGetAttribLocation(mProgram, "a_texCoord");
+    mYHandle = glGetUniformLocation(mProgram, "tex_y");
+    mUVHandle = glGetUniformLocation(mProgram, "tex_uv");
+    //glViewport(0, 0, mWidth, mHeight);
+}
+
+void BootAnimation::buildTexture(const unsigned char* y, const unsigned char* uv, int width, int height)
+{
+    bool videoSizeChanged = (width != mVideoWidth || height != mVideoHeight);
+    if(videoSizeChanged) {
+        mVideoHeight = height;
+        mVideoWidth = width;
+    }
+    if(videoSizeChanged) {
+        glDeleteTextures(1, &mYTexture);
+        glGenTextures(1, &mYTexture);
+        ALOGE("%s mYTexture = %u", __FUNCTION__, mYTexture);
+    }
+    glBindTexture(GL_TEXTURE_2D, mYTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, mVideoWidth, mVideoHeight, 0,
+                GL_LUMINANCE, GL_UNSIGNED_BYTE, y);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    if(videoSizeChanged) {
+        glDeleteTextures(1, &mUVTexture);
+        glGenTextures(1, &mUVTexture);
+        ALOGE("%s mUVTexture = %u", __FUNCTION__, mUVTexture);
+    }
+    glBindTexture(GL_TEXTURE_2D, mUVTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, mVideoWidth / 2, mVideoHeight / 2, 0,
+                GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, uv);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+void BootAnimation::checkGlError(const char* op)
+{
+        int error = glGetError();
+        if(error != GL_NO_ERROR) {
+            ALOGE("[%s] error: 0x%x", op, error);
+        }
+    }
+
+void BootAnimation::drawFrame()
+{
+    static float VERTICE_BUFFER[] = { -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f, };
+    //static float VERTICE_BUFFER[] = { 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, };
+    static float COORD_BUFFER[] = { 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, };
+
+
+    glClearColor(200.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    //eglSwapBuffers(mDisplay, mSurface);
+
+    glUseProgram(mProgram);
+    checkGlError("glUseProgram");
+
+    glVertexAttribPointer(mPositionHandle, 2, GL_FLOAT, false, 8, VERTICE_BUFFER);
+    glEnableVertexAttribArray(mPositionHandle);
+
+    glVertexAttribPointer(mCoordHandle, 2, GL_FLOAT, false, 8, COORD_BUFFER);
+    glEnableVertexAttribArray(mCoordHandle);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, mYTexture);
+    glUniform1i(mYHandle, 0);
+    checkGlError("glUniform1i 0");
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, mUVTexture);
+    glUniform1i(mUVHandle, 1);
+    checkGlError("glUniform1i 1");
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    checkGlError("glDrawArrays");
+    glFinish();
+    glDisableVertexAttribArray(mPositionHandle);
+    glDisableVertexAttribArray(mCoordHandle);
+    eglSwapBuffers(mDisplay, mSurface);
+}
+
+bool BootAnimation::showCamera()
+{
+    int rc = 0;
+    rc = ioctl(mEarlycameraFd,VIDIOC_MSM_EARLYCAMERA_GET_SHOW_CAMERA,NULL);
+    return (rc == 1);
+}
+
+
+bool BootAnimation::camera()
+{
+    //int ret;
+    const GLint version_attribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+    eglMakeCurrent(mDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    eglDestroyContext(mDisplay, mContext);
+    ALOGE("%s eglMakeCurrent opengl 2.0", __FUNCTION__);
+    mContext = eglCreateContext(mDisplay, mConfig, NULL, version_attribs);
+    if (eglMakeCurrent(mDisplay, mSurface, mSurface, mContext) == EGL_FALSE) {
+        ALOGE("%s eglMakeCurrent 2.0 error", __FUNCTION__);
+        return NO_INIT;
+    }
+    initCameraProgram();
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    eglSwapBuffers(mDisplay, mSurface);
+#ifdef USE_CAMERA_DATA
+    //ret = earlyCameraFrameInit(TEST_WIDTH, TEST_HEIGHT);
+    //if(ret < 0) {
+        //ALOGE("earlyCameraFrameInit failed");
+        //return false;
+    //}
+    unsigned char* data = NULL;
+    int  frameCount = 0;
+    struct EarlyCameraBufferCfg cfg;
+    while(showCamera()) {
+        cfg.idx = -1;
+        ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_DQBUF, &cfg);
+        if(cfg.idx < 0) {
+            usleep(5000);
+            continue;
+        }
+        if(frameCount <= 1) {
+            frameCount++;
+            ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_QBUF, &cfg);
+            continue;
+        }
+        ALOGD("get one early camera frame, index: %d", cfg.idx);
+        data = mEarlyCameraBufs[cfg.idx].data;
+#else
+    static unsigned char* data = NULL;
+    if(data == NULL) {
+        data = (unsigned char*) malloc(TEST_WIDTH * TEST_HEIGHT * 3 / 2);
+    }
+    unsigned char value = 0;
+    for(int i = 0; i < 250; i++) {
+        value += 10;
+        memset(data, value, TEST_WIDTH * TEST_HEIGHT);
+        memset(data + TEST_WIDTH * TEST_HEIGHT, 128, TEST_WIDTH * TEST_HEIGHT / 4);
+#endif
+        buildTexture(data, data + (TEST_WIDTH * TEST_HEIGHT), TEST_WIDTH, TEST_HEIGHT);
+        drawFrame();
+#ifdef USE_CAMERA_DATA
+        ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_QBUF, &cfg);
+#else
+        usleep(20000);
+#endif
+    }
+    destroyCameraProgram();
+    //earlyCameraFrameDeinit();
+    eglMakeCurrent(mDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    eglDestroyContext(mDisplay, mContext);
+    mContext = eglCreateContext(mDisplay, mConfig, NULL, NULL);
+    ALOGE("%s eglMakeCurrent opengl 1.0", __FUNCTION__);
+    if (eglMakeCurrent(mDisplay, mSurface, mSurface, mContext) == EGL_FALSE) {
+        ALOGE("%s eglMakeCurrent 1.0 error", __FUNCTION__);
+        return NO_INIT;
+    }
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    eglSwapBuffers(mDisplay, mSurface);
+    return false;
+}
+// ---------------------------------------------------------------------------
+static void* allocIonMem(int ionFd, int size, struct ion_fd_data *ionFdData)
+{
+    int rc = 0;
+    struct ion_allocation_data alloc;
+    struct ion_handle_data handle_data;
+    alloc.len = (size + 4095) & (~4095);
+    alloc.flags = 0;
+    alloc.flags = ION_FLAG_CACHED;
+    alloc.heap_id_mask = 0x1 << ION_IOMMU_HEAP_ID;
+    alloc.align = 4096;
+    rc = ioctl(ionFd, ION_IOC_ALLOC, &alloc);
+    if (rc < 0)
+    {
+        goto ION_ALLOC_FAILED;
+    }
+    ionFdData->handle = alloc.handle;
+    rc = ioctl(ionFd, ION_IOC_SHARE, ionFdData);
+    if (rc < 0)
+    {
+        goto ION_MAP_FAILED;
+    }
+    return mmap(NULL,
+             alloc.len,
+             PROT_READ  | PROT_WRITE,
+             MAP_SHARED,
+             ionFdData->fd,
+             0);
+ION_MAP_FAILED:
+    handle_data.handle = ionFdData->handle;
+    ioctl(ionFd, ION_IOC_FREE, &handle_data);
+ION_ALLOC_FAILED:
+    return NULL;
+}
+
+static int freeIonMem(int ionFd, struct ion_fd_data *ionFdData, void* addr, size_t size)
+{
+    int rc = 0;
+    rc = munmap(addr, size);
+    close(ionFdData->fd);
+    struct ion_handle_data handle_data;
+    handle_data.handle = ionFdData->handle;
+    ioctl(ionFd, ION_IOC_FREE, &handle_data);
+    return rc;
+}
+
+int BootAnimation::notifyLKEarlyCameraPauseDisplay()
+{
+    int fd = open(EARLYCAMERA_PAUSE_FILE,O_WRONLY);
+    if(fd < 0){
+        ALOGE("failed to open notify_LK_earlycamera_pause_display %s ",strerror(errno));
+        return -1;
+    }
+    if(write(fd,"1",strlen("1")) != strlen("1")){
+        ALOGE("ERROR writing to earlycamera_lk_notify_display_pause\n");
+    }
+    close(fd);
+    return 0;
+}
+
+int BootAnimation::openEarlyCameraDevice()
+{
+    mEarlycameraFd  = open(EARLYCAMERA_TAKE_OVER_DISPLAY_FILE,O_WRONLY);
+    if(mEarlycameraFd < 0){
+        ALOGE("failed to open /dev/earlycamera %s ",strerror(errno));
+    }
+    return mEarlycameraFd;
+}
+
+int BootAnimation::earlyCameraFrameInit(int w,int h)
+{
+    int size = w * h * 3 / 2;
+    int ret = 0;
+
+    mIonFd = -1;
+    mIonFd = open("/dev/ion", O_RDONLY | O_SYNC);
+    if(mIonFd < 0){
+        goto open_failed;
+    }
+    struct EarlyCameraBufferCfg cfg;
+    cfg.num_bufs = EARLYCAMERA_BUFFER_NUM;
+    ret = ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_INIT_BUF, &cfg);
+    if(ret < 0) {
+        ALOGE(" failed to VIDIOC_MSM_EARLYCAMERA_INIT_BUF\n");
+        goto request_failed;
+    }
+    for(int i = 0; i < EARLYCAMERA_BUFFER_NUM; i++) {
+        mEarlyCameraBufs[i].cfg.num_bufs = EARLYCAMERA_BUFFER_NUM;
+        mEarlyCameraBufs[i].cfg.idx = i;
+        mEarlyCameraBufs[i].cfg.pingpong_flag = 0;
+        mEarlyCameraBufs[i].cfg.num_planes = 2;
+        mEarlyCameraBufs[i].cfg.offset = w * h;
+        mEarlyCameraBufs[i].size = size;
+        mEarlyCameraBufs[i].data = (unsigned char*)allocIonMem(mIonFd, size, &(mEarlyCameraBufs[i].ionInfo));
+        if(mEarlyCameraBufs[i].data == NULL) {
+            ALOGE(" failed to allocIonMem\n");
+            goto request_failed;
+        }
+        mEarlyCameraBufs[i].cfg.fd = mEarlyCameraBufs[i].ionInfo.fd;
+
+        ret = ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_REQUEST_BUF, &(mEarlyCameraBufs[i].cfg));
+        if(ret < 0) {
+            ALOGE(" failed to earlycamera_request_buffer\n");
+            goto request_failed;
+        }
+
+        ret = ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_QBUF, &(mEarlyCameraBufs[i].cfg));
+        if(ret < 0) {
+            ALOGE(" failed to earlycamera_queue_buffer\n");
+            goto request_failed;
+        }
+    }
+    return 0;
+
+request_failed:
+    ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_RELEASE_BUF, NULL);
+    for(int i = 0; i < EARLYCAMERA_BUFFER_NUM; i++) {
+        if(mEarlyCameraBufs[i].data != NULL) {
+            freeIonMem(mIonFd, &(mEarlyCameraBufs[i].ionInfo), mEarlyCameraBufs[i].data, mEarlyCameraBufs[i].size);
+        }
+    }
+    close(mIonFd);
+open_failed:
+    return -1;
+}
+
+int BootAnimation::earlyCameraFrameDeinit()
+{
+    int ret = ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_RELEASE_BUF, NULL);
+    if(ret < 0){
+        ALOGE("FAILED to earlycamera_rrelease_buffer\n");
+    }
+    for(int i = 0; i < EARLYCAMERA_BUFFER_NUM; i++) {
+        if(mEarlyCameraBufs[i].data != NULL) {
+            freeIonMem(mIonFd, &(mEarlyCameraBufs[i].ionInfo), mEarlyCameraBufs[i].data, mEarlyCameraBufs[i].size);
+        }
+    }
+    close(mIonFd);
+    mIonFd = -1;
+    return ret;
 }
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,8 @@ LOCAL_CFLAGS += -Wall -Werror -Wunused -Wunreachable-code
 
 LOCAL_C_INCLUDES += \
     external/tinyalsa/include \
-    frameworks/wilhelm/include
+    frameworks/wilhelm/include \
+    $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
@@ -24,6 +25,7 @@ LOCAL_SHARED_LIBRARIES := \
     libskia \
     libEGL \
     libGLESv1_CM \
+    libGLESv2 \
     libgui \
     libOpenSLES \
     libtinyalsa \

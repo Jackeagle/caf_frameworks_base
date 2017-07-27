@@ -103,6 +103,8 @@ public class UsbDeviceManager {
             "/sys/class/android_usb/android0/f_audio_source/pcm";
     private static final String MIDI_ALSA_PATH =
             "/sys/class/android_usb/android0/f_midi/alsa";
+    private static final String EARLY_CAMERA_PATH =
+            "devices/virtual/earlycamera/earlycamera";
 
     private static final int MSG_UPDATE_STATE = 0;
     private static final int MSG_ENABLE_ADB = 1;
@@ -113,6 +115,8 @@ public class UsbDeviceManager {
     private static final int MSG_UPDATE_USER_RESTRICTIONS = 6;
     private static final int MSG_UPDATE_HOST_STATE = 7;
     private static final int MSG_UPDATE_CHARGING_STATE = 9;
+    private static final int MSG_EARLY_CAMERA_FINISHED = 10;
+    private static final int MSG_CAR_REVERSE_CHANGED = 11;
 
     private static final int AUDIO_MODE_SOURCE = 1;
 
@@ -175,7 +179,25 @@ public class UsbDeviceManager {
 
             String state = event.get("USB_STATE");
             String accessory = event.get("ACCESSORY");
-            if (state != null) {
+            String subSystem = event.get("SUBSYSTEM");
+            if("earlycamera".equals(subSystem)) {
+                String reverse = event.get("REVERSE");
+                if("1".equals(reverse)) {
+                    Slog.v(TAG, "reverse status change to true");
+                    mHandler.removeMessages(MSG_CAR_REVERSE_CHANGED);
+                    Message tmp = Message.obtain(mHandler, MSG_CAR_REVERSE_CHANGED, 1, 0);
+                    mHandler.sendMessageDelayed(tmp, 800);
+                } else if("0".equals(reverse)) {
+                    Slog.v(TAG, "reverse status change to false");
+                    mHandler.removeMessages(MSG_CAR_REVERSE_CHANGED);
+                    Message tmp = Message.obtain(mHandler, MSG_CAR_REVERSE_CHANGED, 0, 0);
+                    mHandler.sendMessageDelayed(tmp, 800);
+                } else {
+                    Slog.v(TAG, "start show android ui");
+                    SystemProperties.set("sys.earlycamera_finished", "1");
+                    mHandler.sendEmptyMessageDelayed(MSG_EARLY_CAMERA_FINISHED, 3000);
+                }
+            } else if (state != null) {
                 mHandler.updateState(state);
             } else if ("START".equals(accessory)) {
                 if (DEBUG) Slog.d(TAG, "got accessory start");
@@ -387,6 +409,7 @@ public class UsbDeviceManager {
                 // Watch for USB configuration changes
                 mUEventObserver.startObserving(USB_STATE_MATCH);
                 mUEventObserver.startObserving(ACCESSORY_START_MATCH);
+                mUEventObserver.startObserving(EARLY_CAMERA_PATH);
             } catch (Exception e) {
                 Slog.e(TAG, "Error initializing UsbHandler", e);
             }
@@ -827,6 +850,16 @@ public class UsbDeviceManager {
                     }
                     break;
                 }
+                case MSG_EARLY_CAMERA_FINISHED:
+                    Slog.v(TAG, "send earlycamera finish broadcast");
+                    mContext.sendBroadcast(new Intent("android.intent.action.EARLY_CAMERA_FINISHED"));
+                    break;
+                case MSG_CAR_REVERSE_CHANGED:
+                    Slog.v(TAG, "send car reverse changed broadcast: " + (msg.arg1 != 0));
+                    Intent tmp = new Intent("android.intent.action.CAR_REVERSE");
+                    tmp.putExtra("reverse", (msg.arg1 != 0));
+                    mContext.sendBroadcast(tmp);
+                    break;
             }
         }
 

@@ -25,6 +25,21 @@
 
 #include <EGL/egl.h>
 #include <GLES/gl.h>
+#include <GLES2/gl2.h>
+
+#include <linux/msm_ion.h>
+#include <linux/ion.h>
+#include <linux/videodev2.h>
+
+#define  EARLYCAMERA_PAUSE_FILE "/sys/class/earlycamera/earlycamera/earlycamera_lk_notify_display_pause"
+#define  EARLYCAMERA_TAKE_OVER_DISPLAY_FILE "/dev/earlycamera"
+#define  VIDIOC_MSM_EARLYCAMERA_INIT_BUF        0x1002
+#define  VIDIOC_MSM_EARLYCAMERA_REQUEST_BUF     0x1003
+#define  VIDIOC_MSM_EARLYCAMERA_RELEASE_BUF     0x1004
+#define  VIDIOC_MSM_EARLYCAMERA_GET_SHOW_CAMERA 0x1009
+#define  VIDIOC_MSM_EARLYCAMERA_QBUF            0x1010
+#define  VIDIOC_MSM_EARLYCAMERA_DQBUF           0x1011
+#define  EARLYCAMERA_BUFFER_NUM 4
 
 class SkBitmap;
 
@@ -164,6 +179,48 @@ private:
     String8     mZipFileName;
     SortedVector<String8> mLoadedFiles;
     sp<TimeCheckThread> mTimeCheckThread;
+
+    struct EarlyCameraBufferCfg{
+        int fd;
+        int offset;
+        int num_planes;
+        int pingpong_flag;
+        int num_bufs;
+        int idx;
+    };
+
+    struct EarlyCameraBuffer {
+        EarlyCameraBufferCfg cfg;
+        unsigned char* data;
+        size_t size;
+        struct ion_fd_data ionInfo;
+    };
+    int notifyLKEarlyCameraPauseDisplay();
+    int openEarlyCameraDevice();
+    int earlyCameraFrameInit(int w,int h);
+    int earlyCameraFrameDeinit();
+    bool showCamera();
+    bool camera();
+    GLuint loadShader(int iShaderType, const char* source);
+    GLuint createProgram();
+    void initCameraProgram();
+    void destroyCameraProgram();
+    void drawFrame();
+    void checkGlError(const char* op);
+    void buildTexture(const unsigned char* y, const unsigned char* uv, int width, int height);
+    GLuint mProgram;
+    EGLConfig   mConfig;
+    GLuint mPositionHandle;
+    GLuint mCoordHandle;
+    GLuint mYHandle;
+    GLuint mUVHandle;
+    GLuint mYTexture;
+    GLuint mUVTexture;
+    int mVideoWidth;
+    int mVideoHeight;
+    int mEarlycameraFd;
+    EarlyCameraBuffer mEarlyCameraBufs[EARLYCAMERA_BUFFER_NUM];
+    int mIonFd;
 };
 
 // ---------------------------------------------------------------------------
