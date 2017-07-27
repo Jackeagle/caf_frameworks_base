@@ -23,15 +23,14 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.PowerManager;
 import android.os.SystemClock;
-import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.InputType;
-import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
@@ -127,13 +126,16 @@ public class PasswordTextView extends View {
             mCharPadding = a.getDimensionPixelSize(R.styleable.PasswordTextView_charPadding,
                     getContext().getResources().getDimensionPixelSize(
                             R.dimen.password_char_padding));
+            int textColor = a.getColor(R.styleable.PasswordTextView_android_textColor, Color.WHITE);
+            mDrawPaint.setColor(textColor);
         } finally {
             a.recycle();
         }
         mDrawPaint.setFlags(Paint.SUBPIXEL_TEXT_FLAG | Paint.ANTI_ALIAS_FLAG);
         mDrawPaint.setTextAlign(Paint.Align.CENTER);
-        mDrawPaint.setColor(0xffffffff);
-        mDrawPaint.setTypeface(Typeface.create("sans-serif-light", 0));
+        mDrawPaint.setTypeface(Typeface.create(
+                context.getString(com.android.internal.R.string.config_headlineFontFamilyLight),
+                0));
         mShowPassword = Settings.System.getInt(mContext.getContentResolver(),
                 Settings.System.TEXT_SHOW_PASSWORD, 1) == 1;
         mAppearInterpolator = AnimationUtils.loadInterpolator(mContext,
@@ -248,9 +250,9 @@ public class PasswordTextView extends View {
             mText = mText.substring(0, length - 1);
             CharState charState = mTextChars.get(length - 1);
             charState.startRemoveAnimation(0, 0);
+            sendAccessibilityEventTypeViewTextChanged(textbefore, textbefore.length() - 1, 1, 0);
         }
         userActivity();
-        sendAccessibilityEventTypeViewTextChanged(textbefore, textbefore.length() - 1, 1, 0);
     }
 
     public String getText() {

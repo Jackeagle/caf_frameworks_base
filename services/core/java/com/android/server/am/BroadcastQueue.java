@@ -614,9 +614,10 @@ public final class BroadcastQueue {
             skip = true;
         }
 
-        if (!skip && (filter.receiverList.app == null || filter.receiverList.app.crashing)) {
+        if (!skip && (filter.receiverList.app == null || filter.receiverList.app.killed
+                || filter.receiverList.app.crashing)) {
             Slog.w(TAG, "Skipping deliver [" + mQueueName + "] " + r
-                    + " to " + filter.receiverList + ": process crashing");
+                    + " to " + filter.receiverList + ": process gone or crashing");
             skip = true;
         }
 
@@ -1317,7 +1318,7 @@ public final class BroadcastQueue {
             }
 
             // Is this receiver's application already running?
-            if (app != null && app.thread != null) {
+            if (app != null && app.thread != null && !app.killed) {
                 try {
                     app.addPackage(info.activityInfo.packageName,
                             info.activityInfo.applicationInfo.versionCode, mService.mProcessStats);
@@ -1403,13 +1404,6 @@ public final class BroadcastQueue {
         long now = SystemClock.uptimeMillis();
         BroadcastRecord r = mOrderedBroadcasts.get(0);
         if (fromMsg) {
-            if (mService.mDidDexOpt) {
-                // Delay timeouts until dexopt finishes.
-                mService.mDidDexOpt = false;
-                long timeoutTime = SystemClock.uptimeMillis() + mTimeoutPeriod;
-                setBroadcastTimeoutLocked(timeoutTime);
-                return;
-            }
             if (!mService.mProcessesReady) {
                 // Only process broadcast timeouts if the system is ready. That way
                 // PRE_BOOT_COMPLETED broadcasts can't timeout as they are intended

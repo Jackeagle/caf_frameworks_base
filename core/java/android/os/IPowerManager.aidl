@@ -59,6 +59,8 @@ interface IPowerManager
 
     void setStayOnSetting(int val);
     void boostScreenBrightness(long time);
+
+    // --- deprecated ---
     boolean isScreenBrightnessBoosted();
 
     // temporarily overrides the screen brightness settings to allow the user to
@@ -68,4 +70,6 @@ interface IPowerManager
 
     // sets the attention light (used by phone app only)
     void setAttentionLight(boolean on, int color);
+    // update the uids being synchronized by network socket request manager
+    void updateBlockedUids(int uid, boolean isBlocked);
 }

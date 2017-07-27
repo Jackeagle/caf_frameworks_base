@@ -18,7 +18,9 @@ package android.media.session;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.media.AudioManager;
@@ -42,13 +44,11 @@ import java.util.List;
  * Provides support for interacting with {@link MediaSession media sessions}
  * that applications have published to express their ongoing media playback
  * state.
- * <p>
- * Use <code>Context.getSystemService(Context.MEDIA_SESSION_SERVICE)</code> to
- * get an instance of this class.
  *
  * @see MediaSession
  * @see MediaController
  */
+@SystemService(Context.MEDIA_SESSION_SERVICE)
 public final class MediaSessionManager {
     private static final String TAG = "SessionManager";
 
@@ -357,6 +357,7 @@ public final class MediaSessionManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.SET_VOLUME_KEY_LONG_PRESS_LISTENER)
     public void setOnVolumeKeyLongPressListener(
             OnVolumeKeyLongPressListener listener, @Nullable Handler handler) {
         synchronized (mLock) {
@@ -392,6 +393,7 @@ public final class MediaSessionManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.SET_MEDIA_KEY_LISTENER)
     public void setOnMediaKeyListener(OnMediaKeyListener listener, @Nullable Handler handler) {
         synchronized (mLock) {
             try {
@@ -544,18 +546,23 @@ public final class MediaSessionManager {
         private final IActiveSessionsListener.Stub mStub = new IActiveSessionsListener.Stub() {
             @Override
             public void onActiveSessionsChanged(final List<MediaSession.Token> tokens) {
-                if (mHandler != null) {
-                    mHandler.post(new Runnable() {
+                final Handler handler = mHandler;
+                if (handler != null) {
+                    handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            if (mListener != null) {
+                            final Context context = mContext;
+                            if (context != null) {
                                 ArrayList<MediaController> controllers
                                         = new ArrayList<MediaController>();
                                 int size = tokens.size();
                                 for (int i = 0; i < size; i++) {
-                                    controllers.add(new MediaController(mContext, tokens.get(i)));
+                                    controllers.add(new MediaController(context, tokens.get(i)));
                                 }
-                                mListener.onActiveSessionsChanged(controllers);
+                                final OnActiveSessionsChangedListener listener = mListener;
+                                if (listener != null) {
+                                    listener.onActiveSessionsChanged(controllers);
+                                }
                             }
                         }
                     });
@@ -564,8 +571,8 @@ public final class MediaSessionManager {
         };
 
         private void release() {
-            mContext = null;
             mListener = null;
+            mContext = null;
             mHandler = null;
         }
     }

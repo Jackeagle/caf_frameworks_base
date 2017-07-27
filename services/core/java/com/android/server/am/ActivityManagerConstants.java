@@ -20,6 +20,8 @@ import android.content.ContentResolver;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.SystemProperties;
+import android.os.Process;
 import android.provider.Settings;
 import android.util.KeyValueListParser;
 import android.util.Slog;
@@ -35,16 +37,24 @@ final class ActivityManagerConstants extends ContentObserver {
     // Key names stored in the settings value.
     private static final String KEY_MAX_CACHED_PROCESSES = "max_cached_processes";
     private static final String KEY_BACKGROUND_SETTLE_TIME = "background_settle_time";
-    private static final String KEY_FOREGROUND_SERVICE_UI_MIN_TIME
-            = "foreground_service_ui_min_time";
+    private static final String KEY_FGSERVICE_MIN_SHOWN_TIME
+            = "fgservice_min_shown_time";
+    private static final String KEY_FGSERVICE_MIN_REPORT_TIME
+            = "fgservice_min_report_time";
+    private static final String KEY_FGSERVICE_SCREEN_ON_BEFORE_TIME
+            = "fgservice_screen_on_before_time";
+    private static final String KEY_FGSERVICE_SCREEN_ON_AFTER_TIME
+            = "fgservice_screen_on_after_time";
     private static final String KEY_CONTENT_PROVIDER_RETAIN_TIME = "content_provider_retain_time";
     private static final String KEY_GC_TIMEOUT = "gc_timeout";
     private static final String KEY_GC_MIN_INTERVAL = "gc_min_interval";
     private static final String KEY_FULL_PSS_MIN_INTERVAL = "full_pss_min_interval";
     private static final String KEY_FULL_PSS_LOWERED_INTERVAL = "full_pss_lowered_interval";
-    private static final String KEY_POWER_CHECK_DELAY = "power_check_delay";
-    private static final String KEY_WAKE_LOCK_MIN_CHECK_DURATION = "wake_lock_min_check_duration";
-    private static final String KEY_CPU_MIN_CHECK_DURATION = "cpu_min_check_duration";
+    private static final String KEY_POWER_CHECK_INTERVAL = "power_check_interval";
+    private static final String KEY_POWER_CHECK_MAX_CPU_1 = "power_check_max_cpu_1";
+    private static final String KEY_POWER_CHECK_MAX_CPU_2 = "power_check_max_cpu_2";
+    private static final String KEY_POWER_CHECK_MAX_CPU_3 = "power_check_max_cpu_3";
+    private static final String KEY_POWER_CHECK_MAX_CPU_4 = "power_check_max_cpu_4";
     private static final String KEY_SERVICE_USAGE_INTERACTION_TIME
             = "service_usage_interaction_time";
     private static final String KEY_USAGE_STATS_INTERACTION_INTERVAL
@@ -56,19 +66,23 @@ final class ActivityManagerConstants extends ContentObserver {
     static final String KEY_MAX_SERVICE_INACTIVITY = "service_max_inactivity";
     static final String KEY_BG_START_TIMEOUT = "service_bg_start_timeout";
 
-    private static final int DEFAULT_MAX_CACHED_PROCESSES = 32;
+    private static final int DEFAULT_MAX_CACHED_PROCESSES =
+            SystemProperties.getInt("ro.vendor.qti.sys.fw.bg_apps_limit",32);
     private static final long DEFAULT_BACKGROUND_SETTLE_TIME = 60*1000;
-    private static final long DEFAULT_FOREGROUND_SERVICE_UI_MIN_TIME = 30*1000;
+    private static final long DEFAULT_FGSERVICE_MIN_SHOWN_TIME = 2*1000;
+    private static final long DEFAULT_FGSERVICE_MIN_REPORT_TIME = 3*1000;
+    private static final long DEFAULT_FGSERVICE_SCREEN_ON_BEFORE_TIME = 1*1000;
+    private static final long DEFAULT_FGSERVICE_SCREEN_ON_AFTER_TIME = 5*1000;
     private static final long DEFAULT_CONTENT_PROVIDER_RETAIN_TIME = 20*1000;
     private static final long DEFAULT_GC_TIMEOUT = 5*1000;
     private static final long DEFAULT_GC_MIN_INTERVAL = 60*1000;
     private static final long DEFAULT_FULL_PSS_MIN_INTERVAL = 10*60*1000;
     private static final long DEFAULT_FULL_PSS_LOWERED_INTERVAL = 2*60*1000;
-    private static final long DEFAULT_POWER_CHECK_DELAY = (DEBUG_POWER_QUICK ? 2 : 15) * 60*1000;
-    private static final long DEFAULT_WAKE_LOCK_MIN_CHECK_DURATION
-            = (DEBUG_POWER_QUICK ? 1 : 5) * 60*1000;
-    private static final long DEFAULT_CPU_MIN_CHECK_DURATION
-            = (DEBUG_POWER_QUICK ? 1 : 5) * 60*1000;
+    private static final long DEFAULT_POWER_CHECK_INTERVAL = (DEBUG_POWER_QUICK ? 1 : 5) * 60*1000;
+    private static final int DEFAULT_POWER_CHECK_MAX_CPU_1 = 25;
+    private static final int DEFAULT_POWER_CHECK_MAX_CPU_2 = 25;
+    private static final int DEFAULT_POWER_CHECK_MAX_CPU_3 = 10;
+    private static final int DEFAULT_POWER_CHECK_MAX_CPU_4 = 2;
     private static final long DEFAULT_SERVICE_USAGE_INTERACTION_TIME = 30*60*1000;
     private static final long DEFAULT_USAGE_STATS_INTERACTION_INTERVAL = 24*60*60*1000L;
     private static final long DEFAULT_SERVICE_RESTART_DURATION = 1*1000;
@@ -85,8 +99,26 @@ final class ActivityManagerConstants extends ContentObserver {
     // before we start restricting what it can do.
     public long BACKGROUND_SETTLE_TIME = DEFAULT_BACKGROUND_SETTLE_TIME;
 
-    // The minimum time a foreground service will be shown as running in the notification UI.
-    public long FOREGROUND_SERVICE_UI_MIN_TIME = DEFAULT_FOREGROUND_SERVICE_UI_MIN_TIME;
+    // The minimum time we allow a foreground service to run with a notification and the
+    // screen on without otherwise telling the user about it.  (If it runs for less than this,
+    // it will still be reported to the user as a running app for at least this amount of time.)
+    public long FGSERVICE_MIN_SHOWN_TIME = DEFAULT_FGSERVICE_MIN_SHOWN_TIME;
+
+    // If a foreground service is shown for less than FGSERVICE_MIN_SHOWN_TIME, we will display
+    // the background app running notification about it for at least this amount of time (if it
+    // is larger than the remaining shown time).
+    public long FGSERVICE_MIN_REPORT_TIME = DEFAULT_FGSERVICE_MIN_REPORT_TIME;
+
+    // The minimum amount of time the foreground service needs to have remain being shown
+    // before the screen goes on for us to consider it not worth showing to the user.  That is
+    // if an app has a foreground service that stops itself this amount of time or more before
+    // the user turns on the screen, we will just let it go without the user being told about it.
+    public long FGSERVICE_SCREEN_ON_BEFORE_TIME = DEFAULT_FGSERVICE_SCREEN_ON_BEFORE_TIME;
+
+    // The minimum amount of time a foreground service should remain reported to the user if
+    // it is stopped when the screen turns on.  This is the time from when the screen turns
+    // on until we will stop reporting it.
+    public long FGSERVICE_SCREEN_ON_AFTER_TIME = DEFAULT_FGSERVICE_SCREEN_ON_AFTER_TIME;
 
     // How long we will retain processes hosting content providers in the "last activity"
     // state before allowing them to drop down to the regular cached LRU list.  This is
@@ -106,16 +138,26 @@ final class ActivityManagerConstants extends ContentObserver {
     // when the request is due to the memory state being lowered.
     long FULL_PSS_LOWERED_INTERVAL = DEFAULT_FULL_PSS_LOWERED_INTERVAL;
 
-    // The rate at which we check for apps using excessive power -- 15 mins.
-    long POWER_CHECK_DELAY = DEFAULT_POWER_CHECK_DELAY;
-
-    // The minimum sample duration we will allow before deciding we have
-    // enough data on wake locks to start killing things.
-    long WAKE_LOCK_MIN_CHECK_DURATION = DEFAULT_WAKE_LOCK_MIN_CHECK_DURATION;
-
     // The minimum sample duration we will allow before deciding we have
     // enough data on CPU usage to start killing things.
-    long CPU_MIN_CHECK_DURATION = DEFAULT_CPU_MIN_CHECK_DURATION;
+    long POWER_CHECK_INTERVAL = DEFAULT_POWER_CHECK_INTERVAL;
+
+    // The maximum CPU (as a percentage) a process is allowed to use over the first
+    // power check interval that it is cached.
+    int POWER_CHECK_MAX_CPU_1 = DEFAULT_POWER_CHECK_MAX_CPU_1;
+
+    // The maximum CPU (as a percentage) a process is allowed to use over the second
+    // power check interval that it is cached.  The home app will never check for less
+    // CPU than this (it will not test against the 3 or 4 levels).
+    int POWER_CHECK_MAX_CPU_2 = DEFAULT_POWER_CHECK_MAX_CPU_2;
+
+    // The maximum CPU (as a percentage) a process is allowed to use over the third
+    // power check interval that it is cached.
+    int POWER_CHECK_MAX_CPU_3 = DEFAULT_POWER_CHECK_MAX_CPU_3;
+
+    // The maximum CPU (as a percentage) a process is allowed to use over the fourth
+    // power check interval that it is cached.
+    int POWER_CHECK_MAX_CPU_4 = DEFAULT_POWER_CHECK_MAX_CPU_4;
 
     // This is the amount of time an app needs to be running a foreground service before
     // we will consider it to be doing interaction for usage stats.
@@ -168,6 +210,17 @@ final class ActivityManagerConstants extends ContentObserver {
     // process limit.
     public int CUR_MAX_CACHED_PROCESSES;
 
+    static final boolean USE_TRIM_SETTINGS =
+            SystemProperties.getBoolean("ro.vendor.qti.sys.fw.use_trim_settings",true);
+    static final int EMPTY_APP_PERCENT = SystemProperties.getInt("ro.vendor.qti.sys.fw.empty_app_percent",50);
+    static final int TRIM_EMPTY_PERCENT =
+            SystemProperties.getInt("ro.vendor.qti.sys.fw.trim_empty_percent",100);
+    static final int TRIM_CACHE_PERCENT =
+            SystemProperties.getInt("ro.vendor.qti.sys.fw.trim_cache_percent",100);
+    static final long TRIM_ENABLE_MEMORY =
+            SystemProperties.getLong("ro.vendor.qti.sys.fw.trim_enable_memory",1073741824);
+    public static boolean allowTrim() { return Process.getTotalMemory() < TRIM_ENABLE_MEMORY ; }
+
     // The maximum number of empty app processes we will let sit around.
     public int CUR_MAX_EMPTY_PROCESSES;
 
@@ -202,7 +255,27 @@ final class ActivityManagerConstants extends ContentObserver {
     }
 
     public static int computeEmptyProcessLimit(int totalProcessLimit) {
-        return totalProcessLimit/2;
+        if(USE_TRIM_SETTINGS && allowTrim()) {
+            return totalProcessLimit*EMPTY_APP_PERCENT/100;
+        } else {
+            return totalProcessLimit/2;
+        }
+    }
+
+    public static int computeTrimEmptyApps(int rawMaxEmptyProcesses) {
+        if (USE_TRIM_SETTINGS && allowTrim()) {
+            return rawMaxEmptyProcesses*TRIM_EMPTY_PERCENT/100;
+        } else {
+            return rawMaxEmptyProcesses/2;
+        }
+    }
+
+    public static int computeTrimCachedApps(int rawMaxEmptyProcesses, int totalProcessLimit) {
+        if (USE_TRIM_SETTINGS && allowTrim()) {
+            return totalProcessLimit*TRIM_CACHE_PERCENT/100;
+        } else {
+            return (totalProcessLimit-rawMaxEmptyProcesses)/3;
+        }
     }
 
     @Override
@@ -225,8 +298,14 @@ final class ActivityManagerConstants extends ContentObserver {
                     DEFAULT_MAX_CACHED_PROCESSES);
             BACKGROUND_SETTLE_TIME = mParser.getLong(KEY_BACKGROUND_SETTLE_TIME,
                     DEFAULT_BACKGROUND_SETTLE_TIME);
-            FOREGROUND_SERVICE_UI_MIN_TIME = mParser.getLong(KEY_FOREGROUND_SERVICE_UI_MIN_TIME,
-                    DEFAULT_FOREGROUND_SERVICE_UI_MIN_TIME);
+            FGSERVICE_MIN_SHOWN_TIME = mParser.getLong(KEY_FGSERVICE_MIN_SHOWN_TIME,
+                    DEFAULT_FGSERVICE_MIN_SHOWN_TIME);
+            FGSERVICE_MIN_REPORT_TIME = mParser.getLong(KEY_FGSERVICE_MIN_REPORT_TIME,
+                    DEFAULT_FGSERVICE_MIN_REPORT_TIME);
+            FGSERVICE_SCREEN_ON_BEFORE_TIME = mParser.getLong(KEY_FGSERVICE_SCREEN_ON_BEFORE_TIME,
+                    DEFAULT_FGSERVICE_SCREEN_ON_BEFORE_TIME);
+            FGSERVICE_SCREEN_ON_AFTER_TIME = mParser.getLong(KEY_FGSERVICE_SCREEN_ON_AFTER_TIME,
+                    DEFAULT_FGSERVICE_SCREEN_ON_AFTER_TIME);
             CONTENT_PROVIDER_RETAIN_TIME = mParser.getLong(KEY_CONTENT_PROVIDER_RETAIN_TIME,
                     DEFAULT_CONTENT_PROVIDER_RETAIN_TIME);
             GC_TIMEOUT = mParser.getLong(KEY_GC_TIMEOUT,
@@ -237,12 +316,16 @@ final class ActivityManagerConstants extends ContentObserver {
                     DEFAULT_FULL_PSS_MIN_INTERVAL);
             FULL_PSS_LOWERED_INTERVAL = mParser.getLong(KEY_FULL_PSS_LOWERED_INTERVAL,
                     DEFAULT_FULL_PSS_LOWERED_INTERVAL);
-            POWER_CHECK_DELAY = mParser.getLong(KEY_POWER_CHECK_DELAY,
-                    DEFAULT_POWER_CHECK_DELAY);
-            WAKE_LOCK_MIN_CHECK_DURATION = mParser.getLong(KEY_WAKE_LOCK_MIN_CHECK_DURATION,
-                    DEFAULT_WAKE_LOCK_MIN_CHECK_DURATION);
-            CPU_MIN_CHECK_DURATION = mParser.getLong(KEY_CPU_MIN_CHECK_DURATION,
-                    DEFAULT_CPU_MIN_CHECK_DURATION);
+            POWER_CHECK_INTERVAL = mParser.getLong(KEY_POWER_CHECK_INTERVAL,
+                    DEFAULT_POWER_CHECK_INTERVAL);
+            POWER_CHECK_MAX_CPU_1 = mParser.getInt(KEY_POWER_CHECK_MAX_CPU_1,
+                    DEFAULT_POWER_CHECK_MAX_CPU_1);
+            POWER_CHECK_MAX_CPU_2 = mParser.getInt(KEY_POWER_CHECK_MAX_CPU_2,
+                    DEFAULT_POWER_CHECK_MAX_CPU_2);
+            POWER_CHECK_MAX_CPU_3 = mParser.getInt(KEY_POWER_CHECK_MAX_CPU_3,
+                    DEFAULT_POWER_CHECK_MAX_CPU_3);
+            POWER_CHECK_MAX_CPU_4 = mParser.getInt(KEY_POWER_CHECK_MAX_CPU_4,
+                    DEFAULT_POWER_CHECK_MAX_CPU_4);
             SERVICE_USAGE_INTERACTION_TIME = mParser.getLong(KEY_SERVICE_USAGE_INTERACTION_TIME,
                     DEFAULT_SERVICE_USAGE_INTERACTION_TIME);
             USAGE_STATS_INTERACTION_INTERVAL = mParser.getLong(KEY_USAGE_STATS_INTERACTION_INTERVAL,
@@ -272,8 +355,9 @@ final class ActivityManagerConstants extends ContentObserver {
         // to consider the same level the point where we do trimming regardless of any
         // additional enforced limit.
         final int rawMaxEmptyProcesses = computeEmptyProcessLimit(MAX_CACHED_PROCESSES);
-        CUR_TRIM_EMPTY_PROCESSES = rawMaxEmptyProcesses/2;
-        CUR_TRIM_CACHED_PROCESSES = (MAX_CACHED_PROCESSES-rawMaxEmptyProcesses)/3;
+        CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawMaxEmptyProcesses);
+        CUR_TRIM_CACHED_PROCESSES =
+                computeTrimCachedApps(rawMaxEmptyProcesses, MAX_CACHED_PROCESSES);
     }
 
     void dump(PrintWriter pw) {
@@ -284,8 +368,14 @@ final class ActivityManagerConstants extends ContentObserver {
         pw.println(MAX_CACHED_PROCESSES);
         pw.print("  "); pw.print(KEY_BACKGROUND_SETTLE_TIME); pw.print("=");
         pw.println(BACKGROUND_SETTLE_TIME);
-        pw.print("  "); pw.print(KEY_FOREGROUND_SERVICE_UI_MIN_TIME); pw.print("=");
-        pw.println(FOREGROUND_SERVICE_UI_MIN_TIME);
+        pw.print("  "); pw.print(KEY_FGSERVICE_MIN_SHOWN_TIME); pw.print("=");
+        pw.println(FGSERVICE_MIN_SHOWN_TIME);
+        pw.print("  "); pw.print(KEY_FGSERVICE_MIN_REPORT_TIME); pw.print("=");
+        pw.println(FGSERVICE_MIN_REPORT_TIME);
+        pw.print("  "); pw.print(KEY_FGSERVICE_SCREEN_ON_BEFORE_TIME); pw.print("=");
+        pw.println(FGSERVICE_SCREEN_ON_BEFORE_TIME);
+        pw.print("  "); pw.print(KEY_FGSERVICE_SCREEN_ON_AFTER_TIME); pw.print("=");
+        pw.println(FGSERVICE_SCREEN_ON_AFTER_TIME);
         pw.print("  "); pw.print(KEY_CONTENT_PROVIDER_RETAIN_TIME); pw.print("=");
         pw.println(CONTENT_PROVIDER_RETAIN_TIME);
         pw.print("  "); pw.print(KEY_GC_TIMEOUT); pw.print("=");
@@ -296,12 +386,16 @@ final class ActivityManagerConstants extends ContentObserver {
         pw.println(FULL_PSS_MIN_INTERVAL);
         pw.print("  "); pw.print(KEY_FULL_PSS_LOWERED_INTERVAL); pw.print("=");
         pw.println(FULL_PSS_LOWERED_INTERVAL);
-        pw.print("  "); pw.print(KEY_POWER_CHECK_DELAY); pw.print("=");
-        pw.println(POWER_CHECK_DELAY);
-        pw.print("  "); pw.print(KEY_WAKE_LOCK_MIN_CHECK_DURATION); pw.print("=");
-        pw.println(WAKE_LOCK_MIN_CHECK_DURATION);
-        pw.print("  "); pw.print(KEY_CPU_MIN_CHECK_DURATION); pw.print("=");
-        pw.println(CPU_MIN_CHECK_DURATION);
+        pw.print("  "); pw.print(KEY_POWER_CHECK_INTERVAL); pw.print("=");
+        pw.println(POWER_CHECK_INTERVAL);
+        pw.print("  "); pw.print(KEY_POWER_CHECK_MAX_CPU_1); pw.print("=");
+        pw.println(POWER_CHECK_MAX_CPU_1);
+        pw.print("  "); pw.print(KEY_POWER_CHECK_MAX_CPU_2); pw.print("=");
+        pw.println(POWER_CHECK_MAX_CPU_2);
+        pw.print("  "); pw.print(KEY_POWER_CHECK_MAX_CPU_3); pw.print("=");
+        pw.println(POWER_CHECK_MAX_CPU_3);
+        pw.print("  "); pw.print(KEY_POWER_CHECK_MAX_CPU_4); pw.print("=");
+        pw.println(POWER_CHECK_MAX_CPU_4);
         pw.print("  "); pw.print(KEY_SERVICE_USAGE_INTERACTION_TIME); pw.print("=");
         pw.println(SERVICE_USAGE_INTERACTION_TIME);
         pw.print("  "); pw.print(KEY_USAGE_STATS_INTERACTION_INTERVAL); pw.print("=");

@@ -17,6 +17,7 @@
 package com.android.server.am;
 
 import static android.app.ActivityManager.StackId.DOCKED_STACK_ID;
+import static android.os.Trace.TRACE_TAG_ACTIVITY_MANAGER;
 import static android.view.WindowManagerPolicy.KEYGUARD_GOING_AWAY_FLAG_NO_WINDOW_ANIMATIONS;
 import static android.view.WindowManagerPolicy.KEYGUARD_GOING_AWAY_FLAG_TO_SHADE;
 import static android.view.WindowManagerPolicy.KEYGUARD_GOING_AWAY_FLAG_WITH_WALLPAPER;
@@ -29,11 +30,11 @@ import static com.android.server.wm.AppTransition.TRANSIT_FLAG_KEYGUARD_GOING_AW
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_GOING_AWAY;
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_OCCLUDE;
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_UNOCCLUDE;
-import static com.android.server.wm.AppTransition.TRANSIT_NONE;
 import static com.android.server.wm.AppTransition.TRANSIT_UNSET;
 
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.Trace;
 import android.util.Slog;
 
 import com.android.internal.policy.IKeyguardDismissCallback;
@@ -97,7 +98,7 @@ class KeyguardController {
         mKeyguardShowing = showing;
         dismissDockedStackIfNeeded();
         if (showing) {
-            mKeyguardGoingAway = false;
+            setKeyguardGoingAway(false);
             mDismissalRequested = false;
         }
         mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
@@ -111,22 +112,28 @@ class KeyguardController {
      *              etc.
      */
     void keyguardGoingAway(int flags) {
-        if (mKeyguardShowing) {
-            mWindowManager.deferSurfaceLayout();
-            try {
-                mKeyguardGoingAway = true;
-                mWindowManager.prepareAppTransition(TRANSIT_KEYGUARD_GOING_AWAY,
-                        false /* alwaysKeepCurrent */, convertTransitFlags(flags),
-                        false /* forceOverride */);
-                mService.updateSleepIfNeededLocked();
+        if (!mKeyguardShowing) {
+            return;
+        }
+        Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "keyguardGoingAway");
+        mWindowManager.deferSurfaceLayout();
+        try {
+            setKeyguardGoingAway(true);
+            mWindowManager.prepareAppTransition(TRANSIT_KEYGUARD_GOING_AWAY,
+                    false /* alwaysKeepCurrent */, convertTransitFlags(flags),
+                    false /* forceOverride */);
+            mService.updateSleepIfNeededLocked();
 
-                // Some stack visibility might change (e.g. docked stack)
-                mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
-                mStackSupervisor.addStartingWindowsForVisibleActivities(true /* taskSwitch */);
-                mWindowManager.executeAppTransition();
-            } finally {
-                mWindowManager.continueSurfaceLayout();
-            }
+            // Some stack visibility might change (e.g. docked stack)
+            mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
+            mStackSupervisor.addStartingWindowsForVisibleActivities(true /* taskSwitch */);
+            mWindowManager.executeAppTransition();
+        } finally {
+            Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "keyguardGoingAway: surfaceLayout");
+            mWindowManager.continueSurfaceLayout();
+            Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
+
+            Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
         }
     }
 
@@ -136,7 +143,19 @@ class KeyguardController {
             failCallback(callback);
             return;
         }
+
+        // If the client has requested to dismiss the keyguard and the Activity has the flag to
+        // turn the screen on, wakeup the screen if it's the top Activity.
+        if (activityRecord.getTurnScreenOnFlag() && activityRecord.isTopRunningActivity()) {
+            mStackSupervisor.wakeUp("dismissKeyguard");
+        }
+
         mWindowManager.dismissKeyguard(callback);
+    }
+
+    private void setKeyguardGoingAway(boolean keyguardGoingAway) {
+        mKeyguardGoingAway = keyguardGoingAway;
+        mWindowManager.setKeyguardGoingAway(keyguardGoingAway);
     }
 
     private void failCallback(IKeyguardDismissCallback callback) {

@@ -26,6 +26,7 @@ import android.media.MediaCodecInfo.CodecCapabilities;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IHwBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.PersistableBundle;
@@ -75,12 +76,12 @@ import java.util.Map;
  <h4>Compressed Buffers</h4>
  <p>
  Input buffers (for decoders) and output buffers (for encoders) contain compressed data according
- to the {@linkplain MediaFormat#KEY_MIME format's type}. For video types this is a single
+ to the {@linkplain MediaFormat#KEY_MIME format's type}. For video types this is normally a single
  compressed video frame. For audio data this is normally a single access unit (an encoded audio
  segment typically containing a few milliseconds of audio as dictated by the format type), but
  this requirement is slightly relaxed in that a buffer may contain multiple encoded access units
  of audio. In either case, buffers do not start or end on arbitrary byte boundaries, but rather on
- frame/access unit boundaries.
+ frame/access unit boundaries unless they are flagged with {@link #BUFFER_FLAG_PARTIAL_FRAME}.
 
  <h4>Raw Audio Buffers</h4>
  <p>
@@ -337,6 +338,13 @@ import java.util.Map;
         This overrides the pre-skip value in the identification header.</td>
     <td>Seek Pre-roll in nanosecs<br>
         (unsigned 64-bit {@linkplain ByteOrder#nativeOrder native-order} integer.)</td>
+   </tr>
+   <tr>
+    <td>FLAC</td>
+    <td>mandatory metadata block (called the STREAMINFO block),<br>
+        optionally followed by any number of other metadata blocks</td>
+    <td class=NA>Not Used</td>
+    <td class=NA>Not Used</td>
    </tr>
    <tr>
     <td>MPEG-4</td>
@@ -1896,7 +1904,7 @@ final public class MediaCodec {
 
     private void configure(
             @Nullable MediaFormat format, @Nullable Surface surface,
-            @Nullable MediaCrypto crypto, @Nullable IBinder descramblerBinder,
+            @Nullable MediaCrypto crypto, @Nullable IHwBinder descramblerBinder,
             @ConfigureFlag int flags) {
         if (crypto != null && descramblerBinder != null) {
             throw new IllegalArgumentException("Can't use crypto and descrambler together!");
@@ -2011,7 +2019,7 @@ final public class MediaCodec {
     private native final void native_configure(
             @Nullable String[] keys, @Nullable Object[] values,
             @Nullable Surface surface, @Nullable MediaCrypto crypto,
-            @Nullable IBinder descramblerBinder, @ConfigureFlag int flags);
+            @Nullable IHwBinder descramblerBinder, @ConfigureFlag int flags);
 
     /**
      * Requests a Surface to use as the input to an encoder, in place of input buffers.  This
@@ -2440,6 +2448,8 @@ final public class MediaCodec {
             }
         };
 
+        private final Pattern zeroPattern = new Pattern(0, 0);
+
         /**
          * The pattern applicable to the protected data in each subsample.
          */
@@ -2462,7 +2472,7 @@ final public class MediaCodec {
             key = newKey;
             iv = newIV;
             mode = newMode;
-            pattern = new Pattern(0, 0);
+            pattern = zeroPattern;
         }
 
         /**

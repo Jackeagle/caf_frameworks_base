@@ -34,6 +34,8 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.os.Parcelable;
 import android.os.UserHandle;
+import android.service.notification.StatusBarNotification;
+import android.support.v4.graphics.ColorUtils;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
@@ -45,6 +47,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.Interpolator;
 
 import com.android.internal.statusbar.StatusBarIcon;
+import com.android.internal.util.NotificationColorUtil;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.notification.NotificationIconDozeHelper;
@@ -99,7 +102,7 @@ public class StatusBarIconView extends AnimatedImageView {
     private int mNumberX;
     private int mNumberY;
     private String mNumberText;
-    private Notification mNotification;
+    private StatusBarNotification mNotification;
     private final boolean mBlocked;
     private int mDensity;
     private float mIconScale = 1.0f;
@@ -126,12 +129,14 @@ public class StatusBarIconView extends AnimatedImageView {
         setColorInternal(newColor);
     };
     private final NotificationIconDozeHelper mDozer;
+    private int mContrastedDrawableColor;
+    private int mCachedContrastBackgroundColor = NO_COLOR;
 
-    public StatusBarIconView(Context context, String slot, Notification notification) {
-        this(context, slot, notification, false);
+    public StatusBarIconView(Context context, String slot, StatusBarNotification sbn) {
+        this(context, slot, sbn, false);
     }
 
-    public StatusBarIconView(Context context, String slot, Notification notification,
+    public StatusBarIconView(Context context, String slot, StatusBarNotification sbn,
             boolean blocked) {
         super(context);
         mDozer = new NotificationIconDozeHelper(context);
@@ -141,7 +146,7 @@ public class StatusBarIconView extends AnimatedImageView {
         mNumberPain.setTextAlign(Paint.Align.CENTER);
         mNumberPain.setColor(context.getColor(R.drawable.notification_number_text_color));
         mNumberPain.setAntiAlias(true);
-        setNotification(notification);
+        setNotification(sbn);
         maybeUpdateIconScaleDimens();
         setScaleType(ScaleType.CENTER);
         mDensity = context.getResources().getDisplayMetrics().densityDpi;
@@ -179,6 +184,10 @@ public class StatusBarIconView extends AnimatedImageView {
         mIconScale = (float)imageBounds / (float)outerBounds;
     }
 
+    public float getIconScaleFullyDark() {
+        return (float) mStatusBarIconDrawingSizeDark / mStatusBarIconDrawingSize;
+    }
+
     public float getIconScale() {
         return mIconScale;
     }
@@ -203,9 +212,11 @@ public class StatusBarIconView extends AnimatedImageView {
         }
     }
 
-    public void setNotification(Notification notification) {
+    public void setNotification(StatusBarNotification notification) {
         mNotification = notification;
-        setContentDescription(notification);
+        if (notification != null) {
+            setContentDescription(notification.getNotification());
+        }
     }
 
     public StatusBarIconView(Context context, AttributeSet attrs) {
@@ -311,6 +322,10 @@ public class StatusBarIconView extends AnimatedImageView {
         return true;
     }
 
+    public Icon getSourceIcon() {
+        return mIcon.icon;
+    }
+
     private Drawable getIcon(StatusBarIcon icon) {
         return getIcon(getContext(), icon);
     }
@@ -350,7 +365,7 @@ public class StatusBarIconView extends AnimatedImageView {
     public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
         super.onInitializeAccessibilityEvent(event);
         if (mNotification != null) {
-            event.setParcelableData(mNotification);
+            event.setParcelableData(mNotification.getNotification());
         }
     }
 
@@ -452,6 +467,10 @@ public class StatusBarIconView extends AnimatedImageView {
             + " notification=" + mNotification + ")";
     }
 
+    public StatusBarNotification getNotification() {
+        return mNotification;
+    }
+
     public String getSlot() {
         return mSlot;
     }
@@ -513,6 +532,7 @@ public class StatusBarIconView extends AnimatedImageView {
     public void setStaticDrawableColor(int color) {
         mDrawableColor = color;
         setColorInternal(color);
+        updateContrastedStaticColor();
         mIconColor = color;
         mDozer.setColor(color);
     }
@@ -563,6 +583,43 @@ public class StatusBarIconView extends AnimatedImageView {
 
     public int getStaticDrawableColor() {
         return mDrawableColor;
+    }
+
+    /**
+     * A drawable color that passes GAR on a specific background.
+     * This value is cached.
+     *
+     * @param backgroundColor Background to test against.
+     * @return GAR safe version of {@link StatusBarIconView#getStaticDrawableColor()}.
+     */
+    int getContrastedStaticDrawableColor(int backgroundColor) {
+        if (mCachedContrastBackgroundColor != backgroundColor) {
+            mCachedContrastBackgroundColor = backgroundColor;
+            updateContrastedStaticColor();
+        }
+        return mContrastedDrawableColor;
+    }
+
+    private void updateContrastedStaticColor() {
+        if (Color.alpha(mCachedContrastBackgroundColor) != 255) {
+            mContrastedDrawableColor = mDrawableColor;
+            return;
+        }
+        // We'll modify the color if it doesn't pass GAR
+        int contrastedColor = mDrawableColor;
+        if (!NotificationColorUtil.satisfiesTextContrast(mCachedContrastBackgroundColor,
+                contrastedColor)) {
+            float[] hsl = new float[3];
+            ColorUtils.colorToHSL(mDrawableColor, hsl);
+            // This is basically a light grey, pushing the color will only distort it.
+            // Best thing to do in here is to fallback to the default color.
+            if (hsl[1] < 0.2f) {
+                contrastedColor = Notification.COLOR_DEFAULT;
+            }
+            contrastedColor = NotificationColorUtil.resolveContrastColor(mContext,
+                    contrastedColor, mCachedContrastBackgroundColor);
+        }
+        mContrastedDrawableColor = contrastedColor;
     }
 
     public void setVisibleState(int state) {
@@ -699,7 +756,14 @@ public class StatusBarIconView extends AnimatedImageView {
             updateIconScale();
             updateDecorColor();
             updateIconColor();
+            updateAllowAnimation();
         }, dark, fade, delay);
+    }
+
+    private void updateAllowAnimation() {
+        if (mDarkAmount == 0 || mDarkAmount == 1) {
+            setAllowAnimation(mDarkAmount == 0);
+        }
     }
 
     public interface OnVisibilityChangedListener {

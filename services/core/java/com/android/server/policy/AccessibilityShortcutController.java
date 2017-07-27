@@ -78,6 +78,7 @@ public class AccessibilityShortcutController {
 
     public AccessibilityShortcutController(Context context, Handler handler, int initialUserId) {
         mContext = context;
+        mUserId = initialUserId;
 
         // Keep track of state of shortcut settings
         final ContentObserver co = new ContentObserver(handler) {
@@ -233,7 +234,7 @@ public class AccessibilityShortcutController {
 
     private AccessibilityServiceInfo getInfoForTargetService() {
         final String currentShortcutServiceString = getTargetServiceComponentNameString(
-                mContext, UserHandle.myUserId());
+                mContext, UserHandle.USER_CURRENT);
         if (currentShortcutServiceString == null) {
             return null;
         }

@@ -31,6 +31,7 @@ import android.graphics.Rect;
 import android.graphics.Region;
 import android.os.Build;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.AttributeSet;
@@ -264,6 +265,22 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         updateSurface();
     }
 
+    private void performDrawFinished() {
+        if (mPendingReportDraws > 0) {
+            mDrawFinished = true;
+            if (mAttachedToWindow) {
+                mParent.requestTransparentRegion(SurfaceView.this);
+                
+                notifyDrawFinished();
+                invalidate();
+            }
+        } else {
+            Log.e(TAG, System.identityHashCode(this) + "finished drawing"
+                    + " but no pending report draw (extra call"
+                    + " to draw completion runnable?)");
+        }
+    }
+
     void notifyDrawFinished() {
         ViewRootImpl viewRoot = getViewRootImpl();
         if (viewRoot != null) {
@@ -436,6 +453,14 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         }
     }
 
+    private void updateOpaqueFlag() {
+        if (!PixelFormat.formatHasAlpha(mRequestedFormat)) {
+            mSurfaceFlags |= SurfaceControl.OPAQUE;
+        } else {
+            mSurfaceFlags &= ~SurfaceControl.OPAQUE;
+        }
+    }
+
     private Rect getParentSurfaceInsets() {
         final ViewRootImpl root = getViewRootImpl();
         if (root == null) {
@@ -466,10 +491,10 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         if (myHeight <= 0) myHeight = getHeight();
 
         final boolean formatChanged = mFormat != mRequestedFormat;
-        final boolean creating = (mSurfaceControl == null || formatChanged)
+        final boolean visibleChanged = mVisible != mRequestedVisible;
+        final boolean creating = (mSurfaceControl == null || formatChanged || visibleChanged)
                 && mRequestedVisible;
         final boolean sizeChanged = mSurfaceWidth != myWidth || mSurfaceHeight != myHeight;
-        final boolean visibleChanged = mVisible != mRequestedVisible;
         final boolean windowVisibleChanged = mWindowVisibility != mLastWindowVisibility;
         boolean redrawNeeded = false;
 
@@ -506,7 +531,9 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                 if (creating) {
                     mSurfaceSession = new SurfaceSession(viewRoot.mSurface);
                     mDeferredDestroySurfaceControl = mSurfaceControl;
-                    mSurfaceControl = new SurfaceControl(mSurfaceSession,
+
+                    updateOpaqueFlag();
+                    mSurfaceControl = new SurfaceControlWithBackground(mSurfaceSession,
                             "SurfaceView - " + viewRoot.getTitle().toString(),
                             mSurfaceWidth, mSurfaceHeight, mFormat,
                             mSurfaceFlags);
@@ -612,6 +639,16 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
 
                     if (creating) {
                         mSurface.copyFrom(mSurfaceControl);
+                    }
+
+                    if (sizeChanged && getContext().getApplicationInfo().targetSdkVersion
+                            < Build.VERSION_CODES.O) {
+                        // Some legacy applications use the underlying native {@link Surface} object
+                        // as a key to whether anything has changed. In these cases, updates to the
+                        // existing {@link Surface} will be ignored when the size changes.
+                        // Therefore, we must explicitly recreate the {@link Surface} in these
+                        // cases.
+                        mSurface.createFrom(mSurfaceControl);
                     }
 
                     if (visible && mSurface.isValid()) {
@@ -729,12 +766,7 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         }
 
         runOnUiThread(() -> {
-            mDrawFinished = true;
-            if (mAttachedToWindow) {
-                mParent.requestTransparentRegion(SurfaceView.this);
-                notifyDrawFinished();
-                invalidate();
-            }
+            performDrawFinished();
         });
     }
 
@@ -806,6 +838,8 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
             Log.d(TAG, String.format("%d windowPositionLost, frameNr = %d",
                     System.identityHashCode(this), frameNumber));
         }
+        mRTLastReportedPosition.setEmpty();
+
         if (mSurfaceControl == null) {
             return;
         }
@@ -826,7 +860,6 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                     Log.e(TAG, "Exception configuring surface", ex);
                 }
             }
-            mRTLastReportedPosition.setEmpty();
         }
     }
 
@@ -1060,4 +1093,132 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
             return mSurfaceFrame;
         }
     };
+
+    class SurfaceControlWithBackground extends SurfaceControl {
+        private SurfaceControl mBackgroundControl;
+        private boolean mOpaque = true;
+        public boolean mVisible = false;
+
+        public SurfaceControlWithBackground(SurfaceSession s,
+                        String name, int w, int h, int format, int flags)
+                       throws Exception {
+            super(s, name, w, h, format, flags);
+            mBackgroundControl = new SurfaceControl(s, "Background for - " + name, w, h,
+                    PixelFormat.OPAQUE, flags | SurfaceControl.FX_SURFACE_DIM);
+            mOpaque = (flags & SurfaceControl.OPAQUE) != 0;
+        }
+
+        @Override
+        public void setAlpha(float alpha) {
+            super.setAlpha(alpha);
+            mBackgroundControl.setAlpha(alpha);
+        }
+
+        @Override
+        public void setLayer(int zorder) {
+            super.setLayer(zorder);
+            // -3 is below all other child layers as SurfaceView never goes below -2
+            mBackgroundControl.setLayer(-3);
+        }
+
+        @Override
+        public void setPosition(float x, float y) {
+            super.setPosition(x, y);
+            mBackgroundControl.setPosition(x, y);
+        }
+
+        @Override
+        public void setSize(int w, int h) {
+            super.setSize(w, h);
+            mBackgroundControl.setSize(w, h);
+        }
+
+        @Override
+        public void setWindowCrop(Rect crop) {
+            super.setWindowCrop(crop);
+            mBackgroundControl.setWindowCrop(crop);
+        }
+
+        @Override
+        public void setFinalCrop(Rect crop) {
+            super.setFinalCrop(crop);
+            mBackgroundControl.setFinalCrop(crop);
+        }
+
+        @Override
+        public void setLayerStack(int layerStack) {
+            super.setLayerStack(layerStack);
+            mBackgroundControl.setLayerStack(layerStack);
+        }
+
+        @Override
+        public void setOpaque(boolean isOpaque) {
+            super.setOpaque(isOpaque);
+            mOpaque = isOpaque;
+            updateBackgroundVisibility();
+        }
+
+        @Override
+        public void setSecure(boolean isSecure) {
+            super.setSecure(isSecure);
+        }
+
+        @Override
+        public void setMatrix(float dsdx, float dtdx, float dsdy, float dtdy) {
+            super.setMatrix(dsdx, dtdx, dsdy, dtdy);
+            mBackgroundControl.setMatrix(dsdx, dtdx, dsdy, dtdy);
+        }
+
+        @Override
+        public void hide() {
+            super.hide();
+            mVisible = false;
+            updateBackgroundVisibility();
+        }
+
+        @Override
+        public void show() {
+            super.show();
+            mVisible = true;
+            updateBackgroundVisibility();
+        }
+
+        @Override
+        public void destroy() {
+            super.destroy();
+            mBackgroundControl.destroy();
+         }
+
+        @Override
+        public void release() {
+            super.release();
+            mBackgroundControl.release();
+        }
+
+        @Override
+        public void setTransparentRegionHint(Region region) {
+            super.setTransparentRegionHint(region);
+            mBackgroundControl.setTransparentRegionHint(region);
+        }
+
+        @Override
+        public void deferTransactionUntil(IBinder handle, long frame) {
+            super.deferTransactionUntil(handle, frame);
+            mBackgroundControl.deferTransactionUntil(handle, frame);
+        }
+
+        @Override
+        public void deferTransactionUntil(Surface barrier, long frame) {
+            super.deferTransactionUntil(barrier, frame);
+            mBackgroundControl.deferTransactionUntil(barrier, frame);
+        }
+
+        void updateBackgroundVisibility() {
+            if (mOpaque && mVisible) {
+                mBackgroundControl.show();
+            } else {
+                mBackgroundControl.hide();
+            }
+        }
+    }
 }

@@ -54,6 +54,10 @@ public class StorageStatsSource {
                 mStorageStatsManager.queryStatsForPackage(volumeUuid, packageName, user));
     }
 
+    public long getCacheQuotaBytes(String volumeUuid, int uid) {
+        return mStorageStatsManager.getCacheQuotaBytes(volumeUuid, uid);
+    }
+
     /**
      * Static class that provides methods for querying the amount of external storage available as
      * well as breaking it up into several media types.
@@ -63,15 +67,17 @@ public class StorageStatsSource {
         public long audioBytes;
         public long videoBytes;
         public long imageBytes;
+        public long appBytes;
 
         /** Convenience method for testing. */
         @VisibleForTesting
         public ExternalStorageStats(
-                long totalBytes, long audioBytes, long videoBytes, long imageBytes) {
+                long totalBytes, long audioBytes, long videoBytes, long imageBytes, long appBytes) {
             this.totalBytes = totalBytes;
             this.audioBytes = audioBytes;
             this.videoBytes = videoBytes;
             this.imageBytes = imageBytes;
+            this.appBytes = appBytes;
         }
 
         /**
@@ -84,6 +90,7 @@ public class StorageStatsSource {
             audioBytes = stats.getAudioBytes();
             videoBytes = stats.getVideoBytes();
             imageBytes = stats.getImageBytes();
+            appBytes = stats.getAppBytes();
         }
     }
 

@@ -23,14 +23,17 @@ import android.app.IActivityManager;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.IBluetoothManager;
-import android.media.AudioAttributes;
-import android.nfc.NfcAdapter;
-import android.nfc.INfcAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.om.IOverlayManager;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.media.AudioAttributes;
+import android.nfc.INfcAdapter;
+import android.nfc.NfcAdapter;
 import android.os.FileUtils;
 import android.os.Handler;
 import android.os.PowerManager;
@@ -39,24 +42,21 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.os.SystemVibrator;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.Vibrator;
-import android.os.SystemVibrator;
-import android.os.storage.IStorageShutdownObserver;
 import android.os.storage.IStorageManager;
-import android.system.ErrnoException;
-import android.system.Os;
-
+import android.os.storage.IStorageShutdownObserver;
+import android.util.Log;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import com.android.internal.telephony.ITelephony;
 import com.android.server.pm.PackageManagerService;
 
-import android.util.Log;
-import android.view.WindowManager;
-
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 
 public final class ShutdownThread extends Thread {
@@ -243,20 +243,12 @@ public final class ShutdownThread extends Thread {
         shutdownInner(context, confirm);
     }
 
-    private static void beginShutdownSequence(Context context) {
-        synchronized (sIsStartedGuard) {
-            if (sIsStarted) {
-                Log.d(TAG, "Shutdown sequence already running, returning.");
-                return;
-            }
-            sIsStarted = true;
-        }
-
+    private static ProgressDialog showShutdownDialog(Context context) {
         // Throw up a system dialog to indicate the device is rebooting / shutting down.
         ProgressDialog pd = new ProgressDialog(context);
 
         // Path 1: Reboot to recovery for update
-        //   Condition: mReason == REBOOT_RECOVERY_UPDATE
+        //   Condition: mReason startswith REBOOT_RECOVERY_UPDATE
         //
         //  Path 1a: uncrypt needed
         //   Condition: if /cache/recovery/uncrypt_file exists but
@@ -276,7 +268,9 @@ public final class ShutdownThread extends Thread {
         // Path 3: Regular reboot / shutdown
         //   Condition: Otherwise
         //   UI: spinning circle only (no progress bar)
-        if (PowerManager.REBOOT_RECOVERY_UPDATE.equals(mReason)) {
+
+        // mReason could be "recovery-update" or "recovery-update,quiescent".
+        if (mReason != null && mReason.startsWith(PowerManager.REBOOT_RECOVERY_UPDATE)) {
             // We need the progress bar if uncrypt will be invoked during the
             // reboot, which might be time-consuming.
             mRebootHasProgressBar = RecoverySystem.UNCRYPT_PACKAGE_FILE.exists()
@@ -295,12 +289,38 @@ public final class ShutdownThread extends Thread {
                 pd.setMessage(context.getText(
                             com.android.internal.R.string.reboot_to_update_reboot));
             }
-        } else if (PowerManager.REBOOT_RECOVERY.equals(mReason)) {
+        } else if (mReason != null && mReason.equals(PowerManager.REBOOT_RECOVERY)) {
             // Factory reset path. Set the dialog message accordingly.
             pd.setTitle(context.getText(com.android.internal.R.string.reboot_to_reset_title));
             pd.setMessage(context.getText(
                         com.android.internal.R.string.reboot_to_reset_message));
             pd.setIndeterminate(true);
+        } else if (mReason != null && mReason.equals(PowerManager.SHUTDOWN_USER_REQUESTED)) {
+            Dialog d = new Dialog(context);
+            d.setContentView(com.android.internal.R.layout.shutdown_dialog);
+            d.setCancelable(false);
+
+            int color = Color.WHITE;
+            try {
+                IOverlayManager service = IOverlayManager.Stub.asInterface(
+                        ServiceManager.getService(Context.OVERLAY_SERVICE));
+                if (service.getOverlayInfo("com.android.systemui.theme.lightwallpaper", 0).isEnabled()) {
+                    color = Color.BLACK;
+                }
+            } catch (Exception e) {
+                // Shutdown UI really shouldn't crash or have strict dependencies on other services.
+                Log.w(TAG, "Problem getting overlay state", e);
+            }
+            ProgressBar bar = d.findViewById(com.android.internal.R.id.progress);
+            bar.getIndeterminateDrawable().setTint(color);
+            ((TextView) d.findViewById(com.android.internal.R.id.text1)).setTextColor(color);
+            d.getWindow().getAttributes().width = ViewGroup.LayoutParams.MATCH_PARENT;
+            d.getWindow().getAttributes().height = ViewGroup.LayoutParams.MATCH_PARENT;
+            d.getWindow().setType(WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY);
+            d.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            d.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            d.show();
+            return null;
         } else {
             pd.setTitle(context.getText(com.android.internal.R.string.power_off));
             pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
@@ -310,8 +330,19 @@ public final class ShutdownThread extends Thread {
         pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 
         pd.show();
+        return pd;
+    }
 
-        sInstance.mProgressDialog = pd;
+    private static void beginShutdownSequence(Context context) {
+        synchronized (sIsStartedGuard) {
+            if (sIsStarted) {
+                Log.d(TAG, "Shutdown sequence already running, returning.");
+                return;
+            }
+            sIsStarted = true;
+        }
+
+        sInstance.mProgressDialog = showShutdownDialog(context);
         sInstance.mContext = context;
         sInstance.mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
 
@@ -389,7 +420,8 @@ public final class ShutdownThread extends Thread {
         // First send the high-level shut down broadcast.
         mActionDone = false;
         Intent intent = new Intent(Intent.ACTION_SHUTDOWN);
-        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND
+                | Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
         mContext.sendOrderedBroadcastAsUser(intent,
                 UserHandle.ALL, null, br, mHandler, 0, null, null);
 

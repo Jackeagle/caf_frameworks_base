@@ -30,6 +30,7 @@ import android.widget.Switch;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.settingslib.Utils;
 import com.android.settingslib.bluetooth.CachedBluetoothDevice;
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
@@ -114,6 +115,10 @@ public class BluetoothTile extends QSTileImpl<BooleanState> {
                 || mController.getBluetoothState() == BluetoothAdapter.STATE_TURNING_ON;
         state.dualTarget = true;
         state.value = enabled;
+        if (state.slash == null) {
+            state.slash = new SlashState();
+        }
+        state.slash.isSlashed = !enabled;
         if (enabled) {
             state.label = null;
             if (connected) {
@@ -137,7 +142,7 @@ public class BluetoothTile extends QSTileImpl<BooleanState> {
             }
             state.state = Tile.STATE_ACTIVE;
         } else {
-            state.icon = ResourceIcon.get(R.drawable.ic_qs_bluetooth_off);
+            state.icon = ResourceIcon.get(R.drawable.ic_qs_bluetooth_on);
             state.label = mContext.getString(R.string.quick_settings_bluetooth_label);
             state.contentDescription = mContext.getString(
                     R.string.accessibility_quick_settings_bluetooth_off);
@@ -179,12 +184,6 @@ public class BluetoothTile extends QSTileImpl<BooleanState> {
 
         @Override
         public void onBluetoothDevicesChanged() {
-            mUiHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    mDetailAdapter.updateItems();
-                }
-            });
             refreshState();
             if (isShowingDetail()) {
                 mDetailAdapter.updateItems();
@@ -198,6 +197,9 @@ public class BluetoothTile extends QSTileImpl<BooleanState> {
     }
 
     protected class BluetoothDetailAdapter implements DetailAdapter, QSDetailItems.Callback {
+        // We probably won't ever have space in the UI for more than 20 devices, so don't
+        // get info for them.
+        private static final int MAX_DEVICES = 20;
         private QSDetailItems mItems;
 
         @Override
@@ -260,16 +262,24 @@ public class BluetoothTile extends QSTileImpl<BooleanState> {
             final Collection<CachedBluetoothDevice> devices = mController.getDevices();
             if (devices != null) {
                 int connectedDevices = 0;
+                int count = 0;
                 for (CachedBluetoothDevice device : devices) {
-                    if (device.getBondState() == BluetoothDevice.BOND_NONE) continue;
+                    if (mController.getBondState(device) == BluetoothDevice.BOND_NONE) continue;
                     final Item item = new Item();
                     item.icon = R.drawable.ic_qs_bluetooth_on;
                     item.line1 = device.getName();
                     item.tag = device;
-                    int state = device.getMaxConnectionState();
+                    int state = mController.getMaxConnectionState(device);
                     if (state == BluetoothProfile.STATE_CONNECTED) {
                         item.icon = R.drawable.ic_qs_bluetooth_connected;
-                        item.line2 = mContext.getString(R.string.quick_settings_connected);
+                        int batteryLevel = device.getBatteryLevel();
+                        if (batteryLevel != BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
+                            item.line2 = mContext.getString(
+                                    R.string.quick_settings_connected_battery_level,
+                                    Utils.formatPercentage(batteryLevel));
+                        } else {
+                            item.line2 = mContext.getString(R.string.quick_settings_connected);
+                        }
                         item.canDisconnect = true;
                         items.add(connectedDevices, item);
                         connectedDevices++;
@@ -279,6 +289,9 @@ public class BluetoothTile extends QSTileImpl<BooleanState> {
                         items.add(connectedDevices, item);
                     } else {
                         items.add(item);
+                    }
+                    if (++count == MAX_DEVICES) {
+                        break;
                     }
                 }
             }

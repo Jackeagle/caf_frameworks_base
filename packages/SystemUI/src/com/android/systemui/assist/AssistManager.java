@@ -92,7 +92,9 @@ public class AssistManager implements ConfigurationChangedReceiver {
         mAssistDisclosure = new AssistDisclosure(context, new Handler());
 
         registerVoiceInteractionSessionListener();
-        mInterestingConfigChanges = new InterestingConfigChanges(ActivityInfo.CONFIG_ORIENTATION);
+        mInterestingConfigChanges = new InterestingConfigChanges(ActivityInfo.CONFIG_ORIENTATION
+                | ActivityInfo.CONFIG_LOCALE | ActivityInfo.CONFIG_UI_MODE
+                | ActivityInfo.CONFIG_SCREEN_LAYOUT | ActivityInfo.CONFIG_ASSETS_PATHS);
         onConfigurationChanged(context.getResources().getConfiguration());
     }
 
@@ -168,9 +170,6 @@ public class AssistManager implements ConfigurationChangedReceiver {
                         | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         lp.token = new Binder();
-        if (ActivityManager.isHighEndGfx()) {
-            lp.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
-        }
         lp.gravity = Gravity.BOTTOM | Gravity.START;
         lp.setTitle("AssistPreviewPanel");
         lp.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED

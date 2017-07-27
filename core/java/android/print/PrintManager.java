@@ -19,6 +19,8 @@ package android.print;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
+import android.annotation.TestApi;
 import android.app.Activity;
 import android.app.Application.ActivityLifecycleCallbacks;
 import android.content.ComponentName;
@@ -57,14 +59,6 @@ import java.util.Map;
 
 /**
  * System level service for accessing the printing capabilities of the platform.
- * <p>
- * To obtain a handle to the print manager do the following:
- * </p>
- *
- * <pre>
- * PrintManager printManager =
- *         (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
- * </pre>
  *
  * <h3>Print mechanics</h3>
  * <p>
@@ -109,6 +103,7 @@ import java.util.Map;
  * @see PrintJob
  * @see PrintJobInfo
  */
+@SystemService(Context.PRINT_SERVICE)
 public final class PrintManager {
 
     private static final String LOG_TAG = "PrintManager";
@@ -147,6 +142,7 @@ public final class PrintManager {
      * @see #getPrintServices
      * @hide
      */
+    @TestApi
     public static final int ALL_SERVICES = ENABLED_SERVICES | DISABLED_SERVICES;
 
     /**
@@ -633,6 +629,7 @@ public final class PrintManager {
      *
      * @hide
      */
+    @TestApi
     @SystemApi
     public @NonNull List<PrintServiceInfo> getPrintServices(int selectionFlags) {
         Preconditions.checkFlagsArgument(selectionFlags, ALL_SERVICES);

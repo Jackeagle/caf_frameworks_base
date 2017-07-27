@@ -27,6 +27,7 @@ import com.android.systemui.R;
 import com.android.systemui.plugins.qs.QSTile;
 import com.android.systemui.plugins.qs.QSTile.SignalState;
 import com.android.systemui.qs.tileimpl.QSIconViewImpl;
+import com.android.systemui.qs.tileimpl.SlashImageView;
 
 /** View that represents a custom quick settings tile for displaying signal info (wifi/cell). **/
 public class SignalTileView extends QSIconViewImpl {
@@ -35,6 +36,7 @@ public class SignalTileView extends QSIconViewImpl {
 
     protected FrameLayout mIconFrame;
     protected ImageView mSignal;
+    private ImageView mOverlay;
     private ImageView mIn;
     private ImageView mOut;
 
@@ -61,8 +63,10 @@ public class SignalTileView extends QSIconViewImpl {
     @Override
     protected View createIcon() {
         mIconFrame = new FrameLayout(mContext);
-        mSignal = new ImageView(mContext);
+        mSignal = new SlashImageView(mContext);
         mIconFrame.addView(mSignal);
+        mOverlay = new ImageView(mContext);
+        mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         return mIconFrame;
     }
 
@@ -108,7 +112,18 @@ public class SignalTileView extends QSIconViewImpl {
     public void setIcon(QSTile.State state) {
         final SignalState s = (SignalState) state;
         setIcon(mSignal, s);
-        Drawable drawable = mSignal.getDrawable();
+
+        if (s.overlayIconId > 0) {
+            mOverlay.setVisibility(VISIBLE);
+            mOverlay.setImageResource(s.overlayIconId);
+        } else {
+            mOverlay.setVisibility(GONE);
+        }
+        if (s.overlayIconId > 0 && s.isOverlayIconWide) {
+            mSignal.setPaddingRelative(mWideOverlayIconStartPadding, 0, 0, 0);
+        } else {
+            mSignal.setPaddingRelative(0, 0, 0, 0);
+        }
         final boolean shown = isShown();
         setVisibility(mIn, shown, s.activityIn);
         setVisibility(mOut, shown, s.activityOut);

@@ -509,7 +509,6 @@ public class SmsMessage {
     public static SubmitPdu getSubmitPdu(String scAddress,
             String destinationAddress, String message, boolean statusReportRequested, int subId) {
         SubmitPduBase spb;
-
         if (useCdmaFormatForMoSms(subId)) {
             spb = com.android.internal.telephony.cdma.SmsMessage.getSubmitPdu(scAddress,
                     destinationAddress, message, statusReportRequested, null);
@@ -846,6 +845,15 @@ public class SmsMessage {
         return (PHONE_TYPE_CDMA == activePhone);
     }
 
+     /**
+      * Determines whether or not to current phone type is cdma
+      *
+      * @return true if current phone type is cdma, false otherwise.
+      */
+     /*private static boolean isCdmaVoice(int subId) {
+         int activePhone = TelephonyManager.getDefault().getCurrentPhoneType(subId);
+         return (PHONE_TYPE_CDMA == activePhone);
+   }*/
     /**
      * Decide if the carrier supports long SMS.
      * {@hide}

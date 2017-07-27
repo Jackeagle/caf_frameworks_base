@@ -30,19 +30,18 @@ import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.widget.Toast;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.systemui.Dependency;
 import com.android.systemui.plugins.PluginInstanceManager.PluginContextWrapper;
-import com.android.systemui.plugins.PluginInstanceManager.PluginInfo;
 import com.android.systemui.plugins.annotations.ProvidesInterface;
 
 import dalvik.system.PathClassLoader;
@@ -120,14 +119,21 @@ public class PluginManagerImpl extends BroadcastReceiver implements PluginManage
         }
         PluginInstanceManager<T> p = mFactory.createPluginInstanceManager(mContext, action, null,
                 false, mLooper, cls, this);
+        PluginListener<Plugin> listener = new PluginListener<Plugin>() {
+            @Override
+            public void onPluginConnected(Plugin plugin, Context pluginContext) { }
+        };
+        mPluginMap.put(listener, p);
         mPluginPrefs.addAction(action);
-        PluginInfo<T> info = p.getPlugin();
+        PluginInstanceManager.PluginInfo<T> info = p.getPlugin();
         if (info != null) {
             mOneShotPackages.add(info.mPackage);
             mHasOneShot = true;
             startListening();
+            mPluginMap.remove(listener);
             return info.mPlugin;
         }
+        mPluginMap.remove(listener);
         return null;
     }
 
@@ -166,7 +172,9 @@ public class PluginManagerImpl extends BroadcastReceiver implements PluginManage
         }
         if (!mPluginMap.containsKey(listener)) return;
         mPluginMap.remove(listener).destroy();
-        stopListening();
+        if (mPluginMap.size() == 0) {
+            stopListening();
+        }
     }
 
     private void startListening() {
@@ -237,7 +245,9 @@ public class PluginManagerImpl extends BroadcastReceiver implements PluginManage
                 mContext.getSystemService(NotificationManager.class).notifyAsUser(pkg,
                         SystemMessage.NOTE_PLUGIN, nb.build(), UserHandle.ALL);
             }
-            clearClassLoader(pkg);
+            if (clearClassLoader(pkg)) {
+                Toast.makeText(mContext, "Reloading " + pkg, Toast.LENGTH_LONG).show();
+            }
             if (!Intent.ACTION_PACKAGE_REMOVED.equals(intent.getAction())) {
                 for (PluginInstanceManager manager : mPluginMap.values()) {
                     manager.onPackageChange(pkg);
@@ -259,8 +269,8 @@ public class PluginManagerImpl extends BroadcastReceiver implements PluginManage
         return classLoader;
     }
 
-    private void clearClassLoader(String pkg) {
-        mClassLoaders.remove(pkg);
+    private boolean clearClassLoader(String pkg) {
+        return mClassLoaders.remove(pkg) != null;
     }
 
     ClassLoader getParentClassLoader() {

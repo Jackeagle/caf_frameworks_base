@@ -66,7 +66,7 @@ import org.xmlpull.v1.XmlSerializer;
  *      and {@link com.android.server.job.JobStore.ReadJobMapFromDiskRunnable} lock on that
  *      object.
  */
-public class JobStore {
+public final class JobStore {
     private static final String TAG = "JobStore";
     private static final boolean DEBUG = JobSchedulerService.DEBUG;
 
@@ -263,7 +263,7 @@ public class JobStore {
      * Runnable that writes {@link #mJobSet} out to xml.
      * NOTE: This Runnable locks on mLock
      */
-    private class WriteJobsMapToDiskRunnable implements Runnable {
+    private final class WriteJobsMapToDiskRunnable implements Runnable {
         @Override
         public void run() {
             final long startElapsed = SystemClock.elapsedRealtime();
@@ -345,6 +345,11 @@ public class JobStore {
             out.attribute(null, "uid", Integer.toString(jobStatus.getUid()));
             out.attribute(null, "priority", String.valueOf(jobStatus.getPriority()));
             out.attribute(null, "flags", String.valueOf(jobStatus.getFlags()));
+
+            out.attribute(null, "lastSuccessfulRunTime",
+                    String.valueOf(jobStatus.getLastSuccessfulRunTime()));
+            out.attribute(null, "lastFailedRunTime",
+                    String.valueOf(jobStatus.getLastFailedRunTime()));
         }
 
         private void writeBundleToXml(PersistableBundle extras, XmlSerializer out)
@@ -444,7 +449,7 @@ public class JobStore {
      * Runnable that reads list of persisted job from xml. This is run once at start up, so doesn't
      * need to go through {@link JobStore#add(com.android.server.job.controllers.JobStatus)}.
      */
-    private class ReadJobMapFromDiskRunnable implements Runnable {
+    private final class ReadJobMapFromDiskRunnable implements Runnable {
         private final JobSet jobSet;
 
         /**
@@ -555,6 +560,8 @@ public class JobStore {
                 IOException {
             JobInfo.Builder jobBuilder;
             int uid, sourceUserId;
+            long lastSuccessfulRunTime;
+            long lastFailedRunTime;
 
             // Read out job identifier attributes and priority.
             try {
@@ -572,6 +579,12 @@ public class JobStore {
                 }
                 val = parser.getAttributeValue(null, "sourceUserId");
                 sourceUserId = val == null ? -1 : Integer.parseInt(val);
+
+                val = parser.getAttributeValue(null, "lastSuccessfulRunTime");
+                lastSuccessfulRunTime = val == null ? 0 : Long.parseLong(val);
+
+                val = parser.getAttributeValue(null, "lastFailedRunTime");
+                lastFailedRunTime = val == null ? 0 : Long.parseLong(val);
             } catch (NumberFormatException e) {
                 Slog.e(TAG, "Error parsing job's required fields, skipping");
                 return null;
@@ -708,7 +721,8 @@ public class JobStore {
             // And now we're done
             JobStatus js = new JobStatus(
                     jobBuilder.build(), uid, sourcePackageName, sourceUserId, sourceTag,
-                    elapsedRuntimes.first, elapsedRuntimes.second);
+                    elapsedRuntimes.first, elapsedRuntimes.second,
+                    lastSuccessfulRunTime, lastFailedRunTime);
             return js;
         }
 
@@ -796,7 +810,7 @@ public class JobStore {
         }
     }
 
-    static class JobSet {
+    static final class JobSet {
         // Key is the getUid() originator of the jobs in each sheaf
         private SparseArray<ArraySet<JobStatus>> mJobs;
 

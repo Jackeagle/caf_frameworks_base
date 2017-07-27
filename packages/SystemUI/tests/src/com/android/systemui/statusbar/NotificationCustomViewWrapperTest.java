@@ -16,10 +16,7 @@
 
 package com.android.systemui.statusbar;
 
-import android.content.Context;
-import android.support.test.InstrumentationRegistry;
 import android.support.test.annotation.UiThreadTest;
-import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 import android.view.View;
@@ -32,7 +29,6 @@ import com.android.systemui.statusbar.notification.NotificationViewWrapper;
 
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -53,11 +49,14 @@ public class NotificationCustomViewWrapperTest extends SysuiTestCase {
         RemoteViews views = new RemoteViews(mContext.getPackageName(), R.layout.custom_view_dark);
         View v = views.apply(mContext, null);
         NotificationViewWrapper wrap = NotificationCustomViewWrapper.wrap(mContext, v, mRow);
-        wrap.notifyContentUpdated(mRow);
-        Assert.assertTrue(wrap.getCustomBackgroundColor() != 0);
+        wrap.onContentUpdated(mRow);
+        Assert.assertTrue("No background set, when applying custom background view",
+                wrap.getCustomBackgroundColor() != 0);
         views.reapply(mContext, v);
-        wrap.notifyContentUpdated(mRow);
-        Assert.assertTrue(wrap.getCustomBackgroundColor() != 0);
+        wrap.onReinflated();
+        wrap.onContentUpdated(mRow);
+        Assert.assertTrue("Reapplying a custom remote view lost it's background!",
+                wrap.getCustomBackgroundColor() != 0);
     }
 
 }

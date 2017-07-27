@@ -17,19 +17,25 @@
 package com.android.server.autofill.ui;
 
 import static com.android.server.autofill.Helper.sDebug;
+import static com.android.server.autofill.Helper.sVerbose;
 
 import android.annotation.NonNull;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.IntentSender;
 import android.os.Handler;
+import android.service.autofill.CustomDescription;
 import android.service.autofill.SaveInfo;
+import android.service.autofill.ValueFinder;
 import android.text.Html;
+import android.text.method.LinkMovementMethod;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.view.Gravity;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.LinearLayout;
+import android.widget.RemoteViews;
 import android.widget.TextView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -63,7 +69,7 @@ final class SaveUi {
 
         @Override
         public void onSave() {
-            if (sDebug) Slog.d(TAG, "onSave(): " + mDone);
+            if (sDebug) Slog.d(TAG, "OneTimeListener.onSave(): " + mDone);
             if (mDone) {
                 return;
             }
@@ -73,7 +79,7 @@ final class SaveUi {
 
         @Override
         public void onCancel(IntentSender listener) {
-            if (sDebug) Slog.d(TAG, "onCancel(): " + mDone);
+            if (sDebug) Slog.d(TAG, "OneTimeListener.onCancel(): " + mDone);
             if (mDone) {
                 return;
             }
@@ -83,7 +89,7 @@ final class SaveUi {
 
         @Override
         public void onDestroy() {
-            if (sDebug) Slog.d(TAG, "onDestroy(): " + mDone);
+            if (sDebug) Slog.d(TAG, "OneTimeListener.onDestroy(): " + mDone);
             if (mDone) {
                 return;
             }
@@ -98,19 +104,23 @@ final class SaveUi {
 
     private final @NonNull OneTimeListener mListener;
 
+    private final @NonNull OverlayControl mOverlayControl;
+
     private final CharSequence mTitle;
     private final CharSequence mSubTitle;
 
     private boolean mDestroyed;
 
     SaveUi(@NonNull Context context, @NonNull CharSequence providerLabel, @NonNull SaveInfo info,
-            @NonNull OnSaveListener listener) {
+           @NonNull ValueFinder valueFinder, @NonNull OverlayControl overlayControl,
+           @NonNull OnSaveListener listener) {
         mListener = new OneTimeListener(listener);
+        mOverlayControl = overlayControl;
 
         final LayoutInflater inflater = LayoutInflater.from(context);
         final View view = inflater.inflate(R.layout.autofill_save, null);
 
-        final TextView titleView = (TextView) view.findViewById(R.id.autofill_save_title);
+        final TextView titleView = view.findViewById(R.id.autofill_save_title);
 
         final ArraySet<String> types = new ArraySet<>(3);
         final int type = info.getType();
@@ -129,6 +139,23 @@ final class SaveUi {
         }
         if ((type & SaveInfo.SAVE_DATA_TYPE_EMAIL_ADDRESS) != 0) {
             types.add(context.getString(R.string.autofill_save_type_email_address));
+        }
+
+        final CustomDescription customDescription = info.getCustomDescription();
+
+        if (customDescription != null) {
+            // TODO(b/62534917): add CTS test
+            if (sDebug) Slog.d(TAG, "Using custom description");
+
+            final RemoteViews presentation = customDescription.getPresentation(valueFinder);
+            if (presentation != null) {
+                final View remote = presentation.apply(context, null);
+                final LinearLayout layout = view.findViewById(R.id.autofill_save_custom_subtitle);
+                layout.addView(remote);
+                layout.setVisibility(View.VISIBLE);
+            } else {
+                Slog.w(TAG, "could not create remote presentation for custom title");
+            }
         }
 
         switch (types.size()) {
@@ -158,10 +185,7 @@ final class SaveUi {
             subTitleView.setVisibility(View.VISIBLE);
         }
 
-        Slog.i(TAG, "Showing save dialog: " + mTitle);
-        if (sDebug) {
-            Slog.d(TAG, "SubTitle: " + mSubTitle);
-        }
+        if (sDebug) Slog.d(TAG, "on constructor: title=" + mTitle + ", subTitle=" + mSubTitle);
 
         final TextView noButton = view.findViewById(R.id.autofill_save_no);
         if (info.getNegativeActionStyle() == SaveInfo.NEGATIVE_BUTTON_STYLE_REJECT) {
@@ -169,15 +193,15 @@ final class SaveUi {
         } else {
             noButton.setText(R.string.autofill_save_no);
         }
-        noButton.setOnClickListener((v) -> mListener.onCancel(
-                info.getNegativeActionListener()));
+        View.OnClickListener cancelListener =
+                (v) -> mListener.onCancel(info.getNegativeActionListener());
+        noButton.setOnClickListener(cancelListener);
 
         final View yesButton = view.findViewById(R.id.autofill_save_yes);
         yesButton.setOnClickListener((v) -> mListener.onSave());
 
         final View closeButton = view.findViewById(R.id.autofill_save_close);
-        closeButton.setOnClickListener((v) -> mListener.onCancel(
-                info.getNegativeActionListener()));
+        closeButton.setOnClickListener(cancelListener);
 
         mDialog = new Dialog(context, R.style.Theme_DeviceDefault_Light_Panel);
         mDialog.setContentView(view);
@@ -188,6 +212,7 @@ final class SaveUi {
                 | WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH);
+        window.addPrivateFlags(WindowManager.LayoutParams.PRIVATE_FLAG_SHOW_FOR_ALL_USERS);
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         window.setGravity(Gravity.BOTTOM | Gravity.CENTER);
         window.setCloseOnTouchOutside(true);
@@ -195,21 +220,34 @@ final class SaveUi {
         params.width = WindowManager.LayoutParams.MATCH_PARENT;
         params.accessibilityTitle = context.getString(R.string.autofill_save_accessibility_title);
 
+        Slog.i(TAG, "Showing save dialog: " + mTitle);
         mDialog.show();
+        mOverlayControl.hideOverlays();
     }
 
     void destroy() {
-        throwIfDestroyed();
-        mListener.onDestroy();
-        mHandler.removeCallbacksAndMessages(mListener);
-        mDialog.dismiss();
-        mDestroyed = true;
+        try {
+            if (sDebug) Slog.d(TAG, "destroy()");
+            throwIfDestroyed();
+            mListener.onDestroy();
+            mHandler.removeCallbacksAndMessages(mListener);
+            if (sVerbose) Slog.v(TAG, "destroy(): dismissing dialog");
+            mDialog.dismiss();
+            mDestroyed = true;
+        } finally {
+            mOverlayControl.showOverlays();
+        }
     }
 
     private void throwIfDestroyed() {
         if (mDestroyed) {
             throw new IllegalStateException("cannot interact with a destroyed instance");
         }
+    }
+
+    @Override
+    public String toString() {
+        return mTitle == null ? "NO TITLE" : mTitle.toString();
     }
 
     void dump(PrintWriter pw, String prefix) {

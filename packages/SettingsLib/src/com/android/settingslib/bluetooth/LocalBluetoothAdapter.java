@@ -90,6 +90,10 @@ public class LocalBluetoothAdapter {
         return mAdapter.disable();
     }
 
+    public String getAddress() {
+        return mAdapter.getAddress();
+    }
+
     void getProfileProxy(Context context,
             BluetoothProfile.ServiceListener listener, int profile) {
         mAdapter.getProfileProxy(context, listener, profile);
@@ -190,8 +194,13 @@ public class LocalBluetoothAdapter {
         return mState;
     }
 
-    synchronized void setBluetoothStateInt(int state) {
-        mState = state;
+    void setBluetoothStateInt(int state) {
+        synchronized(this) {
+            if(mState == state){
+                return;
+            }
+            mState = state;
+        }
 
         if (state == BluetoothAdapter.STATE_ON) {
             // if mProfileManager hasn't been constructed yet, it will

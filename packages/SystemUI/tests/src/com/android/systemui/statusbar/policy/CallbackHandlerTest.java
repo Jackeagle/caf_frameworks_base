@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.policy;
 import android.os.HandlerThread;
 import android.support.test.runner.AndroidJUnit4;
 import android.telephony.SubscriptionInfo;
+import android.test.AndroidTestCase;
 import android.test.suitebuilder.annotation.SmallTest;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
@@ -111,7 +112,7 @@ public class CallbackHandlerTest extends SysuiTestCase {
         String typeDescription = "Test 1";
         String description = "Test 2";
         int type = R.drawable.stat_sys_data_fully_connected_1x;
-        int qsType = type;
+        int qsType = R.drawable.ic_qs_signal_1x;
         boolean wide = true;
         int subId = 5;
         boolean roaming = true;

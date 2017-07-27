@@ -79,6 +79,7 @@ class ActivityManagerDebugConfig {
     static final boolean DEBUG_SAVED_STATE = DEBUG_ALL_ACTIVITIES || false;
     static final boolean DEBUG_SCREENSHOTS = DEBUG_ALL_ACTIVITIES || false;
     static final boolean DEBUG_SERVICE = DEBUG_ALL || false;
+    static final boolean DEBUG_FOREGROUND_SERVICE = DEBUG_ALL || false;
     static final boolean DEBUG_SERVICE_EXECUTING = DEBUG_ALL || false;
     static final boolean DEBUG_STACK = DEBUG_ALL || false;
     static final boolean DEBUG_STATES = DEBUG_ALL_ACTIVITIES || false;
@@ -90,7 +91,6 @@ class ActivityManagerDebugConfig {
     static final boolean DEBUG_URI_PERMISSION = DEBUG_ALL || false;
     static final boolean DEBUG_USER_LEAVING = DEBUG_ALL || false;
     static final boolean DEBUG_VISIBILITY = DEBUG_ALL || false;
-    static final boolean DEBUG_VISIBLE_BEHIND = DEBUG_ALL_ACTIVITIES || false;
     static final boolean DEBUG_USAGE_STATS = DEBUG_ALL || false;
     static final boolean DEBUG_PERMISSIONS_REVIEW = DEBUG_ALL || false;
     static final boolean DEBUG_WHITELISTS = DEBUG_ALL || false;

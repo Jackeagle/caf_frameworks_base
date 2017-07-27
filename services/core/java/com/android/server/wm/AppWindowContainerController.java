@@ -18,8 +18,9 @@ package com.android.server.wm;
 
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
+
+import static com.android.server.wm.AppTransition.TRANSIT_DOCK_TASK_FROM_RECENTS;
 import static com.android.server.wm.AppTransition.TRANSIT_UNSET;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ADD_REMOVE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
@@ -37,8 +38,11 @@ import android.graphics.Rect;
 import android.os.Debug;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
 import android.os.Trace;
 import android.util.Slog;
+import android.view.DisplayInfo;
 import android.view.IApplicationToken;
 import android.view.WindowManagerPolicy.StartingSurface;
 
@@ -60,23 +64,38 @@ public class AppWindowContainerController
     private final IApplicationToken mToken;
     private final Handler mHandler;
 
-    private final Runnable mOnStartingWindowDrawn = () -> {
-        if (mListener == null) {
-            return;
-        }
-        if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting drawn in "
-                + AppWindowContainerController.this.mToken);
-        mListener.onStartingWindowDrawn();
-    };
+    private final class H extends Handler {
+        public static final int NOTIFY_WINDOWS_DRAWN = 1;
+        public static final int NOTIFY_STARTING_WINDOW_DRAWN = 2;
 
-    private final Runnable mOnWindowsDrawn = () -> {
-        if (mListener == null) {
-            return;
+        public H(Looper looper) {
+            super(looper);
         }
-        if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting drawn in "
-                + AppWindowContainerController.this.mToken);
-        mListener.onWindowsDrawn();
-    };
+
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case NOTIFY_WINDOWS_DRAWN:
+                    if (mListener == null) {
+                        return;
+                    }
+                    if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting drawn in "
+                            + AppWindowContainerController.this.mToken);
+                    mListener.onWindowsDrawn(msg.getWhen());
+                    break;
+                case NOTIFY_STARTING_WINDOW_DRAWN:
+                    if (mListener == null) {
+                        return;
+                    }
+                    if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting drawn in "
+                            + AppWindowContainerController.this.mToken);
+                    mListener.onStartingWindowDrawn(msg.getWhen());
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
 
     private final Runnable mOnWindowsVisible = () -> {
         if (mListener == null) {
@@ -211,7 +230,7 @@ public class AppWindowContainerController
             int targetSdkVersion, int rotationAnimationHint, long inputDispatchingTimeoutNanos,
             WindowManagerService service, Configuration overrideConfig, Rect bounds) {
         super(listener, service);
-        mHandler = new Handler(service.mH.getLooper());
+        mHandler = new H(service.mH.getLooper());
         mToken = token;
         synchronized(mWindowMap) {
             AppWindowToken atoken = mRoot.getAppWindowToken(mToken.asBinder());
@@ -381,6 +400,7 @@ public class AppWindowContainerController
                 // if made visible again.
                 wtoken.removeDeadWindows();
                 wtoken.setVisibleBeforeClientHidden();
+                mService.mUnknownAppVisibilityController.appRemovedOrHidden(wtoken);
             } else {
                 if (!mService.mAppTransition.isTransitionSet()
                         && mService.mAppTransition.isReady()) {
@@ -416,7 +436,7 @@ public class AppWindowContainerController
 
             // If we are preparing an app transition, then delay changing
             // the visibility of this token until we execute that transition.
-            if (mService.okToDisplay() && mService.mAppTransition.isTransitionSet()) {
+            if (mService.okToAnimate() && mService.mAppTransition.isTransitionSet()) {
                 // A dummy animation is a placeholder animation which informs others that an
                 // animation is going on (in this case an application transition). If the animation
                 // was transferred from another application/animator, no dummy animator should be
@@ -479,7 +499,7 @@ public class AppWindowContainerController
     public boolean addStartingWindow(String pkg, int theme, CompatibilityInfo compatInfo,
             CharSequence nonLocalizedLabel, int labelRes, int icon, int logo, int windowFlags,
             IBinder transferFrom, boolean newTask, boolean taskSwitch, boolean processRunning,
-            boolean allowTaskSnapshot, boolean activityCreated) {
+            boolean allowTaskSnapshot, boolean activityCreated, boolean fromRecents) {
         synchronized(mWindowMap) {
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "setAppStartingWindow: token=" + mToken
                     + " pkg=" + pkg + " transferFrom=" + transferFrom + " newTask=" + newTask
@@ -508,11 +528,14 @@ public class AppWindowContainerController
                 return false;
             }
 
+            final TaskSnapshot snapshot = mService.mTaskSnapshotController.getSnapshot(
+                    mContainer.getTask().mTaskId, mContainer.getTask().mUserId,
+                    false /* restoreFromDisk */, false /* reducedResolution */);
             final int type = getStartingWindowType(newTask, taskSwitch, processRunning,
-                    allowTaskSnapshot, activityCreated);
+                    allowTaskSnapshot, activityCreated, fromRecents, snapshot);
 
             if (type == STARTING_WINDOW_TYPE_SNAPSHOT) {
-                return createSnapshot();
+                return createSnapshot(snapshot);
             }
 
             // If this is a translucent window, then don't show a starting window -- the current
@@ -580,12 +603,19 @@ public class AppWindowContainerController
     }
 
     private int getStartingWindowType(boolean newTask, boolean taskSwitch, boolean processRunning,
-            boolean allowTaskSnapshot, boolean activityCreated) {
-        if (newTask || !processRunning
-                || (taskSwitch && !activityCreated)) {
+            boolean allowTaskSnapshot, boolean activityCreated, boolean fromRecents,
+            TaskSnapshot snapshot) {
+        if (mService.mAppTransition.getAppTransition() == TRANSIT_DOCK_TASK_FROM_RECENTS) {
+            // TODO(b/34099271): Remove this statement to add back the starting window and figure
+            // out why it causes flickering, the starting window appears over the thumbnail while
+            // the docked from recents transition occurs
+            return STARTING_WINDOW_TYPE_NONE;
+        } else if (newTask || !processRunning || (taskSwitch && !activityCreated)) {
             return STARTING_WINDOW_TYPE_SPLASH_SCREEN;
         } else if (taskSwitch && allowTaskSnapshot) {
-            return STARTING_WINDOW_TYPE_SNAPSHOT;
+            return snapshot == null ? STARTING_WINDOW_TYPE_NONE
+                    : snapshotOrientationSameAsTask(snapshot) || fromRecents
+                            ? STARTING_WINDOW_TYPE_SNAPSHOT : STARTING_WINDOW_TYPE_SPLASH_SCREEN;
         } else {
             return STARTING_WINDOW_TYPE_NONE;
         }
@@ -599,11 +629,7 @@ public class AppWindowContainerController
         mService.mAnimationHandler.postAtFrontOfQueue(mAddStartingWindow);
     }
 
-    private boolean createSnapshot() {
-        final TaskSnapshot snapshot = mService.mTaskSnapshotController.getSnapshot(
-                mContainer.getTask().mTaskId, mContainer.getTask().mUserId,
-                false /* restoreFromDisk */, false /* reducedResolution */);
-
+    private boolean createSnapshot(TaskSnapshot snapshot) {
         if (snapshot == null) {
             return false;
         }
@@ -614,7 +640,30 @@ public class AppWindowContainerController
         return true;
     }
 
-    public void removeStartingWindow() {
+    private boolean snapshotOrientationSameAsTask(TaskSnapshot snapshot) {
+        if (snapshot == null) {
+            return false;
+        }
+        return mContainer.getTask().getConfiguration().orientation == snapshot.getOrientation();
+    }
+
+    /**
+     * Remove starting window if the app is currently hidden. It is possible the starting window is
+     * part of its app exit transition animation in which case we delay hiding the app token. The
+     * method allows for removal when window manager has set the app token to hidden.
+     */
+    public void removeHiddenStartingWindow() {
+        synchronized (mWindowMap) {
+            if (!mContainer.hidden) {
+                if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Starting window app still visible."
+                        + " Ignoring remove request.");
+                return;
+            }
+            removeStartingWindow();
+        }
+    }
+
+    void removeStartingWindow() {
         synchronized (mWindowMap) {
             if (mHandler.hasCallbacks(mRemoveStartingWindow)) {
                 // Already scheduled.
@@ -734,11 +783,11 @@ public class AppWindowContainerController
     }
 
     void reportStartingWindowDrawn() {
-        mHandler.post(mOnStartingWindowDrawn);
+        mHandler.sendMessage(mHandler.obtainMessage(H.NOTIFY_STARTING_WINDOW_DRAWN));
     }
 
     void reportWindowsDrawn() {
-        mHandler.post(mOnWindowsDrawn);
+        mHandler.sendMessage(mHandler.obtainMessage(H.NOTIFY_WINDOWS_DRAWN));
     }
 
     void reportWindowsVisible() {

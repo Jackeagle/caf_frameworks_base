@@ -15,6 +15,10 @@
  */
 package com.android.systemui;
 
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import android.app.Instrumentation;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,8 +28,11 @@ import android.support.test.filters.SmallTest;
 import android.testing.LeakCheck;
 import android.util.Log;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -42,11 +49,30 @@ public abstract class SysuiTestCase {
     public SysuiTestableContext mContext = new SysuiTestableContext(
             InstrumentationRegistry.getContext(), getLeakCheck());
     public TestableDependency mDependency = new TestableDependency(mContext);
+    private Instrumentation mRealInstrumentation;
 
     @Before
     public void SysuiSetup() throws Exception {
         System.setProperty("dexmaker.share_classloader", "true");
         SystemUIFactory.createFromConfig(mContext);
+
+        mRealInstrumentation = InstrumentationRegistry.getInstrumentation();
+        Instrumentation inst = spy(mRealInstrumentation);
+        when(inst.getContext()).thenAnswer(invocation -> {
+            throw new RuntimeException(
+                    "SysUI Tests should use SysuiTestCase#getContext or SysuiTestCase#mContext");
+        });
+        when(inst.getTargetContext()).thenAnswer(invocation -> {
+            throw new RuntimeException(
+                    "SysUI Tests should use SysuiTestCase#getContext or SysuiTestCase#mContext");
+        });
+        InstrumentationRegistry.registerInstance(inst, InstrumentationRegistry.getArguments());
+    }
+
+    @After
+    public void SysuiTeardown() {
+        InstrumentationRegistry.registerInstance(mRealInstrumentation,
+                InstrumentationRegistry.getArguments());
     }
 
     protected LeakCheck getLeakCheck() {

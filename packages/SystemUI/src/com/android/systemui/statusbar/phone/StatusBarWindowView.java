@@ -53,6 +53,7 @@ import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.widget.FrameLayout;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.view.FloatingActionMode;
 import com.android.internal.widget.FloatingToolbar;
 import com.android.systemui.R;
@@ -182,7 +183,12 @@ public class StatusBarWindowView extends FrameLayout {
 
     public void setService(StatusBar service) {
         mService = service;
-        mDragDownHelper = new DragDownHelper(getContext(), this, mStackScrollLayout, mService);
+        setDragDownHelper(new DragDownHelper(getContext(), this, mStackScrollLayout, mService));
+    }
+
+    @VisibleForTesting
+    void setDragDownHelper(DragDownHelper dragDownHelper) {
+        mDragDownHelper = dragDownHelper;
     }
 
     @Override
@@ -277,7 +283,7 @@ public class StatusBarWindowView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mService.isDozing() && !mService.isPulsing()) {
+        if (mService.isDozing() && !mStackScrollLayout.hasPulsingNotifications()) {
             // Capture all touch events in always-on.
             return true;
         }
@@ -309,8 +315,8 @@ public class StatusBarWindowView extends FrameLayout {
             mDoubleTapHelper.onTouchEvent(ev);
             handled = true;
         }
-        if (mService.getBarState() == StatusBarState.KEYGUARD
-                && (!handled || mDragDownHelper.isDraggingDown())) {
+        if ((mService.getBarState() == StatusBarState.KEYGUARD && !handled)
+                || mDragDownHelper.isDraggingDown()) {
             // we still want to finish our drag down gesture when locking the screen
             handled = mDragDownHelper.onTouchEvent(ev);
         }
@@ -719,6 +725,10 @@ public class StatusBarWindowView extends FrameLayout {
 
         @Override
         public void onMultiWindowModeChanged() {
+        }
+
+        @Override
+        public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
         }
 
         @Override

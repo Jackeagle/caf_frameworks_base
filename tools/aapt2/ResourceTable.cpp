@@ -15,20 +15,24 @@
  */
 
 #include "ResourceTable.h"
-#include "ConfigDescription.h"
-#include "NameMangler.h"
-#include "ResourceValues.h"
-#include "ValueVisitor.h"
-#include "util/Util.h"
 
-#include <android-base/logging.h>
-#include <androidfw/ResourceTypes.h>
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <tuple>
 
-using android::StringPiece;
+#include "android-base/logging.h"
+#include "androidfw/ResourceTypes.h"
+
+#include "ConfigDescription.h"
+#include "NameMangler.h"
+#include "ResourceValues.h"
+#include "ValueVisitor.h"
+#include "text/Unicode.h"
+#include "util/Util.h"
+
+using ::aapt::text::IsValidResourceEntryName;
+using ::android::StringPiece;
 
 namespace aapt {
 
@@ -283,12 +287,9 @@ ResourceTable::CollisionResult ResourceTable::ResolveValueCollision(Value* exist
   return CollisionResult::kConflict;
 }
 
-static constexpr const char* kValidNameChars = "._-";
-
 static StringPiece ValidateName(const StringPiece& name) {
-  auto iter = util::FindNonAlphaNumericAndNotInSet(name, kValidNameChars);
-  if (iter != name.end()) {
-    return StringPiece(iter, 1);
+  if (!IsValidResourceEntryName(name)) {
+    return name;
   }
   return {};
 }
@@ -440,8 +441,7 @@ bool ResourceTable::AddResourceImpl(const ResourceNameRef& name, const ResourceI
   return true;
 }
 
-bool ResourceTable::SetSymbolState(const ResourceNameRef& name,
-                                   const ResourceId& res_id,
+bool ResourceTable::SetSymbolState(const ResourceNameRef& name, const ResourceId& res_id,
                                    const Symbol& symbol, IDiagnostics* diag) {
   return SetSymbolStateImpl(name, res_id, symbol, ValidateName, diag);
 }
@@ -489,8 +489,7 @@ bool ResourceTable::SetSymbolStateImpl(const ResourceNameRef& name, const Resour
     diag->Error(DiagMessage(symbol.source)
                 << "trying to add resource '" << name << "' with ID " << res_id
                 << " but resource already has ID "
-                << ResourceId(package->id.value(), type->id.value(),
-                              entry->id.value()));
+                << ResourceId(package->id.value(), type->id.value(), entry->id.value()));
     return false;
   }
 
@@ -505,6 +504,11 @@ bool ResourceTable::SetSymbolStateImpl(const ResourceNameRef& name, const Resour
     type->symbol_status.state = SymbolState::kPublic;
   }
 
+  if (symbol.allow_new) {
+    // This symbol can be added as a new resource when merging (if it belongs to an overlay).
+    entry->symbol_status.allow_new = true;
+  }
+
   if (symbol.state == SymbolState::kUndefined &&
       entry->symbol_status.state != SymbolState::kUndefined) {
     // We can't undefine a symbol (remove its visibility). Ignore.
@@ -517,7 +521,10 @@ bool ResourceTable::SetSymbolStateImpl(const ResourceNameRef& name, const Resour
     return true;
   }
 
-  entry->symbol_status = std::move(symbol);
+  // This symbol definition takes precedence, replace.
+  entry->symbol_status.state = symbol.state;
+  entry->symbol_status.source = symbol.source;
+  entry->symbol_status.comment = symbol.comment;
   return true;
 }
 

@@ -20,6 +20,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SdkConstant;
+import android.annotation.SystemService;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.content.Context;
 import android.net.ConnectivityManager;
@@ -31,6 +32,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.os.RemoteException;
 import android.util.Log;
 import android.util.SparseArray;
@@ -48,9 +50,7 @@ import java.util.List;
 
 /**
  * This class provides the primary API for managing Wi-Fi Aware operations:
- * discovery and peer-to-peer data connections. Get an instance of this class by calling
- * {@link android.content.Context#getSystemService(String)
- * Context.getSystemService(Context.WIFI_AWARE_SERVICE)}.
+ * discovery and peer-to-peer data connections.
  * <p>
  * The class provides access to:
  * <ul>
@@ -120,6 +120,7 @@ import java.util.List;
  *        {@link DiscoverySession#createNetworkSpecifierPassphrase(PeerHandle, String)}.
  *    </ul>
  */
+@SystemService(Context.WIFI_AWARE_SERVICE)
 public class WifiAwareManager {
     private static final String TAG = "WifiAwareManager";
     private static final boolean DBG = false;
@@ -453,7 +454,8 @@ public class WifiAwareManager {
                 peerHandle != null ? peerHandle.peerId : 0, // 0 is an invalid peer ID
                 null, // peerMac (not used in this method)
                 pmk,
-                passphrase);
+                passphrase,
+                Process.myUid());
     }
 
     /** @hide */
@@ -490,7 +492,8 @@ public class WifiAwareManager {
                 0, // 0 is an invalid peer ID
                 peer,
                 pmk,
-                passphrase);
+                passphrase,
+                Process.myUid());
     }
 
     private static class WifiAwareEventCallbackProxy extends IWifiAwareEventCallback.Stub {

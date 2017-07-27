@@ -25,6 +25,8 @@ import android.view.View;
 import com.android.systemui.R;
 import com.android.systemui.SystemUI;
 import com.android.systemui.recents.Recents;
+import com.android.systemui.recents.events.EventBus;
+import com.android.systemui.recents.events.ui.RecentsDrawnEvent;
 import com.android.systemui.recents.misc.SystemServicesProxy;
 
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
@@ -56,6 +58,7 @@ public class Divider extends SystemUI {
         SystemServicesProxy ssp = Recents.getSystemServices();
         ssp.registerDockedStackListener(mDockDividerVisibilityListener);
         mForcedResizableController = new ForcedResizableInfoActivityController(mContext);
+        EventBus.getDefault().register(this);
     }
 
     @Override
@@ -79,6 +82,7 @@ public class Divider extends SystemUI {
     private void addDivider(Configuration configuration) {
         mView = (DividerView)
                 LayoutInflater.from(mContext).inflate(R.layout.docked_stack_divider, null);
+        mView.injectDependencies(mWindowManager, mDividerState);
         mView.setVisibility(mVisible ? View.VISIBLE : View.INVISIBLE);
         mView.setMinimizedDockStack(mMinimized, mHomeStackResizable);
         final int size = mContext.getResources().getDimensionPixelSize(
@@ -87,10 +91,12 @@ public class Divider extends SystemUI {
         final int width = landscape ? size : MATCH_PARENT;
         final int height = landscape ? MATCH_PARENT : size;
         mWindowManager.add(mView, width, height);
-        mView.injectDependencies(mWindowManager, mDividerState);
     }
 
     private void removeDivider() {
+        if (mView != null) {
+            mView.onDividerRemoved();
+        }
         mWindowManager.remove();
     }
 
@@ -148,6 +154,18 @@ public class Divider extends SystemUI {
 
     private void updateTouchable() {
         mWindowManager.setTouchable((mHomeStackResizable || !mMinimized) && !mAdjustedForIme);
+    }
+
+    /**
+     * Workaround for b/62528361, at the time RecentsDrawnEvent is sent, it may happen before a
+     * configuration change to the Divider, and internally, the event will be posted to the
+     * subscriber, or DividerView, which has been removed and prevented from resizing. Instead,
+     * register the event handler here and proxy the event to the current DividerView.
+     */
+    public final void onBusEvent(RecentsDrawnEvent drawnEvent) {
+        if (mView != null) {
+            mView.onRecentsDrawn();
+        }
     }
 
     @Override

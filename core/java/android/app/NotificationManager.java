@@ -18,13 +18,12 @@ package android.app;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
-import android.annotation.Nullable;
 import android.annotation.SdkConstant;
+import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.app.Notification.Builder;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.ParceledListSlice;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
@@ -32,7 +31,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.RemoteException;
@@ -40,10 +38,8 @@ import android.os.ServiceManager;
 import android.os.StrictMode;
 import android.os.UserHandle;
 import android.provider.Settings.Global;
-import android.service.notification.NotificationListenerService.Ranking;
 import android.service.notification.StatusBarNotification;
 import android.service.notification.ZenModeConfig;
-import android.util.ArraySet;
 import android.util.Log;
 
 import java.lang.annotation.Retention;
@@ -81,10 +77,6 @@ import java.util.Objects;
  * to the {@link #cancel(int)} or {@link #cancel(String, int)} method to clear
  * this notification.
  *
- * <p>
- * You do not instantiate this class directly; instead, retrieve it through
- * {@link android.content.Context#getSystemService}.
- *
  * <div class="special reference">
  * <h3>Developer Guides</h3>
  * <p>For a guide to creating notifications, read the
@@ -93,10 +85,9 @@ import java.util.Objects;
  * </div>
  *
  * @see android.app.Notification
- * @see android.content.Context#getSystemService
  */
-public class NotificationManager
-{
+@SystemService(Context.NOTIFICATION_SERVICE)
+public class NotificationManager {
     private static String TAG = "NotificationManager";
     private static boolean localLOGV = false;
 
@@ -316,7 +307,9 @@ public class NotificationManager
             }
         }
         if (localLOGV) Log.v(TAG, pkg + ": notify(" + id + ", " + notification + ")");
-        final Notification copy = Builder.maybeCloneStrippedForDelivery(notification);
+        ActivityManager am = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
+        boolean isLowRam = am.isLowRamDevice();
+        final Notification copy = Builder.maybeCloneStrippedForDelivery(notification, isLowRam);
         try {
             service.enqueueNotificationWithTag(pkg, mContext.getOpPackageName(), tag, id,
                     copy, user.getIdentifier());
@@ -751,14 +744,14 @@ public class NotificationManager
     }
 
     /**
-     * Checks the ability to read/modify notification policy for the calling package.
+     * Checks the ability to read/modify notification do not disturb policy for the calling package.
      *
      * <p>
      * Returns true if the calling package can read/modify notification policy.
      *
      * <p>
-     * Request policy access by sending the user to the activity that matches the system intent
-     * action {@link android.provider.Settings#ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS}.
+     * Apps can request policy access by sending the user to the activity that matches the system
+     * intent action {@link android.provider.Settings#ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS}.
      *
      * <p>
      * Use {@link #ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED} to listen for
@@ -773,11 +766,56 @@ public class NotificationManager
         }
     }
 
+    /**
+     * Checks whether the user has approved a given
+     * {@link android.service.notification.NotificationListenerService}.
+     *
+     * <p>
+     * The listener service must belong to the calling app.
+     *
+     * <p>
+     * Apps can request notification listener access by sending the user to the activity that
+     * matches the system intent action
+     * {@link android.provider.Settings#ACTION_NOTIFICATION_LISTENER_SETTINGS}.
+     */
+    public boolean isNotificationListenerAccessGranted(ComponentName listener) {
+        INotificationManager service = getService();
+        try {
+            return service.isNotificationListenerAccessGranted(listener);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public boolean isNotificationAssistantAccessGranted(ComponentName assistant) {
+        INotificationManager service = getService();
+        try {
+            return service.isNotificationAssistantAccessGranted(assistant);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     /** @hide */
     public boolean isNotificationPolicyAccessGrantedForPackage(String pkg) {
         INotificationManager service = getService();
         try {
             return service.isNotificationPolicyAccessGrantedForPackage(pkg);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public List<String> getEnabledNotificationListenerPackages() {
+        INotificationManager service = getService();
+        try {
+            return service.getEnabledNotificationListenerPackages();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -829,21 +867,34 @@ public class NotificationManager
     }
 
     /** @hide */
-    public ArraySet<String> getPackagesRequestingNotificationPolicyAccess() {
+    public void setNotificationListenerAccessGranted(ComponentName listener, boolean granted) {
         INotificationManager service = getService();
         try {
-            final String[] pkgs = service.getPackagesRequestingNotificationPolicyAccess();
-            if (pkgs != null && pkgs.length > 0) {
-                final ArraySet<String> rt = new ArraySet<>(pkgs.length);
-                for (int i = 0; i < pkgs.length; i++) {
-                    rt.add(pkgs[i]);
-                }
-                return rt;
-            }
+            service.setNotificationListenerAccessGranted(listener, granted);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        return new ArraySet<>();
+    }
+
+    /** @hide */
+    public void setNotificationListenerAccessGrantedForUser(ComponentName listener, int userId,
+            boolean granted) {
+        INotificationManager service = getService();
+        try {
+            service.setNotificationListenerAccessGrantedForUser(listener, userId, granted);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** @hide */
+    public List<ComponentName> getEnabledNotificationListeners(int userId) {
+        INotificationManager service = getService();
+        try {
+            return service.getEnabledNotificationListeners(userId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     private Context mContext;

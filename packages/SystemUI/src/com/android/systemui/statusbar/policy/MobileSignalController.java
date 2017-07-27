@@ -252,6 +252,9 @@ public class MobileSignalController extends SignalController<
     }
 
     private int getNumLevels() {
+        if (mConfig.inflateSignalStrengths) {
+            return SignalStrength.NUM_SIGNAL_STRENGTH_BINS + 1;
+        }
         return SignalStrength.NUM_SIGNAL_STRENGTH_BINS;
     }
 
@@ -260,12 +263,12 @@ public class MobileSignalController extends SignalController<
         if (mCurrentState.iconGroup == TelephonyIcons.CARRIER_NETWORK_CHANGE) {
             return SignalDrawable.getCarrierChangeState(getNumLevels());
         } else if (mCurrentState.connected) {
-            if (mConfig.readIconsFromXml) {
-                return getIcons().mSingleSignalIcon;
-            } else {
-                return SignalDrawable.getState(mCurrentState.level, getNumLevels(),
-                    mCurrentState.inetCondition == 0);
+            int level = mCurrentState.level;
+            if (mConfig.inflateSignalStrengths) {
+                level++;
             }
+            return SignalDrawable.getState(level, getNumLevels(),
+                    mCurrentState.inetCondition == 0);
         } else if (mCurrentState.enabled) {
             if (mConfig.readIconsFromXml) {
                 return getIcons().mSbDiscState;
@@ -279,7 +282,9 @@ public class MobileSignalController extends SignalController<
 
     @Override
     public int getQsCurrentIconId() {
-        if (mCurrentState.iconGroup == TelephonyIcons.CARRIER_NETWORK_CHANGE) {
+        if (mCurrentState.airplaneMode) {
+            return SignalDrawable.getAirplaneModeState(getNumLevels());
+        } else if (mCurrentState.iconGroup == TelephonyIcons.CARRIER_NETWORK_CHANGE) {
             return SignalDrawable.getCarrierChangeState(getNumLevels());
         } else if (mCurrentState.connected) {
             return SignalDrawable.getState(mCurrentState.level, getNumLevels(),
@@ -313,7 +318,7 @@ public class MobileSignalController extends SignalController<
         String description = null;
         // Only send data sim callbacks to QS.
         if (mCurrentState.dataSim) {
-            qsTypeIcon = showDataIcon ? icons.mDataType : 0;
+            qsTypeIcon = showDataIcon ? icons.mQsDataType : 0;
             qsIcon = new IconState(mCurrentState.enabled
                     && !mCurrentState.isEmergency, getQsCurrentIconId(), contentDescription);
             description = mCurrentState.isEmergency ? null : mCurrentState.networkName;
@@ -372,6 +377,10 @@ public class MobileSignalController extends SignalController<
     }
 
     private boolean isRoaming() {
+        // During a carrier change, roaming indications need to be supressed.
+        if (isCarrierNetworkChangeActive()) {
+            return false;
+        }
         if (isCdma()) {
             final int iconMode = mServiceState.getCdmaEriIconMode();
             return mServiceState.getCdmaEriIconIndex() != EriInfo.ROAMING_INDICATOR_OFF

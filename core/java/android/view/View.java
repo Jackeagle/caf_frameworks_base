@@ -724,6 +724,8 @@ import java.util.function.Predicate;
  * @attr ref android.R.styleable#View_nextFocusUp
  * @attr ref android.R.styleable#View_onClick
  * @attr ref android.R.styleable#View_padding
+ * @attr ref android.R.styleable#View_paddingHorizontal
+ * @attr ref android.R.styleable#View_paddingVertical
  * @attr ref android.R.styleable#View_paddingBottom
  * @attr ref android.R.styleable#View_paddingLeft
  * @attr ref android.R.styleable#View_paddingRight
@@ -802,7 +804,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * {@hide}
      */
-    public static final int LAST_APP_ACCESSIBILITY_ID = Integer.MAX_VALUE / 2;
+    public static final int LAST_APP_AUTOFILL_ID = Integer.MAX_VALUE / 2;
 
     /**
      * Attribute to find the autofilled highlight
@@ -1139,6 +1141,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Autofill type for views that cannot be autofilled.
+     *
+     * <p>Typically used when the view is read-only; for example, a text label.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_NONE = 0;
 
@@ -1148,6 +1154,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>{@link AutofillValue} instances for autofilling a {@link View} can be obtained through
      * {@link AutofillValue#forText(CharSequence)}, and the value passed to autofill a
      * {@link View} can be fetched through {@link AutofillValue#getTextValue()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_TEXT = 1;
 
@@ -1157,6 +1165,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>{@link AutofillValue} instances for autofilling a {@link View} can be obtained through
      * {@link AutofillValue#forToggle(boolean)}, and the value passed to autofill a
      * {@link View} can be fetched through {@link AutofillValue#getToggleValue()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_TOGGLE = 2;
 
@@ -1170,6 +1180,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * <p>The available options in the selection list are typically provided by
      * {@link android.app.assist.AssistStructure.ViewNode#getAutofillOptions()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_LIST = 3;
 
@@ -1182,6 +1194,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>{@link AutofillValue} instances for autofilling a {@link View} can be obtained through
      * {@link AutofillValue#forDate(long)}, and the values passed to
      * autofill a {@link View} can be fetched through {@link AutofillValue#getDateValue()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_DATE = 4;
 
@@ -1198,26 +1212,41 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Automatically determine whether a view is important for autofill.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_AUTO = 0x0;
 
     /**
      * The view is important for autofill, and its children (if any) will be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_YES = 0x1;
 
     /**
      * The view is not important for autofill, but its children (if any) will be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_NO = 0x2;
 
     /**
      * The view is important for autofill, but its children (if any) will not be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS = 0x4;
 
     /**
      * The view is not important for autofill, and its children (if any) will not be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS = 0x8;
 
@@ -2018,6 +2047,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private SparseArray<Object> mKeyedTags;
 
     /**
+     * The next available accessibility id.
+     */
+    private static int sNextAccessibilityViewId;
+
+    /**
      * The animation currently associated with this view.
      * @hide
      */
@@ -2059,21 +2093,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @ViewDebug.ExportedProperty(resolveId = true)
     int mID = NO_ID;
 
-    /** The ID of this view for accessibility and autofill purposes.
+    /** The ID of this view for autofill purposes.
      * <ul>
      *     <li>== {@link #NO_ID}: ID has not been assigned yet
-     *     <li>&le; {@link #LAST_APP_ACCESSIBILITY_ID}: View is not part of a activity. The ID is
+     *     <li>&le; {@link #LAST_APP_AUTOFILL_ID}: View is not part of a activity. The ID is
      *                                                  unique in the process. This might change
      *                                                  over activity lifecycle events.
-     *     <li>&gt; {@link #LAST_APP_ACCESSIBILITY_ID}: View is part of a activity. The ID is
+     *     <li>&gt; {@link #LAST_APP_AUTOFILL_ID}: View is part of a activity. The ID is
      *                                                  unique in the activity. This stays the same
      *                                                  over activity lifecycle events.
      */
+    private int mAutofillViewId = NO_ID;
+
+    // ID for accessibility purposes. This ID must be unique for every window
     private int mAccessibilityViewId = NO_ID;
 
     private int mAccessibilityCursorPosition = ACCESSIBILITY_CURSOR_POSITION_UNDEFINED;
-
-    SendViewStateChangedAccessibilityEvent mSendViewStateChangedAccessibilityEvent;
 
     /**
      * The view's tag.
@@ -7366,23 +7401,70 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Called when assist structure is being retrieved from a view as part of an autofill request.
+     * Populates a {@link ViewStructure} to fullfil an autofill request.
      *
-     * <p>This method already provides most of what's needed for autofill, but should be overridden
-     * when:
+     * <p>The structure should contain at least the following properties:
      * <ul>
-     *   <li>The view contents does not include PII (Personally Identifiable Information), so it
-     * can call {@link ViewStructure#setDataIsSensitive(boolean)} passing {@code false}.
-     *   <li>It must set fields such {@link ViewStructure#setText(CharSequence)},
-     * {@link ViewStructure#setAutofillOptions(CharSequence[])},
-     * or {@link ViewStructure#setWebDomain(String)}.
-     *   <li> The {@code left} and {@code top} values set in
-     * {@link ViewStructure#setDimens(int, int, int, int, int, int)} need to be relative to the next
-     * {@link ViewGroup#isImportantForAutofill() included} parent in the structure.
+     *   <li>Autofill id ({@link ViewStructure#setAutofillId(AutofillId, int)}).
+     *   <li>Autofill type ({@link ViewStructure#setAutofillType(int)}).
+     *   <li>Autofill value ({@link ViewStructure#setAutofillValue(AutofillValue)}).
+     *   <li>Whether the data is sensitive ({@link ViewStructure#setDataIsSensitive(boolean)}).
      * </ul>
      *
-     * @param structure Fill in with structured view data. The default implementation
-     * fills in all data that can be inferred from the view itself.
+     * <p>It's also recommended to set the following properties - the more properties the structure
+     * has, the higher the changes of an {@link android.service.autofill.AutofillService} properly
+     * using the structure:
+     *
+     * <ul>
+     *   <li>Autofill hints ({@link ViewStructure#setAutofillHints(String[])}).
+     *   <li>Autofill options ({@link ViewStructure#setAutofillOptions(CharSequence[])}) when the
+     *       view can only be filled with predefined values (typically used when the autofill type
+     *       is {@link #AUTOFILL_TYPE_LIST}).
+     *   <li>Resource id ({@link ViewStructure#setId(int, String, String, String)}).
+     *   <li>Class name ({@link ViewStructure#setClassName(String)}).
+     *   <li>Content description ({@link ViewStructure#setContentDescription(CharSequence)}).
+     *   <li>Visual properties such as visibility ({@link ViewStructure#setVisibility(int)}),
+     *       dimensions ({@link ViewStructure#setDimens(int, int, int, int, int, int)}), and
+     *       opacity ({@link ViewStructure#setOpaque(boolean)}).
+     *   <li>For views representing text fields, text properties such as the text itself
+     *       ({@link ViewStructure#setText(CharSequence)}), text hints
+     *       ({@link ViewStructure#setHint(CharSequence)}, input type
+     *       ({@link ViewStructure#setInputType(int)}),
+     *   <li>For views representing HTML nodes, its web domain
+     *       ({@link ViewStructure#setWebDomain(String)}) and HTML properties
+     *       (({@link ViewStructure#setHtmlInfo(android.view.ViewStructure.HtmlInfo)}).
+     * </ul>
+     *
+     * <p>The default implementation of this method already sets most of these properties based on
+     * related {@link View} methods (for example, the autofill id is set using
+     * {@link #getAutofillId()}, the autofill type set using {@link #getAutofillType()}, etc.),
+     * and views in the standard Android widgets library also override it to set their
+     * relevant properties (for example, {@link android.widget.TextView} already sets the text
+     * properties), so it's recommended to only override this method
+     * (and call {@code super.onProvideAutofillStructure()}) when:
+     *
+     * <ul>
+     *   <li>The view contents does not include PII (Personally Identifiable Information), so it
+     *       can call {@link ViewStructure#setDataIsSensitive(boolean)} passing {@code false}.
+     *   <li>The view can only be autofilled with predefined options, so it can call
+     *       {@link ViewStructure#setAutofillOptions(CharSequence[])}.
+     * </ul>
+     *
+     * <p><b>NOTE:</b> the {@code left} and {@code top} values set in
+     * {@link ViewStructure#setDimens(int, int, int, int, int, int)} must be relative to the next
+     * {@link ViewGroup#isImportantForAutofill()} predecessor view included in the structure.
+     *
+     * <p>Views support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the view means and how it can be autofilled.
+     *   <li>Notifying the Android System when the view value changed by calling
+     *       {@link AutofillManager#notifyValueChanged(View)}.
+     *   <li>Implementing the methods that autofill the view.
+     * </ul>
+     * <p>This method is responsible for the former; {@link #autofill(AutofillValue)} is responsible
+     * for the latter.
+     *
+     * @param structure fill in with structured view data for autofill purposes.
      * @param flags optional flags.
      *
      * @see #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -7510,32 +7592,56 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Called when assist structure is being retrieved from a view as part of an autofill request
-     * to generate additional virtual structure under this view.
+     * Populates a {@link ViewStructure} containing virtual children to fullfil an autofill
+     * request.
+     *
+     * <p>This method should be used when the view manages a virtual structure under this view. For
+     * example, a view that draws input fields using {@link #draw(Canvas)}.
      *
      * <p>When implementing this method, subclasses must follow the rules below:
      *
-     * <ol>
-     * <li>Also implement {@link #autofill(SparseArray)} to autofill the virtual
-     * children.
-     * <li>Call
-     * {@link android.view.autofill.AutofillManager#notifyViewEntered} and
-     * {@link android.view.autofill.AutofillManager#notifyViewExited(View, int)}
-     * when the focus inside the view changed.
-     * <li>Call {@link android.view.autofill.AutofillManager#notifyValueChanged(View, int,
-     * AutofillValue)} when the value of a child changed.
-     * <li>Call {@link AutofillManager#commit()} when the autofill context
-     * of the view structure changed and you want the current autofill interaction if such
-     * to be commited.
-     * <li>Call {@link AutofillManager#cancel()} when the autofill context
-     * of the view structure changed and you want the current autofill interaction if such
-     * to be cancelled.
-     * <li> The {@code left} and {@code top} values set in
-     * {@link ViewStructure#setDimens(int, int, int, int, int, int)} need to be relative to the next
-     * {@link ViewGroup#isImportantForAutofill() included} parent in the structure.
-     * </ol>
+     * <ul>
+     *   <li>Add virtual children by calling the {@link ViewStructure#newChild(int)} or
+     *       {@link ViewStructure#asyncNewChild(int)} methods, where the {@code id} is an unique id
+     *       identifying the children in the virtual structure.
+     *   <li>The children hierarchy can have multiple levels if necessary, but ideally it should
+     *       exclude intermediate levels that are irrelevant for autofill; that would improve the
+     *       autofill performance.
+     *   <li>Also implement {@link #autofill(SparseArray)} to autofill the virtual
+     *       children.
+     *   <li>Set the autofill properties of the child structure as defined by
+     *       {@link #onProvideAutofillStructure(ViewStructure, int)}, using
+     *       {@link ViewStructure#setAutofillId(AutofillId, int)} to set its autofill id.
+     *   <li>Call {@link android.view.autofill.AutofillManager#notifyViewEntered(View, int, Rect)}
+     *       and/or {@link android.view.autofill.AutofillManager#notifyViewExited(View, int)}
+     *       when the focused virtual child changed.
+     *   <li>Call
+     *    {@link android.view.autofill.AutofillManager#notifyValueChanged(View, int, AutofillValue)}
+     *       when the value of a virtual child changed.
+     *   <li>Call {@link AutofillManager#commit()} when the autofill context of the view structure
+     *       changed and the current context should be committed (for example, when the user tapped
+     *       a {@code SUBMIT} button in an HTML page).
+     *   <li>Call {@link AutofillManager#cancel()} when the autofill context of the view structure
+     *       changed and the current context should be canceled (for example, when the user tapped
+     *       a {@code CANCEL} button in an HTML page).
+     *   <li>Provide ways for users to manually request autofill by calling
+     *       {@link AutofillManager#requestAutofill(View, int, Rect)}.
+     *   <li>The {@code left} and {@code top} values set in
+     *       {@link ViewStructure#setDimens(int, int, int, int, int, int)} must be relative to the
+     *       next {@link ViewGroup#isImportantForAutofill()} predecessor view included in the
+     *       structure.
+     * </ul>
      *
-     * @param structure Fill in with structured view data.
+     * <p>Views with virtual children support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the virtual children mean and how they can be
+     *       autofilled.
+     *   <li>Implementing the methods that autofill the virtual children.
+     * </ul>
+     * <p>This method is responsible for the former; {@link #autofill(SparseArray)} is responsible
+     * for the latter.
+     *
+     * @param structure fill in with virtual children data for autofill purposes.
      * @param flags optional flags.
      *
      * @see #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -7546,15 +7652,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     /**
      * Automatically fills the content of this view with the {@code value}.
      *
-     * <p>By default does nothing, but views should override it (and {@link #getAutofillType()},
-     * {@link #getAutofillValue()}, and {@link #onProvideAutofillStructure(ViewStructure, int)}
-     * to support the Autofill Framework.
+     * <p>Views support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the view means and how it can be autofilled.
+     *   <li>Implementing the methods that autofill the view.
+     * </ul>
+     * <p>{@link #onProvideAutofillStructure(ViewStructure, int)} is responsible for the former,
+     * this method is responsible for latter.
      *
-     * <p>Typically, it is implemented by:
-     *
+     * <p>This method does nothing by default, but when overridden it typically:
      * <ol>
-     * <li>Calling the proper getter method on {@link AutofillValue} to fetch the actual value.
-     * <li>Passing the actual value to the equivalent setter in the view.
+     *   <li>Checks if the provided value matches the expected type (which is defined by
+     *       {@link #getAutofillType()}).
+     *   <li>Checks if the view is editable - if it isn't, it should return right away.
+     *   <li>Call the proper getter method on {@link AutofillValue} to fetch the actual value.
+     *   <li>Pass the actual value to the equivalent setter in the view.
      * </ol>
      *
      * <p>For example, a text-field view could implement the method this way:
@@ -7572,8 +7684,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * }
      * </pre>
      *
-     * <p>If the value is updated asynchronously the next call to
-     * {@link AutofillManager#notifyValueChanged(View)} must happen <u>after</u> the value was
+     * <p>If the value is updated asynchronously, the next call to
+     * {@link AutofillManager#notifyValueChanged(View)} must happen <b>after</b> the value was
      * changed to the autofilled value. If not, the view will not be considered autofilled.
      *
      * @param value value to be autofilled.
@@ -7582,11 +7694,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Automatically fills the content of a virtual views.
+     * Automatically fills the content of the virtual children within this view.
      *
-     * <p>See {@link #autofill(AutofillValue)} and
-     * {@link #onProvideAutofillVirtualStructure(ViewStructure, int)} for more info.
-     * <p>To indicate that a virtual view was autofilled
+     * <p>Views with virtual children support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the virtual children mean and how they can be
+     *       autofilled.
+     *   <li>Implementing the methods that autofill the virtual children.
+     * </ul>
+     * <p>{@link #onProvideAutofillVirtualStructure(ViewStructure, int)} is responsible for the
+     * former, this method is responsible for the latter - see {@link #autofill(AutofillValue)} and
+     * {@link #onProvideAutofillVirtualStructure(ViewStructure, int)} for more info about autofill.
+     *
+     * <p>If a child value is updated asynchronously, the next call to
+     * {@link AutofillManager#notifyValueChanged(View, int, AutofillValue)} must happen
+     * <b>after</b> the value was changed to the autofilled value. If not, the child will not be
+     * considered autofilled.
+     *
+     * <p><b>NOTE:</b> to indicate that a virtual view was autofilled,
      * <code>?android:attr/autofilledHighlight</code> should be drawn over it until the data
      * changes.
      *
@@ -7598,25 +7723,32 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Gets the unique identifier of this view on the screen for Autofill purposes.
+     * Gets the unique identifier of this view in the screen, for autofill purposes.
      *
-     * @return The View's Autofill id.
+     * @return The View's autofill id.
      */
     public final AutofillId getAutofillId() {
         if (mAutofillId == null) {
             // The autofill id needs to be unique, but its value doesn't matter,
             // so it's better to reuse the accessibility id to save space.
-            mAutofillId = new AutofillId(getAccessibilityViewId());
+            mAutofillId = new AutofillId(getAutofillViewId());
         }
         return mAutofillId;
     }
 
     /**
-     * Describes the autofill type that should be used on calls to
-     * {@link #autofill(AutofillValue)} and {@link #autofill(SparseArray)}.
+     * Describes the autofill type of this view, so an
+     * {@link android.service.autofill.AutofillService} can create the proper {@link AutofillValue}
+     * when autofilling the view.
      *
-     * <p>By default returns {@link #AUTOFILL_TYPE_NONE}, but views should override it (and
-     * {@link #autofill(AutofillValue)} to support the Autofill Framework.
+     * <p>By default returns {@link #AUTOFILL_TYPE_NONE}, but views should override it to properly
+     * support the Autofill Framework.
+     *
+     * @return either {@link #AUTOFILL_TYPE_NONE}, {@link #AUTOFILL_TYPE_TEXT},
+     * {@link #AUTOFILL_TYPE_LIST}, {@link #AUTOFILL_TYPE_DATE}, or {@link #AUTOFILL_TYPE_TOGGLE}.
+     *
+     * @see #onProvideAutofillStructure(ViewStructure, int)
+     * @see #autofill(AutofillValue)
      */
     public @AutofillType int getAutofillType() {
         return AUTOFILL_TYPE_NONE;
@@ -7648,9 +7780,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     /**
      * Gets the {@link View}'s current autofill value.
      *
-     * <p>By default returns {@code null}, but views should override it (and
-     * {@link #autofill(AutofillValue)}, and {@link #getAutofillType()} to support the Autofill
-     * Framework.
+     * <p>By default returns {@code null}, but views should override it to properly support the
+     * Autofill Framework.
+     *
+     * @see #onProvideAutofillStructure(ViewStructure, int)
+     * @see #autofill(AutofillValue)
      */
     @Nullable
     public AutofillValue getAutofillValue() {
@@ -7658,9 +7792,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Gets the mode for determining whether this View is important for autofill.
+     * Gets the mode for determining whether this view is important for autofill.
      *
-     * <p>See {@link #setImportantForAutofill(int)} for more info about this mode.
+     * <p>See {@link #setImportantForAutofill(int)} and {@link #isImportantForAutofill()} for more
+     * info about this mode.
      *
      * @return {@link #IMPORTANT_FOR_AUTOFILL_AUTO} by default, or value passed to
      * {@link #setImportantForAutofill(int)}.
@@ -7681,20 +7816,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Sets the mode for determining whether this View is important for autofill.
-     *
-     * <p>This property controls how this view is presented to the autofill components
-     * which help users to fill credentials, addresses, etc. For example, views
-     * that contain labels and input fields are useful for autofill components to
-     * determine the user context and provide values for the inputs. Note that the
-     * user can always override this by manually triggering autotill which would
-     * expose the view to the autofill provider.
+     * Sets the mode for determining whether this view is considered important for autofill.
      *
      * <p>The platform determines the importance for autofill automatically but you
-     * can use this method to customize the behavior. See the autofill modes below
-     * for more details.
+     * can use this method to customize the behavior. For example:
      *
-     * <p>See {@link #setImportantForAutofill(int)} for more info about this mode.
+     * <ol>
+     *   <li>When the view contents is irrelevant for autofill (for example, a text field used in a
+     *       "Captcha" challenge), it should be {@link #IMPORTANT_FOR_AUTOFILL_NO}.
+     *   <li>When both the view and its children are irrelevant for autofill (for example, the root
+     *       view of an activity containing a spreadhseet editor), it should be
+     *       {@link #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS}.
+     *   <li>When the view content is relevant for autofill but its children aren't (for example,
+     *       a credit card expiration date represented by a custom view that overrides the proper
+     *       autofill methods and has 2 children representing the month and year), it should
+     *       be {@link #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS}.
+     * </ol>
+     *
+     * <p><b>NOTE:</strong> setting the mode as does {@link #IMPORTANT_FOR_AUTOFILL_NO} or
+     * {@link #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS} does not guarantee the view (and its
+     * children) will be always be considered not important; for example, when the user explicitly
+     * makes an autofill request, all views are considered important. See
+     * {@link #isImportantForAutofill()} for more details about how the View's importance for
+     * autofill is used.
      *
      * @param mode {@link #IMPORTANT_FOR_AUTOFILL_AUTO}, {@link #IMPORTANT_FOR_AUTOFILL_YES},
      * {@link #IMPORTANT_FOR_AUTOFILL_NO}, {@link #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS},
@@ -7710,40 +7854,51 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Hints the Android System whether the {@link android.app.assist.AssistStructure.ViewNode}
-     * associated with this View should be included in a {@link ViewStructure} used for
-     * autofill purposes.
+     * associated with this view is considered important for autofill purposes.
      *
      * <p>Generally speaking, a view is important for autofill if:
      * <ol>
-     * <li>The view can-be autofilled by an {@link android.service.autofill.AutofillService}.
-     * <li>The view contents can help an {@link android.service.autofill.AutofillService} to
-     * autofill other views.
+     * <li>The view can be autofilled by an {@link android.service.autofill.AutofillService}.
+     * <li>The view contents can help an {@link android.service.autofill.AutofillService}
+     *     determine how other views can be autofilled.
      * <ol>
      *
      * <p>For example, view containers should typically return {@code false} for performance reasons
-     * (since the important info is provided by their children), but if the container is actually
-     * whose children are part of a compound view, it should return {@code true} (and then override
-     * {@link #dispatchProvideAutofillStructure(ViewStructure, int)} to simply call
-     * {@link #onProvideAutofillStructure(ViewStructure, int)} so its children are not included in
-     * the structure). On the other hand, views representing labels or editable fields should
-     * typically return {@code true}, but in some cases they could return {@code false} (for
-     * example, if they're part of a "Captcha" mechanism).
+     * (since the important info is provided by their children), but if its properties have relevant
+     * information (for example, a resource id called {@code credentials}, it should return
+     * {@code true}. On the other hand, views representing labels or editable fields should
+     * typically return {@code true}, but in some cases they could return {@code false}
+     * (for example, if they're part of a "Captcha" mechanism).
      *
-     * <p>By default, this method returns {@code true} if {@link #getImportantForAutofill()} returns
-     * {@link #IMPORTANT_FOR_AUTOFILL_YES}, {@code false } if it returns
-     * {@link #IMPORTANT_FOR_AUTOFILL_NO}, and use some heuristics to define the importance when it
-     * returns {@link #IMPORTANT_FOR_AUTOFILL_AUTO}. Hence, it should rarely be overridden - Views
-     * should use {@link #setImportantForAutofill(int)} instead.
+     * <p>The value returned by this method depends on the value returned by
+     * {@link #getImportantForAutofill()}:
      *
-     * <p><strong>Note:</strong> returning {@code false} does not guarantee the view will be
-     * excluded from the structure; for example, if the user explicitly requested autofill, the
-     * View might be always included.
+     * <ol>
+     *   <li>if it returns {@link #IMPORTANT_FOR_AUTOFILL_YES} or
+     *       {@link #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS}, then it returns {@code true}
+     *   <li>if it returns {@link #IMPORTANT_FOR_AUTOFILL_NO} or
+     *       {@link #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS}, then it returns {@code false}
+     *   <li>if it returns {@link #IMPORTANT_FOR_AUTOFILL_AUTO}, then it uses some simple heuristics
+     *       that can return {@code true} in some cases (like a container with a resource id),
+     *       but {@code false} in most.
+     *   <li>otherwise, it returns {@code false}.
+     * </ol>
      *
-     * <p>This decision applies just for the view, not its children - if the view children are not
-     * important for autofill, the view should override
-     * {@link #dispatchProvideAutofillStructure(ViewStructure, int)} to simply call
-     * {@link #onProvideAutofillStructure(ViewStructure, int)} (instead of calling
-     * {@link #dispatchProvideAutofillStructure(ViewStructure, int)} for each child).
+     * <p>When a view is considered important for autofill:
+     * <ul>
+     *   <li>The view might automatically trigger an autofill request when focused on.
+     *   <li>The contents of the view are included in the {@link ViewStructure} used in an autofill
+     *       request.
+     * </ul>
+     *
+     * <p>On the other hand, when a view is considered not important for autofill:
+     * <ul>
+     *   <li>The view never automatically triggers autofill requests, but it can trigger a manual
+     *       request through {@link AutofillManager#requestAutofill(View)}.
+     *   <li>The contents of the view are not included in the {@link ViewStructure} used in an
+     *       autofill request, unless the request has the
+     *       {@link #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS} flag.
+     * </ul>
      *
      * @return whether the view is considered important for autofill.
      *
@@ -7753,6 +7908,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @see #IMPORTANT_FOR_AUTOFILL_NO
      * @see #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS
      * @see #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+     * @see AutofillManager#requestAutofill(View)
      */
     public final boolean isImportantForAutofill() {
         // Check parent mode to ensure we're not hidden.
@@ -7808,7 +7964,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     private boolean isAutofillable() {
         return getAutofillType() != AUTOFILL_TYPE_NONE && isImportantForAutofill()
-                && getAccessibilityViewId() > LAST_APP_ACCESSIBILITY_ID;
+                && getAutofillViewId() > LAST_APP_AUTOFILL_ID;
     }
 
     private void populateVirtualStructure(ViewStructure structure,
@@ -7877,29 +8033,38 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Dispatch creation of {@link ViewStructure} down the hierarchy.
+     * Dispatches creation of a {@link ViewStructure}s for autofill purposes down the hierarchy,
+     * when an Assist structure is being created as part of an autofill request.
      *
      * <p>The default implementation does the following:
-     *
      * <ul>
      *   <li>Sets the {@link AutofillId} in the structure.
      *   <li>Calls {@link #onProvideAutofillStructure(ViewStructure, int)}.
      *   <li>Calls {@link #onProvideAutofillVirtualStructure(ViewStructure, int)}.
      * </ul>
      *
-     * <p>When overridden, it must either call
-     * {@code super.dispatchProvideAutofillStructure(structure, flags)} or explicitly
-     * set the {@link AutofillId} in the structure (for example, by calling
-     * {@code structure.setAutofillId(getAutofillId())}).
+     * <p>Typically, this method should only be overridden by subclasses that provide a view
+     * hierarchy (such as {@link ViewGroup}) - other classes should override
+     * {@link #onProvideAutofillStructure(ViewStructure, int)} or
+     * {@link #onProvideAutofillVirtualStructure(ViewStructure, int)} instead.
      *
-     * <p>When providing your implementation you need to decide how to handle
-     * the {@link #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS} flag which instructs you
-     * to report all views to the structure regardless if {@link #isImportantForAutofill()}
-     * returns true. We encourage you respect the importance property for a better
-     * user experience in your app. If the flag is not set then you should filter out
-     * not important views to optimize autofill performance in your app.
+     * <p>When overridden, it must:
      *
-     * @param structure Fill in with structured view data.
+     * <ul>
+     *   <li>Either call
+     *       {@code super.dispatchProvideAutofillStructure(structure, flags)} or explicitly
+     *       set the {@link AutofillId} in the structure (for example, by calling
+     *       {@code structure.setAutofillId(getAutofillId())}).
+     *   <li>Decide how to handle the {@link #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS} flag - when
+     *       set, all views in the structure should be considered important for autofill,
+     *       regardless of what {@link #isImportantForAutofill()} returns. We encourage you to
+     *       respect this flag to provide a better user experience - this flag is typically used
+     *       when an user explicitly requested autofill. If the flag is not set,
+     *       then only views marked as important for autofill should be included in the
+     *       structure - skipping non-important views optimizes the overall autofill performance.
+     * </ul>
+     *
+     * @param structure fill in with structured view data for autofill purposes.
      * @param flags optional flags.
      *
      * @see #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -7913,6 +8078,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             boolean forAutofill, @AutofillFlags int flags) {
         if (forAutofill) {
             structure.setAutofillId(getAutofillId());
+            if (!isLaidOut()) {
+                Log.w(VIEW_LOG_TAG, "dispatchProvideAutofillStructure(): not laid out, ignoring");
+                return;
+            }
             onProvideAutofillStructure(structure, flags);
             onProvideAutofillVirtualStructure(structure, flags);
         } else if (!isAssistBlocked()) {
@@ -8313,9 +8482,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public int getAccessibilityViewId() {
         if (mAccessibilityViewId == NO_ID) {
-            mAccessibilityViewId = mContext.getNextAccessibilityId();
+            mAccessibilityViewId = sNextAccessibilityViewId++;
         }
         return mAccessibilityViewId;
+    }
+
+    /**
+     * Gets the unique identifier of this view on the screen for autofill purposes.
+     *
+     * @return The view autofill id.
+     *
+     * @hide
+     */
+    public int getAutofillViewId() {
+        if (mAutofillViewId == NO_ID) {
+            mAutofillViewId = mContext.getNextAutofillId();
+        }
+        return mAutofillViewId;
     }
 
     /**
@@ -10028,12 +10211,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // Going from one cluster to another, so save last-focused.
                 // This covers cluster jumps because they are always FOCUS_DOWN
                 oldFocus.setFocusedInCluster(oldCluster);
+                if (!(oldFocus.mParent instanceof ViewGroup)) {
+                    return;
+                }
                 if (direction == FOCUS_FORWARD || direction == FOCUS_BACKWARD) {
                     // This is a result of ordered navigation so consider navigation through
                     // the previous cluster "complete" and clear its last-focused memory.
-                    if (oldFocus.mParent instanceof ViewGroup) {
-                        ((ViewGroup) oldFocus.mParent).clearFocusedInCluster(oldFocus);
-                    }
+                    ((ViewGroup) oldFocus.mParent).clearFocusedInCluster(oldFocus);
+                } else if (oldFocus instanceof ViewGroup
+                        && ((ViewGroup) oldFocus).getDescendantFocusability()
+                                == ViewGroup.FOCUS_AFTER_DESCENDANTS
+                        && ViewRootImpl.isViewDescendantOf(this, oldFocus)) {
+                    // This means oldFocus is not focusable since it obviously has a focusable
+                    // child (this). Don't restore focus to it in the future.
+                    ((ViewGroup) oldFocus.mParent).clearFocusedInCluster(oldFocus);
                 }
             }
         }
@@ -10971,11 +11162,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (!AccessibilityManager.getInstance(mContext).isEnabled() || mAttachInfo == null) {
             return;
         }
-        if (mSendViewStateChangedAccessibilityEvent == null) {
-            mSendViewStateChangedAccessibilityEvent =
-                    new SendViewStateChangedAccessibilityEvent();
+        // If this is a live region, we should send a subtree change event
+        // from this view immediately. Otherwise, we can let it propagate up.
+        if (getAccessibilityLiveRegion() != ACCESSIBILITY_LIVE_REGION_NONE) {
+            final AccessibilityEvent event = AccessibilityEvent.obtain();
+            event.setEventType(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
+            event.setContentChangeTypes(changeType);
+            sendAccessibilityEventUnchecked(event);
+        } else if (mParent != null) {
+            try {
+                mParent.notifySubtreeAccessibilityStateChanged(this, this, changeType);
+            } catch (AbstractMethodError e) {
+                Log.e(VIEW_LOG_TAG, mParent.getClass().getSimpleName() +
+                        " does not fully implement ViewParent", e);
+            }
         }
-        mSendViewStateChangedAccessibilityEvent.runOrPost(changeType);
     }
 
     /**
@@ -11949,7 +12150,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (isAutofillable()) {
             AutofillManager afm = getAutofillManager();
 
-            if (afm != null && getAccessibilityViewId() > LAST_APP_ACCESSIBILITY_ID) {
+            if (afm != null && getAutofillViewId() > LAST_APP_AUTOFILL_ID) {
                 if (mVisibilityChangeForAutofillHandler != null) {
                     mVisibilityChangeForAutofillHandler.removeMessages(0);
                 }
@@ -13084,7 +13285,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // about in case nothing has focus.  even if this specific view
                 // isn't focusable, it may contain something that is, so let
                 // the root view try to give this focus if nothing else does.
-                if ((mParent != null) && (mBottom > mTop) && (mRight > mLeft)) {
+                if ((mParent != null)) {
                     mParent.focusableViewAvailable(this);
                 }
             }
@@ -17382,16 +17583,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @return Returns a Parcelable object containing the view's current dynamic
      *         state, or null if there is nothing interesting to save.
-     * @see #onRestoreInstanceState(android.os.Parcelable)
-     * @see #saveHierarchyState(android.util.SparseArray)
-     * @see #dispatchSaveInstanceState(android.util.SparseArray)
+     * @see #onRestoreInstanceState(Parcelable)
+     * @see #saveHierarchyState(SparseArray)
+     * @see #dispatchSaveInstanceState(SparseArray)
      * @see #setSaveEnabled(boolean)
      */
     @CallSuper
     @Nullable protected Parcelable onSaveInstanceState() {
         mPrivateFlags |= PFLAG_SAVE_STATE_CALLED;
         if (mStartActivityRequestWho != null || isAutofilled()
-                || mAccessibilityViewId > LAST_APP_ACCESSIBILITY_ID) {
+                || mAutofillViewId > LAST_APP_AUTOFILL_ID) {
             BaseSavedState state = new BaseSavedState(AbsSavedState.EMPTY_STATE);
 
             if (mStartActivityRequestWho != null) {
@@ -17402,13 +17603,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 state.mSavedData |= BaseSavedState.IS_AUTOFILLED;
             }
 
-            if (mAccessibilityViewId > LAST_APP_ACCESSIBILITY_ID) {
-                state.mSavedData |= BaseSavedState.ACCESSIBILITY_ID;
+            if (mAutofillViewId > LAST_APP_AUTOFILL_ID) {
+                state.mSavedData |= BaseSavedState.AUTOFILL_ID;
             }
 
             state.mStartActivityRequestWhoSaved = mStartActivityRequestWho;
             state.mIsAutofilled = isAutofilled();
-            state.mAccessibilityViewId = mAccessibilityViewId;
+            state.mAutofillViewId = mAutofillViewId;
             return state;
         }
         return BaseSavedState.EMPTY_STATE;
@@ -17486,8 +17687,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             if ((baseState.mSavedData & BaseSavedState.IS_AUTOFILLED) != 0) {
                 setAutofilled(baseState.mIsAutofilled);
             }
-            if ((baseState.mSavedData & BaseSavedState.ACCESSIBILITY_ID) != 0) {
-                mAccessibilityViewId = baseState.mAccessibilityViewId;
+            if ((baseState.mSavedData & BaseSavedState.AUTOFILL_ID) != 0) {
+                // It can happen that views have the same view id and the restoration path will not
+                // be able to distinguish between them. The autofill id needs to be unique though.
+                // Hence prevent the same autofill view id from being restored multiple times.
+                ((BaseSavedState) state).mSavedData &= ~BaseSavedState.AUTOFILL_ID;
+
+                mAutofillViewId = baseState.mAutofillViewId;
             }
         }
     }
@@ -21311,7 +21517,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param accessibilityId The searched accessibility id.
      * @return The found view.
      */
-    final <T extends View> T  findViewByAccessibilityId(int accessibilityId) {
+    final <T extends View> T findViewByAccessibilityId(int accessibilityId) {
         if (accessibilityId < 0) {
             return null;
         }
@@ -21323,11 +21529,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Performs the traversal to find a view by its unuque and stable accessibility id.
+     * Performs the traversal to find a view by its unique and stable accessibility id.
      *
      * <strong>Note:</strong>This method does not stop at the root namespace
      * boundary since the user can touch the screen at an arbitrary location
-     * potentially crossing the root namespace bounday which will send an
+     * potentially crossing the root namespace boundary which will send an
      * accessibility event to accessibility services and they should be able
      * to obtain the event source. Also accessibility ids are guaranteed to be
      * unique in the window.
@@ -21338,6 +21544,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public <T extends View> T findViewByAccessibilityIdTraversal(int accessibilityId) {
         if (getAccessibilityViewId() == accessibilityId) {
+            return (T) this;
+        }
+        return null;
+    }
+
+    /**
+     * Performs the traversal to find a view by its autofill id.
+     *
+     * <strong>Note:</strong>This method does not stop at the root namespace
+     * boundary.
+     *
+     * @param autofillId The autofill id.
+     * @return The found view.
+     * @hide
+     */
+    public <T extends View> T findViewByAutofillIdTraversal(int autofillId) {
+        if (getAutofillViewId() == autofillId) {
             return (T) this;
         }
         return null;
@@ -24809,13 +25032,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public static class BaseSavedState extends AbsSavedState {
         static final int START_ACTIVITY_REQUESTED_WHO_SAVED = 0b1;
         static final int IS_AUTOFILLED = 0b10;
-        static final int ACCESSIBILITY_ID = 0b100;
+        static final int AUTOFILL_ID = 0b100;
 
         // Flags that describe what data in this state is valid
         int mSavedData;
         String mStartActivityRequestWhoSaved;
         boolean mIsAutofilled;
-        int mAccessibilityViewId;
+        int mAutofillViewId;
 
         /**
          * Constructor used when reading from a parcel. Reads the state of the superclass.
@@ -24838,7 +25061,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             mSavedData = source.readInt();
             mStartActivityRequestWhoSaved = source.readString();
             mIsAutofilled = source.readBoolean();
-            mAccessibilityViewId = source.readInt();
+            mAutofillViewId = source.readInt();
         }
 
         /**
@@ -24857,7 +25080,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             out.writeInt(mSavedData);
             out.writeString(mStartActivityRequestWhoSaved);
             out.writeBoolean(mIsAutofilled);
-            out.writeInt(mAccessibilityViewId);
+            out.writeInt(mAutofillViewId);
         }
 
         public static final Parcelable.Creator<BaseSavedState> CREATOR
@@ -25693,8 +25916,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
          * </p>
          * <p>
          * The default implementation behaves as
-         * {@link View#addExtraDataToAccessibilityNodeInfo(AccessibilityNodeInfo, int) for
-         * the case where no accessibility delegate is set.
+         * {@link View#addExtraDataToAccessibilityNodeInfo(AccessibilityNodeInfo, String, Bundle)
+         * for the case where no accessibility delegate is set.
          * </p>
          *
          * @param host The View hosting the delegate. Never {@code null}.
@@ -25800,79 +26023,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         public boolean test(View view) {
             return (view.mLabelForId == mLabeledId);
         }
-    }
-
-    private class SendViewStateChangedAccessibilityEvent implements Runnable {
-        private int mChangeTypes = 0;
-        private boolean mPosted;
-        private boolean mPostedWithDelay;
-        private long mLastEventTimeMillis;
-
-        @Override
-        public void run() {
-            mPosted = false;
-            mPostedWithDelay = false;
-            mLastEventTimeMillis = SystemClock.uptimeMillis();
-            if (AccessibilityManager.getInstance(mContext).isEnabled()) {
-                final AccessibilityEvent event = AccessibilityEvent.obtain();
-                event.setEventType(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
-                event.setContentChangeTypes(mChangeTypes);
-                sendAccessibilityEventUnchecked(event);
-            }
-            mChangeTypes = 0;
-        }
-
-        public void runOrPost(int changeType) {
-            mChangeTypes |= changeType;
-
-            // If this is a live region or the child of a live region, collect
-            // all events from this frame and send them on the next frame.
-            if (inLiveRegion()) {
-                // If we're already posted with a delay, remove that.
-                if (mPostedWithDelay) {
-                    removeCallbacks(this);
-                    mPostedWithDelay = false;
-                }
-                // Only post if we're not already posted.
-                if (!mPosted) {
-                    post(this);
-                    mPosted = true;
-                }
-                return;
-            }
-
-            if (mPosted) {
-                return;
-            }
-
-            final long timeSinceLastMillis = SystemClock.uptimeMillis() - mLastEventTimeMillis;
-            final long minEventIntevalMillis =
-                    ViewConfiguration.getSendRecurringAccessibilityEventsInterval();
-            if (timeSinceLastMillis >= minEventIntevalMillis) {
-                removeCallbacks(this);
-                run();
-            } else {
-                postDelayed(this, minEventIntevalMillis - timeSinceLastMillis);
-                mPostedWithDelay = true;
-            }
-        }
-    }
-
-    private boolean inLiveRegion() {
-        if (getAccessibilityLiveRegion() != View.ACCESSIBILITY_LIVE_REGION_NONE) {
-            return true;
-        }
-
-        ViewParent parent = getParent();
-        while (parent instanceof View) {
-            if (((View) parent).getAccessibilityLiveRegion()
-                    != View.ACCESSIBILITY_LIVE_REGION_NONE) {
-                return true;
-            }
-            parent = parent.getParent();
-        }
-
-        return false;
     }
 
     /**
@@ -26108,9 +26258,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 mTooltipInfo.mHideTooltipRunnable = this::hideTooltip;
             }
             mTooltipInfo.mTooltipText = tooltipText;
-            if (mTooltipInfo.mTooltipPopup != null && mTooltipInfo.mTooltipPopup.isShowing()) {
-                mTooltipInfo.mTooltipPopup.updateContent(mTooltipInfo.mTooltipText);
-            }
         }
     }
 

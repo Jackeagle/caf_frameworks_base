@@ -27,18 +27,6 @@
     <string name="terabyteShort" msgid="231613018159186962">"TB"</string>
     <string name="petabyteShort" msgid="5637816680144990219">"PB"</string>
     <string name="fileSizeSuffix" msgid="8897567456150907538">"<xliff:g id="NUMBER">%1$s</xliff:g> <xliff:g id="UNIT">%2$s</xliff:g>"</string>
-    <string name="durationDays" msgid="6652371460511178259">"<xliff:g id="DAYS">%1$d</xliff:g> วัน"</string>
-    <string name="durationDayHours" msgid="2713107458736744435">"<xliff:g id="DAYS">%1$d</xliff:g> วัน <xliff:g id="HOURS">%2$d</xliff:g> ชม."</string>
-    <string name="durationDayHour" msgid="7293789639090958917">"<xliff:g id="DAYS">%1$d</xliff:g> วัน <xliff:g id="HOURS">%2$d</xliff:g> ชม."</string>
-    <string name="durationHours" msgid="4266858287167358988">"<xliff:g id="HOURS">%1$d</xliff:g> ชม."</string>
-    <string name="durationHourMinutes" msgid="9029176248692041549">"<xliff:g id="HOURS">%1$d</xliff:g> ชม. <xliff:g id="MINUTES">%2$d</xliff:g> นาที"</string>
-    <string name="durationHourMinute" msgid="2741677355177402539">"<xliff:g id="HOURS">%1$d</xliff:g> ชม. <xliff:g id="MINUTES">%2$d</xliff:g> นาที"</string>
-    <string name="durationMinutes" msgid="3134226679883579347">"<xliff:g id="MINUTES">%1$d</xliff:g> นาที"</string>
-    <string name="durationMinute" msgid="7155301744174623818">"<xliff:g id="MINUTES">%1$d</xliff:g> นาที"</string>
-    <string name="durationMinuteSeconds" msgid="1424656185379003751">"<xliff:g id="MINUTES">%1$d</xliff:g> นาที <xliff:g id="SECONDS">%2$d</xliff:g> วิ."</string>
-    <string name="durationMinuteSecond" msgid="3989228718067466680">"<xliff:g id="MINUTES">%1$d</xliff:g> นาที <xliff:g id="SECONDS">%2$d</xliff:g> วิ."</string>
-    <string name="durationSeconds" msgid="8050088505238241405">"<xliff:g id="SECONDS">%1$d</xliff:g> วินาที"</string>
-    <string name="durationSecond" msgid="985669622276420331">"<xliff:g id="SECONDS">%1$d</xliff:g> วินาที"</string>
     <string name="untitled" msgid="4638956954852782576">"&lt;ไม่มีชื่อ&gt;"</string>
     <string name="emptyPhoneNumber" msgid="7694063042079676517">"(ไม่มีหมายเลขโทรศัพท์)"</string>
     <string name="unknownName" msgid="6867811765370350269">"ไม่ทราบ"</string>
@@ -90,15 +78,12 @@
     <string name="serviceNotProvisioned" msgid="8614830180508686666">"ไม่มีการนำเสนอบริการ"</string>
     <string name="CLIRPermanent" msgid="3377371145926835671">"คุณไม่สามารถเปลี่ยนการตั้งค่าหมายเลขผู้โทร"</string>
     <string name="RestrictedOnDataTitle" msgid="1322504692764166532">"ไม่มีบริการอินเทอร์เน็ต"</string>
-    <string name="RestrictedOnEmergencyTitle" msgid="1236071219598685236">"ไม่มีบริการฉุกเฉิน"</string>
+    <string name="RestrictedOnEmergencyTitle" msgid="3646729271176394091">"ไม่มีหมายเลขฉุกเฉิน"</string>
     <string name="RestrictedOnNormalTitle" msgid="3179574012752700984">"ไม่มีบริการเสียง"</string>
     <string name="RestrictedOnAllVoiceTitle" msgid="158800171499150681">"ไม่มีบริการเสียง/บริการฉุกเฉิน"</string>
-    <string name="RestrictedOnDataContent" msgid="8997474569390996587">"ผู้ให้บริการของคุณระงับบริการอินเทอร์เน็ตที่นี่ชั่วคราว"</string>
-    <string name="RestrictedOnEmergencyContent" msgid="4573217945494650061">"ผู้ให้บริการของคุณระงับหมายเลขฉุกเฉินที่นี่ชั่วคราว"</string>
-    <string name="RestrictedOnNormalContent" msgid="1579434198284512182">"ผู้ให้บริการของคุณระงับการโทรด้วยเสียงที่นี่ชั่วคราว"</string>
-    <string name="RestrictedOnAllVoiceContent" msgid="5243580774142557047">"ผู้ให้บริการของคุณระงับการโทรด้วยเสียงและหมายเลขฉุกเฉินที่นี่ชั่วคราว"</string>
+    <string name="RestrictedStateContent" msgid="4278821484643362350">"งดให้บริการชั่วคราวโดยเครือข่ายมือถือในตำแหน่งของคุณ"</string>
     <string name="NetworkPreferenceSwitchTitle" msgid="4008877505368566980">"เข้าถึงเครือข่ายไม่ได้"</string>
-    <string name="NetworkPreferenceSwitchSummary" msgid="4164230263214915351">"เพื่อให้การรับสัญญาณดีขึ้น ลองเปลี่ยนประเภทที่เลือกใน \"การตั้งค่า\" &gt; \"เครือข่ายและอินเทอร์เน็ต\" &gt; \"เครือข่ายมือถือ\" &gt; \"ประเภทเครือข่ายที่ต้องการ\""</string>
+    <string name="NetworkPreferenceSwitchSummary" msgid="1203771446683319957">"ลองเปลี่ยนประเภทที่เลือกใน \"การตั้งค่า\" &gt; \"เครือข่ายและอินเทอร์เน็ต\" &gt; \"เครือข่ายมือถือ\" &gt; \"ประเภทเครือข่ายที่ต้องการ\" เพื่อให้การรับสัญญาณดีขึ้น"</string>
     <string name="notification_channel_network_alert" msgid="4427736684338074967">"การแจ้งเตือน"</string>
     <string name="notification_channel_call_forward" msgid="2419697808481833249">"การโอนสาย"</string>
     <string name="notification_channel_emergency_callback" msgid="6686166232265733921">"โหมดติดต่อกลับฉุกเฉิน"</string>
@@ -134,7 +119,7 @@
     <string name="roamingTextSearching" msgid="8360141885972279963">"กำลังค้นหาบริการ"</string>
     <string name="wfcRegErrorTitle" msgid="2301376280632110664">"การโทรผ่าน Wi-Fi"</string>
   <string-array name="wfcOperatorErrorAlertMessages">
-    <item msgid="2254967670088539682">"หากต้องการโทรออกและส่งข้อความผ่าน Wi-Fi โปรดสอบถามผู้ให้บริการของคุณก่อนเพื่อตั้งค่าบริการนี้ แล้วเปิดการโทรผ่าน Wi-Fi อีกครั้งจากการตั้งค่า"</item>
+    <item msgid="3910386316304772394">"หากต้องการโทรออกและส่งข้อความผ่าน Wi-Fi โปรดสอบถามผู้ให้บริการของคุณก่อนเพื่อตั้งค่าบริการนี้ แล้วเปิดการโทรผ่าน Wi-Fi อีกครั้งจากการตั้งค่า (รหัสข้อผิดพลาด: <xliff:g id="CODE">%1$s</xliff:g>)"</item>
   </string-array>
   <string-array name="wfcOperatorErrorNotificationMessages">
     <item msgid="6177300162212449033">"ลงทะเบียนกับผู้ให้บริการ"</item>
@@ -152,8 +137,8 @@
     <string name="cfTemplateForwardedTime" msgid="9206251736527085256">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: <xliff:g id="DIALING_NUMBER">{1}</xliff:g> หลังผ่านไป <xliff:g id="TIME_DELAY">{2}</xliff:g> วินาที"</string>
     <string name="cfTemplateRegistered" msgid="5073237827620166285">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: ไม่ได้โอนสาย"</string>
     <string name="cfTemplateRegisteredTime" msgid="6781621964320635172">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: ไม่ได้โอนสาย"</string>
-    <string name="fcComplete" msgid="3118848230966886575">"รหัสคุณลักษณะเสร็จสมบูรณ์"</string>
-    <string name="fcError" msgid="3327560126588500777">"พบปัญหาในการเชื่อมต่อหรือรหัสคุณลักษณะไม่ถูกต้อง"</string>
+    <string name="fcComplete" msgid="3118848230966886575">"รหัสฟีเจอร์เสร็จสมบูรณ์"</string>
+    <string name="fcError" msgid="3327560126588500777">"พบปัญหาในการเชื่อมต่อหรือรหัสฟีเจอร์ไม่ถูกต้อง"</string>
     <string name="httpErrorOk" msgid="1191919378083472204">"ตกลง"</string>
     <string name="httpError" msgid="7956392511146698522">"เกิดข้อผิดพลาดของเครือข่าย"</string>
     <string name="httpErrorLookup" msgid="4711687456111963163">"ไม่พบ URL"</string>
@@ -414,7 +399,7 @@
     <string name="permlab_accessImsCallService" msgid="3574943847181793918">"เข้าถึงบริการโทร IMS"</string>
     <string name="permdesc_accessImsCallService" msgid="8992884015198298775">"อนุญาตให้แอปใช้บริการ IMS เพื่อโทรออกโดยคุณไม่ต้องดำเนินการใดๆ เลย"</string>
     <string name="permlab_readPhoneState" msgid="9178228524507610486">"อ่านสถานะและข้อมูลระบุตัวตนของโทรศัพท์"</string>
-    <string name="permdesc_readPhoneState" msgid="1639212771826125528">"อนุญาตให้แอปพลิเคชันเข้าถึงคุณลักษณะโทรศัพท์ของอุปกรณ์ การอนุญาตนี้ทำให้แอปพลิเคชันสามารถตรวจสอบหมายเลขโทรศัพท์และรหัสอุปกรณ์ ตรวจสอบว่ามีการโทรที่ทำงานอยู่หรือไม่ และตรวจสอบหมายเลขระยะไกลที่เชื่อมต่อด้วยการโทร"</string>
+    <string name="permdesc_readPhoneState" msgid="1639212771826125528">"อนุญาตให้แอปพลิเคชันเข้าถึงฟีเจอร์โทรศัพท์ของอุปกรณ์ การอนุญาตนี้ทำให้แอปพลิเคชันสามารถตรวจสอบหมายเลขโทรศัพท์และรหัสอุปกรณ์ ตรวจสอบว่ามีการโทรที่ทำงานอยู่หรือไม่ และตรวจสอบหมายเลขระยะไกลที่เชื่อมต่อด้วยการโทร"</string>
     <string name="permlab_manageOwnCalls" msgid="1503034913274622244">"กำหนดเส้นทางการโทรผ่านระบบ"</string>
     <string name="permdesc_manageOwnCalls" msgid="6552974537554717418">"อนุญาตให้แอปกำหนดเส้นทางการโทรของแอปผ่านระบบเพื่อปรับปรุงประสบการณ์ในการโทร"</string>
     <string name="permlab_readPhoneNumbers" msgid="6108163940932852440">"อ่านหมายเลขโทรศัพท์"</string>
@@ -586,8 +571,8 @@
     <string name="policydesc_encryptedStorage" msgid="2637732115325316992">"ข้อมูลของแอปพลิเคชันที่จัดเก็บต้องมีการเข้ารหัส"</string>
     <string name="policylab_disableCamera" msgid="6395301023152297826">"ปิดใช้งานกล้องถ่ายรูป"</string>
     <string name="policydesc_disableCamera" msgid="2306349042834754597">"ป้องกันการใช้กล้องถ่ายรูปของอุปกรณ์ทั้งหมด"</string>
-    <string name="policylab_disableKeyguardFeatures" msgid="8552277871075367771">"ปิดคุณลักษณะล็อกหน้าจอบางอย่าง"</string>
-    <string name="policydesc_disableKeyguardFeatures" msgid="2044755691354158439">"ป้องกันการใช้คุณลักษณะบางอย่างของการล็อกหน้าจอ"</string>
+    <string name="policylab_disableKeyguardFeatures" msgid="8552277871075367771">"ปิดฟีเจอร์ล็อกหน้าจอบางอย่าง"</string>
+    <string name="policydesc_disableKeyguardFeatures" msgid="2044755691354158439">"ป้องกันการใช้ฟีเจอร์บางอย่างของการล็อกหน้าจอ"</string>
   <string-array name="phoneTypes">
     <item msgid="8901098336658710359">"บ้าน"</item>
     <item msgid="869923650527136615">"มือถือ"</item>
@@ -722,7 +707,7 @@
     <string name="lockscreen_pattern_correct" msgid="9039008650362261237">"ถูกต้อง!"</string>
     <string name="lockscreen_pattern_wrong" msgid="4317955014948108794">"ลองอีกครั้ง"</string>
     <string name="lockscreen_password_wrong" msgid="5737815393253165301">"ลองอีกครั้ง"</string>
-    <string name="lockscreen_storage_locked" msgid="9167551160010625200">"ปลดล็อกคุณลักษณะและข้อมูลทั้งหมด"</string>
+    <string name="lockscreen_storage_locked" msgid="9167551160010625200">"ปลดล็อกฟีเจอร์และข้อมูลทั้งหมด"</string>
     <string name="faceunlock_multiple_failures" msgid="754137583022792429">"มีความพยายามที่จะใช้ Face Unlock เกินขีดจำกัด"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="5099439277819215399">"ไม่มีซิมการ์ด"</string>
     <string name="lockscreen_missing_sim_message" product="tablet" msgid="151659196095791474">"ไม่มีซิมการ์ดในแท็บเล็ต"</string>
@@ -842,7 +827,7 @@
     <string name="permdesc_writeHistoryBookmarks" product="tv" msgid="7007393823197766548">"อนุญาตให้แอปแก้ไขประวัติของเบราว์เซอร์หรือบุ๊กมาร์กที่เก็บไว้ในทีวี ซึ่งอาจอนุญาตให้แอปลบหรือแก้ไขข้อมูลเบราว์เซอร์ หมายเหตุ: สิทธิ์นี้ไม่สามารถใช้ได้กับเบราว์เซอร์ของบุคคลที่สามหรือแอปพลิเคชันอื่นที่สามารถท่องเว็บได้"</string>
     <string name="permdesc_writeHistoryBookmarks" product="default" msgid="8497389531014185509">"อนุญาตให้แอปพลิเคชันเปลี่ยนแปลงประวัติหรือบุ๊กมาร์กของเบราว์เซอร์ที่จัดเก็บไว้ในโทรศัพท์ ซึ่งทำให้แอปพลิเคชันสามารถลบหรือเปลี่ยนข้อมูลเบราว์เซอร์ได้ หมายเหตุ: การอนุญาตนี้อาจไม่สามารถใช้งานได้กับเบราว์เซอร์ของบุคคลที่สามหรือแอปพลิเคชันอื่นๆ ที่มีความสามารถในการเรียกดูบนเว็บ"</string>
     <string name="permlab_setAlarm" msgid="1379294556362091814">"ตั้งปลุก"</string>
-    <string name="permdesc_setAlarm" msgid="316392039157473848">"อนุญาตให้แอปพลิเคชันตั้งเวลาปลุกในแอปพลิเคชันนาฬิกาปลุกที่ติดตั้ง แอปพลิเคชันนาฬิกาปลุกบางรายการอาจไม่ใช้คุณลักษณะนี้"</string>
+    <string name="permdesc_setAlarm" msgid="316392039157473848">"อนุญาตให้แอปพลิเคชันตั้งเวลาปลุกในแอปพลิเคชันนาฬิกาปลุกที่ติดตั้ง แอปพลิเคชันนาฬิกาปลุกบางรายการอาจไม่ใช้ฟีเจอร์นี้"</string>
     <string name="permlab_addVoicemail" msgid="5525660026090959044">"เพิ่มข้อวามเสียง"</string>
     <string name="permdesc_addVoicemail" msgid="6604508651428252437">"อนุญาตให้แอปพลิเคชันเพิ่มข้อความลงในกล่องข้อความเสียงของคุณ"</string>
     <string name="permlab_writeGeolocationPermissions" msgid="5962224158955273932">"แก้ไขการอนุญาตเกี่ยวกับการระบุตำแหน่งทางภูมิศาสตร์ของเบราว์เซอร์"</string>
@@ -1109,11 +1094,18 @@
       <item quantity="other">มีหลายเครือข่าย Wi-Fi สาธารณะที่ใช้งานได้</item>
       <item quantity="one">มี 1 เครือข่าย Wi-Fi สาธารณะที่ใช้งานได้</item>
     </plurals>
+    <string name="wifi_available_title" msgid="3817100557900599505">"เชื่อมต่อเครือข่าย Wi‑Fi แบบเปิด"</string>
+    <string name="wifi_available_title_connecting" msgid="1557292688310330032">"กำลังเชื่อมต่อเครือข่าย Wi‑Fi แบบเปิด"</string>
+    <string name="wifi_available_title_connected" msgid="7542672851522241548">"เชื่อมต่อเครือข่าย Wi-Fi แล้ว"</string>
+    <string name="wifi_available_title_failed_to_connect" msgid="6861772233582618132">"ไม่สามารถเชื่อมต่อเครือข่าย Wi‑Fi"</string>
+    <string name="wifi_available_content_failed_to_connect" msgid="3377406637062802645">"แตะเพื่อดูเครือข่ายทั้งหมด"</string>
+    <string name="wifi_available_action_connect" msgid="2635699628459488788">"เชื่อมต่อ"</string>
+    <string name="wifi_available_action_all_networks" msgid="1100098935861622985">"เครือข่ายทั้งหมด"</string>
     <string name="wifi_available_sign_in" msgid="9157196203958866662">"ลงชื่อเข้าใช้เครือข่าย WiFi"</string>
     <string name="network_available_sign_in" msgid="1848877297365446605">"ลงชื่อเข้าใช้เครือข่าย"</string>
     <!-- no translation found for network_available_sign_in_detailed (8000081941447976118) -->
     <skip />
-    <string name="wifi_no_internet" msgid="8451173622563841546">"Wi-Fi ไม่สามารถเข้าถึงอินเทอร์เน็ต"</string>
+    <string name="wifi_no_internet" msgid="8451173622563841546">"Wi-Fi เชื่อมต่ออินเทอร์เน็ตไม่ได้"</string>
     <string name="wifi_no_internet_detailed" msgid="8083079241212301741">"แตะเพื่อดูตัวเลือก"</string>
     <string name="network_switch_metered" msgid="4671730921726992671">"เปลี่ยนเป็น <xliff:g id="NETWORK_TYPE">%1$s</xliff:g>"</string>
     <string name="network_switch_metered_detail" msgid="5325661434777870353">"อุปกรณ์จะใช้ <xliff:g id="NEW_NETWORK">%1$s</xliff:g> เมื่อ <xliff:g id="PREVIOUS_NETWORK">%2$s</xliff:g> ไม่สามารถเข้าถึงอินเทอร์เน็ต อาจมีค่าบริการ"</string>
@@ -1188,7 +1180,9 @@
     <string name="usb_midi_notification_title" msgid="4850904915889144654">"USB สำหรับ MIDI"</string>
     <string name="usb_accessory_notification_title" msgid="7848236974087653666">"เชื่อมต่อกับอุปกรณ์เสริม USB แล้ว"</string>
     <string name="usb_notification_message" msgid="3370903770828407960">"แตะเพื่อดูตัวเลือกเพิ่มเติม"</string>
-    <string name="adb_active_notification_title" msgid="6729044778949189918">"เชื่อมต่อการแก้ไขข้อบกพร่อง USB แล้ว"</string>
+    <string name="usb_unsupported_audio_accessory_title" msgid="2256529893240208458">"ไม่รองรับอุปกรณ์เสริมสำหรับเสียง"</string>
+    <string name="usb_unsupported_audio_accessory_message" msgid="7811865061127547035">"แตะเพื่อดูข้อมูลเพิ่มเติม"</string>
+    <string name="adb_active_notification_title" msgid="6729044778949189918">"เชื่อมต่อการแก้ไขข้อบกพร่องผ่าน USB แล้ว"</string>
     <string name="adb_active_notification_message" msgid="4948470599328424059">"แตะเพื่อปิดใช้การแก้ไขข้อบกพร่องของ USB"</string>
     <string name="adb_active_notification_message" product="tv" msgid="8470296818270110396">"เลือกเพื่อปิดใช้งานการแก้ไขข้อบกพร่อง USB"</string>
     <string name="taking_remote_bugreport_notification_title" msgid="6742483073875060934">"กำลังสร้างรายงานข้อบกพร่อง…"</string>
@@ -1204,9 +1198,10 @@
     <string name="select_keyboard_layout_notification_message" msgid="8084622969903004900">"แตะเพื่อเลือกภาษาและรูปแบบ"</string>
     <string name="fast_scroll_alphabet" msgid="5433275485499039199">" กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ"</string>
     <string name="fast_scroll_numeric_alphabet" msgid="4030170524595123610">" กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ"</string>
+    <string name="alert_windows_notification_channel_group_name" msgid="1463953341148606396">"แสดงทับแอปอื่นๆ"</string>
     <string name="alert_windows_notification_channel_name" msgid="3116610965549449803">"<xliff:g id="NAME">%s</xliff:g> แสดงทับแอปอื่นๆ"</string>
     <string name="alert_windows_notification_title" msgid="3697657294867638947">"<xliff:g id="NAME">%s</xliff:g> กำลังแสดงทับแอปอื่นๆ"</string>
-    <string name="alert_windows_notification_message" msgid="8917232109522912560">"หากคุณไม่ต้องการให้ <xliff:g id="NAME">%s</xliff:g> ใช้คุณลักษณะนี้ ให้แตะเพื่อเปิดการตั้งค่าแล้วปิดคุณลักษณะ"</string>
+    <string name="alert_windows_notification_message" msgid="8917232109522912560">"หากคุณไม่ต้องการให้ <xliff:g id="NAME">%s</xliff:g> ใช้ฟีเจอร์นี้ ให้แตะเพื่อเปิดการตั้งค่าแล้วปิดฟีเจอร์"</string>
     <string name="alert_windows_notification_turn_off_action" msgid="3367294525884949878">"ปิด"</string>
     <string name="ext_media_checking_notification_title" msgid="5734005953288045806">"กำลังเตรียม <xliff:g id="NAME">%s</xliff:g>"</string>
     <string name="ext_media_checking_notification_message" msgid="4747432538578886744">"กำลังตรวจหาข้อผิดพลาด"</string>
@@ -1480,13 +1475,13 @@
     <string name="kg_reordering_delete_drop_target_text" msgid="7899202978204438708">"ลบ"</string>
     <string name="safe_media_volume_warning" product="default" msgid="2276318909314492312">"นี่เป็นการเพิ่มระดับเสียงเกินระดับที่แนะนำ\n\nการฟังเสียงดังเป็นเวลานานอาจทำให้การได้ยินของคุณบกพร่องได้"</string>
     <string name="accessibility_shortcut_warning_dialog_title" msgid="8404780875025725199">"ใช้ทางลัดการเข้าถึงพิเศษไหม"</string>
-    <string name="accessibility_shortcut_toogle_warning" msgid="7256507885737444807">"เมื่อทางลัดเปิดอยู่ การกดปุ่มปรับระดับเสียงทั้ง 2 ปุ่มเป็นเวลา 3 วินาทีจะเริ่มคุณลักษณะการเข้าถึงพิเศษ\n\n คุณลักษณะการเข้าถึงพิเศษปัจจุบัน:\n <xliff:g id="SERVICE_NAME">%1$s</xliff:g>\n\n คุณสามารถเปลี่ยนคุณลักษณะในการตั้งค่า &gt; การเข้าถึงพิเศษ"</string>
+    <string name="accessibility_shortcut_toogle_warning" msgid="7256507885737444807">"เมื่อทางลัดเปิดอยู่ การกดปุ่มปรับระดับเสียงทั้ง 2 ปุ่มเป็นเวลา 3 วินาทีจะเริ่มฟีเจอร์การเข้าถึงพิเศษ\n\n ฟีเจอร์การเข้าถึงพิเศษปัจจุบัน:\n <xliff:g id="SERVICE_NAME">%1$s</xliff:g>\n\n คุณสามารถเปลี่ยนฟีเจอร์ในการตั้งค่า &gt; การเข้าถึงพิเศษ"</string>
     <string name="disable_accessibility_shortcut" msgid="627625354248453445">"ปิดทางลัด"</string>
     <string name="leave_accessibility_shortcut_on" msgid="7653111894438512680">"ใช้ทางลัด"</string>
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"ทางลัดการเข้าถึงเปิด <xliff:g id="SERVICE_NAME">%1$s</xliff:g> แล้ว"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"ทางลัดการเข้าถึงปิด <xliff:g id="SERVICE_NAME">%1$s</xliff:g> แล้ว"</string>
-    <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"เลือกคุณลักษณะที่จะใช้เมื่อคุณแตะปุ่ม \"การเข้าถึงพิเศษ\":"</string>
-    <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"หากต้องการเปลี่ยนคุณลักษณะ ให้แตะปุ่ม \"การเข้าถึงพิเศษ\" ค้างไว้"</string>
+    <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"เลือกฟีเจอร์ที่จะใช้เมื่อคุณแตะปุ่ม \"การเข้าถึงพิเศษ\":"</string>
+    <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"หากต้องการเปลี่ยนฟีเจอร์ ให้แตะปุ่ม \"การเข้าถึงพิเศษ\" ค้างไว้"</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"การขยาย"</string>
     <string name="user_switched" msgid="3768006783166984410">"ผู้ใช้ปัจจุบัน <xliff:g id="NAME">%1$s</xliff:g>"</string>
     <string name="user_switching_message" msgid="2871009331809089783">"กำลังเปลี่ยนเป็น <xliff:g id="NAME">%1$s</xliff:g>…"</string>
@@ -1623,7 +1618,7 @@
     <string name="package_installed_device_owner" msgid="6875717669960212648">"ติดตั้งโดยผู้ดูแลระบบ"</string>
     <string name="package_updated_device_owner" msgid="1847154566357862089">"อัปเดตโดยผู้ดูแลระบบ"</string>
     <string name="package_deleted_device_owner" msgid="2307122077550236438">"ลบโดยผู้ดูแลระบบ"</string>
-    <string name="battery_saver_description" msgid="1960431123816253034">"เพื่อช่วยปรับปรุงอายุการใช้งานแบตเตอรี่ โหมดประหยัดแบตเตอรี่จะลดการทำงานของอุปกรณ์และจำกัดการสั่น บริการตำแหน่ง และข้อมูลแบ็กกราวด์ส่วนใหญ่ สำหรับอีเมล การรับส่งข้อความ และแอปอื่นๆ ที่ใช้การซิงค์จะไม่อัปเดตหากคุณไม่เปิดขึ้นมา\n\nโหมดประหยัดแบตเตอรี่จะปิดโดยอัตโนมัติขณะชาร์จอุปกรณ์"</string>
+    <string name="battery_saver_description" msgid="1960431123816253034">"เพื่อช่วยยืดอายุการใช้งานแบตเตอรี่ โหมดประหยัดแบตเตอรี่จะลดการทำงานของอุปกรณ์และจำกัดการสั่น บริการตำแหน่ง และข้อมูลแบ็กกราวด์ส่วนใหญ่ สำหรับอีเมล การรับส่งข้อความ และแอปอื่นๆ ที่ใช้การซิงค์จะไม่อัปเดตหากคุณไม่เปิดขึ้นมา\n\nโหมดประหยัดแบตเตอรี่จะปิดโดยอัตโนมัติขณะชาร์จอุปกรณ์"</string>
     <string name="data_saver_description" msgid="6015391409098303235">"เพื่อช่วยลดปริมาณการใช้อินเทอร์เน็ต โปรแกรมประหยัดอินเทอร์เน็ตจะช่วยป้องกันไม่ให้แอปบางส่วนส่งหรือรับข้อมูลเครือข่ายมือถือในพื้นหลัง แอปที่คุณกำลังใช้งานสามารถเข้าถึงข้อมูลเครือข่ายมือถือได้ แต่อาจไม่บ่อยเท่าเดิม ตัวอย่างเช่น ภาพต่างๆ จะไม่แสดงจนกว่าคุณจะแตะที่ภาพเหล่านั้น"</string>
     <string name="data_saver_enable_title" msgid="4674073932722787417">"เปิดการประหยัดอินเทอร์เน็ตไหม"</string>
     <string name="data_saver_enable_button" msgid="7147735965247211818">"เปิด"</string>
@@ -1708,7 +1703,7 @@
     <string name="region_picker_section_all" msgid="8966316787153001779">"ภูมิภาคทั้งหมด"</string>
     <string name="locale_search_menu" msgid="2560710726687249178">"ค้นหา"</string>
     <string name="work_mode_off_title" msgid="2615362773958585967">"เปิดโหมดงานไหม"</string>
-    <string name="work_mode_off_message" msgid="2961559609199223594">"การดำเนินการนี้จะเปิดโปรไฟล์งานของคุณ รวมถึงแอป การซิงค์ในพื้นหลัง และคุณลักษณะที่เกี่ยวข้อง"</string>
+    <string name="work_mode_off_message" msgid="2961559609199223594">"การดำเนินการนี้จะเปิดโปรไฟล์งานของคุณ รวมถึงแอป การซิงค์ในพื้นหลัง และฟีเจอร์ที่เกี่ยวข้อง"</string>
     <string name="work_mode_turn_on" msgid="2062544985670564875">"เปิด"</string>
     <string name="new_sms_notification_title" msgid="8442817549127555977">"คุณมีข้อความใหม่"</string>
     <string name="new_sms_notification_content" msgid="7002938807812083463">"เปิดแอป SMS เพื่อดู"</string>
@@ -1774,9 +1769,11 @@
     <string name="etws_primary_default_message_tsunami" msgid="1887685943498368548">"อพยพออกจากจากเขตชายฝั่งทะเลและบริเวณริมแม่น้ำไปยังสถานที่ที่ปลอดภัยกว่า เช่น ที่สูง โดยทันที"</string>
     <string name="etws_primary_default_message_earthquake_and_tsunami" msgid="998797956848445862">"ทำใจให้สงบและหาที่กำบังในบริเวณใกล้เคียง"</string>
     <string name="etws_primary_default_message_test" msgid="2709597093560037455">"การทดสอบข้อความกรณีฉุกเฉิน"</string>
+    <string name="notification_reply_button_accessibility" msgid="3621714652387814344">"ตอบ"</string>
     <string name="etws_primary_default_message_others" msgid="6293148756130398971"></string>
     <string name="mmcc_authentication_reject" msgid="7729819349669603406">"ไม่อนุญาตให้ใช้ซิม"</string>
     <string name="mmcc_imsi_unknown_in_hlr" msgid="6321202257374418726">"ไม่มีการจัดสรรซิม"</string>
     <string name="mmcc_illegal_ms" msgid="2769452751852211112">"ไม่อนุญาตให้ใช้ซิม"</string>
     <string name="mmcc_illegal_me" msgid="4438696681169345015">"ไม่อนุญาตให้ใช้โทรศัพท์"</string>
+    <string name="popup_window_default_title" msgid="4874318849712115433">"หน้าต่างป๊อปอัป"</string>
 </resources>

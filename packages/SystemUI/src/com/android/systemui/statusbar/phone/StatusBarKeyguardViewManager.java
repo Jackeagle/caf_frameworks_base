@@ -85,6 +85,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     protected boolean mShowing;
     protected boolean mOccluded;
     protected boolean mRemoteInputActive;
+    private boolean mDozing;
 
     protected boolean mFirstUpdate = true;
     protected boolean mLastShowing;
@@ -92,6 +93,8 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     private boolean mLastBouncerShowing;
     private boolean mLastBouncerDismissible;
     protected boolean mLastRemoteInputActive;
+    private boolean mLastDozing;
+    private boolean mLastDeferScrimFadeOut;
 
     private OnDismissAction mAfterKeyguardGoneAction;
     private final ArrayList<Runnable> mAfterKeyguardGoneRunnables = new ArrayList<>();
@@ -149,7 +152,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
      * {@link KeyguardBouncer#needsFullscreenBouncer()}.
      */
     protected void showBouncerOrKeyguard(boolean hideBouncerWhenShowing) {
-        if (mBouncer.needsFullscreenBouncer()) {
+        if (mBouncer.needsFullscreenBouncer() && !mDozing) {
 
             // The keyguard might be showing (already). So we need to hide it.
             mStatusBar.hideKeyguard();
@@ -254,6 +257,14 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
         updateStates();
     }
 
+    public void setDozing(boolean dozing) {
+        if (mDozing != dozing) {
+            mDozing = dozing;
+            reset(dozing /* hideBouncerWhenShowing */);
+            updateStates();
+        }
+    }
+
     public void onScreenTurnedOff() {
         mScreenTurnedOn = false;
         mStatusBar.onScreenTurnedOff();
@@ -272,9 +283,6 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     }
 
     public void setOccluded(boolean occluded, boolean animate) {
-        if (occluded != mOccluded) {
-            mStatusBar.onKeyguardOccludedChanged(occluded);
-        }
         if (occluded && !mOccluded && mShowing) {
             if (mStatusBar.isInLaunchTransition()) {
                 mOccluded = true;
@@ -367,7 +375,6 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
             mStatusBar.setKeyguardFadingAway(startTime, delay, fadeoutDuration);
             mFingerprintUnlockController.startKeyguardFadingAway();
             mBouncer.hide(true /* destroyView */);
-            updateStates();
             if (wakeUnlockPulsing) {
                 mStatusBarWindowManager.setKeyguardFadingAway(true);
                 mStatusBar.fadeKeyguardWhilePulsing();
@@ -399,12 +406,17 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
                     mFingerprintUnlockController.finishKeyguardFadingAway();
                 }
             }
+            updateStates();
             mStatusBarWindowManager.setKeyguardShowing(false);
             mViewMediatorCallback.keyguardGone();
         }
     }
 
     public void onDensityOrFontScaleChanged() {
+        mBouncer.hide(true /* destroyView */);
+    }
+
+    public void onOverlayChanged() {
         mBouncer.hide(true /* destroyView */);
     }
 
@@ -497,11 +509,11 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     private long getNavBarShowDelay() {
         if (mStatusBar.isKeyguardFadingAway()) {
             return mStatusBar.getKeyguardFadingAwayDelay();
-        } else {
-
-            // Keyguard is not going away, thus we are showing the navigation bar because the
-            // bouncer is appearing.
+        } else if (mBouncer.isShowing()) {
             return NAV_BAR_SHOW_DELAY_BOUNCER;
+        } else {
+            // No longer dozing, or remote input is active. No delay.
+            return 0;
         }
     }
 
@@ -569,7 +581,8 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
         mLastBouncerShowing = bouncerShowing;
         mLastBouncerDismissible = bouncerDismissible;
         mLastRemoteInputActive = remoteInputActive;
-
+        mLastDozing = mDozing;
+        mLastDeferScrimFadeOut = mDeferScrimFadeOut;
         mStatusBar.onKeyguardViewManagerStatesUpdated();
     }
 
@@ -577,14 +590,16 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
      * @return Whether the navigation bar should be made visible based on the current state.
      */
     protected boolean isNavBarVisible() {
-        return !(mShowing && !mOccluded) || mBouncer.isShowing() || mRemoteInputActive;
+        return (!(mShowing && !mOccluded) && !mDozing || mBouncer.isShowing() || mRemoteInputActive)
+                && !mDeferScrimFadeOut;
     }
 
     /**
      * @return Whether the navigation bar was made visible based on the last known state.
      */
     protected boolean getLastNavBarVisible() {
-        return !(mLastShowing && !mLastOccluded) || mLastBouncerShowing || mLastRemoteInputActive;
+        return (!(mLastShowing && !mLastOccluded) && !mLastDozing || mLastBouncerShowing
+                || mLastRemoteInputActive) && !mLastDeferScrimFadeOut;
     }
 
     public boolean shouldDismissOnMenuPressed() {

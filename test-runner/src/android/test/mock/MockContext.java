@@ -149,6 +149,12 @@ public class MockContext extends Context {
         throw new UnsupportedOperationException();
     }
 
+    /** @hide */
+    @Override
+    public void reloadSharedPreferences() {
+        throw new UnsupportedOperationException();
+    }
+
     @Override
     public boolean moveSharedPreferencesFrom(Context sourceContext, String name) {
         throw new UnsupportedOperationException();
@@ -805,6 +811,12 @@ public class MockContext extends Context {
     @SystemApi
     @Override
     public boolean isCredentialProtectedStorage() {
+        throw new UnsupportedOperationException();
+    }
+
+    /** {@hide} */
+    @Override
+    public boolean canLoadUnsafeResources() {
         throw new UnsupportedOperationException();
     }
 

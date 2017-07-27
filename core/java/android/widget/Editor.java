@@ -83,6 +83,7 @@ import android.view.DisplayListCanvas;
 import android.view.DragAndDropPermissions;
 import android.view.DragEvent;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -175,6 +176,8 @@ public class Editor {
     private ActionMode mTextActionMode;
     private boolean mInsertionControllerEnabled;
     private boolean mSelectionControllerEnabled;
+
+    private final boolean mHapticTextHandleEnabled;
 
     // Used to highlight a word when it is corrected by the IME
     private CorrectionHighlighter mCorrectionHighlighter;
@@ -320,6 +323,8 @@ public class Editor {
         // Synchronize the filter list, which places the undo input filter at the end.
         mTextView.setFilters(mTextView.getFilters());
         mProcessTextIntentActionsHandler = new ProcessTextIntentActionsHandler(this);
+        mHapticTextHandleEnabled = mTextView.getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_enableHapticTextHandle);
     }
 
     ParcelableParcel saveInstanceState() {
@@ -2584,14 +2589,18 @@ public class Editor {
         if (offset == -1) {
             return;
         }
+
         stopTextActionModeWithPreservingSelection();
-        final boolean isOnSelection = mTextView.hasSelection()
-                && offset >= mTextView.getSelectionStart() && offset <= mTextView.getSelectionEnd();
-        if (!isOnSelection) {
-            // Right clicked position is not on the selection. Remove the selection and move the
-            // cursor to the right clicked position.
-            Selection.setSelection((Spannable) mTextView.getText(), offset);
-            stopTextActionMode();
+        if (mTextView.canSelectText()) {
+            final boolean isOnSelection = mTextView.hasSelection()
+                    && offset >= mTextView.getSelectionStart()
+                    && offset <= mTextView.getSelectionEnd();
+            if (!isOnSelection) {
+                // Right clicked position is not on the selection. Remove the selection and move the
+                // cursor to the right clicked position.
+                Selection.setSelection((Spannable) mTextView.getText(), offset);
+                stopTextActionMode();
+            }
         }
 
         if (shouldOfferToShowSuggestions()) {
@@ -2655,7 +2664,7 @@ public class Editor {
                 .setEnabled(mTextView.canSelectAllText())
                 .setOnMenuItemClickListener(mOnContextMenuItemClickListener);
         menu.add(Menu.NONE, TextView.ID_AUTOFILL, MENU_ITEM_ORDER_AUTOFILL,
-                com.android.internal.R.string.autofill)
+                android.R.string.autofill)
                 .setEnabled(mTextView.canRequestAutofill())
                 .setOnMenuItemClickListener(mOnContextMenuItemClickListener);
 
@@ -3842,11 +3851,12 @@ public class Editor {
             }
 
             if (mTextView.canRequestAutofill()) {
-                final int mode = mTextView.getText().length() <= 0
-                        ? MenuItem.SHOW_AS_ACTION_IF_ROOM : MenuItem.SHOW_AS_ACTION_NEVER;
-                menu.add(Menu.NONE, TextView.ID_AUTOFILL, MENU_ITEM_ORDER_AUTOFILL,
-                        com.android.internal.R.string.autofill)
-                        .setShowAsAction(mode);
+                final String selected = mTextView.getSelectedText();
+                if (selected == null || selected.isEmpty()) {
+                    menu.add(Menu.NONE, TextView.ID_AUTOFILL, MENU_ITEM_ORDER_AUTOFILL,
+                            com.android.internal.R.string.autofill)
+                            .setShowAsAction(MenuItem.SHOW_AS_OVERFLOW_ALWAYS);
+                }
             }
 
             if (mTextView.canPasteAsPlainText()) {
@@ -3904,23 +3914,28 @@ public class Editor {
             menu.removeItem(TextView.ID_ASSIST);
             final TextClassification textClassification =
                     getSelectionActionModeHelper().getTextClassification();
-            if (textClassification != null) {
-                final Drawable icon = textClassification.getIcon();
-                final CharSequence label = textClassification.getLabel();
-                final OnClickListener onClickListener =
-                        textClassification.getOnClickListener();
-                final Intent intent = textClassification.getIntent();
-                if ((icon != null || !TextUtils.isEmpty(label))
-                        && (onClickListener != null || intent != null)) {
-                    menu.add(TextView.ID_ASSIST, TextView.ID_ASSIST, MENU_ITEM_ORDER_ASSIST, label)
-                            .setIcon(icon)
-                            .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-                    mMetricsLogger.write(
-                            new LogMaker(MetricsEvent.TEXT_SELECTION_MENU_ITEM_ASSIST)
-                                    .setType(MetricsEvent.TYPE_OPEN)
-                                    .setSubtype(textClassification.getLogType()));
-                }
+            if (canAssist()) {
+                menu.add(TextView.ID_ASSIST, TextView.ID_ASSIST, MENU_ITEM_ORDER_ASSIST,
+                        textClassification.getLabel())
+                        .setIcon(textClassification.getIcon())
+                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+                mMetricsLogger.write(
+                        new LogMaker(MetricsEvent.TEXT_SELECTION_MENU_ITEM_ASSIST)
+                                .setType(MetricsEvent.TYPE_OPEN)
+                                .setSubtype(textClassification.getLogType()));
             }
+        }
+
+        private boolean canAssist() {
+            final TextClassification textClassification =
+                    getSelectionActionModeHelper().getTextClassification();
+            return mTextView.isDeviceProvisioned()
+                    && textClassification != null
+                    && (textClassification.getIcon() != null
+                            || !TextUtils.isEmpty(textClassification.getLabel()))
+                    && (textClassification.getOnClickListener() != null
+                            || (textClassification.getIntent() != null
+                                    && mTextView.getContext().canStartActivityForResult()));
         }
 
         @Override
@@ -4248,7 +4263,7 @@ public class Editor {
             mNumberPreviousOffsets++;
         }
 
-        private void filterOnTouchUp() {
+        private void filterOnTouchUp(boolean fromTouchScreen) {
             final long now = SystemClock.uptimeMillis();
             int i = 0;
             int index = mPreviousOffsetIndex;
@@ -4260,7 +4275,7 @@ public class Editor {
 
             if (i > 0 && i < iMax
                     && (now - mPreviousOffsetsTimes[index]) > TOUCH_UP_FILTER_DELAY_BEFORE) {
-                positionAtCursorOffset(mPreviousOffsets[index], false);
+                positionAtCursorOffset(mPreviousOffsets[index], false, fromTouchScreen);
             }
         }
 
@@ -4277,7 +4292,7 @@ public class Editor {
         public void invalidate() {
             super.invalidate();
             if (isShowing()) {
-                positionAtCursorOffset(getCurrentCursorOffset(), true);
+                positionAtCursorOffset(getCurrentCursorOffset(), true, false);
             }
         };
 
@@ -4296,7 +4311,7 @@ public class Editor {
 
             // Make sure the offset is always considered new, even when focusing at same position
             mPreviousOffset = -1;
-            positionAtCursorOffset(getCurrentCursorOffset(), false);
+            positionAtCursorOffset(getCurrentCursorOffset(), false, false);
         }
 
         protected void dismiss() {
@@ -4333,7 +4348,7 @@ public class Editor {
 
         protected abstract void updateSelection(int offset);
 
-        public abstract void updatePosition(float x, float y);
+        protected abstract void updatePosition(float x, float y, boolean fromTouchScreen);
 
         protected boolean isAtRtlRun(@NonNull Layout layout, int offset) {
             return layout.isRtlCharAt(offset);
@@ -4352,8 +4367,11 @@ public class Editor {
          * @param offset Cursor offset. Must be in [-1, length].
          * @param forceUpdatePosition whether to force update the position.  This should be true
          * when If the parent has been scrolled, for example.
+         * @param fromTouchScreen {@code true} if the cursor is moved with motion events from the
+         * touch screen.
          */
-        protected void positionAtCursorOffset(int offset, boolean forceUpdatePosition) {
+        protected void positionAtCursorOffset(int offset, boolean forceUpdatePosition,
+                boolean fromTouchScreen) {
             // A HandleView relies on the layout, which may be nulled by external methods
             Layout layout = mTextView.getLayout();
             if (layout == null) {
@@ -4367,6 +4385,9 @@ public class Editor {
             if (offsetChanged || forceUpdatePosition) {
                 if (offsetChanged) {
                     updateSelection(offset);
+                    if (fromTouchScreen && mHapticTextHandleEnabled) {
+                        mTextView.performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE);
+                    }
                     addPositionToTouchUpFilter(offset);
                 }
                 final int line = layout.getLineForOffset(offset);
@@ -4399,7 +4420,7 @@ public class Editor {
         @Override
         public void updatePosition(int parentPositionX, int parentPositionY,
                 boolean parentPositionChanged, boolean parentScrolled) {
-            positionAtCursorOffset(getCurrentCursorOffset(), parentScrolled);
+            positionAtCursorOffset(getCurrentCursorOffset(), parentScrolled, false);
             if (parentPositionChanged || mPositionHasChanged) {
                 if (mIsDragging) {
                     // Update touchToWindow offset in case of parent scrolling while dragging
@@ -4511,12 +4532,13 @@ public class Editor {
                             xInWindow - mTouchToWindowOffsetX + mHotspotX + getHorizontalOffset();
                     final float newPosY = yInWindow - mTouchToWindowOffsetY + mTouchOffsetY;
 
-                    updatePosition(newPosX, newPosY);
+                    updatePosition(newPosX, newPosY,
+                            ev.isFromSource(InputDevice.SOURCE_TOUCHSCREEN));
                     break;
                 }
 
                 case MotionEvent.ACTION_UP:
-                    filterOnTouchUp();
+                    filterOnTouchUp(ev.isFromSource(InputDevice.SOURCE_TOUCHSCREEN));
                     mIsDragging = false;
                     updateDrawable();
                     break;
@@ -4697,7 +4719,7 @@ public class Editor {
         }
 
         @Override
-        public void updatePosition(float x, float y) {
+        protected void updatePosition(float x, float y, boolean fromTouchScreen) {
             Layout layout = mTextView.getLayout();
             int offset;
             if (layout != null) {
@@ -4710,7 +4732,7 @@ public class Editor {
             } else {
                 offset = -1;
             }
-            positionAtCursorOffset(offset, false);
+            positionAtCursorOffset(offset, false, fromTouchScreen);
             if (mTextActionMode != null) {
                 invalidateActionMode();
             }
@@ -4801,12 +4823,13 @@ public class Editor {
         }
 
         @Override
-        public void updatePosition(float x, float y) {
+        protected void updatePosition(float x, float y, boolean fromTouchScreen) {
             final Layout layout = mTextView.getLayout();
             if (layout == null) {
                 // HandleView will deal appropriately in positionAtCursorOffset when
                 // layout is null.
-                positionAndAdjustForCrossingHandles(mTextView.getOffsetForPosition(x, y));
+                positionAndAdjustForCrossingHandles(mTextView.getOffsetForPosition(x, y),
+                        fromTouchScreen);
                 return;
             }
 
@@ -4849,12 +4872,12 @@ public class Editor {
                 // to the current position.
                 mLanguageDirectionChanged = true;
                 mTouchWordDelta = 0.0f;
-                positionAndAdjustForCrossingHandles(offset);
+                positionAndAdjustForCrossingHandles(offset, fromTouchScreen);
                 return;
             } else if (mLanguageDirectionChanged && !isLvlBoundary) {
                 // We've just moved past the boundary so update the position. After this we can
                 // figure out if the user is expanding or shrinking to go by word or character.
-                positionAndAdjustForCrossingHandles(offset);
+                positionAndAdjustForCrossingHandles(offset, fromTouchScreen);
                 mTouchWordDelta = 0.0f;
                 mLanguageDirectionChanged = false;
                 return;
@@ -4888,7 +4911,7 @@ public class Editor {
                     final int nextOffset = (atRtl == isStartHandle())
                             ? layout.getOffsetToRightOf(mPreviousOffset)
                             : layout.getOffsetToLeftOf(mPreviousOffset);
-                    positionAndAdjustForCrossingHandles(nextOffset);
+                    positionAndAdjustForCrossingHandles(nextOffset, fromTouchScreen);
                     return;
                 }
             }
@@ -4967,14 +4990,15 @@ public class Editor {
 
             if (positionCursor) {
                 mPreviousLineTouched = currLine;
-                positionAndAdjustForCrossingHandles(offset);
+                positionAndAdjustForCrossingHandles(offset, fromTouchScreen);
             }
             mPrevX = x;
         }
 
         @Override
-        protected void positionAtCursorOffset(int offset, boolean forceUpdatePosition) {
-            super.positionAtCursorOffset(offset, forceUpdatePosition);
+        protected void positionAtCursorOffset(int offset, boolean forceUpdatePosition,
+                boolean fromTouchScreen) {
+            super.positionAtCursorOffset(offset, forceUpdatePosition, fromTouchScreen);
             mInWord = (offset != -1) && !getWordIteratorWithText().isBoundary(offset);
         }
 
@@ -4990,7 +5014,7 @@ public class Editor {
             return superResult;
         }
 
-        private void positionAndAdjustForCrossingHandles(int offset) {
+        private void positionAndAdjustForCrossingHandles(int offset, boolean fromTouchScreen) {
             final int anotherHandleOffset =
                     isStartHandle() ? mTextView.getSelectionEnd() : mTextView.getSelectionStart();
             if ((isStartHandle() && offset >= anotherHandleOffset)
@@ -5015,14 +5039,14 @@ public class Editor {
                         } else {
                             offset = TextUtils.unpackRangeEndFromLong(range);
                         }
-                        positionAtCursorOffset(offset, false);
+                        positionAtCursorOffset(offset, false, fromTouchScreen);
                         return;
                     }
                 }
                 // Handles can not cross and selection is at least one character.
                 offset = getNextCursorOffset(anotherHandleOffset, !isStartHandle());
             }
-            positionAtCursorOffset(offset, false);
+            positionAtCursorOffset(offset, false, fromTouchScreen);
         }
 
         private boolean positionNearEdgeOfScrollingView(float x, boolean atRtl) {
@@ -5465,7 +5489,8 @@ public class Editor {
 
         private void updateCharacterBasedSelection(MotionEvent event) {
             final int offset = mTextView.getOffsetForPosition(event.getX(), event.getY());
-            Selection.setSelection((Spannable) mTextView.getText(), mStartOffset, offset);
+            updateSelectionInternal(mStartOffset, offset,
+                    event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN));
         }
 
         private void updateWordBasedSelection(MotionEvent event) {
@@ -5523,7 +5548,8 @@ public class Editor {
                 }
             }
             mLineSelectionIsOn = currLine;
-            Selection.setSelection((Spannable) mTextView.getText(), startOffset, offset);
+            updateSelectionInternal(startOffset, offset,
+                    event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN));
         }
 
         private void updateParagraphBasedSelection(MotionEvent event) {
@@ -5534,7 +5560,19 @@ public class Editor {
             final long paragraphsRange = getParagraphsRange(start, end);
             final int selectionStart = TextUtils.unpackRangeStartFromLong(paragraphsRange);
             final int selectionEnd = TextUtils.unpackRangeEndFromLong(paragraphsRange);
+            updateSelectionInternal(selectionStart, selectionEnd,
+                    event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN));
+        }
+
+        private void updateSelectionInternal(int selectionStart, int selectionEnd,
+                boolean fromTouchScreen) {
+            final boolean performHapticFeedback = fromTouchScreen && mHapticTextHandleEnabled
+                    && ((mTextView.getSelectionStart() != selectionStart)
+                            || (mTextView.getSelectionEnd() != selectionEnd));
             Selection.setSelection((Spannable) mTextView.getText(), selectionStart, selectionEnd);
+            if (performHapticFeedback) {
+                mTextView.performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE);
+            }
         }
 
         /**

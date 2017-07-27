@@ -210,6 +210,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     final DisplayMetrics mRealDisplayMetrics = new DisplayMetrics();
     /** @see #computeCompatSmallestWidth(boolean, int, int, int, int) */
     private final DisplayMetrics mTmpDisplayMetrics = new DisplayMetrics();
+
     /**
      * Compat metrics computed based on {@link #mDisplayMetrics}.
      * @see #updateDisplayAndOrientation(int)
@@ -226,6 +227,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * @see #updateRotationUnchecked(boolean)
      */
     private int mRotation = 0;
+
     /**
      * Last applied orientation of the display.
      * Constants as per {@link android.content.pm.ActivityInfo.ScreenOrientation}.
@@ -233,6 +235,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * @see WindowManagerService#updateOrientationFromAppTokensLocked(boolean, int)
      */
     private int mLastOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+
     /**
      * Flag indicating that the application is receiving an orientation that has different metrics
      * than it expected. E.g. Portrait instead of Landscape.
@@ -240,6 +243,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * @see #updateRotationUnchecked(boolean)
      */
     private boolean mAltOrientation = false;
+
     /**
      * Orientation forced by some window. If there is no visible window that specifies orientation
      * it is set to {@link android.content.pm.ActivityInfo#SCREEN_ORIENTATION_UNSPECIFIED}.
@@ -247,6 +251,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * @see NonAppWindowContainers#getOrientation()
      */
     private int mLastWindowForcedOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+
     /**
      * Last orientation forced by the keyguard. It is applied when keyguard is shown and is not
      * occluded.
@@ -254,6 +259,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * @see NonAppWindowContainers#getOrientation()
      */
     private int mLastKeyguardForcedOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+
+    /**
+     * Keep track of wallpaper visibility to notify changes.
+     */
+    private boolean mLastWallpaperVisible = false;
 
     private Rect mBaseDisplayRect = new Rect();
     private Rect mContentRect = new Rect();
@@ -313,6 +323,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     // True if this display is in the process of being removed. Used to determine if the removal of
     // the display's direct children should be allowed.
     private boolean mRemovingDisplay = false;
+
+    // {@code false} if this display is in the processing of being created.
+    private boolean mDisplayReady = false;
 
     private final WindowLayersController mLayersController;
     WallpaperController mWallpaperController;
@@ -720,7 +733,6 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      */
     DisplayContent(Display display, WindowManagerService service,
             WindowLayersController layersController, WallpaperController wallpaperController) {
-
         if (service.mRoot.getDisplayContent(display.getDisplayId()) != null) {
             throw new IllegalArgumentException("Display with ID=" + display.getDisplayId()
                     + " already exists=" + service.mRoot.getDisplayContent(display.getDisplayId())
@@ -748,6 +760,15 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
         // Add itself as a child to the root container.
         mService.mRoot.addChild(this, null);
+
+        // TODO(b/62541591): evaluate whether this is the best spot to declare the
+        // {@link DisplayContent} ready for use.
+        mDisplayReady = true;
+    }
+
+    boolean isReady() {
+        // The display is ready when the system and the individual display are both ready.
+        return mService.mDisplayReady && mDisplayReady;
     }
 
     int getDisplayId() {
@@ -987,7 +1008,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         }
 
         if (!rotateSeamlessly) {
-            mService.startFreezingDisplayLocked(inTransaction, anim[0], anim[1]);
+            mService.startFreezingDisplayLocked(inTransaction, anim[0], anim[1], this);
             // startFreezingDisplayLocked can reset the ScreenRotationAnimation.
             screenRotationAnimation = mService.mAnimator.getScreenRotationAnimationLocked(
                     mDisplayId);
@@ -1162,6 +1183,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         final int dh = displayInfo.logicalHeight;
         config.orientation = (dw <= dh) ? Configuration.ORIENTATION_PORTRAIT :
                 Configuration.ORIENTATION_LANDSCAPE;
+        config.setRotation(displayInfo.rotation);
+
         config.screenWidthDp =
                 (int)(mService.mPolicy.getConfigDisplayWidth(dw, dh, displayInfo.rotation,
                         config.uiMode, mDisplayId) / mDisplayMetrics.density);
@@ -1196,7 +1219,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 (displayInfo.isHdr()
                         ? Configuration.COLOR_MODE_HDR_YES
                         : Configuration.COLOR_MODE_HDR_NO)
-                        | (displayInfo.isWideColorGamut()
+                        | (displayInfo.isWideColorGamut() && mService.hasWideColorGamutSupport()
                         ? Configuration.COLOR_MODE_WIDE_COLOR_GAMUT_YES
                         : Configuration.COLOR_MODE_WIDE_COLOR_GAMUT_NO);
 
@@ -2754,6 +2777,12 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
         stopDimmingIfNeeded();
 
+        final boolean wallpaperVisible = mWallpaperController.isWallpaperVisible();
+        if (wallpaperVisible != mLastWallpaperVisible) {
+            mLastWallpaperVisible = wallpaperVisible;
+            mService.mWallpaperVisibilityListeners.notifyWallpaperVisibilityChanged(this);
+        }
+
         while (!mTmpUpdateAllDrawn.isEmpty()) {
             final AppWindowToken atoken = mTmpUpdateAllDrawn.removeLast();
             // See if any windows have been drawn, so they (and others associated with them)
@@ -3492,10 +3521,15 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
             if (win != null) {
                 final int req = win.mAttrs.screenOrientation;
-                if (DEBUG_ORIENTATION) Slog.v(TAG_WM, win + " forcing orientation to " + req);
                 if (policy.isKeyguardHostWindow(win.mAttrs)) {
                     mLastKeyguardForcedOrientation = req;
+                    if (mService.mKeyguardGoingAway) {
+                        // Keyguard can't affect the orientation if it is going away...
+                        mLastWindowForcedOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+                        return SCREEN_ORIENTATION_UNSET;
+                    }
                 }
+                if (DEBUG_ORIENTATION) Slog.v(TAG_WM, win + " forcing orientation to " + req);
                 return (mLastWindowForcedOrientation = req);
             }
 

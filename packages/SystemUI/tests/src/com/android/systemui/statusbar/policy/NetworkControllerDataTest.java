@@ -18,6 +18,7 @@ import org.junit.runner.RunWith;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
+@Ignore("Flaky")
 public class NetworkControllerDataTest extends NetworkControllerBaseTest {
 
     @Test
@@ -25,7 +26,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         setupDefaultSignal();
 
         verifyDataIndicators(TelephonyIcons.ICON_3G,
-                TelephonyIcons.ICON_3G);
+                TelephonyIcons.QS_DATA_3G);
     }
 
     @Test
@@ -35,7 +36,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_GSM);
 
         verifyDataIndicators(TelephonyIcons.ICON_G,
-                TelephonyIcons.ICON_G);
+                TelephonyIcons.QS_DATA_G);
     }
 
     @Test
@@ -45,7 +46,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_CDMA);
 
         verifyDataIndicators(TelephonyIcons.ICON_1X,
-                TelephonyIcons.ICON_1X);
+                TelephonyIcons.QS_DATA_1X);
     }
 
     @Test
@@ -55,7 +56,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_EDGE);
 
         verifyDataIndicators(TelephonyIcons.ICON_E,
-                TelephonyIcons.ICON_E);
+                TelephonyIcons.QS_DATA_E);
     }
 
     @Test
@@ -65,7 +66,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_LTE);
 
         verifyDataIndicators(TelephonyIcons.ICON_LTE,
-                TelephonyIcons.ICON_LTE);
+                TelephonyIcons.QS_DATA_LTE);
     }
 
     @Test
@@ -75,7 +76,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_HSPA);
 
         verifyDataIndicators(TelephonyIcons.ICON_H,
-                TelephonyIcons.ICON_H);
+                TelephonyIcons.QS_DATA_H);
     }
 
     @Test
@@ -91,8 +92,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
     public void test4gDataIcon() {
         // Switch to showing 4g icon and re-initialize the NetworkController.
         mConfig.show4gForLte = true;
-        mNetworkController = new NetworkControllerImpl(mContext, mMockCm, mMockNetworkScoreManager,
-                mMockTm, mMockWm, mMockSm,
+        mNetworkController = new NetworkControllerImpl(mContext, mMockCm, mMockTm, mMockWm, mMockSm,
                 mConfig, Looper.getMainLooper(), mCallbackHandler,
                 mock(AccessPointControllerImpl.class),
                 mock(DataUsageController.class), mMockSubDefaults,
@@ -104,10 +104,9 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_LTE);
 
         verifyDataIndicators(TelephonyIcons.ICON_4G,
-                TelephonyIcons.ICON_4G);
+                TelephonyIcons.QS_DATA_4G);
     }
 
-    @Ignore("Flaky")
     @Test
     public void testDataDisabledIcon() {
         setupNetworkController();
@@ -117,7 +116,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         setConnectivity(NetworkCapabilities.TRANSPORT_CELLULAR, false, false);
 
         verifyDataIndicators(TelephonyIcons.ICON_DATA_DISABLED,
-                TelephonyIcons.ICON_DATA_DISABLED);
+                TelephonyIcons.QS_ICON_DATA_DISABLED);
     }
 
     @Test
@@ -148,7 +147,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
         mNetworkController.handleConfigurationChanged();
 
         verifyDataIndicators(TelephonyIcons.ICON_4G,
-                TelephonyIcons.ICON_4G);
+                TelephonyIcons.QS_DATA_4G);
     }
 
     @Test
@@ -158,13 +157,13 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 TelephonyManager.NETWORK_TYPE_LTE);
 
         verifyDataIndicators(TelephonyIcons.ICON_LTE,
-                TelephonyIcons.ICON_LTE);
+                TelephonyIcons.QS_DATA_LTE);
 
         when(mServiceState.getDataNetworkType())
                 .thenReturn(TelephonyManager.NETWORK_TYPE_HSPA);
         updateServiceState();
         verifyDataIndicators(TelephonyIcons.ICON_H,
-                TelephonyIcons.ICON_H);
+                TelephonyIcons.QS_DATA_H);
     }
 
     @Test

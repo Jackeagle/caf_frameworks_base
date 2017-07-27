@@ -1490,6 +1490,9 @@ public abstract class PackageManager {
      */
     public static final int MOVE_FAILED_3RD_PARTY_NOT_ALLOWED_ON_INTERNAL = -9;
 
+    /** @hide */
+    public static final int MOVE_FAILED_LOCKED_USER = -10;
+
     /**
      * Flag parameter for {@link #movePackage} to indicate that
      * the package should be moved to internal storage if its
@@ -1898,6 +1901,14 @@ public abstract class PackageManager {
     public static final String FEATURE_VULKAN_HARDWARE_VERSION = "android.hardware.vulkan.version";
 
     /**
+     * The device includes broadcast radio tuner.
+     *
+     * @hide FutureFeature
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_RADIO = "android.hardware.radio";
+
+    /**
      * Feature for {@link #getSystemAvailableFeatures} and
      * {@link #hasSystemFeature}: The device includes an accelerometer.
      */
@@ -2029,6 +2040,15 @@ public abstract class PackageManager {
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_TELEPHONY_CARRIERLOCK =
             "android.hardware.telephony.carrierlock";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports embedded subscriptions on eUICCs.
+     * TODO(b/35851809): Make this public.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_EUICC = "android.hardware.telephony.euicc";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
@@ -2267,6 +2287,21 @@ public abstract class PackageManager {
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device supports Wi-Fi Passpoint.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_WIFI_PASSPOINT = "android.hardware.wifi.passpoint";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device supports LoWPAN networking.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_LOWPAN = "android.hardware.lowpan";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
      * {@link #hasSystemFeature}: This is a device dedicated to showing UI
      * on a vehicle headunit. A headunit here is defined to be inside a
      * vehicle that may or may not be moving. A headunit uses either a
@@ -2310,6 +2345,17 @@ public abstract class PackageManager {
      */
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_EMBEDDED = "android.hardware.type.embedded";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: This is a device dedicated to be primarily used
+     * with keyboard, mouse or touchpad. This includes traditional desktop
+     * computers, laptops and variants such as convertibles or detachables.
+     * Due to the larger screen, the device will most likely use the
+     * {@link #FEATURE_FREEFORM_WINDOW_MANAGEMENT} feature as well.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_PC = "android.hardware.type.pc";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:
@@ -3208,8 +3254,7 @@ public abstract class PackageManager {
 
     /**
      * Return a List of all packages that are installed on the device, for a
-     * specific user. Requesting a list of installed packages for another user
-     * will require the permission INTERACT_ACROSS_USERS_FULL.
+     * specific user.
      *
      * @param flags Additional option flags to modify the data returned.
      * @param userId The user for whom the installed packages are to be listed
@@ -3224,6 +3269,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
     public abstract List<PackageInfo> getInstalledPackagesAsUser(@PackageInfoFlags int flags,
             @UserIdInt int userId);
 
@@ -3267,6 +3313,7 @@ public abstract class PackageManager {
      *
      * @hide
      */
+    @TestApi
     public abstract String getPermissionControllerPackageName();
 
     /**
@@ -3365,6 +3412,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS)
     public abstract void grantRuntimePermission(@NonNull String packageName,
             @NonNull String permissionName, @NonNull UserHandle user);
 
@@ -3390,6 +3438,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.REVOKE_RUNTIME_PERMISSIONS)
     public abstract void revokeRuntimePermission(@NonNull String packageName,
             @NonNull String permissionName, @NonNull UserHandle user);
 
@@ -3404,6 +3453,10 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS,
+            android.Manifest.permission.REVOKE_RUNTIME_PERMISSIONS
+    })
     public abstract @PermissionFlags int getPermissionFlags(String permissionName,
             String packageName, @NonNull UserHandle user);
 
@@ -3420,6 +3473,10 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS,
+            android.Manifest.permission.REVOKE_RUNTIME_PERMISSIONS
+    })
     public abstract void updatePermissionFlags(String permissionName,
             String packageName, @PermissionFlags int flagMask, @PermissionFlags int flagValues,
             @NonNull UserHandle user);
@@ -4719,6 +4776,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.INTENT_FILTER_VERIFICATION_AGENT)
     public abstract void verifyIntentFilter(int verificationId, int verificationCode,
             List<String> failedDomains);
 
@@ -4766,6 +4824,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.SET_PREFERRED_APPLICATIONS)
     public abstract boolean updateIntentVerificationStatusAsUser(String packageName, int status,
             @UserIdInt int userId);
 
@@ -4826,6 +4885,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.SET_PREFERRED_APPLICATIONS)
     public abstract boolean setDefaultBrowserPackageNameAsUser(String packageName,
             @UserIdInt int userId);
 
@@ -5289,6 +5349,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS)
     public abstract void removeOnPermissionsChangeListener(OnPermissionsChangedListener listener);
 
     /**
@@ -5717,4 +5778,48 @@ public abstract class PackageManager {
      * @hide
      */
     public abstract String getInstantAppAndroidId(String packageName, @NonNull UserHandle user);
+
+    /**
+     * Callback use to notify the callers of module registration that the operation
+     * has finished.
+     *
+     * @hide
+     */
+    @SystemApi
+    public static abstract class DexModuleRegisterCallback {
+        public abstract void onDexModuleRegistered(String dexModulePath, boolean success,
+                String message);
+    }
+
+    /**
+     * Register an application dex module with the package manager.
+     * The package manager will keep track of the given module for future optimizations.
+     *
+     * Dex module optimizations will disable the classpath checking at runtime. The client bares
+     * the responsibility to ensure that the static assumptions on classes in the optimized code
+     * hold at runtime (e.g. there's no duplicate classes in the classpath).
+     *
+     * Note that the package manager already keeps track of dex modules loaded with
+     * {@link dalvik.system.DexClassLoader} and {@link dalvik.system.PathClassLoader}.
+     * This can be called for an eager registration.
+     *
+     * The call might take a while and the results will be posted on the main thread, using
+     * the given callback.
+     *
+     * If the module is intended to be shared with other apps, make sure that the file
+     * permissions allow for it.
+     * If at registration time the permissions allow for others to read it, the module would
+     * be marked as a shared module which might undergo a different optimization strategy.
+     * (usually shared modules will generated larger optimizations artifacts,
+     * taking more disk space).
+     *
+     * @param dexModulePath the absolute path of the dex module.
+     * @param callback if not null, {@link DexModuleRegisterCallback#onDexModuleRegistered} will
+     *                 be called once the registration finishes.
+     *
+     * @hide
+     */
+    @SystemApi
+    public abstract void registerDexModule(String dexModulePath,
+            @Nullable DexModuleRegisterCallback callback);
 }

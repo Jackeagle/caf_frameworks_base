@@ -21,6 +21,7 @@ import static android.Manifest.permission.WRITE_SECURE_SETTINGS;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.SystemService;
 import android.content.Context;
 import android.graphics.Rect;
 import android.net.Uri;
@@ -73,8 +74,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Central system API to the overall input method framework (IMF) architecture,
  * which arbitrates interaction between applications and the current input method.
- * You can retrieve an instance of this interface with
- * {@link Context#getSystemService(String) Context.getSystemService()}.
  *
  * <p>Topics covered here:
  * <ol>
@@ -98,7 +97,7 @@ import java.util.concurrent.TimeUnit;
  * that manages the interaction across all processes.
  * <li> An <strong>input method (IME)</strong> implements a particular
  * interaction model allowing the user to generate text.  The system binds
- * to the current input method that is use, causing it to be created and run,
+ * to the current input method that is in use, causing it to be created and run,
  * and tells it when to hide and show its UI.  Only one IME is running at a time.
  * <li> Multiple <strong>client applications</strong> arbitrate with the input
  * method manager for input focus and control over the state of the IME.  Only
@@ -211,6 +210,7 @@ import java.util.concurrent.TimeUnit;
  * and want to make it available for use.</p>
  * </ul>
  */
+@SystemService(Context.INPUT_METHOD_SERVICE)
 public final class InputMethodManager {
     static final boolean DEBUG = false;
     static final String TAG = "InputMethodManager";

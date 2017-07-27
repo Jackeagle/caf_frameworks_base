@@ -23,8 +23,10 @@ import android.accounts.AccountAndUser;
 import android.accounts.AccountAuthenticatorResponse;
 import android.accounts.AccountManager;
 import android.accounts.AccountManagerInternal;
+import android.accounts.AccountManagerResponse;
 import android.accounts.AuthenticatorDescription;
 import android.accounts.CantAddAccountActivity;
+import android.accounts.ChooseAccountActivity;
 import android.accounts.GrantCredentialsPermissionActivity;
 import android.accounts.IAccountAuthenticator;
 import android.accounts.IAccountAuthenticatorResponse;
@@ -71,6 +73,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.Process;
 import android.os.RemoteCallback;
 import android.os.RemoteException;
@@ -159,7 +162,8 @@ public class AccountManagerService
 
         @Override
         public void onStopUser(int userHandle) {
-            mService.onStopUser(userHandle);
+            Slog.i(TAG, "onStopUser " + userHandle);
+            mService.purgeUserData(userHandle);
         }
     }
 
@@ -310,6 +314,21 @@ public class AccountManagerService
         }, intentFilter);
 
         injector.addLocalService(new AccountManagerInternalImpl());
+
+        IntentFilter userFilter = new IntentFilter();
+        userFilter.addAction(Intent.ACTION_USER_REMOVED);
+        mContext.registerReceiverAsUser(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (Intent.ACTION_USER_REMOVED.equals(action)) {
+                    int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, -1);
+                    if (userId < 1) return;
+                    Slog.i(TAG, "User " + userId + " removed");
+                    purgeUserData(userId);
+                }
+            }
+        }, UserHandle.ALL, userFilter, null, null);
 
         // Need to cancel account request notifications if the update/install can access the account
         new PackageMonitor() {
@@ -748,6 +767,11 @@ public class AccountManagerService
         }
     }
 
+    private boolean isVisible(int visibility) {
+        return visibility == AccountManager.VISIBILITY_VISIBLE ||
+            visibility == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE;
+    }
+
     /**
      * Updates visibility for given account name and package.
      *
@@ -800,8 +824,10 @@ public class AccountManagerService
                 if (notify) {
                     for (Entry<String, Integer> packageToVisibility : packagesToVisibility
                             .entrySet()) {
-                        if (shouldNotifyOnVisibilityChange(packageToVisibility.getValue(),
-                                resolveAccountVisibility(account, packageName, accounts))) {
+                        int oldVisibility = packageToVisibility.getValue();
+                        int currentVisibility =
+                            resolveAccountVisibility(account, packageName, accounts);
+                        if (isVisible(oldVisibility) != isVisible(currentVisibility)) {
                             notifyPackage(packageToVisibility.getKey(), accounts);
                         }
                     }
@@ -1178,8 +1204,7 @@ public class AccountManagerService
 
                             for (Entry<String, Integer> packageToVisibility :
                                     packagesToVisibility.entrySet()) {
-                                if (shouldNotifyOnVisibilityChange(packageToVisibility.getValue(),
-                                        AccountManager.VISIBILITY_NOT_VISIBLE)) {
+                                if (isVisible(packageToVisibility.getValue())) {
                                     notifyPackage(packageToVisibility.getKey(), accounts);
                                 }
                             }
@@ -1213,14 +1238,6 @@ public class AccountManagerService
                 }
             }
         }
-    }
-
-    private boolean shouldNotifyOnVisibilityChange(int oldVisibility, int newVisibility) {
-        boolean oldVisible = (oldVisibility == AccountManager.VISIBILITY_VISIBLE) ||
-            (oldVisibility == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE);
-        boolean newVisible = (newVisibility == AccountManager.VISIBILITY_VISIBLE) ||
-            (newVisibility == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE);
-        return oldVisible == newVisible;
     }
 
     private SparseBooleanArray getUidsOfInstalledOrUpdatedPackagesAsUser(int userId) {
@@ -1359,9 +1376,7 @@ public class AccountManagerService
         }
     }
 
-
-    private void onStopUser(int userId) {
-        Log.i(TAG, "onStopUser " + userId);
+    private void purgeUserData(int userId) {
         UserAccounts accounts;
         synchronized (mUsers) {
             accounts = mUsers.get(userId);
@@ -1371,6 +1386,7 @@ public class AccountManagerService
         if (accounts != null) {
             synchronized (accounts.dbLock) {
                 synchronized (accounts.cacheLock) {
+                    accounts.statementForLogging.close();
                     accounts.accountsDb.close();
                 }
             }
@@ -4050,6 +4066,7 @@ public class AccountManagerService
         private volatile int mCurrentAccount = 0;
         private final int mCallingUid;
         private final String mPackageName;
+        private final boolean mIncludeManagedNotVisible;
 
         public GetAccountsByTypeAndFeatureSession(
                 UserAccounts accounts,
@@ -4057,19 +4074,21 @@ public class AccountManagerService
                 String type,
                 String[] features,
                 int callingUid,
-                String packageName) {
+                String packageName,
+                boolean includeManagedNotVisible) {
             super(accounts, response, type, false /* expectActivityLaunch */,
                     true /* stripAuthTokenFromResult */, null /* accountName */,
                     false /* authDetailsRequired */);
             mCallingUid = callingUid;
             mFeatures = features;
             mPackageName = packageName;
+            mIncludeManagedNotVisible = includeManagedNotVisible;
         }
 
         @Override
         public void run() throws RemoteException {
             mAccountsOfType = getAccountsFromCache(mAccounts, mAccountType,
-                    mCallingUid, mPackageName, false /* include managed not visible*/);
+                    mCallingUid, mPackageName, mIncludeManagedNotVisible);
             // check whether each account matches the requested features
             mAccountsWithFeatures = new ArrayList<>(mAccountsOfType.length);
             mCurrentAccount = 0;
@@ -4430,8 +4449,119 @@ public class AccountManagerService
                 && (type != null && !isAccountManagedByCaller(type, callingUid, userId))) {
                 return EMPTY_ACCOUNT_ARRAY;
         }
+        if (!UserHandle.isSameApp(callingUid, Process.SYSTEM_UID) && type == null) {
+            return getAccountsAsUserForPackage(type, userId,
+                packageName, packageUid, opPackageName, false /* includeUserManagedNotVisible */);
+        }
         return getAccountsAsUserForPackage(type, userId,
                 packageName, packageUid, opPackageName, true /* includeUserManagedNotVisible */);
+    }
+
+    private boolean needToStartChooseAccountActivity(Account[] accounts, String callingPackage) {
+        if (accounts.length < 1) return false;
+        if (accounts.length > 1) return true;
+        Account account = accounts[0];
+        UserAccounts userAccounts = getUserAccounts(UserHandle.getCallingUserId());
+        int visibility = resolveAccountVisibility(account, callingPackage, userAccounts);
+        if (visibility == AccountManager.VISIBILITY_USER_MANAGED_NOT_VISIBLE) return true;
+        return false;
+    }
+
+    private void startChooseAccountActivityWithAccounts(
+        IAccountManagerResponse response, Account[] accounts, String callingPackage) {
+        Intent intent = new Intent(mContext, ChooseAccountActivity.class);
+        intent.putExtra(AccountManager.KEY_ACCOUNTS, accounts);
+        intent.putExtra(AccountManager.KEY_ACCOUNT_MANAGER_RESPONSE,
+                new AccountManagerResponse(response));
+        intent.putExtra(AccountManager.KEY_ANDROID_PACKAGE_NAME, callingPackage);
+
+        mContext.startActivityAsUser(intent, UserHandle.of(UserHandle.getCallingUserId()));
+    }
+
+    private void handleGetAccountsResult(
+        IAccountManagerResponse response,
+        Account[] accounts,
+        String callingPackage) {
+
+        if (needToStartChooseAccountActivity(accounts, callingPackage)) {
+            startChooseAccountActivityWithAccounts(response, accounts, callingPackage);
+            return;
+        }
+        if (accounts.length == 1) {
+            Bundle bundle = new Bundle();
+            bundle.putString(AccountManager.KEY_ACCOUNT_NAME, accounts[0].name);
+            bundle.putString(AccountManager.KEY_ACCOUNT_TYPE, accounts[0].type);
+            onResult(response, bundle);
+            return;
+        }
+        // No qualified account exists, return an empty Bundle.
+        onResult(response, new Bundle());
+    }
+
+    @Override
+    public void getAccountByTypeAndFeatures(
+        IAccountManagerResponse response,
+        String accountType,
+        String[] features,
+        String opPackageName) {
+
+        int callingUid = Binder.getCallingUid();
+        mAppOpsManager.checkPackage(callingUid, opPackageName);
+        if (Log.isLoggable(TAG, Log.VERBOSE)) {
+            Log.v(TAG, "getAccount: accountType " + accountType
+                    + ", response " + response
+                    + ", features " + Arrays.toString(features)
+                    + ", caller's uid " + callingUid
+                    + ", pid " + Binder.getCallingPid());
+        }
+        if (response == null) throw new IllegalArgumentException("response is null");
+        if (accountType == null) throw new IllegalArgumentException("accountType is null");
+
+        int userId = UserHandle.getCallingUserId();
+
+        long identityToken = clearCallingIdentity();
+        try {
+            UserAccounts userAccounts = getUserAccounts(userId);
+            if (ArrayUtils.isEmpty(features)) {
+                Account[] accountsWithManagedNotVisible = getAccountsFromCache(
+                    userAccounts, accountType, callingUid, opPackageName,
+                    true /* include managed not visible */);
+                handleGetAccountsResult(
+                    response, accountsWithManagedNotVisible, opPackageName);
+                return;
+            }
+
+            IAccountManagerResponse retrieveAccountsResponse =
+                new IAccountManagerResponse.Stub() {
+                @Override
+                public void onResult(Bundle value) throws RemoteException {
+                    Parcelable[] parcelables = value.getParcelableArray(
+                        AccountManager.KEY_ACCOUNTS);
+                    Account[] accounts = new Account[parcelables.length];
+                    for (int i = 0; i < parcelables.length; i++) {
+                        accounts[i] = (Account) parcelables[i];
+                    }
+                    handleGetAccountsResult(
+                        response, accounts, opPackageName);
+                }
+
+                @Override
+                public void onError(int errorCode, String errorMessage)
+                        throws RemoteException {
+                    // Will not be called in this case.
+                }
+            };
+            new GetAccountsByTypeAndFeatureSession(
+                    userAccounts,
+                    retrieveAccountsResponse,
+                    accountType,
+                    features,
+                    callingUid,
+                    opPackageName,
+                    true /* include managed not visible */).bind();
+        } finally {
+            restoreCallingIdentity(identityToken);
+        }
     }
 
     @Override
@@ -4466,6 +4596,7 @@ public class AccountManagerService
             }
             return;
         }
+
         long identityToken = clearCallingIdentity();
         try {
             UserAccounts userAccounts = getUserAccounts(userId);
@@ -4483,7 +4614,8 @@ public class AccountManagerService
                     type,
                     features,
                     callingUid,
-                    opPackageName).bind();
+                    opPackageName,
+                    false /* include managed not visible */).bind();
         } finally {
             restoreCallingIdentity(identityToken);
         }
@@ -4595,6 +4727,10 @@ public class AccountManagerService
         protected void checkKeyIntent(
                 int authUid,
                 Intent intent) throws SecurityException {
+            intent.setFlags(intent.getFlags() & ~(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION));
             long bid = Binder.clearCallingIdentity();
             try {
                 PackageManager pm = mContext.getPackageManager();
@@ -4952,6 +5088,7 @@ public class AccountManagerService
                 this.userDebugDbInsertionPoint = userDebugDbInsertionPoint;
             }
 
+            @Override
             public void run() {
                 SQLiteStatement logStatement = userAccount.statementForLogging;
                 logStatement.bindLong(1, accountId);
@@ -5802,11 +5939,9 @@ public class AccountManagerService
             String tokenType,
             String callingPackage,
             byte[] pkgSigDigest) {
-        synchronized (accounts.dbLock) {
-            synchronized (accounts.cacheLock) {
-                return accounts.accountTokenCaches.get(
-                        account, tokenType, callingPackage, pkgSigDigest);
-            }
+        synchronized (accounts.cacheLock) {
+            return accounts.accountTokenCaches.get(
+                    account, tokenType, callingPackage, pkgSigDigest);
         }
     }
 
@@ -6068,7 +6203,7 @@ public class AccountManagerService
         }
     }
 
-    private class NotificationId {
+    private static class NotificationId {
         final String mTag;
         private final int mId;
 

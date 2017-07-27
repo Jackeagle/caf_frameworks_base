@@ -22,43 +22,37 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.annotation.TestApi;
-import android.content.pm.ActivityInfo;
-import android.content.res.Configuration;
-import android.graphics.Canvas;
-import android.graphics.GraphicBuffer;
-import android.graphics.Matrix;
-import android.graphics.Point;
-import android.os.BatteryStats;
-import android.os.Build;
-import android.os.Build.VERSION_CODES;
-import android.os.IBinder;
-import android.os.ParcelFileDescriptor;
-
-import com.android.internal.app.procstats.ProcessStats;
-import com.android.internal.os.RoSystemProperties;
-import com.android.internal.os.TransferPipe;
-import com.android.internal.util.FastPrintWriter;
-import com.android.server.LocalServices;
-
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.UriPermission;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.IPackageDataObserver;
 import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
 import android.content.pm.UserInfo;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.GraphicBuffer;
+import android.graphics.Matrix;
+import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.BatteryStats;
+import android.os.Build;
+import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Parcel;
+import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 import android.os.Process;
 import android.os.RemoteException;
@@ -70,6 +64,12 @@ import android.util.ArrayMap;
 import android.util.DisplayMetrics;
 import android.util.Singleton;
 import android.util.Size;
+
+import com.android.internal.app.procstats.ProcessStats;
+import com.android.internal.os.RoSystemProperties;
+import com.android.internal.os.TransferPipe;
+import com.android.internal.util.FastPrintWriter;
+import com.android.server.LocalServices;
 
 import org.xmlpull.v1.XmlSerializer;
 
@@ -117,6 +117,7 @@ import java.util.List;
  * be used for testing and debugging purposes only.
  * </p>
  */
+@SystemService(Context.ACTIVITY_SERVICE)
 public class ActivityManager {
     private static String TAG = "ActivityManager";
 
@@ -170,6 +171,9 @@ public class ActivityManager {
 
         @Override
         public void onUidIdle(int uid, boolean disabled) {
+        }
+
+        @Override public void onUidCachedChanged(int uid, boolean cached) {
         }
     }
 
@@ -301,6 +305,19 @@ public class ActivityManager {
     public static final int START_INTENT_NOT_RESOLVED = FIRST_START_FATAL_ERROR_CODE + 9;
 
     /**
+     * Result for IActivityManager.startAssistantActivity: active session is currently hidden.
+     * @hide
+     */
+    public static final int START_ASSISTANT_HIDDEN_SESSION = FIRST_START_FATAL_ERROR_CODE + 10;
+
+    /**
+     * Result for IActivityManager.startAssistantActivity: active session does not match
+     * the requesting token.
+     * @hide
+     */
+    public static final int START_ASSISTANT_NOT_ACTIVE_SESSION = FIRST_START_FATAL_ERROR_CODE + 11;
+
+    /**
      * Result for IActivityManaqer.startActivity: the activity was started
      * successfully as normal.
      * @hide
@@ -343,6 +360,13 @@ public class ActivityManager {
      */
     public static final int START_RETURN_LOCK_TASK_MODE_VIOLATION =
             FIRST_START_NON_FATAL_ERROR_CODE + 1;
+
+    /**
+     * Result for IActivityManaqer.startActivity: a new activity start was aborted. Never returned
+     * externally.
+     * @hide
+     */
+    public static final int START_ABORTED = FIRST_START_NON_FATAL_ERROR_CODE + 2;
 
     /**
      * Flag for IActivityManaqer.startActivity: do special start mode where
@@ -542,6 +566,9 @@ public class ActivityManager {
     /** @hide Flag for registerUidObserver: report uid has become active. */
     public static final int UID_OBSERVER_ACTIVE = 1<<3;
 
+    /** @hide Flag for registerUidObserver: report uid cached state has changed. */
+    public static final int UID_OBSERVER_CACHED = 1<<4;
+
     /** @hide Mode for {@link IActivityManager#isAppStartModeDisabled}: normal free-to-run operation. */
     public static final int APP_START_MODE_NORMAL = 0;
 
@@ -633,6 +660,9 @@ public class ActivityManager {
      * @hide
      */
     public static final int COMPAT_MODE_TOGGLE = 2;
+
+    private static final boolean DEVELOPMENT_FORCE_LOW_RAM =
+            SystemProperties.getBoolean("debug.force_low_ram", false);
 
     /** @hide */
     public static class StackId {
@@ -879,19 +909,6 @@ public class ActivityManager {
         }
 
         /**
-         * Returns true if activities contained in this stack can request visible behind by
-         * calling {@link Activity#requestVisibleBehind}.
-         *
-         * @deprecated This method's functionality is no longer supported as of
-         * {@link android.os.Build.VERSION_CODES#O} and will be removed in a future release.
-         */
-        @Deprecated
-        public static boolean activitiesCanRequestVisibleBehind(int stackId) {
-            return stackId == FULLSCREEN_WORKSPACE_STACK_ID ||
-                    stackId == ASSISTANT_STACK_ID;
-        }
-
-        /**
          * Returns true if this stack may be scaled without resizing, and windows within may need
          * to be configured as such.
          */
@@ -1093,7 +1110,20 @@ public class ActivityManager {
 
     /** @hide */
     public static boolean isLowRamDeviceStatic() {
-        return RoSystemProperties.CONFIG_LOW_RAM;
+        return RoSystemProperties.CONFIG_LOW_RAM ||
+                (Build.IS_DEBUGGABLE && DEVELOPMENT_FORCE_LOW_RAM);
+    }
+
+    /**
+     * Returns true if this is a small battery device. Exactly whether a device is considered to be
+     * small battery is ultimately up to the device configuration, but currently it generally means
+     * something in the class of a device with 1000 mAh or less. This is mostly intended to be used
+     * to determine whether certain features should be altered to account for a drastically smaller
+     * battery.
+     * @hide
+     */
+    public static boolean isSmallBatteryDevice() {
+        return RoSystemProperties.CONFIG_SMALL_BATTERY;
     }
 
     /**
@@ -1139,8 +1169,12 @@ public class ActivityManager {
      * E.g. freeform, split-screen, picture-in-picture.
      * @hide
      */
-    static public boolean supportsMultiWindow() {
-        return !isLowRamDeviceStatic()
+    static public boolean supportsMultiWindow(Context context) {
+        // On watches, multi-window is used to present essential system UI, and thus it must be
+        // supported regardless of device memory characteristics.
+        boolean isWatch = context.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_WATCH);
+        return (!isLowRamDeviceStatic() || isWatch)
                 && Resources.getSystem().getBoolean(
                     com.android.internal.R.bool.config_supportsMultiWindow);
     }
@@ -1149,8 +1183,8 @@ public class ActivityManager {
      * Returns true if the system supports split screen multi-window.
      * @hide
      */
-    static public boolean supportsSplitScreenMultiWindow() {
-        return supportsMultiWindow()
+    static public boolean supportsSplitScreenMultiWindow(Context context) {
+        return supportsMultiWindow(context)
                 && Resources.getSystem().getBoolean(
                     com.android.internal.R.bool.config_supportsSplitScreenMultiWindow);
     }
@@ -3593,6 +3627,7 @@ public class ActivityManager {
      * @hide
      */
     @SystemApi @TestApi
+    @RequiresPermission(Manifest.permission.PACKAGE_USAGE_STATS)
     public void addOnUidImportanceListener(OnUidImportanceListener listener,
             @RunningAppProcessInfo.Importance int importanceCutpoint) {
         synchronized (this) {
@@ -3621,6 +3656,7 @@ public class ActivityManager {
      * @hide
      */
     @SystemApi @TestApi
+    @RequiresPermission(Manifest.permission.PACKAGE_USAGE_STATS)
     public void removeOnUidImportanceListener(OnUidImportanceListener listener) {
         synchronized (this) {
             UidObserver observer = mImportanceListeners.remove(listener);
@@ -3988,6 +4024,10 @@ public class ActivityManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            "android.permission.INTERACT_ACROSS_USERS",
+            "android.permission.INTERACT_ACROSS_USERS_FULL"
+    })
     public static int getCurrentUser() {
         UserInfo ui;
         try {

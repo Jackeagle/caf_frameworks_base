@@ -32,17 +32,16 @@ import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.settingslib.wifi.AccessPoint;
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
-import com.android.systemui.R.string;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.qs.DetailAdapter;
-import com.android.systemui.qs.QSDetailItems;
-import com.android.systemui.qs.QSDetailItems.Item;
-import com.android.systemui.qs.QSHost;
 import com.android.systemui.plugins.qs.QSIconView;
 import com.android.systemui.plugins.qs.QSTile;
 import com.android.systemui.plugins.qs.QSTile.SignalState;
-import com.android.systemui.qs.tileimpl.QSTileImpl;
+import com.android.systemui.qs.QSDetailItems;
+import com.android.systemui.qs.QSDetailItems.Item;
+import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.SignalTileView;
+import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.statusbar.policy.NetworkController;
 import com.android.systemui.statusbar.policy.NetworkController.AccessPointController;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
@@ -150,6 +149,12 @@ public class WifiTile extends QSTileImpl<SignalState> {
             mDetailAdapter.setItemsVisible(cb.enabled);
             fireToggleStateChanged(cb.enabled);
         }
+        if (state.slash == null) {
+            state.slash = new SlashState();
+            state.slash.rotation = 6;
+        }
+        state.slash.isSlashed = false;
+        state.state = Tile.STATE_ACTIVE;
         state.dualTarget = true;
         state.value = cb.enabled;
         state.activityIn = cb.enabled && cb.activityIn;
@@ -160,6 +165,8 @@ public class WifiTile extends QSTileImpl<SignalState> {
             state.icon = ResourceIcon.get(R.drawable.ic_signal_wifi_transient_animation);
             state.label = r.getString(R.string.quick_settings_wifi_label);
         } else if (!state.value) {
+            state.slash.isSlashed = true;
+            state.state = Tile.STATE_INACTIVE;
             state.icon = ResourceIcon.get(R.drawable.ic_qs_wifi_disabled);
             state.label = r.getString(R.string.quick_settings_wifi_label);
         } else if (wifiConnected) {
@@ -180,11 +187,10 @@ public class WifiTile extends QSTileImpl<SignalState> {
                 minimalContentDescription.append(removeDoubleQuotes(cb.enabledDesc));
             }
         }
-        state.contentDescription = minimalContentDescription;
+        state.contentDescription = minimalContentDescription.toString();
         state.dualLabelContentDescription = r.getString(
                 R.string.accessibility_quick_settings_open_settings, getTileLabel());
         state.expandedAccessibilityClassName = Switch.class.getName();
-        state.state = Tile.STATE_ACTIVE;
     }
 
     @Override
@@ -353,13 +359,20 @@ public class WifiTile extends QSTileImpl<SignalState> {
 
         private void updateItems() {
             if (mItems == null) return;
-            if (mSignalCallback.mInfo.enabled) {
-                mItems.setEmptyState(R.drawable.ic_qs_wifi_detail_empty,
-                        R.string.quick_settings_wifi_detail_empty_text);
-            } else {
+
+            // Wi-Fi is off
+            if (!mSignalCallback.mInfo.enabled) {
                 mItems.setEmptyState(R.drawable.ic_qs_wifi_detail_empty,
                         R.string.wifi_is_off);
+                mItems.setItems(null);
+                return;
             }
+
+            // No available access points
+            mItems.setEmptyState(R.drawable.ic_qs_wifi_detail_empty,
+                    R.string.quick_settings_wifi_detail_empty_text);
+
+            // Build the list
             Item[] items = null;
             if (mAccessPoints != null) {
                 items = new Item[mAccessPoints.length];

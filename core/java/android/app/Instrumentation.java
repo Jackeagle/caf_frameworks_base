@@ -817,7 +817,7 @@ public class Instrumentation {
      * returned.  If the timeout expires, a null object is returned. 
      *
      * @param monitor The ActivityMonitor to wait for.
-     * @param timeOut The timeout value in secs.
+     * @param timeOut The timeout value in milliseconds.
      *
      * @return The Activity object that matched the monitor.
      */
@@ -1960,6 +1960,12 @@ public class Instrumentation {
             case ActivityManager.START_VOICE_HIDDEN_SESSION:
                 throw new IllegalStateException(
                         "Cannot start voice activity on a hidden session");
+            case ActivityManager.START_ASSISTANT_NOT_ACTIVE_SESSION:
+                throw new IllegalStateException(
+                        "Session calling startAssistantActivity does not match active session");
+            case ActivityManager.START_ASSISTANT_HIDDEN_SESSION:
+                throw new IllegalStateException(
+                        "Cannot start assistant activity on a hidden session");
             case ActivityManager.START_CANCELED:
                 throw new AndroidRuntimeException("Activity could not be started for "
                         + intent);

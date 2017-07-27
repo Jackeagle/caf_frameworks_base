@@ -53,12 +53,38 @@ public class KernelUidCpuFreqTimeReader {
 
     private SparseArray<long[]> mLastUidCpuFreqTimeMs = new SparseArray<>();
 
+    // We check the existence of proc file a few times (just in case it is not ready yet when we
+    // start reading) and if it is not available, we simply ignore further read requests.
+    private static final int TOTAL_READ_ERROR_COUNT = 5;
+    private int mReadErrorCounter;
+    private boolean mProcFileAvailable;
+
     public void readDelta(@Nullable Callback callback) {
+        if (!mProcFileAvailable && mReadErrorCounter >= TOTAL_READ_ERROR_COUNT) {
+            return;
+        }
         try (BufferedReader reader = new BufferedReader(new FileReader(UID_TIMES_PROC_FILE))) {
             readDelta(reader, callback);
+            mProcFileAvailable = true;
         } catch (IOException e) {
+            mReadErrorCounter++;
             Slog.e(TAG, "Failed to read " + UID_TIMES_PROC_FILE + ": " + e);
         }
+    }
+
+    public void removeUid(int uid) {
+        mLastUidCpuFreqTimeMs.delete(uid);
+    }
+
+    public void removeUidsInRange(int startUid, int endUid) {
+        if (endUid < startUid) {
+            return;
+        }
+        mLastUidCpuFreqTimeMs.put(startUid, null);
+        mLastUidCpuFreqTimeMs.put(endUid, null);
+        final int firstIndex = mLastUidCpuFreqTimeMs.indexOfKey(startUid);
+        final int lastIndex = mLastUidCpuFreqTimeMs.indexOfKey(endUid);
+        mLastUidCpuFreqTimeMs.removeAtRange(firstIndex, lastIndex - firstIndex + 1);
     }
 
     @VisibleForTesting
@@ -89,13 +115,15 @@ public class KernelUidCpuFreqTimeReader {
             return;
         }
         final long[] deltaUidTimeMs = new long[size];
+        boolean notify = false;
         for (int i = 0; i < size; ++i) {
             // Times read will be in units of 10ms
             final long totalTimeMs = Long.parseLong(timesStr[i], 10) * 10;
             deltaUidTimeMs[i] = totalTimeMs - uidTimeMs[i];
             uidTimeMs[i] = totalTimeMs;
+            notify = notify || (deltaUidTimeMs[i] > 0);
         }
-        if (callback != null) {
+        if (callback != null && notify) {
             callback.onUidCpuFreqTime(uid, deltaUidTimeMs);
         }
     }

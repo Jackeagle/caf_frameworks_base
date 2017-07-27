@@ -16,10 +16,6 @@
 
 package com.android.systemui.statusbar.stack;
 
-import android.content.Context;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.annotation.UiThreadTest;
-import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 import android.view.NotificationHeaderView;
@@ -31,7 +27,6 @@ import com.android.systemui.statusbar.NotificationTestHelper;
 
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -59,5 +54,13 @@ public class NotificationChildrenContainerTest extends SysuiTestCase {
         mGroup.setIsLowPriority(false);
         Assert.assertTrue(lowPriorityHeaderView.getParent() == null);
         Assert.assertTrue(childrenContainer.getLowPriorityHeaderView() == null);
+    }
+
+    @Test
+    public void testRecreateNotificationHeader_hasHeader() {
+        NotificationChildrenContainer childrenContainer = mGroup.getChildrenContainer();
+        childrenContainer.recreateNotificationHeader(null);
+        Assert.assertNotNull("Children container must have a header after recreation",
+                childrenContainer.getCurrentHeaderView());
     }
 }

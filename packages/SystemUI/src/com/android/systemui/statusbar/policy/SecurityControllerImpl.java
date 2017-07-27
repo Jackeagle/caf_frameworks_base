@@ -90,6 +90,10 @@ public class SecurityControllerImpl extends CurrentUserTracker implements Securi
     private ArrayMap<Integer, Boolean> mHasCACerts = new ArrayMap<Integer, Boolean>();
 
     public SecurityControllerImpl(Context context) {
+        this(context, null);
+    }
+
+    public SecurityControllerImpl(Context context, SecurityControllerCallback callback) {
         super(context);
         mContext = context;
         mDevicePolicyManager = (DevicePolicyManager)
@@ -101,6 +105,8 @@ public class SecurityControllerImpl extends CurrentUserTracker implements Securi
         mPackageManager = context.getPackageManager();
         mUserManager = (UserManager)
                 context.getSystemService(Context.USER_SERVICE);
+
+        addCallback(callback);
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(KeyChain.ACTION_TRUST_STORE_CHANGED);
@@ -396,7 +402,9 @@ public class SecurityControllerImpl extends CurrentUserTracker implements Securi
                 boolean hasCACerts = !(conn.getService().getUserCaAliases().getList().isEmpty());
                 return new Pair<Integer, Boolean>(userId[0], hasCACerts);
             } catch (RemoteException | InterruptedException | AssertionError e) {
-                Log.i(TAG, e.getMessage());
+                if (e != null && e.getMessage() != null) {
+                    Log.i(TAG, e.getMessage());
+                }
                 new Handler(Dependency.get(Dependency.BG_LOOPER)).postDelayed(
                         () -> new CACertLoader().execute(userId[0]),
                         CA_CERT_LOADING_RETRY_TIME_IN_MS);

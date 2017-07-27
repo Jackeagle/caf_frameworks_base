@@ -18,7 +18,9 @@ package com.android.server.wm;
 
 import static android.app.ActivityManager.ENABLE_TASK_SNAPSHOTS;
 import static android.app.ActivityManager.StackId;
+import static android.app.ActivityManager.StackId.FREEFORM_WORKSPACE_STACK_ID;
 import static android.app.ActivityManager.StackId.INVALID_STACK_ID;
+import static android.app.ActivityManager.StackId.PINNED_STACK_ID;
 import static android.app.ActivityManager.isLowRamDeviceStatic;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -44,6 +46,7 @@ import static android.view.WindowManager.LayoutParams.FORMAT_CHANGED;
 import static android.view.WindowManager.LayoutParams.LAST_SUB_WINDOW;
 import static android.view.WindowManager.LayoutParams.MATCH_PARENT;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_COMPATIBLE_WINDOW;
+import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_LAYOUT_CHILD_WINDOW_IN_PARENT_FRAME;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_WILL_NOT_REPLACE_ON_RELAUNCH;
@@ -57,7 +60,9 @@ import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
 import static android.view.WindowManager.LayoutParams.TYPE_DRAWN_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG;
+import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
+import static android.view.WindowManager.LayoutParams.isSystemAlertWindowType;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_DRAG_RESIZING_DOCKED;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_DRAG_RESIZING_FREEFORM;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_FIRST_TIME;
@@ -206,6 +211,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean mPolicyVisibilityAfterAnim = true;
     private boolean mAppOpVisibility = true;
     boolean mPermanentlyHidden; // the window should never be shown again
+    // This is a non-system overlay window that is currently force hidden.
+    private boolean mForceHideNonSystemOverlayWindow;
     boolean mAppFreezing;
     boolean mHidden;    // Used to determine if to show child windows.
     boolean mWallpaperVisible;  // for wallpaper, what was last vis report?
@@ -558,6 +565,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     final Rect mLastSurfaceInsets = new Rect();
 
     /**
+     * A flag set by the {@link WindowState} parent to indicate that the parent has examined this
+     * {@link WindowState} in its overall drawing context. This book-keeping allows the parent to
+     * make sure all children have been considered.
+     */
+    private boolean mDrawnStateEvaluated;
+
+    /**
      * Compares two window sub-layers and returns -1 if the first is lesser than the second in terms
      * of z-order and 1 otherwise.
      */
@@ -673,6 +687,27 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mSession.windowAddedLocked(mAttrs.packageName);
     }
 
+    /**
+     * Returns whether this {@link WindowState} has been considered for drawing by its parent.
+     */
+    boolean getDrawnStatedEvaluated() {
+        return mDrawnStateEvaluated;
+    }
+
+    /**
+     * Sets whether this {@link WindowState} has been considered for drawing by its parent. Should
+     * be cleared when detached from parent.
+     */
+    void setDrawnStateEvaluated(boolean evaluated) {
+        mDrawnStateEvaluated = evaluated;
+    }
+
+    @Override
+    void onParentSet() {
+        super.onParentSet();
+        setDrawnStateEvaluated(false /*evaluated*/);
+    }
+
     @Override
     public int getOwningUid() {
         return mOwnerUid;
@@ -761,16 +796,19 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             final WindowState imeWin = mService.mInputMethodWindow;
             // IME is up and obscuring this window. Adjust the window position so it is visible.
             if (imeWin != null && imeWin.isVisibleNow() && mService.mInputMethodTarget == this) {
-                    if (windowsAreFloating && mContainingFrame.bottom > contentFrame.bottom) {
-                        // In freeform we want to move the top up directly.
-                        // TODO: Investigate why this is contentFrame not parentFrame.
-                        mContainingFrame.top -= mContainingFrame.bottom - contentFrame.bottom;
-                    } else if (mContainingFrame.bottom > parentFrame.bottom) {
-                        // But in docked we want to behave like fullscreen
-                        // and behave as if the task were given smaller bounds
-                        // for the purposes of layout.
-                        mContainingFrame.bottom = parentFrame.bottom;
-                    }
+                final int stackId = getStackId();
+                if (stackId == FREEFORM_WORKSPACE_STACK_ID
+                        && mContainingFrame.bottom > contentFrame.bottom) {
+                    // In freeform we want to move the top up directly.
+                    // TODO: Investigate why this is contentFrame not parentFrame.
+                    mContainingFrame.top -= mContainingFrame.bottom - contentFrame.bottom;
+                } else if (stackId != PINNED_STACK_ID
+                        && mContainingFrame.bottom > parentFrame.bottom) {
+                    // But in docked we want to behave like fullscreen and behave as if the task
+                    // were given smaller bounds for the purposes of layout. Skip adjustments for
+                    // the pinned stack, they are handled separately in the PinnedStackController.
+                    mContainingFrame.bottom = parentFrame.bottom;
+                }
             }
 
             if (windowsAreFloating) {
@@ -1628,7 +1666,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final boolean adjustedForMinimizedDockOrIme = task != null
                 && (task.mStack.isAdjustedForMinimizedDockedStack()
                 || task.mStack.isAdjustedForIme());
-        if (mService.okToDisplay()
+        if (mService.okToAnimate()
                 && (mAttrs.privateFlags & PRIVATE_FLAG_NO_MOVE_ANIMATION) == 0
                 && !isDragResizing() && !adjustedForMinimizedDockOrIme
                 && (task == null || getTask().mStack.hasMovementAnimations())
@@ -1797,7 +1835,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // First, see if we need to run an animation. If we do, we have to hold off on removing the
         // window until the animation is done. If the display is frozen, just remove immediately,
         // since the animation wouldn't be seen.
-        if (mHasSurface && mService.okToDisplay()) {
+        if (mHasSurface && mService.okToAnimate()) {
             if (mWillReplaceWindow) {
                 // This window is going to be replaced. We need to keep it around until the new one
                 // gets added, then we will get rid of this one.
@@ -1934,6 +1972,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mIsImWindow) {
             // IME windows can't be IME targets. IME targets are required to be below the IME
             // windows and that wouldn't be possible if the IME window is its own target...silly.
+            return false;
+        }
+
+        final boolean windowsAreFocusable = mAppToken != null && mAppToken.windowsAreFocusable();
+        if (!windowsAreFocusable) {
+            // This window can't be an IME target if the app's windows should not be focusable.
             return false;
         }
 
@@ -2202,27 +2246,38 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
-    void prepareWindowToDisplayDuringRelayout(MergedConfiguration mergedConfiguration) {
-        if ((mAttrs.softInputMode & SOFT_INPUT_MASK_ADJUST)
-                == SOFT_INPUT_ADJUST_RESIZE) {
-            mLayoutNeeded = true;
-        }
-        if (isDrawnLw() && mService.okToDisplay()) {
-            mWinAnimator.applyEnterAnimationLocked();
-        }
+    void prepareWindowToDisplayDuringRelayout(boolean wasVisible) {
+        // We need to turn on screen regardless of visibility.
         if ((mAttrs.flags & FLAG_TURN_SCREEN_ON) != 0) {
             if (DEBUG_VISIBILITY) Slog.v(TAG, "Relayout window turning screen on: " + this);
             mTurnOnScreen = true;
         }
-        if (isConfigChanged()) {
-            final Configuration globalConfig = mService.mRoot.getConfiguration();
-            final Configuration overrideConfig = getMergedOverrideConfiguration();
-            mergedConfiguration.setConfiguration(globalConfig, overrideConfig);
-            if (DEBUG_CONFIGURATION) Slog.i(TAG, "Window " + this
-                    + " visible with new global config: " + globalConfig
-                    + " merged override config: " + overrideConfig);
-            mLastReportedConfiguration.setTo(getConfiguration());
+
+        // If we were already visible, skip rest of preparation.
+        if (wasVisible) {
+            if (DEBUG_VISIBILITY) Slog.v(TAG,
+                    "Already visible and does not turn on screen, skip preparing: " + this);
+            return;
         }
+
+        if ((mAttrs.softInputMode & SOFT_INPUT_MASK_ADJUST)
+                == SOFT_INPUT_ADJUST_RESIZE) {
+            mLayoutNeeded = true;
+        }
+
+        if (isDrawnLw() && mService.okToAnimate()) {
+            mWinAnimator.applyEnterAnimationLocked();
+        }
+    }
+
+    void getMergedConfiguration(MergedConfiguration outConfiguration) {
+        final Configuration globalConfig = mService.mRoot.getConfiguration();
+        final Configuration overrideConfig = getMergedOverrideConfiguration();
+        outConfiguration.setConfiguration(globalConfig, overrideConfig);
+    }
+
+    void setReportedConfiguration(MergedConfiguration config) {
+        mLastReportedConfiguration.setTo(config.getMergedConfiguration());
     }
 
     void adjustStartingWindowFlags() {
@@ -2354,6 +2409,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // to handle their windows being removed from under them.
             return false;
         }
+        if (mForceHideNonSystemOverlayWindow) {
+            // This is an alert window that is currently force hidden.
+            return false;
+        }
         if (mPolicyVisibility && mPolicyVisibilityAfterAnim) {
             // Already showing.
             return false;
@@ -2362,7 +2421,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (doAnimation) {
             if (DEBUG_VISIBILITY) Slog.v(TAG, "doAnimation: mPolicyVisibility="
                     + mPolicyVisibility + " mAnimation=" + mWinAnimator.mAnimation);
-            if (!mService.okToDisplay()) {
+            if (!mService.okToAnimate()) {
                 doAnimation = false;
             } else if (mPolicyVisibility && mWinAnimator.mAnimation == null) {
                 // Check for the case where we are currently visible and
@@ -2392,7 +2451,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     boolean hideLw(boolean doAnimation, boolean requestAnim) {
         if (doAnimation) {
-            if (!mService.okToDisplay()) {
+            if (!mService.okToAnimate()) {
                 doAnimation = false;
             }
         }
@@ -2428,6 +2487,22 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mService.updateFocusedWindowLocked(UPDATE_FOCUS_NORMAL, false /* updateImWindows */);
         }
         return true;
+    }
+
+    void setForceHideNonSystemOverlayWindowIfNeeded(boolean forceHide) {
+        if (mOwnerCanAddInternalSystemWindow
+                || (!isSystemAlertWindowType(mAttrs.type) && mAttrs.type != TYPE_TOAST)) {
+            return;
+        }
+        if (mForceHideNonSystemOverlayWindow == forceHide) {
+            return;
+        }
+        mForceHideNonSystemOverlayWindow = forceHide;
+        if (forceHide) {
+            hideLw(true /* doAnimation */, true /* requestAnim */);
+        } else {
+            showLw(true /* doAnimation */, true /* requestAnim */);
+        }
     }
 
     public void setAppOpVisibilityLw(boolean state) {
@@ -2988,14 +3063,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         try {
             if (DEBUG_RESIZE || DEBUG_ORIENTATION) Slog.v(TAG, "Reporting new frame to " + this
                     + ": " + mCompatFrame);
-            final MergedConfiguration mergedConfiguration;
-            if (isConfigChanged()) {
-                mergedConfiguration = new MergedConfiguration(mService.mRoot.getConfiguration(),
-                        getMergedOverrideConfiguration());
-                mLastReportedConfiguration.setTo(mergedConfiguration.getMergedConfiguration());
-            } else {
-                mergedConfiguration = null;
-            }
+            final MergedConfiguration mergedConfiguration =
+                    new MergedConfiguration(mService.mRoot.getConfiguration(),
+                    getMergedOverrideConfiguration());
+
+            setReportedConfiguration(mergedConfiguration);
+
             if (DEBUG_ORIENTATION && mWinAnimator.mDrawState == DRAW_PENDING)
                 Slog.i(TAG, "Resizing " + this + " WITH DRAW PENDING");
 
@@ -3313,7 +3386,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             pw.println(Integer.toHexString(mSystemUiVisibility));
         }
         if (!mPolicyVisibility || !mPolicyVisibilityAfterAnim || !mAppOpVisibility
-                || isParentWindowHidden()|| mPermanentlyHidden) {
+                || isParentWindowHidden()|| mPermanentlyHidden || mForceHideNonSystemOverlayWindow) {
             pw.print(prefix); pw.print("mPolicyVisibility=");
                     pw.print(mPolicyVisibility);
                     pw.print(" mPolicyVisibilityAfterAnim=");
@@ -3321,7 +3394,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     pw.print(" mAppOpVisibility=");
                     pw.print(mAppOpVisibility);
                     pw.print(" parentHidden="); pw.print(isParentWindowHidden());
-                    pw.print(" mPermanentlyHidden="); pw.println(mPermanentlyHidden);
+                    pw.print(" mPermanentlyHidden="); pw.print(mPermanentlyHidden);
+                    pw.print(" mForceHideNonSystemOverlayWindow="); pw.println(
+                    mForceHideNonSystemOverlayWindow);
         }
         if (!mRelayoutCalled || mLayoutNeeded) {
             pw.print(prefix); pw.print("mRelayoutCalled="); pw.print(mRelayoutCalled);
@@ -3407,7 +3482,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             pw.print(prefix); pw.print("mOrientationChanging=");
                     pw.print(mOrientationChanging);
                     pw.print(" mAppFreezing="); pw.print(mAppFreezing);
-                    pw.print(" mTurnOnScreen="); pw.println(mTurnOnScreen);
+                    pw.print(" mTurnOnScreen="); pw.print(mTurnOnScreen);
                     pw.print(" mReportOrientationChanged="); pw.println(mReportOrientationChanged);
         }
         if (mLastFreezeDuration != 0) {
@@ -3574,6 +3649,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean layoutInParentFrame() {
         return mIsChildWindow
                 && (mAttrs.privateFlags & PRIVATE_FLAG_LAYOUT_CHILD_WINDOW_IN_PARENT_FRAME) != 0;
+    }
+
+    /**
+     * Returns true if any window added by an application process that if of type
+     * {@link android.view.WindowManager.LayoutParams#TYPE_TOAST} or that requires that requires
+     * {@link android.app.AppOpsManager#OP_SYSTEM_ALERT_WINDOW} permission should be hidden when
+     * this window is visible.
+     */
+    boolean hideNonSystemOverlayWindowsWhenVisible() {
+        return (mAttrs.privateFlags & PRIVATE_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS) != 0
+                && mSession.mCanHideNonSystemOverlayWindows;
     }
 
     /** Returns the parent window if this is a child of another window, else null. */
@@ -4325,8 +4411,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return !mLastSurfaceInsets.equals(mAttrs.surfaceInsets);
     }
 
-    int relayoutVisibleWindow(MergedConfiguration mergedConfiguration, int result, int attrChanges,
-            int oldVisibility) {
+    int relayoutVisibleWindow(int result, int attrChanges, int oldVisibility) {
         final boolean wasVisible = isVisibleLw();
 
         result |= (!wasVisible || !isDrawnLw()) ? RELAYOUT_RES_FIRST_TIME : 0;
@@ -4348,9 +4433,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mLastVisibleLayoutRotation = getDisplayContent().getRotation();
 
         mWinAnimator.mEnteringAnimation = true;
-        if (!wasVisible) {
-            prepareWindowToDisplayDuringRelayout(mergedConfiguration);
-        }
+
+        prepareWindowToDisplayDuringRelayout(wasVisible);
+
         if ((attrChanges & FORMAT_CHANGED) != 0) {
             // If the format can't be changed in place, preserve the old surface until the app draws
             // on the new one. This prevents blinking when we change elevation of freeform and

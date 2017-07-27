@@ -52,7 +52,6 @@ import static com.android.server.wm.WindowManagerService.logWithStack;
 
 import android.annotation.NonNull;
 import android.app.Activity;
-import android.app.ActivityManager;
 import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Binder;
@@ -395,6 +394,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                     startingWindow.mPolicyVisibility = false;
                     startingWindow.mPolicyVisibilityAfterAnim = false;
                 }
+
+                // We are becoming visible, so better freeze the screen with the windows that are
+                // getting visible so we also wait for them.
+                forAllWindows(mService::makeWindowFreezingScreenIfNeededLocked, true);
             }
 
             if (DEBUG_APP_TRANSITIONS) Slog.v(TAG_WM, "setVisibility: " + this
@@ -438,6 +441,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                     mChildren.get(i).mWinAnimator.hide("immediately hidden");
                 }
                 SurfaceControl.closeTransaction();
+                removeStartingWindow();
             }
 
             if (!mService.mClosingApps.contains(this) && !mService.mOpeningApps.contains(this)) {
@@ -515,6 +519,12 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return super.checkCompleteDeferredRemoval();
     }
 
+    private void removeStartingWindow() {
+        if (startingData != null && getController() != null) {
+            getController().removeStartingWindow();
+        }
+    }
+
     void onRemovedFromDisplay() {
         if (mRemovingFromDisplay) {
             return;
@@ -526,7 +536,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         boolean delayed = setVisibility(null, false, TRANSIT_UNSET, true, mVoiceInteraction);
 
         mService.mOpeningApps.remove(this);
-        mService.mUnknownAppVisibilityController.appRemoved(this);
+        mService.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         mService.mTaskSnapshotController.onAppRemoved(this);
         waitingToShow = false;
         if (mService.mClosingApps.contains(this)) {
@@ -542,9 +552,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (DEBUG_ADD_REMOVE || DEBUG_TOKEN_MOVEMENT) Slog.v(TAG_WM, "removeAppToken: "
                 + this + " delayed=" + delayed + " Callers=" + Debug.getCallers(4));
 
-        if (startingData != null && getController() != null) {
-            getController().removeStartingWindow();
-        }
+        removeStartingWindow();
 
         // If this window was animating, then we need to ensure that the app transition notifies
         // that animations have completed in WMS.handleAnimatingStoppedAndTransitionLocked(), so
@@ -892,8 +900,24 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return mPendingRelaunchCount > 0;
     }
 
+    boolean shouldFreezeBounds() {
+        final Task task = getTask();
+
+        // For freeform windows, we can't freeze the bounds at the moment because this would make
+        // the resizing unresponsive.
+        if (task == null || task.inFreeformWorkspace()) {
+            return false;
+        }
+
+        // We freeze the bounds while drag resizing to deal with the time between
+        // the divider/drag handle being released, and the handling it's new
+        // configuration. If we are relaunched outside of the drag resizing state,
+        // we need to be careful not to do this.
+        return getTask().isDragResizing();
+    }
+
     void startRelaunching() {
-        if (canFreezeBounds()) {
+        if (shouldFreezeBounds()) {
             freezeBounds();
         }
 
@@ -910,26 +934,21 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     }
 
     void finishRelaunching() {
-        if (canFreezeBounds()) {
-            unfreezeBounds();
-        }
+        unfreezeBounds();
+
         if (mPendingRelaunchCount > 0) {
             mPendingRelaunchCount--;
         } else {
             // Update keyguard flags upon finishing relaunch.
             checkKeyguardFlagsChanged();
         }
-
-        updateAllDrawn();
     }
 
     void clearRelaunching() {
         if (mPendingRelaunchCount == 0) {
             return;
         }
-        if (canFreezeBounds()) {
-            unfreezeBounds();
-        }
+        unfreezeBounds();
         mPendingRelaunchCount = 0;
     }
 
@@ -1033,14 +1052,6 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
     }
 
-    private boolean canFreezeBounds() {
-        final Task task = getTask();
-
-        // For freeform windows, we can't freeze the bounds at the moment because this would make
-        // the resizing unresponsive.
-        return task != null && !task.inFreeformWorkspace();
-    }
-
     /**
      * Freezes the task bounds. The size of this task reported the app will be fixed to the bounds
      * freezed by {@link Task#prepareFreezingBounds} until {@link #unfreezeBounds} gets called, even
@@ -1065,9 +1076,10 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
      * Unfreezes the previously frozen bounds. See {@link #freezeBounds}.
      */
     private void unfreezeBounds() {
-        if (!mFrozenBounds.isEmpty()) {
-            mFrozenBounds.remove();
+        if (mFrozenBounds.isEmpty()) {
+            return;
         }
+        mFrozenBounds.remove();
         if (!mFrozenMergedConfig.isEmpty()) {
             mFrozenMergedConfig.remove();
         }
@@ -1108,7 +1120,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 mAppAnimator.lastFreezeDuration = 0;
                 mService.mAppsFreezingScreen++;
                 if (mService.mAppsFreezingScreen == 1) {
-                    mService.startFreezingDisplayLocked(false, 0, 0);
+                    mService.startFreezingDisplayLocked(false, 0, 0, getDisplayContent());
                     mService.mH.removeMessages(H.APP_FREEZE_TIMEOUT);
                     mService.mH.sendEmptyMessageDelayed(H.APP_FREEZE_TIMEOUT, 2000);
                 }
@@ -1335,12 +1347,39 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
     }
 
+    /**
+     * Returns whether the drawn window states of this {@link AppWindowToken} has considered every
+     * child {@link WindowState}. A child is considered if it has been passed into
+     * {@link #updateDrawnWindowStates(WindowState)} after being added. This is used to determine
+     * whether states, such as {@code allDrawn}, can be set, which relies on state variables such as
+     * {@code mNumInterestingWindows}, which depend on all {@link WindowState}s being considered.
+     *
+     * @return {@code true} If all children have been considered, {@code false}.
+     */
+    private boolean allDrawnStatesConsidered() {
+        for (WindowState child : mChildren) {
+            if (!child.getDrawnStatedEvaluated()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     *  Determines if the token has finished drawing. This should only be called from
+     *  {@link DisplayContent#applySurfaceChangesTransaction}
+     */
     void updateAllDrawn() {
         if (!allDrawn) {
             // Number of drawn windows can be less when a window is being relaunched, wait for
-            // all windows to be launched and drawn for this token be considered all drawn
+            // all windows to be launched and drawn for this token be considered all drawn.
             final int numInteresting = mNumInterestingWindows;
-            if (numInteresting > 0 && mNumDrawnWindows >= numInteresting && !isRelaunching()) {
+
+            // We must make sure that all present children have been considered (determined by
+            // {@link #allDrawnStatesConsidered}) before evaluating whether everything has been
+            // drawn.
+            if (numInteresting > 0 && allDrawnStatesConsidered()
+                    && mNumDrawnWindows >= numInteresting && !isRelaunching()) {
                 if (DEBUG_VISIBILITY) Slog.v(TAG, "allDrawn: " + this
                         + " interesting=" + numInteresting + " drawn=" + mNumDrawnWindows);
                 allDrawn = true;
@@ -1385,6 +1424,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
      *         windows in this app token where not considered drawn as of the last pass.
      */
     boolean updateDrawnWindowStates(WindowState w) {
+        w.setDrawnStateEvaluated(true /*evaluated*/);
+
         if (DEBUG_STARTING_WINDOW_VERBOSE && w == startingWindow) {
             Slog.d(TAG, "updateWindows: starting " + w + " isOnScreen=" + w.isOnScreen()
                     + " allDrawn=" + allDrawn + " freezingScreen=" + mAppAnimator.freezingScreen);
@@ -1560,6 +1601,17 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             }
         }
         return null;
+    }
+
+    int getLowestAnimLayer() {
+        for (int i = 0; i < mChildren.size(); i++) {
+            final WindowState w = mChildren.get(i);
+            if (w.mRemoved) {
+                continue;
+            }
+            return w.mWinAnimator.mAnimLayer;
+        }
+        return Integer.MAX_VALUE;
     }
 
     WindowState getHighestAnimLayerWindow(WindowState currentTarget) {

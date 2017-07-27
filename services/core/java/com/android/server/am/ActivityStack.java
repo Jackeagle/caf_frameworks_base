@@ -118,6 +118,8 @@ import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Display;
+import com.android.internal.app.ActivityTrigger;
+
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IVoiceInteractor;
@@ -128,6 +130,7 @@ import com.android.server.am.ActivityStackSupervisor.ActivityContainer;
 import com.android.server.wm.StackWindowController;
 import com.android.server.wm.StackWindowListener;
 import com.android.server.wm.WindowManagerService;
+import android.util.BoostFramework;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -230,9 +233,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     static final int STACK_INVISIBLE = 0;
     // Stack is considered visible
     static final int STACK_VISIBLE = 1;
-    // Stack is considered visible, but only becuase it has activity that is visible behind other
-    // activities and there is a specific combination of stacks.
-    static final int STACK_VISIBLE_ACTIVITY_BEHIND = 2;
 
     @VisibleForTesting
     /* The various modes for the method {@link #removeTask}. */
@@ -244,7 +244,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     static final int REMOVE_TASK_MODE_MOVING = 1;
     // Similar to {@link #REMOVE_TASK_MODE_MOVING} and the task will be added to the top of its new
     // stack and the new stack will be on top of all stacks.
-    private static final int REMOVE_TASK_MODE_MOVING_TO_TOP = 2;
+    static final int REMOVE_TASK_MODE_MOVING_TO_TOP = 2;
 
     // The height/width divide used when fitting a task within a bounds with method
     // {@link #fitWithinBounds}.
@@ -258,6 +258,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     T mWindowContainerController;
     private final RecentTasks mRecentTasks;
 
+    public BoostFramework mPerf = null;
     /**
      * The back history of all previous (and possibly still
      * running) activities.  It contains #TaskRecord objects.
@@ -365,8 +366,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     static final int STOP_TIMEOUT_MSG = ActivityManagerService.FIRST_ACTIVITY_STACK_MSG + 4;
     static final int DESTROY_ACTIVITIES_MSG = ActivityManagerService.FIRST_ACTIVITY_STACK_MSG + 5;
     static final int TRANSLUCENT_TIMEOUT_MSG = ActivityManagerService.FIRST_ACTIVITY_STACK_MSG + 6;
-    static final int RELEASE_BACKGROUND_RESOURCES_TIMEOUT_MSG =
-            ActivityManagerService.FIRST_ACTIVITY_STACK_MSG + 7;
 
     private static class ScheduleDestroyArgs {
         final ProcessRecord mOwner;
@@ -379,8 +378,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
     final Handler mHandler;
 
-    private class ActivityStackHandler extends Handler {
+    static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
 
+    private class ActivityStackHandler extends Handler {
         ActivityStackHandler(Looper looper) {
             super(looper);
         }
@@ -438,15 +438,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 case TRANSLUCENT_TIMEOUT_MSG: {
                     synchronized (mService) {
                         notifyActivityDrawnLocked(null);
-                    }
-                } break;
-                case RELEASE_BACKGROUND_RESOURCES_TIMEOUT_MSG: {
-                    synchronized (mService) {
-                        final ActivityRecord r = getVisibleBehindActivity();
-                        Slog.e(TAG, "Timeout waiting for cancelVisibleBehind player=" + r);
-                        if (r != null) {
-                            mService.killAppAtUsersRequest(r.app, null);
-                        }
                     }
                 } break;
             }
@@ -1195,15 +1186,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
             if (DEBUG_PAUSE) Slog.v(TAG_PAUSE, "Sleep still waiting to pause " + mPausingActivity);
             return true;
         }
-
-        if (hasVisibleBehindActivity()) {
-            // Stop visible behind activity before going to sleep.
-            final ActivityRecord r = getVisibleBehindActivity();
-            mStackSupervisor.mStoppingActivities.add(r);
-            if (DEBUG_STATES) Slog.v(TAG_STATES, "Sleep still waiting to stop visible behind " + r);
-            return true;
-        }
-
         return false;
     }
 
@@ -1281,6 +1263,11 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
         if (DEBUG_STATES) Slog.v(TAG_STATES, "Moving to PAUSING: " + prev);
         else if (DEBUG_PAUSE) Slog.v(TAG_PAUSE, "Start pausing: " + prev);
+
+        if (mActivityTrigger != null) {
+            mActivityTrigger.activityPauseTrigger(prev.intent, prev.info, prev.appInfo);
+        }
+
         mResumedActivity = null;
         mPausingActivity = prev;
         mLastPausedActivity = prev;
@@ -1422,8 +1409,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     // We can't clobber it, because the stop confirmation will not be handled.
                     // We don't need to schedule another stop, we only need to let it happen.
                     prev.state = STOPPING;
-                } else if ((!prev.visible && !hasVisibleBehindActivity())
-                        || mService.isSleepingOrShuttingDownLocked()) {
+                } else if (!prev.visible || mService.isSleepingOrShuttingDownLocked()) {
                     // Clear out any deferred client hide we might currently have.
                     prev.setDeferHidingClient(false);
                     // If we were visible then resumeTopActivities will release resources before
@@ -1628,8 +1614,8 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     }
 
     /**
-     * Returns what the stack visibility should be: {@link #STACK_INVISIBLE}, {@link #STACK_VISIBLE}
-     * or {@link #STACK_VISIBLE_ACTIVITY_BEHIND}.
+     * Returns what the stack visibility should be: {@link #STACK_INVISIBLE} or
+     * {@link #STACK_VISIBLE}.
      *
      * @param starting The currently starting activity or null if there is none.
      */
@@ -1653,14 +1639,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         // Check position and visibility of this stack relative to the front stack on its display.
         final ActivityStack topStack = getTopStackOnDisplay();
         final int topStackId = topStack.mStackId;
-
-        if (StackId.isBackdropToTranslucentActivity(mStackId)
-                && hasVisibleBehindActivity() && StackId.isHomeOrRecentsStack(topStackId)
-                && (topStack.topActivity() == null || !topStack.topActivity().fullscreen)) {
-            // The fullscreen or assistant stack should be visible if it has a visible behind
-            // activity behind the home or recents stack that is translucent.
-            return STACK_VISIBLE_ACTIVITY_BEHIND;
-        }
 
         if (mStackId == DOCKED_STACK_ID) {
             // If the assistant stack is focused and translucent, then the docked stack is always
@@ -1690,14 +1668,20 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         }
         final int stackBehindTopId = (stackBehindTopIndex >= 0)
                 ? mStacks.get(stackBehindTopIndex).mStackId : INVALID_STACK_ID;
-        if ((topStackId == DOCKED_STACK_ID || topStackId == PINNED_STACK_ID)
-                && (stackIndex == stackBehindTopIndex
-                || (stackBehindTopId == DOCKED_STACK_ID
-                && stackIndex == stackBehindTopIndex - 1))) {
-            // Stacks directly behind the docked or pinned stack are always visible.
-            // Also this stack is visible if behind docked stack and the docked stack is behind the
-            // top-most pinned stack
-            return STACK_VISIBLE;
+        if (topStackId == DOCKED_STACK_ID || StackId.isAlwaysOnTop(topStackId)) {
+            if (stackIndex == stackBehindTopIndex) {
+                // Stacks directly behind the docked or pinned stack are always visible.
+                return STACK_VISIBLE;
+            } else if (StackId.isAlwaysOnTop(topStackId) && stackIndex == stackBehindTopIndex - 1) {
+                // Otherwise, this stack can also be visible if it is directly behind a docked stack
+                // or translucent assistant stack behind an always-on-top top-most stack
+                if (stackBehindTopId == DOCKED_STACK_ID) {
+                    return STACK_VISIBLE;
+                } else if (stackBehindTopId == ASSISTANT_STACK_ID) {
+                    return mStacks.get(stackBehindTopIndex).isStackTranslucent(starting, mStackId)
+                            ? STACK_VISIBLE : STACK_INVISIBLE;
+                }
+            }
         }
 
         if (StackId.isBackdropToTranslucentActivity(topStackId)
@@ -1780,12 +1764,10 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
             boolean aboveTop = top != null;
             final int stackVisibility = shouldBeVisible(starting);
             final boolean stackInvisible = stackVisibility != STACK_VISIBLE;
-            final boolean stackVisibleBehind = stackVisibility == STACK_VISIBLE_ACTIVITY_BEHIND;
             boolean behindFullscreenActivity = stackInvisible;
             boolean resumeNextActivity = mStackSupervisor.isFocusedStack(this)
                     && (isInStackLocked(starting) == null);
             boolean behindTranslucentActivity = false;
-            final ActivityRecord visibleBehind = getVisibleBehindActivity();
             for (int taskNdx = mTaskHistory.size() - 1; taskNdx >= 0; --taskNdx) {
                 final TaskRecord task = mTaskHistory.get(taskNdx);
                 final ArrayList<ActivityRecord> activities = task.mActivities;
@@ -1810,7 +1792,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
                     // Check whether activity should be visible without Keyguard influence
                     final boolean visibleIgnoringKeyguard = r.shouldBeVisibleIgnoringKeyguard(
-                            behindTranslucentActivity, stackVisibleBehind, visibleBehind,
                             behindFullscreenActivity);
                     r.visibleIgnoringKeyguard = visibleIgnoringKeyguard;
 
@@ -1862,7 +1843,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                                 + stackInvisible + " behindFullscreenActivity="
                                 + behindFullscreenActivity + " mLaunchTaskBehind="
                                 + r.mLaunchTaskBehind);
-                        makeInvisible(r, visibleBehind);
+                        makeInvisible(r);
                     }
                 }
                 if (mStackId == FREEFORM_WORKSPACE_STACK_ID) {
@@ -1942,7 +1923,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         final boolean isInPinnedStack = r.getStack().getStackId() == PINNED_STACK_ID;
         final boolean keyguardShowing = mStackSupervisor.mKeyguardController.isKeyguardShowing();
         final boolean keyguardLocked = mStackSupervisor.mKeyguardController.isKeyguardLocked();
-        final boolean showWhenLocked = r.hasShowWhenLockedWindows() && !isInPinnedStack;
+        final boolean showWhenLocked = r.canShowWhenLocked() && !isInPinnedStack;
         final boolean dismissKeyguard = r.hasDismissKeyguardWindows();
         if (shouldBeVisible) {
             if (dismissKeyguard && mTopDismissingKeyguardActivity == null) {
@@ -2028,7 +2009,8 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         return false;
     }
 
-    private void makeInvisible(ActivityRecord r, ActivityRecord visibleBehind) {
+    // TODO: Should probably be moved into ActivityRecord.
+    private void makeInvisible(ActivityRecord r) {
         if (!r.visible) {
             if (DEBUG_VISIBILITY) Slog.v(TAG_VISIBILITY, "Already invisible: " + r);
             return;
@@ -2064,14 +2046,8 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 case RESUMED:
                 case PAUSING:
                 case PAUSED:
-                    // This case created for transitioning activities from
-                    // translucent to opaque {@link Activity#convertToOpaque}.
-                    if (visibleBehind == r) {
-                        releaseBackgroundResources(r);
-                    } else {
-                        addToStopping(r, true /* scheduleIdle */,
-                                canEnterPictureInPicture /* idleDelayed */);
-                    }
+                    addToStopping(r, true /* scheduleIdle */,
+                            canEnterPictureInPicture /* idleDelayed */);
                     break;
 
                 default:
@@ -2216,12 +2192,18 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         } finally {
             mStackSupervisor.inResumeTopActivity = false;
         }
+
         // When resuming the top activity, it may be necessary to pause the top activity (for
         // example, returning to the lock screen. We suppress the normal pause logic in
         // {@link #resumeTopActivityUncheckedLocked}, since the top activity is resumed at the end.
         // We call the {@link ActivityStackSupervisor#checkReadyForSleepLocked} again here to ensure
-        // any necessary pause logic occurs.
-        mStackSupervisor.checkReadyForSleepLocked();
+        // any necessary pause logic occurs. In the case where the Activity will be shown regardless
+        // of the lock screen, the call to {@link ActivityStackSupervisor#checkReadyForSleepLocked}
+        // is skipped.
+        final ActivityRecord next = topRunningActivityLocked(true /* focusableOnly */);
+        if (next == null || !next.canTurnScreenOn()) {
+            mStackSupervisor.checkReadyForSleepLocked();
+        }
 
         return result;
     }
@@ -2340,7 +2322,13 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
         if (DEBUG_SWITCH) Slog.v(TAG_SWITCH, "Resuming " + next);
 
-        // If we are currently pausing an activity, then don't do anything until that is done.
+        if (mActivityTrigger != null) {
+            mActivityTrigger.activityResumeTrigger(next.intent, next.info, next.appInfo,
+                    next.getTask().mFullscreen);
+        }
+
+        // If we are currently pausing an activity, then don't do anything
+        // until that is done.
         if (!mStackSupervisor.allPausedActivitiesComplete()) {
             if (DEBUG_SWITCH || DEBUG_PAUSE || DEBUG_STATES) Slog.v(TAG_PAUSE,
                     "resumeTopActivityLocked: Skip resume: some activity pausing.");
@@ -2456,6 +2444,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         // that the previous one will be hidden soon.  This way it can know
         // to ignore it when computing the desired screen orientation.
         boolean anim = true;
+        if (mPerf == null) {
+            mPerf = new BoostFramework();
+        }
         if (prev != null) {
             if (prev.finishing) {
                 if (DEBUG_TRANSITION) Slog.v(TAG_TRANSITION,
@@ -2467,6 +2458,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     mWindowManager.prepareAppTransition(prev.getTask() == next.getTask()
                             ? TRANSIT_ACTIVITY_CLOSE
                             : TRANSIT_TASK_CLOSE, false);
+                    if(prev.getTask() != next.getTask() && mPerf != null) {
+                       mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST, next.packageName);
+                    }
                 }
                 prev.setVisibility(false);
             } else {
@@ -2481,6 +2475,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                             : next.mLaunchTaskBehind
                                     ? TRANSIT_TASK_OPEN_BEHIND
                                     : TRANSIT_TASK_OPEN, false);
+                    if(prev.getTask() != next.getTask() && mPerf != null) {
+                       mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST, next.packageName);
+                    }
                 }
             }
         } else {
@@ -2868,7 +2865,13 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         }
         task.setFrontOfTask();
 
-        if (!isHomeOrRecentsStack() || numActivities() > 0) {
+        if (mActivityTrigger != null) {
+            mActivityTrigger.activityStartTrigger(r.intent, r.info, r.appInfo, r.getTask().mFullscreen);
+        }
+        if (!isHomeStack() || numActivities() > 0) {
+            // We want to show the starting preview window if we are
+            // switching to a new task, or the next activity's process is
+            // not currently running.
             if (DEBUG_TRANSITION) Slog.v(TAG_TRANSITION,
                     "Prepare open transition: starting " + r);
             if ((r.intent.getFlags() & Intent.FLAG_ACTIVITY_NO_ANIMATION) != 0) {
@@ -2882,8 +2885,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     } else {
                         // If a new task is being launched, then mark the existing top activity as
                         // supporting picture-in-picture while pausing
-                        if (focusedTopActivity != null &&
-                                focusedTopActivity.getStack().getStackId() != PINNED_STACK_ID) {
+                        if (focusedTopActivity != null
+                                && focusedTopActivity.getStackId() != PINNED_STACK_ID
+                                && r.getStackId() != ASSISTANT_STACK_ID) {
                             focusedTopActivity.supportsPictureInPictureWhilePausing = true;
                         }
                         transit = TRANSIT_TASK_OPEN;
@@ -3411,11 +3415,17 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
             r.resumeKeyDispatchingLocked();
             try {
                 r.stopped = false;
+
                 if (DEBUG_STATES) Slog.v(TAG_STATES,
                         "Moving to STOPPING: " + r + " (stop requested)");
                 r.state = STOPPING;
                 if (DEBUG_VISIBILITY) Slog.v(TAG_VISIBILITY,
                         "Stopping visible=" + r.visible + " for " + r);
+
+                if (mActivityTrigger != null) {
+                    mActivityTrigger.activityStopTrigger(r.intent, r.info, r.appInfo);
+                }
+
                 if (!r.visible) {
                     r.setVisible(false);
                 }
@@ -3650,7 +3660,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
             finishActivityResultsLocked(r, resultCode, resultData);
 
-            final boolean endTask = index <= 0;
+            final boolean endTask = index <= 0 && !task.isClearingToReuseTask();
             final int transit = endTask ? TRANSIT_TASK_CLOSE : TRANSIT_ACTIVITY_CLOSE;
             if (mResumedActivity == r) {
                 if (DEBUG_VISIBILITY || DEBUG_TRANSITION) Slog.v(TAG_TRANSITION,
@@ -3920,7 +3930,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                             destIntent, null /*ephemeralIntent*/, null, aInfo, null /*rInfo*/, null,
                             null, parent.appToken, null, 0, -1, parent.launchedFromUid,
                             parent.launchedFromPackage, -1, parent.launchedFromUid, 0, null,
-                            false, true, null, null, null);
+                            false, true, null, null, null, "navigateUpTo");
                     foundParentInTask = res == ActivityManager.START_SUCCESS;
                 } catch (RemoteException e) {
                     foundParentInTask = false;
@@ -3991,10 +4001,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
         // Get rid of any pending idle timeouts.
         removeTimeoutsForActivityLocked(r);
-        if (getVisibleBehindActivity() == r) {
-            mStackSupervisor.requestVisibleBehindLocked(r, false);
-        }
-
         // Clean-up activities are no longer relaunching (e.g. app process died). Notify window
         // manager so it can update its bookkeeping.
         mWindowManager.notifyAppRelaunchesCleared(r.appToken);
@@ -4298,56 +4304,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         }
     }
 
-    void releaseBackgroundResources(ActivityRecord r) {
-        if (hasVisibleBehindActivity() &&
-                !mHandler.hasMessages(RELEASE_BACKGROUND_RESOURCES_TIMEOUT_MSG)) {
-            if (r == topRunningActivityLocked()
-                    && shouldBeVisible(null) == STACK_VISIBLE) {
-                // Don't release the top activity if it has requested to run behind the next
-                // activity and the stack is currently visible.
-                return;
-            }
-            if (DEBUG_STATES) Slog.d(TAG_STATES, "releaseBackgroundResources activtyDisplay=" +
-                    mActivityContainer.mActivityDisplay + " visibleBehind=" + r + " app=" + r.app +
-                    " thread=" + r.app.thread);
-            if (r != null && r.app != null && r.app.thread != null) {
-                try {
-                    r.app.thread.scheduleCancelVisibleBehind(r.appToken);
-                } catch (RemoteException e) {
-                }
-                mHandler.sendEmptyMessageDelayed(RELEASE_BACKGROUND_RESOURCES_TIMEOUT_MSG, 500);
-            } else {
-                Slog.e(TAG, "releaseBackgroundResources: activity " + r + " no longer running");
-                backgroundResourcesReleased();
-            }
-        }
-    }
-
-    final void backgroundResourcesReleased() {
-        mHandler.removeMessages(RELEASE_BACKGROUND_RESOURCES_TIMEOUT_MSG);
-        final ActivityRecord r = getVisibleBehindActivity();
-        if (r != null) {
-            mStackSupervisor.mStoppingActivities.add(r);
-            setVisibleBehindActivity(null);
-            mStackSupervisor.scheduleIdleTimeoutLocked(null);
-        }
-        mStackSupervisor.resumeFocusedStackTopActivityLocked();
-    }
-
-    boolean hasVisibleBehindActivity() {
-        return isAttached() && mActivityContainer.mActivityDisplay.hasVisibleBehindActivity();
-    }
-
-    void setVisibleBehindActivity(ActivityRecord r) {
-        if (isAttached()) {
-            mActivityContainer.mActivityDisplay.setVisibleBehindActivity(r);
-        }
-    }
-
-    ActivityRecord getVisibleBehindActivity() {
-        return isAttached() ? mActivityContainer.mActivityDisplay.mVisibleBehindActivity : null;
-    }
-
     private void removeHistoryRecordsForAppLocked(ArrayList<ActivityRecord> list,
             ProcessRecord app, String listName) {
         int i = list.size();
@@ -4549,7 +4505,8 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         }
         // If a new task is moved to the front, then mark the existing top activity as supporting
         // picture-in-picture while paused
-        if (topActivity != null && topActivity.getStack().getStackId() != PINNED_STACK_ID) {
+        if (topActivity != null && topActivity.getStackId() != PINNED_STACK_ID
+                && tr.getStackId() != ASSISTANT_STACK_ID) {
             topActivity.supportsPictureInPictureWhilePausing = true;
         }
 
@@ -4608,28 +4565,6 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         }
 
         if (DEBUG_TRANSITION) Slog.v(TAG_TRANSITION, "Prepare to back transition: task=" + taskId);
-
-        if (mStackId == HOME_STACK_ID && topTask().isHomeTask()) {
-            // For the case where we are moving the home task back and there is an activity visible
-            // behind it on the fullscreen or assistant stack, we want to move the focus to the
-            // visible behind activity to maintain order with what the user is seeing.
-            ActivityRecord visibleBehind = null;
-            final ActivityStack fullscreenStack =
-                    mStackSupervisor.getStack(FULLSCREEN_WORKSPACE_STACK_ID);
-            final ActivityStack assistantStack =
-                    mStackSupervisor.getStack(ASSISTANT_STACK_ID);
-            if (fullscreenStack != null && fullscreenStack.hasVisibleBehindActivity()) {
-                visibleBehind = fullscreenStack.getVisibleBehindActivity();
-            } else if (assistantStack != null && assistantStack.hasVisibleBehindActivity()) {
-                visibleBehind = assistantStack.getVisibleBehindActivity();
-            }
-            if (visibleBehind != null) {
-                mStackSupervisor.moveFocusableActivityStackToFrontLocked(visibleBehind,
-                        "moveTaskToBack");
-                mStackSupervisor.resumeFocusedStackTopActivityLocked();
-                return true;
-            }
-        }
 
         boolean prevIsHome = false;
 

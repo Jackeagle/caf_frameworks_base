@@ -26,6 +26,8 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Environment;
+import android.os.SystemProperties;
+import android.util.DisplayMetrics;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.UserHandle;
@@ -591,6 +593,25 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public static final String METADATA_PRELOADED_FONTS = "preloaded_fonts";
 
     /**
+     * Boolean indicating whether the resolution of the SurfaceView associated
+     * with this appplication can be overriden.
+     * {@hide}
+     */
+    public int overrideRes = 0;
+
+    /**
+     * In case, app needs different density than device density, set this value.
+     * {@hide}
+     */
+    public int overrideDensity = 0;
+
+    /**
+     * In case, app is whitelisted for density-overriding, set this value to 1
+     * (@hide)
+     */
+    public int whiteListed = 0;
+
+    /**
      * The required smallest screen width the application can run on.  If 0,
      * nothing has been specified.  Comes from
      * {@link android.R.styleable#AndroidManifestSupportsScreens_requiresSmallestWidthDp
@@ -1005,6 +1026,12 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         }
     }
 
+    /** @hide */
+    public String classLoaderName;
+
+    /** @hide */
+    public String[] splitClassLoaderNames;
+
     public void dump(Printer pw, String prefix) {
         dump(pw, prefix, DUMP_FLAG_ALL);
     }
@@ -1056,6 +1083,13 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
                 pw.println(prefix + "sharedLibraryFiles=" + Arrays.toString(sharedLibraryFiles));
             }
         }
+        if (classLoaderName != null) {
+            pw.println(prefix + "classLoaderName=" + classLoaderName);
+        }
+        if (!ArrayUtils.isEmpty(splitClassLoaderNames)) {
+            pw.println(prefix + "splitClassLoaderNames=" + Arrays.toString(splitClassLoaderNames));
+        }
+
         pw.println(prefix + "enabled=" + enabled
                 + " minSdkVersion=" + minSdkVersion
                 + " targetSdkVersion=" + targetSdkVersion
@@ -1137,6 +1171,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         theme = orig.theme;
         flags = orig.flags;
         privateFlags = orig.privateFlags;
+        overrideRes = orig.overrideRes;
+        overrideDensity = orig.overrideDensity;
+        whiteListed = orig.whiteListed;
         requiresSmallestWidthDp = orig.requiresSmallestWidthDp;
         compatibleWidthLimitDp = orig.compatibleWidthLimitDp;
         largestWidthLimitDp = orig.largestWidthLimitDp;
@@ -1178,6 +1215,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         networkSecurityConfigRes = orig.networkSecurityConfigRes;
         category = orig.category;
         targetSandboxVersion = orig.targetSandboxVersion;
+        classLoaderName = orig.classLoaderName;
+        splitClassLoaderNames = orig.splitClassLoaderNames;
     }
 
     public String toString() {
@@ -1200,6 +1239,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(theme);
         dest.writeInt(flags);
         dest.writeInt(privateFlags);
+        dest.writeInt(overrideRes);
+        dest.writeInt(overrideDensity);
+        dest.writeInt(whiteListed);
         dest.writeInt(requiresSmallestWidthDp);
         dest.writeInt(compatibleWidthLimitDp);
         dest.writeInt(largestWidthLimitDp);
@@ -1246,6 +1288,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(networkSecurityConfigRes);
         dest.writeInt(category);
         dest.writeInt(targetSandboxVersion);
+        dest.writeString(classLoaderName);
+        dest.writeStringArray(splitClassLoaderNames);
     }
 
     public static final Parcelable.Creator<ApplicationInfo> CREATOR
@@ -1268,6 +1312,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         theme = source.readInt();
         flags = source.readInt();
         privateFlags = source.readInt();
+        overrideRes = source.readInt();
+        overrideDensity = source.readInt();
+        whiteListed = source.readInt();
         requiresSmallestWidthDp = source.readInt();
         compatibleWidthLimitDp = source.readInt();
         largestWidthLimitDp = source.readInt();
@@ -1311,6 +1358,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         networkSecurityConfigRes = source.readInt();
         category = source.readInt();
         targetSandboxVersion = source.readInt();
+        classLoaderName = source.readString();
+        splitClassLoaderNames = source.readStringArray();
     }
 
     /**
@@ -1496,12 +1545,45 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         return this;
     }
 
+    /** @hide */
+    public void setAppOverrideDensity() {
+        int density = 0;
+        String prop = SystemProperties.get("persist.vendor.qti.debug.appdensity");
+        if ((prop != null) && (!prop.isEmpty())) {
+            density = Integer.parseInt(prop);
+            if ((density < DisplayMetrics.DENSITY_LOW) ||(density > DisplayMetrics.DENSITY_XXHIGH))
+                density = 0;
+        }
+        setOverrideDensity(density);
+    }
+
+    /** @hide */
+    public void setOverrideDensity(int density) {
+        overrideDensity = density;
+    }
+
+    /** @hide */
+    public int getOverrideDensity() {
+        return overrideDensity;
+    }
+
+    /** @hide */
+    public boolean isAppWhiteListed() {
+        return (whiteListed == 1);
+    }
+
+    /** @hide */
+    public void setAppWhiteListed(int val) {
+        whiteListed = val;
+    }
+
     /** {@hide} */ public void setCodePath(String codePath) { scanSourceDir = codePath; }
     /** {@hide} */ public void setBaseCodePath(String baseCodePath) { sourceDir = baseCodePath; }
     /** {@hide} */ public void setSplitCodePaths(String[] splitCodePaths) { splitSourceDirs = splitCodePaths; }
     /** {@hide} */ public void setResourcePath(String resourcePath) { scanPublicSourceDir = resourcePath; }
     /** {@hide} */ public void setBaseResourcePath(String baseResourcePath) { publicSourceDir = baseResourcePath; }
     /** {@hide} */ public void setSplitResourcePaths(String[] splitResourcePaths) { splitPublicSourceDirs = splitResourcePaths; }
+    /** {@hide} */ public void setOverrideRes(int overrideResolution) { overrideRes = overrideResolution; }
 
     /** {@hide} */ public String getCodePath() { return scanSourceDir; }
     /** {@hide} */ public String getBaseCodePath() { return sourceDir; }
@@ -1509,4 +1591,5 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /** {@hide} */ public String getResourcePath() { return scanPublicSourceDir; }
     /** {@hide} */ public String getBaseResourcePath() { return publicSourceDir; }
     /** {@hide} */ public String[] getSplitResourcePaths() { return splitPublicSourceDirs; }
+    /** {@hide} */ public int canOverrideRes() { return overrideRes; }
 }

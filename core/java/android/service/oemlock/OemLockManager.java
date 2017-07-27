@@ -17,7 +17,10 @@
 package android.service.oemlock;
 
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
+import android.content.Context;
 import android.os.RemoteException;
 
 /**
@@ -31,6 +34,7 @@ import android.os.RemoteException;
  * @hide
  */
 @SystemApi
+@SystemService(Context.OEM_LOCK_SERVICE)
 public class OemLockManager {
     private IOemLockService mService;
 
@@ -55,6 +59,7 @@ public class OemLockManager {
      *
      * @see #isOemUnlockAllowedByCarrier()
      */
+    @RequiresPermission(android.Manifest.permission.MANAGE_CARRIER_OEM_UNLOCK_STATE)
     public void setOemUnlockAllowedByCarrier(boolean allowed, @Nullable byte[] signature) {
         try {
             mService.setOemUnlockAllowedByCarrier(allowed, signature);
@@ -69,6 +74,7 @@ public class OemLockManager {
      *
      * @see #setOemUnlockAllowedByCarrier(boolean, byte[])
      */
+    @RequiresPermission(android.Manifest.permission.MANAGE_CARRIER_OEM_UNLOCK_STATE)
     public boolean isOemUnlockAllowedByCarrier() {
         try {
             return mService.isOemUnlockAllowedByCarrier();
@@ -82,10 +88,12 @@ public class OemLockManager {
      *
      * All actors involved must agree for OEM unlock to be possible.
      *
-     * @param unlocked Whether the device should be made OEM unlocked.
+     * @param allowed Whether the device should be allowed to be unlocked.
+     * @throws SecurityException if the user is not allowed to unlock the device.
      *
      * @see #isOemUnlockAllowedByUser()
      */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USER_OEM_UNLOCK_STATE)
     public void setOemUnlockAllowedByUser(boolean allowed) {
         try {
             mService.setOemUnlockAllowedByUser(allowed);
@@ -100,9 +108,54 @@ public class OemLockManager {
      *
      * @see #setOemUnlockAllowedByUser(boolean)
      */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USER_OEM_UNLOCK_STATE)
     public boolean isOemUnlockAllowedByUser() {
         try {
             return mService.isOemUnlockAllowedByUser();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns whether all parties other than the user allow OEM unlock meaning the user can
+     * directly control whether or not the device can be OEM unlocked.
+     *
+     * If this is true, {@link #isOemUnlockAllowedByUser} is the same as {@link #isOemUnlockAllowed}
+     *
+     * @return Whether the user can directly control whether the device can be OEM unlocked.
+     *
+     * @hide
+     */
+    public boolean canUserAllowOemUnlock() {
+        try {
+            return mService.canUserAllowOemUnlock();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @return Whether the bootloader is able to OEM unlock the device.
+     *
+     * @hide
+     */
+    public boolean isOemUnlockAllowed() {
+        try {
+            return mService.isOemUnlockAllowed();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @return Whether the device has been OEM unlocked by the bootloader.
+     *
+     * @hide
+     */
+    public boolean isDeviceOemUnlocked() {
+        try {
+            return mService.isDeviceOemUnlocked();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

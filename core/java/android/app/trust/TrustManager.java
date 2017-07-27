@@ -18,6 +18,8 @@ package android.app.trust;
 
 import android.Manifest;
 import android.annotation.RequiresPermission;
+import android.annotation.SystemService;
+import android.content.Context;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -25,12 +27,11 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.util.ArrayMap;
 
-import com.android.internal.widget.LockPatternUtils;
-
 /**
  * See {@link com.android.server.trust.TrustManagerService}
  * @hide
  */
+@SystemService(Context.TRUST_SERVICE)
 public class TrustManager {
 
     private static final int MSG_TRUST_CHANGED = 1;
@@ -179,6 +180,32 @@ public class TrustManager {
     public boolean isTrustUsuallyManaged(int userId) {
         try {
             return mService.isTrustUsuallyManaged(userId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Updates the trust state for the user due to the user unlocking via fingerprint.
+     * Should only be called if user authenticated via fingerprint and bouncer can be skipped.
+     * @param userId
+     */
+    @RequiresPermission(Manifest.permission.ACCESS_KEYGUARD_SECURE_STORAGE)
+    public void unlockedByFingerprintForUser(int userId) {
+        try {
+            mService.unlockedByFingerprintForUser(userId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Clears authenticated fingerprints for all users.
+     */
+    @RequiresPermission(Manifest.permission.ACCESS_KEYGUARD_SECURE_STORAGE)
+    public void clearAllFingerprints() {
+        try {
+            mService.clearAllFingerprints();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

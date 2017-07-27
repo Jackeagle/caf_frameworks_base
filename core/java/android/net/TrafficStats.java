@@ -16,6 +16,7 @@
 
 package android.net;
 
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.app.DownloadManager;
 import android.app.backup.BackupManager;
@@ -108,25 +109,26 @@ public class TrafficStats {
      */
     public static final int TAG_SYSTEM_RESTORE = 0xFFFFFF04;
 
-    /** @hide */
-    public static final int TAG_SYSTEM_DHCP = 0xFFFFFF05;
-    /** @hide */
-    public static final int TAG_SYSTEM_NTP = 0xFFFFFF06;
-    /** @hide */
-    public static final int TAG_SYSTEM_PROBE = 0xFFFFFF07;
-    /** @hide */
-    public static final int TAG_SYSTEM_NEIGHBOR = 0xFFFFFF08;
-    /** @hide */
-    public static final int TAG_SYSTEM_GPS = 0xFFFFFF09;
-    /** @hide */
-    public static final int TAG_SYSTEM_PAC = 0xFFFFFF0A;
-
     /**
-     * Sockets that are strictly local on device; never hits network.
+     * Default tag value for code or resources downloaded by an app store on
+     * behalf of the app, such as app updates.
      *
      * @hide
      */
-    public static final int TAG_SYSTEM_LOCAL = 0xFFFFFFAA;
+    public static final int TAG_SYSTEM_CODE = 0xFFFFFF05;
+
+    /** @hide */
+    public static final int TAG_SYSTEM_DHCP = 0xFFFFFF40;
+    /** @hide */
+    public static final int TAG_SYSTEM_NTP = 0xFFFFFF41;
+    /** @hide */
+    public static final int TAG_SYSTEM_PROBE = 0xFFFFFF42;
+    /** @hide */
+    public static final int TAG_SYSTEM_NEIGHBOR = 0xFFFFFF43;
+    /** @hide */
+    public static final int TAG_SYSTEM_GPS = 0xFFFFFF44;
+    /** @hide */
+    public static final int TAG_SYSTEM_PAC = 0xFFFFFF45;
 
     private static INetworkStatsService sStatsService;
 
@@ -209,6 +211,19 @@ public class TrafficStats {
     }
 
     /**
+     * Set active tag to use when accounting {@link Socket} traffic originating
+     * from the current thread. The tag used internally is well-defined to
+     * distinguish all code-related traffic, such as updates performed by an app
+     * store.
+     *
+     * @hide
+     */
+    @SystemApi
+    public static void setThreadStatsTagCode() {
+        setThreadStatsTag(TAG_SYSTEM_CODE);
+    }
+
+    /**
      * Get the active tag used when accounting {@link Socket} traffic originating
      * from the current thread. Only one active tag per thread is supported.
      * {@link #tagSocket(Socket)}.
@@ -243,6 +258,7 @@ public class TrafficStats {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.UPDATE_DEVICE_STATS)
     public static void setThreadStatsUid(int uid) {
         NetworkManagementSocketTagger.setThreadSocketStatsUid(uid);
     }
@@ -255,6 +271,7 @@ public class TrafficStats {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.UPDATE_DEVICE_STATS)
     public static void clearThreadStatsUid() {
         NetworkManagementSocketTagger.setThreadSocketStatsUid(-1);
     }

@@ -28,6 +28,7 @@ import android.os.Handler;
 import android.service.autofill.Dataset;
 import android.service.autofill.FillResponse;
 import android.service.autofill.SaveInfo;
+import android.service.autofill.ValueFinder;
 import android.text.TextUtils;
 import android.util.Slog;
 import android.view.autofill.AutofillId;
@@ -61,6 +62,8 @@ public final class AutoFillUI {
 
     private final MetricsLogger mMetricsLogger = new MetricsLogger();
 
+    private final @NonNull OverlayControl mOverlayControl;
+
     public interface AutoFillUiCallback {
         void authenticate(int requestId, int datasetIndex, @NonNull IntentSender intent,
                 @Nullable Bundle extras);
@@ -75,6 +78,7 @@ public final class AutoFillUI {
 
     public AutoFillUI(@NonNull Context context) {
         mContext = context;
+        mOverlayControl = new OverlayControl(context);
     }
 
     public void setCallback(@NonNull AutoFillUiCallback callback) {
@@ -174,7 +178,7 @@ public final class AutoFillUI {
             }
             hideAllUiThread(callback);
             mFillUi = new FillUi(mContext, response, focusedId,
-                    filterText, new FillUi.Callback() {
+                    filterText, mOverlayControl, new FillUi.Callback() {
                 @Override
                 public void onResponsePicked(FillResponse response) {
                     log.setType(MetricsProto.MetricsEvent.TYPE_DETAIL);
@@ -239,7 +243,8 @@ public final class AutoFillUI {
      * Shows the UI asking the user to save for autofill.
      */
     public void showSaveUi(@NonNull CharSequence providerLabel, @NonNull SaveInfo info,
-            @NonNull String packageName, @NonNull AutoFillUiCallback callback) {
+            @NonNull ValueFinder valueFinder, @NonNull String packageName,
+            @NonNull AutoFillUiCallback callback) {
         if (sVerbose) Slog.v(TAG, "showSaveUi() for " + packageName + ": " + info);
         int numIds = 0;
         numIds += info.getRequiredIds() == null ? 0 : info.getRequiredIds().length;
@@ -254,7 +259,7 @@ public final class AutoFillUI {
                 return;
             }
             hideAllUiThread(callback);
-            mSaveUi = new SaveUi(mContext, providerLabel, info,
+            mSaveUi = new SaveUi(mContext, providerLabel, info, valueFinder, mOverlayControl,
                     new SaveUi.OnSaveListener() {
                 @Override
                 public void onSave() {
@@ -332,6 +337,10 @@ public final class AutoFillUI {
 
     @android.annotation.UiThread
     private void hideSaveUiUiThread(@Nullable AutoFillUiCallback callback) {
+        if (sVerbose) {
+            Slog.v(TAG, "hideSaveUiUiThread(): mSaveUi=" + mSaveUi + ", callback=" + callback
+                    + ", mCallback=" + mCallback);
+        }
         if (mSaveUi != null && (callback == null || callback == mCallback)) {
             mSaveUi.destroy();
             mSaveUi = null;

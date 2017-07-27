@@ -27,18 +27,6 @@
     <string name="terabyteShort" msgid="231613018159186962">"TB"</string>
     <string name="petabyteShort" msgid="5637816680144990219">"PB"</string>
     <string name="fileSizeSuffix" msgid="8897567456150907538">"<xliff:g id="NUMBER">%1$s</xliff:g><xliff:g id="UNIT">%2$s</xliff:g>"</string>
-    <string name="durationDays" msgid="6652371460511178259">"<xliff:g id="DAYS">%1$d</xliff:g>일"</string>
-    <string name="durationDayHours" msgid="2713107458736744435">"<xliff:g id="DAYS">%1$d</xliff:g>일 <xliff:g id="HOURS">%2$d</xliff:g>시간"</string>
-    <string name="durationDayHour" msgid="7293789639090958917">"<xliff:g id="DAYS">%1$d</xliff:g>일 <xliff:g id="HOURS">%2$d</xliff:g>시간"</string>
-    <string name="durationHours" msgid="4266858287167358988">"<xliff:g id="HOURS">%1$d</xliff:g>시간"</string>
-    <string name="durationHourMinutes" msgid="9029176248692041549">"<xliff:g id="HOURS">%1$d</xliff:g>시간 <xliff:g id="MINUTES">%2$d</xliff:g>분"</string>
-    <string name="durationHourMinute" msgid="2741677355177402539">"<xliff:g id="HOURS">%1$d</xliff:g>시간 <xliff:g id="MINUTES">%2$d</xliff:g>분"</string>
-    <string name="durationMinutes" msgid="3134226679883579347">"<xliff:g id="MINUTES">%1$d</xliff:g>분"</string>
-    <string name="durationMinute" msgid="7155301744174623818">"<xliff:g id="MINUTES">%1$d</xliff:g>분"</string>
-    <string name="durationMinuteSeconds" msgid="1424656185379003751">"<xliff:g id="MINUTES">%1$d</xliff:g>분 <xliff:g id="SECONDS">%2$d</xliff:g>초"</string>
-    <string name="durationMinuteSecond" msgid="3989228718067466680">"<xliff:g id="MINUTES">%1$d</xliff:g>분 <xliff:g id="SECONDS">%2$d</xliff:g>초"</string>
-    <string name="durationSeconds" msgid="8050088505238241405">"<xliff:g id="SECONDS">%1$d</xliff:g>초"</string>
-    <string name="durationSecond" msgid="985669622276420331">"<xliff:g id="SECONDS">%1$d</xliff:g>초"</string>
     <string name="untitled" msgid="4638956954852782576">"&lt;제목 없음&gt;"</string>
     <string name="emptyPhoneNumber" msgid="7694063042079676517">"(전화번호 없음)"</string>
     <string name="unknownName" msgid="6867811765370350269">"알 수 없음"</string>
@@ -90,15 +78,12 @@
     <string name="serviceNotProvisioned" msgid="8614830180508686666">"서비스가 준비되지 않았습니다."</string>
     <string name="CLIRPermanent" msgid="3377371145926835671">"발신자 번호 설정을 변경할 수 없습니다."</string>
     <string name="RestrictedOnDataTitle" msgid="1322504692764166532">"데이터 서비스를 이용할 수 없음"</string>
-    <string name="RestrictedOnEmergencyTitle" msgid="1236071219598685236">"긴급 서비스를 이용할 수 없음"</string>
+    <string name="RestrictedOnEmergencyTitle" msgid="3646729271176394091">"긴급 전화 차단됨"</string>
     <string name="RestrictedOnNormalTitle" msgid="3179574012752700984">"음성 서비스를 이용할 수 없음"</string>
     <string name="RestrictedOnAllVoiceTitle" msgid="158800171499150681">"음성/긴급 서비스를 이용할 수 없음"</string>
-    <string name="RestrictedOnDataContent" msgid="8997474569390996587">"이동통신사에서 이 위치에서의 데이터 서비스를 일시적으로 정지했습니다."</string>
-    <string name="RestrictedOnEmergencyContent" msgid="4573217945494650061">"이동통신사에서 이 위치에서의 긴급 통화를 일시적으로 정지했습니다."</string>
-    <string name="RestrictedOnNormalContent" msgid="1579434198284512182">"이동통신사에서 이 위치에서의 음성 통화를 일시적으로 정지했습니다."</string>
-    <string name="RestrictedOnAllVoiceContent" msgid="5243580774142557047">"이동통신사에서 이 위치에서의 음성 및 긴급 통화를 일시적으로 정지했습니다."</string>
+    <string name="RestrictedStateContent" msgid="4278821484643362350">"현재 위치에서 모바일 네트워크가 서비스 제공을 일시적으로 중단했습니다."</string>
     <string name="NetworkPreferenceSwitchTitle" msgid="4008877505368566980">"네트워크에 연결할 수 없습니다."</string>
-    <string name="NetworkPreferenceSwitchSummary" msgid="4164230263214915351">"수신 상태를 개선하려면 시스템 &gt; 네트워크 및 인터넷 &gt; 모바일 네트워크 &gt; 기본 네트워크 유형에서 선택된 유형을 변경해 보세요."</string>
+    <string name="NetworkPreferenceSwitchSummary" msgid="1203771446683319957">"수신 상태를 개선하려면 설정 &gt; 네트워크 및 인터넷 &gt; 모바일 네트워크 &gt; 기본 네트워크 유형에서 선택된 유형을 변경해 보세요."</string>
     <string name="notification_channel_network_alert" msgid="4427736684338074967">"알림"</string>
     <string name="notification_channel_call_forward" msgid="2419697808481833249">"착신전환"</string>
     <string name="notification_channel_emergency_callback" msgid="6686166232265733921">"긴급 콜백 모드"</string>
@@ -134,7 +119,7 @@
     <string name="roamingTextSearching" msgid="8360141885972279963">"서비스 검색 중"</string>
     <string name="wfcRegErrorTitle" msgid="2301376280632110664">"Wi-Fi 통화"</string>
   <string-array name="wfcOperatorErrorAlertMessages">
-    <item msgid="2254967670088539682">"Wi-Fi를 사용하여 전화를 걸고 메시지를 보내려면 먼저 이동통신사에 문의하여 이 기능을 설정해야 합니다. 그런 다음 설정에서 Wi-Fi 통화를 사용 설정하시기 바랍니다."</item>
+    <item msgid="3910386316304772394">"Wi-Fi를 사용하여 전화를 걸고 메시지를 보내려면 먼저 이동통신사에 문의하여 서비스를 설정해야 합니다. 그런 다음 설정에서 Wi-Fi 통화를 사용 설정하시기 바랍니다. (오류 코드: <xliff:g id="CODE">%1$s</xliff:g>)"</item>
   </string-array>
   <string-array name="wfcOperatorErrorNotificationMessages">
     <item msgid="6177300162212449033">"이동통신사에 등록"</item>
@@ -291,7 +276,7 @@
     <string name="permgroupdesc_camera" msgid="3250611594678347720">"사진 및 동영상 촬영"</string>
     <string name="permgrouplab_phone" msgid="5229115638567440675">"전화"</string>
     <string name="permgroupdesc_phone" msgid="6234224354060641055">"전화 걸기 및 관리"</string>
-    <string name="permgrouplab_sensors" msgid="416037179223226722">"신체 센서"</string>
+    <string name="permgrouplab_sensors" msgid="416037179223226722">"인체 감지 센서"</string>
     <string name="permgroupdesc_sensors" msgid="7147968539346634043">"생체 신호에 관한 센서 데이터에 액세스"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="3901717936930170320">"창 콘텐츠 가져오기"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="3772225008605310672">"상호작용 중인 창의 콘텐츠를 검사합니다."</string>
@@ -381,7 +366,7 @@
     <string name="permdesc_writeCallLog" product="tablet" msgid="6661806062274119245">"앱에서 수신 및 발신 통화 데이터를 포함하여 태블릿의 통화 기록을 수정할 수 있도록 허용합니다. 이 경우 악성 앱이 통화 기록을 지우거나 수정할 수 있습니다."</string>
     <string name="permdesc_writeCallLog" product="tv" msgid="4225034892248398019">"앱에서 수신 및 발신 통화 데이터를 포함하여 TV의 통화 기록을 수정할 수 있도록 허용합니다. 이 경우 악성 앱이 통화 기록을 삭제하거나 수정할 수도 있습니다."</string>
     <string name="permdesc_writeCallLog" product="default" msgid="683941736352787842">"앱에서 수신 및 발신 통화 데이터를 포함하여 휴대전화의 통화 기록을 수정할 수 있도록 허용합니다. 이 경우 악성 앱이 통화 기록을 지우거나 수정할 수 있습니다."</string>
-    <string name="permlab_bodySensors" msgid="4683341291818520277">"신체 센서(예: 심박수 모니터)에 액세스"</string>
+    <string name="permlab_bodySensors" msgid="4683341291818520277">"인체 감지 센서(예: 심박수 모니터)에 액세스"</string>
     <string name="permdesc_bodySensors" product="default" msgid="4380015021754180431">"앱이 심박수와 같은 신체 상태를 확인하는 센서의 데이터에 접근하도록 허용합니다."</string>
     <string name="permlab_readCalendar" msgid="6716116972752441641">"캘린더 일정 및 세부정보 읽기"</string>
     <string name="permdesc_readCalendar" product="tablet" msgid="4993979255403945892">"이 앱은 태블릿에 저장된 모든 캘린더 일정을 읽고 캘린더 데이터를 공유하거나 저장할 수 있습니다."</string>
@@ -1109,6 +1094,13 @@
       <item quantity="other">개방형 Wi-Fi 네트워크 사용 가능</item>
       <item quantity="one">개방형 Wi-Fi 네트워크 사용 가능</item>
     </plurals>
+    <string name="wifi_available_title" msgid="3817100557900599505">"공개 Wi‑Fi 네트워크에 연결"</string>
+    <string name="wifi_available_title_connecting" msgid="1557292688310330032">"공개 Wi‑Fi 네트워크에 연결 중"</string>
+    <string name="wifi_available_title_connected" msgid="7542672851522241548">"Wi‑Fi 네트워크에 연결됨"</string>
+    <string name="wifi_available_title_failed_to_connect" msgid="6861772233582618132">"Wi‑Fi 네트워크에 연결할 수 없음"</string>
+    <string name="wifi_available_content_failed_to_connect" msgid="3377406637062802645">"모든 네트워크를 보려면 탭하세요."</string>
+    <string name="wifi_available_action_connect" msgid="2635699628459488788">"연결"</string>
+    <string name="wifi_available_action_all_networks" msgid="1100098935861622985">"모든 네트워크"</string>
     <string name="wifi_available_sign_in" msgid="9157196203958866662">"Wi-Fi 네트워크에 로그인"</string>
     <string name="network_available_sign_in" msgid="1848877297365446605">"네트워크에 로그인"</string>
     <!-- no translation found for network_available_sign_in_detailed (8000081941447976118) -->
@@ -1188,6 +1180,8 @@
     <string name="usb_midi_notification_title" msgid="4850904915889144654">"MIDI용 USB"</string>
     <string name="usb_accessory_notification_title" msgid="7848236974087653666">"USB 액세서리에 연결됨"</string>
     <string name="usb_notification_message" msgid="3370903770828407960">"옵션을 더 보려면 탭하세요."</string>
+    <string name="usb_unsupported_audio_accessory_title" msgid="2256529893240208458">"지원되지 않는 오디오 액세서리"</string>
+    <string name="usb_unsupported_audio_accessory_message" msgid="7811865061127547035">"자세한 내용은 탭하여 확인하세요."</string>
     <string name="adb_active_notification_title" msgid="6729044778949189918">"USB 디버깅 연결됨"</string>
     <string name="adb_active_notification_message" msgid="4948470599328424059">"USB 디버깅을 사용하지 않으려면 탭하세요."</string>
     <string name="adb_active_notification_message" product="tv" msgid="8470296818270110396">"USB 디버깅을 사용하지 않으려면 선택합니다."</string>
@@ -1204,6 +1198,7 @@
     <string name="select_keyboard_layout_notification_message" msgid="8084622969903004900">"탭하여 언어와 레이아웃을 선택하세요."</string>
     <string name="fast_scroll_alphabet" msgid="5433275485499039199">" ABCDEFGHIJKLMNOPQRSTUVWXYZ"</string>
     <string name="fast_scroll_numeric_alphabet" msgid="4030170524595123610">" 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"</string>
+    <string name="alert_windows_notification_channel_group_name" msgid="1463953341148606396">"다른 앱 위에 표시"</string>
     <string name="alert_windows_notification_channel_name" msgid="3116610965549449803">"<xliff:g id="NAME">%s</xliff:g>이(가) 다른 앱 위에 표시됨"</string>
     <string name="alert_windows_notification_title" msgid="3697657294867638947">"<xliff:g id="NAME">%s</xliff:g>이(가) 다른 앱 위에 표시됨"</string>
     <string name="alert_windows_notification_message" msgid="8917232109522912560">"<xliff:g id="NAME">%s</xliff:g>에서 이 기능이 사용되는 것을 원하지 않는 경우 탭하여 설정을 열고 기능을 사용 중지하세요."</string>
@@ -1774,9 +1769,11 @@
     <string name="etws_primary_default_message_tsunami" msgid="1887685943498368548">"즉시 해안 지대나 강가에서 떨어져 고지대 등 안전한 장소로 대피하세요."</string>
     <string name="etws_primary_default_message_earthquake_and_tsunami" msgid="998797956848445862">"침착하게 가까운 대피소를 찾으세요."</string>
     <string name="etws_primary_default_message_test" msgid="2709597093560037455">"긴급 메시지 테스트"</string>
+    <string name="notification_reply_button_accessibility" msgid="3621714652387814344">"답장"</string>
     <string name="etws_primary_default_message_others" msgid="6293148756130398971"></string>
     <string name="mmcc_authentication_reject" msgid="7729819349669603406">"SIM이 허용되지 않음"</string>
     <string name="mmcc_imsi_unknown_in_hlr" msgid="6321202257374418726">"SIM이 프로비저닝되지 않음"</string>
     <string name="mmcc_illegal_ms" msgid="2769452751852211112">"SIM이 허용되지 않음"</string>
     <string name="mmcc_illegal_me" msgid="4438696681169345015">"전화가 허용되지 않음"</string>
+    <string name="popup_window_default_title" msgid="4874318849712115433">"팝업 창"</string>
 </resources>

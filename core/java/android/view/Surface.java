@@ -52,7 +52,9 @@ public class Surface implements Parcelable {
 
     private static native long nativeCreateFromSurfaceTexture(SurfaceTexture surfaceTexture)
             throws OutOfResourcesException;
+
     private static native long nativeCreateFromSurfaceControl(long surfaceControlNativeObject);
+    private static native long nativeGetFromSurfaceControl(long surfaceControlNativeObject);
 
     private static native long nativeLockCanvas(long nativeObject, Canvas canvas, Rect dirty)
             throws OutOfResourcesException;
@@ -129,9 +131,15 @@ public class Surface implements Parcelable {
     public static final int SCALING_MODE_NO_SCALE_CROP = 3;
 
     /** @hide */
-    @IntDef({ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270})
+    @IntDef({ROTATION_UNDEFINED, ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270})
     @Retention(RetentionPolicy.SOURCE)
     public @interface Rotation {}
+
+    /**
+     * Rotation constant: undefined
+     * @hide
+     */
+    public static final int ROTATION_UNDEFINED = -1;
 
     /**
      * Rotation constant: 0 degree rotation (natural orientation)
@@ -410,6 +418,9 @@ public class Surface implements Parcelable {
      * back from a client, converting it from the representation being managed
      * by the window manager to the representation the client uses to draw
      * in to it.
+     *
+     * @param other {@link SurfaceControl} to copy from.
+     *
      * @hide
      */
     public void copyFrom(SurfaceControl other) {
@@ -420,7 +431,39 @@ public class Surface implements Parcelable {
         long surfaceControlPtr = other.mNativeObject;
         if (surfaceControlPtr == 0) {
             throw new NullPointerException(
-                    "SurfaceControl native object is null. Are you using a released SurfaceControl?");
+                    "null SurfaceControl native object. Are you using a released SurfaceControl?");
+        }
+        long newNativeObject = nativeGetFromSurfaceControl(surfaceControlPtr);
+
+        synchronized (mLock) {
+            if (mNativeObject != 0) {
+                nativeRelease(mNativeObject);
+            }
+            setNativeObjectLocked(newNativeObject);
+        }
+    }
+
+    /**
+     * Gets a reference a surface created from this one.  This surface now holds a reference
+     * to the same data as the original surface, and is -not- the owner.
+     * This is for use by the window manager when returning a window surface
+     * back from a client, converting it from the representation being managed
+     * by the window manager to the representation the client uses to draw
+     * in to it.
+     *
+     * @param other {@link SurfaceControl} to create surface from.
+     *
+     * @hide
+     */
+    public void createFrom(SurfaceControl other) {
+        if (other == null) {
+            throw new IllegalArgumentException("other must not be null");
+        }
+
+        long surfaceControlPtr = other.mNativeObject;
+        if (surfaceControlPtr == 0) {
+            throw new NullPointerException(
+                    "null SurfaceControl native object. Are you using a released SurfaceControl?");
         }
         long newNativeObject = nativeCreateFromSurfaceControl(surfaceControlPtr);
 

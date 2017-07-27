@@ -26,17 +26,18 @@ public class InterestingConfigChanges {
     private int mLastDensity;
 
     public InterestingConfigChanges() {
-        this(0);
+        this(ActivityInfo.CONFIG_LOCALE
+                | ActivityInfo.CONFIG_UI_MODE | ActivityInfo.CONFIG_SCREEN_LAYOUT
+                | ActivityInfo.CONFIG_ASSETS_PATHS);
     }
 
-    public InterestingConfigChanges(int extraFlags) {
-        mFlags = extraFlags | ActivityInfo.CONFIG_LOCALE
-                | ActivityInfo.CONFIG_UI_MODE | ActivityInfo.CONFIG_SCREEN_LAYOUT
-                | ActivityInfo.CONFIG_ASSETS_PATHS;
+    public InterestingConfigChanges(int flags) {
+        mFlags = flags;
     }
 
     public boolean applyNewConfig(Resources res) {
-        int configChanges = mLastConfiguration.updateFrom(res.getConfiguration());
+        int configChanges = mLastConfiguration.updateFrom(
+                Configuration.generateDelta(mLastConfiguration, res.getConfiguration()));
         boolean densityChanged = mLastDensity != res.getDisplayMetrics().densityDpi;
         if (densityChanged || (configChanges & (mFlags)) != 0) {
             mLastDensity = res.getDisplayMetrics().densityDpi;

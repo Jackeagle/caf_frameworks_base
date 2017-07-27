@@ -20,6 +20,8 @@ import static android.companion.BluetoothDeviceFilterUtils.getDeviceDisplayNameI
 import static android.companion.BluetoothDeviceFilterUtils.getDeviceMacAddress;
 
 import static com.android.internal.util.ArrayUtils.isEmpty;
+import static com.android.internal.util.CollectionUtils.emptyIfNull;
+import static com.android.internal.util.CollectionUtils.size;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -75,7 +77,7 @@ public class DeviceDiscoveryService extends Service {
 
     private BluetoothAdapter mBluetoothAdapter;
     private WifiManager mWifiManager;
-    private BluetoothLeScanner mBLEScanner;
+    @Nullable private BluetoothLeScanner mBLEScanner;
     private ScanSettings mDefaultScanSettings = new ScanSettings.Builder().build();
 
     private List<DeviceFilter<?>> mFilters;
@@ -154,6 +156,25 @@ public class DeviceDiscoveryService extends Service {
             onReadyToShowUI();
         }
 
+        // If filtering to get single device by mac address, also search in the set of already
+        // bonded devices to allow linking those directly
+        String singleMacAddressFilter = null;
+        if (mRequest.isSingleDevice()) {
+            int numFilters = size(mBluetoothFilters);
+            for (int i = 0; i < numFilters; i++) {
+                BluetoothDeviceFilter filter = mBluetoothFilters.get(i);
+                if (!TextUtils.isEmpty(filter.getAddress())) {
+                    singleMacAddressFilter = filter.getAddress();
+                    break;
+                }
+            }
+        }
+        if (singleMacAddressFilter != null) {
+            for (BluetoothDevice dev : emptyIfNull(mBluetoothAdapter.getBondedDevices())) {
+                onDeviceFound(DeviceFilterPair.findMatch(dev, mBluetoothFilters));
+            }
+        }
+
         if (shouldScan(mBluetoothFilters)) {
             final IntentFilter intentFilter = new IntentFilter();
             intentFilter.addAction(BluetoothDevice.ACTION_FOUND);
@@ -164,7 +185,7 @@ public class DeviceDiscoveryService extends Service {
             mBluetoothAdapter.startDiscovery();
         }
 
-        if (shouldScan(mBLEFilters)) {
+        if (shouldScan(mBLEFilters) && mBLEScanner != null) {
             mBLEScanCallback = new BLEScanCallback();
             mBLEScanner.startScan(mBLEScanFilters, mDefaultScanSettings, mBLEScanCallback);
         }
@@ -203,7 +224,7 @@ public class DeviceDiscoveryService extends Service {
             unregisterReceiver(mBluetoothBroadcastReceiver);
             mBluetoothBroadcastReceiver = null;
         }
-        mBLEScanner.stopScan(mBLEScanCallback);
+        if (mBLEScanner != null) mBLEScanner.stopScan(mBLEScanCallback);
         if (mWifiBroadcastReceiver != null) {
             unregisterReceiver(mWifiBroadcastReceiver);
             mWifiBroadcastReceiver = null;
@@ -211,6 +232,8 @@ public class DeviceDiscoveryService extends Service {
     }
 
     private void onDeviceFound(@Nullable DeviceFilterPair device) {
+        if (device == null) return;
+
         if (mDevicesFound.contains(device)) {
             return;
         }
@@ -444,12 +467,9 @@ public class DeviceDiscoveryService extends Service {
                 }
 
                 for (int i = 0; i < scanResults.size(); i++) {
-                    DeviceFilterPair<android.net.wifi.ScanResult> deviceFilterPair =
-                            DeviceFilterPair.findMatch(scanResults.get(i), mWifiFilters);
-                    if (deviceFilterPair != null) onDeviceFound(deviceFilterPair);
+                    onDeviceFound(DeviceFilterPair.findMatch(scanResults.get(i), mWifiFilters));
                 }
             }
-
         }
     }
 }

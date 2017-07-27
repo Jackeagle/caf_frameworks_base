@@ -100,7 +100,7 @@ final class FillUi {
 
     FillUi(@NonNull Context context, @NonNull FillResponse response,
             @NonNull AutofillId focusedViewId, @NonNull @Nullable String filterText,
-            @NonNull Callback callback) {
+            @NonNull OverlayControl overlayControl, @NonNull Callback callback) {
         mContext = context;
         mCallback = callback;
 
@@ -146,7 +146,7 @@ final class FillUi {
             mContentWidth = content.getMeasuredWidth();
             mContentHeight = content.getMeasuredHeight();
 
-            mWindow = new AnchoredWindow(decor);
+            mWindow = new AnchoredWindow(decor, overlayControl);
             mCallback.requestShowFillUi(mContentWidth, mContentHeight, mWindowPresenter);
         } else {
             final int datasetCount = response.getDatasets().size();
@@ -158,6 +158,7 @@ final class FillUi {
                     final RemoteViews presentation = dataset.getFieldPresentation(index);
                     final View view;
                     try {
+                        if (sVerbose) Slog.v(TAG, "setting remote view for " + focusedViewId);
                         view = presentation.apply(context, null, interceptionHandler);
                     } catch (RuntimeException e) {
                         Slog.e(TAG, "Error inflating remote views", e);
@@ -192,7 +193,7 @@ final class FillUi {
             }
 
             applyNewFilterText();
-            mWindow = new AnchoredWindow(decor);
+            mWindow = new AnchoredWindow(decor, overlayControl);
         }
     }
 
@@ -203,6 +204,7 @@ final class FillUi {
                 return;
             }
             if (count <= 0) {
+                if (sDebug) Slog.d(TAG, "No dataset matches filter: " + mFilterText);
                 mCallback.requestHideFillUi();
             } else {
                 if (updateContentSize()) {
@@ -364,6 +366,7 @@ final class FillUi {
     }
 
     final class AnchoredWindow implements View.OnTouchListener {
+        private final @NonNull OverlayControl mOverlayControl;
         private final WindowManager mWm;
         private final View mContentView;
         private boolean mShowing;
@@ -373,27 +376,36 @@ final class FillUi {
          *
          * @param contentView content of the window
          */
-        AnchoredWindow(View contentView) {
+        AnchoredWindow(View contentView, @NonNull OverlayControl overlayControl) {
             mWm = contentView.getContext().getSystemService(WindowManager.class);
             mContentView = contentView;
+            mOverlayControl = overlayControl;
         }
 
         /**
          * Shows the window.
          */
         public void show(WindowManager.LayoutParams params) {
+            if (sVerbose) Slog.v(TAG, "show(): showing=" + mShowing + ", params="+  params);
             try {
                 if (!mShowing) {
                     params.accessibilityTitle = mContentView.getContext()
                             .getString(R.string.autofill_picker_accessibility_title);
                     mWm.addView(mContentView, params);
                     mContentView.setOnTouchListener(this);
+                    mOverlayControl.hideOverlays();
                     mShowing = true;
                 } else {
                     mWm.updateViewLayout(mContentView, params);
                 }
             } catch (WindowManager.BadTokenException e) {
                 if (sDebug) Slog.d(TAG, "Filed with with token " + params.token + " gone.");
+                mCallback.onDestroy();
+            } catch (IllegalStateException e) {
+                // WM throws an ISE if mContentView was added twice; this should never happen -
+                // since show() and hide() are always called in the UIThread - but when it does,
+                // it should not crash the system.
+                Slog.e(TAG, "Exception showing window " + params, e);
                 mCallback.onDestroy();
             }
         }
@@ -402,10 +414,20 @@ final class FillUi {
          * Hides the window.
          */
         void hide() {
-            if (mShowing) {
-                mContentView.setOnTouchListener(null);
-                mWm.removeView(mContentView);
-                mShowing = false;
+            try {
+                if (mShowing) {
+                    mContentView.setOnTouchListener(null);
+                    mWm.removeView(mContentView);
+                    mShowing = false;
+                }
+            } catch (IllegalStateException e) {
+                // WM might thrown an ISE when removing the mContentView; this should never
+                // happen - since show() and hide() are always called in the UIThread - but if it
+                // does, it should not crash the system.
+                Slog.e(TAG, "Exception hiding window ", e);
+                mCallback.onDestroy();
+            } finally {
+                mOverlayControl.showOverlays();
             }
         }
 
@@ -486,7 +508,7 @@ final class FillUi {
                         final String value = item.getValue();
                         // No value, i.e. null, matches any filter
                         if (value == null
-                                || value.toLowerCase().contains(constraintLowerCase)) {
+                                || value.toLowerCase().startsWith(constraintLowerCase)) {
                             filteredItems.add(item);
                         }
                     }

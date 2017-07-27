@@ -41,13 +41,15 @@
     <!-- Default clock parameters -->
     <dimen name="bottom_text_spacing_digital">-1dp</dimen>
     <dimen name="widget_label_font_size">14sp</dimen>
-    <dimen name="widget_big_font_size">64dp</dimen>
+    <dimen name="widget_big_font_size">72dp</dimen>
 
     <!-- The y translation to apply at the start in appear animations. -->
     <dimen name="appear_y_translation_start">32dp</dimen>
 
     <!-- The size of the dots in the PIN unlock method. -->
     <dimen name="password_dot_size">9dp</dimen>
+    <!-- The size of PIN text in the PIN unlock method. -->
+    <integer name="scaled_password_text_size">40</integer>
 
     <!-- The padding between chars of the password view. -->
     <dimen name="password_char_padding">8dp</dimen>

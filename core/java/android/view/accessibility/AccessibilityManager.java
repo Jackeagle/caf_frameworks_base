@@ -24,6 +24,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -41,6 +42,7 @@ import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.IWindow;
 import android.view.View;
 
@@ -59,15 +61,6 @@ import java.util.List;
  * {@link android.view.View} changes etc. Parties interested in handling accessibility
  * events implement and register an accessibility service which extends
  * {@link android.accessibilityservice.AccessibilityService}.
- * <p>
- * To obtain a handle to the accessibility manager do the following:
- * </p>
- * <p>
- * <code>
- * <pre>AccessibilityManager accessibilityManager =
- *        (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);</pre>
- * </code>
- * </p>
  *
  * @see AccessibilityEvent
  * @see AccessibilityNodeInfo
@@ -75,6 +68,7 @@ import java.util.List;
  * @see Context#getSystemService
  * @see Context#ACCESSIBILITY_SERVICE
  */
+@SystemService(Context.ACCESSIBILITY_SERVICE)
 public final class AccessibilityManager {
     private static final boolean DEBUG = false;
 
@@ -150,6 +144,11 @@ public final class AccessibilityManager {
 
     private final ArrayMap<AccessibilityServicesStateChangeListener, Handler>
             mServicesStateChangeListeners = new ArrayMap<>();
+
+    /**
+     * Map from a view's accessibility id to the list of request preparers set for that view
+     */
+    private SparseArray<List<AccessibilityRequestPreparer>> mRequestPreparerLists;
 
     /**
      * Listener for the system accessibility state. To listen for changes to the
@@ -704,6 +703,54 @@ public final class AccessibilityManager {
     }
 
     /**
+     * Registers a {@link AccessibilityRequestPreparer}.
+     */
+    public void addAccessibilityRequestPreparer(AccessibilityRequestPreparer preparer) {
+        if (mRequestPreparerLists == null) {
+            mRequestPreparerLists = new SparseArray<>(1);
+        }
+        int id = preparer.getView().getAccessibilityViewId();
+        List<AccessibilityRequestPreparer> requestPreparerList = mRequestPreparerLists.get(id);
+        if (requestPreparerList == null) {
+            requestPreparerList = new ArrayList<>(1);
+            mRequestPreparerLists.put(id, requestPreparerList);
+        }
+        requestPreparerList.add(preparer);
+    }
+
+    /**
+     * Unregisters a {@link AccessibilityRequestPreparer}.
+     */
+    public void removeAccessibilityRequestPreparer(AccessibilityRequestPreparer preparer) {
+        if (mRequestPreparerLists == null) {
+            return;
+        }
+        int viewId = preparer.getView().getAccessibilityViewId();
+        List<AccessibilityRequestPreparer> requestPreparerList = mRequestPreparerLists.get(viewId);
+        if (requestPreparerList != null) {
+            requestPreparerList.remove(preparer);
+            if (requestPreparerList.isEmpty()) {
+                mRequestPreparerLists.remove(viewId);
+            }
+        }
+    }
+
+    /**
+     * Get the preparers that are registered for an accessibility ID
+     *
+     * @param id The ID of interest
+     * @return The list of preparers, or {@code null} if there are none.
+     *
+     * @hide
+     */
+    public List<AccessibilityRequestPreparer> getRequestPreparersForAccessibilityId(int id) {
+        if (mRequestPreparerLists == null) {
+            return null;
+        }
+        return mRequestPreparerLists.get(id);
+    }
+
+    /**
      * Registers a {@link HighTextContrastChangeListener} for changes in
      * the global high text contrast state of the system.
      *
@@ -919,14 +966,14 @@ public final class AccessibilityManager {
     }
 
     /**
-     * Notifies that the availability of the accessibility button in the system's navigation area
+     * Notifies that the visibility of the accessibility button in the system's navigation area
      * has changed.
      *
-     * @param available {@code true} if the accessibility button is available within the system
+     * @param shown {@code true} if the accessibility button is visible within the system
      *                  navigation area, {@code false} otherwise
      * @hide
      */
-    public void notifyAccessibilityButtonAvailabilityChanged(boolean available) {
+    public void notifyAccessibilityButtonVisibilityChanged(boolean shown) {
         final IAccessibilityManager service;
         synchronized (mLock) {
             service = getServiceLocked();
@@ -935,9 +982,9 @@ public final class AccessibilityManager {
             }
         }
         try {
-            service.notifyAccessibilityButtonAvailabilityChanged(available);
+            service.notifyAccessibilityButtonVisibilityChanged(shown);
         } catch (RemoteException re) {
-            Log.e(LOG_TAG, "Error while dispatching accessibility button availability change", re);
+            Log.e(LOG_TAG, "Error while dispatching accessibility button visibility change", re);
         }
     }
 

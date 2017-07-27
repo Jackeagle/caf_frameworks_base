@@ -25,6 +25,7 @@ import static com.android.server.wm.AppTransition.TRANSIT_WALLPAPER_CLOSE;
 import static com.android.server.wm.AppTransition.TRANSIT_WALLPAPER_INTRA_CLOSE;
 import static com.android.server.wm.AppTransition.TRANSIT_WALLPAPER_INTRA_OPEN;
 import static com.android.server.wm.AppTransition.TRANSIT_WALLPAPER_OPEN;
+import static com.android.server.wm.AppTransition.isKeyguardGoingAwayTransit;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.SHOW_LIGHT_TRANSACTIONS;
@@ -38,8 +39,7 @@ import static com.android.server.wm.WindowManagerService.MAX_ANIMATION_DURATION;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_PLACING_SURFACES;
 
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
+import android.graphics.GraphicBuffer;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Binder;
@@ -240,7 +240,7 @@ class WindowSurfacePlacer {
 
         if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "**** GOOD TO GO");
         int transit = mService.mAppTransition.getAppTransition();
-        if (mService.mSkipAppTransitionAnimation) {
+        if (mService.mSkipAppTransitionAnimation && !isKeyguardGoingAwayTransit(transit)) {
             transit = AppTransition.TRANSIT_UNSET;
         }
         mService.mSkipAppTransitionAnimation = false;
@@ -599,42 +599,47 @@ class WindowSurfacePlacer {
                         + ", openingApps=" + openingApps
                         + ", closingApps=" + closingApps);
         mService.mAnimateWallpaperWithTarget = false;
-        if (closingAppHasWallpaper && openingAppHasWallpaper) {
-            if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "Wallpaper animation!");
-            switch (transit) {
-                case TRANSIT_ACTIVITY_OPEN:
-                case TRANSIT_TASK_OPEN:
-                case TRANSIT_TASK_TO_FRONT:
-                    transit = TRANSIT_WALLPAPER_INTRA_OPEN;
-                    break;
-                case TRANSIT_ACTIVITY_CLOSE:
-                case TRANSIT_TASK_CLOSE:
-                case TRANSIT_TASK_TO_BACK:
-                    transit = TRANSIT_WALLPAPER_INTRA_CLOSE;
-                    break;
-            }
-            if (DEBUG_APP_TRANSITIONS) Slog.v(TAG,
-                    "New transit: " + AppTransition.appTransitionToString(transit));
-        } else if (openingCanBeWallpaperTarget && transit == TRANSIT_KEYGUARD_GOING_AWAY) {
+        if (openingCanBeWallpaperTarget && transit == TRANSIT_KEYGUARD_GOING_AWAY) {
             transit = TRANSIT_KEYGUARD_GOING_AWAY_ON_WALLPAPER;
             if (DEBUG_APP_TRANSITIONS) Slog.v(TAG,
                     "New transit: " + AppTransition.appTransitionToString(transit));
-        } else if (oldWallpaper != null && !mService.mOpeningApps.isEmpty()
-                && !openingApps.contains(oldWallpaper.mAppToken)
-                && closingApps.contains(oldWallpaper.mAppToken)) {
-            // We are transitioning from an activity with a wallpaper to one without.
-            transit = TRANSIT_WALLPAPER_CLOSE;
-            if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "New transit away from wallpaper: "
-                    + AppTransition.appTransitionToString(transit));
-        } else if (wallpaperTarget != null && wallpaperTarget.isVisibleLw() &&
-                openingApps.contains(wallpaperTarget.mAppToken)) {
-            // We are transitioning from an activity without
-            // a wallpaper to now showing the wallpaper
-            transit = TRANSIT_WALLPAPER_OPEN;
-            if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "New transit into wallpaper: "
-                    + AppTransition.appTransitionToString(transit));
-        } else {
-            mService.mAnimateWallpaperWithTarget = true;
+        }
+        // We never want to change from a Keyguard transit to a non-Keyguard transit, as our logic
+        // relies on the fact that we always execute a Keyguard transition after preparing one.
+        else if (!isKeyguardGoingAwayTransit(transit)) {
+            if (closingAppHasWallpaper && openingAppHasWallpaper) {
+                if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "Wallpaper animation!");
+                switch (transit) {
+                    case TRANSIT_ACTIVITY_OPEN:
+                    case TRANSIT_TASK_OPEN:
+                    case TRANSIT_TASK_TO_FRONT:
+                        transit = TRANSIT_WALLPAPER_INTRA_OPEN;
+                        break;
+                    case TRANSIT_ACTIVITY_CLOSE:
+                    case TRANSIT_TASK_CLOSE:
+                    case TRANSIT_TASK_TO_BACK:
+                        transit = TRANSIT_WALLPAPER_INTRA_CLOSE;
+                        break;
+                }
+                if (DEBUG_APP_TRANSITIONS) Slog.v(TAG,
+                        "New transit: " + AppTransition.appTransitionToString(transit));
+            } else if (oldWallpaper != null && !mService.mOpeningApps.isEmpty()
+                    && !openingApps.contains(oldWallpaper.mAppToken)
+                    && closingApps.contains(oldWallpaper.mAppToken)) {
+                // We are transitioning from an activity with a wallpaper to one without.
+                transit = TRANSIT_WALLPAPER_CLOSE;
+                if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "New transit away from wallpaper: "
+                        + AppTransition.appTransitionToString(transit));
+            } else if (wallpaperTarget != null && wallpaperTarget.isVisibleLw() &&
+                    openingApps.contains(wallpaperTarget.mAppToken)) {
+                // We are transitioning from an activity without
+                // a wallpaper to now showing the wallpaper
+                transit = TRANSIT_WALLPAPER_OPEN;
+                if (DEBUG_APP_TRANSITIONS) Slog.v(TAG, "New transit into wallpaper: "
+                        + AppTransition.appTransitionToString(transit));
+            } else {
+                mService.mAnimateWallpaperWithTarget = true;
+            }
         }
         return transit;
     }
@@ -675,8 +680,9 @@ class WindowSurfacePlacer {
             return;
         }
         final int taskId = appToken.getTask().mTaskId;
-        Bitmap thumbnailHeader = mService.mAppTransition.getAppTransitionThumbnailHeader(taskId);
-        if (thumbnailHeader == null || thumbnailHeader.getConfig() == Bitmap.Config.ALPHA_8) {
+        final GraphicBuffer thumbnailHeader =
+                mService.mAppTransition.getAppTransitionThumbnailHeader(taskId);
+        if (thumbnailHeader == null) {
             if (DEBUG_APP_TRANSITIONS) Slog.d(TAG, "No thumbnail header bitmap for: " + taskId);
             return;
         }
@@ -694,18 +700,17 @@ class WindowSurfacePlacer {
             SurfaceControl surfaceControl = new SurfaceControl(mService.mFxSession,
                     "thumbnail anim", dirty.width(), dirty.height(),
                     PixelFormat.TRANSLUCENT, SurfaceControl.HIDDEN,
-                    appToken.windowType, window.mOwnerUid);
+                    appToken.windowType,
+                    window != null ? window.mOwnerUid : Binder.getCallingUid());
             surfaceControl.setLayerStack(display.getLayerStack());
             if (SHOW_TRANSACTIONS) {
                 Slog.i(TAG, "  THUMBNAIL " + surfaceControl + ": CREATE");
             }
 
-            // Draw the thumbnail onto the surface
+            // Transfer the thumbnail to the surface
             Surface drawSurface = new Surface();
             drawSurface.copyFrom(surfaceControl);
-            Canvas c = drawSurface.lockCanvas(dirty);
-            c.drawBitmap(thumbnailHeader, 0, 0, null);
-            drawSurface.unlockCanvasAndPost(c);
+            drawSurface.attachAndQueueBuffer(thumbnailHeader);
             drawSurface.release();
 
             // Get the thumbnail animation

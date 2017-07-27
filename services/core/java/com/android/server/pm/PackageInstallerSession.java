@@ -288,6 +288,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     public SessionInfo generateInfo() {
+        return generateInfo(true);
+    }
+
+    public SessionInfo generateInfo(boolean includeIcon) {
         final SessionInfo info = new SessionInfo();
         synchronized (mLock) {
             info.sessionId = sessionId;
@@ -302,7 +306,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             info.installReason = params.installReason;
             info.sizeBytes = params.sizeBytes;
             info.appPackageName = params.appPackageName;
-            info.appIcon = params.appIcon;
+            if (includeIcon) {
+                info.appIcon = params.appIcon;
+            }
             info.appLabel = params.appLabel;
         }
         return info;
@@ -856,8 +862,15 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
                         mResolvedInstructionSets.add(archSubDir.getName());
                         List<File> oatFiles = Arrays.asList(archSubDir.listFiles());
-                        if (!oatFiles.isEmpty()) {
-                            mResolvedInheritedFiles.addAll(oatFiles);
+
+                        // Only add compiled files associated with the base.
+                        // Once b/62269291 is resolved, we can add all compiled files again.
+                        for (File oatFile : oatFiles) {
+                            if (oatFile.getName().equals("base.art")
+                                    || oatFile.getName().equals("base.odex")
+                                    || oatFile.getName().equals("base.vdex")) {
+                                mResolvedInheritedFiles.add(oatFile);
+                            }
                         }
                     }
                 }
@@ -914,7 +927,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         // This is kind of hacky; we're creating a half-parsed package that is
         // straddled between the inherited and staged APKs.
         final PackageLite pkg = new PackageLite(null, baseApk, null, null, null, null,
-                splitPaths.toArray(new String[splitPaths.size()]), null);
+                splitPaths.toArray(new String[splitPaths.size()]), null, null);
         final boolean isForwardLocked =
                 (params.installFlags & PackageManager.INSTALL_FORWARD_LOCK) != 0;
 

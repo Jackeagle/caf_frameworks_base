@@ -49,11 +49,11 @@ import com.android.systemui.statusbar.policy.RemoteInputView;
  */
 public class NotificationContentView extends FrameLayout {
 
-    private static final int VISIBLE_TYPE_CONTRACTED = 0;
-    private static final int VISIBLE_TYPE_EXPANDED = 1;
-    private static final int VISIBLE_TYPE_HEADSUP = 2;
+    public static final int VISIBLE_TYPE_CONTRACTED = 0;
+    public static final int VISIBLE_TYPE_EXPANDED = 1;
+    public static final int VISIBLE_TYPE_HEADSUP = 2;
     private static final int VISIBLE_TYPE_SINGLELINE = 3;
-    private static final int VISIBLE_TYPE_AMBIENT = 4;
+    public static final int VISIBLE_TYPE_AMBIENT = 4;
     private static final int VISIBLE_TYPE_AMBIENT_SINGLELINE = 5;
     public static final int UNDEFINED = -1;
 
@@ -928,7 +928,7 @@ public class NotificationContentView extends FrameLayout {
         }
     }
 
-    private NotificationViewWrapper getVisibleWrapper(int visibleType) {
+    public NotificationViewWrapper getVisibleWrapper(int visibleType) {
         switch (visibleType) {
             case VISIBLE_TYPE_EXPANDED:
                 return mExpandedWrapper;
@@ -1085,16 +1085,16 @@ public class NotificationContentView extends FrameLayout {
         mBeforeN = entry.targetSdk < Build.VERSION_CODES.N;
         updateAllSingleLineViews();
         if (mContractedChild != null) {
-            mContractedWrapper.notifyContentUpdated(entry.row);
+            mContractedWrapper.onContentUpdated(entry.row);
         }
         if (mExpandedChild != null) {
-            mExpandedWrapper.notifyContentUpdated(entry.row);
+            mExpandedWrapper.onContentUpdated(entry.row);
         }
         if (mHeadsUpChild != null) {
-            mHeadsUpWrapper.notifyContentUpdated(entry.row);
+            mHeadsUpWrapper.onContentUpdated(entry.row);
         }
         if (mAmbientChild != null) {
-            mAmbientWrapper.notifyContentUpdated(entry.row);
+            mAmbientWrapper.onContentUpdated(entry.row);
         }
         applyRemoteInput(entry);
         updateLegacy();
@@ -1308,6 +1308,14 @@ public class NotificationContentView extends FrameLayout {
         return header;
     }
 
+
+    public NotificationHeaderView getContractedNotificationHeader() {
+        if (mContractedChild != null) {
+            return mContractedWrapper.getNotificationHeader();
+        }
+        return null;
+    }
+
     public NotificationHeaderView getVisibleNotificationHeader() {
         NotificationViewWrapper wrapper = getVisibleWrapper(mVisibleType);
         return wrapper == null ? null : wrapper.getNotificationHeader();
@@ -1439,5 +1447,16 @@ public class NotificationContentView extends FrameLayout {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Should a single click be disallowed on this view when on the keyguard?
+     */
+    public boolean disallowSingleClick(float x, float y) {
+        NotificationViewWrapper visibleWrapper = getVisibleWrapper(getVisibleType());
+        if (visibleWrapper != null) {
+            return visibleWrapper.disallowSingleClick(x, y);
+        }
+        return false;
     }
 }

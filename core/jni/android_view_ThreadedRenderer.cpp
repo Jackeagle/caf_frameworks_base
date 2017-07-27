@@ -208,8 +208,15 @@ public:
 
     void detachAnimators() {
         // Remove animators from the list and post a delayed message in future to end the animator
+        // For infinite animators, remove the listener so we no longer hold a global ref to the AVD
+        // java object, and therefore the AVD objects in both native and Java can be properly
+        // released.
         for (auto& anim : mRunningVDAnimators) {
             detachVectorDrawableAnimator(anim.get());
+            anim->clearOneShotListener();
+        }
+        for (auto& anim : mPausedVDAnimators) {
+            anim->clearOneShotListener();
         }
         mRunningVDAnimators.clear();
         mPausedVDAnimators.clear();
@@ -574,18 +581,6 @@ void NotifyHandler::handleMessage(const Message& message) {
     mObserver->decStrong(nullptr);
 }
 
-static jboolean android_view_ThreadedRenderer_supportsOpenGL(JNIEnv* env, jobject clazz) {
-    char prop[PROPERTY_VALUE_MAX];
-    if (property_get("ro.kernel.qemu", prop, NULL) == 0) {
-        // not in the emulator
-        return JNI_TRUE;
-    }
-    // In the emulator this property will be set > 0 when OpenGL ES 2.0 is
-    // enabled, 0 otherwise. On old emulator versions it will be undefined.
-    property_get("qemu.gles", prop, "0");
-    return atoi(prop) > 0 ? JNI_TRUE : JNI_FALSE;
-}
-
 static void android_view_ThreadedRenderer_rotateProcessStatsBuffer(JNIEnv* env, jobject clazz) {
     RenderProxy::rotateProcessStatsBuffer();
 }
@@ -684,6 +679,12 @@ static void android_view_ThreadedRenderer_setOpaque(JNIEnv* env, jobject clazz,
         jlong proxyPtr, jboolean opaque) {
     RenderProxy* proxy = reinterpret_cast<RenderProxy*>(proxyPtr);
     proxy->setOpaque(opaque);
+}
+
+static void android_view_ThreadedRenderer_setWideGamut(JNIEnv* env, jobject clazz,
+        jlong proxyPtr, jboolean wideGamut) {
+    RenderProxy* proxy = reinterpret_cast<RenderProxy*>(proxyPtr);
+    proxy->setWideGamut(wideGamut);
 }
 
 static int android_view_ThreadedRenderer_syncAndDrawFrame(JNIEnv* env, jobject clazz,
@@ -877,7 +878,8 @@ static jobject android_view_ThreadedRenderer_createHardwareBitmapFromRenderNode(
     sp<IGraphicBufferProducer> producer;
     sp<IGraphicBufferConsumer> rawConsumer;
     BufferQueue::createBufferQueue(&producer, &rawConsumer);
-    rawConsumer->setMaxBufferCount(1);
+    // We only need 1 buffer but some drivers have bugs so workaround it by setting max count to 2
+    rawConsumer->setMaxBufferCount(2);
     sp<BufferItemConsumer> consumer = new BufferItemConsumer(rawConsumer,
             GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_NEVER);
     consumer->setDefaultBufferSize(width, height);
@@ -922,6 +924,10 @@ static jobject android_view_ThreadedRenderer_createHardwareBitmapFromRenderNode(
     }
     sk_sp<Bitmap> bitmap = Bitmap::createFrom(buffer);
     return createBitmap(env, bitmap.release(), android::bitmap::kBitmapCreateFlag_Mutable);
+}
+
+static void android_view_ThreadedRenderer_disableVsync(JNIEnv*, jclass) {
+    RenderProxy::disableVsync();
 }
 
 // ----------------------------------------------------------------------------
@@ -971,7 +977,6 @@ static void android_view_ThreadedRenderer_setupShadersDiskCache(JNIEnv* env, job
 const char* const kClassPathName = "android/view/ThreadedRenderer";
 
 static const JNINativeMethod gMethods[] = {
-    { "nSupportsOpenGL", "()Z", (void*) android_view_ThreadedRenderer_supportsOpenGL },
     { "nRotateProcessStatsBuffer", "()V", (void*) android_view_ThreadedRenderer_rotateProcessStatsBuffer },
     { "nSetProcessStatsBuffer", "(I)V", (void*) android_view_ThreadedRenderer_setProcessStatsBuffer },
     { "nGetRenderThreadTid", "(J)I", (void*) android_view_ThreadedRenderer_getRenderThreadTid },
@@ -987,6 +992,7 @@ static const JNINativeMethod gMethods[] = {
     { "nSetup", "(JFII)V", (void*) android_view_ThreadedRenderer_setup },
     { "nSetLightCenter", "(JFFF)V", (void*) android_view_ThreadedRenderer_setLightCenter },
     { "nSetOpaque", "(JZ)V", (void*) android_view_ThreadedRenderer_setOpaque },
+    { "nSetWideGamut", "(JZ)V", (void*) android_view_ThreadedRenderer_setWideGamut },
     { "nSyncAndDrawFrame", "(J[JI)I", (void*) android_view_ThreadedRenderer_syncAndDrawFrame },
     { "nDestroy", "(JJ)V", (void*) android_view_ThreadedRenderer_destroy },
     { "nRegisterAnimatingRenderNode", "(JJ)V", (void*) android_view_ThreadedRenderer_registerAnimatingRenderNode },
@@ -1022,6 +1028,7 @@ static const JNINativeMethod gMethods[] = {
                 (void*)android_view_ThreadedRenderer_copySurfaceInto },
     { "nCreateHardwareBitmap", "(JII)Landroid/graphics/Bitmap;",
             (void*)android_view_ThreadedRenderer_createHardwareBitmapFromRenderNode },
+    { "disableVsync", "()V", (void*)android_view_ThreadedRenderer_disableVsync },
 };
 
 int register_android_view_ThreadedRenderer(JNIEnv* env) {

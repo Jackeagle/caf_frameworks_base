@@ -63,6 +63,7 @@ import android.os.ShellCallback;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.os.storage.StorageManager;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
 import android.util.Log;
@@ -413,7 +414,7 @@ public final class Pm {
                 try {
                     ApkLite baseApk = PackageParser.parseApkLite(file, 0);
                     PackageLite pkgLite = new PackageLite(null, baseApk, null, null, null, null,
-                            null, null);
+                            null, null, null);
                     params.sessionParams.setSize(
                             PackageHelper.calculateInstalledSize(pkgLite, false,
                             params.sessionParams.abiOverride));
@@ -1032,7 +1033,7 @@ public final class Pm {
 
             if (info != null) {
                 System.out.println("Success: created user id " + info.id);
-                return 1;
+                return 0;
             } else {
                 System.err.println("Error: couldn't create User.");
                 return 1;
@@ -1471,7 +1472,8 @@ public final class Pm {
         }
         ClearDataObserver obs = new ClearDataObserver();
         try {
-            mPm.freeStorageAndNotify(volumeUuid, sizeVal, obs);
+            mPm.freeStorageAndNotify(volumeUuid, sizeVal,
+                    StorageManager.FLAG_ALLOCATE_DEFY_ALL_RESERVED, obs);
             synchronized (obs) {
                 while (!obs.finished) {
                     try {

@@ -21,6 +21,7 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SystemService;
 import android.app.Activity;
 import android.app.Application;
 import android.app.PendingIntent;
@@ -47,6 +48,7 @@ import java.util.List;
  *
  * @see AssociationRequest
  */
+@SystemService(Context.COMPANION_DEVICE_SERVICE)
 public final class CompanionDeviceManager {
 
     private static final boolean DEBUG = false;
@@ -212,10 +214,12 @@ public final class CompanionDeviceManager {
             return;
         }
         try {
-            mService.requestNotificationAccess(component).send();
+            IntentSender intentSender = mService.requestNotificationAccess(component)
+                    .getIntentSender();
+            mContext.startIntentSender(intentSender, null, 0, 0, 0);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
-        } catch (PendingIntent.CanceledException e) {
+        } catch (IntentSender.SendIntentException e) {
             throw new RuntimeException(e);
         }
     }
@@ -286,6 +290,7 @@ public final class CompanionDeviceManager {
 
         @Override
         public void onActivityDestroyed(Activity activity) {
+            if (activity != getActivity()) return;
             try {
                 mService.stopScan(mRequest, this, getCallingPackage());
             } catch (RemoteException e) {

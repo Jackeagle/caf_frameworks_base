@@ -252,6 +252,12 @@ public class DisconnectCause {
      */
     public static final int WIFI_LOST = 59;
 
+    /**
+     * The call has failed because of access class barring.
+     * {@hide}
+     */
+    public static final int IMS_ACCESS_BLOCKED = 60;
+
     //*********************************************************************************************
     // When adding a disconnect type:
     // 1) Update toString() with the newly added disconnect type.
@@ -477,8 +483,8 @@ public class DisconnectCause {
             return "CHANNEL_UNACCEPTABLE";
         case CALL_REJECTED:
             return "CALL_REJECTED";
-        case NUMBER_CHANGED:
-            return "NUMBER_CHANGED";
+        //case NUMBER_CHANGED:
+        //    return "NUMBER_CHANGED";
         case PREEMPTION:
             return "PREEMPTION";
         case FACILITY_REJECTED:
@@ -557,6 +563,8 @@ public class DisconnectCause {
             return "HO_NOT_FEASIBLE";
         case NON_SELECTED_USER_CLEARING:
             return "NON_SELECTED_USER_CLEARING";
+        case IMS_ACCESS_BLOCKED:
+            return "IMS_ACCESS_BLOCKED";
         default:
             return "INVALID: " + cause;
         }

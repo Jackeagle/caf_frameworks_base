@@ -21,6 +21,7 @@ import static android.view.autofill.Helper.sDebug;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.Activity;
 import android.content.IntentSender;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -45,70 +46,95 @@ import java.util.Arrays;
  * two pieces of information:
  *
  * <ol>
- *   <li>The type of user data that would be saved (like passoword or credit card info).
+ *   <li>The type(s) of user data (like password or credit card info) that would be saved.
  *   <li>The minimum set of views (represented by their {@link AutofillId}) that need to be changed
  *       to trigger a save request.
  * </ol>
  *
- *  Typically, the {@link SaveInfo} contains the same {@code id}s as the {@link Dataset}:
+ * <p>Typically, the {@link SaveInfo} contains the same {@code id}s as the {@link Dataset}:
  *
  * <pre class="prettyprint">
- *  new FillResponse.Builder()
- *      .add(new Dataset.Builder(createPresentation())
- *          .setValue(id1, AutofillValue.forText("homer"))
- *          .setValue(id2, AutofillValue.forText("D'OH!"))
- *          .build())
- *      .setSaveInfo(new SaveInfo.Builder(SaveInfo.SAVE_INFO_TYPE_PASSWORD, new int[] {id1, id2})
- *                  .build())
- *      .build();
+ *   new FillResponse.Builder()
+ *       .addDataset(new Dataset.Builder()
+ *           .setValue(id1, AutofillValue.forText("homer"), createPresentation("homer")) // username
+ *           .setValue(id2, AutofillValue.forText("D'OH!"), createPresentation("password for homer")) // password
+ *           .build())
+ *       .setSaveInfo(new SaveInfo.Builder(
+ *           SaveInfo.SAVE_DATA_TYPE_USERNAME | SaveInfo.SAVE_DATA_TYPE_PASSWORD,
+ *           new AutofillId[] { id1, id2 }).build())
+ *       .build();
  * </pre>
  *
- * There might be cases where the {@link AutofillService} knows how to fill the
- * {@link android.app.Activity}, but the user has no data for it. In that case, the
- * {@link FillResponse} should contain just the {@link SaveInfo}, but no {@link Dataset}s:
+ * <p>The save type flags are used to display the appropriate strings in the save UI affordance.
+ * You can pass multiple values, but try to keep it short if possible. In the above example, just
+ * {@code SaveInfo.SAVE_DATA_TYPE_PASSWORD} would be enough.
+ *
+ * <p>There might be cases where the {@link AutofillService} knows how to fill the screen,
+ * but the user has no data for it. In that case, the {@link FillResponse} should contain just the
+ * {@link SaveInfo}, but no {@link Dataset Datasets}:
  *
  * <pre class="prettyprint">
- *  new FillResponse.Builder()
- *      .setSaveInfo(new SaveInfo.Builder(SaveInfo.SAVE_INFO_TYPE_PASSWORD, new int[] {id1, id2})
- *                  .build())
- *      .build();
+ *   new FillResponse.Builder()
+ *       .setSaveInfo(new SaveInfo.Builder(SaveInfo.SAVE_DATA_TYPE_PASSWORD,
+ *           new AutofillId[] { id1, id2 }).build())
+ *       .build();
  * </pre>
  *
  * <p>There might be cases where the user data in the {@link AutofillService} is enough
  * to populate some fields but not all, and the service would still be interested on saving the
- * other fields. In this scenario, the service could set the
+ * other fields. In that case, the service could set the
  * {@link SaveInfo.Builder#setOptionalIds(AutofillId[])} as well:
  *
  * <pre class="prettyprint">
  *   new FillResponse.Builder()
- *       .add(new Dataset.Builder(createPresentation())
- *          .setValue(id1, AutofillValue.forText("742 Evergreen Terrace"))  // street
- *          .setValue(id2, AutofillValue.forText("Springfield"))            // city
- *          .build())
- *       .setSaveInfo(new SaveInfo.Builder(SaveInfo.SAVE_INFO_TYPE_ADDRESS, new int[] {id1, id2})
- *                   .setOptionalIds(new int[] {id3, id4}) // state and zipcode
- *                   .build())
+ *       .addDataset(new Dataset.Builder()
+ *           .setValue(id1, AutofillValue.forText("742 Evergreen Terrace"),
+ *               createPresentation("742 Evergreen Terrace")) // street
+ *           .setValue(id2, AutofillValue.forText("Springfield"),
+ *               createPresentation("Springfield")) // city
+ *           .build())
+ *       .setSaveInfo(new SaveInfo.Builder(SaveInfo.SAVE_DATA_TYPE_ADDRESS,
+ *           new AutofillId[] { id1, id2 }) // street and  city
+ *           .setOptionalIds(new AutofillId[] { id3, id4 }) // state and zipcode
+ *           .build())
  *       .build();
  * </pre>
  *
- * The
- * {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)}
- * is triggered after a call to {@link AutofillManager#commit()}, but only when all conditions
- * below are met:
+ * <p>The {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)} can be triggered after
+ * any of the following events:
+ * <ul>
+ *   <li>The {@link Activity} finishes.
+ *   <li>The app explicitly called {@link AutofillManager#commit()}.
+ *   <li>All required views became invisible (if the {@link SaveInfo} was created with the
+ *       {@link #FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE} flag).
+ * </ul>
  *
- * <ol>
+ * <p>But it is only triggered when all conditions below are met:
+ * <ul>
  *   <li>The {@link SaveInfo} associated with the {@link FillResponse} is not {@code null}.
- *   <li>The {@link AutofillValue} of all required views (as set by the {@code requiredIds} passed
- *       to {@link SaveInfo.Builder} constructor are not empty.
+ *   <li>The {@link AutofillValue}s of all required views (as set by the {@code requiredIds} passed
+ *       to the {@link SaveInfo.Builder} constructor are not empty.
  *   <li>The {@link AutofillValue} of at least one view (be it required or optional) has changed
- *       (i.e., it's not the same value passed in a {@link Dataset}).
- *   <li>The user explicitly tapped the affordance asking to save data for autofill.
- * </ol>
+ *       (i.e., it's neither the same value passed in a {@link Dataset}, nor the initial value
+ *       presented in the view).
+ *   <li>The user explicitly tapped the UI affordance asking to save data for autofill.
+ * </ul>
+ *
+ * <p>The service can also customize some aspects of the save UI affordance:
+ * <ul>
+ *   <li>Add a simple subtitle by calling {@link Builder#setDescription(CharSequence)}.
+ *   <li>Add a customized subtitle by calling
+ *       {@link Builder#setCustomDescription(CustomDescription)}.
+ *   <li>Customize the button used to reject the save request by calling
+ *       {@link Builder#setNegativeAction(int, IntentSender)}.
+ *   <li>Decide whether the UI should be shown based on the user input validation by calling
+ *       {@link Builder#setValidator(Validator)}.
+ * </ul>
  */
 public final class SaveInfo implements Parcelable {
 
     /**
-     * Type used on when the service can save the contents of an activity, but cannot describe what
+     * Type used when the service can save the contents of a screen, but cannot describe what
      * the content is for.
      */
     public static final int SAVE_DATA_TYPE_GENERIC = 0x0;
@@ -181,8 +207,8 @@ public final class SaveInfo implements Parcelable {
 
     /**
      * Usually {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)}
-     * is called once the activity finishes. If this flag is set it is called once all saved views
-     * become invisible.
+     * is called once the {@link Activity} finishes. If this flag is set it is called once all
+     * saved views become invisible.
      */
     public static final int FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE = 0x1;
 
@@ -200,6 +226,8 @@ public final class SaveInfo implements Parcelable {
     private final AutofillId[] mOptionalIds;
     private final CharSequence mDescription;
     private final int mFlags;
+    private final CustomDescription mCustomDescription;
+    private final InternalValidator mValidator;
 
     private SaveInfo(Builder builder) {
         mType = builder.mType;
@@ -209,6 +237,8 @@ public final class SaveInfo implements Parcelable {
         mOptionalIds = builder.mOptionalIds;
         mDescription = builder.mDescription;
         mFlags = builder.mFlags;
+        mCustomDescription = builder.mCustomDescription;
+        mValidator = builder.mValidator;
     }
 
     /** @hide */
@@ -246,6 +276,18 @@ public final class SaveInfo implements Parcelable {
         return mDescription;
     }
 
+     /** @hide */
+    @Nullable
+    public CustomDescription getCustomDescription() {
+        return mCustomDescription;
+    }
+
+    /** @hide */
+    @Nullable
+    public InternalValidator getValidator() {
+        return mValidator;
+    }
+
     /**
      * A builder for {@link SaveInfo} objects.
      */
@@ -259,12 +301,14 @@ public final class SaveInfo implements Parcelable {
         private CharSequence mDescription;
         private boolean mDestroyed;
         private int mFlags;
+        private CustomDescription mCustomDescription;
+        private InternalValidator mValidator;
 
         /**
          * Creates a new builder.
          *
-         * @param type the type of information the associated {@link FillResponse} represents, can
-         * be any combination of {@link SaveInfo#SAVE_DATA_TYPE_GENERIC},
+         * @param type the type of information the associated {@link FillResponse} represents. It
+         * can be any combination of {@link SaveInfo#SAVE_DATA_TYPE_GENERIC},
          * {@link SaveInfo#SAVE_DATA_TYPE_PASSWORD},
          * {@link SaveInfo#SAVE_DATA_TYPE_ADDRESS}, {@link SaveInfo#SAVE_DATA_TYPE_CREDIT_CARD},
          * {@link SaveInfo#SAVE_DATA_TYPE_USERNAME}, or
@@ -273,19 +317,30 @@ public final class SaveInfo implements Parcelable {
          *
          * <p>See {@link SaveInfo} for more info.
          *
-         * @throws IllegalArgumentException if {@code requiredIds} is {@code null} or empty.
+         * @throws IllegalArgumentException if {@code requiredIds} is {@code null} or empty, or if
+         * it contains any {@code null} entry.
          */
         public Builder(@SaveDataType int type, @NonNull AutofillId[] requiredIds) {
-            Preconditions.checkArgument(requiredIds != null && requiredIds.length > 0,
-                    "must have at least one required id: " + Arrays.toString(requiredIds));
+            // TODO: add CTS unit tests (not integration) to assert the null cases
             mType = type;
-            mRequiredIds = requiredIds;
+            mRequiredIds = assertValid(requiredIds);
+        }
+
+        private AutofillId[] assertValid(AutofillId[] ids) {
+            Preconditions.checkArgument(ids != null && ids.length > 0,
+                    "must have at least one id: " + Arrays.toString(ids));
+            for (int i = 0; i < ids.length; i++) {
+                final AutofillId id = ids[i];
+                Preconditions.checkArgument(id != null,
+                        "cannot have null id: " + Arrays.toString(ids));
+            }
+            return ids;
         }
 
         /**
-         * Set flags changing the save behavior.
+         * Sets flags changing the save behavior.
          *
-         * @param flags {@link #FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE} or 0.
+         * @param flags {@link #FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE} or {@code 0}.
          * @return This builder.
          */
         public @NonNull Builder setFlags(@SaveInfoFlags int flags) {
@@ -302,12 +357,14 @@ public final class SaveInfo implements Parcelable {
          *
          * @param ids The ids of the optional views.
          * @return This builder.
+         *
+         * @throws IllegalArgumentException if {@code ids} is {@code null} or empty, or if
+         * it contains any {@code null} entry.
          */
-        public @NonNull Builder setOptionalIds(@Nullable AutofillId[] ids) {
+        public @NonNull Builder setOptionalIds(@NonNull AutofillId[] ids) {
+            // TODO: add CTS unit tests (not integration) to assert the null cases
             throwIfDestroyed();
-            if (ids != null && ids.length != 0) {
-                mOptionalIds = ids;
-            }
+            mOptionalIds = assertValid(ids);
             return this;
         }
 
@@ -319,21 +376,46 @@ public final class SaveInfo implements Parcelable {
          *
          * @param description a succint description.
          * @return This Builder.
+         *
+         * @throws IllegalStateException if this call was made after calling
+         * {@link #setCustomDescription(CustomDescription)}.
          */
         public @NonNull Builder setDescription(@Nullable CharSequence description) {
             throwIfDestroyed();
+            Preconditions.checkState(mCustomDescription == null,
+                    "Can call setDescription() or setCustomDescription(), but not both");
             mDescription = description;
+            return this;
+        }
+
+        /**
+         * Sets a custom description to be shown in the UI when the user is asked to save.
+         *
+         * <p>Typically used when the service must show more info about the object being saved,
+         * like a credit card logo, masked number, and expiration date.
+         *
+         * @param customDescription the custom description.
+         * @return This Builder.
+         *
+         * @throws IllegalStateException if this call was made after calling
+         * {@link #setDescription(CharSequence)}.
+         */
+        public @NonNull Builder setCustomDescription(@NonNull CustomDescription customDescription) {
+            throwIfDestroyed();
+            Preconditions.checkState(mDescription == null,
+                    "Can call setDescription() or setCustomDescription(), but not both");
+            mCustomDescription = customDescription;
             return this;
         }
 
         /**
          * Sets the style and listener for the negative save action.
          *
-         * <p>This allows a fill-provider to customize the style and be
+         * <p>This allows an autofill service to customize the style and be
          * notified when the user selects the negative action in the save
          * UI. Note that selecting the negative action regardless of its style
          * and listener being customized would dismiss the save UI and if a
-         * custom listener intent is provided then this intent will be
+         * custom listener intent is provided then this intent is
          * started. The default style is {@link #NEGATIVE_BUTTON_STYLE_CANCEL}</p>
          *
          * @param style The action style.
@@ -358,6 +440,74 @@ public final class SaveInfo implements Parcelable {
         }
 
         /**
+         * Sets an object used to validate the user input - if the input is not valid, the Save UI
+         * affordance is not shown.
+         *
+         * <p>Typically used to validate credit card numbers. Examples:
+         *
+         * <p>Validator for a credit number that must have exactly 16 digits:
+         *
+         * <pre class="prettyprint">
+         * Validator validator = new SimpleRegexValidator(ccNumberId, "^\\d{16}$")
+         * </pre>
+         *
+         * <p>Validator for a credit number that must pass a Luhn checksum and either have
+         * 16 digits, or 15 digits starting with 108:
+         *
+         * <pre class="prettyprint">
+         * import android.service.autofill.Validators;
+         *
+         * Validator validator =
+         *   and(
+         *     new LuhnChecksumValidator(ccNumberId),
+         *     or(
+         *       new SimpleRegexValidator(ccNumberId, "^\\d{16}$"),
+         *       new SimpleRegexValidator(ccNumberId, "^108\\d{12}$")
+         *     )
+         *   );
+         * </pre>
+         *
+         * <p><b>NOTE: </b>the example above is just for illustrative purposes; the same validator
+         * could be created using a single regex for the {@code OR} part:
+         *
+         * <pre class="prettyprint">
+         * Validator validator =
+         *   and(
+         *     new LuhnChecksumValidator(ccNumberId),
+         *     new SimpleRegexValidator(ccNumberId, "^(\\d{16}|108\\d{12})$")
+         *   );
+         * </pre>
+         *
+         * <p>Validator for a credit number contained in just 4 fields and that must have exactly
+         * 4 digits on each field:
+         *
+         * <pre class="prettyprint">
+         * import android.service.autofill.Validators;
+         *
+         * Validator validator =
+         *   and(
+         *     new SimpleRegexValidator.(ccNumberId1, "^\\d{4}$"),
+         *     new SimpleRegexValidator.(ccNumberId2, "^\\d{4}$"),
+         *     new SimpleRegexValidator.(ccNumberId3, "^\\d{4}$"),
+         *     new SimpleRegexValidator.(ccNumberId4, "^\\d{4}$")
+         *   );
+         * </pre>
+         *
+         * @param validator an implementation provided by the Android System.
+         * @return this builder.
+         *
+         * @throws IllegalArgumentException if {@code validator} is not a class provided
+         * by the Android System.
+         */
+        public @NonNull Builder setValidator(@NonNull Validator validator) {
+            throwIfDestroyed();
+            Preconditions.checkArgument((validator instanceof InternalValidator),
+                    "not provided by Android System: " + validator);
+            mValidator = (InternalValidator) validator;
+            return this;
+        }
+
+        /**
          * Builds a new {@link SaveInfo} instance.
          */
         public SaveInfo build() {
@@ -371,7 +521,6 @@ public final class SaveInfo implements Parcelable {
                 throw new IllegalStateException("Already called #build()");
             }
         }
-
     }
 
     /////////////////////////////////////
@@ -389,6 +538,8 @@ public final class SaveInfo implements Parcelable {
                 .append(DebugUtils.flagsToString(SaveInfo.class, "NEGATIVE_BUTTON_STYLE_",
                         mNegativeButtonStyle))
                 .append(", mFlags=").append(mFlags)
+                .append(", mCustomDescription=").append(mCustomDescription)
+                .append(", validation=").append(mValidator)
                 .append("]").toString();
     }
 
@@ -409,6 +560,8 @@ public final class SaveInfo implements Parcelable {
         parcel.writeParcelable(mNegativeActionListener, flags);
         parcel.writeParcelableArray(mOptionalIds, flags);
         parcel.writeCharSequence(mDescription);
+        parcel.writeParcelable(mCustomDescription, flags);
+        parcel.writeParcelable(mValidator, flags);
         parcel.writeInt(mFlags);
     }
 
@@ -421,8 +574,19 @@ public final class SaveInfo implements Parcelable {
             final Builder builder = new Builder(parcel.readInt(),
                     parcel.readParcelableArray(null, AutofillId.class));
             builder.setNegativeAction(parcel.readInt(), parcel.readParcelable(null));
-            builder.setOptionalIds(parcel.readParcelableArray(null, AutofillId.class));
+            final AutofillId[] optionalIds = parcel.readParcelableArray(null, AutofillId.class);
+            if (optionalIds != null) {
+                builder.setOptionalIds(optionalIds);
+            }
             builder.setDescription(parcel.readCharSequence());
+            final CustomDescription customDescripton = parcel.readParcelable(null);
+            if (customDescripton != null) {
+                builder.setCustomDescription(customDescripton);
+            }
+            final InternalValidator validator = parcel.readParcelable(null);
+            if (validator != null) {
+                builder.setValidator(validator);
+            }
             builder.setFlags(parcel.readInt());
             return builder.build();
         }

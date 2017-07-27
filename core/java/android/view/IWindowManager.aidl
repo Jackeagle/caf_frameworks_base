@@ -26,8 +26,10 @@ import com.android.internal.policy.IShortcutService;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.GraphicBuffer;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.Region;
 import android.os.Bundle;
 import android.os.IRemoteCallback;
 import android.os.ParcelFileDescriptor;
@@ -37,6 +39,7 @@ import android.view.IDockedStackListener;
 import android.view.IOnKeyguardExitResult;
 import android.view.IPinnedStackListener;
 import android.view.IRotationWatcher;
+import android.view.IWallpaperVisibilityListener;
 import android.view.IWindowSession;
 import android.view.IWindowSessionCallback;
 import android.view.KeyEvent;
@@ -96,9 +99,9 @@ interface IWindowManager
             int startHeight);
     void overridePendingAppTransitionClipReveal(int startX, int startY,
             int startWidth, int startHeight);
-    void overridePendingAppTransitionThumb(in Bitmap srcThumb, int startX, int startY,
+    void overridePendingAppTransitionThumb(in GraphicBuffer srcThumb, int startX, int startY,
             IRemoteCallback startedCallback, boolean scaleUp);
-    void overridePendingAppTransitionAspectScaledThumb(in Bitmap srcThumb, int startX,
+    void overridePendingAppTransitionAspectScaledThumb(in GraphicBuffer srcThumb, int startX,
             int startY, int targetWidth, int targetHeight, IRemoteCallback startedCallback,
             boolean scaleUp);
     /**
@@ -254,6 +257,19 @@ interface IWindowManager
     Bitmap screenshotWallpaper();
 
     /**
+     * Registers a wallpaper visibility listener.
+     * @return Current visibility.
+     */
+    boolean registerWallpaperVisibilityListener(IWallpaperVisibilityListener listener,
+        int displayId);
+
+    /**
+     * Remove a visibility watcher that was added using registerWallpaperVisibilityListener.
+     */
+    void unregisterWallpaperVisibilityListener(IWallpaperVisibilityListener listener,
+        int displayId);
+
+    /**
      * Used only for assist -- request a screenshot of the current application.
      */
     boolean requestAssistScreenshot(IAssistScreenshotReceiver receiver);
@@ -376,4 +392,9 @@ interface IWindowManager
      * associated with that InputConsumer.
      */
     boolean destroyInputConsumer(String name);
+
+    /**
+     * Return the touch region for the current IME window, or an empty region if there is none.
+     */
+    Region getCurrentImeTouchRegion();
 }

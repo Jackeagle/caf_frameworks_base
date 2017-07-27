@@ -20,9 +20,12 @@ import android.annotation.ColorInt;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.annotation.UserIdInt;
 import android.annotation.WorkerThread;
@@ -52,7 +55,6 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.ContactsContract.Directory;
-import android.provider.Settings;
 import android.security.Credentials;
 import android.service.restrictions.RestrictionsReceiver;
 import android.telephony.TelephonyManager;
@@ -98,6 +100,7 @@ import java.util.Set;
  * "{@docRoot}guide/topics/admin/device-admin.html">Device Administration</a> developer
  * guide. </div>
  */
+@SystemService(Context.DEVICE_POLICY_SERVICE)
 public class DevicePolicyManager {
     private static String TAG = "DevicePolicyManager";
 
@@ -166,8 +169,7 @@ public class DevicePolicyManager {
      *
      * <p>From version {@link android.os.Build.VERSION_CODES#O}, when managed provisioning has
      * completed, along with the above broadcast, activity intent
-     * {@link #ACTION_PROVISIONING_SUCCESSFUL} will also be sent to the application specified in
-     * the provisioning intent.
+     * {@link #ACTION_PROVISIONING_SUCCESSFUL} will also be sent to the profile owner.
      *
      * <p>If provisioning fails, the managedProfile is removed so the device returns to its
      * previous state.
@@ -258,6 +260,26 @@ public class DevicePolicyManager {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_PROVISION_MANAGED_DEVICE
         = "android.app.action.PROVISION_MANAGED_DEVICE";
+
+    /**
+     * Activity action: launch when user provisioning completed, i.e.
+     * {@link #getUserProvisioningState()} returns one of the complete state.
+     *
+     * <p> Please note that the API behavior is not necessarily consistent across various releases,
+     * and devices, as it's contract between SetupWizard and ManagedProvisioning. The default
+     * implementation is that ManagedProvisioning launches SetupWizard in NFC provisioning only.
+     *
+     * <p> The activity must be protected by permission
+     * {@link android.Manifest.permission#BIND_DEVICE_ADMIN}, and the process must hold
+     * {@link android.Manifest.permission#DISPATCH_PROVISIONING_MESSAGE} to be launched.
+     * Only one {@link ComponentName} in the entire system should be enabled, and the rest of the
+     * components are not started by this intent.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    @SystemApi
+    public static final String ACTION_STATE_USER_SETUP_COMPLETE =
+            "android.app.action.STATE_USER_SETUP_COMPLETE";
 
     /**
      * Activity action: Starts the provisioning flow which sets up a managed device.
@@ -834,8 +856,7 @@ public class DevicePolicyManager {
      * {@link DeviceAdminReceiver#ACTION_PROFILE_PROVISIONING_COMPLETE} broadcast but this will be
      * delivered faster as it's an activity intent.
      *
-     * <p>The intent is only sent to the application on the profile that requested provisioning. In
-     * the device owner case the profile is the primary user.
+     * <p>The intent is only sent to the new device or profile owner.
      *
      * @see #ACTION_PROVISION_MANAGED_PROFILE
      * @see #ACTION_PROVISION_MANAGED_DEVICE
@@ -1601,6 +1622,7 @@ public class DevicePolicyManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
     public boolean packageHasActiveAdmins(String packageName) {
         return packageHasActiveAdmins(packageName, myUserId());
     }
@@ -3110,6 +3132,14 @@ public class DevicePolicyManager {
     public static final int WIPE_RESET_PROTECTION_DATA = 0x0002;
 
     /**
+     * Flag for {@link #wipeData(int)}: also erase the device's eUICC data.
+     *
+     * TODO(b/35851809): make this public.
+     * @hide
+     */
+    public static final int WIPE_EUICC = 0x0004;
+
+    /**
      * Ask that all user data be wiped. If called as a secondary user, the user will be removed and
      * other users will remain unaffected. Calling from the primary user will cause the device to
      * reboot, erasing all device data - including all the secondary users and their data - while
@@ -4512,11 +4542,10 @@ public class DevicePolicyManager {
     /**
      * @return device owner component name, even if it's running on a different user.
      *
-     * <p>Requires the MANAGE_USERS permission.
-     *
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public ComponentName getDeviceOwnerComponentOnAnyUser() {
         return getDeviceOwnerComponentInner(/* callingUserOnly =*/ false);
     }
@@ -4600,6 +4629,7 @@ public class DevicePolicyManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public @Nullable String getDeviceOwner() {
         throwIfParentInstance("getDeviceOwner");
         final ComponentName name = getDeviceOwnerComponentOnCallingUser();
@@ -4617,6 +4647,7 @@ public class DevicePolicyManager {
      */
     @SystemApi
     @TestApi
+    @SuppressLint("Doclava125")
     public boolean isDeviceManaged() {
         try {
             return mService.hasDeviceOwner();
@@ -4629,11 +4660,10 @@ public class DevicePolicyManager {
      * Returns the device owner name.  Note this method *will* return the device owner
      * name when it's running on a different user.
      *
-     * <p>Requires the MANAGE_USERS permission.
-     *
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public String getDeviceOwnerNameOnAnyUser() {
         throwIfParentInstance("getDeviceOwnerNameOnAnyUser");
         if (mService != null) {
@@ -4653,6 +4683,7 @@ public class DevicePolicyManager {
      */
     @Deprecated
     @SystemApi
+    @SuppressLint("Doclava125")
     public @Nullable String getDeviceInitializerApp() {
         return null;
     }
@@ -4664,6 +4695,7 @@ public class DevicePolicyManager {
      */
     @Deprecated
     @SystemApi
+    @SuppressLint("Doclava125")
     public @Nullable ComponentName getDeviceInitializerComponent() {
         return null;
     }
@@ -4686,6 +4718,7 @@ public class DevicePolicyManager {
      */
     @Deprecated
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_DEVICE_ADMINS)
     public boolean setActiveProfileOwner(@NonNull ComponentName admin, @Deprecated String ownerName)
             throws IllegalArgumentException {
         throwIfParentInstance("setActiveProfileOwner");
@@ -5003,6 +5036,7 @@ public class DevicePolicyManager {
      * @throws IllegalArgumentException if the userId is invalid.
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public @Nullable String getProfileOwnerNameAsUser(int userId) throws IllegalArgumentException {
         throwIfParentInstance("getProfileOwnerNameAsUser");
         if (mService != null) {
@@ -5947,6 +5981,13 @@ public class DevicePolicyManager {
     public static final int MAKE_USER_EPHEMERAL = 0x0002;
 
     /**
+     * Flag used by {@link #createAndManageUser} to specify that the user should be created as a
+     * demo user.
+     * @hide
+     */
+    public static final int MAKE_USER_DEMO = 0x0004;
+
+    /**
      * Called by a device owner to create a user with the specified name and a given component of
      * the calling package as profile owner. The UserHandle returned by this method should not be
      * persisted as user handles are recycled as users are removed and created. If you need to
@@ -6388,34 +6429,35 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Called by device owners to update {@link Settings.Global} settings. Validation that the value
-     * of the setting is in the correct form for the setting type should be performed by the caller.
+     * Called by device owners to update {@link android.provider.Settings.Global} settings.
+     * Validation that the value of the setting is in the correct form for the setting type should
+     * be performed by the caller.
      * <p>
      * The settings that can be updated with this method are:
      * <ul>
-     * <li>{@link Settings.Global#ADB_ENABLED}</li>
-     * <li>{@link Settings.Global#AUTO_TIME}</li>
-     * <li>{@link Settings.Global#AUTO_TIME_ZONE}</li>
-     * <li>{@link Settings.Global#DATA_ROAMING}</li>
-     * <li>{@link Settings.Global#USB_MASS_STORAGE_ENABLED}</li>
-     * <li>{@link Settings.Global#WIFI_SLEEP_POLICY}</li>
-     * <li>{@link Settings.Global#STAY_ON_WHILE_PLUGGED_IN} This setting is only available from
-     * {@link android.os.Build.VERSION_CODES#M} onwards and can only be set if
+     * <li>{@link android.provider.Settings.Global#ADB_ENABLED}</li>
+     * <li>{@link android.provider.Settings.Global#AUTO_TIME}</li>
+     * <li>{@link android.provider.Settings.Global#AUTO_TIME_ZONE}</li>
+     * <li>{@link android.provider.Settings.Global#DATA_ROAMING}</li>
+     * <li>{@link android.provider.Settings.Global#USB_MASS_STORAGE_ENABLED}</li>
+     * <li>{@link android.provider.Settings.Global#WIFI_SLEEP_POLICY}</li>
+     * <li>{@link android.provider.Settings.Global#STAY_ON_WHILE_PLUGGED_IN} This setting is only
+     * available from {@link android.os.Build.VERSION_CODES#M} onwards and can only be set if
      * {@link #setMaximumTimeToLock} is not used to set a timeout.</li>
-     * <li>{@link Settings.Global#WIFI_DEVICE_OWNER_CONFIGS_LOCKDOWN}</li> This setting is only
-     * available from {@link android.os.Build.VERSION_CODES#M} onwards.</li>
+     * <li>{@link android.provider.Settings.Global#WIFI_DEVICE_OWNER_CONFIGS_LOCKDOWN}</li> This
+     * setting is only available from {@link android.os.Build.VERSION_CODES#M} onwards.</li>
      * </ul>
      * <p>
      * Changing the following settings has no effect as of {@link android.os.Build.VERSION_CODES#M}:
      * <ul>
-     * <li>{@link Settings.Global#BLUETOOTH_ON}. Use
+     * <li>{@link android.provider.Settings.Global#BLUETOOTH_ON}. Use
      * {@link android.bluetooth.BluetoothAdapter#enable()} and
      * {@link android.bluetooth.BluetoothAdapter#disable()} instead.</li>
-     * <li>{@link Settings.Global#DEVELOPMENT_SETTINGS_ENABLED}</li>
-     * <li>{@link Settings.Global#MODE_RINGER}. Use
+     * <li>{@link android.provider.Settings.Global#DEVELOPMENT_SETTINGS_ENABLED}</li>
+     * <li>{@link android.provider.Settings.Global#MODE_RINGER}. Use
      * {@link android.media.AudioManager#setRingerMode(int)} instead.</li>
-     * <li>{@link Settings.Global#NETWORK_PREFERENCE}</li>
-     * <li>{@link Settings.Global#WIFI_ON}. Use
+     * <li>{@link android.provider.Settings.Global#NETWORK_PREFERENCE}</li>
+     * <li>{@link android.provider.Settings.Global#WIFI_ON}. Use
      * {@link android.net.wifi.WifiManager#setWifiEnabled(boolean)} instead.</li>
      * </ul>
      *
@@ -6436,19 +6478,19 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Called by profile or device owners to update {@link Settings.Secure} settings. Validation
-     * that the value of the setting is in the correct form for the setting type should be performed
-     * by the caller.
+     * Called by profile or device owners to update {@link android.provider.Settings.Secure}
+     * settings. Validation that the value of the setting is in the correct form for the setting
+     * type should be performed by the caller.
      * <p>
      * The settings that can be updated by a profile or device owner with this method are:
      * <ul>
-     * <li>{@link Settings.Secure#DEFAULT_INPUT_METHOD}</li>
-     * <li>{@link Settings.Secure#SKIP_FIRST_USE_HINTS}</li>
+     * <li>{@link android.provider.Settings.Secure#DEFAULT_INPUT_METHOD}</li>
+     * <li>{@link android.provider.Settings.Secure#SKIP_FIRST_USE_HINTS}</li>
      * </ul>
      * <p>
      * A device owner can additionally update the following settings:
      * <ul>
-     * <li>{@link Settings.Secure#LOCATION_MODE}</li>
+     * <li>{@link android.provider.Settings.Secure#LOCATION_MODE}</li>
      * </ul>
      *
      * <strong>Note: Starting from Android O, apps should no longer call this method with the
@@ -6773,8 +6815,7 @@ public class DevicePolicyManager {
      * Called by the system update service to notify device and profile owners of pending system
      * updates.
      *
-     * The caller must hold {@link android.Manifest.permission#NOTIFY_PENDING_SYSTEM_UPDATE}
-     * permission. This method should only be used when it is unknown whether the pending system
+     * This method should only be used when it is unknown whether the pending system
      * update is a security patch. Otherwise, use
      * {@link #notifyPendingSystemUpdate(long, boolean)}.
      *
@@ -6785,6 +6826,7 @@ public class DevicePolicyManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.NOTIFY_PENDING_SYSTEM_UPDATE)
     public void notifyPendingSystemUpdate(long updateReceivedTime) {
         throwIfParentInstance("notifyPendingSystemUpdate");
         if (mService != null) {
@@ -6800,8 +6842,7 @@ public class DevicePolicyManager {
      * Called by the system update service to notify device and profile owners of pending system
      * updates.
      *
-     * The caller must hold {@link android.Manifest.permission#NOTIFY_PENDING_SYSTEM_UPDATE}
-     * permission. This method should be used instead of {@link #notifyPendingSystemUpdate(long)}
+     * This method should be used instead of {@link #notifyPendingSystemUpdate(long)}
      * when it is known whether the pending system update is a security patch.
      *
      * @param updateReceivedTime The time as given by {@link System#currentTimeMillis()}
@@ -6813,6 +6854,7 @@ public class DevicePolicyManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.NOTIFY_PENDING_SYSTEM_UPDATE)
     public void notifyPendingSystemUpdate(long updateReceivedTime, boolean isSecurityPatch) {
         throwIfParentInstance("notifyPendingSystemUpdate");
         if (mService != null) {
@@ -7521,6 +7563,7 @@ public class DevicePolicyManager {
      */
     @SystemApi
     @TestApi
+    @SuppressLint("Doclava125")
     public @Nullable CharSequence getDeviceOwnerOrganizationName() {
         try {
             return mService.getDeviceOwnerOrganizationName();
@@ -7711,6 +7754,7 @@ public class DevicePolicyManager {
       * @hide
       */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public void setDeviceProvisioningConfigApplied() {
         try {
             mService.setDeviceProvisioningConfigApplied();
@@ -7731,6 +7775,7 @@ public class DevicePolicyManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public boolean isDeviceProvisioningConfigApplied() {
         try {
             return mService.isDeviceProvisioningConfigApplied();

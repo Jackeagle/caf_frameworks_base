@@ -427,8 +427,11 @@ final class RemoteFillService implements DeathRecipient {
                     mCompleted = true;
                 }
 
+                Slog.w(LOG_TAG, getClass().getSimpleName() + " timed out");
                 final RemoteFillService remoteService = mWeakService.get();
                 if (remoteService != null) {
+                    Slog.w(LOG_TAG, getClass().getSimpleName() + " timed out after "
+                            + TIMEOUT_REMOTE_REQUEST_MILLIS + " ms");
                     fail(remoteService);
                 }
             };

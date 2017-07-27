@@ -17,20 +17,25 @@
 package com.android.server.wm;
 
 import static android.app.ActivityManager.ENABLE_TASK_SNAPSHOTS;
-import static android.graphics.Bitmap.Config.ARGB_8888;
-import static android.graphics.Bitmap.Config.HARDWARE;
+
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityManager.StackId;
 import android.app.ActivityManager.TaskSnapshot;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
 import android.os.Environment;
 import android.os.Handler;
 import android.util.ArraySet;
+import android.util.Slog;
+import android.view.DisplayListCanvas;
+import android.view.RenderNode;
+import android.view.ThreadedRenderer;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManagerPolicy.ScreenOffListener;
 import android.view.WindowManagerPolicy.StartingSurface;
@@ -56,6 +61,7 @@ import java.io.PrintWriter;
  * To access this class, acquire the global window manager lock.
  */
 class TaskSnapshotController {
+    private static final String TAG = TAG_WITH_CLASS_NAME ? "TaskSnapshotController" : TAG_WM;
 
     /**
      * Return value for {@link #getSnapshotMode}: We are allowed to take a real screenshot to be
@@ -86,9 +92,23 @@ class TaskSnapshotController {
     private final ArraySet<Task> mTmpTasks = new ArraySet<>();
     private final Handler mHandler = new Handler();
 
+    /**
+     * Flag indicating whether we are running on an Android TV device.
+     */
+    private final boolean mIsRunningOnTv;
+
+    /**
+     * Flag indicating whether we are running on an IoT device.
+     */
+    private final boolean mIsRunningOnIoT;
+
     TaskSnapshotController(WindowManagerService service) {
         mService = service;
         mCache = new TaskSnapshotCache(mService, mLoader);
+        mIsRunningOnTv = mService.mContext.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_LEANBACK);
+        mIsRunningOnIoT = mService.mContext.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_EMBEDDED);
     }
 
     void systemReady() {
@@ -109,7 +129,7 @@ class TaskSnapshotController {
     }
 
     private void handleClosingApps(ArraySet<AppWindowToken> closingApps) {
-        if (!ENABLE_TASK_SNAPSHOTS || ActivityManager.isLowRamDeviceStatic()) {
+        if (shouldDisableSnapshots()) {
             return;
         }
 
@@ -139,10 +159,17 @@ class TaskSnapshotController {
                     break;
             }
             if (snapshot != null) {
-                mCache.putSnapshot(task, snapshot);
-                mPersister.persistSnapshot(task.mTaskId, task.mUserId, snapshot);
-                if (task.getController() != null) {
-                    task.getController().reportSnapshotChanged(snapshot);
+                final GraphicBuffer buffer = snapshot.getSnapshot();
+                if (buffer.getWidth() == 0 || buffer.getHeight() == 0) {
+                    buffer.destroy();
+                    Slog.e(TAG, "Invalid task snapshot dimensions " + buffer.getWidth() + "x"
+                            + buffer.getHeight());
+                } else {
+                    mCache.putSnapshot(task, snapshot);
+                    mPersister.persistSnapshot(task.mTaskId, task.mUserId, snapshot);
+                    if (task.getController() != null) {
+                        task.getController().reportSnapshotChanged(snapshot);
+                    }
                 }
             }
         }
@@ -183,6 +210,11 @@ class TaskSnapshotController {
         return new TaskSnapshot(buffer, top.getConfiguration().orientation,
                 minRect(mainWindow.mContentInsets, mainWindow.mStableInsets), false /* reduced */,
                 1f /* scale */);
+    }
+
+    private boolean shouldDisableSnapshots() {
+        return !ENABLE_TASK_SNAPSHOTS || ActivityManager.isLowRamDeviceStatic()
+                || mIsRunningOnTv || mIsRunningOnIoT;
     }
 
     private Rect minRect(Rect rect1, Rect rect2) {
@@ -238,19 +270,22 @@ class TaskSnapshotController {
         final int color = task.getTaskDescription().getBackgroundColor();
         final int statusBarColor = task.getTaskDescription().getStatusBarColor();
         final int navigationBarColor = task.getTaskDescription().getNavigationBarColor();
-        final Bitmap b = Bitmap.createBitmap(mainWindow.getFrameLw().width(),
-                mainWindow.getFrameLw().height(), ARGB_8888);
-        final Canvas c = new Canvas(b);
-        c.drawColor(color);
         final LayoutParams attrs = mainWindow.getAttrs();
         final SystemBarBackgroundPainter decorPainter = new SystemBarBackgroundPainter(attrs.flags,
                 attrs.privateFlags, attrs.systemUiVisibility, statusBarColor, navigationBarColor);
+        final int width = mainWindow.getFrameLw().width();
+        final int height = mainWindow.getFrameLw().height();
+
+        final RenderNode node = RenderNode.create("TaskSnapshotController", null);
+        node.setLeftTopRightBottom(0, 0, width, height);
+        node.setClipToBounds(false);
+        final DisplayListCanvas c = node.start(width, height);
+        c.drawColor(color);
         decorPainter.setInsets(mainWindow.mContentInsets, mainWindow.mStableInsets);
         decorPainter.drawDecors(c, null /* statusBarExcludeFrame */);
+        node.end(c);
+        final Bitmap hwBitmap = ThreadedRenderer.createHardwareBitmap(node, width, height);
 
-        // Flush writer.
-        c.setBitmap(null);
-        final Bitmap hwBitmap = b.copy(HARDWARE, false /* isMutable */);
         return new TaskSnapshot(hwBitmap.createGraphicBufferHandle(),
                 topChild.getConfiguration().orientation, mainWindow.mStableInsets,
                 false /* reduced */, 1.0f /* scale */);
@@ -295,7 +330,7 @@ class TaskSnapshotController {
      * Called when screen is being turned off.
      */
     void screenTurningOff(ScreenOffListener listener) {
-        if (!ENABLE_TASK_SNAPSHOTS || ActivityManager.isLowRamDeviceStatic()) {
+        if (shouldDisableSnapshots()) {
             listener.onScreenOff();
             return;
         }

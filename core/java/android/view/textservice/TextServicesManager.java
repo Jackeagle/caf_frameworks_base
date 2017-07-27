@@ -16,6 +16,7 @@
 
 package android.view.textservice;
 
+import android.annotation.SystemService;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.RemoteException;
@@ -30,8 +31,7 @@ import java.util.Locale;
 
 /**
  * System API to the overall text services, which arbitrates interaction between applications
- * and text services. You can retrieve an instance of this interface with
- * {@link Context#getSystemService(String) Context.getSystemService()}.
+ * and text services.
  *
  * The user can change the current text services in Settings. And also applications can specify
  * the target text services.
@@ -61,6 +61,7 @@ import java.util.Locale;
  * </ul>
  *
  */
+@SystemService(Context.TEXT_SERVICES_MANAGER_SERVICE)
 public final class TextServicesManager {
     private static final String TAG = TextServicesManager.class.getSimpleName();
     private static final boolean DBG = false;
@@ -212,53 +213,11 @@ public final class TextServicesManager {
     /**
      * @hide
      */
-    public void setCurrentSpellChecker(SpellCheckerInfo sci) {
-        try {
-            if (sci == null) {
-                throw new NullPointerException("SpellCheckerInfo is null.");
-            }
-            mService.setCurrentSpellChecker(null, sci.getId());
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * @hide
-     */
     public SpellCheckerSubtype getCurrentSpellCheckerSubtype(
             boolean allowImplicitlySelectedSubtype) {
         try {
             // Passing null as a locale until we support multiple enabled spell checker subtypes.
             return mService.getCurrentSpellCheckerSubtype(null, allowImplicitlySelectedSubtype);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * @hide
-     */
-    public void setSpellCheckerSubtype(SpellCheckerSubtype subtype) {
-        try {
-            final int hashCode;
-            if (subtype == null) {
-                hashCode = 0;
-            } else {
-                hashCode = subtype.hashCode();
-            }
-            mService.setCurrentSpellCheckerSubtype(null, hashCode);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * @hide
-     */
-    public void setSpellCheckerEnabled(boolean enabled) {
-        try {
-            mService.setSpellCheckerEnabled(enabled);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

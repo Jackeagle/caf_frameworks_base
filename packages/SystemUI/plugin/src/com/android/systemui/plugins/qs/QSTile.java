@@ -112,6 +112,7 @@ public interface QSTile {
         public boolean dualTarget = false;
         public boolean isTransient = false;
         public String expandedAccessibilityClassName;
+        public SlashState slash;
 
         public boolean copyTo(State other) {
             if (other == null) throw new IllegalArgumentException();
@@ -126,7 +127,8 @@ public interface QSTile {
                     || !Objects.equals(other.disabledByPolicy, disabledByPolicy)
                     || !Objects.equals(other.state, state)
                     || !Objects.equals(other.isTransient, isTransient)
-                    || !Objects.equals(other.dualTarget, dualTarget);
+                    || !Objects.equals(other.dualTarget, dualTarget)
+                    || !Objects.equals(other.slash, slash);
             other.icon = icon;
             other.label = label;
             other.contentDescription = contentDescription;
@@ -136,6 +138,7 @@ public interface QSTile {
             other.state = state;
             other.dualTarget = dualTarget;
             other.isTransient = isTransient;
+            other.slash = slash != null ? slash.copy() : null;
             return changed;
         }
 
@@ -155,6 +158,7 @@ public interface QSTile {
             sb.append(",dualTarget=").append(dualTarget);
             sb.append(",isTransient=").append(isTransient);
             sb.append(",state=").append(state);
+            sb.append(",slash=\"").append(slash).append("\"");
             return sb.append(']');
         }
 
@@ -198,14 +202,20 @@ public interface QSTile {
         public static final int VERSION = 1;
         public boolean activityIn;
         public boolean activityOut;
+        public boolean isOverlayIconWide;
+        public int overlayIconId;
 
         @Override
         public boolean copyTo(State other) {
             final SignalState o = (SignalState) other;
             final boolean changed = o.activityIn != activityIn
-                    || o.activityOut != activityOut;
+                    || o.activityOut != activityOut
+                    || o.isOverlayIconWide != isOverlayIconWide
+                    || o.overlayIconId != overlayIconId;
             o.activityIn = activityIn;
             o.activityOut = activityOut;
+            o.isOverlayIconWide = isOverlayIconWide;
+            o.overlayIconId = overlayIconId;
             return super.copyTo(other) || changed;
         }
 
@@ -246,4 +256,34 @@ public interface QSTile {
         }
     }
 
+    @ProvidesInterface(version = SlashState.VERSION)
+    public static class SlashState {
+        public static final int VERSION = 2;
+
+        public boolean isSlashed;
+        public float rotation;
+
+        @Override
+        public String toString() {
+            return "isSlashed=" + isSlashed + ",rotation=" + rotation;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null) return false;
+            try {
+                return (((SlashState) o).rotation == rotation)
+                        && (((SlashState) o).isSlashed == isSlashed);
+            } catch (ClassCastException e) {
+                return false;
+            }
+        }
+
+        public SlashState copy() {
+            SlashState state = new SlashState();
+            state.rotation = rotation;
+            state.isSlashed = isSlashed;
+            return state;
+        }
+    }
 }

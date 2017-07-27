@@ -102,6 +102,7 @@ public final class PendingIntent implements Parcelable {
                     FLAG_NO_CREATE,
                     FLAG_CANCEL_CURRENT,
                     FLAG_UPDATE_CURRENT,
+                    FLAG_IMMUTABLE,
 
                     Intent.FILL_IN_ACTION,
                     Intent.FILL_IN_DATA,
@@ -603,7 +604,7 @@ public final class PendingIntent implements Parcelable {
 
     /**
      * Retrieve a PendingIntent that will start a foreground service, like calling
-     * {@link Context#startService Context.startForegroundService()}.  The start
+     * {@link Context#startForegroundService Context.startForegroundService()}.  The start
      * arguments given to the service will come from the extras of the Intent.
      *
      * <p class="note">For security reasons, the {@link android.content.Intent}

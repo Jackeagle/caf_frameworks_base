@@ -29,8 +29,10 @@ import android.os.ServiceManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
+import android.telephony.euicc.EuiccManager;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 
@@ -121,9 +123,10 @@ public class KeyguardSimPukView extends KeyguardPinBasedInputView {
             handleSubInfoChangeIfNeeded();
             if (mShowDefaultMessage) {
                 showDefaultMessage();
-            }
             mPasswordEntry.requestFocus();
         }
+
+       }
     }
 
     private void handleSubInfoChangeIfNeeded() {
@@ -393,9 +396,10 @@ public class KeyguardSimPukView extends KeyguardPinBasedInputView {
             return;
         }
 
+        boolean isEsimLocked = KeyguardEsimArea.isEsimLocked(mContext, mSubId);
         int count = TelephonyManager.getDefault().getSimCount();
         Resources rez = getResources();
-        final String msg;
+        String msg;
         int color = Color.WHITE;
         if (count < 2) {
             msg = rez.getString(R.string.kg_puk_enter_puk_hint);
@@ -408,8 +412,13 @@ public class KeyguardSimPukView extends KeyguardPinBasedInputView {
                 color = info.getIconTint();
             }
         }
+        if (isEsimLocked) {
+             msg = msg + " " + rez.getString(R.string.kg_sim_lock_instructions_esim);
+        }
         mSecurityMessageDisplay.setMessage(msg);
         mSimImageView.setImageTintList(ColorStateList.valueOf(color));
+        KeyguardEsimArea esimButton = findViewById(R.id.keyguard_esim_area);
+        esimButton.setVisibility(isEsimLocked ? View.VISIBLE : View.GONE);
 
         new CheckSimPuk("", "", mSubId) {
             void onSimLockChangedResponse(final int result, final int attemptsRemaining) {

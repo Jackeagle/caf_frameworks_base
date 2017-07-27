@@ -17,7 +17,9 @@ package android.telecom;
 import android.Manifest;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressAutoDoc;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -48,6 +50,7 @@ import java.util.List;
  * descriptions.
  */
 @SuppressAutoDoc
+@SystemService(Context.TELECOM_SERVICE)
 public class TelecomManager {
 
     /**
@@ -162,6 +165,17 @@ public class TelecomManager {
      */
     public static final String ACTION_DEFAULT_DIALER_CHANGED =
             "android.telecom.action.DEFAULT_DIALER_CHANGED";
+
+    /**
+     *@hide Broadcast intent action indicating the call type(CS call or Non-CS call).
+     * The string extra {@link #EXTRA_CALL_TYPE_CS} will contain the
+     * boolean value true if call is CS call else false.
+     *
+     * @see #EXTRA_CALL_TYPE_CS
+     */
+    public static final String ACTION_CALL_TYPE =
+            "codeaurora.telecom.action.CALL_TYPE";
+
 
     /**
      * Extra value used to provide the package name for {@link #ACTION_CHANGE_DEFAULT_DIALER}.
@@ -303,6 +317,13 @@ public class TelecomManager {
             "android.telecom.extra.CALL_TECHNOLOGY_TYPE";
 
     /**
+     *@hide  Extra value used to provide the call type for {@link #ACTION_CALL_TYPE}.
+     */
+    public static final String EXTRA_CALL_TYPE_CS =
+            "codeaurora.telecom.extra.CALL_TYPE_CS";
+
+
+    /**
      * An optional {@link android.content.Intent#ACTION_CALL} intent extra denoting the
      * package name of the app specifying an alternative gateway for the call.
      * The value is a string.
@@ -344,6 +365,44 @@ public class TelecomManager {
      */
     public static final String EXTRA_NEW_OUTGOING_CALL_CANCEL_TIMEOUT =
             "android.telecom.extra.NEW_OUTGOING_CALL_CANCEL_TIMEOUT";
+
+    /**
+     * Boolean extra specified to indicate that the intention of adding a call is to handover an
+     * existing call from the user's device to a different {@link PhoneAccount}.
+     * <p>
+     * Used when calling {@link #addNewIncomingCall(PhoneAccountHandle, Bundle)}
+     * to indicate to Telecom that the purpose of adding a new incoming call is to handover an
+     * existing call from the user's device to a different {@link PhoneAccount}.  This occurs on
+     * the receiving side of a handover.
+     * <p>
+     * Used when Telecom calls
+     * {@link ConnectionService#onCreateOutgoingConnection(PhoneAccountHandle, ConnectionRequest)}
+     * to indicate that the purpose of Telecom requesting a new outgoing connection it to request
+     * a handover to this {@link ConnectionService} from an ongoing call on the user's device.  This
+     * occurs on the initiating side of a handover.
+     * <p>
+     * The phone number of the call used by Telecom to determine which call should be handed over.
+     * @hide
+     */
+    public static final String EXTRA_IS_HANDOVER = "android.telecom.extra.IS_HANDOVER";
+
+    /**
+     * Parcelable extra used with {@link #EXTRA_IS_HANDOVER} to indicate the source
+     * {@link PhoneAccountHandle} when initiating a handover which {@link ConnectionService}
+     * the handover is from.
+     * @hide
+     */
+    public static final String EXTRA_HANDOVER_FROM_PHONE_ACCOUNT =
+            "android.telecom.extra.HANDOVER_FROM_PHONE_ACCOUNT";
+
+    /**
+     * Extra key specified in the {@link ConnectionRequest#getExtras()} when Telecom calls
+     * {@link ConnectionService#onCreateOutgoingConnection(PhoneAccountHandle, ConnectionRequest)}
+     * to inform the {@link ConnectionService} what the initial {@link CallAudioState} of the
+     * {@link Connection} will be.
+     * @hide
+     */
+    public static final String EXTRA_CALL_AUDIO_STATE = "android.telecom.extra.CALL_AUDIO_STATE";
 
     /**
      * A boolean extra, which when set on the {@link Intent#ACTION_CALL} intent or on the bundle
@@ -734,6 +793,10 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE,
+            android.Manifest.permission.READ_PHONE_STATE
+    })
     public List<PhoneAccountHandle> getPhoneAccountsSupportingScheme(String uriScheme) {
         try {
             if (isServiceConnected()) {
@@ -815,6 +878,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @SuppressLint("Doclava125")
     public List<PhoneAccountHandle> getPhoneAccountsForPackage() {
         try {
             if (isServiceConnected()) {
@@ -942,6 +1006,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @SuppressLint("Doclava125")
     public void clearPhoneAccounts() {
         clearAccounts();
     }
@@ -951,6 +1016,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @SuppressLint("Doclava125")
     public void clearAccounts() {
         try {
             if (isServiceConnected()) {
@@ -982,6 +1048,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @SuppressLint("Doclava125")
     public ComponentName getDefaultPhoneApp() {
         try {
             if (isServiceConnected()) {
@@ -1198,6 +1265,10 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE,
+            android.Manifest.permission.READ_PHONE_STATE
+    })
     public boolean isRinging() {
         try {
             if (isServiceConnected()) {
@@ -1216,6 +1287,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public boolean endCall() {
         try {
             if (isServiceConnected()) {
@@ -1295,6 +1367,10 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE,
+            android.Manifest.permission.READ_PHONE_STATE
+    })
     public boolean isTtySupported() {
         try {
             if (isServiceConnected()) {
@@ -1573,6 +1649,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public void enablePhoneAccount(PhoneAccountHandle handle, boolean isEnabled) {
         ITelecomService service = getTelecomService();
         if (service != null) {

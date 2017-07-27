@@ -26,6 +26,7 @@ import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.net.NetworkRequest;
 import android.net.Proxy;
 import android.net.Uri;
@@ -37,6 +38,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -44,6 +46,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
+import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -53,14 +58,23 @@ import java.lang.InterruptedException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CaptivePortalLoginActivity extends Activity {
     private static final String TAG = CaptivePortalLoginActivity.class.getSimpleName();
     private static final boolean DBG = true;
+    private static final boolean VDBG = false;
 
     private static final int SOCKET_TIMEOUT_MS = 10000;
 
-    private enum Result { DISMISSED, UNWANTED, WANTED_AS_IS };
+    private enum Result {
+        DISMISSED(MetricsEvent.ACTION_CAPTIVE_PORTAL_LOGIN_RESULT_DISMISSED),
+        UNWANTED(MetricsEvent.ACTION_CAPTIVE_PORTAL_LOGIN_RESULT_UNWANTED),
+        WANTED_AS_IS(MetricsEvent.ACTION_CAPTIVE_PORTAL_LOGIN_RESULT_WANTED_AS_IS);
+
+        final int metricsEvent;
+        Result(int metricsEvent) { this.metricsEvent = metricsEvent; }
+    };
 
     private URL mUrl;
     private String mUserAgent;
@@ -70,10 +84,15 @@ public class CaptivePortalLoginActivity extends Activity {
     private ConnectivityManager mCm;
     private boolean mLaunchBrowser = false;
     private MyWebViewClient mWebViewClient;
+    // Ensures that done() happens once exactly, handling concurrent callers with atomic operations.
+    private final AtomicBoolean isDone = new AtomicBoolean(false);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        logMetricsEvent(MetricsEvent.ACTION_CAPTIVE_PORTAL_LOGIN_ACTIVITY);
+
         mCm = ConnectivityManager.from(this);
         mNetwork = getIntent().getParcelableExtra(ConnectivityManager.EXTRA_NETWORK);
         mCaptivePortal = getIntent().getParcelableExtra(ConnectivityManager.EXTRA_CAPTIVE_PORTAL);
@@ -97,8 +116,6 @@ public class CaptivePortalLoginActivity extends Activity {
         // setContentView initializes the WebView logic which in turn reads the system properties.
         setContentView(R.layout.activity_captive_portal_login);
 
-        getActionBar().setDisplayShowHomeEnabled(false);
-
         // Exit app if Network disappears.
         final NetworkCapabilities networkCapabilities = mCm.getNetworkCapabilities(mNetwork);
         if (networkCapabilities == null) {
@@ -117,9 +134,14 @@ public class CaptivePortalLoginActivity extends Activity {
         }
         mCm.registerNetworkCallback(builder.build(), mNetworkCallback);
 
-        final WebView myWebView = findViewById(R.id.webview);
-        myWebView.clearCache(true);
-        WebSettings webSettings = myWebView.getSettings();
+        getActionBar().setDisplayShowHomeEnabled(false);
+        getActionBar().setElevation(0); // remove shadow
+        getActionBar().setTitle(getHeaderTitle());
+        getActionBar().setSubtitle("");
+
+        final WebView webview = getWebview();
+        webview.clearCache(true);
+        WebSettings webSettings = webview.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         webSettings.setUseWideViewPort(true);
@@ -128,11 +150,11 @@ public class CaptivePortalLoginActivity extends Activity {
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false);
         mWebViewClient = new MyWebViewClient();
-        myWebView.setWebViewClient(mWebViewClient);
-        myWebView.setWebChromeClient(new MyWebChromeClient());
+        webview.setWebViewClient(mWebViewClient);
+        webview.setWebChromeClient(new MyWebChromeClient());
         // Start initial page load so WebView finishes loading proxy settings.
         // Actual load of mUrl is initiated by MyWebViewClient.
-        myWebView.loadData("", "text/html", null);
+        webview.loadData("", "text/html", null);
     }
 
     // Find WebView's proxy BroadcastReceiver and prompt it to read proxy system properties.
@@ -160,13 +182,14 @@ public class CaptivePortalLoginActivity extends Activity {
     }
 
     private void done(Result result) {
+        if (isDone.getAndSet(true)) {
+            // isDone was already true: done() already called
+            return;
+        }
         if (DBG) {
             Log.d(TAG, String.format("Result %s for %s", result.name(), mUrl.toString()));
         }
-        if (mNetworkCallback != null) {
-            mCm.unregisterNetworkCallback(mNetworkCallback);
-            mNetworkCallback = null;
-        }
+        logMetricsEvent(result.metricsEvent);
         switch (result) {
             case DISMISSED:
                 mCaptivePortal.reportCaptivePortalDismissed();
@@ -225,8 +248,8 @@ public class CaptivePortalLoginActivity extends Activity {
     public void onDestroy() {
         super.onDestroy();
         if (mNetworkCallback != null) {
+            // mNetworkCallback is not null if mUrl is not null.
             mCm.unregisterNetworkCallback(mNetworkCallback);
-            mNetworkCallback = null;
         }
         if (mLaunchBrowser) {
             // Give time for this network to become default. After 500ms just proceed.
@@ -251,10 +274,14 @@ public class CaptivePortalLoginActivity extends Activity {
         if (url == null) {
             url = mCm.getCaptivePortalServerUrl();
         }
+        return makeURL(url);
+    }
+
+    private static URL makeURL(String url) {
         try {
             return new URL(url);
         } catch (MalformedURLException e) {
-            Log.e(TAG, "Invalid captive portal URL " + url);
+            Log.e(TAG, "Invalid URL " + url);
         }
         return null;
     }
@@ -303,6 +330,7 @@ public class CaptivePortalLoginActivity extends Activity {
 
     private class MyWebViewClient extends WebViewClient {
         private static final String INTERNAL_ASSETS = "file:///android_asset/";
+
         private final String mBrowserBailOutToken = Long.toString(new Random().nextLong());
         // How many Android device-independent-pixels per scaled-pixel
         // dp/sp = (px/sp) / (px/dp) = (1/sp) / (1/dp)
@@ -331,15 +359,16 @@ public class CaptivePortalLoginActivity extends Activity {
             // For internally generated pages, leave URL bar listing prior URL as this is the URL
             // the page refers to.
             if (!url.startsWith(INTERNAL_ASSETS)) {
-                final TextView myUrlBar = findViewById(R.id.url_bar);
-                myUrlBar.setText(url);
+                getActionBar().setSubtitle(getHeaderSubtitle(url));
             }
+            getProgressBar().setVisibility(View.VISIBLE);
             testForCaptivePortal();
         }
 
         @Override
         public void onPageFinished(WebView view, String url) {
             mPagesLoaded++;
+            getProgressBar().setVisibility(View.INVISIBLE);
             if (mPagesLoaded == 1) {
                 // Now that WebView has loaded at least one page we know it has read in the proxy
                 // settings.  Now prompt the WebView read the Network-specific proxy settings.
@@ -349,15 +378,12 @@ public class CaptivePortalLoginActivity extends Activity {
                 return;
             } else if (mPagesLoaded == 2) {
                 // Prevent going back to empty first page.
+                // Fix for missing focus, see b/62449959 for details. Remove it once we get a
+                // newer version of WebView (60.x.y).
+                view.requestFocus();
                 view.clearHistory();
             }
             testForCaptivePortal();
-        }
-
-        // Convert Android device-independent-pixels (dp) to HTML size.
-        private String dp(int dp) {
-            // HTML px's are scaled just like dp's, so just add "px" suffix.
-            return Integer.toString(dp) + "px";
         }
 
         // Convert Android scaled-pixels (sp) to HTML size.
@@ -367,36 +393,76 @@ public class CaptivePortalLoginActivity extends Activity {
             // Apply a scale factor to make things look right.
             dp *= 1.3;
             // Convert dp's to HTML size.
-            return dp((int)dp);
+            // HTML px's are scaled just like dp's, so just add "px" suffix.
+            return Integer.toString((int)dp) + "px";
         }
 
         // A web page consisting of a large broken lock icon to indicate SSL failure.
-        private final String SSL_ERROR_HTML = "<html><head><style>" +
-                "body { margin-left:" + dp(48) + "; margin-right:" + dp(48) + "; " +
-                        "margin-top:" + dp(96) + "; background-color:#fafafa; }" +
-                "img { width:" + dp(48) + "; height:" + dp(48) + "; }" +
-                "div.warn { font-size:" + sp(16) + "; margin-top:" + dp(16) + "; " +
-                "           opacity:0.87; line-height:1.28; }" +
-                "div.example { font-size:" + sp(14) + "; margin-top:" + dp(16) + "; " +
-                "              opacity:0.54; line-height:1.21905; }" +
-                "a { font-size:" + sp(14) + "; text-decoration:none; text-transform:uppercase; " +
-                "    margin-top:" + dp(24) + "; display:inline-block; color:#4285F4; " +
-                "    height:" + dp(48) + "; font-weight:bold; }" +
-                "</style></head><body><p><img src=quantum_ic_warning_amber_96.png><br>" +
-                "<div class=warn>%s</div>" +
-                "<div class=example>%s</div>" +
-                "<a href=%s>%s</a></body></html>";
 
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            logMetricsEvent(MetricsEvent.CAPTIVE_PORTAL_LOGIN_ACTIVITY_SSL_ERROR);
             Log.w(TAG, "SSL error (error: " + error.getPrimaryError() + " host: " +
                     // Only show host to avoid leaking private info.
                     Uri.parse(error.getUrl()).getHost() + " certificate: " +
                     error.getCertificate() + "); displaying SSL warning.");
-            final String html = String.format(SSL_ERROR_HTML, getString(R.string.ssl_error_warning),
-                    getString(R.string.ssl_error_example), mBrowserBailOutToken,
-                    getString(R.string.ssl_error_continue));
-            view.loadDataWithBaseURL(INTERNAL_ASSETS, html, "text/HTML", "UTF-8", null);
+            final String sslErrorPage = makeSslErrorPage();
+            if (VDBG) {
+                Log.d(TAG, sslErrorPage);
+            }
+            view.loadDataWithBaseURL(INTERNAL_ASSETS, sslErrorPage, "text/HTML", "UTF-8", null);
+        }
+
+        private String makeSslErrorPage() {
+            final String warningMsg = getString(R.string.ssl_error_warning);
+            final String exampleMsg = getString(R.string.ssl_error_example);
+            final String continueMsg = getString(R.string.ssl_error_continue);
+            return String.join("\n",
+                    "<html>",
+                    "<head>",
+                    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+                    "  <style>",
+                    "    body {",
+                    "      background-color:#fafafa;",
+                    "      margin:auto;",
+                    "      width:80%;",
+                    "      margin-top: 96px",
+                    "    }",
+                    "    img {",
+                    "      height:48px;",
+                    "      width:48px;",
+                    "    }",
+                    "    div.warn {",
+                    "      font-size:" + sp(16) + ";",
+                    "      line-height:1.28;",
+                    "      margin-top:16px;",
+                    "      opacity:0.87;",
+                    "    }",
+                    "    div.example {",
+                    "      font-size:" + sp(14) + ";",
+                    "      line-height:1.21905;",
+                    "      margin-top:16px;",
+                    "      opacity:0.54;",
+                    "    }",
+                    "    a {",
+                    "      color:#4285F4;",
+                    "      display:inline-block;",
+                    "      font-size:" + sp(14) + ";",
+                    "      font-weight:bold;",
+                    "      height:48px;",
+                    "      margin-top:24px;",
+                    "      text-decoration:none;",
+                    "      text-transform:uppercase;",
+                    "    }",
+                    "  </style>",
+                    "</head>",
+                    "<body>",
+                    "  <p><img src=quantum_ic_warning_amber_96.png><br>",
+                    "  <div class=warn>" + warningMsg + "</div>",
+                    "  <div class=example>" + exampleMsg + "</div>",
+                    "  <a href=" + mBrowserBailOutToken + ">" + continueMsg + "</a>",
+                    "</body>",
+                    "</html>");
         }
 
         @Override
@@ -412,8 +478,43 @@ public class CaptivePortalLoginActivity extends Activity {
     private class MyWebChromeClient extends WebChromeClient {
         @Override
         public void onProgressChanged(WebView view, int newProgress) {
-            final ProgressBar myProgressBar = findViewById(R.id.progress_bar);
-            myProgressBar.setProgress(newProgress);
+            getProgressBar().setProgress(newProgress);
         }
+    }
+
+    private ProgressBar getProgressBar() {
+        return findViewById(R.id.progress_bar);
+    }
+
+    private WebView getWebview() {
+        return findViewById(R.id.webview);
+    }
+
+    private String getHeaderTitle() {
+        NetworkInfo info = mCm.getNetworkInfo(mNetwork);
+        if (info == null) {
+            return getString(R.string.action_bar_label);
+        }
+        NetworkCapabilities nc = mCm.getNetworkCapabilities(mNetwork);
+        if (!nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            return getString(R.string.action_bar_label);
+        }
+        return getString(R.string.action_bar_title, info.getExtraInfo().replaceAll("^\"|\"$", ""));
+    }
+
+    private String getHeaderSubtitle(String urlString) {
+        URL url = makeURL(urlString);
+        if (url == null) {
+            return urlString;
+        }
+        final String https = "https";
+        if (https.equals(url.getProtocol())) {
+            return https + "://" + url.getHost();
+        }
+        return url.getHost();
+    }
+
+    private void logMetricsEvent(int event) {
+        MetricsLogger.action(this, event, getPackageName());
     }
 }

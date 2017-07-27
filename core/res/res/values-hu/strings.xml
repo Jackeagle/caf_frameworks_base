@@ -27,18 +27,6 @@
     <string name="terabyteShort" msgid="231613018159186962">"TB"</string>
     <string name="petabyteShort" msgid="5637816680144990219">"PB"</string>
     <string name="fileSizeSuffix" msgid="8897567456150907538">"<xliff:g id="NUMBER">%1$s</xliff:g> <xliff:g id="UNIT">%2$s</xliff:g>"</string>
-    <string name="durationDays" msgid="6652371460511178259">"<xliff:g id="DAYS">%1$d</xliff:g> nap"</string>
-    <string name="durationDayHours" msgid="2713107458736744435">"<xliff:g id="DAYS">%1$d</xliff:g> nap <xliff:g id="HOURS">%2$d</xliff:g> óra"</string>
-    <string name="durationDayHour" msgid="7293789639090958917">"<xliff:g id="DAYS">%1$d</xliff:g> nap <xliff:g id="HOURS">%2$d</xliff:g> óra"</string>
-    <string name="durationHours" msgid="4266858287167358988">"<xliff:g id="HOURS">%1$d</xliff:g> óra"</string>
-    <string name="durationHourMinutes" msgid="9029176248692041549">"<xliff:g id="HOURS">%1$d</xliff:g> óra <xliff:g id="MINUTES">%2$d</xliff:g> perc"</string>
-    <string name="durationHourMinute" msgid="2741677355177402539">"<xliff:g id="HOURS">%1$d</xliff:g> óra <xliff:g id="MINUTES">%2$d</xliff:g> perc"</string>
-    <string name="durationMinutes" msgid="3134226679883579347">"<xliff:g id="MINUTES">%1$d</xliff:g> perc"</string>
-    <string name="durationMinute" msgid="7155301744174623818">"<xliff:g id="MINUTES">%1$d</xliff:g> perc"</string>
-    <string name="durationMinuteSeconds" msgid="1424656185379003751">"<xliff:g id="MINUTES">%1$d</xliff:g> perc <xliff:g id="SECONDS">%2$d</xliff:g> mp"</string>
-    <string name="durationMinuteSecond" msgid="3989228718067466680">"<xliff:g id="MINUTES">%1$d</xliff:g> perc <xliff:g id="SECONDS">%2$d</xliff:g> mp"</string>
-    <string name="durationSeconds" msgid="8050088505238241405">"<xliff:g id="SECONDS">%1$d</xliff:g> másodperc"</string>
-    <string name="durationSecond" msgid="985669622276420331">"<xliff:g id="SECONDS">%1$d</xliff:g> másodperc"</string>
     <string name="untitled" msgid="4638956954852782576">"&lt;Névtelen&gt;"</string>
     <string name="emptyPhoneNumber" msgid="7694063042079676517">"(Nincs telefonszám)"</string>
     <string name="unknownName" msgid="6867811765370350269">"Ismeretlen"</string>
@@ -90,15 +78,12 @@
     <string name="serviceNotProvisioned" msgid="8614830180508686666">"A szolgáltatás nincs biztosítva."</string>
     <string name="CLIRPermanent" msgid="3377371145926835671">"Nem tudja módosítani a hívó fél azonosítója beállítást."</string>
     <string name="RestrictedOnDataTitle" msgid="1322504692764166532">"Adatszolgáltatás letiltva"</string>
-    <string name="RestrictedOnEmergencyTitle" msgid="1236071219598685236">"Segélyszolgáltatás letiltva"</string>
+    <string name="RestrictedOnEmergencyTitle" msgid="3646729271176394091">"Nincs segélyhívás"</string>
     <string name="RestrictedOnNormalTitle" msgid="3179574012752700984">"Hangszolgáltatás letiltva"</string>
     <string name="RestrictedOnAllVoiceTitle" msgid="158800171499150681">"Hang- és segélyszolgáltatás letiltva"</string>
-    <string name="RestrictedOnDataContent" msgid="8997474569390996587">"Szolgáltatója ezen a helyen átmenetileg felfüggesztette az adatszolgáltatást"</string>
-    <string name="RestrictedOnEmergencyContent" msgid="4573217945494650061">"Szolgáltatója ezen a helyen átmenetileg felfüggesztette a segélyhívásokat"</string>
-    <string name="RestrictedOnNormalContent" msgid="1579434198284512182">"Szolgáltatója ezen a helyen átmenetileg felfüggesztette a hanghívásokat"</string>
-    <string name="RestrictedOnAllVoiceContent" msgid="5243580774142557047">"Szolgáltatója ezen a helyen átmenetileg felfüggesztette a hang- és segélyhívásokat"</string>
+    <string name="RestrictedStateContent" msgid="4278821484643362350">"Az Ön tartózkodási helyén ideiglenesen nem áll rendelkezésre a mobilhálózaton"</string>
     <string name="NetworkPreferenceSwitchTitle" msgid="4008877505368566980">"A hálózat nem érhető el"</string>
-    <string name="NetworkPreferenceSwitchSummary" msgid="4164230263214915351">"A vétel javítása érdekében próbálja módosítani a kiválasztott hálózattípust a Rendszer &gt; Hálózat és internet &gt; Mobilhálózatok &gt; Preferált hálózattípus menüben."</string>
+    <string name="NetworkPreferenceSwitchSummary" msgid="1203771446683319957">"A vétel javítása érdekében próbálja módosítani a kiválasztott hálózattípust a Beállítások &gt; Hálózat és internet &gt; Mobilhálózatok &gt; Preferált hálózattípus menüpontban."</string>
     <string name="notification_channel_network_alert" msgid="4427736684338074967">"Értesítések"</string>
     <string name="notification_channel_call_forward" msgid="2419697808481833249">"Hívásátirányítás"</string>
     <string name="notification_channel_emergency_callback" msgid="6686166232265733921">"Sürgősségi visszahívás mód"</string>
@@ -134,7 +119,7 @@
     <string name="roamingTextSearching" msgid="8360141885972279963">"Szolgáltatás keresése"</string>
     <string name="wfcRegErrorTitle" msgid="2301376280632110664">"Wi-Fi-hívás"</string>
   <string-array name="wfcOperatorErrorAlertMessages">
-    <item msgid="2254967670088539682">"Ha Wi-Fi-n szeretne telefonálni és üzenetet küldeni, kérje meg szolgáltatóját, hogy állítsa be ezt a szolgáltatást. Ezután a Beállítások menüben kapcsolhatja be újra a Wi-Fi-hívást."</item>
+    <item msgid="3910386316304772394">"Ha Wi-Fi-hálózaton szeretne telefonálni és üzenetet küldeni, kérje meg szolgáltatóját, hogy állítsa be ezt a szolgáltatást. Ezután kapcsolja be újra a Wi-Fi-hívást a Beállításokban. (Hibakód: <xliff:g id="CODE">%1$s</xliff:g>)"</item>
   </string-array>
   <string-array name="wfcOperatorErrorNotificationMessages">
     <item msgid="6177300162212449033">"Regisztráljon a szolgáltatójánál"</item>
@@ -226,7 +211,7 @@
     <string name="global_actions" product="default" msgid="2406416831541615258">"Telefonbeállítások"</string>
     <string name="global_action_lock" msgid="2844945191792119712">"Képernyő lezárása"</string>
     <string name="global_action_power_off" msgid="4471879440839879722">"Kikapcsolás"</string>
-    <string name="global_action_emergency" msgid="7112311161137421166">"Vészhívás"</string>
+    <string name="global_action_emergency" msgid="7112311161137421166">"Segélyhívás"</string>
     <string name="global_action_bug_report" msgid="7934010578922304799">"Programhiba bejelentése"</string>
     <string name="bugreport_title" msgid="2667494803742548533">"Hibajelentés készítése"</string>
     <string name="bugreport_message" msgid="398447048750350456">"Ezzel információt fog gyűjteni az eszköz jelenlegi állapotáról, amelyet a rendszer e-mailben fog elküldeni. Kérjük, legyen türelemmel, amíg a hibajelentés elkészül, és küldhető állapotba kerül."</string>
@@ -717,7 +702,7 @@
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="46154051614126049">"A feloldáshoz vagy segélyhívás kezdeményezéséhez nyomja meg a Menü gombot."</string>
     <string name="lockscreen_instructions_when_pattern_disabled" msgid="686260028797158364">"A feloldáshoz nyomja meg a Menü gombot."</string>
     <string name="lockscreen_pattern_instructions" msgid="7478703254964810302">"Rajzolja le a mintát a feloldáshoz"</string>
-    <string name="lockscreen_emergency_call" msgid="5298642613417801888">"Vészhívás"</string>
+    <string name="lockscreen_emergency_call" msgid="5298642613417801888">"Segélyhívás"</string>
     <string name="lockscreen_return_to_call" msgid="5244259785500040021">"Hívás folytatása"</string>
     <string name="lockscreen_pattern_correct" msgid="9039008650362261237">"Helyes!"</string>
     <string name="lockscreen_pattern_wrong" msgid="4317955014948108794">"Próbálja újra"</string>
@@ -1109,6 +1094,13 @@
       <item quantity="other">Nyílt Wi-Fi hálózatok érhetők el</item>
       <item quantity="one">Nyílt Wi-Fi hálózat érhető el</item>
     </plurals>
+    <string name="wifi_available_title" msgid="3817100557900599505">"Nyílt Wi-Fi-hálózathoz kapcsolódhat"</string>
+    <string name="wifi_available_title_connecting" msgid="1557292688310330032">"Kapcsolódás nyílt Wi‑Fi-hálózathoz…"</string>
+    <string name="wifi_available_title_connected" msgid="7542672851522241548">"Sikeres kapcsolódás a Wi-Fi-hálózathoz"</string>
+    <string name="wifi_available_title_failed_to_connect" msgid="6861772233582618132">"Nem sikerült kapcsolódni a Wi‑Fi-hálózathoz"</string>
+    <string name="wifi_available_content_failed_to_connect" msgid="3377406637062802645">"Koppintással megjelenítheti az összes hálózatot"</string>
+    <string name="wifi_available_action_connect" msgid="2635699628459488788">"Kapcsolódás"</string>
+    <string name="wifi_available_action_all_networks" msgid="1100098935861622985">"Összes hálózat"</string>
     <string name="wifi_available_sign_in" msgid="9157196203958866662">"Bejelentkezés Wi-Fi hálózatba"</string>
     <string name="network_available_sign_in" msgid="1848877297365446605">"Bejelentkezés a hálózatba"</string>
     <!-- no translation found for network_available_sign_in_detailed (8000081941447976118) -->
@@ -1188,6 +1180,8 @@
     <string name="usb_midi_notification_title" msgid="4850904915889144654">"USB MIDI-hez"</string>
     <string name="usb_accessory_notification_title" msgid="7848236974087653666">"Csatlakoztatva egy USB-kiegészítőhöz"</string>
     <string name="usb_notification_message" msgid="3370903770828407960">"Koppintson a további beállítások megjelenítéséhez."</string>
+    <string name="usb_unsupported_audio_accessory_title" msgid="2256529893240208458">"Ez az audiotartozék nem támogatott"</string>
+    <string name="usb_unsupported_audio_accessory_message" msgid="7811865061127547035">"Koppintson, ha további információra van szüksége"</string>
     <string name="adb_active_notification_title" msgid="6729044778949189918">"USB hibakereső csatlakoztatva"</string>
     <string name="adb_active_notification_message" msgid="4948470599328424059">"Koppintson az USB fejlesztő mód kikapcsolásához."</string>
     <string name="adb_active_notification_message" product="tv" msgid="8470296818270110396">"Válassza ezt az USB hibakeresés kikapcsolásához."</string>
@@ -1204,6 +1198,7 @@
     <string name="select_keyboard_layout_notification_message" msgid="8084622969903004900">"Koppintson a nyelv és a billentyűzetkiosztás kiválasztásához"</string>
     <string name="fast_scroll_alphabet" msgid="5433275485499039199">" ABCDEFGHIJKLMNOPQRSTUVWXYZ"</string>
     <string name="fast_scroll_numeric_alphabet" msgid="4030170524595123610">" 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"</string>
+    <string name="alert_windows_notification_channel_group_name" msgid="1463953341148606396">"Megjelenítés a többi alkalmazás fölött"</string>
     <string name="alert_windows_notification_channel_name" msgid="3116610965549449803">"A(z) <xliff:g id="NAME">%s</xliff:g> a többi alkalmazás felett jelenik meg"</string>
     <string name="alert_windows_notification_title" msgid="3697657294867638947">"<xliff:g id="NAME">%s</xliff:g> – a többi alkalmazás felett"</string>
     <string name="alert_windows_notification_message" msgid="8917232109522912560">"Ha nem szeretné, hogy a(z) <xliff:g id="NAME">%s</xliff:g> használja ezt a funkciót, koppintson a beállítások megnyitásához, és kapcsolja ki."</string>
@@ -1774,9 +1769,11 @@
     <string name="etws_primary_default_message_tsunami" msgid="1887685943498368548">"Azonnal meneküljön biztonságosabb helyre a tengerparti, illetve folyóparti területekről, például valamilyen magaslatra."</string>
     <string name="etws_primary_default_message_earthquake_and_tsunami" msgid="998797956848445862">"Őrizze meg nyugalmát, és keressen menedéket a közelben."</string>
     <string name="etws_primary_default_message_test" msgid="2709597093560037455">"Vészhelyzetben küldött üzenetek tesztelése"</string>
+    <string name="notification_reply_button_accessibility" msgid="3621714652387814344">"Válasz"</string>
     <string name="etws_primary_default_message_others" msgid="6293148756130398971"></string>
     <string name="mmcc_authentication_reject" msgid="7729819349669603406">"A SIM-kártya nem engedélyezett"</string>
     <string name="mmcc_imsi_unknown_in_hlr" msgid="6321202257374418726">"Nem engedélyezett SIM-kártya"</string>
     <string name="mmcc_illegal_ms" msgid="2769452751852211112">"A SIM-kártya nem engedélyezett"</string>
     <string name="mmcc_illegal_me" msgid="4438696681169345015">"A telefon nem engedélyezett"</string>
+    <string name="popup_window_default_title" msgid="4874318849712115433">"Előugró ablak"</string>
 </resources>

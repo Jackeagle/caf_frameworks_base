@@ -66,7 +66,7 @@ interface IBatteryStats {
     void noteSyncStart(String name, int uid);
     void noteSyncFinish(String name, int uid);
     void noteJobStart(String name, int uid);
-    void noteJobFinish(String name, int uid);
+    void noteJobFinish(String name, int uid, int stopReason);
 
     void noteStartWakelock(int uid, int pid, String name, String historyName,
             int type, boolean unimportantForLogging);
@@ -129,7 +129,7 @@ interface IBatteryStats {
     long getAwakeTimeBattery();
     long getAwakeTimePlugged();
 
-    void noteBleScanStarted(in WorkSource ws);
+    void noteBleScanStarted(in WorkSource ws, boolean isUnoptimized);
     void noteBleScanStopped(in WorkSource ws);
     void noteResetBleScan();
     void noteBleScanResults(in WorkSource ws, int numNewResults);

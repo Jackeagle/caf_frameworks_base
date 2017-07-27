@@ -16,6 +16,7 @@
 
 package com.android.server.wm;
 
+import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static com.android.server.wm.WindowManagerDebugConfig.SHOW_SURFACE_ALLOC;
 import static com.android.server.wm.WindowManagerDebugConfig.SHOW_TRANSACTIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.SHOW_LIGHT_TRANSACTIONS;
@@ -23,16 +24,15 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_SURFACE_TRACE
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
-import static android.view.Surface.SCALING_MODE_FREEZE;
 import static android.view.Surface.SCALING_MODE_SCALE_TO_WINDOW;
 
-import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.os.IBinder;
 import android.os.Debug;
+import android.os.Trace;
 import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceSession;
@@ -101,8 +101,10 @@ class WindowSurfaceController {
             mSurfaceControl = new SurfaceTrace(
                     s, name, w, h, format, flags, windowType, ownerUid);
         } else {
+            Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "new SurfaceControl");
             mSurfaceControl = new SurfaceControl(
                     s, name, w, h, format, flags, windowType, ownerUid);
+            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
         }
 
         if (mService.mRoot.mSurfaceTraceEnabled) {
@@ -509,6 +511,8 @@ class WindowSurfaceController {
 
     void setShown(boolean surfaceShown) {
         mSurfaceShown = surfaceShown;
+
+        mService.updateNonSystemOverlayWindowsVisibilityIfNeeded(mAnimator.mWin, surfaceShown);
 
         if (mWindowSession != null) {
             mWindowSession.onWindowSurfaceVisibilityChanged(this, mSurfaceShown, mWindowType);
