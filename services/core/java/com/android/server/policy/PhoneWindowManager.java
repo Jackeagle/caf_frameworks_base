@@ -6103,7 +6103,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         IDreamManager dreamManager = getDreamManager();
 
         try {
-            if (dreamManager != null && dreamManager.isDreaming()) {
+            // Don't pass key to app when device suspends(OFF state) and contextual mode is OFF in wearables.
+            if (dreamManager != null && dreamManager.isDreaming() && !mHasFeatureWatch ) {
                 return true;
             }
         } catch (RemoteException e) {
