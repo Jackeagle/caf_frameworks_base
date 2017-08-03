@@ -3302,6 +3302,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
 
                             updateNetworkEnabledNL();
                             updateNotificationsNL();
+                            updateNetworkRulesNL();
                         }
                     }
                     return true;
