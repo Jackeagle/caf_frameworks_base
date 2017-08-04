@@ -291,6 +291,11 @@ public final class AudioFormat implements Parcelable {
      * @hide
      * */
     public static final int ENCODING_EVRCNW = 105;
+    /** Audio data format: MP2
+     * @hide
+     * */
+    public static final int ENCODING_MP2 = 106;
+
     /** Invalid audio channel configuration */
     /** @deprecated Use {@link #CHANNEL_INVALID} instead.  */
     @Deprecated    public static final int CHANNEL_CONFIGURATION_INVALID   = 0;
@@ -522,6 +527,7 @@ public final class AudioFormat implements Parcelable {
         case ENCODING_EVRCB:
         case ENCODING_EVRCWB:
         case ENCODING_EVRCNW:
+        case ENCODING_MP2:
             return true;
         default:
             return false;
@@ -540,6 +546,7 @@ public final class AudioFormat implements Parcelable {
         case ENCODING_DTS:
         case ENCODING_DTS_HD:
         case ENCODING_IEC61937:
+        case ENCODING_MP2:
             return true;
         default:
             return false;
@@ -570,6 +577,7 @@ public final class AudioFormat implements Parcelable {
         case ENCODING_EVRCB:
         case ENCODING_EVRCWB:
         case ENCODING_EVRCNW:
+        case ENCODING_MP2:
             return false;
         case ENCODING_INVALID:
         default:
@@ -595,6 +603,7 @@ public final class AudioFormat implements Parcelable {
         case ENCODING_AAC_LC:
         case ENCODING_AAC_HE_V1:
         case ENCODING_AAC_HE_V2:
+        case ENCODING_MP2:
             return false;
         case ENCODING_INVALID:
         default:
@@ -832,6 +841,7 @@ public final class AudioFormat implements Parcelable {
                 case ENCODING_EVRCB:
                 case ENCODING_EVRCWB:
                 case ENCODING_EVRCNW:
+                case ENCODING_MP2:
                     mEncoding = encoding;
                     break;
                 case ENCODING_INVALID:
