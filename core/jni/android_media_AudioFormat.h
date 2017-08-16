@@ -40,6 +40,7 @@
 #define ENCODING_EVRC_B     103
 #define ENCODING_EVRC_WB    104
 #define ENCODING_EVRC_NW    105
+#define ENCODING_MP2        106
 
 #define ENCODING_INVALID    0
 #define ENCODING_DEFAULT    1
@@ -90,6 +91,8 @@ static inline audio_format_t audioFormatToNative(int audioFormat)
         return AUDIO_FORMAT_EVRCWB;
     case ENCODING_EVRC_NW:
         return AUDIO_FORMAT_EVRCNW;
+    case ENCODING_MP2:
+        return AUDIO_FORMAT_MP2;
     case ENCODING_DEFAULT:
         return AUDIO_FORMAT_DEFAULT;
     default:
@@ -145,6 +148,8 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
         return ENCODING_EVRC_WB;
     case AUDIO_FORMAT_EVRCNW:
         return ENCODING_EVRC_NW;
+    case AUDIO_FORMAT_MP2:
+        return ENCODING_MP2;
     case AUDIO_FORMAT_DEFAULT:
         return ENCODING_DEFAULT;
     default:
