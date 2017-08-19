@@ -67,8 +67,7 @@ public class LockPatternUtils {
 
     private static final String TAG = "LockPatternUtils";
     private static final boolean DEBUG = false;
-    private static final boolean FRP_CREDENTIAL_ENABLED =
-            Build.IS_DEBUGGABLE && SystemProperties.getBoolean("debug.frpcredential.enable", false);
+    private static final boolean FRP_CREDENTIAL_ENABLED = true;
 
     /**
      * The key to identify when the lock pattern enabled flag is being accessed for legacy reasons.
@@ -648,8 +647,12 @@ public class LockPatternUtils {
         boolean disabledByDefault = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_disableLockscreenByDefault);
         boolean isSystemUser = UserManager.isSplitSystemUser() && userId == UserHandle.USER_SYSTEM;
+        UserInfo userInfo = getUserManager().getUserInfo(userId);
+        boolean isDemoUser = UserManager.isDeviceInDemoMode(mContext) && userInfo != null
+                && userInfo.isDemo();
         return getBoolean(DISABLE_LOCKSCREEN_KEY, false, userId)
-                || (disabledByDefault && !isSystemUser);
+                || (disabledByDefault && !isSystemUser)
+                || isDemoUser;
     }
 
     /**
@@ -916,26 +919,48 @@ public class LockPatternUtils {
      */
     public void setSeparateProfileChallengeEnabled(int userHandle, boolean enabled,
             String managedUserPassword) {
-        UserInfo info = getUserManager().getUserInfo(userHandle);
-        if (info.isManagedProfile()) {
-            try {
-                getLockSettings().setSeparateProfileChallengeEnabled(userHandle, enabled,
-                        managedUserPassword);
-                onAfterChangingPassword(userHandle);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Couldn't update work profile challenge enabled");
-            }
+        if (!isManagedProfile(userHandle)) {
+            return;
+        }
+        try {
+            getLockSettings().setSeparateProfileChallengeEnabled(userHandle, enabled,
+                    managedUserPassword);
+            onAfterChangingPassword(userHandle);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Couldn't update work profile challenge enabled");
         }
     }
 
     /**
-     * Retrieves whether the Separate Profile Challenge is enabled for this {@param userHandle}.
+     * Returns true if {@param userHandle} is a managed profile with separate challenge.
      */
     public boolean isSeparateProfileChallengeEnabled(int userHandle) {
-        UserInfo info = getUserManager().getUserInfo(userHandle);
-        if (info == null || !info.isManagedProfile()) {
-            return false;
-        }
+        return isManagedProfile(userHandle) && hasSeparateChallenge(userHandle);
+    }
+
+    /**
+     * Returns true if {@param userHandle} is a managed profile with unified challenge.
+     */
+    public boolean isManagedProfileWithUnifiedChallenge(int userHandle) {
+        return isManagedProfile(userHandle) && !hasSeparateChallenge(userHandle);
+    }
+
+    /**
+     * Retrieves whether the current DPM allows use of the Profile Challenge.
+     */
+    public boolean isSeparateProfileChallengeAllowed(int userHandle) {
+        return isManagedProfile(userHandle)
+                && getDevicePolicyManager().isSeparateProfileChallengeAllowed(userHandle);
+    }
+
+    /**
+     * Retrieves whether the current profile and device locks can be unified.
+     */
+    public boolean isSeparateProfileChallengeAllowedToUnify(int userHandle) {
+        return getDevicePolicyManager().isProfileActivePasswordSufficientForParent(userHandle);
+    }
+
+    private boolean hasSeparateChallenge(int userHandle) {
         try {
             return getLockSettings().getSeparateProfileChallengeEnabled(userHandle);
         } catch (RemoteException e) {
@@ -945,22 +970,9 @@ public class LockPatternUtils {
         }
     }
 
-    /**
-     * Retrieves whether the current DPM allows use of the Profile Challenge.
-     */
-    public boolean isSeparateProfileChallengeAllowed(int userHandle) {
-        UserInfo info = getUserManager().getUserInfo(userHandle);
-        if (info == null || !info.isManagedProfile()) {
-            return false;
-        }
-        return getDevicePolicyManager().isSeparateProfileChallengeAllowed(userHandle);
-    }
-
-    /**
-     * Retrieves whether the current profile and device locks can be unified.
-     */
-    public boolean isSeparateProfileChallengeAllowedToUnify(int userHandle) {
-        return getDevicePolicyManager().isProfileActivePasswordSufficientForParent(userHandle);
+    private boolean isManagedProfile(int userHandle) {
+        final UserInfo info = getUserManager().getUserInfo(userHandle);
+        return info != null && info.isManagedProfile();
     }
 
     /**
@@ -1210,6 +1222,11 @@ public class LockPatternUtils {
      */
     public long setLockoutAttemptDeadline(int userId, int timeoutMs) {
         final long deadline = SystemClock.elapsedRealtime() + timeoutMs;
+        if (userId == USER_FRP) {
+            // For secure password storage (that is required for FRP), the underlying storage also
+            // enforces the deadline. Since we cannot store settings for the FRP user, don't.
+            return deadline;
+        }
         setLong(LOCKOUT_ATTEMPT_DEADLINE, deadline, userId);
         setLong(LOCKOUT_ATTEMPT_TIMEOUT_MS, timeoutMs, userId);
         return deadline;

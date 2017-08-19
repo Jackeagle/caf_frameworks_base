@@ -135,6 +135,7 @@ public class WifiTrackerTest {
     private HandlerThread mWorkerThread;
     private Looper mWorkerLooper;
     private Looper mMainLooper;
+
     private int mOriginalScoringUiSettingValue;
 
     @Before
@@ -210,6 +211,7 @@ public class WifiTrackerTest {
                 InstrumentationRegistry.getTargetContext().getContentResolver(),
                 Settings.Global.NETWORK_SCORING_UI_ENABLED,
                 1 /* enabled */);
+
     }
 
     @After
@@ -340,7 +342,10 @@ public class WifiTrackerTest {
 
         Intent intent = new Intent(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         intent.putExtra(WifiManager.EXTRA_NETWORK_INFO, networkInfo);
-        return createTrackerWithImmediateBroadcastsAndInjectInitialScanResults(intent);
+        WifiTracker tracker =
+                createTrackerWithImmediateBroadcastsAndInjectInitialScanResults(intent);
+        assertThat(tracker.isConnected()).isTrue();
+        return tracker;
     }
 
     private void waitForHandlersToProcessCurrentlyEnqueuedMessages(WifiTracker tracker)
@@ -470,6 +475,17 @@ public class WifiTrackerTest {
 
         assertTrue(mRequestedKeys.contains(NETWORK_KEY_1));
         assertTrue(mRequestedKeys.contains(NETWORK_KEY_2));
+    }
+
+    @Test
+    public void stopTracking_shouldNotClearExistingScores()
+            throws InterruptedException {
+        // Start the tracker and inject the initial scan results and then stop tracking
+        WifiTracker tracker =  createTrackerWithImmediateBroadcastsAndInjectInitialScanResults();
+        updateScoresAndWaitForAccessPointsChangedCallback(tracker);
+        tracker.stopTracking();
+
+        assertThat(mScoreCacheCaptor.getValue().getScoredNetwork(NETWORK_KEY_1)).isNotNull();
     }
 
     @Test
@@ -828,5 +844,41 @@ public class WifiTrackerTest {
         waitForHandlersToProcessCurrentlyEnqueuedMessages(tracker);
 
         assertThat(tracker.getAccessPoints()).isEmpty();
+    }
+
+    @Test
+    public void onConnectedChangedCallback_shouldNotBeInvokedWhenNoStateChange() throws Exception {
+        WifiTracker tracker = createTrackerWithScanResultsAndAccessPoint1Connected();
+        verify(mockWifiListener, times(1)).onConnectedChanged();
+
+        NetworkInfo networkInfo = new NetworkInfo(
+                ConnectivityManager.TYPE_WIFI, 0, "Type Wifi", "subtype");
+        networkInfo.setDetailedState(NetworkInfo.DetailedState.CONNECTED, "connected", "test");
+
+        Intent intent = new Intent(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+        intent.putExtra(WifiManager.EXTRA_NETWORK_INFO, networkInfo);
+        tracker.mReceiver.onReceive(mContext, intent);
+
+        waitForHandlersToProcessCurrentlyEnqueuedMessages(tracker);
+        verify(mockWifiListener, times(1)).onConnectedChanged();
+    }
+
+    @Test
+    public void onConnectedChangedCallback_shouldBeInvokedWhenStateChanges() throws Exception {
+        WifiTracker tracker = createTrackerWithScanResultsAndAccessPoint1Connected();
+        verify(mockWifiListener, times(1)).onConnectedChanged();
+
+        NetworkInfo networkInfo = new NetworkInfo(
+                ConnectivityManager.TYPE_WIFI, 0, "Type Wifi", "subtype");
+        networkInfo.setDetailedState(
+                NetworkInfo.DetailedState.DISCONNECTED, "disconnected", "test");
+
+        Intent intent = new Intent(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+        intent.putExtra(WifiManager.EXTRA_NETWORK_INFO, networkInfo);
+        tracker.mReceiver.onReceive(mContext, intent);
+
+        waitForHandlersToProcessCurrentlyEnqueuedMessages(tracker);
+        assertThat(tracker.isConnected()).isFalse();
+        verify(mockWifiListener, times(2)).onConnectedChanged();
     }
 }

@@ -306,7 +306,7 @@
     <protected-broadcast android:name="com.android.server.WifiManager.action.DEVICE_IDLE" />
     <protected-broadcast android:name="com.android.server.action.REMOTE_BUGREPORT_SHARING_ACCEPTED" />
     <protected-broadcast android:name="com.android.server.action.REMOTE_BUGREPORT_SHARING_DECLINED" />
-    <protected-broadcast android:name="com.android.server.action.WIPE_EUICC_DATA" />
+    <protected-broadcast android:name="com.android.internal.action.EUICC_FACTORY_RESET" />
     <protected-broadcast android:name="com.android.server.usb.ACTION_OPEN_IN_APPS" />
     <protected-broadcast android:name="com.android.server.am.DELETE_DUMPHEAP" />
     <protected-broadcast android:name="com.android.server.net.action.SNOOZE_WARNING" />
@@ -547,6 +547,7 @@
     <protected-broadcast android:name="android.media.tv.action.PREVIEW_PROGRAM_BROWSABLE_DISABLED" />
     <protected-broadcast android:name="android.media.tv.action.WATCH_NEXT_PROGRAM_BROWSABLE_DISABLED" />
     <protected-broadcast android:name="android.media.tv.action.CHANNEL_BROWSABLE_REQUESTED" />
+    <protected-broadcast android:name="com.android.server.InputMethodManagerService.SHOW_INPUT_METHOD_PICKER" />
 
     <!-- ====================================================================== -->
     <!--                          RUNTIME PERMISSIONS                           -->
@@ -771,7 +772,7 @@
         android:permissionGroup="android.permission-group.LOCATION"
         android:label="@string/permlab_accessFineLocation"
         android:description="@string/permdesc_accessFineLocation"
-        android:protectionLevel="dangerous|ephemeral" />
+        android:protectionLevel="dangerous|instant" />
 
     <!-- Allows an app to access approximate location.
          Alternatively, you might want {@link #ACCESS_FINE_LOCATION}.
@@ -781,7 +782,7 @@
         android:permissionGroup="android.permission-group.LOCATION"
         android:label="@string/permlab_accessCoarseLocation"
         android:description="@string/permdesc_accessCoarseLocation"
-        android:protectionLevel="dangerous|ephemeral" />
+        android:protectionLevel="dangerous|instant" />
 
     <!-- ====================================================================== -->
     <!-- Permissions for accessing the device telephony                         -->
@@ -815,13 +816,13 @@
         android:protectionLevel="dangerous" />
 
     <!-- Allows read access to the device's phone number(s). This is a subset of the capabilities
-         granted by {@link #READ_PHONE_STATE} but is exposed to ephemeral applications.
+         granted by {@link #READ_PHONE_STATE} but is exposed to instant applications.
          <p>Protection level: dangerous-->
     <permission android:name="android.permission.READ_PHONE_NUMBERS"
         android:permissionGroup="android.permission-group.PHONE"
         android:label="@string/permlab_readPhoneNumbers"
         android:description="@string/permdesc_readPhoneNumbers"
-        android:protectionLevel="dangerous|ephemeral" />
+        android:protectionLevel="dangerous|instant" />
 
     <!-- Allows an application to initiate a phone call without going through
         the Dialer user interface for the user to confirm the call.
@@ -960,18 +961,18 @@
     <!-- ====================================================================== -->
 
     <!-- @hide Allows an application to Access UCE-Presence.
-         <p>Protection level: dangerous
+         <p>Protection level: signature|privileged
     -->
     <permission android:name="android.permission.ACCESS_UCE_PRESENCE_SERVICE"
         android:permissionGroup="android.permission-group.PHONE"
-        android:protectionLevel="signatureOrSystem"/>
+        android:protectionLevel="signature|privileged"/>
 
     <!-- @hide Allows an application to Access UCE-OPTIONS.
-         <p>Protection level: dangerous
+         <p>Protection level: signature|privileged
     -->
     <permission android:name="android.permission.ACCESS_UCE_OPTIONS_SERVICE"
         android:permissionGroup="android.permission-group.PHONE"
-        android:protectionLevel="signatureOrSystem"/>
+        android:protectionLevel="signature|privileged"/>
 
 
 
@@ -1001,7 +1002,7 @@
         android:permissionGroup="android.permission-group.CAMERA"
         android:label="@string/permlab_camera"
         android:description="@string/permdesc_camera"
-        android:protectionLevel="dangerous|ephemeral" />
+        android:protectionLevel="dangerous|instant" />
 
 
     <!-- ====================================================================== -->
@@ -1248,7 +1249,7 @@
     <permission android:name="android.permission.INTERNET"
         android:description="@string/permdesc_createNetworkSockets"
         android:label="@string/permlab_createNetworkSockets"
-        android:protectionLevel="normal|ephemeral" />
+        android:protectionLevel="normal|instant" />
 
     <!-- Allows applications to access information about networks.
          <p>Protection level: normal
@@ -1256,7 +1257,7 @@
     <permission android:name="android.permission.ACCESS_NETWORK_STATE"
         android:description="@string/permdesc_accessNetworkState"
         android:label="@string/permlab_accessNetworkState"
-        android:protectionLevel="normal|ephemeral" />
+        android:protectionLevel="normal|instant" />
 
     <!-- Allows applications to access information about Wi-Fi networks.
          <p>Protection level: normal
@@ -1479,7 +1480,7 @@
     <permission android:name="android.permission.VIBRATE"
         android:label="@string/permlab_vibrate"
         android:description="@string/permdesc_vibrate"
-        android:protectionLevel="normal|ephemeral" />
+        android:protectionLevel="normal|instant" />
 
     <!-- Allows using PowerManager WakeLocks to keep processor from sleeping or screen
          from dimming.
@@ -1488,7 +1489,7 @@
     <permission android:name="android.permission.WAKE_LOCK"
         android:label="@string/permlab_wakeLock"
         android:description="@string/permdesc_wakeLock"
-        android:protectionLevel="normal|ephemeral" />
+        android:protectionLevel="normal|instant" />
 
     <!-- Allows using the device's IR transmitter, if available.
          <p>Protection level: normal
@@ -1534,7 +1535,12 @@
     <permission android:name="android.permission.HARDWARE_TEST"
         android:protectionLevel="signature" />
 
-    <!-- @SystemApi Allows access to FM
+    <!-- @SystemApi Allows access to Broadcast Radio
+         @hide This is not a third-party API (intended for system apps).-->
+    <permission android:name="android.permission.ACCESS_BROADCAST_RADIO"
+        android:protectionLevel="signature|privileged" />
+
+    <!-- @deprecated @SystemApi Allows access to FM
          @hide This is not a third-party API (intended for system apps).-->
     <permission android:name="android.permission.ACCESS_FM_RADIO"
         android:protectionLevel="signature|privileged" />
@@ -1701,6 +1707,11 @@
     <permission android:name="android.permission.RECEIVE_STK_COMMANDS"
         android:protectionLevel="signature|privileged" />
 
+      <!-- Allows an application to send EMBMS download intents to apps
+           @hide -->
+    <permission android:name="android.permission.SEND_EMBMS_INTENTS"
+        android:protectionLevel="signature|privileged" />
+
     <!-- Must be required by an ImsService to ensure that only the
          system can bind to it.
          <p>Protection level: signature|privileged
@@ -1821,10 +1832,6 @@
     <permission android:name="android.permission.MANAGE_USERS"
         android:protectionLevel="signature|privileged" />
 
-    <!-- @hide Allows an application to configure the assist gesture -->
-    <permission android:name="android.permission.CONFIGURE_ASSIST_GESTURE"
-        android:protectionLevel="signature" />
-
     <!-- @hide Allows an application to create, remove users and get the list of
          users on the device. Applications holding this permission can only create restricted,
          guest, managed, demo, and ephemeral users. For creating other kind of users,
@@ -1861,6 +1868,10 @@
     <!-- @SystemApi @hide Allows an application to create/manage/remove stacks -->
     <permission android:name="android.permission.MANAGE_ACTIVITY_STACKS"
         android:protectionLevel="signature|privileged" />
+
+    <!-- @SystemApi @hide Allows an application to embed other activities -->
+    <permission android:name="android.permission.ACTIVITY_EMBEDDING"
+                android:protectionLevel="signature|privileged" />
 
     <!-- Allows an application to start any activity, regardless of permission
          protection or exported state.
@@ -1979,6 +1990,15 @@
         android:label="@string/permlab_setWallpaperHints"
         android:description="@string/permdesc_setWallpaperHints"
         android:protectionLevel="normal" />
+
+    <!-- Allow the app to read the system wallpaper image without
+        holding the READ_EXTERNAL_STORAGE permission.
+        <p>Not for use by third-party applications.
+        @hide
+        @SystemApi
+    -->
+    <permission android:name="android.permission.READ_WALLPAPER_INTERNAL"
+        android:protectionLevel="signature|privileged" />
 
     <!-- ============================================ -->
     <!-- Permissions for changing the system clock -->
@@ -2216,7 +2236,7 @@
 
     <!-- Allows an application to clear the caches of all installed
          applications on the device.
-         <p>Protection level: system|signature
+         <p>Protection level: signature|privileged
     -->
     <permission android:name="android.permission.CLEAR_APP_CACHE"
         android:protectionLevel="signature|privileged" />
@@ -2257,7 +2277,7 @@
          <p>An application requesting this permission is responsible for
          verifying the source and integrity of the update before passing
          it off to the installer components.
-         @hide -->
+         @SystemApi @hide -->
     <permission android:name="android.permission.UPDATE_TIME_ZONE_RULES"
         android:protectionLevel="signature|privileged" />
 
@@ -2537,6 +2557,22 @@
     <permission android:name="android.permission.BIND_PRINT_RECOMMENDATION_SERVICE"
             android:protectionLevel="signature" />
 
+    <!-- Allows applications to get the installed and enabled print services.
+         @hide
+         @SystemApi
+         <p>Protection level: signature|preinstalled
+    -->
+    <permission android:name="android.permission.READ_PRINT_SERVICES"
+        android:protectionLevel="signature|preinstalled" />
+
+    <!-- Allows applications to get the currently recommended print services for printers.
+         @hide
+         @SystemApi
+         <p>Protection level: signature|preinstalled
+    -->
+    <permission android:name="android.permission.READ_PRINT_SERVICE_RECOMMENDATIONS"
+        android:protectionLevel="signature|preinstalled" />
+
     <!-- Must be required by a {@link android.nfc.cardemulation.HostApduService}
          or {@link android.nfc.cardemulation.OffHostApduService} to ensure that only
          the system can bind to it.
@@ -2577,7 +2613,7 @@
 
     <!-- Must be required by a {@link android.service.wallpaper.WallpaperService},
          to ensure that only the system can bind to it.
-         <p>Protection level: system|signature
+         <p>Protection level: signature|privileged
     -->
     <permission android:name="android.permission.BIND_WALLPAPER"
         android:protectionLevel="signature|privileged" />
@@ -2614,7 +2650,7 @@
 
     <!-- Must be required by a {@link android.media.tv.TvInputService}
          to ensure that only the system can bind to it.
-         <p>Protection level: signature
+         <p>Protection level: signature|privileged
     -->
     <permission android:name="android.permission.BIND_TV_INPUT"
         android:protectionLevel="signature|privileged" />
@@ -3142,10 +3178,12 @@
     <permission android:name="android.permission.MANAGE_NETWORK_POLICY"
         android:protectionLevel="signature" />
 
-    <!-- @SystemApi Allows an application to account its network traffic against other UIDs. Used
-         by system services like download manager and media server. Not for use by
-         third party apps. @hide -->
+    <!-- @SystemApi @hide @deprecated use UPDATE_DEVICE_STATS instead -->
     <permission android:name="android.permission.MODIFY_NETWORK_ACCOUNTING"
+        android:protectionLevel="signature|privileged" />
+
+    <!-- @SystemApi @hide Allows an application to manage carrier subscription plans. -->
+    <permission android:name="android.permission.MANAGE_SUBSCRIPTION_PLANS"
         android:protectionLevel="signature|privileged" />
 
     <!-- C2DM permission.
@@ -3376,7 +3414,7 @@
     <!-- The system process that is allowed to bind to services in carrier apps will
          have this permission. Carrier apps should use this permission to protect
          their services that only the system is allowed to bind to.
-         <p>Protection level: system|signature
+         <p>Protection level: signature|privileged
     -->
     <permission android:name="android.permission.BIND_CARRIER_SERVICES"
         android:label="@string/permlab_bindCarrierServices"
@@ -3510,7 +3548,7 @@
 
     <!-- Allows an instant app to create foreground services. -->
     <permission android:name="android.permission.INSTANT_APP_FOREGROUND_SERVICE"
-        android:protectionLevel="signature|development|ephemeral|appop" />
+        android:protectionLevel="signature|development|instant|appop" />
 
     <application android:process="system"
                  android:persistent="true"
@@ -3846,6 +3884,11 @@
         <service android:name="com.android.server.PreloadsFileCacheExpirationJobService"
                  android:permission="android.permission.BIND_JOB_SERVICE" >
         </service>
+
+        <service android:name="com.android.server.camera.CameraStatsJobService"
+                 android:permission="android.permission.BIND_JOB_SERVICE" >
+        </service>
+
     </application>
 
 </manifest>

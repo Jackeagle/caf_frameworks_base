@@ -18,6 +18,7 @@ package com.android.server;
 
 import static android.Manifest.permission.CONNECTIVITY_INTERNAL;
 import static android.Manifest.permission.DUMP;
+import static android.Manifest.permission.NETWORK_STACK;
 import static android.Manifest.permission.SHUTDOWN;
 import static android.net.NetworkPolicyManager.FIREWALL_CHAIN_DOZABLE;
 import static android.net.NetworkPolicyManager.FIREWALL_CHAIN_NAME_DOZABLE;
@@ -55,6 +56,7 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.INetd;
 import android.net.INetworkManagementEventObserver;
+import android.net.ITetheringStatsProvider;
 import android.net.InterfaceConfiguration;
 import android.net.IpPrefix;
 import android.net.LinkAddress;
@@ -225,6 +227,10 @@ public class NetworkManagementService extends INetworkManagementService.Stub
 
     private final NetworkStatsFactory mStatsFactory = new NetworkStatsFactory();
 
+    @GuardedBy("mTetheringStatsProviders")
+    private final HashMap<ITetheringStatsProvider, String>
+            mTetheringStatsProviders = Maps.newHashMap();
+
     /**
      * If both locks need to be held, then they should be obtained in the order:
      * first {@link #mQuotaLock} and then {@link #mRulesLock}.
@@ -331,6 +337,10 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         Watchdog.getInstance().addMonitor(this);
 
         LocalServices.addService(NetworkManagementInternal.class, new LocalService());
+
+        synchronized (mTetheringStatsProviders) {
+            mTetheringStatsProviders.put(new NetdTetheringStatsProvider(), "netd");
+        }
     }
 
     @VisibleForTesting
@@ -517,6 +527,23 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         }
         if (report) {
             reportNetworkActive();
+        }
+    }
+
+    @Override
+    public void registerTetheringStatsProvider(ITetheringStatsProvider provider, String name) {
+        mContext.enforceCallingOrSelfPermission(NETWORK_STACK, TAG);
+        Preconditions.checkNotNull(provider);
+        synchronized(mTetheringStatsProviders) {
+            mTetheringStatsProviders.put(provider, name);
+        }
+    }
+
+    @Override
+    public void unregisterTetheringStatsProvider(ITetheringStatsProvider provider) {
+        mContext.enforceCallingOrSelfPermission(NETWORK_STACK, TAG);
+        synchronized(mTetheringStatsProviders) {
+            mTetheringStatsProviders.remove(provider);
         }
     }
 
@@ -1542,6 +1569,17 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             } catch (NativeDaemonConnectorException e) {
                 throw e.rethrowAsParcelableException();
             }
+
+            synchronized (mTetheringStatsProviders) {
+                for (ITetheringStatsProvider provider : mTetheringStatsProviders.keySet()) {
+                    try {
+                        provider.setInterfaceQuota(iface, quotaBytes);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "Problem setting tethering data limit on provider " +
+                                mTetheringStatsProviders.get(provider) + ": " + e);
+                    }
+                }
+            }
         }
     }
 
@@ -1567,6 +1605,17 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                 mConnector.execute("bandwidth", "removeiquota", iface);
             } catch (NativeDaemonConnectorException e) {
                 throw e.rethrowAsParcelableException();
+            }
+
+            synchronized (mTetheringStatsProviders) {
+                for (ITetheringStatsProvider provider : mTetheringStatsProviders.keySet()) {
+                    try {
+                        provider.setInterfaceQuota(iface, ITetheringStatsProvider.QUOTA_UNLIMITED);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "Problem removing tethering data limit on provider " +
+                                mTetheringStatsProviders.get(provider) + ": " + e);
+                    }
+                }
             }
         }
     }
@@ -1789,14 +1838,16 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         }
     }
 
-    @Override
-    public NetworkStats getNetworkStatsTethering() {
-        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
-
-        final NetworkStats stats = new NetworkStats(SystemClock.elapsedRealtime(), 1);
-        try {
-            final NativeDaemonEvent[] events = mConnector.executeForList(
-                    "bandwidth", "gettetherstats");
+    private class NetdTetheringStatsProvider extends ITetheringStatsProvider.Stub {
+        @Override
+        public NetworkStats getTetherStats() {
+            final NativeDaemonEvent[] events;
+            try {
+                events = mConnector.executeForList("bandwidth", "gettetherstats");
+            } catch (NativeDaemonConnectorException e) {
+                throw e.rethrowAsParcelableException();
+            }
+            final NetworkStats stats = new NetworkStats(SystemClock.elapsedRealtime(), 1);
             for (NativeDaemonEvent event : events) {
                 if (event.getCode() != TetheringStatsListResult) continue;
 
@@ -1822,8 +1873,29 @@ public class NetworkManagementService extends INetworkManagementService.Stub
                     throw new IllegalStateException("problem parsing tethering stats: " + event);
                 }
             }
-        } catch (NativeDaemonConnectorException e) {
-            throw e.rethrowAsParcelableException();
+            return stats;
+        }
+
+        @Override
+        public void setInterfaceQuota(String iface, long quotaBytes) {
+            // Do nothing. netd is already informed of quota changes in setInterfaceQuota.
+        }
+    }
+
+    @Override
+    public NetworkStats getNetworkStatsTethering() {
+        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
+
+        final NetworkStats stats = new NetworkStats(SystemClock.elapsedRealtime(), 1);
+        synchronized (mTetheringStatsProviders) {
+            for (ITetheringStatsProvider provider: mTetheringStatsProviders.keySet()) {
+                try {
+                    stats.combineAllValues(provider.getTetherStats());
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Problem reading tethering stats from " +
+                            mTetheringStatsProviders.get(provider) + ": " + e);
+                }
+            }
         }
         return stats;
     }
@@ -2602,6 +2674,42 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         return failures;
     }
 
+    @Override
+    public boolean isNetworkRestricted(int uid) {
+        mContext.enforceCallingOrSelfPermission(CONNECTIVITY_INTERNAL, TAG);
+        return isNetworkRestrictedInternal(uid);
+    }
+
+    private boolean isNetworkRestrictedInternal(int uid) {
+        synchronized (mRulesLock) {
+            if (getFirewallChainState(FIREWALL_CHAIN_STANDBY)
+                    && mUidFirewallStandbyRules.get(uid) == FIREWALL_RULE_DENY) {
+                if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of app standby mode");
+                return true;
+            }
+            if (getFirewallChainState(FIREWALL_CHAIN_DOZABLE)
+                    && mUidFirewallDozableRules.get(uid) != FIREWALL_RULE_ALLOW) {
+                if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of device idle mode");
+                return true;
+            }
+            if (getFirewallChainState(FIREWALL_CHAIN_POWERSAVE)
+                    && mUidFirewallPowerSaveRules.get(uid) != FIREWALL_RULE_ALLOW) {
+                if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of power saver mode");
+                return true;
+            }
+            if (mUidRejectOnMetered.get(uid)) {
+                if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of no metered data"
+                        + " in the background");
+                return true;
+            }
+            if (mDataSaverMode && !mUidAllowOnMetered.get(uid)) {
+                if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of data saver mode");
+                return true;
+            }
+            return false;
+        }
+    }
+
     private void setFirewallChainState(int chain, boolean state) {
         synchronized (mRulesLock) {
             mFirewallChainStates.put(chain, state);
@@ -2618,33 +2726,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     class LocalService extends NetworkManagementInternal {
         @Override
         public boolean isNetworkRestrictedForUid(int uid) {
-            synchronized (mRulesLock) {
-                if (getFirewallChainState(FIREWALL_CHAIN_STANDBY)
-                        && mUidFirewallStandbyRules.get(uid) == FIREWALL_RULE_DENY) {
-                    if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of app standby mode");
-                    return true;
-                }
-                if (getFirewallChainState(FIREWALL_CHAIN_DOZABLE)
-                        && mUidFirewallDozableRules.get(uid) != FIREWALL_RULE_ALLOW) {
-                    if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of device idle mode");
-                    return true;
-                }
-                if (getFirewallChainState(FIREWALL_CHAIN_POWERSAVE)
-                        && mUidFirewallPowerSaveRules.get(uid) != FIREWALL_RULE_ALLOW) {
-                    if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of power saver mode");
-                    return true;
-                }
-                if (mUidRejectOnMetered.get(uid)) {
-                    if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of no metered data"
-                            + " in the background");
-                    return true;
-                }
-                if (mDataSaverMode && !mUidAllowOnMetered.get(uid)) {
-                    if (DBG) Slog.d(TAG, "Uid " + uid + " restricted because of data saver mode");
-                    return true;
-                }
-                return false;
-            }
+            return isNetworkRestrictedInternal(uid);
         }
     }
 

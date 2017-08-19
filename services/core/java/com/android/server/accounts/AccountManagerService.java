@@ -5188,6 +5188,28 @@ public class AccountManagerService
 
             fout.println();
             mAuthenticatorCache.dump(fd, fout, args, userAccounts.userId);
+
+            boolean isUserUnlocked;
+            synchronized (mUsers) {
+                isUserUnlocked = isLocalUnlockedUser(userAccounts.userId);
+            }
+            // Following logs are printed only when user is unlocked.
+            if (!isUserUnlocked) {
+                return;
+            }
+            fout.println();
+            synchronized (userAccounts.dbLock) {
+                Map<Account, Map<String, Integer>> allVisibilityValues =
+                        userAccounts.accountsDb.findAllVisibilityValues();
+                fout.println("Account visibility:");
+                for (Account account : allVisibilityValues.keySet()) {
+                    fout.println("  " + account.name);
+                    Map<String, Integer> visibilities = allVisibilityValues.get(account);
+                    for (Entry<String, Integer> entry : visibilities.entrySet()) {
+                        fout.println("    " + entry.getKey() + ", " + entry.getValue());
+                    }
+                }
+            }
         }
     }
 
@@ -5316,25 +5338,25 @@ public class AccountManagerService
         long identityToken = Binder.clearCallingIdentity();
         try {
             packages = mPackageManager.getPackagesForUid(callingUid);
-        } finally {
-            Binder.restoreCallingIdentity(identityToken);
-        }
-        if (packages == null) {
-            Log.d(TAG, "No packages for callingUid " + callingUid);
-            return false;
-        }
-        for (String name : packages) {
-            try {
-                PackageInfo packageInfo = mPackageManager.getPackageInfo(name, 0 /* flags */);
-                if (packageInfo != null
-                        && (packageInfo.applicationInfo.privateFlags
-                                & ApplicationInfo.PRIVATE_FLAG_PRIVILEGED) != 0) {
-                    return true;
-                }
-            } catch (PackageManager.NameNotFoundException e) {
-                Log.d(TAG, "Package not found " + e.getMessage());
+            if (packages == null) {
+                Log.d(TAG, "No packages for callingUid " + callingUid);
                 return false;
             }
+            for (String name : packages) {
+                try {
+                    PackageInfo packageInfo =
+                        mPackageManager.getPackageInfo(name, 0 /* flags */);
+                    if (packageInfo != null
+                        && (packageInfo.applicationInfo.privateFlags
+                            & ApplicationInfo.PRIVATE_FLAG_PRIVILEGED) != 0) {
+                        return true;
+                    }
+                } catch (PackageManager.NameNotFoundException e) {
+                    Log.d(TAG, "Package not found " + e.getMessage());
+                }
+            }
+        } finally {
+            Binder.restoreCallingIdentity(identityToken);
         }
         return false;
     }

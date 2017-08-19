@@ -296,6 +296,11 @@
     <!-- Mask to use when checking skb mark defined in config_networkWakeupPacketMark above. -->
     <integer name="config_networkWakeupPacketMask">0</integer>
 
+    <!-- Whether the APF Filter in the device should filter out IEEE 802.3 Frames
+         Those frames are identified by the field Eth-type having values
+         less than 0x600 -->
+    <bool translatable="false" name="config_apfDrop802_3Frames">true</bool>
+
     <!-- Default value for ConnectivityManager.getMultipathPreference() on metered networks. Actual
          device behaviour is controlled by Settings.Global.NETWORK_METERED_MULTIPATH_PREFERENCE.
          This is the default value of that setting. -->
@@ -520,6 +525,9 @@
     <!-- Integers specifying the max packet Tx/Rx rates for full scan -->
     <integer translatable="false" name="config_wifi_framework_max_tx_rate_for_full_scan">8</integer>
     <integer translatable="false" name="config_wifi_framework_max_rx_rate_for_full_scan">16</integer>
+    <!-- Integers specifying the min packet Tx/Rx rates in packets per second for staying on the same network -->
+    <integer translatable="false" name="config_wifi_framework_min_tx_rate_for_staying_on_network">16</integer>
+    <integer translatable="false" name="config_wifi_framework_min_rx_rate_for_staying_on_network">16</integer>
     <!-- Integer parameters of the wifi to cellular handover feature
          wifi should not stick to bad networks -->
     <integer translatable="false" name="config_wifi_framework_wifi_score_bad_rssi_threshold_5GHz">-82</integer>
@@ -593,6 +601,10 @@
 
     <!-- Boolean indicating that wifi only link configuratios that have exact same credentials (i.e PSK) -->
     <bool translatable="false" name="config_wifi_only_link_same_credential_configurations">true</bool>
+
+    <!-- Boolean indicating whether framework needs to set the tx power limit for meeting SAR requirements
+         during voice calls -->
+    <bool translatable="false" name="config_wifi_framework_enable_voice_call_sar_tx_power_limit">false</bool>
 
     <!-- Wifi driver supports batched scan -->
     <bool translatable="false" name="config_wifi_batched_scan_supported">false</bool>
@@ -981,15 +993,7 @@
         <item>30</item>
     </integer-array>
 
-    <!-- Vibrator pattern for feedback about booting with safe mode disabled -->
-    <integer-array name="config_safeModeDisabledVibePattern">
-        <item>0</item>
-        <item>1</item>
-        <item>20</item>
-        <item>21</item>
-    </integer-array>
-
-    <!-- Vibrator pattern for feedback about booting with safe mode disabled -->
+    <!-- Vibrator pattern for feedback about booting with safe mode enabled -->
     <integer-array name="config_safeModeEnabledVibePattern">
         <item>0</item>
         <item>1</item>
@@ -1387,6 +1391,7 @@
     <!-- The package name of the default network recommendation app.
          A network recommendation provider must:
              * Be granted the SCORE_NETWORKS permission.
+             * Be granted the ACCESS_COARSE_LOCATION permission.
              * Include a Service for the android.net.scoring.RECOMMEND_NETWORKS action
                protected by the BIND_NETWORK_RECOMMENDATION_SERVICE permission.
 
@@ -1675,6 +1680,10 @@
          The size of the WAL file is also constrained by 'db_journal_size_limit'. -->
     <integer name="db_wal_autocheckpoint">100</integer>
 
+    <!-- The number of milliseconds that SQLite connection is allowed to be idle before it
+         is closed and removed from the pool -->
+    <integer name="db_default_idle_connection_timeout">30000</integer>
+
     <!-- Max space (in MB) allocated to DownloadManager to store the downloaded
          files if they are to be stored in DownloadManager's data dir,
          which typically is /data/data/com.android.providers.downloads/files -->
@@ -1879,10 +1888,20 @@
     <!-- Type of the double tap sensor. Empty if double tap is not supported. -->
     <string name="config_dozeDoubleTapSensorType" translatable="false"></string>
 
+    <!-- Type of the long press sensor. Empty if long press is not supported. -->
+    <string name="config_dozeLongPressSensorType" translatable="false"></string>
+
     <!-- Control whether the always on display mode is available. This should only be enabled on
          devices where the display has be tuned to be power efficient in DOZE and/or DOZE_SUSPEND
          states. -->
     <bool name="config_dozeAlwaysOnDisplayAvailable">false</bool>
+
+    <!-- Whether the display blanks itself when transitioning from a doze to a non-doze state -->
+    <bool name="config_displayBlanksAfterDoze">false</bool>
+
+    <!-- True if the display hardware only has brightness buckets rather than a full range of
+         backlight values -->
+    <bool name="config_displayBrightnessBucketsInDoze">false</bool>
 
     <!-- Power Management: Specifies whether to decouple the auto-suspend state of the
          device from the display on/off state.
@@ -1981,6 +2000,10 @@
 
     <!-- Amount of time in ms the user needs to press the relevant key to bring up the global actions dialog -->
     <integer name="config_globalActionsKeyTimeout">500</integer>
+
+    <!-- Default width of a vertical scrollbar and height of a horizontal scrollbar.
+         Takes effect only if the scrollbar drawables have no intrinsic size. -->
+    <dimen name="config_scrollbarSize">4dp</dimen>
 
     <!-- Distance that should be scrolled, per axis value, in response to a horizontal
          {@link MotionEvent#ACTION_SCROLL} event. -->
@@ -2218,11 +2241,19 @@
     <string-array name="config_disabledUntilUsedPreinstalledCarrierApps" translatable="false" />
 
     <!-- The list of classes that should be added to the notification ranking pipline.
-     See {@link com.android.server.notification.NotificationSignalExtractor} -->
+     See {@link com.android.server.notification.NotificationSignalExtractor}
+      If you add a new extractor to this list make sure to update
+      NotificationManagerService.handleRankingSort()-->
     <string-array name="config_notificationSignalExtractors">
+        <!-- many of the following extractors depend on the notification channel, so this
+        extractor must come first -->
+        <item>com.android.server.notification.NotificationChannelExtractor</item>
+        <item>com.android.server.notification.NotificationAdjustmentExtractor</item>
+        <!-- depends on AdjustmentExtractor-->
         <item>com.android.server.notification.ValidateNotificationPeople</item>
         <item>com.android.server.notification.PriorityExtractor</item>
         <item>com.android.server.notification.ImportanceExtractor</item>
+        <!-- depends on ImportanceExtractor-->
         <item>com.android.server.notification.NotificationIntrusivenessExtractor</item>
         <item>com.android.server.notification.VisibilityExtractor</item>
         <item>com.android.server.notification.BadgeExtractor</item>
@@ -2785,18 +2816,6 @@
     <!-- True if camera app should be pinned via Pinner Service -->
     <bool name="config_pinnerCameraApp">false</bool>
 
-    <!-- Component that is the default launcher when demo mode is enabled. -->
-    <string name="config_demoModeLauncherComponent">com.android.retaildemo/.DemoPlayer</string>
-
-    <!-- Hashed password (SHA-256) used to restrict carrier demo mode operation. -->
-    <string name="config_carrierDemoModePassword" translatable="false"></string>
-
-    <!-- Secure setting used to activate carrier demo mode. -->
-    <string name="config_carrierDemoModeSetting" translatable="false"></string>
-
-    <!-- List of packages to enable in carrier demo mode (comma separated). -->
-    <string name="config_carrierDemoModePackages" translatable="false"></string>
-
     <!-- Number of days preloaded file cache should be preserved on a device before it can be
          deleted -->
     <integer name="config_keepPreloadsMinDays">7</integer>
@@ -2987,9 +3006,11 @@
     <!-- Handle volume keys directly in Window Manager without passing them to the foreground app -->
     <bool name="config_handleVolumeKeysInWindowManager">false</bool>
 
-    <!-- Volume level of in-call notification tone playback,
-         relative to the overall voice call stream volume [0..100] -->
-    <integer name="config_inCallNotificationVolumeRelative">67</integer>
+    <!-- Volume level of in-call notification tone playback [0..1] -->
+    <item name="config_inCallNotificationVolume" format="float" type="dimen">.25</item>
+
+    <!-- URI for in call notification sound -->
+    <string translatable="false" name="config_inCallNotificationSound">/system/media/audio/ui/InCallNotification.ogg</string>
 
     <!-- Configuartion to support SIM contact batch operation.-->
     <bool name="config_sim_phonebook_batch_operation">true</bool>
@@ -3007,6 +3028,8 @@
     <string name="config_headlineFontFamily" translatable="false"></string>
     <!-- Name of a font family to use for headlines. Defaults to sans-serif-light -->
     <string name="config_headlineFontFamilyLight" translatable="false">sans-serif-light</string>
+    <!-- Allows setting custom fontFeatureSettings on specific text. -->
+    <string name="config_headlineFontFeatureSettings" translatable="false"></string>
 
     <!-- An array of packages that need to be treated as type system in battery settings -->
     <string-array translatable="false" name="config_batteryPackageTypeSystem">
@@ -3030,4 +3053,7 @@
 
     <!-- Enable the RingtonePickerActivity in 'com.android.providers.media'. -->
     <bool name="config_defaultRingtonePickerEnabled">true</bool>
+
+    <!-- Allow SystemUI to show the shutdown dialog -->
+    <bool name="config_showSysuiShutdown">true</bool>
 </resources>

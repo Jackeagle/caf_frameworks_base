@@ -21,10 +21,6 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="byteShort" msgid="8340973892742019101">"B"</string>
-    <string name="kilobyteShort" msgid="7542884022844556968">"kB"</string>
-    <string name="megabyteShort" msgid="6355851576770428922">"MB"</string>
-    <string name="gigabyteShort" msgid="3259882455212193214">"GB"</string>
-    <string name="terabyteShort" msgid="231613018159186962">"TB"</string>
     <string name="petabyteShort" msgid="5637816680144990219">"PB"</string>
     <string name="fileSizeSuffix" msgid="8897567456150907538">"<xliff:g id="NUMBER">%1$s</xliff:g> <xliff:g id="UNIT">%2$s</xliff:g>"</string>
     <string name="untitled" msgid="4638956954852782576">"&lt;ಶೀರ್ಷಿಕೆ ರಹಿತ&gt;"</string>
@@ -84,10 +80,12 @@
     <string name="RestrictedStateContent" msgid="4278821484643362350">"ತಾತ್ಕಾಲಿಕವಾಗಿ ಮೊಬೈಲ್ ನೆಟ್‌ವರ್ಕ್‌ನಿಂದ ನಿಮ್ಮ ಸ್ಥಳದಲ್ಲಿ ಒದಗಿಸುತ್ತಿಲ್ಲ"</string>
     <string name="NetworkPreferenceSwitchTitle" msgid="4008877505368566980">"ನೆಟ್‌ವರ್ಕ್ ತಲುಪಲು ಸಾಧ್ಯವಿಲ್ಲ"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="1203771446683319957">"ನೆಟ್‌ವರ್ಕ್ ಸಂಪರ್ಕ ಪಡೆಯುವುದನ್ನು ಸುಧಾರಿಸಲು, ಆಯ್ಕೆ ಮಾಡಿರುವ ವಿಧವನ್ನು ಸೆಟ್ಟಿಂಗ್‌ಗಳು &gt; ನೆಟ್‌ವರ್ಕ್ ಮತ್ತು ಇಂಟರ್ನೆಟ್ &gt; ಮೊಬೈಲ್ ನೆಟ್‌ವರ್ಕ್‌ಗಳು &gt; ಆದ್ಯತೆಯ ನೆಟ್‌ವರ್ಕ್ ವಿಧದಲ್ಲಿ ಬದಲಿಸಿ ನೋಡಿ."</string>
+    <string name="EmergencyCallWarningTitle" msgid="4790413876281901612">"ವೈ‑ಫೈ ಕರೆಮಾಡುವಿಕೆ ಸಕ್ರಿಯವಾಗಿದೆ"</string>
+    <string name="EmergencyCallWarningSummary" msgid="8973232888021643293">"ತುರ್ತು ಕರೆಗಳನ್ನು ಮಾಡಲು ಮೊಬೈಲ್ ನೆಟ್‌ವರ್ಕ್ ಅಗತ್ಯವಿದೆ."</string>
     <string name="notification_channel_network_alert" msgid="4427736684338074967">"ಎಚ್ಚರಿಕೆಗಳು"</string>
     <string name="notification_channel_call_forward" msgid="2419697808481833249">"ಕರೆ ಫಾರ್ವರ್ಡ್‌ ಮಾಡುವಿಕೆ"</string>
     <string name="notification_channel_emergency_callback" msgid="6686166232265733921">"ತುರ್ತು ಕಾಲ್‌ಬ್ಯಾಕ್‌ ಮೋಡ್‌"</string>
-    <string name="notification_channel_mobile_data_alert" msgid="6130875231721406231">"ಮೊಬೈಲ್ ಡೇಟಾ ಎಚ್ಚರಿಕೆಗಳು"</string>
+    <string name="notification_channel_mobile_data_status" msgid="4575131690860945836">"ಮೊಬೈಲ್ ಡೇಟಾ ಸ್ಥಿತಿ"</string>
     <string name="notification_channel_sms" msgid="3441746047346135073">"ಎಸ್‌ಎಂಎಸ್ ಸಂದೇಶಗಳು"</string>
     <string name="notification_channel_voice_mail" msgid="3954099424160511919">"ಧ್ವನಿಮೇಲ್ ಸಂದೇಶಗಳು"</string>
     <string name="notification_channel_wfc" msgid="2130802501654254801">"ವೈ-ಫೈ ಕರೆ ಮಾಡುವಿಕೆ"</string>
@@ -122,7 +120,7 @@
     <item msgid="3910386316304772394">"ವೈ-ಫೈ ಮೂಲಕ ಕರೆಗಳನ್ನು ಮಾಡಲು ಮತ್ತು ಸಂದೇಶಗಳನ್ನು ಕಳುಹಿಸಲು, ಈ ಸೇವೆಯನ್ನು ಹೊಂದಿಸಲು ಮೊದಲು ನಿಮ್ಮ ವಾಹಕವನ್ನು ಕೇಳಿ. ಆ ನಂತರ ಸೆಟ್ಟಿಂಗ್‌ಗಳಿಂದ ವೈ-ಫೈ ಕರೆಮಾಡುವಿಕೆಯನ್ನು ಅನ್ನು ಆನ್ ಮಾಡಿ. (ದೋಷ ಕೋಡ್: <xliff:g id="CODE">%1$s</xliff:g>)"</item>
   </string-array>
   <string-array name="wfcOperatorErrorNotificationMessages">
-    <item msgid="6177300162212449033">"ನಿಮ್ಮ ವಾಹಕದಲ್ಲಿ ನೋಂದಾಯಿಸಿಕೊಳ್ಳಿ"</item>
+    <item msgid="7472393097168811593">"ನಿಮ್ಮ ವಾಹಕದ ಜೊತೆಗೆ ನೋಂದಾಯಿಸಿಕೊಳ್ಳಿ (ದೋಷ ಕೋಡ್: <xliff:g id="CODE">%1$s</xliff:g>)"</item>
   </string-array>
   <string-array name="wfcSpnFormats">
     <item msgid="6830082633573257149">"%s"</item>
@@ -218,7 +216,7 @@
     <string name="bugreport_option_interactive_title" msgid="8635056131768862479">"ಪರಸ್ಪರ ಸಂವಹನ ವರದಿ"</string>
     <string name="bugreport_option_interactive_summary" msgid="229299488536107968">"ಹೆಚ್ಚಿನ ಸಂದರ್ಭಗಳಲ್ಲಿ ಇದನ್ನು ಬಳಸಿ. ಇದು ವರದಿಯ ಪ್ರಗತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಲು, ಸಮಸ್ಯೆ ಕುರಿತು ಹೆಚ್ಚಿನ ವಿವರಗಳನ್ನು ನಮೂದಿಸಲು ಮತ್ತು ಸ್ಕ್ರೀನ್‌ಶಾಟ್‌ಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಲು ಅನುಮತಿಸುತ್ತದೆ. ಇದು ವರದಿ ಮಾಡಲು ಹೆಚ್ಚು ಸಮಯ ತೆಗೆದುಕೊಳ್ಳುವಂತಹ ಕೆಲವು ಕಡಿಮೆ ಬಳಸಲಾದ ವಿಭಾಗಗಳನ್ನು ತ್ಯಜಿಸಬಹುದು."</string>
     <string name="bugreport_option_full_title" msgid="6354382025840076439">"ಪೂರ್ಣ ವರದಿ"</string>
-    <string name="bugreport_option_full_summary" msgid="7210859858969115745">"ನಿಮ್ಮ ಸಾಧನವು ಸ್ಪಂದಿಸುತ್ತಿಲ್ಲದಿರುವಾಗ ಅಥವಾ ತುಂಬಾ ನಿಧಾನವಾಗಿರುವಾಗ ಕನಿಷ್ಟ ಹಸ್ತಕ್ಷೇಪಕ್ಕಾಗಿ ಅಥವಾ ನಿಮಗೆ ಎಲ್ಲಾ ವಿಭಾಗಗಳೂ ಅಗತ್ಯವಿರುವಾಗ ಈ ಆಯ್ಕೆಯನ್ನು ಬಳಸಿ. ಹೆಚ್ಚಿನ ವಿವರಗಳನ್ನು ನಮೂದಿಸಲು ಅಥವಾ ಹೆಚ್ಚುವರಿ ಸ್ಕ್ರೀನ್‌ಶಾಟ್‌ಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಲು ನಿಮಗೆ ಅನುಮತಿಸುವುದಿಲ್ಲ."</string>
+    <string name="bugreport_option_full_summary" msgid="7210859858969115745">"ನಿಮ್ಮ ಸಾಧನವು ಸ್ಪಂದಿಸುತ್ತಿಲ್ಲದಿರುವಾಗ ಅಥವಾ ತುಂಬಾ ನಿಧಾನವಾಗಿರುವಾಗ ಕನಿಷ್ಠ ಹಸ್ತಕ್ಷೇಪಕ್ಕಾಗಿ ಅಥವಾ ನಿಮಗೆ ಎಲ್ಲಾ ವಿಭಾಗಗಳೂ ಅಗತ್ಯವಿರುವಾಗ ಈ ಆಯ್ಕೆಯನ್ನು ಬಳಸಿ. ಹೆಚ್ಚಿನ ವಿವರಗಳನ್ನು ನಮೂದಿಸಲು ಅಥವಾ ಹೆಚ್ಚುವರಿ ಸ್ಕ್ರೀನ್‌ಶಾಟ್‌ಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಲು ನಿಮಗೆ ಅನುಮತಿಸುವುದಿಲ್ಲ."</string>
     <plurals name="bugreport_countdown" formatted="false" msgid="6878900193900090368">
       <item quantity="one">ಬಗ್ ವರದಿ ಮಾಡಲು <xliff:g id="NUMBER_1">%d</xliff:g> ಸೆಕೆಂಡುಗಳಲ್ಲಿ ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ತೆಗೆದುಕೊಳ್ಳಲಾಗುತ್ತಿದೆ.</item>
       <item quantity="other">ಬಗ್ ವರದಿ ಮಾಡಲು <xliff:g id="NUMBER_1">%d</xliff:g> ಸೆಕೆಂಡುಗಳಲ್ಲಿ ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ತೆಗೆದುಕೊಳ್ಳಲಾಗುತ್ತಿದೆ.</item>
@@ -234,8 +232,7 @@
     <string name="global_action_voice_assist" msgid="7751191495200504480">"ಧ್ವನಿ ಸಹಾಯಕ"</string>
     <string name="global_action_lockdown" msgid="8751542514724332873">"ಈಗ ಲಾಕ್ ಮಾಡಿ"</string>
     <string name="status_bar_notification_info_overflow" msgid="5301981741705354993">"999+"</string>
-    <string name="notification_hidden_text" msgid="1135169301897151909">"ವಿಷಯಗಳನ್ನು ಮರೆಮಾಡಲಾಗಿದೆ"</string>
-    <string name="notification_hidden_by_policy_text" msgid="9004631276932584600">"ನೀತಿಯಿಂದ ಮರೆಮಾಡಲಾಗಿರುವ ವಿಷಯಗಳು"</string>
+    <string name="notification_hidden_text" msgid="6351207030447943784">"ಹೊಸ ಅಧಿಸೂಚನೆ"</string>
     <string name="notification_channel_virtual_keyboard" msgid="6969925135507955575">"ವರ್ಚುಯಲ್ ಕೀಬೋರ್ಡ್"</string>
     <string name="notification_channel_physical_keyboard" msgid="7297661826966861459">"ಭೌತಿಕ ಕೀಬೋರ್ಡ್‌"</string>
     <string name="notification_channel_security" msgid="7345516133431326347">"ಭದ್ರತೆ"</string>
@@ -1094,7 +1091,7 @@
       <item quantity="one">ಮುಕ್ತ ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗಳು ಲಭ್ಯವಿವೆ</item>
       <item quantity="other">ಮುಕ್ತ ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗಳು ಲಭ್ಯವಿವೆ</item>
     </plurals>
-    <string name="wifi_available_title" msgid="3817100557900599505">"ಮುಕ್ತ ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗೆ ಸಂಪರ್ಕಪಡಿಸಿ"</string>
+    <string name="wifi_available_title" msgid="3817100557900599505">"ಮುಕ್ತ ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗೆ ಸಂಪರ್ಕಿಸಿ"</string>
     <string name="wifi_available_title_connecting" msgid="1557292688310330032">"ಮುಕ್ತ ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗೆ ಸಂಪರ್ಕಪಡಿಸಲಾಗುತ್ತಿದೆ"</string>
     <string name="wifi_available_title_connected" msgid="7542672851522241548">"ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗೆ ಸಂಪರ್ಕಪಡಿಸಲಾಗಿದೆ"</string>
     <string name="wifi_available_title_failed_to_connect" msgid="6861772233582618132">"ವೈ-ಫೈ ನೆಟ್‌ವರ್ಕ್‌ಗೆ ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"</string>
@@ -1180,12 +1177,11 @@
     <string name="usb_midi_notification_title" msgid="4850904915889144654">"MIDI ಗೆ USB"</string>
     <string name="usb_accessory_notification_title" msgid="7848236974087653666">"USB ಪರಿಕರಕ್ಕೆ ಸಂಪರ್ಕಗೊಂಡಿದೆ"</string>
     <string name="usb_notification_message" msgid="3370903770828407960">"ಹೆಚ್ಚಿನ ಆಯ್ಕೆಗಳಿಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ."</string>
-    <string name="usb_unsupported_audio_accessory_title" msgid="2256529893240208458">"ಆಡಿಯೋ ಪರಿಕರಗಳು ಬೆಂಬಲಿತವಾಗಿಲ್ಲ"</string>
-    <string name="usb_unsupported_audio_accessory_message" msgid="7811865061127547035">"ಹೆಚ್ಚಿನ ಮಾಹಿತಿಗಾಗಿ ಟ್ಯಾಪ್ ಮಾಡಿ"</string>
+    <string name="usb_unsupported_audio_accessory_title" msgid="3529881374464628084">"ಅನ್‌ಲಾಗ್ ಆಡಿಯೋ ಪರಿಕರ ಪತ್ತೆಯಾಗಿದೆ"</string>
+    <string name="usb_unsupported_audio_accessory_message" msgid="6309553946441565215">"ಲಗತ್ತಿಸಲಾದ ಸಾಧನವು ಈ ಫೋನಿನೊಂದಿಗೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ. ಇನ್ನಷ್ಟು ತಿಳಿಯಲು ಟ್ಯಾಪ್ ಮಾಡಿ."</string>
     <string name="adb_active_notification_title" msgid="6729044778949189918">"USB ಡೀಬಗಿಂಗ್‌‌ ಸಂಪರ್ಕ"</string>
     <string name="adb_active_notification_message" msgid="4948470599328424059">"USB ಡೀಬಗ್‌ ಮಾಡುವಿಕೆಯನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ."</string>
-    <!-- no translation found for adb_active_notification_message (8470296818270110396) -->
-    <skip />
+    <string name="adb_active_notification_message" product="tv" msgid="8470296818270110396">"USB ಡೀಬಗ್‌ ಮಾಡುವಿಕೆಯನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲು ಆಯ್ಕೆ ಮಾಡಿ."</string>
     <string name="taking_remote_bugreport_notification_title" msgid="6742483073875060934">"ದೋಷದ ವರದಿಯನ್ನು ತೆಗೆದುಕೊಳ್ಳಲಾಗುತ್ತಿದೆ…"</string>
     <string name="share_remote_bugreport_notification_title" msgid="4987095013583691873">"ಬಗ್ ವರದಿಯನ್ನು ಹಂಚುವುದೇ?"</string>
     <string name="sharing_remote_bugreport_notification_title" msgid="7572089031496651372">"ಬಗ್ ವರದಿಯನ್ನು ಹಂಚಿಕೊಳ್ಳಲಾಗುತ್ತಿದೆ…"</string>
@@ -1419,7 +1415,7 @@
     <string name="bluetooth_a2dp_audio_route_name" msgid="8575624030406771015">"ಬ್ಲೂಟೂತ್‌ ಆಡಿಯೊ"</string>
     <string name="wireless_display_route_description" msgid="9070346425023979651">"ವಯರ್‌ಲೆಸ್ ಪ್ರದರ್ಶನ"</string>
     <string name="media_route_button_content_description" msgid="591703006349356016">"ಪಾತ್ರ"</string>
-    <string name="media_route_chooser_title" msgid="1751618554539087622">"ಸಾಧನಕ್ಕೆ ಸಂಪರ್ಕಪಡಿಸಿ"</string>
+    <string name="media_route_chooser_title" msgid="1751618554539087622">"ಸಾಧನಕ್ಕೆ ಸಂಪರ್ಕಿಸಿ"</string>
     <string name="media_route_chooser_title_for_remote_display" msgid="3395541745872017583">"ಸಾಧನಕ್ಕೆ ಬಿತ್ತರಿಸುವ ಪರದೆ"</string>
     <string name="media_route_chooser_searching" msgid="4776236202610828706">"ಸಾಧನಗಳನ್ನು ಹುಡುಕಲಾಗುತ್ತಿದೆ…"</string>
     <string name="media_route_chooser_extended_settings" msgid="87015534236701604">"ಸೆಟ್ಟಿಂಗ್‌ಗಳು"</string>
@@ -1589,7 +1585,7 @@
     <string name="restr_pin_confirm_pin" msgid="8501523829633146239">"ಹೊಸ ಪಿನ್‌ ದೃಢೀಕರಿಸಿ"</string>
     <string name="restr_pin_create_pin" msgid="8017600000263450337">"ನಿರ್ಬಂಧಗಳನ್ನು ಮಾರ್ಪಡಿಸಲು ಪಿನ್‌ ರಚಿಸಿ"</string>
     <string name="restr_pin_error_doesnt_match" msgid="2224214190906994548">"ಪಿನ್‌ ಗಳು ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."</string>
-    <string name="restr_pin_error_too_short" msgid="8173982756265777792">"ಪಿನ್‌ ತುಂಬಾ ಚಿಕ್ಕದಾಗಿದೆ. ಕನಿಷ್ಟ ಪಕ್ಷ 4 ಅಂಕಿಗಳಾಗಿರಬೇಕು."</string>
+    <string name="restr_pin_error_too_short" msgid="8173982756265777792">"ಪಿನ್‌ ತುಂಬಾ ಚಿಕ್ಕದಾಗಿದೆ. ಕನಿಷ್ಠ ಪಕ್ಷ 4 ಅಂಕಿಗಳಾಗಿರಬೇಕು."</string>
     <plurals name="restr_pin_countdown" formatted="false" msgid="9061246974881224688">
       <item quantity="one"><xliff:g id="COUNT">%d</xliff:g> ಸೆಕೆಂಡುಗಳಲ್ಲಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ</item>
       <item quantity="other"><xliff:g id="COUNT">%d</xliff:g> ಸೆಕೆಂಡುಗಳಲ್ಲಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ</item>
@@ -1719,14 +1715,8 @@
     <string name="unpin_target" msgid="3556545602439143442">"ಅನ್‌ಪಿನ್"</string>
     <string name="app_info" msgid="6856026610594615344">"ಅಪ್ಲಿಕೇಶನ್ ಮಾಹಿತಿ"</string>
     <string name="negative_duration" msgid="5688706061127375131">"−<xliff:g id="TIME">%1$s</xliff:g>"</string>
-    <string name="reset_retail_demo_mode_title" msgid="2370249087943803584">"ಸಾಧನವನ್ನು ಮರುಹೊಂದಿಸುವುದೇ?"</string>
-    <string name="reset_retail_demo_mode_text" msgid="5481925817590883246">"ಸಾಧನ ಮರುಹೊಂದಿಸಲು ಟ್ಯಾಪ್‌ ಮಾಡಿ"</string>
     <string name="demo_starting_message" msgid="5268556852031489931">"ಡೆಮೋ ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ..."</string>
     <string name="demo_restarting_message" msgid="952118052531642451">"ಸಾಧನ ಮರುಹೊಂದಿಸಲಾಗುತ್ತಿದೆ..."</string>
-    <string name="demo_user_inactivity_timeout_title" msgid="6596109959002331334">"ಸಾಧನವನ್ನು ಮರುಹೊಂದಿಸುವುದೇ?"</string>
-    <string name="demo_user_inactivity_timeout_countdown" msgid="5675588824402569506">"ನೀವು ಯಾವುದೇ ಬದಲಾವಣೆಗಳನ್ನು ಕಳೆದುಕೊಳ್ಳುತ್ತೀರಿ ಮತ್ತು <xliff:g id="TIMEOUT">%1$s</xliff:g> ಸೆಕೆಂಡುಗಳಲ್ಲಿ ಡೆಮೋ ಮತ್ತೆ ಪ್ರಾರಂಭವಾಗುತ್ತದೆ..."</string>
-    <string name="demo_user_inactivity_timeout_left_button" msgid="5314271347014802475">"ರದ್ದುಮಾಡಿ"</string>
-    <string name="demo_user_inactivity_timeout_right_button" msgid="5019306703066964808">"ಈಗಲೇ ಮರುಹೊಂದಿಸು"</string>
     <string name="suspended_widget_accessibility" msgid="6712143096475264190">"<xliff:g id="LABEL">%1$s</xliff:g> ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ"</string>
     <string name="conference_call" msgid="3751093130790472426">"ಕಾನ್ಫರೆನ್ಸ್ ಕರೆ"</string>
     <string name="tooltip_popup_title" msgid="5253721848739260181">"ಟೂಲ್‌ಟಿಪ್"</string>

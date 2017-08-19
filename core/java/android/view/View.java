@@ -9711,6 +9711,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param hasTransientState true if this view has transient state
      */
     public void setHasTransientState(boolean hasTransientState) {
+        final boolean oldHasTransientState = hasTransientState();
         mTransientStateCount = hasTransientState ? mTransientStateCount + 1 :
                 mTransientStateCount - 1;
         if (mTransientStateCount < 0) {
@@ -9722,9 +9723,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             // update flag if we've just incremented up from 0 or decremented down to 0
             mPrivateFlags2 = (mPrivateFlags2 & ~PFLAG2_HAS_TRANSIENT_STATE) |
                     (hasTransientState ? PFLAG2_HAS_TRANSIENT_STATE : 0);
-            if (mParent != null) {
+            final boolean newHasTransientState = hasTransientState();
+            if (mParent != null && newHasTransientState != oldHasTransientState) {
                 try {
-                    mParent.childHasTransientStateChanged(this, hasTransientState);
+                    mParent.childHasTransientStateChanged(this, newHasTransientState);
                 } catch (AbstractMethodError e) {
                     Log.e(VIEW_LOG_TAG, mParent.getClass().getSimpleName() +
                             " does not fully implement ViewParent", e);
@@ -10180,6 +10182,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @hide
      */
+    @TestApi
     public final void setFocusedInCluster() {
         setFocusedInCluster(findKeyboardNavigationCluster());
     }
@@ -12158,7 +12161,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // If the view is in the background but still part of the hierarchy this is called
                 // with isVisible=false. Hence visibility==false requires further checks
                 if (isVisible) {
-                    afm.notifyViewVisibilityChange(this, true);
+                    afm.notifyViewVisibilityChanged(this, true);
                 } else {
                     if (mVisibilityChangeForAutofillHandler == null) {
                         mVisibilityChangeForAutofillHandler =
@@ -13285,7 +13288,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // about in case nothing has focus.  even if this specific view
                 // isn't focusable, it may contain something that is, so let
                 // the root view try to give this focus if nothing else does.
-                if ((mParent != null)) {
+                if ((mParent != null) && (mBottom > mTop) && (mRight > mLeft)) {
                     mParent.focusableViewAvailable(this);
                 }
             }
@@ -25021,7 +25024,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         @Override
         public void handleMessage(Message msg) {
-            mAfm.notifyViewVisibilityChange(mView, mView.isShown());
+            mAfm.notifyViewVisibilityChanged(mView, mView.isShown());
         }
     }
 

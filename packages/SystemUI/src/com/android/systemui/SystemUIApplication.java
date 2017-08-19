@@ -30,10 +30,9 @@ import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.util.ArraySet;
-import android.util.BootTimingsTraceLog;
+import android.util.TimingsTraceLog;
 import android.util.Log;
 
-import com.android.systemui.fragments.FragmentService;
 import com.android.systemui.globalactions.GlobalActionsComponent;
 import com.android.systemui.keyboard.KeyboardUI;
 import com.android.systemui.keyguard.KeyguardViewMediator;
@@ -52,7 +51,6 @@ import com.android.systemui.stackdivider.Divider;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.statusbar.phone.StatusBarWindowManager;
-import com.android.systemui.tuner.TunerService;
 import com.android.systemui.usb.StorageNotification;
 import com.android.systemui.util.NotificationChannels;
 import com.android.systemui.util.leak.GarbageMonitor;
@@ -118,7 +116,7 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
         // Set the application theme that is inherited by all services. Note that setting the
         // application theme in the manifest does only work for activities. Keep this in sync with
         // the theme set there.
-        setTheme(R.style.systemui_theme);
+        setTheme(R.style.Theme_SystemUI);
 
         SystemUIFactory.createFromConfig(this);
 
@@ -194,7 +192,7 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
 
         Log.v(TAG, "Starting SystemUI services for user " +
                 Process.myUserHandle().getIdentifier() + ".");
-        BootTimingsTraceLog log = new BootTimingsTraceLog("SystemUIBootTiming",
+        TimingsTraceLog log = new TimingsTraceLog("SystemUIBootTiming",
                 Trace.TRACE_TAG_APP);
         log.traceBegin("StartServices");
         final int N = services.length;

@@ -113,6 +113,11 @@ public class KeyButtonView extends ImageView implements ButtonInterface {
         setBackground(mRipple);
     }
 
+    @Override
+    public boolean isClickable() {
+        return mCode != 0 || super.isClickable();
+    }
+
     public void setCode(int code) {
         mCode = code;
     }
@@ -228,7 +233,7 @@ public class KeyButtonView extends ImageView implements ButtonInterface {
                 setPressed(false);
                 // Always send a release ourselves because it doesn't seem to be sent elsewhere
                 // and it feels weird to sometimes get a release haptic and other times not.
-                if ((SystemClock.uptimeMillis() - mDownTime) > 100) {
+                if ((SystemClock.uptimeMillis() - mDownTime) > 150 && !mLongClicked) {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY_RELEASE);
                 }
                 if (mCode != 0) {
@@ -298,11 +303,6 @@ public class KeyButtonView extends ImageView implements ButtonInterface {
     @Override
     public void setVertical(boolean vertical) {
         //no op
-    }
-
-    @Override
-    public void setCarMode(boolean carMode) {
-        // no op
     }
 }
 

@@ -16,15 +16,6 @@
 
 package android.os;
 
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Formatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import android.app.job.JobParameters;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -42,6 +33,15 @@ import android.view.Display;
 
 import com.android.internal.os.BatterySipper;
 import com.android.internal.os.BatteryStatsHelper;
+
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Formatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A class providing access to battery usage statistics, including information on
@@ -168,6 +168,11 @@ public abstract class BatteryStats implements Parcelable {
     public static final int BLUETOOTH_UNOPTIMIZED_SCAN_ON = 21;
 
     /**
+     * A constant indicating a foreground service timer
+     */
+    public static final int FOREGROUND_SERVICE = 22;
+
+    /**
      * Include all of the data in the stats, including previously saved data.
      */
     public static final int STATS_SINCE_CHARGED = 0;
@@ -201,8 +206,15 @@ public abstract class BatteryStats implements Parcelable {
      *   - CPU frequency time per uid
      * New in version 22:
      *   - BLE scan result background count, BLE unoptimized scan time
+     *   - Background partial wakelock time & count
+     * New in version 23:
+     *   - Logging smeared power model values
+     * New in version 24:
+     *   - Fixed bugs in background timers and BLE scan time
+     * New in version 25:
+     *   - Package wakeup alarms are now on screen-off timebase
      */
-    static final String CHECKIN_VERSION = "23";
+    static final String CHECKIN_VERSION = "25";
 
     /**
      * Old version, we hit 9 and ran out of room, need to remove.
@@ -223,7 +235,11 @@ public abstract class BatteryStats implements Parcelable {
     private static final String CPU_TIMES_AT_FREQ_DATA = "ctf";
     private static final String SENSOR_DATA = "sr";
     private static final String VIBRATOR_DATA = "vib";
-    private static final String FOREGROUND_DATA = "fg";
+    private static final String FOREGROUND_ACTIVITY_DATA = "fg";
+    // fgs line is:
+    // BATTERY_STATS_CHECKIN_VERSION, uid, category, "fgs",
+    // foreground service time, count
+    private static final String FOREGROUND_SERVICE_DATA = "fgs";
     private static final String STATE_TIME_DATA = "st";
     // wl line is:
     // BATTERY_STATS_CHECKIN_VERSION, uid, which, "wl", name,
@@ -582,6 +598,11 @@ public abstract class BatteryStats implements Parcelable {
         public abstract Timer getFlashlightTurnedOnTimer();
         public abstract Timer getCameraTurnedOnTimer();
         public abstract Timer getForegroundActivityTimer();
+
+        /**
+         * Returns the timer keeping track of Foreground Service time
+         */
+        public abstract Timer getForegroundServiceTimer();
         public abstract Timer getBluetoothScanTimer();
         public abstract Timer getBluetoothScanBackgroundTimer();
         public abstract Timer getBluetoothUnoptimizedScanTimer();
@@ -672,7 +693,7 @@ public abstract class BatteryStats implements Parcelable {
         public abstract long getSystemCpuTimeUs(int which);
 
         /**
-         * Returns the approximate cpu time (in milliseconds) spent at a certain CPU speed for a
+         * Returns the approximate cpu time (in microseconds) spent at a certain CPU speed for a
          * given CPU cluster.
          * @param cluster the index of the CPU cluster.
          * @param step the index of the CPU speed. This is not the actual speed of the CPU.
@@ -3530,6 +3551,12 @@ public abstract class BatteryStats implements Parcelable {
                     if (name.indexOf(',') >= 0) {
                         name = name.replace(',', '_');
                     }
+                    if (name.indexOf('\n') >= 0) {
+                        name = name.replace('\n', '_');
+                    }
+                    if (name.indexOf('\r') >= 0) {
+                        name = name.replace('\r', '_');
+                    }
                     dumpLine(pw, uid, category, WAKELOCK_DATA, name, sb.toString());
                 }
             }
@@ -3616,7 +3643,10 @@ public abstract class BatteryStats implements Parcelable {
             dumpTimer(pw, uid, category, VIBRATOR_DATA, u.getVibratorOnTimer(),
                     rawRealtime, which);
 
-            dumpTimer(pw, uid, category, FOREGROUND_DATA, u.getForegroundActivityTimer(),
+            dumpTimer(pw, uid, category, FOREGROUND_ACTIVITY_DATA, u.getForegroundActivityTimer(),
+                    rawRealtime, which);
+
+            dumpTimer(pw, uid, category, FOREGROUND_SERVICE_DATA, u.getForegroundServiceTimer(),
                     rawRealtime, which);
 
             final Object[] stateTimes = new Object[Uid.NUM_PROCESS_STATE];
@@ -3637,25 +3667,29 @@ public abstract class BatteryStats implements Parcelable {
                         0 /* old cpu power, keep for compatibility */);
             }
 
-            final long[] cpuFreqTimeMs = u.getCpuFreqTimes(which);
-            // If total cpuFreqTimes is null, then we don't need to check for screenOffCpuFreqTimes.
-            if (cpuFreqTimeMs != null) {
-                sb.setLength(0);
-                for (int i = 0; i < cpuFreqTimeMs.length; ++i) {
-                    sb.append((i == 0 ? "" : ",") + cpuFreqTimeMs[i]);
-                }
-                final long[] screenOffCpuFreqTimeMs = u.getScreenOffCpuFreqTimes(which);
-                if (screenOffCpuFreqTimeMs != null) {
-                    for (int i = 0; i < screenOffCpuFreqTimeMs.length; ++i) {
-                        sb.append("," + screenOffCpuFreqTimeMs[i]);
-                    }
-                } else {
+            // If the cpuFreqs is null, then don't bother checking for cpu freq times.
+            if (cpuFreqs != null) {
+                final long[] cpuFreqTimeMs = u.getCpuFreqTimes(which);
+                // If total cpuFreqTimes is null, then we don't need to check for
+                // screenOffCpuFreqTimes.
+                if (cpuFreqTimeMs != null && cpuFreqTimeMs.length == cpuFreqs.length) {
+                    sb.setLength(0);
                     for (int i = 0; i < cpuFreqTimeMs.length; ++i) {
-                        sb.append(",0");
+                        sb.append((i == 0 ? "" : ",") + cpuFreqTimeMs[i]);
                     }
+                    final long[] screenOffCpuFreqTimeMs = u.getScreenOffCpuFreqTimes(which);
+                    if (screenOffCpuFreqTimeMs != null) {
+                        for (int i = 0; i < screenOffCpuFreqTimeMs.length; ++i) {
+                            sb.append("," + screenOffCpuFreqTimeMs[i]);
+                        }
+                    } else {
+                        for (int i = 0; i < cpuFreqTimeMs.length; ++i) {
+                            sb.append(",0");
+                        }
+                    }
+                    dumpLine(pw, uid, category, CPU_TIMES_AT_FREQ_DATA, UID_TIMES_TYPE_ALL,
+                            cpuFreqTimeMs.length, sb.toString());
                 }
-                dumpLine(pw, uid, category, CPU_TIMES_AT_FREQ_DATA, UID_TIMES_TYPE_ALL,
-                        cpuFreqTimeMs.length, sb.toString());
             }
 
             final ArrayMap<String, ? extends BatteryStats.Uid.Proc> processStats
@@ -5093,6 +5127,8 @@ public abstract class BatteryStats implements Parcelable {
                     "Vibrator");
             uidActivity |= printTimer(pw, sb, u.getForegroundActivityTimer(), rawRealtime, which,
                     prefix, "Foreground activities");
+            uidActivity |= printTimer(pw, sb, u.getForegroundServiceTimer(), rawRealtime, which,
+                    prefix, "Foreground services");
 
             long totalStateTime = 0;
             for (int ips=0; ips<Uid.NUM_PROCESS_STATE; ips++) {
@@ -5646,8 +5682,10 @@ public abstract class BatteryStats implements Parcelable {
                         pw.print(',');
                         if (rec.stepDetails.statPlatformIdleState != null) {
                             pw.print(rec.stepDetails.statPlatformIdleState);
+                            if (rec.stepDetails.statSubsystemPowerState != null) {
+                                pw.print(',');
+                            }
                         }
-                        pw.println();
 
                         if (rec.stepDetails.statSubsystemPowerState != null) {
                             pw.print(rec.stepDetails.statSubsystemPowerState);

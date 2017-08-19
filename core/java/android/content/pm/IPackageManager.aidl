@@ -72,7 +72,7 @@ interface IPackageManager {
     String[] currentToCanonicalPackageNames(in String[] names);
     String[] canonicalToCurrentPackageNames(in String[] names);
 
-    PermissionInfo getPermissionInfo(String name, int flags);
+    PermissionInfo getPermissionInfo(String name, String packageName, int flags);
 
     ParceledListSlice queryPermissionsByGroup(String group, int flags);
 
@@ -128,6 +128,7 @@ interface IPackageManager {
     String[] getPackagesForUid(int uid);
 
     String getNameForUid(int uid);
+    String[] getNamesForUids(in int[] uids);
 
     int getUidForSharedUser(String sharedUserName);
 
@@ -469,11 +470,19 @@ interface IPackageManager {
      * Notify the package manager that a list of dex files have been loaded.
      *
      * @param loadingPackageName the name of the package who performs the load
-     * @param dexPats the list of the dex files paths that have been loaded
+     * @param classLoadersNames the names of the class loaders present in the loading chain. The
+     *    list encodes the class loader chain in the natural order. The first class loader has
+     *    the second one as its parent and so on. The dex files present in the class path of the
+     *    first class loader will be recorded in the usage file.
+     * @param classPaths the class paths corresponding to the class loaders names from
+     *     {@param classLoadersNames}. The the first element corresponds to the first class loader
+     *     and so on. A classpath is represented as a list of dex files separated by
+     *     {@code File.pathSeparator}.
+     *     The dex files found in the first class path will be recorded in the usage file.
      * @param loaderIsa the ISA of the loader process
      */
-    oneway void notifyDexLoad(String loadingPackageName, in List<String> dexPaths,
-            String loaderIsa);
+    oneway void notifyDexLoad(String loadingPackageName, in List<String> classLoadersNames,
+            in List<String> classPaths, String loaderIsa);
 
     /**
      * Register an application dex module with the package manager.
@@ -508,21 +517,13 @@ interface IPackageManager {
              in boolean isSharedModule, IDexModuleRegisterCallback callback);
 
     /**
-     * Ask the package manager to perform a dex-opt for the given reason. The package
-     * manager will map the reason to a compiler filter according to the current system
-     * configuration.
-     */
-    boolean performDexOpt(String packageName, boolean checkProfiles,
-            int compileReason, boolean force, boolean bootComplete);
-
-    /**
      * Ask the package manager to perform a dex-opt with the given compiler filter.
      *
      * Note: exposed only for the shell command to allow moving packages explicitly to a
      *       definite state.
      */
     boolean performDexOptMode(String packageName, boolean checkProfiles,
-            String targetCompilerFilter, boolean force, boolean bootComplete);
+            String targetCompilerFilter, boolean force, boolean bootComplete, String splitName);
 
     /**
      * Ask the package manager to perform a dex-opt with the given compiler filter on the

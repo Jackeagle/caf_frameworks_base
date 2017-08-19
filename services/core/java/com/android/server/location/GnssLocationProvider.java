@@ -543,7 +543,9 @@ public class GnssLocationProvider implements LocationProviderInterface {
                     loadPropertiesFromResource(context, mProperties);
                     String lpp_profile = mProperties.getProperty("LPP_PROFILE");
                     // set the persist property LPP_PROFILE for the value
-                    SystemProperties.set(LPP_PROFILE, lpp_profile);
+                    if (lpp_profile != null) {
+                        SystemProperties.set(LPP_PROFILE, lpp_profile);
+                    }
                 } else {
                     // reset the persist property
                     SystemProperties.set(LPP_PROFILE, "");
@@ -1053,8 +1055,15 @@ public class GnssLocationProvider implements LocationProviderInterface {
                 // download tasks overrun.
                 synchronized (mLock) {
                     if (mDownloadXtraWakeLock.isHeld()) {
-                        mDownloadXtraWakeLock.release();
-                        if (DEBUG) Log.d(TAG, "WakeLock released by handleDownloadXtraData()");
+                        // This wakelock may have time-out, if a timeout was specified.
+                        // Catch (and ignore) any timeout exceptions.
+                        try {
+                            mDownloadXtraWakeLock.release();
+                            if (DEBUG) Log.d(TAG, "WakeLock released by handleDownloadXtraData()");
+                        } catch (Exception e) {
+                            Log.i(TAG, "Wakelock timeout & release race exception in "
+                                    + "handleDownloadXtraData()", e);
+                        }
                     } else {
                         Log.e(TAG, "WakeLock expired before release in "
                                 + "handleDownloadXtraData()");
@@ -1652,6 +1661,9 @@ public class GnssLocationProvider implements LocationProviderInterface {
                 mSvAzimuths,
                 mSvCarrierFreqs);
 
+        // Log CN0 as part of GNSS metrics
+        mGnssMetrics.logCn0(mCn0s, svCount);
+
         if (VERBOSE) {
             Log.v(TAG, "SV count: " + svCount);
         }
@@ -1752,20 +1764,32 @@ public class GnssLocationProvider implements LocationProviderInterface {
     }
 
     /**
-     * called from native code - Gps measurements callback
+     * called from native code - GNSS measurements callback
      */
     private void reportMeasurementData(GnssMeasurementsEvent event) {
         if (!mItarSpeedLimitExceeded) {
-            mGnssMeasurementsProvider.onMeasurementsAvailable(event);
+            // send to handler to allow native to return quickly
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mGnssMeasurementsProvider.onMeasurementsAvailable(event);
+                }
+            });
         }
     }
 
     /**
-     * called from native code - GPS navigation message callback
+     * called from native code - GNSS navigation message callback
      */
     private void reportNavigationMessage(GnssNavigationMessage event) {
         if (!mItarSpeedLimitExceeded) {
-            mGnssNavigationMessageProvider.onNavigationMessageAvailable(event);
+            // send to handler to allow native to return quickly
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mGnssNavigationMessageProvider.onNavigationMessageAvailable(event);
+                }
+            });
         }
     }
 
@@ -2514,6 +2538,7 @@ public class GnssLocationProvider implements LocationProviderInterface {
     @Override
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         StringBuilder s = new StringBuilder();
+        s.append("  mStarted=").append(mStarted).append('\n');
         s.append("  mFixInterval=").append(mFixInterval).append('\n');
         s.append("  mDisableGps (battery saver mode)=").append(mDisableGps).append('\n');
         s.append("  mEngineCapabilities=0x").append(Integer.toHexString(mEngineCapabilities));

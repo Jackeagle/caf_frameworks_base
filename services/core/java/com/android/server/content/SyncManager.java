@@ -58,6 +58,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.TrafficStats;
 import android.os.BatteryStats;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -461,6 +462,7 @@ public class SyncManager {
                             continue;
                         }
                         if (opx.key.equals(opy.key)) {
+                            mLogger.log("Removing duplicate sync: ", opy);
                             mJobScheduler.cancel(opy.jobId);
                         }
                     }
@@ -473,25 +475,57 @@ public class SyncManager {
         if (mJobScheduler != null) {
             return;
         }
-        if (Log.isLoggable(TAG, Log.VERBOSE)) {
-            Log.d(TAG, "initializing JobScheduler object.");
-        }
-        mJobScheduler = (JobScheduler) mContext.getSystemService(
-                Context.JOB_SCHEDULER_SERVICE);
-        mJobSchedulerInternal = LocalServices.getService(JobSchedulerInternal.class);
-        // Get all persisted syncs from JobScheduler
-        List<JobInfo> pendingJobs = mJobScheduler.getAllPendingJobs();
-        for (JobInfo job : pendingJobs) {
-            SyncOperation op = SyncOperation.maybeCreateFromJobExtras(job.getExtras());
-            if (op != null) {
-                if (!op.isPeriodic) {
-                    // Set the pending status of this EndPoint to true. Pending icon is
-                    // shown on the settings activity.
-                    mSyncStorageEngine.markPending(op.target, true);
+        final long token = Binder.clearCallingIdentity();
+        try {
+            if (Log.isLoggable(TAG, Log.VERBOSE)) {
+                Log.d(TAG, "initializing JobScheduler object.");
+            }
+            mJobScheduler = (JobScheduler) mContext.getSystemService(
+                    Context.JOB_SCHEDULER_SERVICE);
+            mJobSchedulerInternal = LocalServices.getService(JobSchedulerInternal.class);
+            // Get all persisted syncs from JobScheduler
+            List<JobInfo> pendingJobs = mJobScheduler.getAllPendingJobs();
+
+            int numPersistedPeriodicSyncs = 0;
+            int numPersistedOneshotSyncs = 0;
+            for (JobInfo job : pendingJobs) {
+                SyncOperation op = SyncOperation.maybeCreateFromJobExtras(job.getExtras());
+                if (op != null) {
+                    if (op.isPeriodic) {
+                        numPersistedPeriodicSyncs++;
+                    } else {
+                        numPersistedOneshotSyncs++;
+                        // Set the pending status of this EndPoint to true. Pending icon is
+                        // shown on the settings activity.
+                        mSyncStorageEngine.markPending(op.target, true);
+                    }
                 }
             }
+            if (mLogger.enabled()) {
+                mLogger.log("Connected to JobScheduler: "
+                        + numPersistedPeriodicSyncs + " periodic syncs "
+                        + numPersistedOneshotSyncs + " oneshot syncs.");
+            }
+            cleanupJobs();
+
+            if ((numPersistedPeriodicSyncs == 0) && likelyHasPeriodicSyncs()) {
+                Slog.wtf(TAG, "Device booted with no persisted periodic syncs.");
+            }
+        } finally {
+            Binder.restoreCallingIdentity(token);
         }
-        cleanupJobs();
+    }
+
+    /**
+     * @return whether the device most likely has some periodic syncs.
+     */
+    private boolean likelyHasPeriodicSyncs() {
+        try {
+            return AccountManager.get(mContext).getAccountsByType("com.google").length > 0;
+        } catch (Throwable th) {
+            // Just in case.
+        }
+        return false;
     }
 
     private JobScheduler getJobScheduler() {
@@ -1085,11 +1119,13 @@ public class SyncManager {
     }
 
     private void removeSyncsForAuthority(EndPoint info) {
+        mLogger.log("removeSyncsForAuthority: ", info);
         verifyJobScheduler();
         List<SyncOperation> ops = getAllPendingSyncs();
         for (SyncOperation op: ops) {
             if (op.target.matchesSpec(info)) {
-                 getJobScheduler().cancel(op.jobId);
+                mLogger.log("canceling: ", op);
+                getJobScheduler().cancel(op.jobId);
             }
         }
     }
@@ -1634,6 +1670,7 @@ public class SyncManager {
     }
 
     private void onUserRemoved(int userId) {
+        mLogger.log("onUserRemoved: u", userId);
         updateRunningAccounts(null /* Don't sync any target */);
 
         // Clean up the storage engine database
@@ -1704,6 +1741,8 @@ public class SyncManager {
             // Include "this" in the message so that the handler can ignore it if this
             // ActiveSyncContext is no longer the mActiveSyncContext at message handling
             // time.
+            mLogger.log("onFinished result=", result, " endpoint=",
+                    (mSyncOperation == null ? "null" : mSyncOperation.target));
             sendSyncFinishedOrCanceledMessage(this, result);
         }
 
@@ -1745,6 +1784,7 @@ public class SyncManager {
                     Context.BIND_AUTO_CREATE | Context.BIND_NOT_FOREGROUND
                             | Context.BIND_ALLOW_OOM_MANAGEMENT,
                     new UserHandle(mSyncOperation.target.userId));
+            mLogger.log("bindService() returned=", mBound, " for ", this);
             if (!bindResult) {
                 mBound = false;
             } else {
@@ -1767,6 +1807,7 @@ public class SyncManager {
             }
             if (mBound) {
                 mBound = false;
+                mLogger.log("unbindService for ", this);
                 mContext.unbindService(this);
                 try {
                     mBatteryStats.noteSyncFinish(mEventName, mSyncAdapterUid);
@@ -2729,9 +2770,14 @@ public class SyncManager {
                             // outstanding
                             try {
                                 if (currentSyncContext.mSyncAdapter != null) {
+                                    mLogger.log("Calling cancelSync for SERVICE_DISCONNECTED ",
+                                            currentSyncContext,
+                                            " adapter=", currentSyncContext.mSyncAdapter);
                                     currentSyncContext.mSyncAdapter.cancelSync(currentSyncContext);
+                                    mLogger.log("Canceled");
                                 }
                             } catch (RemoteException e) {
+                                mLogger.log("RemoteException ", Log.getStackTraceString(e));
                                 // We don't need to retry this in this case.
                             }
 
@@ -2917,6 +2963,9 @@ public class SyncManager {
                     Slog.v(TAG, acc.toString());
                 }
             }
+            if (mLogger.enabled()) {
+                mLogger.log("updateRunningAccountsH: ", Arrays.toString(mRunningAccounts));
+            }
             if (mBootCompleted) {
                 doDatabaseCleanup();
             }
@@ -2948,6 +2997,7 @@ public class SyncManager {
             List<SyncOperation> ops = getAllPendingSyncs();
             for (SyncOperation op: ops) {
                 if (!containsAccountAndUser(allAccounts, op.target.account, op.target.userId)) {
+                    mLogger.log("canceling: ", op);
                     getJobScheduler().cancel(op.jobId);
                 }
             }
@@ -3066,6 +3116,7 @@ public class SyncManager {
                                 "removePeriodicSyncInternalH");
                         runSyncFinishedOrCanceledH(null, asc);
                     }
+                    mLogger.log("removePeriodicSyncInternalH-canceling: ", op);
                     getJobScheduler().cancel(op.jobId);
                 }
             }
@@ -3217,14 +3268,15 @@ public class SyncManager {
                 mLogger.log("Sync start: account=" + syncOperation.target.account,
                         " authority=", syncOperation.target.provider,
                         " reason=", SyncOperation.reasonToString(null, syncOperation.reason),
-                        " extras=", SyncOperation.extrasToString(syncOperation.extras));
+                        " extras=", SyncOperation.extrasToString(syncOperation.extras),
+                        " adapter=", activeSyncContext.mSyncAdapter);
 
                 activeSyncContext.mSyncAdapter = ISyncAdapter.Stub.asInterface(syncAdapter);
                 activeSyncContext.mSyncAdapter
                         .startSync(activeSyncContext, syncOperation.target.provider,
                                 syncOperation.target.account, syncOperation.extras);
 
-                mLogger.log("Sync finish");
+                mLogger.log("Sync is running now...");
             } catch (RemoteException remoteExc) {
                 mLogger.log("Sync failed with RemoteException: ", remoteExc.toString());
                 Log.d(TAG, "maybeStartNextSync: caught a RemoteException, rescheduling", remoteExc);
@@ -3297,7 +3349,6 @@ public class SyncManager {
                 activeSyncContext.mSyncAdapter.asBinder().unlinkToDeath(activeSyncContext, 0);
                 activeSyncContext.mIsLinkedToDeath = false;
             }
-            closeActiveSyncContext(activeSyncContext);
             final long elapsedTime = SystemClock.elapsedRealtime() - activeSyncContext.mStartTime;
             String historyMessage;
             int downstreamActivity;
@@ -3355,8 +3406,12 @@ public class SyncManager {
                 }
                 if (activeSyncContext.mSyncAdapter != null) {
                     try {
+                        mLogger.log("Calling cancelSync for runSyncFinishedOrCanceled ",
+                                activeSyncContext, "  adapter=", activeSyncContext.mSyncAdapter);
                         activeSyncContext.mSyncAdapter.cancelSync(activeSyncContext);
+                        mLogger.log("Canceled");
                     } catch (RemoteException e) {
+                        mLogger.log("RemoteException ", Log.getStackTraceString(e));
                         // we don't need to retry this in this case
                     }
                 }
@@ -3364,6 +3419,9 @@ public class SyncManager {
                 downstreamActivity = 0;
                 upstreamActivity = 0;
             }
+
+            // Close and unbind the service.  Don't use activeSyncContext.mSyncAdapter after this.
+            closeActiveSyncContext(activeSyncContext);
 
             stopSyncEvent(activeSyncContext.mHistoryRowId, syncOperation, historyMessage,
                     upstreamActivity, downstreamActivity, elapsedTime);

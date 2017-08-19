@@ -76,7 +76,8 @@ public class BuzzBeepBlinkTest extends NotificationTestCase {
     @Mock Vibrator mVibrator;
     @Mock android.media.IRingtonePlayer mRingtonePlayer;
     @Mock Light mLight;
-    @Mock Handler mHandler;
+    @Mock
+    NotificationManagerService.WorkerHandler mHandler;
     @Mock
     NotificationUsageStats mUsageStats;
 
@@ -536,6 +537,21 @@ public class BuzzBeepBlinkTest extends NotificationTestCase {
     }
 
     @Test
+    public void testInCallNotification() throws Exception {
+        NotificationRecord r = getBeepyNotification();
+
+        // set up internal state
+        mService.buzzBeepBlinkLocked(r);
+        Mockito.reset(mRingtonePlayer);
+
+        mService.mInCall = true;
+        mService.buzzBeepBlinkLocked(r);
+
+        //verify(mService, times(1)).playInCallNotification();
+        verifyNeverBeep(); // doesn't play normal beep
+    }
+
+    @Test
     public void testNoDemoteSoundToVibrateIfVibrateGiven() throws Exception {
         NotificationRecord r = getBuzzyBeepyNotification();
         assertTrue(r.getSound() != null);
@@ -826,6 +842,16 @@ public class BuzzBeepBlinkTest extends NotificationTestCase {
     public void testPostingSilentNotificationDoesNotAffectRateLimiting() throws Exception {
         NotificationRecord r = getQuietNotification();
         mService.buzzBeepBlinkLocked(r);
+
+        verify(mUsageStats, never()).isAlertRateLimited(any());
+    }
+
+    @Test
+    public void testPostingGroupSuppressedDoesNotAffectRateLimiting() throws Exception {
+        NotificationRecord summary = getBeepyNotificationRecord("a", GROUP_ALERT_CHILDREN);
+        summary.getNotification().flags |= Notification.FLAG_GROUP_SUMMARY;
+
+        mService.buzzBeepBlinkLocked(summary);
 
         verify(mUsageStats, never()).isAlertRateLimited(any());
     }

@@ -999,7 +999,10 @@ public class WifiManager {
         }
     }
 
-    /** @hide */
+    /**
+     * @hide
+     * @removed
+     */
     @SystemApi
     @RequiresPermission(android.Manifest.permission.READ_WIFI_CREDENTIAL)
     public WifiConnectionStatistics getConnectionStatistics() {
@@ -1411,6 +1414,8 @@ public class WifiManager {
     public static final int WIFI_FEATURE_IE_WHITELIST     = 0x1000000; // Probe IE white listing
     /** @hide */
     public static final int WIFI_FEATURE_SCAN_RAND        = 0x2000000; // Random MAC & Probe seq
+    /** @hide */
+    public static final int WIFI_FEATURE_TX_POWER_LIMIT   = 0x4000000; // Set Tx power limit
 
 
     private int getSupportedFeatures() {
@@ -1577,6 +1582,7 @@ public class WifiManager {
      * @deprecated This API is nolonger supported.
      * Use {@link android.net.wifi.WifiScanner} API
      * @hide
+     * @removed
      */
     @Deprecated
     @SystemApi
@@ -1592,6 +1598,7 @@ public class WifiManager {
      * @deprecated This API is nolonger supported.
      * Use {@link android.net.wifi.WifiScanner} API
      * @hide
+     * @removed
      */
     @Deprecated
     @SystemApi
@@ -1606,6 +1613,7 @@ public class WifiManager {
      * @deprecated This API is nolonger supported.
      * Use {@link android.net.wifi.WifiScanner} API
      * @hide
+     * @removed
      */
     @Deprecated
     @SystemApi
@@ -1631,11 +1639,17 @@ public class WifiManager {
 
     /**
      * Return dynamic information about the current Wi-Fi connection, if any is active.
+     * <p>
+     * In the connected state, access to the SSID and BSSID requires
+     * the same permissions as {@link #getScanResults}. If such access is not allowed,
+     * {@link WifiInfo#getSSID} will return {@code "<unknown ssid>"} and
+     * {@link WifiInfo#getBSSID} will return {@code "02:00:00:00:00:00"}.
+     *
      * @return the Wi-Fi information, contained in {@link WifiInfo}.
      */
     public WifiInfo getConnectionInfo() {
         try {
-            return mService.getConnectionInfo();
+            return mService.getConnectionInfo(mContext.getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1754,9 +1768,18 @@ public class WifiManager {
 
     /**
      * Enable or disable Wi-Fi.
+     *
+     * Note: This method will return false if wifi cannot be enabled (e.g., an incompatible mode
+     * where the user has enabled tethering or Airplane Mode).
+     *
+     * Applications need to have the {@link android.Manifest.permission#CHANGE_WIFI_STATE}
+     * permission to toggle wifi. Callers without the permissions will trigger a
+     * {@link java.lang.SecurityException}.
+     *
      * @param enabled {@code true} to enable, {@code false} to disable.
      * @return {@code true} if the operation succeeds (or if the existing state
-     *         is the same as the requested state).
+     *         is the same as the requested state). False if wifi cannot be toggled on/off when the
+     *         request is made.
      */
     public boolean setWifiEnabled(boolean enabled) {
         try {
@@ -1836,7 +1859,7 @@ public class WifiManager {
     }
 
     /**
-     * This call will be deprecated and removed in an upcoming release.  It is no longer used to
+     * This call is deprecated and removed.  It is no longer used to
      * start WiFi Tethering.  Please use {@link ConnectivityManager#startTethering(int, boolean,
      * ConnectivityManager#OnStartTetheringCallback)} if
      * the caller has proper permissions.  Callers can also use the LocalOnlyHotspot feature for a
@@ -1848,8 +1871,11 @@ public class WifiManager {
      * @return {@code false}
      *
      * @hide
+     * @deprecated This API is nolonger supported.
+     * @removed
      */
     @SystemApi
+    @Deprecated
     @RequiresPermission(android.Manifest.permission.TETHER_PRIVILEGED)
     public boolean setWifiApEnabled(WifiConfiguration wifiConfig, boolean enabled) {
         String packageName = mContext.getOpPackageName();
@@ -2303,12 +2329,20 @@ public class WifiManager {
      */
     @SystemApi
     public interface ActionListener {
-        /** The operation succeeded */
+        /**
+         * The operation succeeded.
+         * This is called when the scan request has been validated and ready
+         * to sent to driver.
+         */
         public void onSuccess();
         /**
-         * The operation failed
-         * @param reason The reason for failure could be one of
-         * {@link #ERROR}, {@link #IN_PROGRESS} or {@link #BUSY}
+         * The operation failed.
+         * This is called when the scan request failed.
+         * @param reason The reason for failure could be one of the following:
+         * {@link #REASON_INVALID_REQUEST}} is specified when scan request parameters are invalid.
+         * {@link #REASON_NOT_AUTHORIZED} is specified when requesting app doesn't have the required
+         * permission to request a scan.
+         * {@link #REASON_UNSPECIFIED} is specified when driver reports a scan failure.
          */
         public void onFailure(int reason);
     }
@@ -2318,7 +2352,7 @@ public class WifiManager {
         /** WPS start succeeded */
         public abstract void onStarted(String pin);
 
-        /** WPS operation completed succesfully */
+        /** WPS operation completed successfully */
         public abstract void onSucceeded();
 
         /**
@@ -3201,7 +3235,7 @@ public class WifiManager {
      * Normally the Wifi stack filters out packets not explicitly
      * addressed to this device.  Acquring a MulticastLock will
      * cause the stack to receive packets addressed to multicast
-     * addresses.  Processing these extra packets can cause a noticable
+     * addresses.  Processing these extra packets can cause a noticeable
      * battery drain and should be disabled when not needed.
      */
     public class MulticastLock {

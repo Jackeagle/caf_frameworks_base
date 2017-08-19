@@ -52,6 +52,7 @@ import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 
+import com.android.internal.util.XmlUtils;
 import com.android.server.notification.NotificationManagerService.DumpFilter;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -211,12 +212,25 @@ abstract public class ManagedServices {
         }
     }
 
-    protected void onSettingRestored(String element, String value, int userId) {
+    protected void onSettingRestored(String element, String value, int backupSdkInt, int userId) {
         if (!mUseXml) {
             Slog.d(TAG, "Restored managed service setting: " + element);
             if (mConfig.secureSettingName.equals(element) ||
                     (mConfig.secondarySettingName != null
                             && mConfig.secondarySettingName.equals(element))) {
+                if (backupSdkInt < Build.VERSION_CODES.O) {
+                    // automatic system grants were added in O, so append the approved apps
+                    // rather than wiping out the setting
+                    String currentSetting =
+                            getApproved(userId, mConfig.secureSettingName.equals(element));
+                    if (!TextUtils.isEmpty(currentSetting)) {
+                        if (!TextUtils.isEmpty(value)) {
+                            value = value + ENABLED_SERVICES_SEPARATOR + currentSetting;
+                        } else {
+                            value = currentSetting;
+                        }
+                    }
+                }
                 Settings.Secure.putStringForUser(
                         mContext.getContentResolver(), element, value, userId);
                 loadAllowedComponentsFromSettings();
@@ -226,7 +240,7 @@ abstract public class ManagedServices {
     }
 
     public void writeXml(XmlSerializer out, boolean forBackup) throws IOException {
-        out.startTag(null, getConfig().managedServiceTypeTag);
+        out.startTag(null, getConfig().xmlTag);
 
         if (forBackup) {
             trimApprovedListsAccordingToInstalledServices();
@@ -241,7 +255,7 @@ abstract public class ManagedServices {
                 for (int j = 0; j < M; j++) {
                     final boolean isPrimary = approvedByType.keyAt(j);
                     final Set<String> approved = approvedByType.valueAt(j);
-                    if (approved != null && approved.size() > 0) {
+                    if (approved != null) {
                         String allowedItems = String.join(ENABLED_SERVICES_SEPARATOR, approved);
                         out.startTag(null, TAG_MANAGED_SERVICES);
                         out.attribute(null, ATT_APPROVED_LIST, allowedItems);
@@ -260,43 +274,34 @@ abstract public class ManagedServices {
             }
         }
 
-        out.endTag(null, getConfig().managedServiceTypeTag);
+        out.endTag(null, getConfig().xmlTag);
     }
 
-    /**
-     * @return false if modifications were made to the data on load that requires the xml file
-     * to be re-written
-     */
-    public boolean readXml(XmlPullParser parser)
+    protected void migrateToXml() {
+        loadAllowedComponentsFromSettings();
+    }
+
+    public void readXml(XmlPullParser parser)
             throws XmlPullParserException, IOException {
-        boolean rewriteXml = false;
-        int type = parser.getEventType();
-        String tag = parser.getName();
-        if (type != XmlPullParser.START_TAG || !getConfig().managedServiceTypeTag.equals(tag)) {
-            // xml empty/invalid - read from setting instead
-            loadAllowedComponentsFromSettings();
-            rewriteXml = true;
-        } else {
-            while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
-                tag = parser.getName();
-                if (type == XmlPullParser.END_TAG
-                        && getConfig().managedServiceTypeTag.equals(tag)) {
-                    break;
-                }
-                if (type == XmlPullParser.START_TAG) {
-                    if (TAG_MANAGED_SERVICES.equals(tag)) {
-                        final String approved = XmlUtils.safeString(parser, ATT_APPROVED_LIST, "");
-                        final int userId = XmlUtils.safeInt(parser, ATT_USER_ID, 0);
-                        final boolean isPrimary = XmlUtils.safeBool(parser, ATT_IS_PRIMARY, true);
-                        addApprovedList(approved, userId, isPrimary);
-                    }
+        int type;
+        while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
+            String tag = parser.getName();
+            if (type == XmlPullParser.END_TAG
+                    && getConfig().xmlTag.equals(tag)) {
+                break;
+            }
+            if (type == XmlPullParser.START_TAG) {
+                if (TAG_MANAGED_SERVICES.equals(tag)) {
+                    final String approved = XmlUtils.readStringAttribute(parser, ATT_APPROVED_LIST);
+                    final int userId = XmlUtils.readIntAttribute(parser, ATT_USER_ID, 0);
+                    final boolean isPrimary =
+                            XmlUtils.readBooleanAttribute(parser, ATT_IS_PRIMARY, true);
+                    addApprovedList(approved, userId, isPrimary);
+                    mUseXml = true;
                 }
             }
-            mUseXml = true;
         }
         rebindServices(false);
-
-        return rewriteXml;
     }
 
     private void loadAllowedComponentsFromSettings() {
@@ -376,6 +381,13 @@ abstract public class ManagedServices {
         } else {
             return getPackageName(pkgOrComponent);
         }
+    }
+
+    protected String getApproved(int userId, boolean primary) {
+        final ArrayMap<Boolean, ArraySet<String>> allowedByType =
+                mApproved.getOrDefault(userId, new ArrayMap<>());
+        ArraySet<String> approved = allowedByType.getOrDefault(primary, new ArraySet<>());
+        return String.join(ENABLED_SERVICES_SEPARATOR, approved);
     }
 
     protected List<ComponentName> getAllowedComponents(int userId) {
@@ -1119,7 +1131,7 @@ abstract public class ManagedServices {
         public String serviceInterface;
         public String secureSettingName;
         public String secondarySettingName;
-        public String managedServiceTypeTag;
+        public String xmlTag;
         public String bindPermission;
         public String settingsAction;
         public int clientLabel;

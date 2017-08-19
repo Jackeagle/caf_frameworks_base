@@ -19,6 +19,7 @@ package com.android.internal.os;
 import android.os.Trace;
 
 import dalvik.system.DelegateLastClassLoader;
+import dalvik.system.DexClassLoader;
 import dalvik.system.PathClassLoader;
 
 /**
@@ -31,6 +32,7 @@ public class ClassLoaderFactory {
     private ClassLoaderFactory() {}
 
     private static final String PATH_CLASS_LOADER_NAME = PathClassLoader.class.getName();
+    private static final String DEX_CLASS_LOADER_NAME = DexClassLoader.class.getName();
     private static final String DELEGATE_LAST_CLASS_LOADER_NAME =
             DelegateLastClassLoader.class.getName();
 
@@ -39,8 +41,26 @@ public class ClassLoaderFactory {
      * binary name of a class, as defined by {@code Class.getName}.
      */
     public static boolean isValidClassLoaderName(String name) {
-        return PATH_CLASS_LOADER_NAME.equals(name) ||
-                DELEGATE_LAST_CLASS_LOADER_NAME.equals(name);
+        // This method is used to parse package data and does not accept null names.
+        return name != null && (isPathClassLoaderName(name) || isDelegateLastClassLoaderName(name));
+    }
+
+    /**
+     * Returns true if {@code name} is the encoding for either PathClassLoader or DexClassLoader.
+     * The two class loaders are grouped together because they have the same behaviour.
+     */
+    public static boolean isPathClassLoaderName(String name) {
+        // For null values we default to PathClassLoader. This cover the case when packages
+        // don't specify any value for their class loaders.
+        return name == null || PATH_CLASS_LOADER_NAME.equals(name) ||
+                DEX_CLASS_LOADER_NAME.equals(name);
+    }
+
+    /**
+     * Returns true if {@code name} is the encoding for the DelegateLastClassLoader.
+     */
+    public static boolean isDelegateLastClassLoaderName(String name) {
+        return DELEGATE_LAST_CLASS_LOADER_NAME.equals(name);
     }
 
     /**
@@ -49,9 +69,9 @@ public class ClassLoaderFactory {
      */
     public static ClassLoader createClassLoader(String dexPath,
             String librarySearchPath, ClassLoader parent, String classloaderName) {
-        if (classloaderName == null || PATH_CLASS_LOADER_NAME.equals(classloaderName)) {
+        if (isPathClassLoaderName(classloaderName)) {
             return new PathClassLoader(dexPath, librarySearchPath, parent);
-        } else if (DELEGATE_LAST_CLASS_LOADER_NAME.equals(classloaderName)) {
+        } else if (isDelegateLastClassLoaderName(classloaderName)) {
             return new DelegateLastClassLoader(dexPath, librarySearchPath, parent);
         }
 

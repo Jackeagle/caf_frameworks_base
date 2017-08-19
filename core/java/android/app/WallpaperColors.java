@@ -136,12 +136,12 @@ public final class WallpaperColors implements Parcelable {
         }
 
         final int bitmapArea = bitmap.getWidth() * bitmap.getHeight();
+        boolean shouldRecycle = false;
         if (bitmapArea > MAX_WALLPAPER_EXTRACTION_AREA) {
+            shouldRecycle = true;
             Size optimalSize = calculateOptimalSize(bitmap.getWidth(), bitmap.getHeight());
-            Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, optimalSize.getWidth(),
+            bitmap = Bitmap.createScaledBitmap(bitmap, optimalSize.getWidth(),
                     optimalSize.getHeight(), true /* filter */);
-            bitmap.recycle();
-            bitmap = scaledBitmap;
         }
 
         final Palette palette = Palette
@@ -181,6 +181,11 @@ public final class WallpaperColors implements Parcelable {
         }
 
         int hints = calculateHints(bitmap);
+
+        if (shouldRecycle) {
+            bitmap.recycle();
+        }
+
         return new WallpaperColors(primary, secondary, tertiary, hints);
     }
 
@@ -402,5 +407,14 @@ public final class WallpaperColors implements Parcelable {
         }
 
         return new Size(newWidth, newHeight);
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder colors = new StringBuilder();
+        for (int i = 0; i < mMainColors.size(); i++) {
+            colors.append(Integer.toHexString(mMainColors.get(i).toArgb())).append(" ");
+        }
+        return "[WallpaperColors: " + colors.toString() + "h: " + mColorHints + "]";
     }
 }

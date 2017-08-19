@@ -24,7 +24,14 @@ import static com.android.systemui.doze.DozeMachine.State.INITIALIZED;
 import static com.android.systemui.doze.DozeMachine.State.UNINITIALIZED;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 import android.view.Display;
@@ -41,11 +48,13 @@ public class DozeScreenStateTest extends SysuiTestCase {
 
     DozeServiceFake mServiceFake;
     DozeScreenState mScreen;
+    private ImmediateHandler mHandler;
 
     @Before
     public void setUp() throws Exception {
         mServiceFake = new DozeServiceFake();
-        mScreen = new DozeScreenState(mServiceFake);
+        mHandler = spy(new ImmediateHandler(Looper.getMainLooper()));
+        mScreen = new DozeScreenState(mServiceFake, mHandler);
     }
 
     @Test
@@ -86,13 +95,37 @@ public class DozeScreenStateTest extends SysuiTestCase {
     }
 
     @Test
-    public void testScreen_onInRequestPulseWithAoD() {
+    public void testScreen_offInRequestPulseWithAoD() {
         mScreen.transitionTo(UNINITIALIZED, INITIALIZED);
         mScreen.transitionTo(INITIALIZED, DOZE_AOD);
 
         mScreen.transitionTo(DOZE, DOZE_REQUEST_PULSE);
 
-        assertEquals(Display.STATE_DOZE_SUSPEND, mServiceFake.screenState);
+        assertEquals(Display.STATE_OFF, mServiceFake.screenState);
     }
 
+    @Test
+    public void test_postedToHandler() {
+        mScreen.transitionTo(UNINITIALIZED, INITIALIZED);
+        mScreen.transitionTo(INITIALIZED, DOZE_AOD);
+
+        verify(mHandler).sendMessageAtTime(any(), anyLong());
+    }
+
+    private static class ImmediateHandler extends Handler {
+
+        public ImmediateHandler(Looper looper) {
+            super(looper);
+        }
+
+        @Override
+        public boolean sendMessageAtTime(Message msg, long uptimeMillis) {
+            Runnable callback = msg.getCallback();
+            if (callback != null) {
+                callback.run();
+                return false;
+            }
+            return super.sendMessageAtTime(msg, uptimeMillis);
+        }
+    }
 }

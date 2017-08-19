@@ -31,6 +31,7 @@ import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.annotation.UserIdInt;
 import android.annotation.XmlRes;
+import android.app.ActivityManager;
 import android.app.PackageDeleteObserver;
 import android.app.PackageInstallObserver;
 import android.app.admin.DevicePolicyManager;
@@ -46,6 +47,7 @@ import android.content.res.XmlResourceParser;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -54,7 +56,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.storage.StorageManager;
 import android.os.storage.VolumeInfo;
-import android.provider.Settings;
 import android.util.AndroidException;
 import android.util.Log;
 
@@ -809,6 +810,14 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_ALLOCATE_AGGRESSIVE = 0x00008000;
+
+    /**
+     * Flag parameter for {@link #installPackage} to indicate that this package
+     * is a virtual preload.
+     *
+     * @hide
+     */
+    public static final int INSTALL_VIRTUAL_PRELOAD = 0x00010000;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "DONT_KILL_APP" }, value = {
@@ -1783,6 +1792,24 @@ public abstract class PackageManager {
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device's
+     * {@link ActivityManager#isLowRamDevice() ActivityManager.isLowRamDevice()} method returns
+     * true.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_RAM_LOW = "android.hardware.ram.low";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device's
+     * {@link ActivityManager#isLowRamDevice() ActivityManager.isLowRamDevice()} method returns
+     * false.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_RAM_NORMAL = "android.hardware.ram.normal";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
      * {@link #hasSystemFeature}: The device can record audio via a
      * microphone.
      */
@@ -1901,12 +1928,13 @@ public abstract class PackageManager {
     public static final String FEATURE_VULKAN_HARDWARE_VERSION = "android.hardware.vulkan.version";
 
     /**
-     * The device includes broadcast radio tuner.
-     *
-     * @hide FutureFeature
+     * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device includes broadcast radio tuner.
+     * @hide
      */
+    @SystemApi
     @SdkConstant(SdkConstantType.FEATURE)
-    public static final String FEATURE_RADIO = "android.hardware.radio";
+    public static final String FEATURE_BROADCAST_RADIO = "android.hardware.broadcastradio";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
@@ -2287,7 +2315,9 @@ public abstract class PackageManager {
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
-     * {@link #hasSystemFeature}: The device supports Wi-Fi Passpoint.
+     * {@link #hasSystemFeature}: The device supports Wi-Fi Passpoint and all
+     * Passpoint related APIs in {@link WifiManager} are supported. Refer to
+     * {@link WifiManager#addOrUpdatePasspointConfiguration} for more info.
      */
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_WIFI_PASSPOINT = "android.hardware.wifi.passpoint";
@@ -3582,6 +3612,14 @@ public abstract class PackageManager {
     public abstract @Nullable String getNameForUid(int uid);
 
     /**
+     * Retrieves the official names associated with each given uid.
+     * @see #getNameForUid(int)
+     *
+     * @hide
+     */
+    public abstract @Nullable String[] getNamesForUids(int[] uids);
+
+    /**
      * Return the user id associated with a shared user name. Multiple
      * applications can specify a shared user name in their manifest and thus
      * end up using a common uid. This might be used for new applications
@@ -3760,7 +3798,6 @@ public abstract class PackageManager {
 
     /**
      * @removed
-     * @hide
      */
     public abstract boolean setInstantAppCookie(@Nullable byte[] cookie);
 
@@ -4013,6 +4050,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(Manifest.permission.INTERACT_ACROSS_USERS)
     public List<ResolveInfo> queryBroadcastReceiversAsUser(Intent intent,
             @ResolveInfoFlags int flags, UserHandle userHandle) {
         return queryBroadcastReceiversAsUser(intent, flags, userHandle.getIdentifier());
@@ -4683,6 +4721,7 @@ public abstract class PackageManager {
      * on the system for other users, also install it for the calling user.
      * @hide
      */
+    @SystemApi
     public abstract int installExistingPackage(String packageName) throws NameNotFoundException;
 
     /**
@@ -4690,6 +4729,7 @@ public abstract class PackageManager {
      * on the system for other users, also install it for the calling user.
      * @hide
      */
+    @SystemApi
     public abstract int installExistingPackage(String packageName, @InstallReason int installReason)
             throws NameNotFoundException;
 
@@ -4801,6 +4841,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(Manifest.permission.INTERACT_ACROSS_USERS_FULL)
     public abstract int getIntentVerificationStatusAsUser(String packageName, @UserIdInt int userId);
 
     /**
@@ -4870,6 +4911,7 @@ public abstract class PackageManager {
      */
     @TestApi
     @SystemApi
+    @RequiresPermission(Manifest.permission.INTERACT_ACROSS_USERS_FULL)
     public abstract String getDefaultBrowserPackageNameAsUser(@UserIdInt int userId);
 
     /**
@@ -4885,7 +4927,9 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
-    @RequiresPermission(android.Manifest.permission.SET_PREFERRED_APPLICATIONS)
+    @RequiresPermission(allOf = {
+            Manifest.permission.SET_PREFERRED_APPLICATIONS,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL})
     public abstract boolean setDefaultBrowserPackageNameAsUser(String packageName,
             @UserIdInt int userId);
 

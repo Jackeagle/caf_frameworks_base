@@ -675,20 +675,29 @@ public class AudioService extends IAudioService.Stub
         mHasVibrator = vibrator == null ? false : vibrator.hasVibrator();
 
         // Initialize volume
-        int maxVolume = SystemProperties.getInt("ro.config.vc_call_vol_steps",
-                MAX_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL]);
-        if (maxVolume != MAX_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL]) {
-            MAX_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL] = maxVolume;
-            AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL] = (maxVolume * 3) / 4;
+        int maxCallVolume = SystemProperties.getInt("ro.config.vc_call_vol_steps", -1);
+        if (maxCallVolume != -1) {
+            MAX_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL] = maxCallVolume;
+            AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL] =
+                    (maxCallVolume * 3) / 4;
         }
-        maxVolume = SystemProperties.getInt("ro.config.media_vol_steps",
-                MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC]);
-        if (maxVolume != MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC]) {
-            MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = maxVolume;
+
+        int maxMusicVolume = SystemProperties.getInt("ro.config.media_vol_steps", -1);
+        if (maxMusicVolume != -1) {
+            MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = maxMusicVolume;
+        }
+
+        int defaultMusicVolume = SystemProperties.getInt("ro.config.media_vol_default", -1);
+        if (defaultMusicVolume != -1 &&
+                defaultMusicVolume <= MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC]) {
+            AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = defaultMusicVolume;
+        } else {
             if (isPlatformTelevision()) {
-                AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = maxVolume / 4;
+                AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] =
+                        MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] / 4;
             } else {
-                AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = (maxVolume * 3) / 4;
+                AudioSystem.DEFAULT_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] =
+                        MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] / 3;
             }
         }
 
@@ -1018,6 +1027,19 @@ public class AudioService extends IAudioService.Stub
         checkAllFixedVolumeDevices();
         checkAllAliasStreamVolumes();
         checkMuteAffectedStreams();
+        updateDefaultVolumes();
+    }
+
+    // Update default indexes from aliased streams. Must be called after mStreamStates is created
+    private void updateDefaultVolumes() {
+        for (int stream = 0; stream < mStreamStates.length; stream++) {
+            if (stream != mStreamVolumeAlias[stream]) {
+                AudioSystem.DEFAULT_STREAM_VOLUME[stream] = rescaleIndex(
+                        AudioSystem.DEFAULT_STREAM_VOLUME[mStreamVolumeAlias[stream]],
+                        mStreamVolumeAlias[stream],
+                        stream);
+            }
+        }
     }
 
     private void dumpStreamStates(PrintWriter pw) {
@@ -1066,7 +1088,9 @@ public class AudioService extends IAudioService.Stub
         mStreamVolumeAlias[AudioSystem.STREAM_DTMF] = dtmfStreamAlias;
         mStreamVolumeAlias[AudioSystem.STREAM_ACCESSIBILITY] = a11yStreamAlias;
 
-        if (updateVolumes) {
+        if (updateVolumes && mStreamStates != null) {
+            updateDefaultVolumes();
+
             mStreamStates[AudioSystem.STREAM_DTMF].setAllIndexes(mStreamStates[dtmfStreamAlias],
                     caller);
 
@@ -5433,10 +5457,28 @@ public class AudioService extends IAudioService.Stub
         } else if (device == AudioSystem.DEVICE_OUT_WIRED_HEADPHONE ||
                    device == AudioSystem.DEVICE_OUT_LINE) {
             intent.setAction(Intent.ACTION_HEADSET_PLUG);
-            intent.putExtra("microphone", 0);
+            intent.putExtra("microphone",  0);
+        } else if (device == AudioSystem.DEVICE_OUT_USB_HEADSET) {
+            intent.setAction(Intent.ACTION_HEADSET_PLUG);
+            intent.putExtra("microphone",
+                    AudioSystem.getDeviceConnectionState(AudioSystem.DEVICE_IN_USB_HEADSET, "")
+                        == AudioSystem.DEVICE_STATE_AVAILABLE ? 1 : 0);
+        } else if (device == AudioSystem.DEVICE_IN_USB_HEADSET) {
+            if (AudioSystem.getDeviceConnectionState(AudioSystem.DEVICE_OUT_USB_HEADSET, "")
+                    == AudioSystem.DEVICE_STATE_AVAILABLE) {
+                intent.setAction(Intent.ACTION_HEADSET_PLUG);
+                intent.putExtra("microphone", 1);
+            } else {
+                // do not send ACTION_HEADSET_PLUG when only the input side is seen as changing
+                return;
+            }
         } else if (device == AudioSystem.DEVICE_OUT_HDMI ||
                 device == AudioSystem.DEVICE_OUT_HDMI_ARC) {
             configureHdmiPlugIntent(intent, state);
+        }
+
+        if (intent.getAction() == null) {
+            return;
         }
 
         intent.putExtra(CONNECT_INTENT_KEY_STATE, state);
@@ -5472,9 +5514,7 @@ public class AudioService extends IAudioService.Stub
             if ((state == 0) && ((device & DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG) != 0)) {
                 setBluetoothA2dpOnInt(true);
             }
-            boolean isUsb = ((device & ~AudioSystem.DEVICE_OUT_ALL_USB) == 0) ||
-                            (((device & AudioSystem.DEVICE_BIT_IN) != 0) &&
-                             ((device & ~AudioSystem.DEVICE_IN_ALL_USB) == 0));
+
             if (!handleDeviceConnection(state == 1, device, address, deviceName)) {
                 // change of connection state failed, bailout
                 return;
@@ -5514,9 +5554,7 @@ public class AudioService extends IAudioService.Stub
                     }
                 }
             }
-            if (!isUsb && device != AudioSystem.DEVICE_IN_WIRED_HEADSET) {
-                sendDeviceConnectionIntent(device, state, address, deviceName);
-            }
+            sendDeviceConnectionIntent(device, state, address, deviceName);
             updateAudioRoutes(device, state);
         }
     }

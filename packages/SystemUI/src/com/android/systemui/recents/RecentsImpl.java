@@ -24,12 +24,12 @@ import static android.view.View.MeasureSpec;
 import android.app.ActivityManager;
 import android.app.ActivityManager.TaskSnapshot;
 import android.app.ActivityOptions;
+import android.app.ActivityOptions.OnAnimationFinishedListener;
+import android.app.ActivityOptions.OnAnimationStartedListener;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -208,6 +208,20 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
     protected static RecentsTaskLoadPlan sInstanceLoadPlan;
     // Stores the last pinned task time
     protected static long sLastPipTime = -1;
+    // Stores whether we are waiting for a transition to/from recents to start. During this time,
+    // we disallow the user from manually toggling recents until the transition has started.
+    private static boolean mWaitingForTransitionStart = false;
+    // Stores whether or not the user toggled while we were waiting for a transition to/from
+    // recents. In this case, we defer the toggle state until then and apply it immediately after.
+    private static boolean mToggleFollowingTransitionStart = true;
+
+    private ActivityOptions.OnAnimationStartedListener mResetToggleFlagListener =
+            new OnAnimationStartedListener() {
+                @Override
+                public void onAnimationStarted() {
+                    setWaitingForTransitionStart(false);
+                }
+            };
 
     protected Context mContext;
     protected Handler mHandler;
@@ -362,6 +376,11 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
     public void toggleRecents(int growTarget) {
         // Skip this toggle if we are already waiting to trigger recents via alt-tab
         if (mFastAltTabTrigger.isDozing()) {
+            return;
+        }
+
+        if (mWaitingForTransitionStart) {
+            mToggleFollowingTransitionStart = true;
             return;
         }
 
@@ -638,6 +657,18 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
         }
     }
 
+    public void setWaitingForTransitionStart(boolean waitingForTransitionStart) {
+        if (mWaitingForTransitionStart == waitingForTransitionStart) {
+            return;
+        }
+
+        mWaitingForTransitionStart = waitingForTransitionStart;
+        if (!waitingForTransitionStart && mToggleFollowingTransitionStart) {
+            mHandler.post(() -> toggleRecents(DividerView.INVALID_RECENTS_GROW_TARGET));
+        }
+        mToggleFollowingTransitionStart = false;
+    }
+
     /**
      * Returns the preloaded load plan and invalidates it.
      */
@@ -836,6 +867,7 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
     private Pair<ActivityOptions, AppTransitionAnimationSpecsFuture>
             getThumbnailTransitionActivityOptions(ActivityManager.RunningTaskInfo runningTask,
                     Rect windowOverrideRect) {
+        final boolean isLowRamDevice = Recents.getConfiguration().isLowRamDevice;
         if (runningTask != null && runningTask.stackId == FREEFORM_WORKSPACE_STACK_ID) {
             ArrayList<AppTransitionAnimationSpec> specs = new ArrayList<>();
             ArrayList<Task> tasks;
@@ -865,8 +897,12 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
             }
             AppTransitionAnimationSpec[] specsArray = new AppTransitionAnimationSpec[specs.size()];
             specs.toArray(specsArray);
+
+            // For low end ram devices, wait for transition flag is reset when Recents entrance
+            // animation is complete instead of when the transition animation starts
             return new Pair<>(ActivityOptions.makeThumbnailAspectScaleDownAnimation(mDummyStackView,
-                    specsArray, mHandler, null, this), null);
+                    specsArray, mHandler, isLowRamDevice ? null : mResetToggleFlagListener, this),
+                    null);
         } else {
             // Update the destination rect
             Task toTask = new Task();
@@ -884,8 +920,12 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
                         return Lists.newArrayList(new AppTransitionAnimationSpec(
                                 toTask.key.id, thumbnail, rect));
                     });
+
+            // For low end ram devices, wait for transition flag is reset when Recents entrance
+            // animation is complete instead of when the transition animation starts
             return new Pair<>(ActivityOptions.makeMultiThumbFutureAspectScaleAnimation(mContext,
-                    mHandler, future.getFuture(), null, false /* scaleUp */), future);
+                    mHandler, future.getFuture(), isLowRamDevice ? null : mResetToggleFlagListener,
+                    false /* scaleUp */), future);
         }
     }
 
@@ -919,11 +959,11 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
     private GraphicBuffer drawThumbnailTransitionBitmap(Task toTask,
             TaskViewTransform toTransform) {
         SystemServicesProxy ssp = Recents.getSystemServices();
-        if (toTransform != null && toTask.key != null) {
+        int width = (int) toTransform.rect.width();
+        int height = (int) toTransform.rect.height();
+        if (toTransform != null && toTask.key != null && width > 0 && height > 0) {
             synchronized (mHeaderBarLock) {
                 boolean disabledInSafeMode = !toTask.isSystemApp && ssp.isInSafeMode();
-                int width = (int) toTransform.rect.width();
-                int height = (int) toTransform.rect.height();
                 mHeaderBar.onTaskViewSizeChanged(width, height);
                 if (RecentsDebugFlags.Static.EnableTransitionThumbnailDebugMode) {
                     return RecentsTransitionHelper.drawViewIntoGraphicBuffer(width, mTaskBarHeight,
@@ -990,6 +1030,10 @@ public class RecentsImpl implements ActivityOptions.OnAnimationFinishedListener 
         launchState.launchedViaDragGesture = mDraggingInRecents;
         launchState.launchedToTaskId = runningTaskId;
         launchState.launchedWithAltTab = mTriggeredFromAltTab;
+
+        // Disable toggling of recents between starting the activity and it is visible and the app
+        // has started its transition into recents.
+        setWaitingForTransitionStart(useThumbnailTransition);
 
         // Preload the icon (this will be a null-op if we have preloaded the icon already in
         // preloadRecents())

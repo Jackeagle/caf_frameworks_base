@@ -698,6 +698,7 @@ public class BackupManagerService implements BackupManagerServiceInterface {
     final SparseArray<Operation> mCurrentOperations = new SparseArray<Operation>();
     final Object mCurrentOpLock = new Object();
     final Random mTokenGenerator = new Random();
+    final AtomicInteger mNextToken = new AtomicInteger();
 
     final SparseArray<AdbParams> mAdbBackupRestoreConfirmations = new SparseArray<AdbParams>();
 
@@ -770,15 +771,15 @@ public class BackupManagerService implements BackupManagerServiceInterface {
     @GuardedBy("mQueueLock")
     ArrayList<FullBackupEntry> mFullBackupQueue;
 
-    // Utility: build a new random integer token
+    // Utility: build a new random integer token.  The low bits are the ordinal of the
+    // operation for near-time uniqueness, and the upper bits are random for app-
+    // side unpredictability.
     @Override
     public int generateRandomIntegerToken() {
-        int token;
-        do {
-            synchronized (mTokenGenerator) {
-                token = mTokenGenerator.nextInt();
-            }
-        } while (token < 0);
+        int token = mTokenGenerator.nextInt();
+        if (token < 0) token = -token;
+        token &= ~0xFF;
+        token |= (mNextToken.incrementAndGet() & 0xFF);
         return token;
     }
 
@@ -1447,52 +1448,23 @@ public class BackupManagerService implements BackupManagerServiceInterface {
         // rebooted in the middle of an operation that was removing something from
         // this log, we sanity-check its contents here and reconstruct it.
         mEverStored = new File(mBaseStateDir, "processed");
-        File tempProcessedFile = new File(mBaseStateDir, "processed.new");
-
-        // If we were in the middle of removing something from the ever-backed-up
-        // file, there might be a transient "processed.new" file still present.
-        // Ignore it -- we'll validate "processed" against the current package set.
-        if (tempProcessedFile.exists()) {
-            tempProcessedFile.delete();
-        }
 
         // If there are previous contents, parse them out then start a new
         // file to continue the recordkeeping.
         if (mEverStored.exists()) {
-            DataOutputStream temp = null;
-            DataInputStream in = null;
-
-            try {
-                temp = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(
-                        tempProcessedFile)));
-                in = new DataInputStream(new BufferedInputStream(new FileInputStream(mEverStored)));
+            try (DataInputStream in = new DataInputStream(
+                    new BufferedInputStream(new FileInputStream(mEverStored)))) {
 
                 // Loop until we hit EOF
                 while (true) {
                     String pkg = in.readUTF();
-                    try {
-                        // is this package still present?
-                        mPackageManager.getPackageInfo(pkg, 0);
-                        // if we get here then yes it is; remember it
-                        mEverStoredApps.add(pkg);
-                        temp.writeUTF(pkg);
-                        if (MORE_DEBUG) Slog.v(TAG, "   + " + pkg);
-                    } catch (NameNotFoundException e) {
-                        // nope, this package was uninstalled; don't include it
-                        if (MORE_DEBUG) Slog.v(TAG, "   - " + pkg);
-                    }
+                    mEverStoredApps.add(pkg);
+                    if (MORE_DEBUG) Slog.v(TAG, "   + " + pkg);
                 }
             } catch (EOFException e) {
-                // Once we've rewritten the backup history log, atomically replace the
-                // old one with the new one then reopen the file for continuing use.
-                if (!tempProcessedFile.renameTo(mEverStored)) {
-                    Slog.e(TAG, "Error renaming " + tempProcessedFile + " to " + mEverStored);
-                }
+                // Done
             } catch (IOException e) {
                 Slog.e(TAG, "Error in processed file", e);
-            } finally {
-                try { if (temp != null) temp.close(); } catch (IOException e) {}
-                try { if (in != null) in.close(); } catch (IOException e) {}
             }
         }
 
@@ -2235,44 +2207,6 @@ public class BackupManagerService implements BackupManagerServiceInterface {
                 Slog.e(TAG, "Can't log backup of " + packageName + " to " + mEverStored);
             } finally {
                 try { if (out != null) out.close(); } catch (IOException e) {}
-            }
-        }
-    }
-
-    // Remove our awareness of having ever backed up the given package
-    void removeEverBackedUp(String packageName) {
-        if (DEBUG) Slog.v(TAG, "Removing backed-up knowledge of " + packageName);
-        if (MORE_DEBUG) Slog.v(TAG, "New set:");
-
-        synchronized (mEverStoredApps) {
-            // Rewrite the file and rename to overwrite.  If we reboot in the middle,
-            // we'll recognize on initialization time that the package no longer
-            // exists and fix it up then.
-            File tempKnownFile = new File(mBaseStateDir, "processed.new");
-            RandomAccessFile known = null;
-            try {
-                known = new RandomAccessFile(tempKnownFile, "rws");
-                mEverStoredApps.remove(packageName);
-                for (String s : mEverStoredApps) {
-                    known.writeUTF(s);
-                    if (MORE_DEBUG) Slog.v(TAG, "    " + s);
-                }
-                known.close();
-                known = null;
-                if (!tempKnownFile.renameTo(mEverStored)) {
-                    throw new IOException("Can't rename " + tempKnownFile + " to " + mEverStored);
-                }
-            } catch (IOException e) {
-                // Bad: we couldn't create the new copy.  For safety's sake we
-                // abandon the whole process and remove all what's-backed-up
-                // state entirely, meaning we'll force a backup pass for every
-                // participant on the next boot or [re]install.
-                Slog.w(TAG, "Error rewriting " + mEverStored, e);
-                mEverStoredApps.clear();
-                tempKnownFile.delete();
-                mEverStored.delete();
-            } finally {
-                try { if (known != null) known.close(); } catch (IOException e) {}
             }
         }
     }
@@ -4875,6 +4809,7 @@ public class BackupManagerService implements BackupManagerServiceInterface {
                 final int N = mPackages.size();
                 final byte[] buffer = new byte[8192];
                 for (int i = 0; i < N; i++) {
+                    mBackupRunner = null;
                     PackageInfo currentPackage = mPackages.get(i);
                     String packageName = currentPackage.packageName;
                     if (DEBUG) {
@@ -5058,7 +4993,13 @@ public class BackupManagerService implements BackupManagerServiceInterface {
                         }
                         EventLog.writeEvent(EventLogTags.FULL_BACKUP_AGENT_FAILURE, packageName,
                                 "transport rejected");
-                        // Do nothing, clean up, and continue looping.
+                        // This failure state can come either a-priori from the transport, or
+                        // from the preflight pass.  If we got as far as preflight, we now need
+                        // to tear down the target process.
+                        if (mBackupRunner != null) {
+                            tearDownAgentAndKill(currentPackage.applicationInfo);
+                        }
+                        // ... and continue looping.
                     } else if (backupPackageStatus == BackupTransport.TRANSPORT_QUOTA_EXCEEDED) {
                         sendBackupOnPackageResult(mBackupObserver, packageName,
                                 BackupManager.ERROR_TRANSPORT_QUOTA_EXCEEDED);
@@ -5067,6 +5008,7 @@ public class BackupManagerService implements BackupManagerServiceInterface {
                             EventLog.writeEvent(EventLogTags.FULL_BACKUP_QUOTA_EXCEEDED,
                                     packageName);
                         }
+                        tearDownAgentAndKill(currentPackage.applicationInfo);
                         // Do nothing, clean up, and continue looping.
                     } else if (backupPackageStatus == BackupTransport.AGENT_ERROR) {
                         sendBackupOnPackageResult(mBackupObserver, packageName,
@@ -5090,6 +5032,7 @@ public class BackupManagerService implements BackupManagerServiceInterface {
                         EventLog.writeEvent(EventLogTags.FULL_BACKUP_TRANSPORT_FAILURE);
                         // Abort entire backup pass.
                         backupRunStatus = BackupManager.ERROR_TRANSPORT_ABORTED;
+                        tearDownAgentAndKill(currentPackage.applicationInfo);
                         return;
                     } else {
                         // Success!

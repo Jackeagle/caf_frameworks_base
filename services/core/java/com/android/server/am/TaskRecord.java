@@ -1045,8 +1045,7 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
         }
         // We need to provide the current orientation of the display on which this task resides,
         // not the orientation of the task.
-        final int orientation =
-                getStack().mActivityContainer.mActivityDisplay.getConfiguration().orientation;
+        final int orientation = getStack().getDisplay().getConfiguration().orientation;
         return setLastThumbnailLocked(thumbnail, taskWidth, taskHeight, orientation);
     }
 
@@ -1112,6 +1111,19 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
         return intent != null ? intent : affinityIntent;
     }
 
+    /**
+     * @return Whether there are only fullscreen activities in this task.
+     */
+    boolean containsOnlyFullscreenActivities() {
+        for (int i = 0; i < mActivities.size(); i++) {
+            final ActivityRecord r = mActivities.get(i);
+            if (!r.finishing && !r.fullscreen) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Returns the first non-finishing activity from the root. */
     ActivityRecord getRootActivity() {
         for (int i = 0; i < mActivities.size(); i++) {
@@ -1145,6 +1157,17 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
             }
         }
         return null;
+    }
+
+    void getAllRunningVisibleActivitiesLocked(ArrayList<ActivityRecord> outActivities) {
+        if (mStack != null) {
+            for (int activityNdx = mActivities.size() - 1; activityNdx >= 0; --activityNdx) {
+                ActivityRecord r = mActivities.get(activityNdx);
+                if (!r.finishing && r.okToShowLocked() && r.visibleIgnoringKeyguard) {
+                    outActivities.add(r);
+                }
+            }
+        }
     }
 
     ActivityRecord topRunningActivityWithStartingWindowLocked() {
@@ -1569,7 +1592,8 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
      */
     boolean canBeLaunchedOnDisplay(int displayId) {
         return mService.mStackSupervisor.canPlaceEntityOnDisplay(displayId,
-                isResizeable(false /* checkSupportsPip */));
+                isResizeable(false /* checkSupportsPip */), -1 /* don't check PID */,
+                -1 /* don't check UID */, null /* activityInfo */);
     }
 
     /**

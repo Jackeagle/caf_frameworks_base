@@ -16,7 +16,6 @@
 
 package android.view;
 
-import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_PANEL;
 import static android.view.WindowManagerPolicy.APPLICATION_MEDIA_OVERLAY_SUBLAYER;
 import static android.view.WindowManagerPolicy.APPLICATION_MEDIA_SUBLAYER;
 import static android.view.WindowManagerPolicy.APPLICATION_PANEL_SUBLAYER;
@@ -729,7 +728,7 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                 mLocation[1] = getHeight();
 
                 mScreenRect.set(mWindowSpaceLeft, mWindowSpaceTop,
-                        mLocation[0], mLocation[1]);
+                        mWindowSpaceLeft + mLocation[0], mWindowSpaceTop + mLocation[1]);
 
                 if (mTranslator != null) {
                     mTranslator.translateRectInAppWindowToScreen(mScreenRect);
@@ -870,31 +869,6 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
             mCallbacks.toArray(callbacks);
         }
         return callbacks;
-    }
-
-    /**
-     * This method still exists only for compatibility reasons because some applications have relied
-     * on this method via reflection. See Issue 36345857 for details.
-     *
-     * @deprecated No platform code is using this method anymore.
-     * @hide
-     */
-    @Deprecated
-    public void setWindowType(int type) {
-        if (getContext().getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.O) {
-            throw new UnsupportedOperationException(
-                    "SurfaceView#setWindowType() has never been a public API.");
-        }
-
-        if (type == TYPE_APPLICATION_PANEL) {
-            Log.e(TAG, "If you are calling SurfaceView#setWindowType(TYPE_APPLICATION_PANEL) "
-                    + "just to make the SurfaceView to be placed on top of its window, you must "
-                    + "call setZOrderOnTop(true) instead.", new Throwable());
-            setZOrderOnTop(true);
-            return;
-        }
-        Log.e(TAG, "SurfaceView#setWindowType(int) is deprecated and now does nothing. "
-                + "type=" + type, new Throwable());
     }
 
     private void runOnUiThread(Runnable runnable) {

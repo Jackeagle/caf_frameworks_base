@@ -25,8 +25,10 @@ import com.android.internal.telephony.TelephonyProperties;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.HardwareUiLayout;
+import com.android.systemui.Interpolators;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.plugins.GlobalActions.GlobalActionsManager;
+import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.volume.VolumeDialogMotion.LogAccelerateInterpolator;
 import com.android.systemui.volume.VolumeDialogMotion.LogDecelerateInterpolator;
@@ -65,6 +67,8 @@ import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
+import android.util.MathUtils;
+import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -138,7 +142,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener, DialogIn
      * @param context everything needs a context :(
      */
     public GlobalActionsDialog(Context context, GlobalActionsManager windowManagerFuncs) {
-        mContext = context;
+        mContext = new ContextThemeWrapper(context, com.android.systemui.R.style.qs_theme);
         mWindowManagerFuncs = windowManagerFuncs;
         mAudioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
         mDreamManager = IDreamManager.Stub.asInterface(
@@ -676,10 +680,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener, DialogIn
     /** {@inheritDoc} */
     public void onClick(DialogInterface dialog, int which) {
         Action item = mAdapter.getItem(which);
-        if ((item instanceof PowerAction)
-                || (item instanceof RestartAction)) {
-            if (mDialog != null) mDialog.fadeOut();
-        } else if (!(item instanceof SilentModeTriStateAction)) {
+        if (!(item instanceof SilentModeTriStateAction)) {
             dialog.dismiss();
         }
         item.onPress();
@@ -1221,7 +1222,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener, DialogIn
         public ActionsDialog(Context context, OnClickListener clickListener, MyAdapter adapter,
                 OnItemLongClickListener longClickListener) {
             super(context, com.android.systemui.R.style.Theme_SystemUI_Dialog_GlobalActions);
-            mContext = getContext();
+            mContext = context;
             mAdapter = adapter;
             mClickListener = clickListener;
             mLongClickListener = longClickListener;
@@ -1233,8 +1234,8 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener, DialogIn
             window.requestFeature(Window.FEATURE_NO_TITLE);
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND
                     | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR);
-            window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            window.addFlags(
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                     | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                     | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                     | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
@@ -1291,7 +1292,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener, DialogIn
                     .alpha(1)
                     .translationX(0)
                     .setDuration(300)
-                    .setInterpolator(new LogDecelerateInterpolator())
+                    .setInterpolator(Interpolators.FAST_OUT_SLOW_IN)
                     .setUpdateListener(animation -> {
                         int alpha = (int) ((Float) animation.getAnimatedValue()
                                 * ScrimController.GRADIENT_SCRIM_ALPHA * 255);
@@ -1315,24 +1316,6 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener, DialogIn
                         int alpha = (int) ((1f - (Float) animation.getAnimatedValue())
                                 * ScrimController.GRADIENT_SCRIM_ALPHA * 255);
                         mGradientDrawable.setAlpha(alpha);
-                    })
-                    .start();
-        }
-
-        public void fadeOut() {
-            mHardwareLayout.setTranslationX(0);
-            mHardwareLayout.setAlpha(1);
-            mListView.animate()
-                    .alpha(0)
-                    .translationX(getAnimTranslation())
-                    .setDuration(300)
-                    .setInterpolator(new LogAccelerateInterpolator())
-                    .setUpdateListener(animation -> {
-                        float frac = animation.getAnimatedFraction();
-                        float alpha = frac *(ScrimController.GRADIENT_SCRIM_ALPHA_BUSY
-                                        - ScrimController.GRADIENT_SCRIM_ALPHA)
-                                + ScrimController.GRADIENT_SCRIM_ALPHA;
-                        mGradientDrawable.setAlpha((int) (alpha * 255));
                     })
                     .start();
         }

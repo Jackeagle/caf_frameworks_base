@@ -40,7 +40,7 @@ import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_NO_CERTIFIC
 import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_UNEXPECTED_EXCEPTION;
 import static android.os.Build.VERSION_CODES.O;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
-import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_ROTATE;
+import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_UNSPECIFIED;
 
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -50,6 +50,8 @@ import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageParserCacheHelper.ReadHelper;
+import android.content.pm.PackageParserCacheHelper.WriteHelper;
 import android.content.pm.split.DefaultSplitAssetLoader;
 import android.content.pm.split.SplitAssetDependencyLoader;
 import android.content.pm.split.SplitAssetLoader;
@@ -64,6 +66,7 @@ import android.os.FileUtils;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PatternMatcher;
+import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -120,6 +123,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 
@@ -145,13 +149,14 @@ public class PackageParser {
     private static final boolean DEBUG_JAR = false;
     private static final boolean DEBUG_PARSER = false;
     private static final boolean DEBUG_BACKUP = false;
+    private static final boolean LOG_PARSE_TIMINGS = Build.IS_DEBUGGABLE;
+    private static final int LOG_PARSE_TIMINGS_THRESHOLD_MS = 100;
 
     private static final String PROPERTY_CHILD_PACKAGES_ENABLED =
             "persist.sys.child_packages_enabled";
 
-    // TODO: Decide the correct default before O-MR1.
     private static final boolean MULTI_PACKAGE_APK_ENABLED = Build.IS_DEBUGGABLE &&
-            SystemProperties.getBoolean(PROPERTY_CHILD_PACKAGES_ENABLED, true);
+            SystemProperties.getBoolean(PROPERTY_CHILD_PACKAGES_ENABLED, false);
 
     private static final int MAX_PACKAGES_PER_APK = 5;
 
@@ -202,6 +207,8 @@ public class PackageParser {
     // Temporary workaround; allow meta-data to expose components to instant apps
     private static final String META_DATA_INSTANT_APPS = "instantapps.clients.allowed";
 
+    private static final String METADATA_MAX_ASPECT_RATIO = "android.max_aspect";
+
     /**
      * Bit mask of all the valid bits that can be set in recreateOnConfigChanges.
      * @hide
@@ -229,6 +236,11 @@ public class PackageParser {
     }
 
     private static final boolean LOG_UNSAFE_BROADCASTS = false;
+
+    /**
+     * Total number of packages that were read from the cache.  We use it only for logging.
+     */
+    public static final AtomicInteger sCachedPackageReadCount = new AtomicInteger();
 
     // Set of broadcast actions that are safe for manifest receivers
     private static final Set<String> SAFE_BROADCASTS = new ArraySet<>();
@@ -416,12 +428,9 @@ public class PackageParser {
         public final boolean extractNativeLibs;
         public final boolean isolatedSplits;
 
-        public final String classLoaderName;
-        public final String[] splitClassLoaderNames;
-
         public PackageLite(String codePath, ApkLite baseApk, String[] splitNames,
                 boolean[] isFeatureSplits, String[] usesSplitNames, String[] configForSplit,
-                String[] splitCodePaths, int[] splitRevisionCodes, String[] splitClassLoaderNames) {
+                String[] splitCodePaths, int[] splitRevisionCodes) {
             this.packageName = baseApk.packageName;
             this.versionCode = baseApk.versionCode;
             this.installLocation = baseApk.installLocation;
@@ -441,9 +450,6 @@ public class PackageParser {
             this.use32bitAbi = baseApk.use32bitAbi;
             this.extractNativeLibs = baseApk.extractNativeLibs;
             this.isolatedSplits = baseApk.isolatedSplits;
-
-            this.classLoaderName = baseApk.classLoaderName;
-            this.splitClassLoaderNames = splitClassLoaderNames;
         }
 
         public List<String> getAllCodePaths() {
@@ -478,14 +484,13 @@ public class PackageParser {
         public final boolean use32bitAbi;
         public final boolean extractNativeLibs;
         public final boolean isolatedSplits;
-        public final String classLoaderName;
 
         public ApkLite(String codePath, String packageName, String splitName, boolean isFeatureSplit,
                 String configForSplit, String usesSplitName, int versionCode, int revisionCode,
                 int installLocation, List<VerifierInfo> verifiers, Signature[] signatures,
                 Certificate[][] certificates, boolean coreApp, boolean debuggable,
                 boolean multiArch, boolean use32bitAbi, boolean extractNativeLibs,
-                boolean isolatedSplits, String classLoaderName) {
+                boolean isolatedSplits) {
             this.codePath = codePath;
             this.packageName = packageName;
             this.splitName = splitName;
@@ -504,7 +509,6 @@ public class PackageParser {
             this.use32bitAbi = use32bitAbi;
             this.extractNativeLibs = extractNativeLibs;
             this.isolatedSplits = isolatedSplits;
-            this.classLoaderName = classLoaderName;
         }
     }
 
@@ -663,6 +667,7 @@ public class PackageParser {
         pi.sharedUserLabel = p.mSharedUserLabel;
         pi.applicationInfo = generateApplicationInfo(p, flags, state, userId);
         pi.installLocation = p.installLocation;
+        pi.isStub = p.isStub;
         pi.coreApp = p.coreApp;
         if ((pi.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM) != 0
                 || (pi.applicationInfo.flags&ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0) {
@@ -872,7 +877,7 @@ public class PackageParser {
         final ApkLite baseApk = parseApkLite(packageFile, flags);
         final String packagePath = packageFile.getAbsolutePath();
         Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
-        return new PackageLite(packagePath, baseApk, null, null, null, null, null, null, null);
+        return new PackageLite(packagePath, baseApk, null, null, null, null, null, null);
     }
 
     static PackageLite parseClusterPackageLite(File packageDir, int flags)
@@ -943,7 +948,6 @@ public class PackageParser {
             configForSplits = new String[size];
             splitCodePaths = new String[size];
             splitRevisionCodes = new int[size];
-            splitClassLoaderNames = new String[size];
 
             splitNames = apks.keySet().toArray(splitNames);
             Arrays.sort(splitNames, sSplitNameComparator);
@@ -955,13 +959,12 @@ public class PackageParser {
                 configForSplits[i] = apk.configForSplit;
                 splitCodePaths[i] = apk.codePath;
                 splitRevisionCodes[i] = apk.revisionCode;
-                splitClassLoaderNames[i] = apk.classLoaderName;
             }
         }
 
         final String codePath = packageDir.getAbsolutePath();
         return new PackageLite(codePath, baseApk, splitNames, isFeatureSplits, usesSplitNames,
-                configForSplits, splitCodePaths, splitRevisionCodes, splitClassLoaderNames);
+                configForSplits, splitCodePaths, splitRevisionCodes);
     }
 
     /**
@@ -990,14 +993,23 @@ public class PackageParser {
             return parsed;
         }
 
+        long parseTime = LOG_PARSE_TIMINGS ? SystemClock.uptimeMillis() : 0;
         if (packageFile.isDirectory()) {
             parsed = parseClusterPackage(packageFile, flags);
         } else {
             parsed = parseMonolithicPackage(packageFile, flags);
         }
 
+        long cacheTime = LOG_PARSE_TIMINGS ? SystemClock.uptimeMillis() : 0;
         cacheResult(packageFile, flags, parsed);
-
+        if (LOG_PARSE_TIMINGS) {
+            parseTime = cacheTime - parseTime;
+            cacheTime = SystemClock.uptimeMillis() - cacheTime;
+            if (parseTime + cacheTime > LOG_PARSE_TIMINGS_THRESHOLD_MS) {
+                Slog.i(TAG, "Parse times for '" + packageFile + "': parse=" + parseTime
+                        + "ms, update_cache=" + cacheTime + " ms");
+            }
+        }
         return parsed;
     }
 
@@ -1020,21 +1032,45 @@ public class PackageParser {
     }
 
     @VisibleForTesting
-    protected Package fromCacheEntry(byte[] bytes) throws IOException {
-        Parcel p = Parcel.obtain();
+    protected Package fromCacheEntry(byte[] bytes) {
+        return fromCacheEntryStatic(bytes);
+    }
+
+    /** static version of {@link #fromCacheEntry} for unit tests. */
+    @VisibleForTesting
+    public static Package fromCacheEntryStatic(byte[] bytes) {
+        final Parcel p = Parcel.obtain();
         p.unmarshall(bytes, 0, bytes.length);
         p.setDataPosition(0);
 
+        final ReadHelper helper = new ReadHelper(p);
+        helper.startAndInstall();
+
         PackageParser.Package pkg = new PackageParser.Package(p);
+
         p.recycle();
+
+        sCachedPackageReadCount.incrementAndGet();
 
         return pkg;
     }
 
     @VisibleForTesting
-    protected byte[] toCacheEntry(Package pkg) throws IOException {
-        Parcel p = Parcel.obtain();
+    protected byte[] toCacheEntry(Package pkg) {
+        return toCacheEntryStatic(pkg);
+
+    }
+
+    /** static version of {@link #toCacheEntry} for unit tests. */
+    @VisibleForTesting
+    public static byte[] toCacheEntryStatic(Package pkg) {
+        final Parcel p = Parcel.obtain();
+        final WriteHelper helper = new WriteHelper(p);
+
         pkg.writeToParcel(p, 0 /* flags */);
+
+        helper.finishAndUninstall();
+
         byte[] serialized = p.marshall();
         p.recycle();
 
@@ -1131,13 +1167,7 @@ public class PackageParser {
             }
         }
 
-        final byte[] cacheEntry;
-        try {
-            cacheEntry = toCacheEntry(parsed);
-        } catch (IOException ioe) {
-            Slog.e(TAG, "Unable to serialize parsed package for: " + packageFile);
-            return;
-        }
+        final byte[] cacheEntry = toCacheEntry(parsed);
 
         if (cacheEntry == null) {
             return;
@@ -1199,8 +1229,7 @@ public class PackageParser {
                 pkg.splitPrivateFlags = new int[num];
                 pkg.applicationInfo.splitNames = pkg.splitNames;
                 pkg.applicationInfo.splitDependencies = splitDependencies;
-                pkg.applicationInfo.classLoaderName = lite.classLoaderName;
-                pkg.applicationInfo.splitClassLoaderNames = lite.splitClassLoaderNames;
+                pkg.applicationInfo.splitClassLoaderNames = new String[num];
 
                 for (int i = 0; i < num; i++) {
                     final AssetManager splitAssets = assetLoader.getSplitAssetManager(i);
@@ -1814,7 +1843,6 @@ public class PackageParser {
         boolean isFeatureSplit = false;
         String configForSplit = null;
         String usesSplitName = null;
-        String classLoaderName = null;
 
         for (int i = 0; i < attrs.getAttributeCount(); i++) {
             final String attr = attrs.getAttributeName(i);
@@ -1871,14 +1899,6 @@ public class PackageParser {
                     if ("extractNativeLibs".equals(attr)) {
                         extractNativeLibs = attrs.getAttributeBooleanValue(i, true);
                     }
-                    if ("classLoader".equals(attr)) {
-                        classLoaderName = attrs.getAttributeValue(i);
-                        if (!ClassLoaderFactory.isValidClassLoaderName(classLoaderName)) {
-                            throw new PackageParserException(
-                                    PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED,
-                                    "Invalid class loader name: " + classLoaderName);
-                        }
-                    }
                 }
             } else if (TAG_USES_SPLIT.equals(parser.getName())) {
                 if (usesSplitName != null) {
@@ -1898,7 +1918,7 @@ public class PackageParser {
         return new ApkLite(codePath, packageSplit.first, packageSplit.second, isFeatureSplit,
                 configForSplit, usesSplitName, versionCode, revisionCode, installLocation,
                 verifiers, signatures, certificates, coreApp, debuggable, multiArch, use32bitAbi,
-                extractNativeLibs, isolatedSplits, classLoaderName);
+                extractNativeLibs, isolatedSplits);
     }
 
     /**
@@ -2961,7 +2981,7 @@ public class PackageParser {
         if (procSeq == null || procSeq.length() <= 0) {
             return defProc;
         }
-        return buildCompoundName(pkg, procSeq, "process", outError);
+        return TextUtils.safeIntern(buildCompoundName(pkg, procSeq, "process", outError));
     }
 
     private static String buildTaskAffinityName(String pkg, String defProc,
@@ -3215,11 +3235,11 @@ public class PackageParser {
         perm.info.protectionLevel = PermissionInfo.fixProtectionLevel(perm.info.protectionLevel);
 
         if ((perm.info.protectionLevel&PermissionInfo.PROTECTION_MASK_FLAGS) != 0) {
-            if ( (perm.info.protectionLevel&PermissionInfo.PROTECTION_FLAG_EPHEMERAL) == 0
+            if ( (perm.info.protectionLevel&PermissionInfo.PROTECTION_FLAG_INSTANT) == 0
                     && (perm.info.protectionLevel&PermissionInfo.PROTECTION_FLAG_RUNTIME_ONLY) == 0
                     && (perm.info.protectionLevel&PermissionInfo.PROTECTION_MASK_BASE) !=
                     PermissionInfo.PROTECTION_SIGNATURE) {
-                outError[0] = "<permission>  protectionLevel specifies a non-ephemeral flag but is "
+                outError[0] = "<permission>  protectionLevel specifies a non-instnat flag but is "
                         + "not based on signature type";
                 mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                 return false;
@@ -3650,6 +3670,13 @@ public class PackageParser {
         ai.uiOptions = sa.getInt(
                 com.android.internal.R.styleable.AndroidManifestApplication_uiOptions, 0);
 
+        ai.classLoaderName = sa.getString(
+            com.android.internal.R.styleable.AndroidManifestApplication_classLoader);
+        if (ai.classLoaderName != null
+                && !ClassLoaderFactory.isValidClassLoaderName(ai.classLoaderName)) {
+            outError[0] = "Invalid class loader name: " + ai.classLoaderName;
+        }
+
         sa.recycle();
 
         if (outError[0] != null) {
@@ -3662,6 +3689,7 @@ public class PackageParser {
         // getting added to the wrong package.
         final CachedComponentArgs cachedArgs = new CachedComponentArgs();
         int type;
+
         while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
                 && (type != XmlPullParser.END_TAG || parser.getDepth() > innerDepth)) {
             if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
@@ -3839,7 +3867,11 @@ public class PackageParser {
             }
         }
 
-        modifySharedLibrariesForBackwardCompatibility(owner);
+        // Must be ran after the entire {@link ApplicationInfo} has been fully processed and after
+        // every activity info has had a chance to set it from its attributes.
+        setMaxAspectRatio(owner);
+
+        PackageBackwardCompatibility.modifySharedLibraries(owner);
 
         if (hasDomainURLs(owner)) {
             owner.applicationInfo.privateFlags |= ApplicationInfo.PRIVATE_FLAG_HAS_DOMAIN_URLS;
@@ -3848,18 +3880,6 @@ public class PackageParser {
         }
 
         return true;
-    }
-
-    private static void modifySharedLibrariesForBackwardCompatibility(Package owner) {
-        // "org.apache.http.legacy" is now a part of the boot classpath so it doesn't need
-        // to be an explicit dependency.
-        //
-        // A future change will remove this library from the boot classpath, at which point
-        // all apps that target SDK 21 and earlier will have it automatically added to their
-        // dependency lists.
-        owner.usesLibraries = ArrayUtils.remove(owner.usesLibraries, "org.apache.http.legacy");
-        owner.usesOptionalLibraries = ArrayUtils.remove(owner.usesOptionalLibraries,
-                "org.apache.http.legacy");
     }
 
     /**
@@ -3904,6 +3924,16 @@ public class PackageParser {
         if (sa.getBoolean(
                 com.android.internal.R.styleable.AndroidManifestApplication_hasCode, true)) {
             owner.splitFlags[splitIndex] |= ApplicationInfo.FLAG_HAS_CODE;
+        }
+
+        final String classLoaderName = sa.getString(
+                com.android.internal.R.styleable.AndroidManifestApplication_classLoader);
+        if (classLoaderName == null || ClassLoaderFactory.isValidClassLoaderName(classLoaderName)) {
+            owner.applicationInfo.splitClassLoaderNames[splitIndex] = classLoaderName;
+        } else {
+            outError[0] = "Invalid class loader name: " + classLoaderName;
+            mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+            return false;
         }
 
         final int innerDepth = parser.getDepth();
@@ -4286,7 +4316,12 @@ public class PackageParser {
                 a.info.flags |= FLAG_ALWAYS_FOCUSABLE;
             }
 
-            setActivityMaxAspectRatio(a.info, sa, owner);
+            if (sa.hasValue(R.styleable.AndroidManifestActivity_maxAspectRatio)
+                    && sa.getType(R.styleable.AndroidManifestActivity_maxAspectRatio)
+                    == TypedValue.TYPE_FLOAT) {
+                a.setMaxAspectRatio(sa.getFloat(R.styleable.AndroidManifestActivity_maxAspectRatio,
+                        0 /*default*/));
+            }
 
             a.info.lockTaskLaunchMode =
                     sa.getInt(R.styleable.AndroidManifestActivity_lockTaskMode, 0);
@@ -4299,7 +4334,7 @@ public class PackageParser {
                 sa.getString(R.styleable.AndroidManifestActivity_enableVrMode);
 
             a.info.rotationAnimation =
-                sa.getInt(R.styleable.AndroidManifestActivity_rotationAnimation, ROTATION_ANIMATION_ROTATE);
+                sa.getInt(R.styleable.AndroidManifestActivity_rotationAnimation, ROTATION_ANIMATION_UNSPECIFIED);
 
             a.info.colorMode = sa.getInt(R.styleable.AndroidManifestActivity_colorMode,
                     ActivityInfo.COLOR_MODE_DEFAULT);
@@ -4533,28 +4568,40 @@ public class PackageParser {
         }
     }
 
-    private void setActivityMaxAspectRatio(ActivityInfo aInfo, TypedArray sa, Package owner) {
-        if (aInfo.resizeMode == RESIZE_MODE_RESIZEABLE
-                || aInfo.resizeMode == RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION) {
-            // Resizeable activities can be put in any aspect ratio.
-            aInfo.maxAspectRatio = 0;
-            return;
-        }
-
+    /**
+     * Sets every the max aspect ratio of every child activity that doesn't already have an aspect
+     * ratio set.
+     */
+    private void setMaxAspectRatio(Package owner) {
         // Default to (1.86) 16.7:9 aspect ratio for pre-O apps and unset for O and greater.
         // NOTE: 16.7:9 was the max aspect ratio Android devices can support pre-O per the CDD.
-        float defaultMaxAspectRatio = owner.applicationInfo.targetSdkVersion < O
+        float maxAspectRatio = owner.applicationInfo.targetSdkVersion < O
                 ? DEFAULT_PRE_O_MAX_ASPECT_RATIO : 0;
-        if (owner.applicationInfo.maxAspectRatio != 0 ) {
+
+        if (owner.applicationInfo.maxAspectRatio != 0) {
             // Use the application max aspect ration as default if set.
-            defaultMaxAspectRatio = owner.applicationInfo.maxAspectRatio;
+            maxAspectRatio = owner.applicationInfo.maxAspectRatio;
+        } else if (owner.mAppMetaData != null
+                && owner.mAppMetaData.containsKey(METADATA_MAX_ASPECT_RATIO)) {
+            maxAspectRatio = owner.mAppMetaData.getFloat(METADATA_MAX_ASPECT_RATIO, maxAspectRatio);
         }
 
-        aInfo.maxAspectRatio = sa.getFloat(
-                R.styleable.AndroidManifestActivity_maxAspectRatio, defaultMaxAspectRatio);
-        if (aInfo.maxAspectRatio < 1.0f && aInfo.maxAspectRatio != 0) {
-            // Ignore any value lesser than 1.0.
-            aInfo.maxAspectRatio = 0;
+        for (Activity activity : owner.activities) {
+            // If the max aspect ratio for the activity has already been set, skip.
+            if (activity.hasMaxAspectRatio()) {
+                continue;
+            }
+
+            // By default we prefer to use a values defined on the activity directly than values
+            // defined on the application. We do not check the styled attributes on the activity
+            // as it would have already been set when we processed the activity. We wait to process
+            // the meta data here since this method is called at the end of processing the
+            // application and all meta data is guaranteed.
+            final float activityAspectRatio = activity.metaData != null
+                    ? activity.metaData.getFloat(METADATA_MAX_ASPECT_RATIO, maxAspectRatio)
+                    : maxAspectRatio;
+
+            activity.setMaxAspectRatio(activityAspectRatio);
         }
     }
 
@@ -4696,6 +4743,7 @@ public class PackageParser {
         info.windowLayout = target.info.windowLayout;
         info.resizeMode = target.info.resizeMode;
         info.maxAspectRatio = target.info.maxAspectRatio;
+
         info.encryptionAware = info.directBootAware = target.info.directBootAware;
 
         Activity a = new Activity(cachedArgs.mActivityAliasArgs, info);
@@ -5866,10 +5914,10 @@ public class PackageParser {
 
         public byte[] restrictUpdateHash;
 
-        /**
-         * Set if the app or any of its components are visible to Instant Apps.
-         */
+        /** Set if the app or any of its components are visible to instant applications. */
         public boolean visibleToInstantApps;
+        /** Whether or not the package is a stub and must be replaced by the full version. */
+        public boolean isStub;
 
         public Package(String packageName) {
             this.packageName = packageName;
@@ -6395,8 +6443,11 @@ public class PackageParser {
 
             dest.writeStringList(requestedPermissions);
             dest.writeStringList(protectedBroadcasts);
+
+            // TODO: This doesn't work: b/64295061
             dest.writeParcelable(parentPackage, flags);
             dest.writeParcelableList(childPackages, flags);
+
             dest.writeString(staticSharedLibName);
             dest.writeInt(staticSharedLibVersion);
             dest.writeStringList(libraryNames);
@@ -6875,6 +6926,11 @@ public class PackageParser {
         } else {
             ai.privateFlags &= ~ApplicationInfo.PRIVATE_FLAG_INSTANT;
         }
+        if (state.virtualPreload) {
+            ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_VIRTUAL_PRELOAD;
+        } else {
+            ai.privateFlags &= ~ApplicationInfo.PRIVATE_FLAG_VIRTUAL_PRELOAD;
+        }
         if (state.hidden) {
             ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_HIDDEN;
         } else {
@@ -6980,6 +7036,11 @@ public class PackageParser {
 
     public final static class Activity extends Component<ActivityIntentInfo> implements Parcelable {
         public final ActivityInfo info;
+        private boolean mHasMaxAspectRatio;
+
+        private boolean hasMaxAspectRatio() {
+            return mHasMaxAspectRatio;
+        }
 
         public Activity(final ParseComponentArgs args, final ActivityInfo _info) {
             super(args, _info);
@@ -6990,6 +7051,23 @@ public class PackageParser {
         public void setPackageName(String packageName) {
             super.setPackageName(packageName);
             info.packageName = packageName;
+        }
+
+
+        private void setMaxAspectRatio(float maxAspectRatio) {
+            if (info.resizeMode == RESIZE_MODE_RESIZEABLE
+                    || info.resizeMode == RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION) {
+                // Resizeable activities can be put in any aspect ratio.
+                return;
+            }
+
+            if (maxAspectRatio < 1.0f && maxAspectRatio != 0) {
+                // Ignore any value lesser than 1.0.
+                return;
+            }
+
+            info.maxAspectRatio = maxAspectRatio;
+            mHasMaxAspectRatio = true;
         }
 
         public String toString() {
@@ -7011,11 +7089,13 @@ public class PackageParser {
         public void writeToParcel(Parcel dest, int flags) {
             super.writeToParcel(dest, flags);
             dest.writeParcelable(info, flags | Parcelable.PARCELABLE_ELIDE_DUPLICATES);
+            dest.writeBoolean(mHasMaxAspectRatio);
         }
 
         private Activity(Parcel in) {
             super(in);
             info = in.readParcelable(Object.class.getClassLoader());
+            mHasMaxAspectRatio = in.readBoolean();
 
             for (ActivityIntentInfo aii : intents) {
                 aii.activity = this;

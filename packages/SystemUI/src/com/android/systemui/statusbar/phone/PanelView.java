@@ -24,6 +24,8 @@ import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.SystemClock;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.InputDevice;
@@ -99,6 +101,7 @@ public abstract class PanelView extends FrameLayout {
     private FlingAnimationUtils mFlingAnimationUtilsClosing;
     private FlingAnimationUtils mFlingAnimationUtilsDismissing;
     private FalsingManager mFalsingManager;
+    private final Vibrator mVibrator;
 
     /**
      * For PanelView fling perflock call
@@ -207,6 +210,7 @@ public abstract class PanelView extends FrameLayout {
                 getResources().getBoolean(R.bool.config_enableNotificationShadeDrag);
 
         mPerf = new BoostFramework();
+        mVibrator = mContext.getSystemService(Vibrator.class);
     }
 
     protected void loadDimens() {
@@ -398,6 +402,7 @@ public abstract class PanelView extends FrameLayout {
         runPeekAnimation(INITIAL_OPENING_PEEK_DURATION, getOpeningHeight(),
                 false /* collapseWhenFinished */);
         notifyBarPanelExpansionChanged();
+        mVibrator.vibrate(VibrationEffect.get(VibrationEffect.EFFECT_CLICK));
     }
 
     protected abstract float getOpeningHeight();

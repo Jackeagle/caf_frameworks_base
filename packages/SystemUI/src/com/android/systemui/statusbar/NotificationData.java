@@ -89,6 +89,7 @@ public class NotificationData {
         private int mCachedContrastColor = COLOR_INVALID;
         private int mCachedContrastColorIsFor = COLOR_INVALID;
         private InflationTask mRunningTask = null;
+        private Throwable mDebugThrowable;
 
         public Entry(StatusBarNotification n) {
             this.key = n.getKey();
@@ -107,7 +108,6 @@ public class NotificationData {
          * Resets the notification entry to be re-used.
          */
         public void reset() {
-            lastFullScreenIntentLaunchTime = NOT_LAUNCHED_YET;
             if (row != null) {
                 row.reset();
             }
@@ -122,6 +122,7 @@ public class NotificationData {
         }
 
         public void notifyFullScreenIntentLaunched() {
+            setInterruption();
             lastFullScreenIntentLaunchTime = SystemClock.elapsedRealtime();
         }
 
@@ -248,6 +249,19 @@ public class NotificationData {
         @VisibleForTesting
         public InflationTask getRunningTask() {
             return mRunningTask;
+        }
+
+        /**
+         * Set a throwable that is used for debugging
+         *
+         * @param debugThrowable the throwable to save
+         */
+        public void setDebugThrowable(Throwable debugThrowable) {
+            mDebugThrowable = debugThrowable;
+        }
+
+        public Throwable getDebugThrowable() {
+            return mDebugThrowable;
         }
     }
 

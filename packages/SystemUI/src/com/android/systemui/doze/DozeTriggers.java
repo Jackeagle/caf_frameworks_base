@@ -103,8 +103,11 @@ public class DozeTriggers implements DozeMachine.Part {
     private void proximityCheckThenCall(IntConsumer callback,
             boolean alreadyPerformedProxCheck,
             int pulseReason) {
+        Boolean cachedProxFar = mDozeSensors.isProximityCurrentlyFar();
         if (alreadyPerformedProxCheck) {
             callback.accept(ProximityCheck.RESULT_NOT_CHECKED);
+        } else if (cachedProxFar != null) {
+            callback.accept(cachedProxFar ? ProximityCheck.RESULT_FAR : ProximityCheck.RESULT_NEAR);
         } else {
             final long start = SystemClock.uptimeMillis();
             new ProximityCheck() {
@@ -123,8 +126,9 @@ public class DozeTriggers implements DozeMachine.Part {
             float screenX, float screenY) {
         boolean isDoubleTap = pulseReason == DozeLog.PULSE_REASON_SENSOR_DOUBLE_TAP;
         boolean isPickup = pulseReason == DozeLog.PULSE_REASON_SENSOR_PICKUP;
+        boolean isLongPress = pulseReason == DozeLog.PULSE_REASON_SENSOR_LONG_PRESS;
 
-        if (mConfig.alwaysOnEnabled(UserHandle.USER_CURRENT)) {
+        if (mConfig.alwaysOnEnabled(UserHandle.USER_CURRENT) && !isLongPress) {
             proximityCheckThenCall((result) -> {
                 if (result == ProximityCheck.RESULT_NEAR) {
                     // In pocket, drop event.
@@ -158,10 +162,10 @@ public class DozeTriggers implements DozeMachine.Part {
         final boolean pausing = (state == DozeMachine.State.DOZE_AOD_PAUSING);
         final boolean aod = (state == DozeMachine.State.DOZE_AOD);
 
-        if (near && state == DozeMachine.State.DOZE_PULSING) {
-            if (DEBUG) Log.i(TAG, "Prox NEAR, ending pulse");
-            DozeLog.tracePulseCanceledByProx(mContext);
-            mMachine.requestState(DozeMachine.State.DOZE_PULSE_DONE);
+        if (state == DozeMachine.State.DOZE_PULSING) {
+            boolean ignoreTouch = near;
+            if (DEBUG) Log.i(TAG, "Prox changed, ignore touch = " + ignoreTouch);
+            mDozeHost.onIgnoreTouchWhilePulsing(ignoreTouch);
         }
         if (far && (paused || pausing)) {
             if (DEBUG) Log.i(TAG, "Prox FAR, unpausing AOD");
@@ -194,6 +198,7 @@ public class DozeTriggers implements DozeMachine.Part {
                 mDozeSensors.setListening(false);
                 break;
             case DOZE_PULSING:
+                mDozeSensors.setTouchscreenSensorsListening(false);
                 mDozeSensors.setProxListening(true);
                 break;
             case FINISH:

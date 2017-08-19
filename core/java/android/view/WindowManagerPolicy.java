@@ -16,6 +16,7 @@
 
 package android.view;
 
+import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.FIRST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
@@ -74,7 +75,6 @@ import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.os.RemoteException;
 import android.util.Slog;
 import android.view.animation.Animation;
@@ -149,6 +149,11 @@ public interface WindowManagerPolicy {
     // of some type are available.
     public final static int PRESENCE_INTERNAL = 1 << 0;
     public final static int PRESENCE_EXTERNAL = 1 << 1;
+
+    // Navigation bar position values
+    int NAV_BAR_LEFT = 1 << 0;
+    int NAV_BAR_RIGHT = 1 << 1;
+    int NAV_BAR_BOTTOM = 1 << 2;
 
     public final static boolean WATCH_POINTER = false;
 
@@ -612,7 +617,16 @@ public interface WindowManagerPolicy {
          * 2. motionEvent will be recycled after onPointerEvent returns so if it is needed later a
          * copy() must be made and the copy must be recycled.
          **/
-        public void onPointerEvent(MotionEvent motionEvent);
+        void onPointerEvent(MotionEvent motionEvent);
+
+        /**
+         * @see #onPointerEvent(MotionEvent)
+         **/
+        default void onPointerEvent(MotionEvent motionEvent, int displayId) {
+            if (displayId == DEFAULT_DISPLAY) {
+                onPointerEvent(motionEvent);
+            }
+        }
     }
 
     /** Window has been added to the screen. */
@@ -1312,12 +1326,12 @@ public interface WindowManagerPolicy {
     public boolean isScreenOn();
 
     /**
-     * @return whether the device is currently {@link PowerManager#isInteractive() interactive}.
+     * @return whether the device is currently allowed to animate.
      *
-     * Note: the screen can be on while the device is not interactive, e.g. when the device is
-     * showing Ambient Display.
+     * Note: this can be true even if it is not appropriate to animate for reasons that are outside
+     *       of the policy's authority.
      */
-    boolean isInteractive();
+    boolean okToAnimate();
 
     /**
      * Tell the policy that the lid switch has changed state.
@@ -1674,6 +1688,14 @@ public interface WindowManagerPolicy {
      * @return true if the navigation bar is forced to stay visible
      */
     public boolean isNavBarForcedShownLw(WindowState win);
+
+    /**
+     * @return The side of the screen where navigation bar is positioned.
+     * @see #NAV_BAR_LEFT
+     * @see #NAV_BAR_RIGHT
+     * @see #NAV_BAR_BOTTOM
+     */
+    int getNavBarPosition();
 
     /**
      * Calculates the insets for the areas that could never be removed in Honeycomb, i.e. system

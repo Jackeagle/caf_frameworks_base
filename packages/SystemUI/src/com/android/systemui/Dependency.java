@@ -16,6 +16,7 @@ package com.android.systemui;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.hardware.SensorManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -30,12 +31,16 @@ import com.android.settingslib.bluetooth.LocalBluetoothManager;
 import com.android.systemui.assist.AssistManager;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.fragments.FragmentService;
+import com.android.systemui.keyguard.ScreenLifecycle;
+import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.PluginActivityManager;
 import com.android.systemui.plugins.PluginDependencyProvider;
 import com.android.systemui.plugins.PluginManager;
 import com.android.systemui.plugins.PluginManagerImpl;
 import com.android.systemui.plugins.VolumeDialogController;
+import com.android.systemui.power.PowerNotificationWarnings;
+import com.android.systemui.power.PowerUI;
 import com.android.systemui.statusbar.phone.ConfigurationControllerImpl;
 import com.android.systemui.statusbar.phone.DarkIconDispatcherImpl;
 import com.android.systemui.statusbar.phone.ManagedProfileController;
@@ -82,6 +87,7 @@ import com.android.systemui.statusbar.policy.ZenModeControllerImpl;
 import com.android.systemui.tuner.TunablePadding.TunablePaddingService;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.tuner.TunerServiceImpl;
+import com.android.systemui.util.AsyncSensorManager;
 import com.android.systemui.util.leak.GarbageMonitor;
 import com.android.systemui.util.leak.LeakDetector;
 import com.android.systemui.util.leak.LeakReporter;
@@ -153,6 +159,9 @@ public class Dependency extends SystemUI {
         mProviders.put(ActivityStarter.class, () -> new ActivityStarterDelegate());
         mProviders.put(ActivityStarterDelegate.class, () ->
                 getDependency(ActivityStarter.class));
+
+        mProviders.put(AsyncSensorManager.class, () ->
+                new AsyncSensorManager(mContext.getSystemService(SensorManager.class)));
 
         mProviders.put(BluetoothController.class, () ->
                 new BluetoothControllerImpl(mContext, getDependency(BG_LOOPER)));
@@ -248,6 +257,12 @@ public class Dependency extends SystemUI {
         mProviders.put(StatusBarIconController.class, () ->
                 new StatusBarIconControllerImpl(mContext));
 
+        mProviders.put(ScreenLifecycle.class, () ->
+                new ScreenLifecycle());
+
+        mProviders.put(WakefulnessLifecycle.class, () ->
+                new WakefulnessLifecycle());
+
         mProviders.put(FragmentService.class, () ->
                 new FragmentService(mContext));
 
@@ -282,6 +297,8 @@ public class Dependency extends SystemUI {
 
         mProviders.put(PluginActivityManager.class,
                 () -> new PluginActivityManager(mContext, getDependency(PluginManager.class)));
+
+        mProviders.put(PowerUI.WarningsUI.class, () -> new PowerNotificationWarnings(mContext));
 
         // Put all dependencies above here so the factory can override them if it wants.
         SystemUIFactory.getInstance().injectDependencies(mProviders, mContext);

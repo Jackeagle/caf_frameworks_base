@@ -956,11 +956,6 @@ public class UsbDeviceManager {
                         Slog.i(TAG, "HOST_STATE connected:" + connected);
                     }
 
-                    if ((mHideUsbNotification && connected)
-                            || (!mHideUsbNotification && !connected)) {
-                        break;
-                    }
-
                     mHideUsbNotification = false;
                     while (devices.hasNext()) {
                         Map.Entry pair = (Map.Entry) devices.next();
@@ -1042,7 +1037,9 @@ public class UsbDeviceManager {
                     if (DEBUG) {
                         Slog.v(TAG, "Accessory mode enter timeout: " + mConnected);
                     }
-                    if (!mConnected) {
+                    if (!mConnected || !UsbManager.containsFunction(
+                            mCurrentFunctions,
+                            UsbManager.USB_FUNCTION_ACCESSORY)) {
                         notifyAccessoryModeExit();
                     }
                     break;
@@ -1061,12 +1058,22 @@ public class UsbDeviceManager {
 
         private void updateUsbNotification(boolean force) {
             if (mNotificationManager == null || !mUseUsbNotification
-                    || ("0".equals(SystemProperties.get("persist.charging.notify")))
-                    // Dont show the notification when connected to a USB peripheral
-                    // and the link does not support PR_SWAP and DR_SWAP
-                    || (mHideUsbNotification && !mSupportsAllCombinations)) {
+                    || ("0".equals(SystemProperties.get("persist.charging.notify")))) {
                 return;
             }
+
+            // Dont show the notification when connected to a USB peripheral
+            // and the link does not support PR_SWAP and DR_SWAP
+            if (mHideUsbNotification && !mSupportsAllCombinations) {
+                if (mUsbNotificationId != 0) {
+                    mNotificationManager.cancelAsUser(null, mUsbNotificationId,
+                            UserHandle.ALL);
+                    mUsbNotificationId = 0;
+                    Slog.d(TAG, "Clear notification");
+                }
+                return;
+            }
+
             int id = 0;
             int titleRes = 0;
             Resources r = mContext.getResources();
@@ -1117,6 +1124,7 @@ public class UsbDeviceManager {
                 if (mUsbNotificationId != 0) {
                     mNotificationManager.cancelAsUser(null, mUsbNotificationId,
                             UserHandle.ALL);
+                    Slog.d(TAG, "Clear notification");
                     mUsbNotificationId = 0;
                 }
                 if (id != 0) {
@@ -1155,8 +1163,7 @@ public class UsbDeviceManager {
                                         .usb_unsupported_audio_accessory_message);
                     }
 
-                    Notification notification =
-                            new Notification.Builder(mContext, channel)
+                    Notification.Builder builder = new Notification.Builder(mContext, channel)
                                     .setSmallIcon(com.android.internal.R.drawable.stat_sys_adb)
                                     .setWhen(0)
                                     .setOngoing(true)
@@ -1168,11 +1175,19 @@ public class UsbDeviceManager {
                                     .setContentTitle(title)
                                     .setContentText(message)
                                     .setContentIntent(pi)
-                                    .setVisibility(Notification.VISIBILITY_PUBLIC)
-                                    .build();
+                                    .setVisibility(Notification.VISIBILITY_PUBLIC);
+
+                    if (titleRes
+                            == com.android.internal.R.string
+                            .usb_unsupported_audio_accessory_title) {
+                        builder.setStyle(new Notification.BigTextStyle()
+                                .bigText(message));
+                    }
+                    Notification notification = builder.build();
 
                     mNotificationManager.notifyAsUser(null, id, notification,
                             UserHandle.ALL);
+                    Slog.d(TAG, "push notification:" + title);
                     mUsbNotificationId = id;
                 }
             }

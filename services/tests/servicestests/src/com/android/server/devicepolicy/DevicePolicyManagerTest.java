@@ -69,6 +69,7 @@ import android.os.Bundle;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.platform.test.annotations.Presubmit;
 import android.provider.Settings;
 import android.security.KeyChain;
 import android.telephony.TelephonyManager;
@@ -112,6 +113,7 @@ import java.util.concurrent.TimeUnit;
  * runtest -c com.android.server.devicepolicy.DevicePolicyManagerTest frameworks-services
  */
 @SmallTest
+@Presubmit
 public class DevicePolicyManagerTest extends DpmTestBase {
     private static final List<String> OWNER_SETUP_PERMISSIONS = Arrays.asList(
             permission.MANAGE_DEVICE_ADMINS, permission.MANAGE_PROFILE_AND_DEVICE_OWNERS,
@@ -380,74 +382,6 @@ public class DevicePolicyManagerTest extends DpmTestBase {
                 dpm.getActiveAdminsAsUser(DpmMockContext.CALLER_USER_HANDLE + 1)));
 
         mContext.callerPermissions.remove("android.permission.INTERACT_ACROSS_USERS_FULL");
-    }
-
-    public void testCreateAndManageUser_demoUserSystemApp() throws Exception {
-        mContext.callerPermissions.add(android.Manifest.permission.MANAGE_DEVICE_ADMINS);
-
-        setDeviceOwner();
-
-        final int id = UserHandle.getUserId(DpmMockContext.CALLER_UID);
-
-        final UserInfo demoUserInfo = mock(UserInfo.class);
-        demoUserInfo.id = id;
-        doReturn(UserHandle.of(id)).when(demoUserInfo).getUserHandle();
-        doReturn(true).when(demoUserInfo).isDemo();
-        final UserManager um = (UserManager) mContext.getSystemService(Context.USER_SERVICE);
-        doReturn(demoUserInfo).when(um).getUserInfo(id);
-        doReturn(demoUserInfo).when(mContext.getUserManagerInternal())
-                .createUserEvenWhenDisallowed(anyString(), anyInt());
-
-        final ApplicationInfo applicationInfo = getServices().ipackageManager.getApplicationInfo(
-                admin2.getPackageName(), PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS, id);
-        applicationInfo.flags = ApplicationInfo.FLAG_SYSTEM;
-        doReturn(applicationInfo).when(getServices().ipackageManager).getApplicationInfo(
-                anyString(), anyInt(), anyInt());
-
-        final UserHandle userHandle = dpm.createAndManageUser(admin1, "", admin2, null, 0);
-
-        verify(getServices().ipackageManager, times(1)).setApplicationEnabledSetting(
-                eq(admin2.getPackageName()),
-                eq(PackageManager.COMPONENT_ENABLED_STATE_ENABLED),
-                eq(PackageManager.DONT_KILL_APP),
-                eq(id),
-                anyString());
-
-        assertNotNull(userHandle);
-    }
-
-    public void testCreateAndManageUser_demoUserSystemUpdatedApp() throws Exception {
-        mContext.callerPermissions.add(android.Manifest.permission.MANAGE_DEVICE_ADMINS);
-
-        setDeviceOwner();
-
-        final int id = UserHandle.getUserId(DpmMockContext.CALLER_UID);
-
-        final UserInfo demoUserInfo = mock(UserInfo.class);
-        demoUserInfo.id = id;
-        doReturn(UserHandle.of(id)).when(demoUserInfo).getUserHandle();
-        doReturn(true).when(demoUserInfo).isDemo();
-        final UserManager um = (UserManager) mContext.getSystemService(Context.USER_SERVICE);
-        doReturn(demoUserInfo).when(um).getUserInfo(id);
-        doReturn(demoUserInfo).when(mContext.getUserManagerInternal())
-                .createUserEvenWhenDisallowed(anyString(), anyInt());
-
-        final ApplicationInfo applicationInfo = getServices().ipackageManager.getApplicationInfo(
-                admin2.getPackageName(), PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS, id);
-        applicationInfo.flags = ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
-        doReturn(applicationInfo).when(getServices().ipackageManager).getApplicationInfo(
-                anyString(), anyInt(), anyInt());
-
-        final UserHandle userHandle = dpm.createAndManageUser(admin1, "", admin2, null, 0);
-
-        verify(getServices().ipackageManager, times(1)).setApplicationEnabledSetting(
-                eq(admin2.getPackageName()),
-                eq(PackageManager.COMPONENT_ENABLED_STATE_ENABLED),
-                eq(PackageManager.DONT_KILL_APP),
-                eq(id),
-                anyString());
-
-        assertNotNull(userHandle);
     }
 
     public void testSetActiveAdmin_multiUsers() throws Exception {
