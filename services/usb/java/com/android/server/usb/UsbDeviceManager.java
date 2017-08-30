@@ -186,12 +186,12 @@ public class UsbDeviceManager {
                     Slog.v(TAG, "reverse status change to true");
                     mHandler.removeMessages(MSG_CAR_REVERSE_CHANGED);
                     Message tmp = Message.obtain(mHandler, MSG_CAR_REVERSE_CHANGED, 1, 0);
-                    mHandler.sendMessageDelayed(tmp, 800);
+                    mHandler.sendMessageDelayed(tmp, 200);
                 } else if("0".equals(reverse)) {
                     Slog.v(TAG, "reverse status change to false");
                     mHandler.removeMessages(MSG_CAR_REVERSE_CHANGED);
                     Message tmp = Message.obtain(mHandler, MSG_CAR_REVERSE_CHANGED, 0, 0);
-                    mHandler.sendMessageDelayed(tmp, 800);
+                    mHandler.sendMessageDelayed(tmp, 200);
                 } else {
                     Slog.v(TAG, "start show android ui");
                     SystemProperties.set("sys.earlycamera_finished", "1");
