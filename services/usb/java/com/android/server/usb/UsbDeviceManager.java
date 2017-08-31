@@ -858,6 +858,8 @@ public class UsbDeviceManager {
                     Slog.v(TAG, "send car reverse changed broadcast: " + (msg.arg1 != 0));
                     Intent tmp = new Intent("android.intent.action.CAR_REVERSE");
                     tmp.putExtra("reverse", (msg.arg1 != 0));
+                    tmp.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+                    tmp.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
                     mContext.sendBroadcast(tmp);
                     break;
             }
