@@ -17,7 +17,10 @@
 package com.android.server.connectivity.tethering;
 
 import static android.net.NetworkStats.SET_DEFAULT;
+import static android.net.NetworkStats.STATS_PER_IFACE;
+import static android.net.NetworkStats.STATS_PER_UID;
 import static android.net.NetworkStats.TAG_NONE;
+import static android.net.NetworkStats.UID_ALL;
 import static android.net.TrafficStats.UID_TETHERING;
 import static android.provider.Settings.Global.TETHER_OFFLOAD_DISABLED;
 import static com.android.server.connectivity.tethering.OffloadHardwareInterface.ForwardedStats;
@@ -76,6 +79,15 @@ import org.mockito.MockitoAnnotations;
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 public class OffloadControllerTest {
+    private static final String RNDIS0 = "test_rndis0";
+    private static final String RMNET0 = "test_rmnet_data0";
+    private static final String WLAN0 = "test_wlan0";
+
+    private static final String IPV6_LINKLOCAL = "fe80::/64";
+    private static final String IPV6_DOC_PREFIX = "2001:db8::/64";
+    private static final String IPV6_DISCARD_PREFIX = "100::/64";
+    private static final String USB_PREFIX = "192.168.42.0/24";
+    private static final String WIFI_PREFIX = "192.168.43.0/24";
 
     @Mock private OffloadHardwareInterface mHardware;
     @Mock private ApplicationInfo mApplicationInfo;
@@ -85,6 +97,8 @@ public class OffloadControllerTest {
             ArgumentCaptor.forClass(ArrayList.class);
     private final ArgumentCaptor<ITetheringStatsProvider.Stub> mTetherStatsProviderCaptor =
             ArgumentCaptor.forClass(ITetheringStatsProvider.Stub.class);
+    private final ArgumentCaptor<OffloadHardwareInterface.ControlCallback> mControlCallbackCaptor =
+            ArgumentCaptor.forClass(OffloadHardwareInterface.ControlCallback.class);
     private MockContentResolver mContentResolver;
 
     @Before public void setUp() {
@@ -103,9 +117,11 @@ public class OffloadControllerTest {
 
     private void setupFunctioningHardwareInterface() {
         when(mHardware.initOffloadConfig()).thenReturn(true);
-        when(mHardware.initOffloadControl(any(OffloadHardwareInterface.ControlCallback.class)))
+        when(mHardware.initOffloadControl(mControlCallbackCaptor.capture()))
                 .thenReturn(true);
+        when(mHardware.setUpstreamParameters(anyString(), any(), any(), any())).thenReturn(true);
         when(mHardware.getForwardedStats(any())).thenReturn(new ForwardedStats());
+        when(mHardware.setDataLimit(anyString(), anyLong())).thenReturn(true);
     }
 
     private void enableOffload() {
@@ -227,10 +243,8 @@ public class OffloadControllerTest {
         inOrder.verify(mHardware, times(1)).setLocalPrefixes(mStringArrayCaptor.capture());
         ArrayList<String> localPrefixes = mStringArrayCaptor.getValue();
         assertEquals(4, localPrefixes.size());
-        assertTrue(localPrefixes.contains("127.0.0.0/8"));
-        assertTrue(localPrefixes.contains("192.0.2.0/24"));
-        assertTrue(localPrefixes.contains("fe80::/64"));
-        assertTrue(localPrefixes.contains("2001:db8::/64"));
+        assertArrayListContains(localPrefixes,
+                "127.0.0.0/8", "192.0.2.0/24", "fe80::/64", "2001:db8::/64");
         inOrder.verifyNoMoreInteractions();
 
         offload.setUpstreamLinkProperties(null);
@@ -251,6 +265,7 @@ public class OffloadControllerTest {
         inOrder.verify(mHardware, never()).setLocalPrefixes(mStringArrayCaptor.capture());
         inOrder.verify(mHardware, times(1)).setUpstreamParameters(
                 eq(testIfName), eq(null), eq(null), eq(null));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         final String ipv4Addr = "192.0.2.5";
@@ -268,6 +283,7 @@ public class OffloadControllerTest {
         inOrder.verify(mHardware, times(1)).setUpstreamParameters(
                 eq(testIfName), eq(ipv4Addr), eq(null), eq(null));
         inOrder.verify(mHardware, times(1)).getForwardedStats(eq(testIfName));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         final String ipv4Gateway = "192.0.2.1";
@@ -278,6 +294,7 @@ public class OffloadControllerTest {
         inOrder.verify(mHardware, times(1)).setUpstreamParameters(
                 eq(testIfName), eq(ipv4Addr), eq(ipv4Gateway), eq(null));
         inOrder.verify(mHardware, times(1)).getForwardedStats(eq(testIfName));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         final String ipv6Gw1 = "fe80::cafe";
@@ -291,6 +308,7 @@ public class OffloadControllerTest {
         ArrayList<String> v6gws = mStringArrayCaptor.getValue();
         assertEquals(1, v6gws.size());
         assertTrue(v6gws.contains(ipv6Gw1));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         final String ipv6Gw2 = "fe80::d00d";
@@ -305,6 +323,7 @@ public class OffloadControllerTest {
         assertEquals(2, v6gws.size());
         assertTrue(v6gws.contains(ipv6Gw1));
         assertTrue(v6gws.contains(ipv6Gw2));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         final LinkProperties stacked = new LinkProperties();
@@ -323,6 +342,7 @@ public class OffloadControllerTest {
         assertEquals(2, v6gws.size());
         assertTrue(v6gws.contains(ipv6Gw1));
         assertTrue(v6gws.contains(ipv6Gw2));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         // Add in some IPv6 upstream info. When there is a tethered downstream
@@ -339,12 +359,9 @@ public class OffloadControllerTest {
         inOrder.verify(mHardware, times(1)).setLocalPrefixes(mStringArrayCaptor.capture());
         localPrefixes = mStringArrayCaptor.getValue();
         assertEquals(6, localPrefixes.size());
-        assertTrue(localPrefixes.contains("127.0.0.0/8"));
-        assertTrue(localPrefixes.contains("192.0.2.0/24"));
-        assertTrue(localPrefixes.contains("fe80::/64"));
-        assertTrue(localPrefixes.contains("2001:db8::/64"));
-        assertTrue(localPrefixes.contains("2001:db8::6173:7369:676e:6564/128"));
-        assertTrue(localPrefixes.contains("2001:db8::7261:6e64:6f6d/128"));
+        assertArrayListContains(localPrefixes,
+                "127.0.0.0/8", "192.0.2.0/24", "fe80::/64", "2001:db8::/64",
+                "2001:db8::6173:7369:676e:6564/128", "2001:db8::7261:6e64:6f6d/128");
         // The relevant parts of the LinkProperties have not changed, but at the
         // moment we do not de-dup upstream LinkProperties this carefully.
         inOrder.verify(mHardware, times(1)).setUpstreamParameters(
@@ -354,6 +371,7 @@ public class OffloadControllerTest {
         assertTrue(v6gws.contains(ipv6Gw1));
         assertTrue(v6gws.contains(ipv6Gw2));
         inOrder.verify(mHardware, times(1)).getForwardedStats(eq(testIfName));
+        inOrder.verify(mHardware, times(1)).setDataLimit(eq(testIfName), eq(Long.MAX_VALUE));
         inOrder.verifyNoMoreInteractions();
 
         // Completely identical LinkProperties updates are de-duped.
@@ -371,7 +389,6 @@ public class OffloadControllerTest {
         assertEquals(stats.txBytes, entry.txBytes);
         assertEquals(SET_DEFAULT, entry.set);
         assertEquals(TAG_NONE, entry.tag);
-        assertEquals(UID_TETHERING, entry.uid);
     }
 
     @Test
@@ -396,33 +413,64 @@ public class OffloadControllerTest {
         when(mHardware.getForwardedStats(eq(ethernetIface))).thenReturn(ethernetStats);
         when(mHardware.getForwardedStats(eq(mobileIface))).thenReturn(mobileStats);
 
+        InOrder inOrder = inOrder(mHardware);
+
         final LinkProperties lp = new LinkProperties();
         lp.setInterfaceName(ethernetIface);
         offload.setUpstreamLinkProperties(lp);
+        // Previous upstream was null, so no stats are fetched.
+        inOrder.verify(mHardware, never()).getForwardedStats(any());
 
         lp.setInterfaceName(mobileIface);
         offload.setUpstreamLinkProperties(lp);
+        // Expect that we fetch stats from the previous upstream.
+        inOrder.verify(mHardware, times(1)).getForwardedStats(eq(ethernetIface));
 
         lp.setInterfaceName(ethernetIface);
         offload.setUpstreamLinkProperties(lp);
+        // Expect that we fetch stats from the previous upstream.
+        inOrder.verify(mHardware, times(1)).getForwardedStats(eq(mobileIface));
 
+        ethernetStats = new ForwardedStats();
         ethernetStats.rxBytes = 100000;
         ethernetStats.txBytes = 100000;
+        when(mHardware.getForwardedStats(eq(ethernetIface))).thenReturn(ethernetStats);
         offload.setUpstreamLinkProperties(null);
+        // Expect that we fetch stats from the previous upstream.
+        inOrder.verify(mHardware, times(1)).getForwardedStats(eq(ethernetIface));
 
-        NetworkStats stats = mTetherStatsProviderCaptor.getValue().getTetherStats();
+        ITetheringStatsProvider provider = mTetherStatsProviderCaptor.getValue();
+        NetworkStats stats = provider.getTetherStats(STATS_PER_IFACE);
+        NetworkStats perUidStats = provider.getTetherStats(STATS_PER_UID);
+        waitForIdle();
+        // There is no current upstream, so no stats are fetched.
+        inOrder.verify(mHardware, never()).getForwardedStats(any());
+        inOrder.verify(mHardware, times(1)).setUpstreamParameters(
+                eq(null), eq(null), eq(null), eq(null));
+        inOrder.verifyNoMoreInteractions();
+
         assertEquals(2, stats.size());
+        assertEquals(2, perUidStats.size());
 
         NetworkStats.Entry entry = null;
+        for (int i = 0; i < stats.size(); i++) {
+            assertEquals(UID_ALL, stats.getValues(i, entry).uid);
+            assertEquals(UID_TETHERING, perUidStats.getValues(i, entry).uid);
+        }
+
         int ethernetPosition = ethernetIface.equals(stats.getValues(0, entry).iface) ? 0 : 1;
         int mobilePosition = 1 - ethernetPosition;
 
         entry = stats.getValues(mobilePosition, entry);
         assertNetworkStats(mobileIface, mobileStats, entry);
+        entry = perUidStats.getValues(mobilePosition, entry);
+        assertNetworkStats(mobileIface, mobileStats, entry);
 
         ethernetStats.rxBytes = 12345 + 100000;
         ethernetStats.txBytes = 54321 + 100000;
         entry = stats.getValues(ethernetPosition, entry);
+        assertNetworkStats(ethernetIface, ethernetStats, entry);
+        entry = perUidStats.getValues(ethernetPosition, entry);
         assertNetworkStats(ethernetIface, ethernetStats, entry);
     }
 
@@ -487,6 +535,95 @@ public class OffloadControllerTest {
         offload.setUpstreamLinkProperties(lp);
         provider.setInterfaceQuota(mobileIface, mobileLimit);
         waitForIdle();
+        inOrder.verify(mHardware).getForwardedStats(ethernetIface);
         inOrder.verify(mHardware).stopOffloadControl();
+    }
+
+    @Test
+    public void testDataLimitCallback() throws Exception {
+        setupFunctioningHardwareInterface();
+        enableOffload();
+
+        final OffloadController offload = makeOffloadController();
+        offload.start();
+
+        OffloadHardwareInterface.ControlCallback callback = mControlCallbackCaptor.getValue();
+        callback.onStoppedLimitReached();
+        verify(mNMService, times(1)).tetherLimitReached(mTetherStatsProviderCaptor.getValue());
+    }
+
+    @Test
+    public void testAddRemoveDownstreams() throws Exception {
+        setupFunctioningHardwareInterface();
+        enableOffload();
+
+        final OffloadController offload = makeOffloadController();
+        offload.start();
+
+        final InOrder inOrder = inOrder(mHardware);
+        inOrder.verify(mHardware, times(1)).initOffloadConfig();
+        inOrder.verify(mHardware, times(1)).initOffloadControl(
+                any(OffloadHardwareInterface.ControlCallback.class));
+        inOrder.verifyNoMoreInteractions();
+
+        // Tethering makes several calls to setLocalPrefixes() before add/remove
+        // downstream calls are made. This is not tested here; only the behavior
+        // of notifyDownstreamLinkProperties() and removeDownstreamInterface()
+        // are tested.
+
+        // [1] USB tethering is started.
+        final LinkProperties usbLinkProperties = new LinkProperties();
+        usbLinkProperties.setInterfaceName(RNDIS0);
+        usbLinkProperties.addLinkAddress(new LinkAddress("192.168.42.1/24"));
+        usbLinkProperties.addRoute(new RouteInfo(new IpPrefix(USB_PREFIX)));
+        offload.notifyDownstreamLinkProperties(usbLinkProperties);
+        inOrder.verify(mHardware, times(1)).addDownstreamPrefix(RNDIS0, USB_PREFIX);
+        inOrder.verifyNoMoreInteractions();
+
+        // [2] Routes for IPv6 link-local prefixes should never be added.
+        usbLinkProperties.addRoute(new RouteInfo(new IpPrefix(IPV6_LINKLOCAL)));
+        offload.notifyDownstreamLinkProperties(usbLinkProperties);
+        inOrder.verify(mHardware, never()).addDownstreamPrefix(eq(RNDIS0), anyString());
+        inOrder.verifyNoMoreInteractions();
+
+        // [3] Add an IPv6 prefix for good measure. Only new offload-able
+        // prefixes should be passed to the HAL.
+        usbLinkProperties.addLinkAddress(new LinkAddress("2001:db8::1/64"));
+        usbLinkProperties.addRoute(new RouteInfo(new IpPrefix(IPV6_DOC_PREFIX)));
+        offload.notifyDownstreamLinkProperties(usbLinkProperties);
+        inOrder.verify(mHardware, times(1)).addDownstreamPrefix(RNDIS0, IPV6_DOC_PREFIX);
+        inOrder.verifyNoMoreInteractions();
+
+        // [4] Adding addresses doesn't affect notifyDownstreamLinkProperties().
+        // The address is passed in by a separate setLocalPrefixes() invocation.
+        usbLinkProperties.addLinkAddress(new LinkAddress("2001:db8::2/64"));
+        offload.notifyDownstreamLinkProperties(usbLinkProperties);
+        inOrder.verify(mHardware, never()).addDownstreamPrefix(eq(RNDIS0), anyString());
+
+        // [5] Differences in local routes are converted into addDownstream()
+        // and removeDownstream() invocations accordingly.
+        usbLinkProperties.removeRoute(new RouteInfo(new IpPrefix(IPV6_DOC_PREFIX), null, RNDIS0));
+        usbLinkProperties.addRoute(new RouteInfo(new IpPrefix(IPV6_DISCARD_PREFIX)));
+        offload.notifyDownstreamLinkProperties(usbLinkProperties);
+        inOrder.verify(mHardware, times(1)).removeDownstreamPrefix(RNDIS0, IPV6_DOC_PREFIX);
+        inOrder.verify(mHardware, times(1)).addDownstreamPrefix(RNDIS0, IPV6_DISCARD_PREFIX);
+        inOrder.verifyNoMoreInteractions();
+
+        // [6] Removing a downstream interface which was never added causes no
+        // interactions with the HAL.
+        offload.removeDownstreamInterface(WLAN0);
+        inOrder.verifyNoMoreInteractions();
+
+        // [7] Removing an active downstream removes all remaining prefixes.
+        offload.removeDownstreamInterface(RNDIS0);
+        inOrder.verify(mHardware, times(1)).removeDownstreamPrefix(RNDIS0, USB_PREFIX);
+        inOrder.verify(mHardware, times(1)).removeDownstreamPrefix(RNDIS0, IPV6_DISCARD_PREFIX);
+        inOrder.verifyNoMoreInteractions();
+    }
+
+    private static void assertArrayListContains(ArrayList<String> list, String... elems) {
+        for (String element : elems) {
+            assertTrue(list.contains(element));
+        }
     }
 }

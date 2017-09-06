@@ -734,6 +734,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return mOwnerCanAddInternalSystemWindow;
     }
 
+    @Override
+    public boolean canAcquireSleepToken() {
+        return mSession.mCanAcquireSleepToken;
+    }
+
     /**
      * Subtracts the insets calculated by intersecting {@param layoutFrame} with {@param insetFrame}
      * from {@param frame}. In other words, it applies the insets that would result if
@@ -1479,7 +1484,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     // TODO: Another visibility method that was added late in the release to minimize risk.
     @Override
     public boolean canAffectSystemUiFlags() {
-        final boolean shown = mWinAnimator.getShown();
+        final boolean shown = mWinAnimator.getShown() && mWinAnimator.mShownAlpha > 0f;
 
         // We only consider the app to be exiting when the animation has started. After the app
         // transition is executed the windows are marked exiting before the new windows have been
@@ -1711,7 +1716,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final boolean adjustedForMinimizedDockOrIme = task != null
                 && (task.mStack.isAdjustedForMinimizedDockedStack()
                 || task.mStack.isAdjustedForIme());
-        if (mService.okToAnimate()
+        if (mToken.okToAnimate()
                 && (mAttrs.privateFlags & PRIVATE_FLAG_NO_MOVE_ANIMATION) == 0
                 && !isDragResizing() && !adjustedForMinimizedDockOrIme
                 && (task == null || getTask().mStack.hasMovementAnimations())
@@ -1880,7 +1885,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // First, see if we need to run an animation. If we do, we have to hold off on removing the
         // window until the animation is done. If the display is frozen, just remove immediately,
         // since the animation wouldn't be seen.
-        if (mHasSurface && mService.okToAnimate()) {
+        if (mHasSurface && mToken.okToAnimate()) {
             if (mWillReplaceWindow) {
                 // This window is going to be replaced. We need to keep it around until the new one
                 // gets added, then we will get rid of this one.
@@ -2315,7 +2320,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mLayoutNeeded = true;
         }
 
-        if (isDrawnLw() && mService.okToAnimate()) {
+        if (isDrawnLw() && mToken.okToAnimate()) {
             mWinAnimator.applyEnterAnimationLocked();
         }
     }
@@ -2471,7 +2476,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (doAnimation) {
             if (DEBUG_VISIBILITY) Slog.v(TAG, "doAnimation: mPolicyVisibility="
                     + mPolicyVisibility + " mAnimation=" + mWinAnimator.mAnimation);
-            if (!mService.okToAnimate()) {
+            if (!mToken.okToAnimate()) {
                 doAnimation = false;
             } else if (mPolicyVisibility && mWinAnimator.mAnimation == null) {
                 // Check for the case where we are currently visible and
@@ -2501,7 +2506,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     boolean hideLw(boolean doAnimation, boolean requestAnim) {
         if (doAnimation) {
-            if (!mService.okToAnimate()) {
+            if (!mToken.okToAnimate()) {
                 doAnimation = false;
             }
         }
@@ -3972,6 +3977,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         windowInfo.type = mAttrs.type;
         windowInfo.layer = mLayer;
         windowInfo.token = mClient.asBinder();
+        if (mAppToken != null) {
+            windowInfo.activityToken = mAppToken.appToken.asBinder();
+        }
         windowInfo.title = mAttrs.accessibilityTitle;
         windowInfo.accessibilityIdOfAnchor = mAttrs.accessibilityIdOfAnchor;
         windowInfo.focused = isFocused();

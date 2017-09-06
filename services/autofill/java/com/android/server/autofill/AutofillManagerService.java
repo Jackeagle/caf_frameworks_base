@@ -655,14 +655,16 @@ public final class AutofillManagerService extends SystemService {
         }
 
         @Override
-        public void dismissUi() {
-            final UserHandle user = getCallingUserHandle();
-
+        public void onPendingSaveUi(int operation, IBinder token) {
+            Preconditions.checkNotNull(token, "token");
+            Preconditions.checkArgument(operation == AutofillManager.PENDING_UI_OPERATION_CANCEL
+                    || operation == AutofillManager.PENDING_UI_OPERATION_RESTORE,
+                    "invalid operation: %d", operation);
             synchronized (mLock) {
                 final AutofillManagerServiceImpl service = peekServiceForUserLocked(
-                        user.getIdentifier());
+                        UserHandle.getCallingUserId());
                 if (service != null) {
-                    service.dismissUi();
+                    service.onPendingSaveUi(operation, token);
                 }
             }
         }

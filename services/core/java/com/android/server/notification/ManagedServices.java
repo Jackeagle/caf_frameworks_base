@@ -455,6 +455,11 @@ abstract public class ManagedServices {
         }
     }
 
+    public void onUserRemoved(int user) {
+        mApproved.remove(user);
+        rebindServices(true);
+    }
+
     public void onUserSwitched(int user) {
         if (DEBUG) Slog.d(TAG, "onUserSwitched u=" + user);
         if (Arrays.equals(mLastSeenProfileIds, mUserProfiles.getCurrentProfileIds())) {
@@ -877,6 +882,7 @@ abstract public class ManagedServices {
 
                 @Override
                 public void onServiceDisconnected(ComponentName name) {
+                    mServicesBinding.remove(servicesBindingTag);
                     Slog.v(TAG, getCaption() + " connection lost: " + name);
                 }
             };
@@ -889,6 +895,7 @@ abstract public class ManagedServices {
                 return;
             }
         } catch (SecurityException ex) {
+            mServicesBinding.remove(servicesBindingTag);
             Slog.e(TAG, "Unable to bind " + getCaption() + " service: " + intent, ex);
         }
     }

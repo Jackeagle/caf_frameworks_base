@@ -16,6 +16,7 @@
 
 package com.android.server.am;
 
+import static android.Manifest.permission.ACTIVITY_EMBEDDING;
 import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
 import static android.Manifest.permission.START_ANY_ACTIVITY;
 import static android.Manifest.permission.START_TASKS_FROM_RECENTS;
@@ -35,6 +36,7 @@ import static android.app.ActivityManager.StackId.PINNED_STACK_ID;
 import static android.app.ActivityManager.StackId.RECENTS_STACK_ID;
 import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SECONDARY_DISPLAY;
 import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SPLIT_SCREEN;
+import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.PowerManager.PARTIAL_WAKE_LOCK;
@@ -57,7 +59,6 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_STACK;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_STATES;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_SWITCH;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_TASKS;
-import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_CONTAINERS;
 import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_FOCUS;
 import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_IDLE;
 import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_LOCKTASK;
@@ -105,6 +106,7 @@ import android.app.ActivityManager;
 import android.app.ActivityManager.RunningTaskInfo;
 import android.app.ActivityManager.StackId;
 import android.app.ActivityManager.StackInfo;
+import android.app.ActivityManagerInternal.SleepToken;
 import android.app.ActivityOptions;
 import android.app.AppOpsManager;
 import android.app.ProfilerInfo;
@@ -134,7 +136,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
-import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
@@ -156,6 +157,7 @@ import android.util.MergedConfiguration;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
+import android.util.TimeUtils;
 import android.view.Display;
 import android.view.InputEvent;
 import android.view.Surface;
@@ -180,6 +182,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -382,9 +385,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
      * is being brought in front of us. */
     boolean mUserLeaving = false;
 
-    /** Set when we have taken too long waiting to go to sleep. */
-    boolean mSleepTimeout = false;
-
     /**
      * We don't want to allow the device to go to sleep while in the process
      * of launching an activity.  This is primarily to allow alarm intent
@@ -399,6 +399,13 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
      * At that point the system is allowed to actually sleep.
      */
     PowerManager.WakeLock mGoingToSleep;
+
+    /**
+     * A list of tokens that cause the top activity to be put to sleep.
+     * They are used by components that may hide and block interaction with underlying
+     * activities.
+     */
+    final ArrayList<SleepToken> mSleepTokens = new ArrayList<SleepToken>();
 
     /** Stack id of the front stack when user switched, indexed by userId. */
     SparseIntArray mUserStackInFront = new SparseIntArray(2);
@@ -1651,7 +1658,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             if (options.getLaunchTaskId() != INVALID_STACK_ID) {
                 final int startInTaskPerm = mService.checkPermission(START_TASKS_FROM_RECENTS,
                         callingPid, callingUid);
-                if (startInTaskPerm != PERMISSION_GRANTED) {
+                if (startInTaskPerm == PERMISSION_DENIED) {
                     final String msg = "Permission Denial: starting " + intent.toString()
                             + " from " + callerApp + " (pid=" + callingPid
                             + ", uid=" + callingUid + ") with launchTaskId="
@@ -1704,14 +1711,21 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             return true;
         }
 
-        if (activityDisplay.mDisplay.getType() == TYPE_VIRTUAL
-                && activityDisplay.mDisplay.getOwnerUid() != SYSTEM_UID
-                && activityDisplay.mDisplay.getOwnerUid() != aInfo.applicationInfo.uid) {
+        final int displayOwnerUid = activityDisplay.mDisplay.getOwnerUid();
+        if (activityDisplay.mDisplay.getType() == TYPE_VIRTUAL && displayOwnerUid != SYSTEM_UID
+                && displayOwnerUid != aInfo.applicationInfo.uid) {
             // Limit launching on virtual displays, because their contents can be read from Surface
             // by apps that created them.
             if ((aInfo.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) == 0) {
                 if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
                         + " disallow launch on virtual display for not-embedded activity.");
+                return false;
+            }
+            // Check if the caller is allowed to embed activities from other apps.
+            if (mService.checkPermission(ACTIVITY_EMBEDDING, callingPid, callingUid)
+                    == PERMISSION_DENIED) {
+                if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
+                        + " disallow activity embedding without permission.");
                 return false;
             }
         }
@@ -1724,7 +1738,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         }
 
         // Check if the caller is the owner of the display.
-        if (activityDisplay.mDisplay.getOwnerUid() == callingUid) {
+        if (displayOwnerUid == callingUid) {
             if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
                     + " allow launch for owner of the display");
             return true;
@@ -1769,7 +1783,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             String callingPackage, int callingPid, int callingUid, boolean ignoreTargetSecurity) {
         if (!ignoreTargetSecurity && mService.checkComponentPermission(activityInfo.permission,
                 callingPid, callingUid, activityInfo.applicationInfo.uid, activityInfo.exported)
-                == PackageManager.PERMISSION_DENIED) {
+                == PERMISSION_DENIED) {
             return ACTIVITY_RESTRICTION_PERMISSION;
         }
 
@@ -1816,8 +1830,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             return ACTIVITY_RESTRICTION_NONE;
         }
 
-        if (mService.checkPermission(permission, callingPid, callingUid) ==
-                PackageManager.PERMISSION_DENIED) {
+        if (mService.checkPermission(permission, callingPid, callingUid) == PERMISSION_DENIED) {
             return ACTIVITY_RESTRICTION_PERMISSION;
         }
 
@@ -2994,7 +3007,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 // while pausing because that changes the focused stack and may prevent the new
                 // starting activity from resuming.
                 if (moveHomeStackToFront && task.getTaskToReturnTo() == HOME_ACTIVITY_TYPE
-                        && (r.state == RESUMED || !r.supportsPictureInPictureWhilePausing)) {
+                        && (r.state == RESUMED || !r.supportsEnterPipOnTaskSwitch)) {
                     // Move the home stack forward if the task we just moved to the pinned stack
                     // was launched from home so home should be visible behind it.
                     moveHomeStackToFront(reason);
@@ -3023,7 +3036,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
             // Reset the state that indicates it can enter PiP while pausing after we've moved it
             // to the pinned stack
-            r.supportsPictureInPictureWhilePausing = false;
+            r.supportsEnterPipOnTaskSwitch = false;
         } finally {
             mWindowManager.continueSurfaceLayout();
         }
@@ -3169,6 +3182,16 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         return null;
     }
 
+    boolean hasAwakeDisplay() {
+        for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
+            final ActivityDisplay display = mActivityDisplays.valueAt(displayNdx);
+            if (!display.shouldSleep()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void goingToSleepLocked() {
         scheduleSleepTimeout();
         if (!mGoingToSleep.isHeld()) {
@@ -3181,7 +3204,16 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 mService.mHandler.removeMessages(LAUNCH_TIMEOUT_MSG);
             }
         }
-        checkReadyForSleepLocked();
+
+        applySleepTokensLocked(false /* applyToStacks */);
+
+        checkReadyForSleepLocked(true /* allowDelay */);
+    }
+
+    void prepareForShutdownLocked() {
+        for (int i = 0; i < mActivityDisplays.size(); i++) {
+            createSleepTokenLocked("shutdown", mActivityDisplays.keyAt(i));
+        }
     }
 
     boolean shutdownLocked(int timeout) {
@@ -3190,14 +3222,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         boolean timedout = false;
         final long endTime = System.currentTimeMillis() + timeout;
         while (true) {
-            boolean cantShutdown = false;
-            for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
-                final ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks;
-                for (int stackNdx = stacks.size() - 1; stackNdx >= 0; --stackNdx) {
-                    cantShutdown |= stacks.get(stackNdx).checkReadyForSleepLocked();
-                }
-            }
-            if (cantShutdown) {
+            if (!putStacksToSleepLocked(true /* allowDelay */, true /* shuttingDown */)) {
                 long timeRemaining = endTime - System.currentTimeMillis();
                 if (timeRemaining > 0) {
                     try {
@@ -3215,8 +3240,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         }
 
         // Force checkReadyForSleep to complete.
-        mSleepTimeout = true;
-        checkReadyForSleepLocked();
+        checkReadyForSleepLocked(false /* allowDelay */);
 
         return timedout;
     }
@@ -3226,68 +3250,71 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         if (mGoingToSleep.isHeld()) {
             mGoingToSleep.release();
         }
+    }
+
+    void applySleepTokensLocked(boolean applyToStacks) {
         for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
-            final ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks;
+            // Set the sleeping state of the display.
+            final ActivityDisplay display = mActivityDisplays.valueAt(displayNdx);
+            final boolean displayShouldSleep = display.shouldSleep();
+            if (displayShouldSleep == display.isSleeping()) {
+                continue;
+            }
+            display.setIsSleeping(displayShouldSleep);
+
+            if (!applyToStacks) {
+                continue;
+            }
+
+            // Set the sleeping state of the stacks on the display.
+            final ArrayList<ActivityStack> stacks = display.mStacks;
             for (int stackNdx = stacks.size() - 1; stackNdx >= 0; --stackNdx) {
                 final ActivityStack stack = stacks.get(stackNdx);
-                stack.awakeFromSleepingLocked();
-                if (isFocusedStack(stack)) {
-                    resumeFocusedStackTopActivityLocked();
+                if (displayShouldSleep) {
+                    stack.goToSleepIfPossible(false /* shuttingDown */);
+                } else {
+                    stack.awakeFromSleepingLocked();
+                    if (isFocusedStack(stack)) {
+                        resumeFocusedStackTopActivityLocked();
+                    }
+                }
+            }
+
+            if (displayShouldSleep || mGoingToSleepActivities.isEmpty()) {
+                continue;
+            }
+            // The display is awake now, so clean up the going to sleep list.
+            for (Iterator<ActivityRecord> it = mGoingToSleepActivities.iterator(); it.hasNext(); ) {
+                final ActivityRecord r = it.next();
+                if (r.getDisplayId() == display.mDisplayId) {
+                    it.remove();
                 }
             }
         }
-        mGoingToSleepActivities.clear();
     }
 
     void activitySleptLocked(ActivityRecord r) {
         mGoingToSleepActivities.remove(r);
-        checkReadyForSleepLocked();
+        final ActivityStack s = r.getStack();
+        if (s != null) {
+            s.checkReadyForSleep();
+        } else {
+            checkReadyForSleepLocked(true);
+        }
     }
 
-    void checkReadyForSleepLocked() {
+    void checkReadyForSleepLocked(boolean allowDelay) {
         if (!mService.isSleepingOrShuttingDownLocked()) {
             // Do not care.
             return;
         }
 
-        if (!mSleepTimeout) {
-            boolean dontSleep = false;
-            for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
-                final ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks;
-                for (int stackNdx = stacks.size() - 1; stackNdx >= 0; --stackNdx) {
-                    dontSleep |= stacks.get(stackNdx).checkReadyForSleepLocked();
-                }
-            }
-
-            if (mStoppingActivities.size() > 0) {
-                // Still need to tell some activities to stop; can't sleep yet.
-                if (DEBUG_PAUSE) Slog.v(TAG_PAUSE, "Sleep still need to stop "
-                        + mStoppingActivities.size() + " activities");
-                scheduleIdleLocked();
-                dontSleep = true;
-            }
-
-            if (mGoingToSleepActivities.size() > 0) {
-                // Still need to tell some activities to sleep; can't sleep yet.
-                if (DEBUG_PAUSE) Slog.v(TAG_PAUSE, "Sleep still need to sleep "
-                        + mGoingToSleepActivities.size() + " activities");
-                dontSleep = true;
-            }
-
-            if (dontSleep) {
-                return;
-            }
+        if (!putStacksToSleepLocked(allowDelay, false /* shuttingDown */)) {
+            return;
         }
 
         // Send launch end powerhint before going sleep
         mService.mActivityStarter.sendPowerHintForLaunchEndIfNeeded();
-
-        for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
-            final ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks;
-            for (int stackNdx = stacks.size() - 1; stackNdx >= 0; --stackNdx) {
-                stacks.get(stackNdx).goToSleep();
-            }
-        }
 
         removeSleepTimeouts();
 
@@ -3297,6 +3324,23 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         if (mService.mShuttingDown) {
             mService.notifyAll();
         }
+    }
+
+    // Tries to put all activity stacks to sleep. Returns true if all stacks were
+    // successfully put to sleep.
+    private boolean putStacksToSleepLocked(boolean allowDelay, boolean shuttingDown) {
+        boolean allSleep = true;
+        for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
+            final ArrayList<ActivityStack> stacks = mActivityDisplays.valueAt(displayNdx).mStacks;
+            for (int stackNdx = stacks.size() - 1; stackNdx >= 0; --stackNdx) {
+                if (allowDelay) {
+                    allSleep &= stacks.get(stackNdx).goToSleepIfPossible(shuttingDown);
+                } else {
+                    stacks.get(stackNdx).goToSleep();
+                }
+            }
+        }
+        return allSleep;
     }
 
     boolean reportResumedActivityLocked(ActivityRecord r) {
@@ -3559,21 +3603,27 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                     s.setVisibility(false);
                 }
             }
-            if ((!waitingVisible || mService.isSleepingOrShuttingDownLocked()) && remove) {
-                if (!processPausingActivities && s.state == PAUSING) {
-                    // Defer processing pausing activities in this iteration and reschedule
-                    // a delayed idle to reprocess it again
-                    removeTimeoutsForActivityLocked(idleActivity);
-                    scheduleIdleTimeoutLocked(idleActivity);
-                    continue;
-                }
+            if (remove) {
+                final ActivityStack stack = s.getStack();
+                final boolean shouldSleepOrShutDown = stack != null
+                        ? stack.shouldSleepOrShutDownActivities()
+                        : mService.isSleepingOrShuttingDownLocked();
+                if (!waitingVisible || shouldSleepOrShutDown) {
+                    if (!processPausingActivities && s.state == PAUSING) {
+                        // Defer processing pausing activities in this iteration and reschedule
+                        // a delayed idle to reprocess it again
+                        removeTimeoutsForActivityLocked(idleActivity);
+                        scheduleIdleTimeoutLocked(idleActivity);
+                        continue;
+                    }
 
-                if (DEBUG_STATES) Slog.v(TAG, "Ready to stop: " + s);
-                if (stops == null) {
-                    stops = new ArrayList<>();
+                    if (DEBUG_STATES) Slog.v(TAG, "Ready to stop: " + s);
+                    if (stops == null) {
+                        stops = new ArrayList<>();
+                    }
+                    stops.add(s);
+                    mStoppingActivities.remove(activityNdx);
                 }
-                stops.add(s);
-                mStoppingActivities.remove(activityNdx);
             }
         }
 
@@ -3626,7 +3676,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     public void dump(PrintWriter pw, String prefix) {
         pw.print(prefix); pw.print("mFocusedStack=" + mFocusedStack);
                 pw.print(" mLastFocusedStack="); pw.println(mLastFocusedStack);
-        pw.print(prefix); pw.println("mSleepTimeout=" + mSleepTimeout);
         pw.print(prefix);
         pw.println("mCurTaskIdForUser=" + mCurTaskIdForUser);
         pw.print(prefix); pw.println("mUserStackInFront=" + mUserStackInFront);
@@ -3723,6 +3772,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 stackHeader.append("\n");
                 stackHeader.append("  mFullscreen=" + stack.mFullscreen);
                 stackHeader.append("\n");
+                stackHeader.append("  isSleeping=" + stack.shouldSleepActivities());
+                stackHeader.append("\n");
                 stackHeader.append("  mBounds=" + stack.mBounds);
 
                 final boolean printedStackHeader = stack.dumpActivitiesLocked(fd, pw, dumpAll,
@@ -3772,8 +3823,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         printed |= dumpHistoryList(fd, pw, mActivitiesWaitingForVisibleActivity, "  ", "Wait",
                 false, !dumpAll, false, dumpPackage, true,
                 "  Activities waiting for another to become visible:", null);
-        printed |= dumpHistoryList(fd, pw, mGoingToSleepActivities, "  ", "Sleep", false, !dumpAll,
-                false, dumpPackage, true, "  Activities waiting to sleep:", null);
         printed |= dumpHistoryList(fd, pw, mGoingToSleepActivities, "  ", "Sleep", false, !dumpAll,
                 false, dumpPackage, true, "  Activities waiting to sleep:", null);
 
@@ -3886,7 +3935,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     }
 
     void removeSleepTimeouts() {
-        mSleepTimeout = false;
         mHandler.removeMessages(SLEEP_TIMEOUT_MSG);
     }
 
@@ -3988,6 +4036,9 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                         moveTasksToFullscreenStackLocked(stack.getStackId(), true /* onTop */);
                     }
                 }
+
+                releaseSleepTokens(activityDisplay);
+
                 mActivityDisplays.remove(displayId);
                 mWindowManager.onDisplayRemoved(displayId);
             }
@@ -3998,10 +4049,58 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         synchronized (mService) {
             ActivityDisplay activityDisplay = mActivityDisplays.get(displayId);
             if (activityDisplay != null) {
+                // The window policy is responsible for stopping activities on the default display
+                if (displayId != Display.DEFAULT_DISPLAY) {
+                    int displayState = activityDisplay.mDisplay.getState();
+                    if (displayState == Display.STATE_OFF && activityDisplay.mOffToken == null) {
+                        activityDisplay.mOffToken =
+                                mService.acquireSleepToken("Display-off", displayId);
+                    } else if (displayState == Display.STATE_ON
+                            && activityDisplay.mOffToken != null) {
+                        activityDisplay.mOffToken.release();
+                        activityDisplay.mOffToken = null;
+                    }
+                }
                 // TODO: Update the bounds.
             }
             mWindowManager.onDisplayChanged(displayId);
         }
+    }
+
+    SleepToken createSleepTokenLocked(String tag, int displayId) {
+        ActivityDisplay display = mActivityDisplays.get(displayId);
+        if (display == null) {
+            throw new IllegalArgumentException("Invalid display: " + displayId);
+        }
+
+        final SleepTokenImpl token = new SleepTokenImpl(tag, displayId);
+        mSleepTokens.add(token);
+        display.mAllSleepTokens.add(token);
+        return token;
+    }
+
+    private void removeSleepTokenLocked(SleepTokenImpl token) {
+        mSleepTokens.remove(token);
+
+        ActivityDisplay display = mActivityDisplays.get(token.mDisplayId);
+        if (display != null) {
+            display.mAllSleepTokens.remove(token);
+            if (display.mAllSleepTokens.isEmpty()) {
+                mService.updateSleepIfNeededLocked();
+            }
+        }
+    }
+
+    private void releaseSleepTokens(ActivityDisplay display) {
+        if (display.mAllSleepTokens.isEmpty()) {
+            return;
+        }
+        for (SleepTokenImpl token : display.mAllSleepTokens) {
+            mSleepTokens.remove(token);
+        }
+        display.mAllSleepTokens.clear();
+
+        mService.updateSleepIfNeededLocked();
     }
 
     private StackInfo getStackInfoLocked(ActivityStack stack) {
@@ -4309,9 +4408,9 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
     void activityRelaunchedLocked(IBinder token) {
         mWindowManager.notifyAppRelaunchingFinished(token);
-        if (mService.isSleepingOrShuttingDownLocked()) {
-            final ActivityRecord r = ActivityRecord.isInStackLocked(token);
-            if (r != null) {
+        final ActivityRecord r = ActivityRecord.isInStackLocked(token);
+        if (r != null) {
+            if (r.getStack().shouldSleepOrShutDownActivities()) {
                 r.setSleeping(true, true);
             }
         }
@@ -4463,8 +4562,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                     synchronized (mService) {
                         if (mService.isSleepingOrShuttingDownLocked()) {
                             Slog.w(TAG, "Sleep timeout!  Sleeping now.");
-                            mSleepTimeout = true;
-                            checkReadyForSleepLocked();
+                            checkReadyForSleepLocked(false /* allowDelay */);
                         }
                     }
                 } break;
@@ -4589,6 +4687,13 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         /** Array of all UIDs that are present on the display. */
         private IntArray mDisplayAccessUIDs = new IntArray();
 
+        /** All tokens used to put activities on this stack to sleep (including mOffToken) */
+        final ArrayList<SleepTokenImpl> mAllSleepTokens = new ArrayList<>();
+        /** The token acquired by ActivityStackSupervisor to put stacks on the display to sleep */
+        SleepToken mOffToken;
+
+        private boolean mSleeping;
+
         @VisibleForTesting
         ActivityDisplay() {
             mActivityDisplays.put(mDisplayId, this);
@@ -4613,12 +4718,14 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             if (DEBUG_STACK) Slog.v(TAG_STACK, "attachStack: attaching " + stack
                     + " to displayId=" + mDisplayId + " position=" + position);
             mStacks.add(position, stack);
+            mService.updateSleepIfNeededLocked();
         }
 
         void detachStack(ActivityStack stack) {
             if (DEBUG_STACK) Slog.v(TAG_STACK, "detachStack: detaching " + stack
                     + " from displayId=" + mDisplayId);
             mStacks.remove(stack);
+            mService.updateSleepIfNeededLocked();
         }
 
         @Override
@@ -4665,6 +4772,19 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
         boolean shouldDestroyContentOnRemove() {
             return mDisplay.getRemoveMode() == REMOVE_MODE_DESTROY_CONTENT;
+        }
+
+        boolean shouldSleep() {
+            return (mStacks.isEmpty() || !mAllSleepTokens.isEmpty())
+                    && (mService.mRunningVoice == null);
+        }
+
+        boolean isSleeping() {
+            return mSleeping;
+        }
+
+        void setIsSleeping(boolean asleep) {
+            mSleeping = asleep;
         }
     }
 
@@ -4847,4 +4967,30 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             mResult.dump(pw, prefix);
         }
     }
+
+    private final class SleepTokenImpl extends SleepToken {
+        private final String mTag;
+        private final long mAcquireTime;
+        private final int mDisplayId;
+
+        public SleepTokenImpl(String tag, int displayId) {
+            mTag = tag;
+            mDisplayId = displayId;
+            mAcquireTime = SystemClock.uptimeMillis();
+        }
+
+        @Override
+        public void release() {
+            synchronized (mService) {
+                removeSleepTokenLocked(this);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "{\"" + mTag + "\", display " + mDisplayId
+                    + ", acquire at " + TimeUtils.formatUptime(mAcquireTime) + "}";
+        }
+    }
+
 }

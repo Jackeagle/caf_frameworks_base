@@ -17,7 +17,9 @@
 package com.android.server.connectivity.tethering;
 
 import static android.net.NetworkStats.SET_DEFAULT;
+import static android.net.NetworkStats.STATS_PER_UID;
 import static android.net.NetworkStats.TAG_NONE;
+import static android.net.NetworkStats.UID_ALL;
 import static android.net.TrafficStats.UID_TETHERING;
 import static android.provider.Settings.Global.TETHER_OFFLOAD_DISABLED;
 
@@ -30,11 +32,13 @@ import android.net.NetworkStats;
 import android.net.RouteInfo;
 import android.net.util.SharedLog;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.INetworkManagementService;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.TextUtils;
+import com.android.server.connectivity.tethering.OffloadHardwareInterface.ForwardedStats;
 
 import com.android.internal.util.IndentingPrintWriter;
 
@@ -44,8 +48,11 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -60,7 +67,10 @@ public class OffloadController {
     private final Handler mHandler;
     private final OffloadHardwareInterface mHwInterface;
     private final ContentResolver mContentResolver;
+    private final INetworkManagementService mNms;
+    private final ITetheringStatsProvider mStatsProvider;
     private final SharedLog mLog;
+    private final HashMap<String, LinkProperties> mDownstreams;
     private boolean mConfigInitialized;
     private boolean mControlInitialized;
     private LinkProperties mUpstreamLinkProperties;
@@ -75,8 +85,8 @@ public class OffloadController {
     // Maps upstream interface names to offloaded traffic statistics.
     // Always contains the latest value received from the hardware for each interface, regardless of
     // whether offload is currently running on that interface.
-    private HashMap<String, OffloadHardwareInterface.ForwardedStats>
-            mForwardedStats = new HashMap<>();
+    private ConcurrentHashMap<String, ForwardedStats> mForwardedStats =
+            new ConcurrentHashMap<>(16, 0.75F, 1);
 
     // Maps upstream interface names to interface quotas.
     // Always contains the latest value received from the framework for each interface, regardless
@@ -89,13 +99,15 @@ public class OffloadController {
         mHandler = h;
         mHwInterface = hwi;
         mContentResolver = contentResolver;
+        mNms = nms;
+        mStatsProvider = new OffloadTetheringStatsProvider();
         mLog = log.forSubComponent(TAG);
+        mDownstreams = new HashMap<>();
         mExemptPrefixes = new HashSet<>();
         mLastLocalPrefixStrs = new HashSet<>();
 
         try {
-            nms.registerTetheringStatsProvider(
-                    new OffloadTetheringStatsProvider(), getClass().getSimpleName());
+            mNms.registerTetheringStatsProvider(mStatsProvider, getClass().getSimpleName());
         } catch (RemoteException e) {
             mLog.e("Cannot register offload stats provider: " + e);
         }
@@ -122,21 +134,25 @@ public class OffloadController {
                 new OffloadHardwareInterface.ControlCallback() {
                     @Override
                     public void onStarted() {
+                        if (!started()) return;
                         mLog.log("onStarted");
                     }
 
                     @Override
                     public void onStoppedError() {
+                        if (!started()) return;
                         mLog.log("onStoppedError");
                     }
 
                     @Override
                     public void onStoppedUnsupported() {
+                        if (!started()) return;
                         mLog.log("onStoppedUnsupported");
                     }
 
                     @Override
                     public void onSupportAvailable() {
+                        if (!started()) return;
                         mLog.log("onSupportAvailable");
 
                         // [1] Poll for statistics and notify NetworkStats
@@ -144,19 +160,40 @@ public class OffloadController {
                         //     [a] push local prefixes
                         //     [b] push downstreams
                         //     [c] push upstream parameters
-                        pushUpstreamParameters();
+                        pushUpstreamParameters(null);
                     }
 
                     @Override
                     public void onStoppedLimitReached() {
+                        if (!started()) return;
                         mLog.log("onStoppedLimitReached");
-                        // Poll for statistics and notify NetworkStats
+
+                        // We cannot reliably determine on which interface the limit was reached,
+                        // because the HAL interface does not specify it. We cannot just use the
+                        // current upstream, because that might have changed since the time that
+                        // the HAL queued the callback.
+                        // TODO: rev the HAL so that it provides an interface name.
+
+                        // Fetch current stats, so that when our notification reaches
+                        // NetworkStatsService and triggers a poll, we will respond with
+                        // current data (which will be above the limit that was reached).
+                        // Note that if we just changed upstream, this is unnecessary but harmless.
+                        // The stats for the previous upstream were already updated on this thread
+                        // just after the upstream was changed, so they are also up-to-date.
+                        updateStatsForCurrentUpstream();
+
+                        try {
+                            mNms.tetherLimitReached(mStatsProvider);
+                        } catch (RemoteException e) {
+                            mLog.e("Cannot report data limit reached: " + e);
+                        }
                     }
 
                     @Override
                     public void onNatTimeoutUpdate(int proto,
                                                    String srcAddr, int srcPort,
                                                    String dstAddr, int dstPort) {
+                        if (!started()) return;
                         mLog.log(String.format("NAT timeout update: %s (%s,%s) -> (%s,%s)",
                                 proto, srcAddr, srcPort, dstAddr, dstPort));
                     }
@@ -169,6 +206,9 @@ public class OffloadController {
     }
 
     public void stop() {
+        // Completely stops tethering offload. After this method is called, it is no longer safe to
+        // call any HAL method, no callbacks from the hardware will be delivered, and any in-flight
+        // callbacks must be ignored. Offload may be started again by calling start().
         final boolean wasStarted = started();
         updateStatsForCurrentUpstream();
         mUpstreamLinkProperties = null;
@@ -180,26 +220,30 @@ public class OffloadController {
 
     private class OffloadTetheringStatsProvider extends ITetheringStatsProvider.Stub {
         @Override
-        public NetworkStats getTetherStats() {
+        public NetworkStats getTetherStats(int how) {
+            // getTetherStats() is the only function in OffloadController that can be called from
+            // a different thread. Do not attempt to update stats by querying the offload HAL
+            // synchronously from a different thread than our Handler thread. http://b/64771555.
+            Runnable updateStats = () -> { updateStatsForCurrentUpstream(); };
+            if (Looper.myLooper() == mHandler.getLooper()) {
+                updateStats.run();
+            } else {
+                mHandler.post(updateStats);
+            }
+
             NetworkStats stats = new NetworkStats(SystemClock.elapsedRealtime(), 0);
+            NetworkStats.Entry entry = new NetworkStats.Entry();
+            entry.set = SET_DEFAULT;
+            entry.tag = TAG_NONE;
+            entry.uid = (how == STATS_PER_UID) ? UID_TETHERING : UID_ALL;
 
-            // We can't just post to mHandler because we are mostly (but not always) called by
-            // NetworkStatsService#performPollLocked, which is (currently) on the same thread as us.
-            mHandler.runWithScissors(() -> {
-                NetworkStats.Entry entry = new NetworkStats.Entry();
-                entry.set = SET_DEFAULT;
-                entry.tag = TAG_NONE;
-                entry.uid = UID_TETHERING;
-
-                updateStatsForCurrentUpstream();
-
-                for (String iface : mForwardedStats.keySet()) {
-                    entry.iface = iface;
-                    entry.rxBytes = mForwardedStats.get(iface).rxBytes;
-                    entry.txBytes = mForwardedStats.get(iface).txBytes;
-                    stats.addValues(entry);
-                }
-            }, 0);
+            for (Map.Entry<String, ForwardedStats> kv : mForwardedStats.entrySet()) {
+                ForwardedStats value = kv.getValue();
+                entry.iface = kv.getKey();
+                entry.rxBytes = value.rxBytes;
+                entry.txBytes = value.txBytes;
+                stats.addValues(entry);
+            }
 
             return stats;
         }
@@ -216,22 +260,36 @@ public class OffloadController {
         }
     }
 
+    private String currentUpstreamInterface() {
+        return (mUpstreamLinkProperties != null)
+                ? mUpstreamLinkProperties.getInterfaceName() : null;
+    }
+
     private void maybeUpdateStats(String iface) {
         if (TextUtils.isEmpty(iface)) {
             return;
         }
 
-        if (!mForwardedStats.containsKey(iface)) {
-            mForwardedStats.put(iface, new OffloadHardwareInterface.ForwardedStats());
+        // Always called on the handler thread.
+        //
+        // Use get()/put() instead of updating ForwardedStats in place because we can be called
+        // concurrently with getTetherStats. In combination with the guarantees provided by
+        // ConcurrentHashMap, this ensures that getTetherStats always gets the most recent copy of
+        // the stats for each interface, and does not observe partial writes where rxBytes is
+        // updated and txBytes is not.
+        ForwardedStats diff = mHwInterface.getForwardedStats(iface);
+        ForwardedStats base = mForwardedStats.get(iface);
+        if (base != null) {
+            diff.add(base);
         }
-        mForwardedStats.get(iface).add(mHwInterface.getForwardedStats(iface));
+        mForwardedStats.put(iface, diff);
+        // diff is a new object, just created by getForwardedStats(). Therefore, anyone reading from
+        // mForwardedStats (i.e., any caller of getTetherStats) will see the new stats immediately.
     }
 
     private boolean maybeUpdateDataLimit(String iface) {
         // setDataLimit may only be called while offload is occuring on this upstream.
-        if (!started() ||
-                mUpstreamLinkProperties == null ||
-                !TextUtils.equals(iface, mUpstreamLinkProperties.getInterfaceName())) {
+        if (!started() || !TextUtils.equals(iface, currentUpstreamInterface())) {
             return true;
         }
 
@@ -244,9 +302,7 @@ public class OffloadController {
     }
 
     private void updateStatsForCurrentUpstream() {
-        if (mUpstreamLinkProperties != null) {
-            maybeUpdateStats(mUpstreamLinkProperties.getInterfaceName());
-        }
+        maybeUpdateStats(currentUpstreamInterface());
     }
 
     public void setUpstreamLinkProperties(LinkProperties lp) {
@@ -262,10 +318,7 @@ public class OffloadController {
         // onOffloadEvent() callback to tell us offload is available again and
         // then reapply all state).
         computeAndPushLocalPrefixes();
-        pushUpstreamParameters();
-
-        // Update stats after we've told the hardware to change routing so we don't miss packets.
-        maybeUpdateStats(prevUpstream);
+        pushUpstreamParameters(prevUpstream);
     }
 
     public void setLocalPrefixes(Set<IpPrefix> localPrefixes) {
@@ -276,17 +329,42 @@ public class OffloadController {
     }
 
     public void notifyDownstreamLinkProperties(LinkProperties lp) {
+        final String ifname = lp.getInterfaceName();
+        final LinkProperties oldLp = mDownstreams.put(ifname, new LinkProperties(lp));
+        if (Objects.equals(oldLp, lp)) return;
+
         if (!started()) return;
 
-        // TODO: Cache LinkProperties on a per-ifname basis and compute the
-        // deltas, calling addDownstream()/removeDownstream() accordingly.
+        final List<RouteInfo> oldRoutes = (oldLp != null) ? oldLp.getRoutes() : new ArrayList<>();
+        final List<RouteInfo> newRoutes = lp.getRoutes();
+
+        // For each old route, if not in new routes: remove.
+        for (RouteInfo oldRoute : oldRoutes) {
+            if (shouldIgnoreDownstreamRoute(oldRoute)) continue;
+            if (!newRoutes.contains(oldRoute)) {
+                mHwInterface.removeDownstreamPrefix(ifname, oldRoute.getDestination().toString());
+            }
+        }
+
+        // For each new route, if not in old routes: add.
+        for (RouteInfo newRoute : newRoutes) {
+            if (shouldIgnoreDownstreamRoute(newRoute)) continue;
+            if (!oldRoutes.contains(newRoute)) {
+                mHwInterface.addDownstreamPrefix(ifname, newRoute.getDestination().toString());
+            }
+        }
     }
 
     public void removeDownstreamInterface(String ifname) {
+        final LinkProperties lp = mDownstreams.remove(ifname);
+        if (lp == null) return;
+
         if (!started()) return;
 
-        // TODO: Check cache for LinkProperties of ifname and, if present,
-        // call removeDownstream() accordingly.
+        for (RouteInfo route : lp.getRoutes()) {
+            if (shouldIgnoreDownstreamRoute(route)) continue;
+            mHwInterface.removeDownstreamPrefix(ifname, route.getDestination().toString());
+        }
     }
 
     private boolean isOffloadDisabled() {
@@ -299,8 +377,9 @@ public class OffloadController {
         return mConfigInitialized && mControlInitialized;
     }
 
-    private boolean pushUpstreamParameters() {
+    private boolean pushUpstreamParameters(String prevUpstream) {
         if (mUpstreamLinkProperties == null) {
+            maybeUpdateStats(prevUpstream);
             return mHwInterface.setUpstreamParameters(null, null, null, null);
         }
 
@@ -339,9 +418,14 @@ public class OffloadController {
            return success;
         }
 
+        // Update stats after we've told the hardware to change routing so we don't miss packets.
+        maybeUpdateStats(prevUpstream);
+
         // Data limits can only be set once offload is running on the upstream.
         success = maybeUpdateDataLimit(iface);
         if (!success) {
+            // If we failed to set a data limit, don't use this upstream, because we don't want to
+            // blow through the data limit that we were told to apply.
             mLog.log("Setting data limit for " + iface + " failed, disabling offload.");
             stop();
         }
@@ -385,6 +469,13 @@ public class OffloadController {
         final HashSet<String> localPrefixStrs = new HashSet<>();
         for (IpPrefix pfx : prefixSet) localPrefixStrs.add(pfx.toString());
         return localPrefixStrs;
+    }
+
+    private static boolean shouldIgnoreDownstreamRoute(RouteInfo route) {
+        // Ignore any link-local routes.
+        if (!route.getDestinationLinkAddress().isGlobalPreferred()) return true;
+
+        return false;
     }
 
     public void dump(IndentingPrintWriter pw) {

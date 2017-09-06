@@ -984,6 +984,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             Slog.d(TAG, "Animating brightness: target=" + target +", rate=" + rate);
         }
         if (mScreenBrightnessRampAnimator.animateTo(target, rate)) {
+            Trace.traceCounter(Trace.TRACE_TAG_POWER, "TargetScreenBrightness", target);
             try {
                 mBatteryStats.noteScreenBrightness(target);
             } catch (RemoteException ex) {
@@ -1010,7 +1011,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             // contents of the screen.
             mPowerState.prepareColorFade(mContext,
                     mColorFadeFadesConfig ? ColorFade.MODE_FADE : ColorFade.MODE_WARM_UP);
-            mColorFadeOffAnimator.end();
+            if (mColorFadeOffAnimator != null) {
+                mColorFadeOffAnimator.end();
+            }
             // Some display hardware will blank itself on the transition between doze and non-doze
             // but still on display states. In this case we want to report to policy that the
             // display has turned off so it can prepare the appropriate power on animation, but we

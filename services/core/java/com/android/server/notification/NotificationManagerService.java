@@ -158,6 +158,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.internal.os.BackgroundThread;
 import com.android.internal.statusbar.NotificationVisibility;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
@@ -804,6 +805,7 @@ public class NotificationManagerService extends SystemService {
         public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_LOCALE_CHANGED.equals(intent.getAction())) {
                 mZenModeHelper.updateDefaultZenRules();
+                mRankingHelper.onLocaleChanged(context, ActivityManager.getCurrentUser());
             }
         }
     };
@@ -984,12 +986,17 @@ public class NotificationManagerService extends SystemService {
                 final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
                 if (userId != USER_NULL) {
                     mUserProfiles.updateCache(context);
-                    readDefaultApprovedServices(userId);
+                    if (!mUserProfiles.isManagedProfile(userId)) {
+                        readDefaultApprovedServices(userId);
+                    }
                 }
             } else if (action.equals(Intent.ACTION_USER_REMOVED)) {
                 final int user = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
                 mZenModeHelper.onUserRemoved(user);
                 mRankingHelper.onUserRemoved(user);
+                mListeners.onUserRemoved(user);
+                mConditionProviders.onUserRemoved(user);
+                mAssistants.onUserRemoved(user);
                 savePolicyFile();
             } else if (action.equals(Intent.ACTION_USER_UNLOCKED)) {
                 final int user = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
@@ -3104,7 +3111,7 @@ public class NotificationManagerService extends SystemService {
             }
         }
         if (summaryRecord != null && checkDisqualifyingFeatures(userId, MY_UID,
-                summaryRecord.sbn.getId(), summaryRecord.sbn.getTag(), summaryRecord)) {
+                summaryRecord.sbn.getId(), summaryRecord.sbn.getTag(), summaryRecord, true)) {
             mHandler.post(new EnqueueNotificationRunnable(userId, summaryRecord));
         }
     }
@@ -3449,7 +3456,8 @@ public class NotificationManagerService extends SystemService {
                 user, null, System.currentTimeMillis());
         final NotificationRecord r = new NotificationRecord(getContext(), n, channel);
 
-        if (!checkDisqualifyingFeatures(userId, notificationUid, id, tag, r)) {
+        if (!checkDisqualifyingFeatures(userId, notificationUid, id, tag, r,
+                r.sbn.getOverrideGroupKey() != null)) {
             return;
         }
 
@@ -3504,7 +3512,7 @@ public class NotificationManagerService extends SystemService {
      * Has side effects.
      */
     private boolean checkDisqualifyingFeatures(int userId, int callingUid, int id, String tag,
-            NotificationRecord r) {
+            NotificationRecord r, boolean isAutogroup) {
         final String pkg = r.sbn.getPackageName();
         final String dialerPackage =
                 getContext().getSystemService(TelecomManager.class).getSystemDialerPackage();
@@ -3528,7 +3536,8 @@ public class NotificationManagerService extends SystemService {
 
                 // rate limit updates that aren't completed progress notifications
                 if (mNotificationsByKey.get(r.sbn.getKey()) != null
-                        && !r.getNotification().hasCompletedProgress()) {
+                        && !r.getNotification().hasCompletedProgress()
+                        && !isAutogroup) {
 
                     final float appEnqueueRate = mUsageStats.getAppEnqueueRate(pkg);
                     if (appEnqueueRate > mMaxPackageEnqueueRate) {
@@ -3536,7 +3545,7 @@ public class NotificationManagerService extends SystemService {
                         final long now = SystemClock.elapsedRealtime();
                         if ((now - mLastOverRateLogTime) > MIN_PACKAGE_OVERRATE_LOG_INTERVAL) {
                             Slog.e(TAG, "Package enqueue rate is " + appEnqueueRate
-                                    + ". Shedding events. package=" + pkg);
+                                    + ". Shedding " + r.sbn.getKey() + ". package=" + pkg);
                             mLastOverRateLogTime = now;
                         }
                         return false;
@@ -5568,13 +5577,10 @@ public class NotificationManagerService extends SystemService {
                     continue;
                 }
 
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (hasCompanionDevice(serviceInfo)) {
-                            notifyNotificationChannelChanged(
-                                    serviceInfo, pkg, user, channel, modificationType);
-                        }
+                BackgroundThread.getHandler().post(() -> {
+                    if (hasCompanionDevice(serviceInfo)) {
+                        notifyNotificationChannelChanged(
+                                serviceInfo, pkg, user, channel, modificationType);
                     }
                 });
             }
@@ -5591,13 +5597,10 @@ public class NotificationManagerService extends SystemService {
                     continue;
                 }
 
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (hasCompanionDevice(serviceInfo)) {
-                            notifyNotificationChannelGroupChanged(
-                                    serviceInfo, pkg, user, group, modificationType);
-                        }
+                BackgroundThread.getHandler().post(() -> {
+                    if (hasCompanionDevice(serviceInfo)) {
+                        notifyNotificationChannelGroupChanged(
+                                serviceInfo, pkg, user, group, modificationType);
                     }
                 });
             }

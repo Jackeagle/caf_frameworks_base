@@ -351,13 +351,11 @@
     <string name="power_discharging_duration_short" msgid="4192244429001842403">"<xliff:g id="LEVEL">^1</xliff:g> - <xliff:g id="TIME">^2</xliff:g> 남음"</string>
     <string name="power_charging" msgid="1779532561355864267">"<xliff:g id="LEVEL">%1$s</xliff:g> - <xliff:g id="STATE">%2$s</xliff:g>"</string>
     <string name="power_charging_duration" msgid="4676999980973411875">"<xliff:g id="LEVEL">^1</xliff:g> - 충전 완료까지 <xliff:g id="TIME">^2</xliff:g> 남음"</string>
-    <string name="power_charging_duration_short" msgid="1098603958472207920">"<xliff:g id="LEVEL">^1</xliff:g> - <xliff:g id="TIME">^2</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="196130600938058547">"알 수 없음"</string>
     <string name="battery_info_status_charging" msgid="1705179948350365604">"충전 중"</string>
     <string name="battery_info_status_charging_lower" msgid="8689770213898117994">"충전 중"</string>
     <string name="battery_info_status_discharging" msgid="310932812698268588">"충전 안함"</string>
-    <!-- no translation found for battery_info_status_not_charging (8523453668342598579) -->
-    <skip />
+    <string name="battery_info_status_not_charging" msgid="8523453668342598579">"전원이 연결되었지만 현재 충전할 수 없음"</string>
     <string name="battery_info_status_full" msgid="2824614753861462808">"충전 완료"</string>
     <string name="disabled_by_admin_summary_text" msgid="6750513964908334617">"관리자가 제어"</string>
     <string name="enabled_by_admin" msgid="5302986023578399263">"관리자가 사용 설정함"</string>

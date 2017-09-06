@@ -96,7 +96,7 @@
     <string name="bluetooth_pairing_decline" msgid="4185420413578948140">"రద్దు చేయి"</string>
     <string name="bluetooth_pairing_will_share_phonebook" msgid="4982239145676394429">"జత చేయడం వలన కనెక్ట్ చేయబడినప్పుడు మీ పరిచయాలకు మరియు కాల్ చరిత్రకు ప్రాప్యతను మంజూరు చేస్తుంది."</string>
     <string name="bluetooth_pairing_error_message" msgid="3748157733635947087">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>తో జత చేయడం సాధ్యపడలేదు."</string>
-    <string name="bluetooth_pairing_pin_error_message" msgid="8337234855188925274">"పిన్‌ లేదా పాస్‌కీ చెల్లని కారణంగా <xliff:g id="DEVICE_NAME">%1$s</xliff:g>తో జత చేయడం సాధ్యపడలేదు."</string>
+    <string name="bluetooth_pairing_pin_error_message" msgid="8337234855188925274">"పిన్ లేదా పాస్‌కీ చెల్లని కారణంగా <xliff:g id="DEVICE_NAME">%1$s</xliff:g>తో జత చేయడం సాధ్యపడలేదు."</string>
     <string name="bluetooth_pairing_device_down_error_message" msgid="7870998403045801381">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>తో కమ్యూనికేట్ చేయడం సాధ్యపడదు."</string>
     <string name="bluetooth_pairing_rejected_error_message" msgid="1648157108520832454">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> జత చేయడాన్ని తిరస్కరించింది."</string>
     <string name="accessibility_wifi_off" msgid="1166761729660614716">"Wifi ఆఫ్‌లో ఉంది."</string>
@@ -169,11 +169,11 @@
     <string name="development_settings_not_available" msgid="4308569041701535607">"ఈ వినియోగదారు కోసం డెవలపర్ ఎంపికలు అందుబాటులో లేవు"</string>
     <string name="vpn_settings_not_available" msgid="956841430176985598">"VPN సెట్టింగ్‌లు ఈ వినియోగదారుకి అందుబాటులో లేవు"</string>
     <string name="tethering_settings_not_available" msgid="6765770438438291012">"టీథరింగ్ సెట్టింగ్‌లు ఈ వినియోగదారుకి అందుబాటులో లేవు"</string>
-    <string name="apn_settings_not_available" msgid="7873729032165324000">"ప్రాప్యత స్థానం పేరు సెట్టింగ్‌లు ఈ వినియోగదారుకి అందుబాటులో లేవు"</string>
+    <string name="apn_settings_not_available" msgid="7873729032165324000">"యాక్సెస్ స్థానం పేరు సెట్టింగ్‌లు ఈ వినియోగదారుకి అందుబాటులో లేవు"</string>
     <string name="enable_adb" msgid="7982306934419797485">"USB డీబగ్గింగ్"</string>
     <string name="enable_adb_summary" msgid="4881186971746056635">"USB కనెక్ట్ చేయబడినప్పుడు డీబగ్ మోడ్"</string>
     <string name="clear_adb_keys" msgid="4038889221503122743">"USB డీబగ్ ప్రామాణీకరణలను ఉపసంహరించు"</string>
-    <string name="bugreport_in_power" msgid="7923901846375587241">"బగ్ నివేదిక సత్వరమార్గం"</string>
+    <string name="bugreport_in_power" msgid="7923901846375587241">"బగ్ నివేదిక షార్ట్‌కట్"</string>
     <string name="bugreport_in_power_summary" msgid="1778455732762984579">"బగ్ నివేదికను తీసుకోవడానికి పవర్ మెనులో బటన్‌ను చూపు"</string>
     <string name="keep_screen_on" msgid="1146389631208760344">"సక్రియంగా ఉంచు"</string>
     <string name="keep_screen_on_summary" msgid="2173114350754293009">"ఛార్జ్ చేస్తున్నప్పుడు స్క్రీన్ ఎప్పటికీ నిద్రావస్థలోకి వెళ్లదు"</string>
@@ -184,8 +184,8 @@
     <string name="confirm_enable_oem_unlock_title" msgid="4802157344812385674">"OEM అన్‌లాకింగ్‌ను అనుమతించాలా?"</string>
     <string name="confirm_enable_oem_unlock_text" msgid="5517144575601647022">"హెచ్చరిక: ఈ సెట్టింగ్ ఆన్ చేయబడినప్పుడు పరికరం రక్షణ లక్షణాలు ఈ పరికరంలో పని చేయవు."</string>
     <string name="mock_location_app" msgid="7966220972812881854">"అనుకృత స్థాన అనువర్తనాన్ని ఎంచుకోండి"</string>
-    <string name="mock_location_app_not_set" msgid="809543285495344223">"అనుకృత స్థాన అనువర్తనం ఏదీ సెట్ చేయబడలేదు"</string>
-    <string name="mock_location_app_set" msgid="8966420655295102685">"అనుకృత స్థాన అనువర్తనం: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="mock_location_app_not_set" msgid="809543285495344223">"అనుకృత స్థాన యాప్ ఏదీ సెట్ చేయబడలేదు"</string>
+    <string name="mock_location_app_set" msgid="8966420655295102685">"అనుకృత స్థాన యాప్: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="debug_networking_category" msgid="7044075693643009662">"నెట్‌వర్కింగ్"</string>
     <string name="wifi_display_certification" msgid="8611569543791307533">"వైర్‌లెస్ ప్రదర్శన ప్రమాణీకరణ"</string>
     <string name="wifi_verbose_logging" msgid="4203729756047242344">"Wi‑Fi విశదీకృత లాగింగ్‌ను ప్రారంభించండి"</string>
@@ -229,7 +229,7 @@
     <string name="adb_warning_message" msgid="7316799925425402244">"USB డీబగ్గింగ్ అనేది అభివృద్ధి ప్రయోజనాల కోసం మాత్రమే ఉద్దేశించబడింది. మీ కంప్యూటర్ మరియు మీ పరికరం మధ్య డేటాను కాపీ చేయడానికి, నోటిఫికేషన్ లేకుండా మీ పరికరంలో అనువర్తనాలను ఇన్‌స్టాల్ చేయడానికి మరియు లాగ్ డేటాను చదవడానికి దీన్ని ఉపయోగించండి."</string>
     <string name="adb_keys_warning_message" msgid="5659849457135841625">"మీరు గతంలో ప్రామాణీకరించిన అన్ని కంప్యూటర్‌ల నుండి USB డీబగ్గింగ్‌కు ప్రాప్యతను ఉపసంహరించాలా?"</string>
     <string name="dev_settings_warning_title" msgid="7244607768088540165">"అభివృద్ధి సెట్టింగ్‌లను అనుమతించాలా?"</string>
-    <string name="dev_settings_warning_message" msgid="2298337781139097964">"ఈ సెట్టింగ్‌లు అభివృద్ధి వినియోగం కోసం మాత్రమే ఉద్దేశించబడినవి. వీటి వలన మీ పరికరం మరియు దీనిలోని అనువర్తనాలు విచ్ఛిన్నం కావచ్చు లేదా తప్పుగా ప్రవర్తించవచ్చు."</string>
+    <string name="dev_settings_warning_message" msgid="2298337781139097964">"ఈ సెట్టింగ్‌లు అభివృద్ధి వినియోగం కోసం మాత్రమే ఉద్దేశించబడినవి. వీటి వలన మీ పరికరం మరియు దీనిలోని యాప్‌లు విచ్ఛిన్నం కావచ్చు లేదా తప్పుగా ప్రవర్తించవచ్చు."</string>
     <string name="verify_apps_over_usb_title" msgid="4177086489869041953">"USB ద్వారా అనువర్తనాలను ధృవీకరించు"</string>
     <string name="verify_apps_over_usb_summary" msgid="9164096969924529200">"హానికరమైన ప్రవర్తన కోసం ADB/ADT ద్వారా ఇన్‌స్టాల్ చేయబడిన అనువర్తనాలను తనిఖీ చేయి."</string>
     <string name="bluetooth_disable_absolute_volume_summary" msgid="6031284410786545957">"రిమోట్ పరికరాల్లో ఆమోదించలేని స్థాయిలో అధిక వాల్యూమ్ ఉండటం లేదా వాల్యూమ్ నియంత్రణ లేకపోవడం వంటి సమస్యలు ఉంటే బ్లూటూత్ సంపూర్ణ వాల్యూమ్ లక్షణాన్ని నిలిపివేస్తుంది."</string>
@@ -240,12 +240,12 @@
     <string name="hdcp_checking_dialog_title" msgid="5141305530923283">"HDCP తనిఖీ ప్రవర్తనను సెట్ చేయండి"</string>
     <string name="debug_debugging_category" msgid="6781250159513471316">"డీబగ్గింగ్"</string>
     <string name="debug_app" msgid="8349591734751384446">"డీబగ్ అనువర్తనాన్ని ఎంచుకోండి"</string>
-    <string name="debug_app_not_set" msgid="718752499586403499">"డీబగ్ అనువర్తనం సెట్ చేయబడలేదు"</string>
-    <string name="debug_app_set" msgid="2063077997870280017">"డీబగ్గింగ్ అనువర్తనం: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="debug_app_not_set" msgid="718752499586403499">"డీబగ్ యాప్ సెట్ చేయబడలేదు"</string>
+    <string name="debug_app_set" msgid="2063077997870280017">"డీబగ్గింగ్ యాప్: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="select_application" msgid="5156029161289091703">"అనువర్తనాన్ని ఎంచుకోండి"</string>
     <string name="no_application" msgid="2813387563129153880">"ఏదీ వద్దు"</string>
     <string name="wait_for_debugger" msgid="1202370874528893091">"డీబగ్గర్ కోసం వేచి ఉండండి"</string>
-    <string name="wait_for_debugger_summary" msgid="1766918303462746804">"డీబగ్ చేయబడిన అనువర్తనం అమలు కావడానికి ముందు జోడించాల్సిన డీబగ్గర్ కోసం వేచి ఉంటుంది"</string>
+    <string name="wait_for_debugger_summary" msgid="1766918303462746804">"డీబగ్ చేయబడిన యాప్ అమలు కావడానికి ముందు జోడించాల్సిన డీబగ్గర్ కోసం వేచి ఉంటుంది"</string>
     <string name="telephony_monitor_switch" msgid="1764958220062121194">"టెలిఫోనీ మానిటర్"</string>
     <string name="telephony_monitor_switch_summary" msgid="7695552966547975635">"టెలిఫోనీ/మోడెమ్ కార్యాచరణలో సమస్యను గుర్తించినప్పుడు TelephonyMonitor లాగ్‌లను సేకరిస్తుంది మరియు బగ్‌ని ఫైల్ చేయమని వినియోగదారును ప్రోత్సహిస్తుంది"</string>
     <string name="debug_input_category" msgid="1811069939601180246">"ఇన్‌పుట్"</string>
@@ -259,11 +259,11 @@
     <string name="pointer_location_summary" msgid="840819275172753713">"ప్రస్తుత స్పర్శ డేటాను చూపేలా స్క్రీన్ అతివ్యాప్తి చేయండి"</string>
     <string name="show_touches" msgid="2642976305235070316">"నొక్కినవి చూపు"</string>
     <string name="show_touches_summary" msgid="6101183132903926324">"నొక్కినవాటికి సంబంధించిన దృశ్య అభిప్రాయాన్ని చూపు"</string>
-    <string name="show_screen_updates" msgid="5470814345876056420">"సర్ఫేస్ నవీకరణలను చూపండి"</string>
+    <string name="show_screen_updates" msgid="5470814345876056420">"సర్ఫేస్ అప్‌డేట్‌లను చూపండి"</string>
     <string name="show_screen_updates_summary" msgid="2569622766672785529">"పూర్తి విండో ఉపరితలాలు నవీకరించబడినప్పుడు వాటిని ఫ్లాష్ చేయండి"</string>
-    <string name="show_hw_screen_updates" msgid="5036904558145941590">"GPU వీక్షణ నవీకరణలను చూపండి"</string>
+    <string name="show_hw_screen_updates" msgid="5036904558145941590">"GPU వీక్షణ అప్‌డేట్‌లను చూపండి"</string>
     <string name="show_hw_screen_updates_summary" msgid="1115593565980196197">"GPUతో గీసినప్పుడు విండోల లోపల వీక్షణలను ఫ్లాష్ చేయండి"</string>
-    <string name="show_hw_layers_updates" msgid="5645728765605699821">"హార్డ్‌వేర్ లేయర్‌ల నవీకరణలను చూపండి"</string>
+    <string name="show_hw_layers_updates" msgid="5645728765605699821">"హార్డ్‌వేర్ లేయర్‌ల అప్‌డేట్‌లను చూపండి"</string>
     <string name="show_hw_layers_updates_summary" msgid="5296917233236661465">"హార్డ్‌వేర్ లేయర్‌లు నవీకరించబడినప్పుడు వాటిని ఆకుపచ్చ రంగులో ఫ్లాష్ చేయండి"</string>
     <string name="debug_hw_overdraw" msgid="2968692419951565417">"GPU ఓవర్‌డ్రాను డీబగ్ చేయండి"</string>
     <string name="debug_hw_renderer" msgid="7568529019431785816">"GPU Rendererని సెట్ చేయండి"</string>
@@ -292,9 +292,9 @@
     <string name="immediately_destroy_activities_summary" msgid="3592221124808773368">"ప్రతి కార్యాచరణను వినియోగదారు నిష్క్రమించిన వెంటనే తొలగించండి"</string>
     <string name="app_process_limit_title" msgid="4280600650253107163">"నేపథ్య ప్రాసెస్ పరిమితి"</string>
     <string name="show_all_anrs" msgid="28462979638729082">"అన్ని ANRలను చూపు"</string>
-    <string name="show_all_anrs_summary" msgid="641908614413544127">"నేపథ్య అనువర్తనాల కోసం అనువర్తనం ప్రతిస్పందించడం లేదు డైలాగ్‌ను చూపు"</string>
+    <string name="show_all_anrs_summary" msgid="641908614413544127">"నేపథ్య యాప్‌ల కోసం యాప్ ప్రతిస్పందించడం లేదు డైలాగ్‌ను చూపు"</string>
     <string name="show_notification_channel_warnings" msgid="1399948193466922683">"ఛానెల్ హెచ్చరికల నోటిఫికేషన్‌‌ను చూపు"</string>
-    <string name="show_notification_channel_warnings_summary" msgid="5536803251863694895">"చెల్లుబాటు అయ్యే ఛానెల్ లేకుండా అనువర్తనం నోటిఫికేషన్‌ను పోస్ట్ చేస్తున్నప్పుడు స్క్రీన్‌పై హెచ్చరికను చూపిస్తుంది"</string>
+    <string name="show_notification_channel_warnings_summary" msgid="5536803251863694895">"చెల్లుబాటు అయ్యే ఛానెల్ లేకుండా యాప్ నోటిఫికేషన్‌ను పోస్ట్ చేస్తున్నప్పుడు స్క్రీన్‌పై హెచ్చరికను చూపిస్తుంది"</string>
     <string name="force_allow_on_external" msgid="3215759785081916381">"అనువర్తనాలను బాహ్య నిల్వలో నిర్బంధంగా అనుమతించు"</string>
     <string name="force_allow_on_external_summary" msgid="3640752408258034689">"ఏ అనువర్తనాన్ని అయినా మానిఫెస్ట్ విలువలతో సంబంధం లేకుండా బాహ్య నిల్వలో వ్రాయడానికి అనుమతిస్తుంది"</string>
     <string name="force_resizable_activities" msgid="8615764378147824985">"కార్యాచరణలను పరిమాణం మార్చగలిగేలా నిర్బంధించు"</string>
@@ -351,13 +351,11 @@
     <string name="power_discharging_duration_short" msgid="4192244429001842403">"<xliff:g id="LEVEL">^1</xliff:g> - <xliff:g id="TIME">^2</xliff:g> మిగిలి ఉంది"</string>
     <string name="power_charging" msgid="1779532561355864267">"<xliff:g id="LEVEL">%1$s</xliff:g> - <xliff:g id="STATE">%2$s</xliff:g>"</string>
     <string name="power_charging_duration" msgid="4676999980973411875">"<xliff:g id="LEVEL">^1</xliff:g> - <xliff:g id="TIME">^2</xliff:g>లో పూర్తిగా ఛార్జ్ అవుతుంది"</string>
-    <string name="power_charging_duration_short" msgid="1098603958472207920">"<xliff:g id="LEVEL">^1</xliff:g> - <xliff:g id="TIME">^2</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="196130600938058547">"తెలియదు"</string>
     <string name="battery_info_status_charging" msgid="1705179948350365604">"ఛార్జ్ అవుతోంది"</string>
     <string name="battery_info_status_charging_lower" msgid="8689770213898117994">"ఛార్జ్ అవుతోంది"</string>
     <string name="battery_info_status_discharging" msgid="310932812698268588">"ఛార్జ్ కావడం లేదు"</string>
-    <!-- no translation found for battery_info_status_not_charging (8523453668342598579) -->
-    <skip />
+    <string name="battery_info_status_not_charging" msgid="8523453668342598579">"ప్లగ్ ఇన్ చేయబడింది, ప్రస్తుతం ఛార్జ్ చేయడం సాధ్యం కాదు"</string>
     <string name="battery_info_status_full" msgid="2824614753861462808">"నిండింది"</string>
     <string name="disabled_by_admin_summary_text" msgid="6750513964908334617">"నిర్వాహకుని ద్వారా నియంత్రించబడింది"</string>
     <string name="enabled_by_admin" msgid="5302986023578399263">"నిర్వాహకులు ప్రారంభించారు"</string>
@@ -389,5 +387,5 @@
     <string name="use_system_language_to_select_input_method_subtypes" msgid="5747329075020379587">"సిస్టమ్ భాషలను ఉపయోగించు"</string>
     <string name="failed_to_open_app_settings_toast" msgid="1251067459298072462">"<xliff:g id="SPELL_APPLICATION_NAME">%1$s</xliff:g> యొక్క సెట్టింగ్‌లను తెరవడం విఫలమైంది"</string>
     <string name="ime_security_warning" msgid="4135828934735934248">"ఈ ఇన్‌పుట్ పద్ధతి మీరు టైప్ చేసే మొత్తం వచనాన్ని అలాగే పాస్‌వర్డ్‌లు మరియు క్రెడిట్ కార్డు నంబర్‌ల వంటి వ్యక్తిగత డేటాను సేకరించగలదు. ఇది <xliff:g id="IME_APPLICATION_NAME">%1$s</xliff:g> అనువర్తనంలో అందించబడుతుంది. ఈ ఇన్‌పుట్ పద్ధతిని ఉపయోగించాలా?"</string>
-    <string name="direct_boot_unaware_dialog_message" msgid="7870273558547549125">"గమనిక: రీబూట్ చేసాక, మీరు మీ ఫోన్‌ను అన్‌లాక్ చేసే వరకు ఈ అనువర్తనం ప్రారంభం కాదు"</string>
+    <string name="direct_boot_unaware_dialog_message" msgid="7870273558547549125">"గమనిక: రీబూట్ చేసాక, మీరు మీ ఫోన్‌ను అన్‌లాక్ చేసే వరకు ఈ యాప్ ప్రారంభం కాదు"</string>
 </resources>

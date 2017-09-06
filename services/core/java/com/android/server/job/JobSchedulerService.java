@@ -782,6 +782,11 @@ public final class JobSchedulerService extends com.android.server.SystemService
      *
      */
     public void cancelJobsForUid(int uid, String reason) {
+        if (uid == Process.SYSTEM_UID) {
+            // This really shouldn't happen.
+            Slog.wtfStack(TAG, "cancelJobsForUid() called for system uid");
+            return;
+        }
         synchronized (mLock) {
             final List<JobStatus> jobsForUid = mJobs.getJobsByUid(uid);
             for (int i=0; i<jobsForUid.size(); i++) {
@@ -1835,6 +1840,13 @@ public final class JobSchedulerService extends com.android.server.SystemService
                 }
             }
         }
+
+        @Override
+        public JobStorePersistStats getPersistStats() {
+            synchronized (mLock) {
+                return new JobStorePersistStats(mJobs.getPersistStats());
+            }
+        }
     }
 
     /**
@@ -2015,7 +2027,6 @@ public final class JobSchedulerService extends com.android.server.SystemService
         @Override
         public void cancelAll() throws RemoteException {
             final int uid = Binder.getCallingUid();
-
             long ident = Binder.clearCallingIdentity();
             try {
                 JobSchedulerService.this.cancelJobsForUid(uid, "cancelAll() called by app");
@@ -2457,6 +2468,9 @@ public final class JobSchedulerService extends com.android.server.SystemService
                 pw.print("mReportedActive="); pw.println(mReportedActive);
                 pw.print("mMaxActiveJobs="); pw.println(mMaxActiveJobs);
             }
+            pw.println();
+            pw.print("PersistStats: ");
+            pw.println(mJobs.getPersistStats());
         }
         pw.println();
     }

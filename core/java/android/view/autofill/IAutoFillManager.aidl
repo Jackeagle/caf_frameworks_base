@@ -49,5 +49,5 @@ interface IAutoFillManager {
     void disableOwnedAutofillServices(int userId);
     boolean isServiceSupported(int userId);
     boolean isServiceEnabled(int userId, String packageName);
-    void dismissUi();
+    void onPendingSaveUi(int operation, IBinder token);
 }

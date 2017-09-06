@@ -2354,7 +2354,7 @@ public class WindowManagerService extends IWindowManager.Stub
         // artifacts when we unfreeze the display if some different animation
         // is running.
         Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "WM#applyAnimationLocked");
-        if (okToAnimate()) {
+        if (atoken.okToAnimate()) {
             final DisplayContent displayContent = atoken.getTask().getDisplayContent();
             final DisplayInfo displayInfo = displayContent.getDisplayInfo();
             final int width = displayInfo.appWidth;
@@ -2430,14 +2430,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 + ", uid=" + Binder.getCallingUid() + " requires " + permission;
         Slog.w(TAG_WM, msg);
         return false;
-    }
-
-    boolean okToDisplay() {
-        return !mDisplayFrozen && mDisplayEnabled && mPolicy.isScreenOn();
-    }
-
-    boolean okToAnimate() {
-        return okToDisplay() && mPolicy.okToAnimate();
     }
 
     @Override
@@ -2706,7 +2698,9 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized(mWindowMap) {
             boolean prepared = mAppTransition.prepareAppTransitionLocked(transit, alwaysKeepCurrent,
                     flags, forceOverride);
-            if (prepared && okToAnimate()) {
+            // TODO (multidisplay): associate app transitions with displays
+            final DisplayContent dc = mRoot.getDisplayContent(DEFAULT_DISPLAY);
+            if (prepared && dc != null && dc.okToAnimate()) {
                 mSkipAppTransitionAnimation = false;
             }
         }
@@ -5850,7 +5844,7 @@ public class WindowManagerService extends IWindowManager.Stub
         // If the screen is currently frozen or off, then keep
         // it frozen/off until this window draws at its new
         // orientation.
-        if (!okToDisplay() && mWindowsFreezingScreen != WINDOWS_FREEZING_SCREENS_TIMEOUT) {
+        if (!w.mToken.okToDisplay() && mWindowsFreezingScreen != WINDOWS_FREEZING_SCREENS_TIMEOUT) {
             if (DEBUG_ORIENTATION) Slog.v(TAG_WM, "Changing surface while display frozen: " + w);
             w.setOrientationChanging(true);
             w.mLastFreezeDuration = 0;
@@ -6066,7 +6060,7 @@ public class WindowManagerService extends IWindowManager.Stub
             return;
         }
 
-        if (!displayContent.isReady() || !mPolicy.isScreenOn() || !okToAnimate()) {
+        if (!displayContent.isReady() || !mPolicy.isScreenOn() || !displayContent.okToAnimate()) {
             // No need to freeze the screen before the display is ready,  if the screen is off,
             // or we can't currently animate.
             return;
@@ -6102,7 +6096,8 @@ public class WindowManagerService extends IWindowManager.Stub
             Debug.startMethodTracing(file.toString(), 8 * 1024 * 1024);
         }
 
-        if (CUSTOM_SCREEN_ROTATION) {
+        // TODO(multidisplay): rotation on non-default displays
+        if (CUSTOM_SCREEN_ROTATION && displayContent.isDefaultDisplay) {
             mExitAnimId = exitAnim;
             mEnterAnimId = enterAnim;
             ScreenRotationAnimation screenRotationAnimation =
@@ -6114,7 +6109,6 @@ public class WindowManagerService extends IWindowManager.Stub
             // Check whether the current screen contains any secure content.
             boolean isSecure = displayContent.hasSecureWindowOnScreen();
 
-            // TODO(multidisplay): rotation on main screen only.
             displayContent.updateDisplayInfo();
             screenRotationAnimation = new ScreenRotationAnimation(mContext, displayContent,
                     mFxSession, inTransaction, mPolicy.isDefaultOrientationForced(), isSecure,
