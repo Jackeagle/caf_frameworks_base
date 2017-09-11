@@ -200,7 +200,7 @@ private:
     int earlyCameraFrameInit(int w,int h);
     int earlyCameraFrameDeinit();
     bool showCamera();
-    bool camera();
+    bool camera(bool& notifyLK);
     GLuint loadShader(int iShaderType, const char* source);
     GLuint createProgram();
     void initCameraProgram();

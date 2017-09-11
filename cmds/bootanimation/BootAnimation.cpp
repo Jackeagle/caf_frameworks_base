@@ -384,8 +384,6 @@ bool BootAnimation::threadLoop()
 #ifdef USE_CAMERA_DATA
     static bool notifyLK = true;
     if(notifyLK) {
-        notifyLKEarlyCameraPauseDisplay();
-        notifyLK = false;
         earlyCameraFrameInit(TEST_WIDTH, TEST_HEIGHT);
     }
 #endif
@@ -393,11 +391,17 @@ bool BootAnimation::threadLoop()
     // animation.
     do {
         if(showCamera()) {
-            camera();
-        } else if (mZipFileName.isEmpty()) {
-            r = android();
+            camera(notifyLK);
         } else {
-            r = movie();
+            if(notifyLK) {
+                notifyLKEarlyCameraPauseDisplay();
+                notifyLK = false;
+            }
+            if (mZipFileName.isEmpty()) {
+                r = android();
+            } else {
+                r = movie();
+            }
         }
     } while (!exitPending());
 
@@ -1430,7 +1434,7 @@ bool BootAnimation::showCamera()
 }
 
 
-bool BootAnimation::camera()
+bool BootAnimation::camera(bool& notifyLK)
 {
     //int ret;
     const GLint version_attribs[] = {
@@ -1446,9 +1450,10 @@ bool BootAnimation::camera()
         return NO_INIT;
     }
     initCameraProgram();
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    eglSwapBuffers(mDisplay, mSurface);
+    if(notifyLK) {
+        notifyLKEarlyCameraPauseDisplay();
+        notifyLK = false;
+    }
 #ifdef USE_CAMERA_DATA
     //ret = earlyCameraFrameInit(TEST_WIDTH, TEST_HEIGHT);
     //if(ret < 0) {
@@ -1467,8 +1472,8 @@ bool BootAnimation::camera()
         }
         if(frameCount <= 1) {
             frameCount++;
-            ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_QBUF, &cfg);
-            continue;
+            //ioctl(mEarlycameraFd, VIDIOC_MSM_EARLYCAMERA_QBUF, &cfg);
+            //continue;
         }
         ALOGD("get one early camera frame, index: %d", cfg.idx);
         data = mEarlyCameraBufs[cfg.idx].data;
@@ -1492,6 +1497,11 @@ bool BootAnimation::camera()
 #endif
     }
     destroyCameraProgram();
+    if(frameCount == 0) {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        eglSwapBuffers(mDisplay, mSurface);
+    }
     //earlyCameraFrameDeinit();
     eglMakeCurrent(mDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroyContext(mDisplay, mContext);
