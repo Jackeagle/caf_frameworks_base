@@ -155,7 +155,7 @@
     <string name="accessibility_cell_data" msgid="5326139158682385073">"მობილური ინტერნეტი"</string>
     <string name="accessibility_cell_data_on" msgid="5927098403452994422">"მობილური ინტერნეტი ჩართულია"</string>
     <string name="accessibility_cell_data_off" msgid="443267573897409704">"მობილური ინტერნეტი გამორთულია"</string>
-    <string name="accessibility_bluetooth_tether" msgid="4102784498140271969">"Bluetooth-ის ჩართვა"</string>
+    <string name="accessibility_bluetooth_tether" msgid="4102784498140271969">"Bluetooth ტეტერინგის ჩართვა"</string>
     <string name="accessibility_airplane_mode" msgid="834748999790763092">"თვითმფრინავის რეჟიმი"</string>
     <string name="accessibility_vpn_on" msgid="5993385083262856059">"VPN ჩართულია."</string>
     <string name="accessibility_no_sims" msgid="3957997018324995781">"SIM ბარათი არ არის."</string>
@@ -312,7 +312,7 @@
     <string name="quick_settings_connected" msgid="1722253542984847487">"დაკავშირებულია"</string>
     <string name="quick_settings_connected_battery_level" msgid="4136051440381328892">"დაკავშირებულია. ბატარეის დონე: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
     <string name="quick_settings_connecting" msgid="47623027419264404">"დაკავშირება..."</string>
-    <string name="quick_settings_tethering_label" msgid="7153452060448575549">"მოდემის რეჟიმი"</string>
+    <string name="quick_settings_tethering_label" msgid="7153452060448575549">"ტეტერინგი"</string>
     <string name="quick_settings_hotspot_label" msgid="6046917934974004879">"წვდომის წერტილი"</string>
     <string name="quick_settings_notifications_label" msgid="4818156442169154523">"შეტყობინებები"</string>
     <string name="quick_settings_flashlight_label" msgid="2133093497691661546">"ფანარი"</string>
@@ -556,8 +556,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"ამ აპს შეტყობინებების კატეგორიები არ აქვს"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"ამ აპიდან შეტყობინებების გამორთვა ვერ მოხერხდება"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="other">ამ აპის შეტყობინებების <xliff:g id="NUMBER_1">%d</xliff:g> კატეგორიიდან 1</item>
-      <item quantity="one">ამ აპის შეტყობინებების <xliff:g id="NUMBER_0">%d</xliff:g> კატეგორიიდან 1</item>
+      <item quantity="other">ამ აპის შეტყობინებების <xliff:g id="NUMBER_1">%s</xliff:g> კატეგორიიდან 1</item>
+      <item quantity="one">ამ აპის შეტყობინებების <xliff:g id="NUMBER_0">%s</xliff:g> კატეგორიიდან 1</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">

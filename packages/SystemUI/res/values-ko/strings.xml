@@ -242,9 +242,9 @@
     <string name="accessibility_ambient_display_charging" msgid="9084521679384069087">"충전 중"</string>
     <string name="data_usage_disabled_dialog_3g_title" msgid="5281770593459841889">"2G-3G 데이터 사용 중지됨"</string>
     <string name="data_usage_disabled_dialog_4g_title" msgid="1601769736881078016">"4G 데이터 사용 중지됨"</string>
-    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"모바일 데이터가 일시 중지됨"</string>
+    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"모바일 데이터가 일시중지됨"</string>
     <string name="data_usage_disabled_dialog_title" msgid="3932437232199671967">"데이터 사용 중지됨"</string>
-    <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"설정한 데이터 한도에 도달했습니다. 더 이상 모바일 데이터를 사용하지 않습니다.\n\n계속하면 데이터 사용량에 따른 요금이 부과될 수 있습니다."</string>
+    <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"설정한 데이터 한도에 도달했습니다. 더 이상 모바일 데이터를 사용하지 않습니다.\n\n계속하면 데이터 사용량에 따라 요금이 부과될 수 있습니다."</string>
     <string name="data_usage_disabled_dialog_enable" msgid="1412395410306390593">"재개"</string>
     <string name="status_bar_settings_signal_meter_disconnected" msgid="1940231521274147771">"인터넷에 연결되지 않음"</string>
     <string name="status_bar_settings_signal_meter_wifi_nossid" msgid="6557486452774597820">"Wi-Fi 연결됨"</string>
@@ -558,8 +558,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"이 앱에는 알림 카테고리가 없습니다."</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"이 앱의 알림을 사용 중지할 수 없습니다."</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="other">이 앱에서 <xliff:g id="NUMBER_1">%d</xliff:g>개의 알림 카테고리 중 1개가 정의됨</item>
-      <item quantity="one">이 앱에서 <xliff:g id="NUMBER_0">%d</xliff:g>개의 알림 카테고리 중 1개가 정의됨</item>
+      <item quantity="other">이 앱에서 <xliff:g id="NUMBER_1">%s</xliff:g>개의 알림 카테고리 중 1개가 정의됨</item>
+      <item quantity="one">이 앱에서 <xliff:g id="NUMBER_0">%s</xliff:g>개의 알림 카테고리 중 1개가 정의됨</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">

@@ -355,8 +355,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"Rechercher"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"Faites glisser vers le haut pour <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"Faites glisser vers la gauche pour <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
-    <string name="zen_priority_introduction" msgid="1149025108714420281">"Vous ne serez pas dérangé par des sons ou des vibrations, hormis ceux des alarmes, des rappels, des événements et des appelants de votre choix. Vous entendrez encore les sons que vous choisirez de jouer, notamment la musique, les vidéos et les jeux."</string>
-    <string name="zen_alarms_introduction" msgid="4934328096749380201">"Vous ne serez pas dérangé par des sons ou des vibrations, hormis ceux des alarmes. Vous entendrez encore les sons que vous choisirez de jouer, notamment la musique, les vidéos et les jeux."</string>
+    <string name="zen_priority_introduction" msgid="1149025108714420281">"Vous ne serez dérangé par aucun son ni aucune vibration, hormis ceux des alarmes, des rappels, des événements et des appels des contacts de votre choix. Le son continuera de fonctionner notamment pour la musique, les vidéos et les jeux."</string>
+    <string name="zen_alarms_introduction" msgid="4934328096749380201">"Vous ne serez dérangé par aucun son ni aucune vibration, hormis ceux des alarmes. Le son continuera de fonctionner notamment pour la musique, les vidéos et les jeux."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"Personnaliser"</string>
     <string name="zen_silence_introduction_voice" msgid="3948778066295728085">"Cette option permet de bloquer TOUS les sons et les vibrations, y compris pour les alarmes, la musique, les vidéos et les jeux. Vous pourrez encore passer des appels téléphoniques."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"Cette option permet de bloquer TOUS les sons et les vibrations, y compris pour les alarmes, la musique, les vidéos et les jeux."</string>
@@ -558,8 +558,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"Cette application n\'a pas de catégories de notification"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Impossible de désactiver les notifications de cette application"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">1 catégorie de notification sur <xliff:g id="NUMBER_1">%d</xliff:g> provenant de cette application</item>
-      <item quantity="other">1 catégorie de notification sur <xliff:g id="NUMBER_1">%d</xliff:g> provenant de cette application</item>
+      <item quantity="one">1 catégorie de notification sur <xliff:g id="NUMBER_1">%s</xliff:g> provenant de cette application</item>
+      <item quantity="other">1 catégorie de notification sur <xliff:g id="NUMBER_1">%s</xliff:g> provenant de cette application</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">
@@ -777,6 +777,5 @@
     <string name="running_foreground_services_title" msgid="381024150898615683">"Applications en cours d\'exécution en arrière-plan"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"Appuyer pour obtenir des informations sur l\'utilisation de la batterie et des données"</string>
     <string name="data_usage_disable_mobile" msgid="5116269981510015864">"Désactiver les données mobiles ?"</string>
-    <!-- no translation found for touch_filtered_warning (8671693809204767551) -->
-    <skip />
+    <string name="touch_filtered_warning" msgid="8671693809204767551">"L\'application Paramètres ne peut pas valider votre réponse, car une application masque la demande d\'autorisation."</string>
 </resources>

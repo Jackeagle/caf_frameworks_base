@@ -22,7 +22,7 @@
     <string name="app_label" msgid="7164937344850004466">"System-UI"</string>
     <string name="status_bar_clear_all_button" msgid="7774721344716731603">"Ryd"</string>
     <string name="status_bar_recent_remove_item_title" msgid="6026395868129852968">"Fjern fra listen"</string>
-    <string name="status_bar_recent_inspect_item_title" msgid="7793624864528818569">"Oplysninger om appen"</string>
+    <string name="status_bar_recent_inspect_item_title" msgid="7793624864528818569">"Appinfo"</string>
     <string name="status_bar_no_recent_apps" msgid="7374907845131203189">"Dine seneste skærme vises her"</string>
     <string name="status_bar_accessibility_dismiss_recents" msgid="4576076075226540105">"Luk de seneste apps"</string>
     <plurals name="status_bar_accessibility_recent_apps" formatted="false" msgid="9138535907802238759">
@@ -279,7 +279,7 @@
     <string name="accessibility_quick_settings_rotation" msgid="4231661040698488779">"Roter skærmen automatisk"</string>
     <string name="accessibility_quick_settings_rotation_value" msgid="8187398200140760213">"Tilstanden <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="quick_settings_rotation_locked_label" msgid="6359205706154282377">"Rotationen er låst"</string>
-    <string name="quick_settings_rotation_locked_portrait_label" msgid="5102691921442135053">"Stående format"</string>
+    <string name="quick_settings_rotation_locked_portrait_label" msgid="5102691921442135053">"Stående"</string>
     <string name="quick_settings_rotation_locked_landscape_label" msgid="8553157770061178719">"Liggende"</string>
     <string name="quick_settings_ime_label" msgid="7073463064369468429">"Inputmetode"</string>
     <string name="quick_settings_location_label" msgid="5011327048748762257">"Placering"</string>
@@ -556,8 +556,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"Denne app har ingen underretningskategorier"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Underretninger fra denne app kan ikke deaktiveres"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">1 ud af <xliff:g id="NUMBER_1">%d</xliff:g> underretningskategori fra denne app</item>
-      <item quantity="other">1 ud af <xliff:g id="NUMBER_1">%d</xliff:g> underretningskategorier fra denne app</item>
+      <item quantity="one">1 ud af <xliff:g id="NUMBER_1">%s</xliff:g> underretningskategori fra denne app</item>
+      <item quantity="other">1 ud af <xliff:g id="NUMBER_1">%s</xliff:g> underretningskategorier fra denne app</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">
@@ -760,7 +760,7 @@
     <string name="notification_channel_storage" msgid="3077205683020695313">"Lagerplads"</string>
     <string name="instant_apps" msgid="6647570248119804907">"Instant Apps"</string>
     <string name="instant_apps_message" msgid="8116608994995104836">"Instant apps kræver ingen installation."</string>
-    <string name="app_info" msgid="6856026610594615344">"Oplysninger om appen"</string>
+    <string name="app_info" msgid="6856026610594615344">"Appinfo"</string>
     <string name="go_to_web" msgid="1106022723459948514">"Gå til website"</string>
     <string name="mobile_data" msgid="7094582042819250762">"Mobildata"</string>
     <string name="wifi_is_off" msgid="1838559392210456893">"Wi-Fi er slået fra"</string>
@@ -775,6 +775,5 @@
     <string name="running_foreground_services_title" msgid="381024150898615683">"Apps, der kører i baggrunden"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"Tryk for at se oplysninger om batteri- og dataforbrug"</string>
     <string name="data_usage_disable_mobile" msgid="5116269981510015864">"Vil du deaktivere mobildata?"</string>
-    <!-- no translation found for touch_filtered_warning (8671693809204767551) -->
-    <skip />
+    <string name="touch_filtered_warning" msgid="8671693809204767551">"Indstillinger kan ikke bekræfte dit svar, da en app dækker for en anmodning om tilladelse."</string>
 </resources>

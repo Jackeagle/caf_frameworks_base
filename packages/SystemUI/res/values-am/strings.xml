@@ -298,7 +298,7 @@
     <string name="quick_settings_wifi_off_label" msgid="7558778100843885864">"Wi-Fi ጠፍቷል"</string>
     <string name="quick_settings_wifi_on_label" msgid="7607810331387031235">"Wi-Fi በርቷል"</string>
     <string name="quick_settings_wifi_detail_empty_text" msgid="269990350383909226">"ምንም የWi-Fi  አውታረ መረቦች የሉም"</string>
-    <string name="quick_settings_cast_title" msgid="7709016546426454729">"ውሰድ"</string>
+    <string name="quick_settings_cast_title" msgid="7709016546426454729">"Cast"</string>
     <string name="quick_settings_casting" msgid="6601710681033353316">"በመውሰድ ላይ"</string>
     <string name="quick_settings_cast_device_default_name" msgid="5367253104742382945">"ያልተሰየመ መሳሪያ"</string>
     <string name="quick_settings_cast_device_default_description" msgid="2484573682378634413">"ለመውሰድ ዝግጁ"</string>
@@ -556,8 +556,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"ይህ መተግበሪያ የማሳወቂያ ምድቦች የሉትም"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"ከዚህ መተግበሪያ የሚመጡ ማሳወቂያዎች ሊጠፉ አይችሉም"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">1 ከ<xliff:g id="NUMBER_1">%d</xliff:g> የማሳወቂያ ምድቦች ከዚህ መተግበሪያ</item>
-      <item quantity="other">1 <xliff:g id="NUMBER_1">%d</xliff:g> የማሳወቂያ ምድቦች ከዚህ መተግበሪያ</item>
+      <item quantity="one">1 ከ<xliff:g id="NUMBER_1">%s</xliff:g> የማሳወቂያ ምድቦች ከዚህ መተግበሪያ</item>
+      <item quantity="other">1 <xliff:g id="NUMBER_1">%s</xliff:g> የማሳወቂያ ምድቦች ከዚህ መተግበሪያ</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>፣ <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">

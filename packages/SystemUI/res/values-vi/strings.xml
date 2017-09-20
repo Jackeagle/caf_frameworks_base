@@ -240,9 +240,9 @@
     <string name="accessibility_ambient_display_charging" msgid="9084521679384069087">"Đang sạc"</string>
     <string name="data_usage_disabled_dialog_3g_title" msgid="5281770593459841889">"Đã tạm dừng dữ liệu 2G-3G"</string>
     <string name="data_usage_disabled_dialog_4g_title" msgid="1601769736881078016">"Đã tạm dừng dữ liệu 4G"</string>
-    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"Dữ liệu di động bị tạm dừng"</string>
+    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"Dữ liệu di động đã bị tạm dừng"</string>
     <string name="data_usage_disabled_dialog_title" msgid="3932437232199671967">"Đã tạm dừng dữ liệu"</string>
-    <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"Đã đạt đến giới hạn dữ liệu mà bạn đặt. Bạn hiện không còn sử dụng dữ liệu di động.\n\nNếu tiếp tục, bạn có thể phải trả phí sử dụng dữ liệu."</string>
+    <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"Dữ liệu đã đạt đến mức giới hạn mà bạn đã đặt. Bạn hiện không sử dụng dữ liệu di động nữa.\n\nNếu tiếp tục, bạn có thể bị tính phí sử dụng dữ liệu."</string>
     <string name="data_usage_disabled_dialog_enable" msgid="1412395410306390593">"Tiếp tục"</string>
     <string name="status_bar_settings_signal_meter_disconnected" msgid="1940231521274147771">"Ko có k.nối Internet"</string>
     <string name="status_bar_settings_signal_meter_wifi_nossid" msgid="6557486452774597820">"Đã kết nối Wi-Fi"</string>
@@ -558,8 +558,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"Ứng dụng này không có loại thông báo"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Không thể tắt thông báo từ ứng dụng này"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="other">1 trên tổng số <xliff:g id="NUMBER_1">%d</xliff:g> loại thông báo từ ứng dụng này</item>
-      <item quantity="one">1 trên tổng số <xliff:g id="NUMBER_0">%d</xliff:g> loại thông báo từ ứng dụng này</item>
+      <item quantity="other">1 trên tổng số <xliff:g id="NUMBER_1">%s</xliff:g> loại thông báo từ ứng dụng này</item>
+      <item quantity="one">1 trên tổng số <xliff:g id="NUMBER_0">%s</xliff:g> loại thông báo từ ứng dụng này</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">

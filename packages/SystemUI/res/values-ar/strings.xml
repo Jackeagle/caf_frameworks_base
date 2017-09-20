@@ -156,7 +156,7 @@
     <string name="accessibility_data_connection_edge" msgid="4477457051631979278">"Edge"</string>
     <string name="accessibility_data_connection_wifi" msgid="2324496756590645221">"Wi-Fi"</string>
     <string name="accessibility_no_sim" msgid="8274017118472455155">"‏ليست هناك شريحة SIM."</string>
-    <string name="accessibility_cell_data" msgid="5326139158682385073">"بيانات الجوال"</string>
+    <string name="accessibility_cell_data" msgid="5326139158682385073">"بيانات الجوّال"</string>
     <string name="accessibility_cell_data_on" msgid="5927098403452994422">"تشغيل بيانات الجوال"</string>
     <string name="accessibility_cell_data_off" msgid="443267573897409704">"إيقاف بيانات الجوال"</string>
     <string name="accessibility_bluetooth_tether" msgid="4102784498140271969">"ربط البلوتوث."</string>
@@ -244,7 +244,7 @@
     <string name="accessibility_ambient_display_charging" msgid="9084521679384069087">"جارٍ الشحن"</string>
     <string name="data_usage_disabled_dialog_3g_title" msgid="5281770593459841889">"بيانات شبكات الجيل الثاني والثالث متوقفة مؤقتًا"</string>
     <string name="data_usage_disabled_dialog_4g_title" msgid="1601769736881078016">"تم إيقاف بيانات شبكة الجيل الرابع مؤقتًا"</string>
-    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"تم إيقاف بيانات الجوال مؤقتًا"</string>
+    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"تم إيقاف بيانات الجوّال مؤقتًا"</string>
     <string name="data_usage_disabled_dialog_title" msgid="3932437232199671967">"تم إيقاف البيانات مؤقتًا"</string>
     <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"تم الوصول إلى حد البيانات الذي عيَّنته. لم يُعد بإمكانك استخدام بيانات الجوال.\n\nفي حالة الاستئناف، قد يتم تطبيق الرسوم لاستخدام البيانات."</string>
     <string name="data_usage_disabled_dialog_enable" msgid="1412395410306390593">"استئناف"</string>
@@ -328,7 +328,7 @@
     <string name="quick_settings_cellular_detail_data_usage" msgid="1964260360259312002">"استخدام البيانات"</string>
     <string name="quick_settings_cellular_detail_remaining_data" msgid="722715415543541249">"البيانات المتبقية"</string>
     <string name="quick_settings_cellular_detail_over_limit" msgid="967669665390990427">"فوق القيد"</string>
-    <string name="quick_settings_cellular_detail_data_used" msgid="1476810587475761478">"<xliff:g id="DATA_USED">%s</xliff:g> مستخدم"</string>
+    <string name="quick_settings_cellular_detail_data_used" msgid="1476810587475761478">"<xliff:g id="DATA_USED">%s</xliff:g> مستخدَمة"</string>
     <string name="quick_settings_cellular_detail_data_limit" msgid="56011158504994128">"قيد <xliff:g id="DATA_LIMIT">%s</xliff:g>"</string>
     <string name="quick_settings_cellular_detail_data_warning" msgid="2440098045692399009">"تحذير <xliff:g id="DATA_LIMIT">%s</xliff:g>"</string>
     <string name="quick_settings_work_mode_label" msgid="6244915274350490429">"وضع العمل"</string>
@@ -564,12 +564,12 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"لا يحتوي هذا التطبيق على فئات إشعار"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"لا يمكن إيقاف الإشعارات من هذا التطبيق"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="zero">1 من إجمالي <xliff:g id="NUMBER_1">%d</xliff:g> فئة إشعار من هذا التطبيق</item>
-      <item quantity="two">1 من إجمالي فئتي إشعار (<xliff:g id="NUMBER_1">%d</xliff:g>) من هذا التطبيق</item>
-      <item quantity="few">1 من إجمالي <xliff:g id="NUMBER_1">%d</xliff:g> فئات إشعار من هذا التطبيق</item>
-      <item quantity="many">1 من إجمالي <xliff:g id="NUMBER_1">%d</xliff:g> فئة إشعار من هذا التطبيق</item>
-      <item quantity="other">1 من إجمالي <xliff:g id="NUMBER_1">%d</xliff:g> فئة إشعار من هذا التطبيق</item>
-      <item quantity="one">1 من إجمالي <xliff:g id="NUMBER_0">%d</xliff:g> فئة إشعار من هذا التطبيق</item>
+      <item quantity="zero">1 من إجمالي <xliff:g id="NUMBER_1">%s</xliff:g> فئة إشعار من هذا التطبيق</item>
+      <item quantity="two">1 من إجمالي فئتي إشعار (<xliff:g id="NUMBER_1">%s</xliff:g>) من هذا التطبيق</item>
+      <item quantity="few">1 من إجمالي <xliff:g id="NUMBER_1">%s</xliff:g> فئات إشعار من هذا التطبيق</item>
+      <item quantity="many">1 من إجمالي <xliff:g id="NUMBER_1">%s</xliff:g> فئة إشعار من هذا التطبيق</item>
+      <item quantity="other">1 من إجمالي <xliff:g id="NUMBER_1">%s</xliff:g> فئة إشعار من هذا التطبيق</item>
+      <item quantity="one">1 من إجمالي <xliff:g id="NUMBER_0">%s</xliff:g> فئة إشعار من هذا التطبيق</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>، <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">
@@ -799,6 +799,5 @@
     <string name="running_foreground_services_title" msgid="381024150898615683">"التطبيقات التي تعمل في الخلفية"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"انقر للحصول على تفاصيل حول البطارية واستخدام البيانات"</string>
     <string name="data_usage_disable_mobile" msgid="5116269981510015864">"هل تريد إيقاف تشغيل بيانات الجوال؟"</string>
-    <!-- no translation found for touch_filtered_warning (8671693809204767551) -->
-    <skip />
+    <string name="touch_filtered_warning" msgid="8671693809204767551">"لا يمكن للإعدادات التحقق من ردك لأن هناك تطبيقًا يحجب طلب الإذن."</string>
 </resources>

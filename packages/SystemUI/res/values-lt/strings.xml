@@ -385,7 +385,7 @@
     <string name="accessibility_multi_user_switch_switcher_with_current" msgid="8434880595284601601">"Perjungti naudotoją, dabartinis naudotojas <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
     <string name="accessibility_multi_user_switch_inactive" msgid="1424081831468083402">"Dabartinis naudotojas <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
     <string name="accessibility_multi_user_switch_quick_contact" msgid="3020367729287990475">"Rodyti profilį"</string>
-    <string name="user_add_user" msgid="5110251524486079492">"Naudotojo pridėjimas"</string>
+    <string name="user_add_user" msgid="5110251524486079492">"Pridėti naudotoją"</string>
     <string name="user_new_user_name" msgid="426540612051178753">"Naujas naudotojas"</string>
     <string name="guest_nickname" msgid="8059989128963789678">"Svečias"</string>
     <string name="guest_new_guest" msgid="600537543078847803">"Pridėti svečią"</string>
@@ -560,10 +560,10 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"Šioje programoje nėra pranešimų kategorijų"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Šios programos pranešimų negalima išjungti"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">1 iš <xliff:g id="NUMBER_1">%d</xliff:g> šios programos pranešimų kategorijos</item>
-      <item quantity="few">1 iš <xliff:g id="NUMBER_1">%d</xliff:g> šios programos pranešimų kategorijų</item>
-      <item quantity="many">1 iš <xliff:g id="NUMBER_1">%d</xliff:g> šios programos pranešimų kategorijos</item>
-      <item quantity="other">1 iš <xliff:g id="NUMBER_1">%d</xliff:g> šios programos pranešimų kategorijų</item>
+      <item quantity="one">1 iš <xliff:g id="NUMBER_1">%s</xliff:g> šios programos pranešimų kategorijos</item>
+      <item quantity="few">1 iš <xliff:g id="NUMBER_1">%s</xliff:g> šios programos pranešimų kategorijų</item>
+      <item quantity="many">1 iš <xliff:g id="NUMBER_1">%s</xliff:g> šios programos pranešimų kategorijos</item>
+      <item quantity="other">1 iš <xliff:g id="NUMBER_1">%s</xliff:g> šios programos pranešimų kategorijų</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"„<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>“, „<xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>“"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">

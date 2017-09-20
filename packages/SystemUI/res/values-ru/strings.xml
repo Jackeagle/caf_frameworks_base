@@ -244,9 +244,9 @@
     <string name="accessibility_ambient_display_charging" msgid="9084521679384069087">"Зарядка батареи"</string>
     <string name="data_usage_disabled_dialog_3g_title" msgid="5281770593459841889">"Передача данных 2G и 3G приостановлена"</string>
     <string name="data_usage_disabled_dialog_4g_title" msgid="1601769736881078016">"Передача данных 4G приостановлена"</string>
-    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"Передача данных по моб. сети приостановлена"</string>
+    <string name="data_usage_disabled_dialog_mobile_title" msgid="6801382439018099779">"Передача данных остановлена"</string>
     <string name="data_usage_disabled_dialog_title" msgid="3932437232199671967">"Передача данных приостановлена"</string>
-    <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"Достигнут лимит мобильного трафика, и вы больше его не расходуете.\n\nЕсли вы продолжите, возможно, начнет взиматься плата за передачу данных."</string>
+    <string name="data_usage_disabled_dialog" msgid="4919541636934603816">"Достигнут лимит мобильного трафика, и передача данных остановлена.\n\nЕсли вы возобновите передачу данных по мобильной сети, может взиматься плата."</string>
     <string name="data_usage_disabled_dialog_enable" msgid="1412395410306390593">"Возобновить"</string>
     <string name="status_bar_settings_signal_meter_disconnected" msgid="1940231521274147771">"Нет интернет-подключения"</string>
     <string name="status_bar_settings_signal_meter_wifi_nossid" msgid="6557486452774597820">"Wi-Fi подключено"</string>
@@ -562,10 +562,10 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"В приложении нет категорий уведомлений"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Уведомления этого приложения нельзя отключить"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">1 из <xliff:g id="NUMBER_1">%d</xliff:g> категории уведомлений этого приложения</item>
-      <item quantity="few">1 из <xliff:g id="NUMBER_1">%d</xliff:g> категорий уведомлений этого приложения</item>
-      <item quantity="many">1 из <xliff:g id="NUMBER_1">%d</xliff:g> категорий уведомлений этого приложения</item>
-      <item quantity="other">1 из <xliff:g id="NUMBER_1">%d</xliff:g> категории уведомлений этого приложения</item>
+      <item quantity="one">1 из <xliff:g id="NUMBER_1">%s</xliff:g> категории уведомлений этого приложения</item>
+      <item quantity="few">1 из <xliff:g id="NUMBER_1">%s</xliff:g> категорий уведомлений этого приложения</item>
+      <item quantity="many">1 из <xliff:g id="NUMBER_1">%s</xliff:g> категорий уведомлений этого приложения</item>
+      <item quantity="other">1 из <xliff:g id="NUMBER_1">%s</xliff:g> категории уведомлений этого приложения</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">

@@ -81,7 +81,7 @@
     <string name="use_ptp_button_title" msgid="7517127540301625751">"कॅमेरा म्हणून माउंट करा (PTP)"</string>
     <string name="installer_cd_button_title" msgid="2312667578562201583">"Mac साठी Android फाईल स्थानांतर अॅप इंस्टॉल करा"</string>
     <string name="accessibility_back" msgid="567011538994429120">"मागे"</string>
-    <string name="accessibility_home" msgid="8217216074895377641">"होम स्क्रीन"</string>
+    <string name="accessibility_home" msgid="8217216074895377641">"होम"</string>
     <string name="accessibility_menu" msgid="316839303324695949">"मेनू"</string>
     <string name="accessibility_accessibility_button" msgid="7601252764577607915">"प्रवेशयोग्यता"</string>
     <string name="accessibility_recent" msgid="5208608566793607626">"अवलोकन"</string>
@@ -473,7 +473,7 @@
     <string name="keyguard_indication_trust_disabled" msgid="7412534203633528135">"तुम्ही मॅन्युअली अनलॉक करेपर्यंत डीव्हाइस लॉक राहील"</string>
     <string name="hidden_notifications_title" msgid="7139628534207443290">"सूचना अधिक जलद मिळवा"</string>
     <string name="hidden_notifications_text" msgid="2326409389088668981">"आपण अनलॉक करण्‍यापूर्वी त्यांना पहा"</string>
-    <string name="hidden_notifications_cancel" msgid="3690709735122344913">"नाही धन्यवाद"</string>
+    <string name="hidden_notifications_cancel" msgid="3690709735122344913">"नाही, नको"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"सेट अप"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
     <string name="volume_zen_end_now" msgid="6930243045593601084">"आता बंद करा"</string>
@@ -483,7 +483,7 @@
     <string name="screen_pinning_description" msgid="8909878447196419623">"आपण अनपिन करेर्यंत हे यास दृश्यामध्ये ठेवते. अनपिन करण्‍यासाठी परत आणि विहंगावलोकनास स्पर्श करा आणि धरून ठेवा."</string>
     <string name="screen_pinning_description_accessible" msgid="426190689254018656">"आपण अनपिन करेर्यंत हे यास दृश्यामध्ये ठेवते. अनपिन करण्‍यासाठी विहंगावलोकनास स्पर्श करा आणि धरून ठेवा."</string>
     <string name="screen_pinning_positive" msgid="3783985798366751226">"समजले"</string>
-    <string name="screen_pinning_negative" msgid="3741602308343880268">"नाही धन्यवाद"</string>
+    <string name="screen_pinning_negative" msgid="3741602308343880268">"नाही, नको"</string>
     <string name="quick_settings_reset_confirmation_title" msgid="748792586749897883">"<xliff:g id="TILE_LABEL">%1$s</xliff:g> लपवायचे?"</string>
     <string name="quick_settings_reset_confirmation_message" msgid="2235970126803317374">"आपण सेटिंग्जमध्ये ते पुढील वेळी चालू कराल तेव्हा ते पुन्हा दिसेल."</string>
     <string name="quick_settings_reset_confirmation_button" msgid="2660339101868367515">"लपवा"</string>
@@ -511,7 +511,7 @@
     <string name="status_bar" msgid="4877645476959324760">"स्टेटस बार"</string>
     <string name="overview" msgid="4018602013895926956">"अवलोकन"</string>
     <string name="demo_mode" msgid="2532177350215638026">"सिस्टीम UI डेमो मोड"</string>
-    <string name="enable_demo_mode" msgid="4844205668718636518">"डेमो मोड सक्षम करा"</string>
+    <string name="enable_demo_mode" msgid="4844205668718636518">"डेमो मोड सुरू करा"</string>
     <string name="show_demo_mode" msgid="2018336697782464029">"डेमो मोड दर्शवा"</string>
     <string name="status_bar_ethernet" msgid="5044290963549500128">"इथरनेट"</string>
     <string name="status_bar_alarm" msgid="8536256753575881818">"अलार्म"</string>
@@ -556,8 +556,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"या अ‍ॅपला सूचना श्रेण्या नाहीत"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"या अ‍ॅपकडून येणार्‍या सूचना बंद ठेवता येणार नाहीत"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">या अॅपकडील <xliff:g id="NUMBER_1">%d</xliff:g> पैकी 1 सूचना श्रेणी</item>
-      <item quantity="other">या अॅपकडील <xliff:g id="NUMBER_1">%d</xliff:g> पैकी 1 सूचना श्रेणी</item>
+      <item quantity="one">या अॅपकडील <xliff:g id="NUMBER_1">%s</xliff:g> पैकी 1 सूचना श्रेणी</item>
+      <item quantity="other">या अॅपकडील <xliff:g id="NUMBER_1">%s</xliff:g> पैकी 1 सूचना श्रेणी</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">
@@ -615,7 +615,7 @@
     <string name="keyboard_key_num_lock" msgid="5052537581246772117">"Num Lock"</string>
     <string name="keyboard_key_numpad_template" msgid="8729216555174634026">"Numpad <xliff:g id="NAME">%1$s</xliff:g>"</string>
     <string name="keyboard_shortcut_group_system" msgid="6472647649616541064">"सिस्टीम"</string>
-    <string name="keyboard_shortcut_group_system_home" msgid="3054369431319891965">"होम स्क्रीन"</string>
+    <string name="keyboard_shortcut_group_system_home" msgid="3054369431319891965">"होम"</string>
     <string name="keyboard_shortcut_group_system_recents" msgid="3154851905021926744">"अलीकडील"</string>
     <string name="keyboard_shortcut_group_system_back" msgid="2207004531216446378">"परत"</string>
     <string name="keyboard_shortcut_group_system_notifications" msgid="8366964080041773224">"सूचना"</string>
@@ -775,6 +775,5 @@
     <string name="running_foreground_services_title" msgid="381024150898615683">"अॅप्‍स बॅकग्राउंडमध्‍ये चालू आहेत"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"बॅटरी आणि डेटा वापराच्‍या तपशीलांसाठी टॅप करा"</string>
     <string name="data_usage_disable_mobile" msgid="5116269981510015864">"मोबाइल डेटा बंद करायचा?"</string>
-    <!-- no translation found for touch_filtered_warning (8671693809204767551) -->
-    <skip />
+    <string name="touch_filtered_warning" msgid="8671693809204767551">"अ‍ॅप परवानगी विनंती अस्पष्‍ट करत असल्‍याने, सेटिंग्ज तुमचा प्रतिसाद पडताळू शकत नाहीत."</string>
 </resources>

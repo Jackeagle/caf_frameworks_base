@@ -290,7 +290,7 @@
     <string name="quick_settings_settings_label" msgid="5326556592578065401">"Կարգավորումներ"</string>
     <string name="quick_settings_time_label" msgid="4635969182239736408">"Ժամանակը"</string>
     <string name="quick_settings_user_label" msgid="5238995632130897840">"Ես"</string>
-    <string name="quick_settings_user_title" msgid="4467690427642392403">"Օտատեր"</string>
+    <string name="quick_settings_user_title" msgid="4467690427642392403">"Օգտատեր"</string>
     <string name="quick_settings_user_new_user" msgid="9030521362023479778">"Նոր օգտատեր"</string>
     <string name="quick_settings_wifi_label" msgid="9135344704899546041">"Wi-Fi"</string>
     <string name="quick_settings_wifi_not_connected" msgid="7171904845345573431">"Միացված չէ"</string>
@@ -384,7 +384,7 @@
     <string name="user_add_user" msgid="5110251524486079492">"Ավելացնել օգտատեր"</string>
     <string name="user_new_user_name" msgid="426540612051178753">"Նոր օգտատեր"</string>
     <string name="guest_nickname" msgid="8059989128963789678">"Հյուր"</string>
-    <string name="guest_new_guest" msgid="600537543078847803">"Հյուր ավելացնել"</string>
+    <string name="guest_new_guest" msgid="600537543078847803">"Ավելացնել հյուր"</string>
     <string name="guest_exit_guest" msgid="7187359342030096885">"Հեռացնել հյուրին"</string>
     <string name="guest_exit_guest_dialog_title" msgid="8480693520521766688">"Հեռացնե՞լ հյուրին:"</string>
     <string name="guest_exit_guest_dialog_message" msgid="4155503224769676625">"Այս աշխատաշրջանի բոլոր ծրագրերն ու տվյալները կջնջվեն:"</string>
@@ -556,8 +556,8 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"Այս հավելվածը ծանուցման կատեգորիաներ չունի"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Այս հավելվածի ծանուցումները հնարավոր չէ անջատել"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="one">1 out of <xliff:g id="NUMBER_1">%d</xliff:g> notification categories from this app</item>
-      <item quantity="other">1 ալիք` այս հավելվածի <xliff:g id="NUMBER_1">%d</xliff:g> կատեգորիաներից</item>
+      <item quantity="one">1 out of <xliff:g id="NUMBER_1">%s</xliff:g> notification categories from this app</item>
+      <item quantity="other">1 ալիք` այս հավելվածի <xliff:g id="NUMBER_1">%s</xliff:g> կատեգորիաներից</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">
@@ -775,6 +775,5 @@
     <string name="running_foreground_services_title" msgid="381024150898615683">"Ֆոնային ռեժիմում աշխատող հավելվածներ"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"Հպեք՝ մարտկոցի և թրաֆիկի մանրամասները տեսնելու համար"</string>
     <string name="data_usage_disable_mobile" msgid="5116269981510015864">"Անջատե՞լ բջջային ինտերնետը։"</string>
-    <!-- no translation found for touch_filtered_warning (8671693809204767551) -->
-    <skip />
+    <string name="touch_filtered_warning" msgid="8671693809204767551">"Քանի որ ներածումն արգելափակված է ինչ-որ հավելվածի կողմից, Կարգավորումները չեն կարող հաստատել ձեր պատասխանը:"</string>
 </resources>

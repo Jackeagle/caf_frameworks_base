@@ -76,10 +76,10 @@ public class AccessPointPreference extends Preference {
     public static String generatePreferenceKey(AccessPoint accessPoint) {
         StringBuilder builder = new StringBuilder();
 
-        if (TextUtils.isEmpty(accessPoint.getBssid())) {
-            builder.append(accessPoint.getSsidStr());
-        } else {
+        if (TextUtils.isEmpty(accessPoint.getSsidStr())) {
             builder.append(accessPoint.getBssid());
+        } else {
+            builder.append(accessPoint.getSsidStr());
         }
 
         builder.append(',').append(accessPoint.getSecurity());
@@ -160,7 +160,7 @@ public class AccessPointPreference extends Preference {
             drawable.setLevel(mLevel);
         }
 
-        mTitleView = (TextView) view.findViewById(com.android.internal.R.id.title);
+        mTitleView = (TextView) view.findViewById(android.R.id.title);
         if (mTitleView != null) {
             // Attach to the end of the title view
             mTitleView.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, mBadge, null);
@@ -231,12 +231,7 @@ public class AccessPointPreference extends Preference {
      * Updates the title and summary; may indirectly call notifyChanged().
      */
     public void refresh() {
-        if (mForSavedNetworks) {
-            setTitle(mAccessPoint.getConfigName());
-        } else {
-            setTitle(mAccessPoint.getSsid());
-        }
-
+        setTitle(this, mAccessPoint, mForSavedNetworks);
         final Context context = getContext();
         int level = mAccessPoint.getLevel();
         int wifiSpeed = mAccessPoint.getSpeed();
@@ -262,6 +257,15 @@ public class AccessPointPreference extends Preference {
             postNotifyChanged();
         } else {
             super.notifyChanged();
+        }
+    }
+
+    @VisibleForTesting
+    static void setTitle(AccessPointPreference preference, AccessPoint ap, boolean savedNetworks) {
+        if (savedNetworks) {
+            preference.setTitle(ap.getConfigName());
+        } else {
+            preference.setTitle(ap.getSsidStr());
         }
     }
 

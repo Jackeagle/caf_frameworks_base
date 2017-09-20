@@ -22,7 +22,7 @@
     <string name="app_label" msgid="7164937344850004466">"UI systému"</string>
     <string name="status_bar_clear_all_button" msgid="7774721344716731603">"Vymazat"</string>
     <string name="status_bar_recent_remove_item_title" msgid="6026395868129852968">"Odebrat ze seznamu"</string>
-    <string name="status_bar_recent_inspect_item_title" msgid="7793624864528818569">"Informace o aplikaci"</string>
+    <string name="status_bar_recent_inspect_item_title" msgid="7793624864528818569">"O aplikaci"</string>
     <string name="status_bar_no_recent_apps" msgid="7374907845131203189">"Zde budou zobrazeny vaše poslední obrazovky"</string>
     <string name="status_bar_accessibility_dismiss_recents" msgid="4576076075226540105">"Zavřít nové aplikace"</string>
     <plurals name="status_bar_accessibility_recent_apps" formatted="false" msgid="9138535907802238759">
@@ -562,10 +562,10 @@
     <string name="notification_default_channel_desc" msgid="2506053815870808359">"Tato aplikace nemá kategorie oznámení"</string>
     <string name="notification_unblockable_desc" msgid="3561016061737896906">"Oznámení této aplikace nelze vypnout"</string>
     <plurals name="notification_num_channels_desc" formatted="false" msgid="5492793452274077663">
-      <item quantity="few">1 ze <xliff:g id="NUMBER_1">%d</xliff:g> kategorií oznámení z této aplikace</item>
-      <item quantity="many">1 z <xliff:g id="NUMBER_1">%d</xliff:g> kategorie oznámení z této aplikace</item>
-      <item quantity="other">1 z <xliff:g id="NUMBER_1">%d</xliff:g> kategorií oznámení z této aplikace</item>
-      <item quantity="one">1 z <xliff:g id="NUMBER_0">%d</xliff:g> kategorie oznámení z této aplikace</item>
+      <item quantity="few">1 ze <xliff:g id="NUMBER_1">%s</xliff:g> kategorií oznámení z této aplikace</item>
+      <item quantity="many">1 z <xliff:g id="NUMBER_1">%s</xliff:g> kategorie oznámení z této aplikace</item>
+      <item quantity="other">1 z <xliff:g id="NUMBER_1">%s</xliff:g> kategorií oznámení z této aplikace</item>
+      <item quantity="one">1 z <xliff:g id="NUMBER_0">%s</xliff:g> kategorie oznámení z této aplikace</item>
     </plurals>
     <string name="notification_channels_list_desc_2" msgid="6214732715833946441">"<xliff:g id="CHANNEL_NAME_1">%1$s</xliff:g>, <xliff:g id="CHANNEL_NAME_2">%2$s</xliff:g>"</string>
     <plurals name="notification_channels_list_desc_2_and_others" formatted="false" msgid="2747813553355336157">
@@ -774,7 +774,7 @@
     <string name="notification_channel_storage" msgid="3077205683020695313">"Úložiště"</string>
     <string name="instant_apps" msgid="6647570248119804907">"Okamžité aplikace"</string>
     <string name="instant_apps_message" msgid="8116608994995104836">"Okamžité aplikace není třeba instalovat."</string>
-    <string name="app_info" msgid="6856026610594615344">"Informace o aplikaci"</string>
+    <string name="app_info" msgid="6856026610594615344">"O aplikaci"</string>
     <string name="go_to_web" msgid="1106022723459948514">"Přejít na web"</string>
     <string name="mobile_data" msgid="7094582042819250762">"Mobilní data"</string>
     <string name="wifi_is_off" msgid="1838559392210456893">"Wi-Fi je vypnuta"</string>
@@ -789,6 +789,5 @@
     <string name="running_foreground_services_title" msgid="381024150898615683">"Aplikace běžící na pozadí"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"Klepnutím zobrazíte podrobnosti o využití baterie a dat"</string>
     <string name="data_usage_disable_mobile" msgid="5116269981510015864">"Vypnout mobilní data?"</string>
-    <!-- no translation found for touch_filtered_warning (8671693809204767551) -->
-    <skip />
+    <string name="touch_filtered_warning" msgid="8671693809204767551">"Žádost o oprávnění je blokována jinou aplikací. Nastavení proto vaši odpověď nemůže ověřit."</string>
 </resources>

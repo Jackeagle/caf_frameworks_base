@@ -30,6 +30,10 @@ import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.NetworkStats;
 import android.net.RouteInfo;
+import android.net.netlink.ConntrackMessage;
+import android.net.netlink.NetlinkConstants;
+import android.net.netlink.NetlinkSocket;
+import android.net.util.IpUtils;
 import android.net.util.SharedLog;
 import android.os.Handler;
 import android.os.Looper;
@@ -37,10 +41,12 @@ import android.os.INetworkManagementService;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.system.ErrnoException;
+import android.system.OsConstants;
 import android.text.TextUtils;
-import com.android.server.connectivity.tethering.OffloadHardwareInterface.ForwardedStats;
 
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.server.connectivity.tethering.OffloadHardwareInterface.ForwardedStats;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -63,6 +69,9 @@ import java.util.concurrent.TimeUnit;
  */
 public class OffloadController {
     private static final String TAG = OffloadController.class.getSimpleName();
+    private static final boolean DBG = false;
+    private static final String ANYIP = "0.0.0.0";
+    private static final ForwardedStats EMPTY_STATS = new ForwardedStats();
 
     private final Handler mHandler;
     private final OffloadHardwareInterface mHwInterface;
@@ -94,6 +103,9 @@ public class OffloadController {
     // includes upstream interfaces that have a quota set.
     private HashMap<String, Long> mInterfaceQuotas = new HashMap<>();
 
+    private int mNatUpdateCallbacksReceived;
+    private int mNatUpdateNetlinkErrors;
+
     public OffloadController(Handler h, OffloadHardwareInterface hwi,
             ContentResolver contentResolver, INetworkManagementService nms, SharedLog log) {
         mHandler = h;
@@ -113,12 +125,12 @@ public class OffloadController {
         }
     }
 
-    public void start() {
-        if (started()) return;
+    public boolean start() {
+        if (started()) return true;
 
         if (isOffloadDisabled()) {
             mLog.i("tethering offload disabled");
-            return;
+            return false;
         }
 
         if (!mConfigInitialized) {
@@ -126,11 +138,14 @@ public class OffloadController {
             if (!mConfigInitialized) {
                 mLog.i("tethering offload config not supported");
                 stop();
-                return;
+                return false;
             }
         }
 
         mControlInitialized = mHwInterface.initOffloadControl(
+                // OffloadHardwareInterface guarantees that these callback
+                // methods are called on the handler passed to it, which is the
+                // same as mHandler, as coordinated by the setup in Tethering.
                 new OffloadHardwareInterface.ControlCallback() {
                     @Override
                     public void onStarted() {
@@ -148,6 +163,14 @@ public class OffloadController {
                     public void onStoppedUnsupported() {
                         if (!started()) return;
                         mLog.log("onStoppedUnsupported");
+                        // Poll for statistics and trigger a sweep of tethering
+                        // stats by observers. This might not succeed, but it's
+                        // worth trying anyway. We need to do this because from
+                        // this point on we continue with software forwarding,
+                        // and we need to synchronize stats and limits between
+                        // software and hardware forwarding.
+                        updateStatsForAllUpstreams();
+                        forceTetherStatsPoll();
                     }
 
                     @Override
@@ -155,11 +178,15 @@ public class OffloadController {
                         if (!started()) return;
                         mLog.log("onSupportAvailable");
 
-                        // [1] Poll for statistics and notify NetworkStats
-                        // [2] (Re)Push all state:
-                        //     [a] push local prefixes
-                        //     [b] push downstreams
-                        //     [c] push upstream parameters
+                        // [1] Poll for statistics and trigger a sweep of stats
+                        // by observers. We need to do this to ensure that any
+                        // limits set take into account any software tethering
+                        // traffic that has been happening in the meantime.
+                        updateStatsForAllUpstreams();
+                        forceTetherStatsPoll();
+                        // [2] (Re)Push all state.
+                        // TODO: computeAndPushLocalPrefixes()
+                        // TODO: push all downstream state.
                         pushUpstreamParameters(null);
                     }
 
@@ -181,12 +208,7 @@ public class OffloadController {
                         // The stats for the previous upstream were already updated on this thread
                         // just after the upstream was changed, so they are also up-to-date.
                         updateStatsForCurrentUpstream();
-
-                        try {
-                            mNms.tetherLimitReached(mStatsProvider);
-                        } catch (RemoteException e) {
-                            mLog.e("Cannot report data limit reached: " + e);
-                        }
+                        forceTetherStatsPoll();
                     }
 
                     @Override
@@ -194,15 +216,20 @@ public class OffloadController {
                                                    String srcAddr, int srcPort,
                                                    String dstAddr, int dstPort) {
                         if (!started()) return;
-                        mLog.log(String.format("NAT timeout update: %s (%s,%s) -> (%s,%s)",
-                                proto, srcAddr, srcPort, dstAddr, dstPort));
+                        updateNatTimeout(proto, srcAddr, srcPort, dstAddr, dstPort);
                     }
                 });
-        if (!mControlInitialized) {
+
+        final boolean isStarted = started();
+        if (!isStarted) {
             mLog.i("tethering offload control not supported");
             stop();
+        } else {
+            mLog.log("tethering offload started");
+            mNatUpdateCallbacksReceived = 0;
+            mNatUpdateNetlinkErrors = 0;
         }
-        mLog.log("tethering offload started");
+        return isStarted;
     }
 
     public void stop() {
@@ -216,6 +243,10 @@ public class OffloadController {
         mControlInitialized = false;
         mConfigInitialized = false;
         if (wasStarted) mLog.log("tethering offload stopped");
+    }
+
+    private boolean started() {
+        return mConfigInitialized && mControlInitialized;
     }
 
     private class OffloadTetheringStatsProvider extends ITetheringStatsProvider.Stub {
@@ -305,13 +336,33 @@ public class OffloadController {
         maybeUpdateStats(currentUpstreamInterface());
     }
 
+    private void updateStatsForAllUpstreams() {
+        // In practice, there should only ever be a single digit number of
+        // upstream interfaces over the lifetime of an active tethering session.
+        // Roughly speaking, imagine a very ambitious one or two of each of the
+        // following interface types: [ "rmnet_data", "wlan", "eth", "rndis" ].
+        for (Map.Entry<String, ForwardedStats> kv : mForwardedStats.entrySet()) {
+            maybeUpdateStats(kv.getKey());
+        }
+    }
+
+    private void forceTetherStatsPoll() {
+        try {
+            mNms.tetherLimitReached(mStatsProvider);
+        } catch (RemoteException e) {
+            mLog.e("Cannot report data limit reached: " + e);
+        }
+    }
+
     public void setUpstreamLinkProperties(LinkProperties lp) {
         if (!started() || Objects.equals(mUpstreamLinkProperties, lp)) return;
 
-        String prevUpstream = (mUpstreamLinkProperties != null) ?
-                mUpstreamLinkProperties.getInterfaceName() : null;
+        final String prevUpstream = currentUpstreamInterface();
 
         mUpstreamLinkProperties = (lp != null) ? new LinkProperties(lp) : null;
+        // Make sure we record this interface in the ForwardedStats map.
+        final String iface = currentUpstreamInterface();
+        if (!TextUtils.isEmpty(iface)) mForwardedStats.putIfAbsent(iface, EMPTY_STATS);
 
         // TODO: examine return code and decide what to do if programming
         // upstream parameters fails (probably just wait for a subsequent
@@ -373,21 +424,21 @@ public class OffloadController {
                 mContentResolver, TETHER_OFFLOAD_DISABLED, defaultDisposition) != 0);
     }
 
-    private boolean started() {
-        return mConfigInitialized && mControlInitialized;
-    }
-
     private boolean pushUpstreamParameters(String prevUpstream) {
-        if (mUpstreamLinkProperties == null) {
+        final String iface = currentUpstreamInterface();
+
+        if (TextUtils.isEmpty(iface)) {
+            final boolean rval = mHwInterface.setUpstreamParameters("", ANYIP, ANYIP, null);
+            // Update stats after we've told the hardware to stop forwarding so
+            // we don't miss packets.
             maybeUpdateStats(prevUpstream);
-            return mHwInterface.setUpstreamParameters(null, null, null, null);
+            return rval;
         }
 
         // A stacked interface cannot be an upstream for hardware offload.
         // Consequently, we examine only the primary interface name, look at
         // getAddresses() rather than getAllAddresses(), and check getRoutes()
         // rather than getAllRoutes().
-        final String iface = mUpstreamLinkProperties.getInterfaceName();
         final ArrayList<String> v6gateways = new ArrayList<>();
         String v4addr = null;
         String v4gateway = null;
@@ -483,10 +534,113 @@ public class OffloadController {
             pw.println("Offload disabled");
             return;
         }
-        pw.println("Offload HALs " + (started() ? "started" : "not started"));
+        final boolean isStarted = started();
+        pw.println("Offload HALs " + (isStarted ? "started" : "not started"));
         LinkProperties lp = mUpstreamLinkProperties;
         String upstream = (lp != null) ? lp.getInterfaceName() : null;
         pw.println("Current upstream: " + upstream);
         pw.println("Exempt prefixes: " + mLastLocalPrefixStrs);
+        pw.println("NAT timeout update callbacks received during the "
+                + (isStarted ? "current" : "last")
+                + " offload session: "
+                + mNatUpdateCallbacksReceived);
+        pw.println("NAT timeout update netlink errors during the "
+                + (isStarted ? "current" : "last")
+                + " offload session: "
+                + mNatUpdateNetlinkErrors);
+    }
+
+    private void updateNatTimeout(
+            int proto, String srcAddr, int srcPort, String dstAddr, int dstPort) {
+        final String protoName = protoNameFor(proto);
+        if (protoName == null) {
+            mLog.e("Unknown NAT update callback protocol: " + proto);
+            return;
+        }
+
+        final Inet4Address src = parseIPv4Address(srcAddr);
+        if (src == null) {
+            mLog.e("Failed to parse IPv4 address: " + srcAddr);
+            return;
+        }
+
+        if (!IpUtils.isValidUdpOrTcpPort(srcPort)) {
+            mLog.e("Invalid src port: " + srcPort);
+            return;
+        }
+
+        final Inet4Address dst = parseIPv4Address(dstAddr);
+        if (dst == null) {
+            mLog.e("Failed to parse IPv4 address: " + dstAddr);
+            return;
+        }
+
+        if (!IpUtils.isValidUdpOrTcpPort(dstPort)) {
+            mLog.e("Invalid dst port: " + dstPort);
+            return;
+        }
+
+        mNatUpdateCallbacksReceived++;
+        if (DBG) {
+            mLog.log(String.format("NAT timeout update: %s (%s, %s) -> (%s, %s)",
+                     protoName, srcAddr, srcPort, dstAddr, dstPort));
+        }
+
+        final int timeoutSec = connectionTimeoutUpdateSecondsFor(proto);
+        final byte[] msg = ConntrackMessage.newIPv4TimeoutUpdateRequest(
+                proto, src, srcPort, dst, dstPort, timeoutSec);
+
+        try {
+            NetlinkSocket.sendOneShotKernelMessage(OsConstants.NETLINK_NETFILTER, msg);
+        } catch (ErrnoException e) {
+            mNatUpdateNetlinkErrors++;
+            mLog.e("Error updating NAT conntrack entry: " + e
+                    + ", msg: " + NetlinkConstants.hexify(msg));
+            mLog.log("NAT timeout update callbacks received: " + mNatUpdateCallbacksReceived);
+            mLog.log("NAT timeout update netlink errors: " + mNatUpdateNetlinkErrors);
+        }
+    }
+
+    private static Inet4Address parseIPv4Address(String addrString) {
+        try {
+            final InetAddress ip = InetAddress.parseNumericAddress(addrString);
+            // TODO: Consider other sanitization steps here, including perhaps:
+            //           not eql to 0.0.0.0
+            //           not within 169.254.0.0/16
+            //           not within ::ffff:0.0.0.0/96
+            //           not within ::/96
+            // et cetera.
+            if (ip instanceof Inet4Address) {
+                return (Inet4Address) ip;
+            }
+        } catch (IllegalArgumentException iae) {}
+        return null;
+    }
+
+    private static String protoNameFor(int proto) {
+        // OsConstants values are not constant expressions; no switch statement.
+        if (proto == OsConstants.IPPROTO_UDP) {
+            return "UDP";
+        } else if (proto == OsConstants.IPPROTO_TCP) {
+            return "TCP";
+        }
+        return null;
+    }
+
+    private static int connectionTimeoutUpdateSecondsFor(int proto) {
+        // TODO: Replace this with more thoughtful work, perhaps reading from
+        // and maybe writing to any required
+        //
+        //     /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_*
+        //     /proc/sys/net/netfilter/nf_conntrack_udp_timeout{,_stream}
+        //
+        // entries.  TBD.
+        if (proto == OsConstants.IPPROTO_TCP) {
+            // Cf. /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established
+            return 432000;
+        } else {
+            // Cf. /proc/sys/net/netfilter/nf_conntrack_udp_timeout_stream
+            return 180;
+        }
     }
 }

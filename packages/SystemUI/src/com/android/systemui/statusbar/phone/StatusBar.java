@@ -300,6 +300,7 @@ public class StatusBar extends SystemUI implements DemoMode,
     // Should match the values in PhoneWindowManager
     public static final String SYSTEM_DIALOG_REASON_HOME_KEY = "homekey";
     public static final String SYSTEM_DIALOG_REASON_RECENT_APPS = "recentapps";
+    static public final String SYSTEM_DIALOG_REASON_SCREENSHOT = "screenshot";
 
     private static final String BANNER_ACTION_CANCEL =
             "com.android.systemui.statusbar.banner_action_cancel";
@@ -558,14 +559,12 @@ public class StatusBar extends SystemUI implements DemoMode,
     protected DozeScrimController mDozeScrimController;
     private final UiOffloadThread mUiOffloadThread = Dependency.get(UiOffloadThread.class);
 
-    private final Runnable mAutohide = new Runnable() {
-        @Override
-        public void run() {
-            int requested = mSystemUiVisibility & ~STATUS_OR_NAV_TRANSIENT;
-            if (mSystemUiVisibility != requested) {
-                notifyUiVisibilityChanged(requested);
-            }
-        }};
+    private final Runnable mAutohide = () -> {
+        int requested = mSystemUiVisibility & ~STATUS_OR_NAV_TRANSIENT;
+        if (mSystemUiVisibility != requested) {
+            notifyUiVisibilityChanged(requested);
+        }
+    };
 
     private boolean mWaitingForKeyguardExit;
     protected boolean mDozing;
@@ -1126,7 +1125,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             }
         });
 
-        mLightBarController = new LightBarController(context);
+        mLightBarController = Dependency.get(LightBarController.class);
         if (mNavigationBar != null) {
             mNavigationBar.setLightBarController(mLightBarController);
         }
@@ -3322,6 +3321,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         } else {
             cancelAutohide();
         }
+        touchAutoDim();
     }
 
     protected int computeStatusBarMode(int oldVal, int newVal) {
@@ -3407,6 +3407,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             dismissVolumeDialog();
         }
         checkBarModes();
+        touchAutoDim();
     }
 
     private void dismissVolumeDialog() {
@@ -3436,6 +3437,16 @@ public class StatusBar extends SystemUI implements DemoMode,
     private void scheduleAutohide() {
         cancelAutohide();
         mHandler.postDelayed(mAutohide, AUTOHIDE_TIMEOUT_MS);
+    }
+
+    public void touchAutoDim() {
+        if (mNavigationBar != null) {
+            mNavigationBar.getBarTransitions().setAutoDim(false);
+        }
+        mHandler.removeCallbacks(mAutoDim);
+        if (mState != StatusBarState.KEYGUARD && mState != StatusBarState.SHADE_LOCKED) {
+            mHandler.postDelayed(mAutoDim, AUTOHIDE_TIMEOUT_MS);
+        }
     }
 
     void checkUserAutohide(View v, MotionEvent event) {
@@ -4777,7 +4788,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             animateCollapsePanels();
             return true;
         }
-        if (mKeyguardUserSwitcher.hideIfNotSimple(true)) {
+        if (mKeyguardUserSwitcher != null && mKeyguardUserSwitcher.hideIfNotSimple(true)) {
             return true;
         }
         return false;
@@ -4856,6 +4867,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         updateReportRejectedTouchVisibility();
         updateDozing();
         updateTheme();
+        touchAutoDim();
         mNotificationShelf.setStatusBarState(state);
     }
 
@@ -7560,4 +7572,10 @@ public class StatusBar extends SystemUI implements DemoMode,
         }
     }
     // End Extra BaseStatusBarMethods.
+
+    private final Runnable mAutoDim = () -> {
+        if (mNavigationBar != null) {
+            mNavigationBar.getBarTransitions().setAutoDim(true);
+        }
+    };
 }
