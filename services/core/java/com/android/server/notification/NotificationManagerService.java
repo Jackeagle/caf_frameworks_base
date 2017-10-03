@@ -16,8 +16,10 @@
 
 package com.android.server.notification;
 
+import static android.app.NotificationManager.IMPORTANCE_LOW;
 import static android.app.NotificationManager.IMPORTANCE_MIN;
 import static android.app.NotificationManager.IMPORTANCE_NONE;
+import static android.app.NotificationManager.IMPORTANCE_UNSPECIFIED;
 import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.content.pm.PackageManager.FEATURE_TELEVISION;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
@@ -756,9 +758,12 @@ public class NotificationManagerService extends SystemService {
                 if (r != null) {
                     r.stats.onExpansionChanged(userAction, expanded);
                     final long now = System.currentTimeMillis();
-                    MetricsLogger.action(r.getLogMaker(now)
-                            .setCategory(MetricsEvent.NOTIFICATION_ITEM)
-                            .setType(MetricsEvent.TYPE_DETAIL));
+                    if (userAction) {
+                        MetricsLogger.action(r.getLogMaker(now)
+                                .setCategory(MetricsEvent.NOTIFICATION_ITEM)
+                                .setType(expanded ? MetricsEvent.TYPE_DETAIL
+                                        : MetricsEvent.TYPE_COLLAPSE));
+                    }
                     EventLogTags.writeNotificationExpansion(key,
                             userAction ? 1 : 0, expanded ? 1 : 0,
                             r.getLifespanMs(now), r.getFreshnessMs(now), r.getExposureMs(now));
@@ -1140,6 +1145,12 @@ public class NotificationManagerService extends SystemService {
     }
 
     @VisibleForTesting
+    NotificationRecord getNotificationRecord(String key) {
+        return mNotificationsByKey.get(key);
+    }
+
+
+    @VisibleForTesting
     void setSystemReady(boolean systemReady) {
         mSystemReady = systemReady;
     }
@@ -1214,7 +1225,7 @@ public class NotificationManagerService extends SystemService {
         mUsageStats = usageStats;
         mRankingHandler = new RankingHandlerWorker(mRankingThread.getLooper());
         mRankingHelper = new RankingHelper(getContext(),
-                getContext().getPackageManager(),
+                mPackageManagerClient,
                 mRankingHandler,
                 mUsageStats,
                 extractorNames);
@@ -1474,7 +1485,7 @@ public class NotificationManagerService extends SystemService {
                 }
             }
         }
-        mRankingHelper.updateNotificationChannel(pkg, uid, channel);
+        mRankingHelper.updateNotificationChannel(pkg, uid, channel, true);
 
         if (!fromListener) {
             final NotificationChannel modifiedChannel =
@@ -2747,17 +2758,22 @@ public class NotificationManagerService extends SystemService {
         public void setNotificationPolicyAccessGranted(String pkg, boolean granted)
                 throws RemoteException {
             checkCallerIsSystemOrShell();
-            if (!mActivityManager.isLowRamDevice()) {
-                mConditionProviders.setPackageOrComponentEnabled(
-                        pkg, getCallingUserHandle().getIdentifier(), true, granted);
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                if (!mActivityManager.isLowRamDevice()) {
+                    mConditionProviders.setPackageOrComponentEnabled(
+                            pkg, getCallingUserHandle().getIdentifier(), true, granted);
 
-                getContext().sendBroadcastAsUser(new Intent(
-                        NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
-                                .setPackage(pkg)
-                                .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY),
-                        getCallingUserHandle(), null);
+                    getContext().sendBroadcastAsUser(new Intent(
+                            NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
+                                    .setPackage(pkg)
+                                    .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY),
+                            getCallingUserHandle(), null);
 
-                savePolicyFile();
+                    savePolicyFile();
+                }
+            } finally {
+                Binder.restoreCallingIdentity(identity);
             }
         }
 
@@ -2839,19 +2855,25 @@ public class NotificationManagerService extends SystemService {
                 boolean granted) throws RemoteException {
             Preconditions.checkNotNull(listener);
             checkCallerIsSystemOrShell();
-            if (!mActivityManager.isLowRamDevice()) {
-                mConditionProviders.setPackageOrComponentEnabled(listener.flattenToString(),
-                        userId, false, granted);
-                mListeners.setPackageOrComponentEnabled(listener.flattenToString(),
-                        userId, true, granted);
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                if (!mActivityManager.isLowRamDevice()) {
+                    mConditionProviders.setPackageOrComponentEnabled(listener.flattenToString(),
+                            userId, false, granted);
+                    mListeners.setPackageOrComponentEnabled(listener.flattenToString(),
+                            userId, true, granted);
 
-                getContext().sendBroadcastAsUser(new Intent(
-                        NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
-                                .setPackage(listener.getPackageName())
-                                .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY),
-                        getCallingUserHandle(), null);
+                    getContext().sendBroadcastAsUser(new Intent(
+                                    NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
 
-                savePolicyFile();
+                                    .setPackage(listener.getPackageName())
+                                    .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY),
+                            getCallingUserHandle(), null);
+
+                    savePolicyFile();
+                }
+            } finally {
+                Binder.restoreCallingIdentity(identity);
             }
         }
 
@@ -2860,19 +2882,24 @@ public class NotificationManagerService extends SystemService {
                 int userId, boolean granted) throws RemoteException {
             Preconditions.checkNotNull(assistant);
             checkCallerIsSystemOrShell();
-            if (!mActivityManager.isLowRamDevice()) {
-                mConditionProviders.setPackageOrComponentEnabled(assistant.flattenToString(),
-                        userId, false, granted);
-                mAssistants.setPackageOrComponentEnabled(assistant.flattenToString(),
-                        userId, true, granted);
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                if (!mActivityManager.isLowRamDevice()) {
+                    mConditionProviders.setPackageOrComponentEnabled(assistant.flattenToString(),
+                            userId, false, granted);
+                    mAssistants.setPackageOrComponentEnabled(assistant.flattenToString(),
+                            userId, true, granted);
 
-                getContext().sendBroadcastAsUser(new Intent(
-                        NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
-                                .setPackage(assistant.getPackageName())
-                                .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY),
-                        getCallingUserHandle(), null);
+                    getContext().sendBroadcastAsUser(new Intent(
+                            NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
+                                    .setPackage(assistant.getPackageName())
+                                    .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY),
+                            getCallingUserHandle(), null);
 
-                savePolicyFile();
+                    savePolicyFile();
+                }
+            } finally {
+                Binder.restoreCallingIdentity(identity);
             }
         }
 
@@ -3465,6 +3492,21 @@ public class NotificationManagerService extends SystemService {
                 pkg, opPkg, id, tag, notificationUid, callingPid, notification,
                 user, null, System.currentTimeMillis());
         final NotificationRecord r = new NotificationRecord(getContext(), n, channel);
+
+        if ((notification.flags & Notification.FLAG_FOREGROUND_SERVICE) != 0
+                && (channel.getUserLockedFields() & NotificationChannel.USER_LOCKED_IMPORTANCE) == 0
+                && (r.getImportance() == IMPORTANCE_MIN || r.getImportance() == IMPORTANCE_NONE)) {
+            // Increase the importance of foreground service notifications unless the user had an
+            // opinion otherwise
+            if (TextUtils.isEmpty(channelId)
+                    || NotificationChannel.DEFAULT_CHANNEL_ID.equals(channelId)) {
+                r.setImportance(IMPORTANCE_LOW, "Bumped for foreground service");
+            } else {
+                channel.setImportance(IMPORTANCE_LOW);
+                mRankingHelper.updateNotificationChannel(pkg, notificationUid, channel, false);
+                r.updateNotificationChannel(channel);
+            }
+        }
 
         if (!checkDisqualifyingFeatures(userId, notificationUid, id, tag, r,
                 r.sbn.getOverrideGroupKey() != null)) {
