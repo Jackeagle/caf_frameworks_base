@@ -1278,13 +1278,11 @@ public class NotificationManagerService extends SystemService {
                 R.array.config_notificationFallbackVibePattern,
                 VIBRATE_PATTERN_MAXLEN,
                 DEFAULT_VIBRATE_PATTERN);
-
         mInCallNotificationUri = Uri.parse("file://" +
                 resources.getString(R.string.config_inCallNotificationSound));
         mInCallNotificationAudioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                 .build();
         mInCallNotificationVolume = resources.getFloat(R.dimen.config_inCallNotificationVolume);
 
@@ -3375,6 +3373,12 @@ public class NotificationManagerService extends SystemService {
      */
     private final NotificationManagerInternal mInternalService = new NotificationManagerInternal() {
         @Override
+        public NotificationChannel getNotificationChannel(String pkg, int uid, String
+                channelId) {
+            return mRankingHelper.getNotificationChannel(pkg, uid, channelId, false);
+        }
+
+        @Override
         public void enqueueNotification(String pkg, String opPkg, int callingUid, int callingPid,
                 String tag, int id, Notification notification, int userId) {
             enqueueNotificationInternal(pkg, opPkg, callingUid, callingPid, tag, id, notification,
@@ -3743,6 +3747,8 @@ public class NotificationManagerService extends SystemService {
             MetricsLogger.action(r.getLogMaker()
                     .setCategory(MetricsEvent.NOTIFICATION_SNOOZED)
                     .setType(MetricsEvent.TYPE_CLOSE)
+                    .addTaggedData(MetricsEvent.FIELD_NOTIFICATION_SNOOZE_DURATION_MS,
+                            mDuration)
                     .addTaggedData(MetricsEvent.NOTIFICATION_SNOOZED_CRITERIA,
                             mSnoozeCriterionId == null ? 0 : 1));
             boolean wasPosted = removeFromNotificationListsLocked(r);
@@ -4019,19 +4025,19 @@ public class NotificationManagerService extends SystemService {
             if (mSystemReady && mAudioManager != null) {
                 Uri soundUri = record.getSound();
                 hasValidSound = soundUri != null && !Uri.EMPTY.equals(soundUri);
-
                 long[] vibration = record.getVibration();
                 // Demote sound to vibration if vibration missing & phone in vibration mode.
                 if (vibration == null
                         && hasValidSound
                         && (mAudioManager.getRingerModeInternal()
-                        == AudioManager.RINGER_MODE_VIBRATE)) {
+                        == AudioManager.RINGER_MODE_VIBRATE)
+                        && mAudioManager.getStreamVolume(
+                        AudioAttributes.toLegacyStreamType(record.getAudioAttributes())) == 0) {
                     vibration = mFallbackVibrationPattern;
                 }
                 hasValidVibrate = vibration != null;
 
                 boolean hasAudibleAlert = hasValidSound || hasValidVibrate;
-
                 if (hasAudibleAlert && !shouldMuteNotificationLocked(record)) {
                     if (DBG) Slog.v(TAG, "Interrupting!");
                     if (hasValidSound) {
@@ -4128,8 +4134,9 @@ public class NotificationManagerService extends SystemService {
         boolean looping = (record.getNotification().flags & Notification.FLAG_INSISTENT) != 0;
         // do not play notifications if there is a user of exclusive audio focus
         // or the device is in vibrate mode
-        if (!mAudioManager.isAudioFocusExclusive() && mAudioManager.getRingerModeInternal()
-                != AudioManager.RINGER_MODE_VIBRATE) {
+        if (!mAudioManager.isAudioFocusExclusive() && (mAudioManager.getRingerModeInternal()
+                != AudioManager.RINGER_MODE_VIBRATE || mAudioManager.getStreamVolume(
+                AudioAttributes.toLegacyStreamType(record.getAudioAttributes())) != 0)) {
             final long identity = Binder.clearCallingIdentity();
             try {
                 final IRingtonePlayer player = mAudioManager.getRingtonePlayer();
@@ -5839,8 +5846,8 @@ public class NotificationManagerService extends SystemService {
 
     private class ShellCmd extends ShellCommand {
         public static final String USAGE = "help\n"
-                + "allow_listener COMPONENT\n"
-                + "disallow_listener COMPONENT\n"
+                + "allow_listener COMPONENT [user_id]\n"
+                + "disallow_listener COMPONENT [user_id]\n"
                 + "set_assistant COMPONENT\n"
                 + "remove_assistant COMPONENT\n"
                 + "allow_dnd PACKAGE\n"
@@ -5871,7 +5878,13 @@ public class NotificationManagerService extends SystemService {
                             pw.println("Invalid listener - must be a ComponentName");
                             return -1;
                         }
-                        getBinderService().setNotificationListenerAccessGranted(cn, true);
+                        String userId = getNextArg();
+                        if (userId == null) {
+                            getBinderService().setNotificationListenerAccessGranted(cn, true);
+                        } else {
+                            getBinderService().setNotificationListenerAccessGrantedForUser(
+                                    cn, Integer.parseInt(userId), true);
+                        }
                     }
                     break;
                     case "disallow_listener": {
@@ -5880,7 +5893,13 @@ public class NotificationManagerService extends SystemService {
                             pw.println("Invalid listener - must be a ComponentName");
                             return -1;
                         }
-                        getBinderService().setNotificationListenerAccessGranted(cn, false);
+                        String userId = getNextArg();
+                        if (userId == null) {
+                            getBinderService().setNotificationListenerAccessGranted(cn, false);
+                        } else {
+                            getBinderService().setNotificationListenerAccessGrantedForUser(
+                                    cn, Integer.parseInt(userId), false);
+                        }
                     }
                     break;
                     case "allow_assistant": {

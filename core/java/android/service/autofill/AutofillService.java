@@ -305,7 +305,7 @@ import com.android.internal.os.SomeArgs;
  *   <li>Use the {@link android.app.assist.AssistStructure.ViewNode#getWebDomain()} to get the
  *       source of the document.
  *   <li>Get the canonical domain using the
- *       <a href="https://publicsuffix.org/>Public Suffix List</a> (see example below).
+ *       <a href="https://publicsuffix.org/">Public Suffix List</a> (see example below).
  *   <li>Use <a href="https://developers.google.com/digital-asset-links/">Digital Asset Links</a>
  *       to obtain the package name and certificate fingerprint of the package corresponding to
  *       the canonical domain.
@@ -503,13 +503,19 @@ public abstract class AutofillService extends Service {
             @NonNull CancellationSignal cancellationSignal, @NonNull FillCallback callback);
 
     /**
-     * Called when user requests service to save the fields of a screen.
+     * Called when the user requests the service to save the contents of a screen.
      *
      * <p>Service must call one of the {@link SaveCallback} methods (like
      * {@link SaveCallback#onSuccess()} or {@link SaveCallback#onFailure(CharSequence)})
-     * to notify the result of the request.
+     * to notify the Android System of the result of the request.
      *
-     * <p><b>Note:</b> To retrieve the actual value of the field, the service should call
+     * <p>If the service could not handle the request right away&mdash;for example, because it must
+     * launch an activity asking the user to authenticate first or because the network is
+     * down&mdash;the service could keep the {@link SaveRequest request} and reuse it later,
+     * but the service must call {@link SaveCallback#onSuccess()} right away.
+     *
+     * <p><b>Note:</b> To retrieve the actual value of fields input by the user, the service
+     * should call
      * {@link android.app.assist.AssistStructure.ViewNode#getAutofillValue()}; if it calls
      * {@link android.app.assist.AssistStructure.ViewNode#getText()} or other methods, there is no
      * guarantee such method will return the most recent value of the field.
