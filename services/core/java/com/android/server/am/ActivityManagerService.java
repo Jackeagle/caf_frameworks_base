@@ -609,6 +609,9 @@ public class ActivityManagerService extends IActivityManager.Stub
     public static BoostFramework mPerf = null;
     public static boolean mIsPerfLockAcquired = false;
     private static final int NATIVE_DUMP_TIMEOUT_MS = 2000; // 2 seconds;
+    int mActiveNetType = -1;
+    Object mNetLock = new Object();
+    ConnectivityManager mConnectivityManager;
 
     /** All system services */
     SystemServiceManager mSystemServiceManager;
@@ -1697,8 +1700,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     static final int SERVICE_FOREGROUND_CRASH_MSG = 69;
     static final int DISPATCH_OOM_ADJ_OBSERVER_MSG = 70;
     static final int START_USER_SWITCH_FG_MSG = 712;
-    static final int TOP_APP_KILLED_BY_LMK_MSG = 73;
     static final int NOTIFY_VR_KEYGUARD_MSG = 74;
+    static final int NETWORK_OPTS_CHECK_MSG = 88;
 
     static final int FIRST_ACTIVITY_STACK_MSG = 100;
     static final int FIRST_BROADCAST_QUEUE_MSG = 200;
@@ -1941,17 +1944,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 final int pid = msg.arg1;
                 final int uid = msg.arg2;
                 dispatchProcessDied(pid, uid);
-                break;
-            }
-            case TOP_APP_KILLED_BY_LMK_MSG: {
-                final String appName = (String) msg.obj;
-                final AlertDialog d = new BaseErrorDialog(mUiContext);
-                d.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ERROR);
-                d.setTitle(mUiContext.getText(R.string.top_app_killed_title));
-                d.setMessage(mUiContext.getString(R.string.top_app_killed_message, appName));
-                d.setButton(DialogInterface.BUTTON_POSITIVE, mUiContext.getText(R.string.close),
-                        obtainMessage(DISMISS_DIALOG_UI_MSG, d));
-                d.show();
                 break;
             }
             case DISPATCH_UIDS_CHANGED_UI_MSG: {
@@ -2463,6 +2455,25 @@ public class ActivityManagerService extends IActivityManager.Stub
                             }
                         }
                     }
+                }
+            } break;
+            case NETWORK_OPTS_CHECK_MSG: {
+                int flag = msg.arg1;
+                String packageName = (String)msg.obj;
+                if (flag == 0) {
+                    if (mActivityTrigger != null) {
+                        synchronized (mNetLock) {
+                            if (mActiveNetType >= 0) {
+                                mActivityTrigger.activityMiscTrigger(ActivityTrigger.NETWORK_OPTS,
+                                    packageName, mActiveNetType, 0);
+                                return;
+                            }
+                        }
+                    }
+                }
+                if (mActivityTrigger != null) {
+                    mActivityTrigger.activityMiscTrigger(ActivityTrigger.NETWORK_OPTS,
+                        packageName, ConnectivityManager.TYPE_NONE, 1);
                 }
             } break;
             }
@@ -3124,22 +3135,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private final void networkOptsCheck(int flag, String packageName) {
-        ConnectivityManager connectivityManager =
-            (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivityManager != null) {
-            NetworkInfo netInfo = connectivityManager.getActiveNetworkInfo();
-            if (netInfo != null) {
-                /* netType: 0 for Mobile, 1 for WIFI*/
-                int netType = netInfo.getType();
-                if (mActivityTrigger != null) {
-                    mActivityTrigger.activityMiscTrigger(ActivityTrigger.NETWORK_OPTS, packageName, netType, flag);
-                }
-            } else {
-                if (mActivityTrigger != null) {
-                    mActivityTrigger.activityMiscTrigger(ActivityTrigger.NETWORK_OPTS, packageName, ConnectivityManager.TYPE_NONE, flag);
-                }
-            }
-        }
+        mHandler.sendMessage(mHandler.obtainMessage(NETWORK_OPTS_CHECK_MSG, flag, 0, packageName));
     }
 
     /**
@@ -5513,7 +5509,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             boolean doLowMem = app.instr == null;
             boolean doOomAdj = doLowMem;
             if (!app.killedByAm) {
-                maybeNotifyTopAppKilled(app);
                 Slog.i(TAG, "Process " + app.processName + " (pid " + pid + ") has died: "
                         + ProcessList.makeOomAdjString(app.setAdj)
                         + ProcessList.makeProcStateString(app.setProcState));
@@ -5548,23 +5543,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             Slog.d(TAG_PROCESSES, "Received spurious death notification for thread "
                     + thread.asBinder());
         }
-    }
-
-    /** Show system error dialog when a top app is killed by LMK */
-    void maybeNotifyTopAppKilled(ProcessRecord app) {
-        if (!shouldNotifyTopAppKilled(app)) {
-            return;
-        }
-
-        Message msg = mHandler.obtainMessage(TOP_APP_KILLED_BY_LMK_MSG);
-        msg.obj = mContext.getPackageManager().getApplicationLabel(app.info);
-        mUiHandler.sendMessage(msg);
-    }
-
-    /** Only show notification when the top app is killed on low ram devices */
-    private boolean shouldNotifyTopAppKilled(ProcessRecord app) {
-        return app.curSchedGroup == ProcessList.SCHED_GROUP_TOP_APP &&
-            ActivityManager.isLowRamDeviceStatic();
     }
 
     /**
@@ -7431,10 +7409,15 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (mEnableNetOpts) {
             IntentFilter netInfoFilter = new IntentFilter();
             netInfoFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
-            netInfoFilter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
             mContext.registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
+                    if (mConnectivityManager != null) {
+                        NetworkInfo netInfo = mConnectivityManager.getActiveNetworkInfo();
+                        synchronized(mNetLock) {
+                            mActiveNetType = (netInfo != null) ? netInfo.getType() : -1;
+                        }
+                    }
                     ActivityStack stack = mStackSupervisor.getLastStack();
                     if (stack != null) {
                         ActivityRecord r = stack.topRunningActivityLocked();
@@ -7447,6 +7430,15 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
                 }
             }, netInfoFilter);
+            mConnectivityManager = (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (mConnectivityManager != null) {
+                NetworkInfo netInfo = mConnectivityManager.getActiveNetworkInfo();
+                if (netInfo != null) {
+                    synchronized (mNetLock) {
+                        mActiveNetType = netInfo.getType();
+                    }
+                }
+            }
         }
 
         // Let system services know.
