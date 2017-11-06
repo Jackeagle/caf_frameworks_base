@@ -1554,7 +1554,7 @@ public final class SystemServer {
 
         if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
             traceBeginAndSlog("StartWearConnectivityService");
-            mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
+            //mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
             traceEnd();
 
             if (!disableNonCoreServices) {
