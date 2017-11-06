@@ -1266,7 +1266,7 @@ public final class SystemServer {
 
                 if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
                     traceBeginAndSlog("StartThermalObserver");
-                    mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
+                   // mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
                     traceEnd();
                 }
             }
@@ -1559,13 +1559,13 @@ public final class SystemServer {
 
             if (!disableNonCoreServices) {
                 traceBeginAndSlog("StartWearTimeService");
-                mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
-                mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
+               // mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
+                //mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
                 traceEnd();
 
                 if (enableLeftyService) {
                     traceBeginAndSlog("StartWearLeftyService");
-                    mSystemServiceManager.startService(WEAR_LEFTY_SERVICE_CLASS);
+                   // mSystemServiceManager.startService(WEAR_LEFTY_SERVICE_CLASS);
                     traceEnd();
                 }
             }
