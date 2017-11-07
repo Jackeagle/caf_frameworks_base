@@ -143,7 +143,8 @@ public class KeyStore {
     public State state(int userId) {
         final int ret;
         try {
-            ret = mBinder.getState(userId);
+            if (mBinder != null)ret = mBinder.getState(userId);
+            else ret = UNINITIALIZED;
         } catch (RemoteException e) {
             Log.w(TAG, "Cannot connect to keystore", e);
             throw new AssertionError(e);

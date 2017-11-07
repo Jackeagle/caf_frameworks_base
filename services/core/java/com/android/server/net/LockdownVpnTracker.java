@@ -89,7 +89,8 @@ public class LockdownVpnTracker {
     private int mErrorCount;
 
     public static boolean isEnabled() {
-        return KeyStore.getInstance().contains(Credentials.LOCKDOWN_VPN);
+	return false;
+        //return KeyStore.getInstance().contains(Credentials.LOCKDOWN_VPN);
     }
 
     public LockdownVpnTracker(Context context, INetworkManagementService netService,

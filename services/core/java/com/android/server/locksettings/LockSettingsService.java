@@ -514,6 +514,7 @@ public class LockSettingsService extends ILockSettings.Stub {
      */
     private void ensureProfileKeystoreUnlocked(int userId) {
         final KeyStore ks = KeyStore.getInstance();
+        if (ks == null) return;
         if (ks.state(userId) == KeyStore.State.LOCKED
                 && tiedManagedProfileReadyToUnlock(mUserManager.getUserInfo(userId))) {
             Slog.i(TAG, "Managed profile got unlocked, will unlock its keystore");
