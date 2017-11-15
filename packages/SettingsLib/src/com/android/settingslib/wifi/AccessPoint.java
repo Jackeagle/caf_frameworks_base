@@ -172,7 +172,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
      */
     public static final int SIGNAL_LEVELS = 5;
 
-    public static final int UNREACHABLE_RSSI = Integer.MIN_VALUE;
+    public static final int UNREACHABLE_RSSI = WifiConfiguration.INVALID_RSSI;
 
     private final Context mContext;
 
@@ -605,6 +605,24 @@ public class AccessPoint implements Comparable<AccessPoint> {
     public void clearConfig() {
         mConfig = null;
         networkId = WifiConfiguration.INVALID_NETWORK_ID;
+    }
+
+    public boolean isFils256Supported() {
+            for (ScanResult result : mScanResultCache.values()) {
+                if (result.capabilities.contains("FILS-SHA256")) {
+                    return true;
+                }
+            }
+        return false;
+    }
+
+    public boolean isFils384Supported() {
+            for (ScanResult result : mScanResultCache.values()) {
+                if (result.capabilities.contains("FILS-SHA384")) {
+                    return true;
+                }
+            }
+        return false;
     }
 
     public WifiInfo getInfo() {
@@ -1084,7 +1102,11 @@ public class AccessPoint implements Comparable<AccessPoint> {
             // Might be an ephemeral connection with no WifiConfiguration. Try matching on SSID.
             // (Note that we only do this if the WifiConfiguration explicitly equals INVALID).
             // TODO: Handle hex string SSIDs.
-            return ssid.equals(removeDoubleQuotes(info.getSSID()));
+            if (!info.isEphemeral() && config == null) {
+                return false;
+            } else {
+                return ssid.equals(removeDoubleQuotes(info.getSSID()));
+            }
         }
     }
 

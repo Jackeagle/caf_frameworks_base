@@ -46,7 +46,7 @@
     <protected-broadcast android:name="android.intent.action.PACKAGE_DATA_CLEARED" />
     <protected-broadcast android:name="android.intent.action.PACKAGE_FIRST_LAUNCH" />
     <protected-broadcast android:name="android.intent.action.PACKAGE_NEEDS_VERIFICATION" />
-    <protected-broadcast android:name="android.intent.action.PACKAGE_NEEDS_OPTIONAL_VERIFICATION" />
+    <protected-broadcast android:name="com.qualcomm.qti.intent.action.PACKAGE_NEEDS_OPTIONAL_VERIFICATION" />
     <protected-broadcast android:name="android.intent.action.PACKAGE_VERIFIED" />
     <protected-broadcast android:name="android.intent.action.PACKAGES_SUSPENDED" />
     <protected-broadcast android:name="android.intent.action.PACKAGES_UNSUSPENDED" />
@@ -571,6 +571,10 @@
     <protected-broadcast android:name="android.media.tv.action.WATCH_NEXT_PROGRAM_BROWSABLE_DISABLED" />
     <protected-broadcast android:name="android.media.tv.action.CHANNEL_BROWSABLE_REQUESTED" />
     <protected-broadcast android:name="com.android.server.InputMethodManagerService.SHOW_INPUT_METHOD_PICKER" />
+
+    <!-- Added in O : DPM  -->
+    <protected-broadcast android:name="com.qti.dpmframework.DPM_INTERNET_CONNECTED" />
+    <protected-broadcast android:name="com.qti.dpmframework.DPM_PREFERENCE_CHANGED" />
 
     <!-- ====================================================================== -->
     <!--                          RUNTIME PERMISSIONS                           -->
