@@ -72,6 +72,8 @@ public class WifiConfiguration implements Parcelable {
 
     /** {@hide} */
     private String mPasspointManagementObjectTree;
+    /** {@hide} */
+    public static final String SIMNumVarName = "sim_num";
 
     /**
      * Recognized key management schemes.
@@ -275,6 +277,12 @@ public class WifiConfiguration implements Parcelable {
      * @hide
      */
     public static final int AP_BAND_5GHZ = 1;
+
+    /**
+     * 2GHz + 5GHz Dual band.
+     * @hide
+     */
+    public static final int AP_BAND_DUAL = 2;
 
     /**
      * The band which AP resides on
@@ -487,6 +495,12 @@ public class WifiConfiguration implements Parcelable {
      */
     @SystemApi
     public String lastUpdateName;
+
+    /**
+     * @hide
+     * sim number selected
+     */
+    public int SIMNum;
 
     /**
      * @hide
@@ -1546,6 +1560,7 @@ public class WifiConfiguration implements Parcelable {
         creatorUid = -1;
         shared = true;
         dtimInterval = 0;
+        SIMNum = 0;
     }
 
     /**
@@ -1710,6 +1725,10 @@ public class WifiConfiguration implements Parcelable {
         }
         sbuf.append('\n').append(" PSK: ");
         if (this.preSharedKey != null) {
+            sbuf.append('*');
+        }
+        sbuf.append('\n').append(" sim_num ");
+        if (this.SIMNum > 0 ) {
             sbuf.append('*');
         }
         sbuf.append("\nEnterprise config:\n");
@@ -2129,6 +2148,7 @@ public class WifiConfiguration implements Parcelable {
             updateTime = source.updateTime;
             shared = source.shared;
             recentFailure.setAssociationStatus(source.recentFailure.getAssociationStatus());
+            SIMNum = source.SIMNum;
         }
     }
 
@@ -2196,6 +2216,7 @@ public class WifiConfiguration implements Parcelable {
         dest.writeInt(shared ? 1 : 0);
         dest.writeString(mPasspointManagementObjectTree);
         dest.writeInt(recentFailure.getAssociationStatus());
+        dest.writeInt(SIMNum);
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -2264,6 +2285,7 @@ public class WifiConfiguration implements Parcelable {
                 config.shared = in.readInt() != 0;
                 config.mPasspointManagementObjectTree = in.readString();
                 config.recentFailure.setAssociationStatus(in.readInt());
+                config.SIMNum = in.readInt();
                 return config;
             }
 

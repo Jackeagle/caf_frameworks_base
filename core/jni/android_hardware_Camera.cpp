@@ -1124,7 +1124,7 @@ static void android_hardware_Camera_enableFocusMoveCallback(JNIEnv *env, jobject
 //-------------------------------------------------
 
 static const JNINativeMethod camMethods[] = {
-  { "getNumberOfCameras",
+  { "_getNumberOfCameras",
     "()I",
     (void *)android_hardware_Camera_getNumberOfCameras },
   { "_getCameraInfo",
@@ -1303,6 +1303,8 @@ int register_android_hardware_Camera(JNIEnv *env)
     if (NULL != clazz) {
         fields.face_constructor = env->GetMethodID(clazz, "<init>", "()V");
         find_fields(env, extendedfacefields_to_find, NELEM(extendedfacefields_to_find));
+    }else {
+        env->ExceptionClear();
     }
 
     // Register native functions
