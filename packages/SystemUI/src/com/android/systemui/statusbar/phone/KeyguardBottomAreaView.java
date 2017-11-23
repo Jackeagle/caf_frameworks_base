@@ -256,7 +256,7 @@ public class KeyguardBottomAreaView extends FrameLayout implements View.OnClickL
         mLeftAffordanceView.setOnClickListener(this);
         initAccessibility();
         mActivityStarter = Dependency.get(ActivityStarter.class);
-        //mFlashlightController = Dependency.get(FlashlightController.class);
+        mFlashlightController = Dependency.get(FlashlightController.class);
         mAccessibilityController = Dependency.get(AccessibilityController.class);
         mAssistManager = Dependency.get(AssistManager.class);
         mLockIcon.setAccessibilityController(mAccessibilityController);
