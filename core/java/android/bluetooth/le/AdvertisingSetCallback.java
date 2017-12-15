@@ -154,4 +154,15 @@ public abstract class AdvertisingSetCallback {
      * @hide
      */
     public void onOwnAddressRead(AdvertisingSet advertisingSet, int addressType, String address) {}
+
+    /**
+     * @hide
+     * Callback triggered in response to {@link AdvertisingSet#updateAdvertisingWhiteList}
+     * indicating result of the operation.
+     *
+     * @param advertisingSet The advertising set.
+     * @param status Status of the operation.
+     */
+    public void
+    onAdvertisingWhiteListUpdated(AdvertisingSet advertisingSet, int status) {}
 }
