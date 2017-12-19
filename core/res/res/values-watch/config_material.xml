@@ -31,7 +31,7 @@
     <bool name="config_windowOverscanByDefault">true</bool>
 
     <!-- Enable windowSwipeToDismiss. -->
-    <bool name="config_windowSwipeToDismiss">true</bool>
+    <bool name="config_windowSwipeToDismiss">false</bool>
 
     <!-- Style the scrollbars accoridngly. -->
     <drawable name="config_scrollbarThumbVertical">@drawable/scrollbar_vertical_thumb</drawable>
