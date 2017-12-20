@@ -57,6 +57,7 @@ import java.net.InetAddress;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import android.net.wifi.WifiDevice;
 
 /**
  * This class provides the primary API for managing all aspects of Wi-Fi
@@ -132,6 +133,13 @@ public class WifiManager {
      * @hide
      */
     public static final String EXTRA_SCAN_AVAILABLE = "scan_enabled";
+
+    /**
+     *  ACTION_AUTH_PASSWORD_WRONG
+     *
+     * @ @hide
+     **/
+    public static final String  ACTION_AUTH_PASSWORD_WRONG = "android.intent.action.AUTH_PASSWORD_WRONG";
 
     /**
      * Broadcast intent action indicating that the credential of a Wi-Fi network
@@ -732,6 +740,14 @@ public class WifiManager {
      */
     public static final String LINK_CONFIGURATION_CHANGED_ACTION =
         "android.net.wifi.LINK_CONFIGURATION_CHANGED";
+
+    /**
+     * Broadcast intent action indicating that the user initiated Wifi OFF
+     * or APM ON and Wifi disconnection is in progress
+     * Actual Wifi disconnection happens after mDisconnectDelayDuration seconds.
+     * @hide
+     */
+    public static final String  ACTION_WIFI_DISCONNECT_IN_PROGRESS = "wifi_disconnect_in_progress";
 
     /**
      * The lookup key for a {@link android.net.LinkProperties} object associated with the
@@ -3504,6 +3520,21 @@ public class WifiManager {
     }
 
     /**
+     * get concurrency support
+     *
+     * @return true if concurrency is allowed.
+     *
+     * @hide no intent to publish
+     */
+    public boolean getWifiStaSapConcurrency() {
+        try {
+            return mService.getWifiStaSapConcurrency();
+        } catch (RemoteException e) {
+             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Resets all wifi manager settings back to factory defaults.
      *
      * @hide
@@ -3602,6 +3633,20 @@ public class WifiManager {
             mService.restoreSupplicantBackupData(supplicantData, ipConfigData);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Get the list of Stations connected to Hotspot.
+     *
+     * @return a list of {@link WifiDevice} objects.
+     * {@hide}
+     */
+    public List<WifiDevice> getConnectedStations() {
+        try {
+            return mService.getConnectedStations();
+        } catch (RemoteException e) {
+            return null;
         }
     }
 }
