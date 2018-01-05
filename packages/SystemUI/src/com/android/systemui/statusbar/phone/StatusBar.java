@@ -4318,7 +4318,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         // turned off fully.
         boolean keyguardForDozing = mDozingRequested &&
                 (!mDeviceInteractive || isGoingToSleep() && (isScreenFullyOff() || mIsKeyguard));
-        boolean shouldBeKeyguard = (mKeyguardRequested || keyguardForDozing) && !wakeAndUnlocking;
+        boolean shouldBeKeyguard = false; //(mKeyguardRequested || keyguardForDozing) && !wakeAndUnlocking;
         if (keyguardForDozing) {
             updatePanelExpansionForKeyguard();
         }
