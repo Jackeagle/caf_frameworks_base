@@ -81,6 +81,8 @@ public final class BluetoothUuid {
             ParcelUuid.fromString("0000112D-0000-1000-8000-00805F9B34FB");
     public static final ParcelUuid HearingAid =
             ParcelUuid.fromString("0000FDF0-0000-1000-8000-00805f9b34fb");
+    public static final ParcelUuid DIP =
+              ParcelUuid.fromString("00001200-0000-1000-8000-00805F9B34FB");
 
     public static final ParcelUuid BASE_UUID =
             ParcelUuid.fromString("00000000-0000-1000-8000-00805F9B34FB");
