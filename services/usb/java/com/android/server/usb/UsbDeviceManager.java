@@ -117,6 +117,7 @@ public class UsbDeviceManager {
     private static final int MSG_UPDATE_CHARGING_STATE = 9;
     private static final int MSG_EARLY_CAMERA_FINISHED = 10;
     private static final int MSG_CAR_REVERSE_CHANGED = 11;
+    private static final int MSG_CHECK_BOOTANIM_EXIT = 12;
 
     private static final int AUDIO_MODE_SOURCE = 1;
 
@@ -195,7 +196,7 @@ public class UsbDeviceManager {
                 } else {
                     Slog.v(TAG, "start show android ui");
                     SystemProperties.set("sys.earlycamera_finished", "1");
-                    mHandler.sendEmptyMessageDelayed(MSG_EARLY_CAMERA_FINISHED, 3000);
+                    mHandler.sendEmptyMessageDelayed(MSG_EARLY_CAMERA_FINISHED, 300);
                 }
             } else if (state != null) {
                 mHandler.updateState(state);
@@ -410,6 +411,7 @@ public class UsbDeviceManager {
                 mUEventObserver.startObserving(USB_STATE_MATCH);
                 mUEventObserver.startObserving(ACCESSORY_START_MATCH);
                 mUEventObserver.startObserving(EARLY_CAMERA_PATH);
+                sendEmptyMessage(MSG_CHECK_BOOTANIM_EXIT);
             } catch (Exception e) {
                 Slog.e(TAG, "Error initializing UsbHandler", e);
             }
@@ -774,6 +776,7 @@ public class UsbDeviceManager {
         @Override
         public void handleMessage(Message msg) {
             SomeArgs args;
+            Intent tmp;
             switch (msg.what) {
                 case MSG_UPDATE_STATE:
                     mConnected = (msg.arg1 == 1);
@@ -852,15 +855,30 @@ public class UsbDeviceManager {
                 }
                 case MSG_EARLY_CAMERA_FINISHED:
                     Slog.v(TAG, "send earlycamera finish broadcast");
-                    mContext.sendBroadcast(new Intent("android.intent.action.EARLY_CAMERA_FINISHED"));
+                    tmp = new Intent("android.intent.action.EARLY_CAMERA_FINISHED");
+                    tmp.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+                    tmp.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+                    mContext.sendBroadcast(tmp);
                     break;
                 case MSG_CAR_REVERSE_CHANGED:
                     Slog.v(TAG, "send car reverse changed broadcast: " + (msg.arg1 != 0));
-                    Intent tmp = new Intent("android.intent.action.CAR_REVERSE");
+                    tmp = new Intent("android.intent.action.CAR_REVERSE");
                     tmp.putExtra("reverse", (msg.arg1 != 0));
                     tmp.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
                     tmp.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
                     mContext.sendBroadcast(tmp);
+                case MSG_CHECK_BOOTANIM_EXIT:
+                    if("1".equals(SystemProperties.get("sys.dvr.started"))){
+                        break;
+                    }
+                    else if("1".equals(SystemProperties.get("service.bootanim.exit"))) {
+                        Slog.v(TAG, "xxxxx send BOOTANIM_EXIT broadcast");
+                        tmp = new Intent("android.intent.action.BOOTANIM_EXIT");
+                        tmp.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
+                        tmp.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+                        mContext.sendBroadcast(tmp);
+                    }
+                    sendEmptyMessageDelayed(MSG_CHECK_BOOTANIM_EXIT, 500);
                     break;
             }
         }

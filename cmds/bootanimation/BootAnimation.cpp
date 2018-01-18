@@ -91,7 +91,7 @@ static constexpr size_t FONT_NUM_COLS = 16;
 static constexpr size_t FONT_NUM_ROWS = FONT_NUM_CHARS / FONT_NUM_COLS;
 static const int TEXT_CENTER_VALUE = INT_MAX;
 static const int TEXT_MISSING_VALUE = INT_MIN;
-static const char EXIT_PROP_NAME[] = "service.bootanim.exit";
+static const char EXIT_PROP_NAME[] = "service.bootanim.exit";//"service.bootanim.exit"; "sys.dvr.started"
 static const char PLAY_SOUND_PROP_NAME[] = "persist.sys.bootanim.play_sound";
 static const int ANIM_ENTRY_NAME_MAX = 256;
 static constexpr size_t TEXT_POS_LEN_MAX = 16;
@@ -489,6 +489,15 @@ void BootAnimation::checkExit() {
     property_get(EXIT_PROP_NAME, value, "0");
     int exitnow = atoi(value);
     if (exitnow && !showCamera()) {
+        {
+            int fd = open("/sys/class/earlycamera/earlycamera/earlycamera_status", O_WRONLY);
+            if(fd < 0) {
+                ALOGE("open early camera node failed");
+            } else {
+                write(fd, "1", 1);
+                close(fd);
+            }
+        }
         requestExit();
     }
 }
@@ -1288,7 +1297,7 @@ GLuint BootAnimation::createProgram()
         "void main() {\n" \
         "vec3 yuv;\n" \
         "vec3 rgb;\n" \
-        "vec2 tmp = vec2(1.0 - tc.y, 1.0 - tc.x);"
+        "vec2 tmp = vec2(1.0 - tc.x, tc.y);"
         "yuv.x = texture2D(tex_y, tmp).r;\n" \
         "yuv.x = yuv.x < 0.764f ? yuv.x + 0.235f : 1.0f;\n"\
         "yuv.y = texture2D(tex_uv, tmp).r - 0.5;\n" \
@@ -1451,6 +1460,7 @@ bool BootAnimation::camera(bool& notifyLK)
     }
     initCameraProgram();
     if(notifyLK) {
+        ALOGE("notify lk not to show camera images");
         notifyLKEarlyCameraPauseDisplay();
         notifyLK = false;
     }
