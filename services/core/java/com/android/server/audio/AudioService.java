@@ -459,6 +459,8 @@ public class AudioService extends IAudioService.Stub {
 
     // Forced device usage for communications
     private int mForcedUseForComm;
+    private int mForcedUseForCommExt; // External state returned by getters: always consistent
+                                      // with requests by setters
 
     // List of binder death handlers for setMode() client processes.
     // The last process to have called setMode() is at the top of the list.
@@ -2798,13 +2800,14 @@ public class AudioService extends IAudioService.Stub {
             mForcedUseForComm = AudioSystem.FORCE_NONE;
         }
 
+        mForcedUseForCommExt = mForcedUseForComm;
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
                 AudioSystem.FOR_COMMUNICATION, mForcedUseForComm, null, 0);
     }
 
     /** @see AudioManager#isSpeakerphoneOn() */
     public boolean isSpeakerphoneOn() {
-        return (mForcedUseForComm == AudioSystem.FORCE_SPEAKER);
+        return (mForcedUseForCommExt == AudioSystem.FORCE_SPEAKER);
     }
 
     /** @see AudioManager#setBluetoothScoOn(boolean) */
@@ -2812,16 +2815,36 @@ public class AudioService extends IAudioService.Stub {
         if (!checkAudioSettingsPermission("setBluetoothScoOn()")) {
             return;
         }
+
+        // Only enable calls from system components
+        if (Binder.getCallingUid() >= FIRST_APPLICATION_UID) {
+            if (on)
+                mForcedUseForCommExt = AudioSystem.FORCE_BT_SCO;
+            else if (mForcedUseForCommExt == AudioSystem.FORCE_BT_SCO)
+                mForcedUseForCommExt = AudioSystem.FORCE_NONE;
+            return;
+        }
+
         setBluetoothScoOnInt(on);
     }
 
     public void setBluetoothScoOnInt(boolean on) {
         if (on) {
+            // do not accept SCO ON if SCO audio is not connected
+            synchronized(mScoClients) {
+                if ((mBluetoothHeadset != null) &&
+                    (mBluetoothHeadset.getAudioState(mBluetoothHeadsetDevice)
+                             != BluetoothHeadset.STATE_AUDIO_CONNECTED)) {
+                    mForcedUseForCommExt = AudioSystem.FORCE_BT_SCO;
+                    return;
+                }
+            }
             mForcedUseForComm = AudioSystem.FORCE_BT_SCO;
         } else if (mForcedUseForComm == AudioSystem.FORCE_BT_SCO) {
             mForcedUseForComm = AudioSystem.FORCE_NONE;
         }
-
+        mForcedUseForCommExt = mForcedUseForComm;
+        AudioSystem.setParameters("BT_SCO="+ (on ? "on" : "off"));
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
                 AudioSystem.FOR_COMMUNICATION, mForcedUseForComm, null, 0);
         sendMsg(mAudioHandler, MSG_SET_FORCE_USE, SENDMSG_QUEUE,
@@ -2830,7 +2853,7 @@ public class AudioService extends IAudioService.Stub {
 
     /** @see AudioManager#isBluetoothScoOn() */
     public boolean isBluetoothScoOn() {
-        return (mForcedUseForComm == AudioSystem.FORCE_BT_SCO);
+        return (mForcedUseForCommExt == AudioSystem.FORCE_BT_SCO);
     }
 
     /** @see AudioManager#setBluetoothA2dpOn(boolean) */
