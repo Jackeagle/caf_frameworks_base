@@ -41,7 +41,7 @@
     <integer name="config_notificationServiceArchiveSize">1</integer>
 
     <!-- Flags enabling default window features. See Window.java -->
-    <bool name="config_defaultWindowFeatureOptionsPanel">false</bool>
+    <bool name="config_defaultWindowFeatureOptionsPanel">true</bool>
     <bool name="config_defaultWindowFeatureContextMenu">false</bool>
 
     <!-- Time adjustment, in milliseconds, applied to the default double tap threshold
