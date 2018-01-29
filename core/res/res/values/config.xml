@@ -957,7 +957,7 @@
             4 - Go to home
             5 - Dismiss IME if shown. Otherwise go to home
     -->
-    <integer name="config_shortPressOnPowerBehavior">1</integer>
+    <integer name="config_shortPressOnPowerBehavior">5</integer>
 
     <!-- Control the behavior when the user double presses the power button.
             0 - Nothing
