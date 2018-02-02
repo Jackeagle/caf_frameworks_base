@@ -526,11 +526,11 @@ public class SubsidyController {
             IExtTelephony extTelephony =
                     IExtTelephony.Stub.asInterface(ServiceManager
                             .getService("extphone"));
-            return extTelephony
-                    .getPrimaryCarrierSlotId();
+            return extTelephony.getPrimaryCarrierSlotId();
         } catch (RemoteException e) {
-            Log.e(TAG,
-                    "Exception for getPrimaryCarrierSlotId:", e);
+            Log.e(TAG, "Exception for getPrimaryCarrierSlotId:", e);
+        } catch (NullPointerException e) {
+            Log.e(TAG, "NPE for getPrimaryCarrierSlotId: ", e);
         }
         return SubscriptionManager.INVALID_SIM_SLOT_INDEX;
     }
