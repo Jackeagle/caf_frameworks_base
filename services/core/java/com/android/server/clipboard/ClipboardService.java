@@ -307,12 +307,11 @@ public class ClipboardService extends IClipboard.Stub {
     }
 
     private boolean isDeviceLocked() {
-        int callingUserId = UserHandle.getCallingUserId();
         final long token = Binder.clearCallingIdentity();
         try {
             final KeyguardManager keyguardManager = mContext.getSystemService(
                     KeyguardManager.class);
-            return keyguardManager != null && keyguardManager.isDeviceLocked(callingUserId);
+            return keyguardManager != null && keyguardManager.isDeviceLocked();
         } finally {
             Binder.restoreCallingIdentity(token);
         }
