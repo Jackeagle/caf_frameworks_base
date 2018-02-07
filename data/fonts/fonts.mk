@@ -15,11 +15,13 @@
 # Warning: this is actually a product definition, to be inherited from
 
 PRODUCT_COPY_FILES := \
-    frameworks/base/data/fonts/system_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/system_fonts.xml
+    frameworks/base/data/fonts/system_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/system_fonts.xml 
+
 ifneq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_COPY_FILES += \
     frameworks/base/data/fonts/fallback_fonts.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/fallback_fonts.xml
 endif
+
 
 PRODUCT_PACKAGES := \
     DroidSansFallback.ttf \
@@ -50,7 +52,7 @@ PRODUCT_PACKAGES := \
     Clockopia.ttf \
     AndroidClock.ttf \
     AndroidClock_Highlight.ttf \
-    AndroidClock_Solid.ttf
+    AndroidClock_Solid.ttf 
 
 ifeq ($(MULTI_LANG_ENGINE),REVERIE)
 PRODUCT_PACKAGES += \
@@ -62,13 +64,9 @@ PRODUCT_PACKAGES += \
     DroidSansPunjabi.ttf \
     DroidSansKannada.ttf \
     DroidSansBengali.ttf \
+    DroidSansMalayalam.ttf \
     DroidSansOdia.ttf \
-    DroidSansSantali.ttf
+    DroidSansSantali.ttf \
+    DroidSansMeetei.ttf
 
 endif
-
-#ifeq ($(MULTI_LANG_ENGINE),REVERIE)
-#PRODUCT_PACKAGES += \
-#     fallback_fonts.xml \
-#     $(PRODUCT_RENDERING_ENGINE_TTF_FILES)
-#endif
