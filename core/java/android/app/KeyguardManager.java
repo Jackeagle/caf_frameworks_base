@@ -249,7 +249,12 @@ public class KeyguardManager {
      */
     public boolean isDeviceLocked(int userId) {
         try {
-            return mTrustManager.isDeviceLocked(userId);
+            // This can be null if calling uid is not trusted.
+            if (mTrustManager != null) {
+               return mTrustManager.isDeviceLocked(userId);
+            } else {
+               return false;
+            }
         } catch (RemoteException e) {
             return false;
         }
@@ -274,7 +279,12 @@ public class KeyguardManager {
      */
     public boolean isDeviceSecure(int userId) {
         try {
-            return mTrustManager.isDeviceSecure(userId);
+            // This can be null if calling uid is not trusted.
+            if (mTrustManager != null) {
+               return mTrustManager.isDeviceSecure(userId);
+            } else {
+               return false;
+            }
         } catch (RemoteException e) {
             return false;
         }
