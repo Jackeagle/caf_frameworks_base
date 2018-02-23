@@ -190,6 +190,8 @@ interface IWifiManager
 
     void unregisterSoftApCallback(int callbackIdentifier);
 
+    String getCapabilities(String capaType);
+
     void addOnWifiUsabilityStatsListener(in IBinder binder, in IOnWifiUsabilityStatsListener listener, int listenerIdentifier);
 
     void removeOnWifiUsabilityStatsListener(int listenerIdentifier);

@@ -133,7 +133,6 @@ public class WifiConfiguration implements Parcelable {
          * @hide
          */
         public static final int FT_EAP = 7;
-
         /**
          * Simultaneous Authentication of Equals
          */
@@ -161,11 +160,24 @@ public class WifiConfiguration implements Parcelable {
          */
         public static final int WPA_EAP_SHA256 = 12;
 
+        /**
+         * IEEE 802.11ai FILS SK with SHA256
+         * @hide
+         */
+        public static final int FILS_SHA256 = 13;
+
+        /**
+         * IEEE 802.11ai FILS SK with SHA384:
+         * @hide
+         */
+        public static final int FILS_SHA384 = 14;
+
+
         public static final String varName = "key_mgmt";
 
         public static final String[] strings = { "NONE", "WPA_PSK", "WPA_EAP",
                 "IEEE8021X", "WPA2_PSK", "OSEN", "FT_PSK", "FT_EAP",
-                "SAE", "OWE", "SUITE_B_192", "WPA_PSK_SHA256", "WPA_EAP_SHA256" };
+                "SAE", "OWE", "SUITE_B_192", "WPA_PSK_SHA256", "WPA_EAP_SHA256", "FILS_SHA256", "FILS_SHA384" };
     }
 
     /**
@@ -359,6 +371,10 @@ public class WifiConfiguration implements Parcelable {
     public static final int SECURITY_TYPE_EAP_SUITE_B = 5;
     /** @hide */
     public static final int SECURITY_TYPE_OWE = 6;
+    /** @hide */
+    public static final int SECURITY_TYPE_FILS_SHA256 = 7;
+    /** @hide */
+    public static final int SECURITY_TYPE_FILS_SHA384 = 8;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -597,6 +613,8 @@ public class WifiConfiguration implements Parcelable {
      */
     @NonNull
     public BitSet allowedGroupCiphers;
+     /** {@hide} */
+    public static final String erpVarName = "erp";
     /**
      * The set of group management ciphers supported by this configuration.
      * See {@link GroupMgmtCipher} for descriptions of the values.

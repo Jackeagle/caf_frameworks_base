@@ -165,6 +165,17 @@ public class ScanResult implements Parcelable {
     public static final int KEY_MGMT_OWE_TRANSITION = 12;
     /**
      * @hide
+     * Security key management scheme: FILS_SHA256.
+     */
+    public static final int KEY_MGMT_FILS_SHA256 = 13;
+    /**
+     * @hide
+     * Security key management scheme: FILS_SHA384.
+     */
+    public static final int KEY_MGMT_FILS_SHA384 = 14;
+
+    /**
+     * @hide
      * No cipher suite.
      */
     public static final int CIPHER_NONE = 0;
