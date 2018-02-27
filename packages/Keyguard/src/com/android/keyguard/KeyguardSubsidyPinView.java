@@ -341,7 +341,7 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                         onUnlockResponse(false);
                     }
                 });
-            } catch (NullPointerException ex) {
+            } catch (NullPointerException e) {
                 Log.e(TAG, "NullPointerException for supplyNetworkDepersonalization:", e);
                 post(new Runnable() {
                     public void run() {
