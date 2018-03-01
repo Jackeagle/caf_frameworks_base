@@ -431,8 +431,10 @@ public class InputManagerService extends IInputManager.Stub
             setDisplayViewport(VIEWPORT_EXTERNAL, defaultViewport);
         }
 
-        nativeSetVirtualDisplayViewports(mPtr,
-                virtualTouchViewports.toArray(new DisplayViewport[0]));
+        if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
+            nativeSetVirtualDisplayViewports(mPtr,
+                    virtualTouchViewports.toArray(new DisplayViewport[0]));
+        }
     }
 
     private void setDisplayViewport(int viewportType, DisplayViewport viewport) {
