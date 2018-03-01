@@ -1566,6 +1566,10 @@ public class UsbDeviceManager implements ActivityManagerInternal.ScreenObserver 
             mCurrentFunctions = usbFunctions;
             if (functions == null || applyAdbFunction(functions)
                     .equals(UsbManager.USB_FUNCTION_NONE)) {
+                functions = getSystemProperty(getPersistProp(true),
+                            UsbManager.USB_FUNCTION_NONE);
+
+                if (functions.equals(UsbManager.USB_FUNCTION_NONE))
                 functions = UsbManager.usbFunctionsToString(getChargingFunctions());
             }
             functions = applyAdbFunction(functions);
