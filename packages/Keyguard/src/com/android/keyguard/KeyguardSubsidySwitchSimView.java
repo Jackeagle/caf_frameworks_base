@@ -105,6 +105,8 @@ public class KeyguardSubsidySwitchSimView extends KeyguardSubsidyStateView  {
             mCurrentSlotId = extTelephony.getCurrentPrimaryCardSlotId();
         } catch (RemoteException e) {
             Log.e(TAG, "Exception for getCurrentPrimaryCardSlotId:", e);
+        } catch (NullPointerException e) {
+            Log.e(TAG, "NullPointerException for getCurrentPrimaryCardSlotId:", e);
         }
         Log.d(TAG, "Primary slot id from telephony = "+mCurrentSlotId);
 
@@ -127,12 +129,13 @@ public class KeyguardSubsidySwitchSimView extends KeyguardSubsidyStateView  {
                             IExtTelephony.Stub.asInterface(ServiceManager
                                 .getService("extphone"));
 
-                    extTelephony
-                        .setPrimaryCardOnSlot(newSlotId);
+                    extTelephony.setPrimaryCardOnSlot(newSlotId);
                 } catch (RemoteException e) {
-                       Log.e(TAG,
-                           "Exception for setPrimaryCardOnSlot:", e);
+                    Log.e(TAG, "Exception for setPrimaryCardOnSlot:", e);
+                } catch (NullPointerException e) {
+                    Log.e(TAG, "NullPointerException for setPrimaryCardOnSlot:", e);
                 }
+
                 setProgressViewVisible(true);
             }
         });

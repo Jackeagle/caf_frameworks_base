@@ -335,8 +335,14 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
                     .supplyIccDepersonalization(mPin, PERSOSUBSTATE_SIM_NETWORK, depersoResCallback, slotId);
 
             } catch (RemoteException e) {
-                Log.e(TAG,
-                        "Exception for supplyNetworkDepersonalization:", e);
+                Log.e(TAG, "Exception for supplyNetworkDepersonalization:", e);
+                post(new Runnable() {
+                    public void run() {
+                        onUnlockResponse(false);
+                    }
+                });
+            } catch (NullPointerException e) {
+                Log.e(TAG, "NullPointerException for supplyNetworkDepersonalization:", e);
                 post(new Runnable() {
                     public void run() {
                         onUnlockResponse(false);
