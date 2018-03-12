@@ -1703,20 +1703,22 @@ public class PackageParser {
                                         + entry.getName());
                             }
                             final Signature[] entrySignatures = convertToSignatures(entryCerts);
-
-                            if (pkg.mCertificates == null) {
-                                pkg.mCertificates = entryCerts;
-                                pkg.mSignatures = entrySignatures;
-                                pkg.mSigningKeys = new ArraySet<PublicKey>();
-                                for (int i=0; i < entryCerts.length; i++) {
-                                    pkg.mSigningKeys.add(entryCerts[i][0].getPublicKey());
-                                }
-                            } else {
-                                if (!Signature.areExactMatch(pkg.mSignatures, entrySignatures)) {
-                                    throw new PackageParserException(
-                                            INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES, "Package " + apkPath
-                                            + " has mismatched certificates at entry "
-                                            + entry.getName());
+                            //add lock for pkg sync
+                            synchronized (sObjWaitAll) {
+                                if (pkg.mCertificates == null) {
+                                    pkg.mCertificates = entryCerts;
+                                    pkg.mSignatures = entrySignatures;
+                                    pkg.mSigningKeys = new ArraySet<PublicKey>();
+                                    for (int i=0; i < entryCerts.length; i++) {
+                                        pkg.mSigningKeys.add(entryCerts[i][0].getPublicKey());
+                                    }
+                                } else {
+                                    if (!Signature.areExactMatch(pkg.mSignatures, entrySignatures)) {
+                                        throw new PackageParserException(
+                                                INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES, "Package " + apkPath
+                                                + " has mismatched certificates at entry "
+                                                + entry.getName());
+                                    }
                                 }
                             }
                         } catch (GeneralSecurityException e) {
