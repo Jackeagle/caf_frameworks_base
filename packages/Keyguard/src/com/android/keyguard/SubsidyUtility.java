@@ -172,8 +172,9 @@ public class SubsidyUtility {
                     .isPrimaryCarrierSlotId(slotId);
             Log.d(TAG, "Is Subsidy restricted sim is white listed = "+isSIMWhiteListed);
         } catch (RemoteException e) {
-               Log.e(TAG,
-                   "Exception for isPrimaryCarrierSlotId(slotid):", e);
+            Log.e(TAG, "Exception for isPrimaryCarrierSlotId(slotid):", e);
+        } catch (NullPointerException e) {
+            Log.e(TAG, "NullPointerException for isPrimaryCarrierSlotId: " , e);
         }
         return isSubsidyLockFeatureEnabled(null) && subsidyLocked
                && !isSIMWhiteListed;
