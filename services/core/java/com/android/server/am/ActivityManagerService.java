@@ -641,7 +641,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     // Whether we should show our dialogs (ANR, crash, etc) or just perform their
     // default action automatically.  Important for devices without direct input
     // devices.
-    private boolean mShowDialogs = true;
+    private boolean mShowDialogs = false;
 
     private final VrController mVrController;
 
@@ -719,6 +719,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      * {@link WindowManagerService#LAST_ANR_LIFETIME_DURATION_MSECS}
      */
     String mLastANRState;
+
+    String mHeadlessMode = SystemProperties.get("device.mode.headless","false");
 
     /**
      * Indicates the maximum time spent waiting for the network rules to get updated.
@@ -7412,9 +7414,11 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     final void finishBooting() {
         synchronized (this) {
-            if (!mBootAnimationComplete) {
-                mCallFinishBooting = true;
-                return;
+            if ("false".equals(mHeadlessMode)) {
+                if (!mBootAnimationComplete) {
+                    mCallFinishBooting = true;
+                    return;
+                }
             }
             mCallFinishBooting = false;
         }
@@ -7575,7 +7579,10 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         if (booting) {
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "FinishBooting");
-            finishBooting();
+
+            if ("false".equals(mHeadlessMode)) {
+                finishBooting();
+            }
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
 
@@ -14451,7 +14458,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     throw e.rethrowAsRuntimeException();
                 }
             }
-            startHomeActivityLocked(currentUserId, "systemReady");
+
+            if ("false".equals(mHeadlessMode)) {
+                startHomeActivityLocked(currentUserId, "systemReady");
+            }
 
             try {
                 if (AppGlobals.getPackageManager().hasSystemUidErrors()) {
@@ -14495,8 +14505,18 @@ public class ActivityManagerService extends IActivityManager.Stub
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
-            mStackSupervisor.resumeFocusedStackTopActivityLocked();
-            mUserController.sendUserSwitchBroadcastsLocked(-1, currentUserId);
+
+            if ("false".equals(mHeadlessMode)) {
+                mStackSupervisor.resumeFocusedStackTopActivityLocked();
+                mUserController.sendUserSwitchBroadcastsLocked(-1, currentUserId);
+            }
+
+            if("true".equals(mHeadlessMode)) {
+                Slog.e(TAG," Stopping boot animation for HeadlessMode: " + mHeadlessMode);
+                // stop boot animation
+                SystemProperties.set("service.bootanim.exit", "1");
+                finishBooting();
+            }
             traceLog.traceEnd(); // ActivityManagerStartApps
             traceLog.traceEnd(); // PhaseActivityManagerReady
         }
