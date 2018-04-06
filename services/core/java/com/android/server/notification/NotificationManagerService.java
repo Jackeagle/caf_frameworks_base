@@ -4507,6 +4507,13 @@ public class NotificationManagerService extends SystemService {
         @Override
         public void handleMessage(Message msg)
         {
+            /* we don't support notification handling for headless device*/
+            String mHeadlessMode = SystemProperties.get("device.mode.headless","false");
+
+            if ("true".equals(mHeadlessMode)) {
+                return;
+            }
+
             switch (msg.what)
             {
                 case MESSAGE_TIMEOUT:
