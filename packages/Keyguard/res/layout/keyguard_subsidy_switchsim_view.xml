@@ -73,6 +73,7 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/switch_sim_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingRight="24dp"
@@ -87,8 +88,6 @@
             android:layout_height="wrap_content"
             android:layout_gravity="right"
             style="?android:attr/buttonBarButtonStyle"
-            android:drawableRight="@drawable/kg_subsidy_sim_1"
-            android:drawablePadding="3dp"
             android:layout_marginRight="8dp"
             android:text="@string/kg_button_switch_sim" />
     </LinearLayout>

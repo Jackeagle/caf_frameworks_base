@@ -418,6 +418,6 @@ number">%d</xliff:g> remaining attempts before SIM becomes permanently unusable.
     <string name="kg_subsidy_no_data_connection">No Data connection, To enable data, use options below</string>
     <string name="kg_button_switch_sim">Switch SIM</string>
     <string name="kg_subsidy_content_switch_sim">
-        Your primary SIM card is invalid.\n\nPlease insert valid SIM or switch to other SIM card</string>
+        Your primary SIM <xliff:g id="number">%d</xliff:g> is invalid.\n\nPlease insert valid SIM or switch to other SIM card</string>
     <string name="kg_subsidy_title_switch_sim_progress_dialog">Switching Primary SIM</string>
 </resources>
