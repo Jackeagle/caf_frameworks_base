@@ -321,6 +321,7 @@
   <java-symbol type="bool" name="config_wifi_framework_enable_voice_call_sar_tx_power_limit" />
   <java-symbol type="bool" name="config_wifi_enable_disconnection_debounce" />
   <java-symbol type="bool" name="config_wifi_revert_country_code_on_cellular_loss" />
+  <java-symbol type="bool" name="config_wifi_dnbs_support" />
   <java-symbol type="bool" name="config_wifi_enable_wifi_firmware_debugging" />
   <java-symbol type="bool" name="config_wifi_disconnect_only_on_initial_ipreachability" />
   <java-symbol type="bool" name="config_softap_extension" />

@@ -506,6 +506,9 @@
          radio is unable to find any MCC information to infer wifi country code from -->
     <bool translatable="false" name="config_wifi_revert_country_code_on_cellular_loss">false</bool>
 
+    <!-- Boolean indicating wifi dbns feature support or not -->
+    <bool translatable="false" name="config_wifi_dnbs_support">false</bool>
+
     <!-- Boolean indicating whether or not wifi firmware debugging is enabled -->
     <bool translatable="false" name="config_wifi_enable_wifi_firmware_debugging">true</bool>
 

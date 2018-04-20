@@ -129,6 +129,8 @@ interface IWifiManager
 
     void setWifiApEnabled(in WifiConfiguration wifiConfig, boolean enable);
 
+    boolean setDnbsEnabled(boolean enable);
+
     void updateInterfaceIpState(String ifaceName, int mode);
 
     boolean startSoftAp(in WifiConfiguration wifiConfig);

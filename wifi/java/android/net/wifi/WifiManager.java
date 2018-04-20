@@ -1949,6 +1949,19 @@ public class WifiManager {
     }
 
     /**
+     * set DNBS (Do Not Break Stream) flag for Softap and p2p GO.
+     *
+     * @hide
+     */
+    public boolean setDnbsEnabled(boolean enable) {
+        try {
+            return mService.setDnbsEnabled(enable);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Call allowing ConnectivityService to update WifiService with interface mode changes.
      *
      * The possible modes include: {@link IFACE_IP_MODE_TETHERED},
