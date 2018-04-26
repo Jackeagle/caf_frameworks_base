@@ -64,6 +64,7 @@ public class KeyguardSubsidySwitchSimView extends KeyguardSubsidyStateView  {
     private TextView mProgressTitleView;
     private TextView mProgressContentView;
     private TextView mNoDataText;
+    private TextView mContentTextView;
     private Button mSwitchSimBtn;
     private Context mContext;
     private LinearLayout mSubsidySetupContainer;
@@ -110,7 +111,7 @@ public class KeyguardSubsidySwitchSimView extends KeyguardSubsidyStateView  {
         }
         Log.d(TAG, "Primary slot id from telephony = "+mCurrentSlotId);
 
-        updateSimSlotDrawable();
+        updateSwitchSimText();
 
         mSwitchSimBtn.setOnClickListener(new OnClickListener() {
             @Override
@@ -222,10 +223,10 @@ public class KeyguardSubsidySwitchSimView extends KeyguardSubsidyStateView  {
                                SubscriptionManager.INVALID_SIM_SLOT_INDEX);
                            Log.d(TAG, "PrimaryConfigChanged newSlotId = "
                                +mCurrentSlotId);
-                           updateSimSlotDrawable();
                         } else {
                            Log.d(TAG, "receiver primaryCardChange failed");
                         }
+                        updateSwitchSimText();
                         setEnableDataButtonVisibility();
                         setProgressViewVisible(false);
                         resetSubsidySetupView();
@@ -255,24 +256,10 @@ public class KeyguardSubsidySwitchSimView extends KeyguardSubsidyStateView  {
         }
     }
 
-    public void updateSimSlotDrawable() {
-        if (mCurrentSlotId != SubscriptionManager.INVALID_SIM_SLOT_INDEX) {
-            Drawable slotDrawable = null;
-            if (mCurrentSlotId == 0) {
-                slotDrawable =
-                        getResources().getDrawable(
-                                R.drawable.kg_subsidy_sim_1);
-            } else if (mCurrentSlotId == 1) {
-                slotDrawable =
-                        getResources().getDrawable(
-                                R.drawable.kg_subsidy_sim_2);
-            }
-            slotDrawable.setBounds(5, 0,
-                    (int) (slotDrawable.getIntrinsicWidth()),
-                    (int) (slotDrawable.getIntrinsicHeight()));
-            mSwitchSimBtn.setCompoundDrawables(null, null, slotDrawable,
-                    null);
-        }
+    private void updateSwitchSimText() {
+        mContentTextView = (TextView) findViewById(R.id.switch_sim_content);
+        mContentTextView.setText(mContext.getString(
+                R.string.kg_subsidy_content_switch_sim, mCurrentSlotId + 1));
     }
 
     private void resetSubsidySetupView() {
