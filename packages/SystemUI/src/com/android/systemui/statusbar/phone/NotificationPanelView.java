@@ -160,6 +160,7 @@ public class NotificationPanelView extends PanelView implements
     protected int mQsMinExpansionHeight;
     protected int mQsMaxExpansionHeight;
     private int mQsPeekHeight;
+    private int mBouncerTop;
     private boolean mStackScrollerOverscrolling;
     private boolean mQsExpansionFromOverscroll;
     private float mLastOverscroll;
@@ -237,6 +238,7 @@ public class NotificationPanelView extends PanelView implements
     private boolean mIsFullWidth;
     private float mDarkAmount;
     private float mDarkAmountTarget;
+    private boolean mPulsing;
     private LockscreenGestureLogger mLockscreenGestureLogger = new LockscreenGestureLogger();
     private boolean mNoVisibleNotifications = true;
     private ValueAnimator mDarkAnimator;
@@ -476,7 +478,8 @@ public class NotificationPanelView extends PanelView implements
                     mKeyguardStatusView.getHeight(),
                     mDarkAmount,
                     mStatusBar.isKeyguardCurrentlySecure(),
-                    mTracking);
+                    mPulsing,
+                    mBouncerTop);
             mClockPositionAlgorithm.run(mClockPositionResult);
             if (animate || mClockAnimator != null) {
                 startClockAnimation(mClockPositionResult.clockX, mClockPositionResult.clockY);
@@ -548,6 +551,11 @@ public class NotificationPanelView extends PanelView implements
             }
         }
         return count;
+    }
+
+    public void setBouncerTop(int bouncerTop) {
+        mBouncerTop = bouncerTop;
+        positionClockAndNotifications();
     }
 
     private void startClockAnimation(int x, int y) {
@@ -650,6 +658,14 @@ public class NotificationPanelView extends PanelView implements
             mQsExpandImmediate = true;
         }
         expand(true /* animate */);
+    }
+
+    public void expandWithoutQs() {
+        if (isQsExpanded()) {
+            flingSettings(0 /* velocity */, false /* expand */);
+        } else {
+            expand(true /* animate */);
+        }
     }
 
     @Override
@@ -2674,14 +2690,8 @@ public class NotificationPanelView extends PanelView implements
         positionClockAndNotifications();
     }
 
-    public void setNoVisibleNotifications(boolean noNotifications) {
-        mNoVisibleNotifications = noNotifications;
-        if (mQs != null) {
-            mQs.setHasNotifications(!noNotifications);
-        }
-    }
-
     public void setPulsing(boolean pulsing) {
+        mPulsing = pulsing;
         mKeyguardStatusView.setPulsing(pulsing);
         positionClockAndNotifications();
         mNotificationStackScroller.setPulsing(pulsing, mKeyguardStatusView.getLocationOnScreen()[1]

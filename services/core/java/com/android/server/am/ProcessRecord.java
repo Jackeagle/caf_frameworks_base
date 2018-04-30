@@ -57,6 +57,7 @@ import java.util.Arrays;
 final class ProcessRecord {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessRecord" : TAG_AM;
 
+    private final ActivityManagerService mService; // where we came from
     private final BatteryStatsImpl mBatteryStats; // where to collect runtime statistics
     final ApplicationInfo info; // all about the first app in the process
     final boolean isolated;     // true if this is a special isolated process
@@ -486,15 +487,16 @@ final class ProcessRecord {
         }
     }
 
-    ProcessRecord(BatteryStatsImpl _batteryStats, ApplicationInfo _info,
-            String _processName, int _uid) {
+    ProcessRecord(ActivityManagerService _service, BatteryStatsImpl _batteryStats,
+            ApplicationInfo _info, String _processName, int _uid) {
+        mService = _service;
         mBatteryStats = _batteryStats;
         info = _info;
         isolated = _info.uid != _uid;
         uid = _uid;
         userId = UserHandle.getUserId(_uid);
         processName = _processName;
-        pkgList.put(_info.packageName, new ProcessStats.ProcessStateHolder(_info.versionCode));
+        pkgList.put(_info.packageName, new ProcessStats.ProcessStateHolder(_info.longVersionCode));
         maxAdj = ProcessList.UNKNOWN_ADJ;
         curRawAdj = setRawAdj = ProcessList.INVALID_ADJ;
         curAdj = setAdj = verifiedAdj = ProcessList.INVALID_ADJ;
@@ -519,7 +521,7 @@ final class ProcessRecord {
                 origBase.makeInactive();
             }
             baseProcessTracker = tracker.getProcessStateLocked(info.packageName, uid,
-                    info.versionCode, processName);
+                    info.longVersionCode, processName);
             baseProcessTracker.makeActive();
             for (int i=0; i<pkgList.size(); i++) {
                 ProcessStats.ProcessStateHolder holder = pkgList.valueAt(i);
@@ -527,7 +529,7 @@ final class ProcessRecord {
                     holder.state.makeInactive();
                 }
                 holder.state = tracker.getProcessStateLocked(pkgList.keyAt(i), uid,
-                        info.versionCode, processName);
+                        info.longVersionCode, processName);
                 if (holder.state != baseProcessTracker) {
                     holder.state.makeActive();
                 }
@@ -660,8 +662,10 @@ final class ProcessRecord {
     void kill(String reason, boolean noisy) {
         if (!killedByAm) {
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "kill");
-            if (noisy) {
-                Slog.i(TAG, "Killing " + toShortString() + " (adj " + setAdj + "): " + reason);
+            if (mService != null && (noisy || info.uid == mService.mCurOomAdjUid)) {
+                mService.reportUidInfoMessageLocked(TAG,
+                        "Killing " + toShortString() + " (adj " + setAdj + "): " + reason,
+                        info.uid);
             }
             if (pid > 0) {
                 EventLog.writeEvent(EventLogTags.AM_KILL, userId, pid, processName, setAdj, reason);
@@ -824,9 +828,9 @@ final class ProcessRecord {
                 }
                 pkgList.clear();
                 ProcessState ps = tracker.getProcessStateLocked(
-                        info.packageName, uid, info.versionCode, processName);
+                        info.packageName, uid, info.longVersionCode, processName);
                 ProcessStats.ProcessStateHolder holder = new ProcessStats.ProcessStateHolder(
-                        info.versionCode);
+                        info.longVersionCode);
                 holder.state = ps;
                 pkgList.put(info.packageName, holder);
                 if (ps != baseProcessTracker) {
@@ -835,7 +839,7 @@ final class ProcessRecord {
             }
         } else if (N != 1) {
             pkgList.clear();
-            pkgList.put(info.packageName, new ProcessStats.ProcessStateHolder(info.versionCode));
+            pkgList.put(info.packageName, new ProcessStats.ProcessStateHolder(info.longVersionCode));
         }
     }
 

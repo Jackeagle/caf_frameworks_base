@@ -180,6 +180,7 @@ public final class AudioAttributes implements Parcelable {
      * IMPORTANT: when adding new usage types, add them to SDK_USAGES and update SUPPRESSIBLE_USAGES
      *            if applicable, as well as audioattributes.proto.
      *            Also consider adding them to <aaudio/AAudio.h> for the NDK.
+     *            Also consider adding them to UsageTypeConverter for service dump and etc.
      */
 
     /**
@@ -249,9 +250,10 @@ public final class AudioAttributes implements Parcelable {
         SUPPRESSIBLE_USAGES.put(USAGE_ASSISTANCE_NAVIGATION_GUIDANCE,    SUPPRESSIBLE_MEDIA);
         SUPPRESSIBLE_USAGES.put(USAGE_GAME,                              SUPPRESSIBLE_MEDIA);
         SUPPRESSIBLE_USAGES.put(USAGE_ASSISTANT,                         SUPPRESSIBLE_MEDIA);
+        /** default volume assignment is STREAM_MUSIC, handle unknown usage as media */
+        SUPPRESSIBLE_USAGES.put(USAGE_UNKNOWN,                           SUPPRESSIBLE_MEDIA);
         SUPPRESSIBLE_USAGES.put(USAGE_VOICE_COMMUNICATION_SIGNALLING,    SUPPRESSIBLE_SYSTEM);
         SUPPRESSIBLE_USAGES.put(USAGE_ASSISTANCE_SONIFICATION,           SUPPRESSIBLE_SYSTEM);
-        SUPPRESSIBLE_USAGES.put(USAGE_UNKNOWN,                           SUPPRESSIBLE_SYSTEM);
     }
 
     /**
@@ -1056,8 +1058,7 @@ public final class AudioAttributes implements Parcelable {
             case USAGE_ASSISTANCE_ACCESSIBILITY:
                 return AudioSystem.STREAM_ACCESSIBILITY;
             case USAGE_UNKNOWN:
-                return fromGetVolumeControlStream ?
-                        AudioManager.USE_DEFAULT_STREAM_TYPE : AudioSystem.STREAM_MUSIC;
+                return AudioSystem.STREAM_MUSIC;
             default:
                 if (fromGetVolumeControlStream) {
                     throw new IllegalArgumentException("Unknown usage value " + aa.getUsage() +

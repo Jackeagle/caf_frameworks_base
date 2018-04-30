@@ -17,7 +17,6 @@
 package android.telephony;
 
 import android.annotation.IntDef;
-import android.annotation.SystemApi;
 import android.os.RemoteException;
 import android.telephony.NetworkService.NetworkServiceProvider;
 
@@ -33,7 +32,6 @@ import java.lang.ref.WeakReference;
  *
  * @hide
  */
-@SystemApi
 public class NetworkServiceCallback {
 
     private static final String mTag = NetworkServiceCallback.class.getSimpleName();
@@ -83,6 +81,8 @@ public class NetworkServiceCallback {
             } catch (RemoteException e) {
                 Rlog.e(mTag, "Failed to onGetNetworkRegistrationStateComplete on the remote");
             }
+        } else {
+            Rlog.e(mTag, "Weak reference of callback is null.");
         }
     }
 }

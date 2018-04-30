@@ -32,6 +32,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -158,6 +159,18 @@ public class ZygoteProcess {
     private final Object mLock = new Object();
 
     /**
+     * List of exemptions to the API blacklist. These are prefix matches on the runtime format
+     * symbol signature. Any matching symbol is treated by the runtime as being on the light grey
+     * list.
+     */
+    private List<String> mApiBlacklistExemptions = Collections.emptyList();
+
+    /**
+     * Proportion of hidden API accesses that should be logged to the event log; 0 - 0x10000.
+     */
+    private int mHiddenApiAccessLogSampleRate;
+
+    /**
      * The state of the connection to the primary zygote.
      */
     private ZygoteState primaryZygoteState;
@@ -175,7 +188,7 @@ public class ZygoteProcess {
      * The process will continue running after this function returns.
      *
      * <p>If processes are not enabled, a new thread in the caller's
-     * process is created and main() of <var>processClass</var> called there.
+     * process is created and main() of <var>processclass</var> called there.
      *
      * <p>The niceName parameter, if not an empty string, is a custom name to
      * give to the process instead of using processClass.  This allows you to
@@ -454,6 +467,88 @@ public class ZygoteProcess {
     }
 
     /**
+     * Push hidden API blacklisting exemptions into the zygote process(es).
+     *
+     * <p>The list of exemptions will take affect for all new processes forked from the zygote after
+     * this call.
+     *
+     * @param exemptions List of hidden API exemption prefixes. Any matching members are treated as
+     *        whitelisted/public APIs (i.e. allowed, no logging of usage).
+     */
+    public void setApiBlacklistExemptions(List<String> exemptions) {
+        synchronized (mLock) {
+            mApiBlacklistExemptions = exemptions;
+            maybeSetApiBlacklistExemptions(primaryZygoteState, true);
+            maybeSetApiBlacklistExemptions(secondaryZygoteState, true);
+        }
+    }
+
+    /**
+     * Set the precentage of detected hidden API accesses that are logged to the event log.
+     *
+     * <p>This rate will take affect for all new processes forked from the zygote after this call.
+     *
+     * @param rate An integer between 0 and 0x10000 inclusive. 0 means no event logging.
+     */
+    public void setHiddenApiAccessLogSampleRate(int rate) {
+        synchronized (mLock) {
+            mHiddenApiAccessLogSampleRate = rate;
+            maybeSetHiddenApiAccessLogSampleRate(primaryZygoteState);
+            maybeSetHiddenApiAccessLogSampleRate(secondaryZygoteState);
+        }
+    }
+
+    @GuardedBy("mLock")
+    private void maybeSetApiBlacklistExemptions(ZygoteState state, boolean sendIfEmpty) {
+        if (state == null || state.isClosed()) {
+            return;
+        }
+        if (!sendIfEmpty && mApiBlacklistExemptions.isEmpty()) {
+            return;
+        }
+        try {
+            state.writer.write(Integer.toString(mApiBlacklistExemptions.size() + 1));
+            state.writer.newLine();
+            state.writer.write("--set-api-blacklist-exemptions");
+            state.writer.newLine();
+            for (int i = 0; i < mApiBlacklistExemptions.size(); ++i) {
+                state.writer.write(mApiBlacklistExemptions.get(i));
+                state.writer.newLine();
+            }
+            state.writer.flush();
+            int status = state.inputStream.readInt();
+            if (status != 0) {
+                Slog.e(LOG_TAG, "Failed to set API blacklist exemptions; status " + status);
+            }
+        } catch (IOException ioe) {
+            Slog.e(LOG_TAG, "Failed to set API blacklist exemptions", ioe);
+        }
+    }
+
+    private void maybeSetHiddenApiAccessLogSampleRate(ZygoteState state) {
+        if (state == null || state.isClosed()) {
+            return;
+        }
+        if (mHiddenApiAccessLogSampleRate == -1) {
+            return;
+        }
+        try {
+            state.writer.write(Integer.toString(1));
+            state.writer.newLine();
+            state.writer.write("--hidden-api-log-sampling-rate="
+                    + Integer.toString(mHiddenApiAccessLogSampleRate));
+            state.writer.newLine();
+            state.writer.flush();
+            int status = state.inputStream.readInt();
+            if (status != 0) {
+                Slog.e(LOG_TAG, "Failed to set hidden API log sampling rate; status " + status);
+            }
+        } catch (IOException ioe) {
+            Slog.e(LOG_TAG, "Failed to set hidden API log sampling rate", ioe);
+        }
+    }
+
+    /**
      * Tries to open socket to Zygote process if not already open. If
      * already open, does nothing.  May block and retry.  Requires that mLock be held.
      */
@@ -467,8 +562,9 @@ public class ZygoteProcess {
             } catch (IOException ioe) {
                 throw new ZygoteStartFailedEx("Error connecting to primary zygote", ioe);
             }
+            maybeSetApiBlacklistExemptions(primaryZygoteState, false);
+            maybeSetHiddenApiAccessLogSampleRate(primaryZygoteState);
         }
-
         if (primaryZygoteState.matches(abi)) {
             return primaryZygoteState;
         }
@@ -480,6 +576,8 @@ public class ZygoteProcess {
             } catch (IOException ioe) {
                 throw new ZygoteStartFailedEx("Error connecting to secondary zygote", ioe);
             }
+            maybeSetApiBlacklistExemptions(secondaryZygoteState, false);
+            maybeSetHiddenApiAccessLogSampleRate(secondaryZygoteState);
         }
 
         if (secondaryZygoteState.matches(abi)) {

@@ -116,9 +116,10 @@ static jobject native_create(JNIEnv* env, std::unique_ptr<SkStream> stream, jobj
     const auto& info = decoder->mCodec->getInfo();
     const int width = info.width();
     const int height = info.height();
+    const bool isNinePatch = decoder->mPeeker->mPatch != nullptr;
     return env->NewObject(gImageDecoder_class, gImageDecoder_constructorMethodID,
                           reinterpret_cast<jlong>(decoder.release()), width, height,
-                          animated);
+                          animated, isNinePatch);
 }
 
 static jobject ImageDecoder_nCreateFd(JNIEnv* env, jobject /*clazz*/,
@@ -210,7 +211,7 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
                                           jint desiredWidth, jint desiredHeight, jobject jsubset,
                                           jboolean requireMutable, jint allocator,
                                           jboolean requireUnpremul, jboolean preferRamOverQuality,
-                                          jboolean asAlphaMask) {
+                                          jboolean asAlphaMask, jobject jcolorSpace) {
     auto* decoder = reinterpret_cast<ImageDecoder*>(nativePtr);
     SkAndroidCodec* codec = decoder->mCodec.get();
     const SkISize desiredSize = SkISize::Make(desiredWidth, desiredHeight);
@@ -264,7 +265,8 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         // This is currently the only way to know that we should decode to F16.
         colorType = codec->computeOutputColorType(colorType);
     }
-    sk_sp<SkColorSpace> colorSpace = codec->computeOutputColorSpace(colorType);
+    sk_sp<SkColorSpace> colorSpace = GraphicsJNI::getNativeColorSpace(env, jcolorSpace);
+    colorSpace = codec->computeOutputColorSpace(colorType, colorSpace);
     decodeInfo = decodeInfo.makeColorType(colorType).makeColorSpace(colorSpace);
 
     SkBitmap bm;
@@ -331,13 +333,6 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         }
     }
 
-    float scaleX = 1.0f;
-    float scaleY = 1.0f;
-    if (scale) {
-        scaleX = (float) desiredWidth  / decodeInfo.width();
-        scaleY = (float) desiredHeight / decodeInfo.height();
-    }
-
     jbyteArray ninePatchChunk = nullptr;
     jobject ninePatchInsets = nullptr;
 
@@ -345,9 +340,6 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
     if (!jpostProcess) {
         // FIXME: Share more code with BitmapFactory.cpp.
         if (decoder->mPeeker->mPatch != nullptr) {
-            if (scale) {
-                decoder->mPeeker->scale(scaleX, scaleY, desiredWidth, desiredHeight);
-            }
             size_t ninePatchArraySize = decoder->mPeeker->mPatch->serializedSize();
             ninePatchChunk = env->NewByteArray(ninePatchArraySize);
             if (ninePatchChunk == nullptr) {
@@ -407,7 +399,12 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
 
         SkCanvas canvas(scaledBm, SkCanvas::ColorBehavior::kLegacy);
         canvas.translate(translateX, translateY);
-        canvas.scale(scaleX, scaleY);
+        if (scale) {
+            float scaleX = (float) desiredWidth  / decodeInfo.width();
+            float scaleY = (float) desiredHeight / decodeInfo.height();
+            canvas.scale(scaleX, scaleY);
+        }
+
         canvas.drawBitmap(bm, 0.0f, 0.0f, &paint);
 
         bm.swap(scaledBm);
@@ -507,23 +504,31 @@ static jstring ImageDecoder_nGetMimeType(JNIEnv* env, jobject /*clazz*/, jlong n
     return encodedFormatToString(env, decoder->mCodec->getEncodedFormat());
 }
 
+static jobject ImageDecoder_nGetColorSpace(JNIEnv* env, jobject /*clazz*/, jlong nativePtr) {
+    auto* codec = reinterpret_cast<ImageDecoder*>(nativePtr)->mCodec.get();
+    auto colorType = codec->computeOutputColorType(codec->getInfo().colorType());
+    sk_sp<SkColorSpace> colorSpace = codec->computeOutputColorSpace(colorType);
+    return GraphicsJNI::getColorSpace(env, colorSpace, colorType);
+}
+
 static const JNINativeMethod gImageDecoderMethods[] = {
     { "nCreate",        "(JLandroid/graphics/ImageDecoder$Source;)Landroid/graphics/ImageDecoder;",    (void*) ImageDecoder_nCreateAsset },
     { "nCreate",        "(Ljava/nio/ByteBuffer;IILandroid/graphics/ImageDecoder$Source;)Landroid/graphics/ImageDecoder;", (void*) ImageDecoder_nCreateByteBuffer },
     { "nCreate",        "([BIILandroid/graphics/ImageDecoder$Source;)Landroid/graphics/ImageDecoder;", (void*) ImageDecoder_nCreateByteArray },
     { "nCreate",        "(Ljava/io/InputStream;[BLandroid/graphics/ImageDecoder$Source;)Landroid/graphics/ImageDecoder;", (void*) ImageDecoder_nCreateInputStream },
     { "nCreate",        "(Ljava/io/FileDescriptor;Landroid/graphics/ImageDecoder$Source;)Landroid/graphics/ImageDecoder;", (void*) ImageDecoder_nCreateFd },
-    { "nDecodeBitmap",  "(JLandroid/graphics/ImageDecoder;ZIILandroid/graphics/Rect;ZIZZZ)Landroid/graphics/Bitmap;",
+    { "nDecodeBitmap",  "(JLandroid/graphics/ImageDecoder;ZIILandroid/graphics/Rect;ZIZZZLandroid/graphics/ColorSpace;)Landroid/graphics/Bitmap;",
                                                                  (void*) ImageDecoder_nDecodeBitmap },
     { "nGetSampledSize","(JI)Landroid/util/Size;",               (void*) ImageDecoder_nGetSampledSize },
     { "nGetPadding",    "(JLandroid/graphics/Rect;)V",           (void*) ImageDecoder_nGetPadding },
     { "nClose",         "(J)V",                                  (void*) ImageDecoder_nClose},
     { "nGetMimeType",   "(J)Ljava/lang/String;",                 (void*) ImageDecoder_nGetMimeType },
+    { "nGetColorSpace", "(J)Landroid/graphics/ColorSpace;",      (void*) ImageDecoder_nGetColorSpace },
 };
 
 int register_android_graphics_ImageDecoder(JNIEnv* env) {
     gImageDecoder_class = MakeGlobalRefOrDie(env, FindClassOrDie(env, "android/graphics/ImageDecoder"));
-    gImageDecoder_constructorMethodID = GetMethodIDOrDie(env, gImageDecoder_class, "<init>", "(JIIZ)V");
+    gImageDecoder_constructorMethodID = GetMethodIDOrDie(env, gImageDecoder_class, "<init>", "(JIIZZ)V");
     gImageDecoder_postProcessMethodID = GetMethodIDOrDie(env, gImageDecoder_class, "postProcessAndRelease", "(Landroid/graphics/Canvas;)I");
 
     gSize_class = MakeGlobalRefOrDie(env, FindClassOrDie(env, "android/util/Size"));

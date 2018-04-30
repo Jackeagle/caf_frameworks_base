@@ -22,7 +22,6 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.RequiresPermission;
-import android.annotation.SystemApi;
 import android.content.Context;
 import android.os.Binder;
 import android.os.Handler;
@@ -130,7 +129,8 @@ public final class IpSecTransform implements AutoCloseable {
         synchronized (this) {
             try {
                 IIpSecService svc = getIpSecService();
-                IpSecTransformResponse result = svc.createTransform(mConfig, new Binder());
+                IpSecTransformResponse result = svc.createTransform(
+                        mConfig, new Binder(), mContext.getOpPackageName());
                 int status = result.status;
                 checkResultStatus(status);
                 mResourceId = result.resourceId;
@@ -249,7 +249,6 @@ public final class IpSecTransform implements AutoCloseable {
      *
      * @hide
      */
-    @SystemApi
     public static class NattKeepaliveCallback {
         /** The specified {@code Network} is not connected. */
         public static final int ERROR_INVALID_NETWORK = 1;
@@ -280,7 +279,6 @@ public final class IpSecTransform implements AutoCloseable {
      *
      * @hide
      */
-    @SystemApi
     @RequiresPermission(anyOf = {
             android.Manifest.permission.MANAGE_IPSEC_TUNNELS,
             android.Manifest.permission.PACKET_KEEPALIVE_OFFLOAD
@@ -323,7 +321,6 @@ public final class IpSecTransform implements AutoCloseable {
      *
      * @hide
      */
-    @SystemApi
     @RequiresPermission(anyOf = {
             android.Manifest.permission.MANAGE_IPSEC_TUNNELS,
             android.Manifest.permission.PACKET_KEEPALIVE_OFFLOAD
@@ -476,7 +473,6 @@ public final class IpSecTransform implements AutoCloseable {
          * @throws IOException indicating other errors
          * @hide
          */
-        @SystemApi
         @NonNull
         @RequiresPermission(android.Manifest.permission.MANAGE_IPSEC_TUNNELS)
         public IpSecTransform buildTunnelModeTransform(

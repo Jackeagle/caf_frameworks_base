@@ -853,11 +853,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             if (mSecurityPolicy.findA11yWindowInfoById(windowId) == null) {
                 return null;
             }
-            IBinder token = mGlobalWindowTokens.get(windowId);
-            if (token != null) {
-                return token;
-            }
-            return getCurrentUserStateLocked().mWindowTokens.get(windowId);
+            return findWindowTokenLocked(windowId);
         }
     }
 
@@ -2527,6 +2523,14 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         getInteractionBridge().clearAccessibilityFocusNotLocked(windowId);
     }
 
+    private IBinder findWindowTokenLocked(int windowId) {
+        IBinder token = mGlobalWindowTokens.get(windowId);
+        if (token != null) {
+            return token;
+        }
+        return getCurrentUserStateLocked().mWindowTokens.get(windowId);
+    }
+
     private int findWindowIdLocked(IBinder token) {
         final int globalIndex = mGlobalWindowTokens.indexOfValue(token);
         if (globalIndex >= 0) {
@@ -2717,7 +2721,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             }
         }
 
-        private AccessibilityWindowInfo populateReportedWindow(WindowInfo window) {
+        private AccessibilityWindowInfo populateReportedWindowLocked(WindowInfo window) {
             final int windowId = findWindowIdLocked(window.token);
             if (windowId < 0) {
                 return null;
@@ -2945,7 +2949,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 | AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED
                 | AccessibilityEvent.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY;
 
-        // In Z order
+        // In Z order top to bottom
         public List<AccessibilityWindowInfo> mWindows;
         public SparseArray<AccessibilityWindowInfo> mA11yWindowInfoById = new SparseArray<>();
         public SparseArray<WindowInfo> mWindowInfoById = new SparseArray<>();
@@ -2986,7 +2990,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 // the accessibility layer reports which are windows
                 // that a sighted user can touch.
                 default: {
-                    return isRetrievalAllowingWindow(event.getWindowId());
+                    return isRetrievalAllowingWindowLocked(event.getWindowId());
                 }
             }
         }
@@ -3136,11 +3140,19 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     mAccessibilityFocusedWindowId != INVALID_WINDOW_ID;
             if (windowCount > 0) {
                 for (int i = 0; i < windowCount; i++) {
-                    WindowInfo windowInfo = windows.get(i);
-                    AccessibilityWindowInfo window = (mWindowsForAccessibilityCallback != null)
-                            ? mWindowsForAccessibilityCallback.populateReportedWindow(windowInfo)
-                            : null;
+                    final WindowInfo windowInfo = windows.get(i);
+                    final AccessibilityWindowInfo window;
+                    if (mWindowsForAccessibilityCallback != null) {
+                        window = mWindowsForAccessibilityCallback
+                                .populateReportedWindowLocked(windowInfo);
+                    } else {
+                        window = null;
+                    }
                     if (window != null) {
+
+                        // Flip layers in list to be consistent with AccessibilityService#getWindows
+                        window.setLayer(windowCount - 1 - window.getLayer());
+
                         final int windowId = window.getId();
                         if (window.isFocused()) {
                             mFocusedWindowId = windowId;
@@ -3165,7 +3177,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 // active window once we decided which it is.
                 final int accessibilityWindowCount = mWindows.size();
                 for (int i = 0; i < accessibilityWindowCount; i++) {
-                    AccessibilityWindowInfo window = mWindows.get(i);
+                    final AccessibilityWindowInfo window = mWindows.get(i);
                     if (window.getId() == mActiveWindowId) {
                         window.setActive(true);
                     }
@@ -3184,7 +3196,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             }
 
             if (shouldClearAccessibilityFocus) {
-                clearAccessibilityFocus(mAccessibilityFocusedWindowId);
+                mMainHandler.sendMessage(obtainMessage(
+                        AccessibilityManagerService::clearAccessibilityFocus,
+                        AccessibilityManagerService.this,
+                        box(mAccessibilityFocusedWindowId)));
             }
         }
 
@@ -3438,7 +3453,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         public boolean canGetAccessibilityNodeInfoLocked(
                 AbstractAccessibilityServiceConnection service, int windowId) {
-            return canRetrieveWindowContentLocked(service) && isRetrievalAllowingWindow(windowId);
+            return canRetrieveWindowContentLocked(service)
+                    && isRetrievalAllowingWindowLocked(windowId);
         }
 
         public boolean canRetrieveWindowsLocked(AbstractAccessibilityServiceConnection service) {
@@ -3523,15 +3539,38 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     || userId == UserHandle.USER_CURRENT_OR_SELF);
         }
 
-        private boolean isRetrievalAllowingWindow(int windowId) {
+        private boolean isRetrievalAllowingWindowLocked(int windowId) {
             // The system gets to interact with any window it wants.
             if (Binder.getCallingUid() == Process.SYSTEM_UID) {
                 return true;
+            }
+            if (Binder.getCallingUid() == Process.SHELL_UID) {
+                if (!isShellAllowedToRetrieveWindowLocked(windowId)) {
+                    return false;
+                }
             }
             if (windowId == mActiveWindowId) {
                 return true;
             }
             return findA11yWindowInfoById(windowId) != null;
+        }
+
+        private boolean isShellAllowedToRetrieveWindowLocked(int windowId) {
+            long token = Binder.clearCallingIdentity();
+            try {
+                IBinder windowToken = findWindowTokenLocked(windowId);
+                if (windowToken == null) {
+                    return false;
+                }
+                int userId = mWindowManagerService.getWindowOwnerUserId(windowToken);
+                if (userId == UserHandle.USER_NULL) {
+                    return false;
+                }
+                return !mUserManager.hasUserRestriction(
+                        UserManager.DISALLOW_DEBUGGING_FEATURES, UserHandle.of(userId));
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
         }
 
         public AccessibilityWindowInfo findA11yWindowInfoById(int windowId) {

@@ -34,6 +34,7 @@ struct ConfigStats {
     int64_t id;
     int32_t creation_time_sec;
     int32_t deletion_time_sec = 0;
+    int32_t reset_time_sec = 0;
     int32_t metric_count;
     int32_t condition_count;
     int32_t matcher_count;
@@ -42,7 +43,7 @@ struct ConfigStats {
 
     std::list<int32_t> broadcast_sent_time_sec;
     std::list<int32_t> data_drop_time_sec;
-    std::list<int32_t> dump_report_time_sec;
+    std::list<std::pair<int32_t, int64_t>> dump_report_stats;
 
     // Stores how many times a matcher have been matched. The map size is capped by kMaxConfigCount.
     std::map<const int64_t, int> matcher_stats;
@@ -57,17 +58,25 @@ struct ConfigStats {
     // it means some data has been dropped. The map size is capped by kMaxConfigCount.
     std::map<const int64_t, int> metric_stats;
 
+    // Stores the max number of output tuple of dimensions in condition across dimensions in what
+    // when it's bigger than kDimensionKeySizeSoftLimit. When you see the number is
+    // kDimensionKeySizeHardLimit +1, it means some data has been dropped. The map size is capped by
+    // kMaxConfigCount.
+    std::map<const int64_t, int> metric_dimension_in_condition_stats;
+
     // Stores the number of times an anomaly detection alert has been declared.
     // The map size is capped by kMaxConfigCount.
     std::map<const int64_t, int> alert_stats;
+
+    // Stores the config ID for each sub-config used.
+    std::list<std::pair<const int64_t, const int32_t>> annotations;
 };
 
 struct UidMapStats {
-    int32_t snapshots;
     int32_t changes;
     int32_t bytes_used;
-    int32_t dropped_snapshots;
     int32_t dropped_changes;
+    int32_t deleted_apps = 0;
 };
 
 // Keeps track of stats of statsd.
@@ -93,7 +102,7 @@ public:
     // The max number of old config stats we keep.
     const static int kMaxIceBoxSize = 20;
 
-    const static int kMaxLoggerErrors = 10;
+    const static int kMaxLoggerErrors = 20;
 
     const static int kMaxTimestampCount = 20;
 
@@ -111,11 +120,14 @@ public:
     // is critical for understanding the metrics.
     const static size_t kMaxBytesUsedUidMap = 50 * 1024;
 
+    // The number of deleted apps that are stored in the uid map.
+    const static int kMaxDeletedAppsInUidMap = 100;
+
     /* Minimum period between two broadcasts in nanoseconds. */
-    static const unsigned long long kMinBroadcastPeriodNs = 60 * NS_PER_SEC;
+    static const int64_t kMinBroadcastPeriodNs = 60 * NS_PER_SEC;
 
     /* Min period between two checks of byte size per config key in nanoseconds. */
-    static const unsigned long long kMinByteSizeCheckPeriodNs = 10 * NS_PER_SEC;
+    static const int64_t kMinByteSizeCheckPeriodNs = 10 * NS_PER_SEC;
 
     // Maximum age (30 days) that files on disk can exist in seconds.
     static const int kMaxAgeSecond = 60 * 60 * 24 * 30;
@@ -136,11 +148,17 @@ public:
      * If the config is not valid, this config stats will be put into icebox immediately.
      */
     void noteConfigReceived(const ConfigKey& key, int metricsCount, int conditionsCount,
-                            int matchersCount, int alertCount, bool isValid);
+                            int matchersCount, int alertCount,
+                            const std::list<std::pair<const int64_t, const int32_t>>& annotations,
+                            bool isValid);
     /**
      * Report a config has been removed.
      */
     void noteConfigRemoved(const ConfigKey& key);
+   /**
+     * Report a config has been reset when ttl expires.
+     */
+    void noteConfigReset(const ConfigKey& key);
 
     /**
      * Report a broadcast has been sent to a config owner to collect the data.
@@ -157,7 +175,7 @@ public:
      *
      * The report may be requested via StatsManager API, or through adb cmd.
      */
-    void noteMetricsReportSent(const ConfigKey& key);
+    void noteMetricsReportSent(const ConfigKey& key, const size_t num_bytes);
 
     /**
      * Report the size of output tuple of a condition.
@@ -182,6 +200,19 @@ public:
      * [size]: The output tuple size.
      */
     void noteMetricDimensionSize(const ConfigKey& key, const int64_t& id, int size);
+
+
+    /**
+     * Report the max size of output tuple of dimension in condition across dimensions in what.
+     *
+     * Note: only report when the metric has an output dimension in condition, and the max tuple
+     * count > kDimensionKeySizeSoftLimit.
+     *
+     * [key]: The config key that this metric belongs to.
+     * [id]: The id of the metric.
+     * [size]: The output tuple size.
+     */
+    void noteMetricDimensionInConditionSize(const ConfigKey& key, const int64_t& id, int size);
 
     /**
      * Report a matcher has been matched.
@@ -215,14 +246,18 @@ public:
     void noteRegisteredPeriodicAlarmChanged();
 
     /**
-     * Records the number of snapshot and delta entries that are being dropped from the uid map.
+     * Records the number of delta entries that are being dropped from the uid map.
      */
-    void noteUidMapDropped(int snapshots, int deltas);
+    void noteUidMapDropped(int deltas);
 
     /**
-     * Updates the number of snapshots currently stored in the uid map.
+     * Records that an app was deleted (from statsd's map).
      */
-    void setUidMapSnapshots(int snapshots);
+    void noteUidMapAppDeletionDropped();
+
+    /**
+     * Updates the number of changes currently stored in the uid map.
+     */
     void setUidMapChanges(int changes);
     void setCurrentUidMapMemory(int bytes);
 
@@ -239,6 +274,11 @@ public:
      * Records statsd met an error while reading from logd.
      */
     void noteLoggerError(int error);
+
+    /**
+     * Records statsd skipped an event.
+     */
+    void noteLogLost(int64_t timestamp);
 
     /**
      * Reset the historical stats. Including all stats in icebox, and the tracked stats about
@@ -295,6 +335,9 @@ private:
     // Logd errors. Size capped by kMaxLoggerErrors.
     std::list<const std::pair<int, int>> mLoggerErrors;
 
+    // Timestamps when we detect log loss after logd reconnect.
+    std::list<int64_t> mLogLossTimestampNs;
+
     // Stores the number of times statsd modified the anomaly alarm registered with
     // StatsCompanionService.
     int mAnomalyAlarmRegisteredStats = 0;
@@ -302,6 +345,7 @@ private:
     // Stores the number of times statsd registers the periodic alarm changes
     int mPeriodicAlarmRegisteredStats = 0;
 
+    void noteConfigResetInternalLocked(const ConfigKey& key);
 
     void noteConfigRemovedInternalLocked(const ConfigKey& key);
 
@@ -309,7 +353,7 @@ private:
 
     void noteDataDropped(const ConfigKey& key, int32_t timeSec);
 
-    void noteMetricsReportSent(const ConfigKey& key, int32_t timeSec);
+    void noteMetricsReportSent(const ConfigKey& key, const size_t num_bytes, int32_t timeSec);
 
     void noteBroadcastSent(const ConfigKey& key, int32_t timeSec);
 

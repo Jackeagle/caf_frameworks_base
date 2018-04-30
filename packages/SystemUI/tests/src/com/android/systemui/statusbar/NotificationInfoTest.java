@@ -52,17 +52,20 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
+import android.os.Looper;
 import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.PollingCheck;
+import android.testing.TestableLooper;
 import android.testing.UiThreadTest;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.android.systemui.Dependency;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
 
@@ -76,26 +79,28 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
-@UiThreadTest
+@TestableLooper.RunWithLooper
 public class NotificationInfoTest extends SysuiTestCase {
     private static final String TEST_PACKAGE_NAME = "test_package";
     private static final String TEST_SYSTEM_PACKAGE_NAME = PRINT_SPOOLER_PACKAGE_NAME;
     private static final int TEST_UID = 1;
+    private static final int MULTIPLE_CHANNEL_COUNT = 2;
     private static final String TEST_CHANNEL = "test_channel";
     private static final String TEST_CHANNEL_NAME = "TEST CHANNEL NAME";
 
+    private TestableLooper mTestableLooper;
     private NotificationInfo mNotificationInfo;
     private NotificationChannel mNotificationChannel;
     private NotificationChannel mDefaultNotificationChannel;
     private StatusBarNotification mSbn;
 
     @Rule public MockitoRule mockito = MockitoJUnit.rule();
+    private Looper mLooper;
     @Mock private INotificationManager mMockINotificationManager;
     @Mock private PackageManager mMockPackageManager;
     @Mock private NotificationBlockingHelperManager mBlockingHelperManager;
@@ -105,7 +110,8 @@ public class NotificationInfoTest extends SysuiTestCase {
         mDependency.injectTestDependency(
                 NotificationBlockingHelperManager.class,
                 mBlockingHelperManager);
-
+        mTestableLooper = TestableLooper.get(this);
+        mDependency.injectTestDependency(Dependency.BG_LOOPER, mTestableLooper.getLooper());
         // Inflate the layout
         final LayoutInflater layoutInflater = LayoutInflater.from(mContext);
         mNotificationInfo = (NotificationInfo) layoutInflater.inflate(R.layout.notification_info,
@@ -157,7 +163,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testBindNotification_SetsTextApplicationName() throws Exception {
         when(mMockPackageManager.getApplicationLabel(any())).thenReturn("App Name");
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final TextView textView = mNotificationInfo.findViewById(R.id.pkgname);
         assertTrue(textView.getText().toString().contains("App Name"));
         assertEquals(VISIBLE, mNotificationInfo.findViewById(R.id.header).getVisibility());
@@ -169,7 +175,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         when(mMockPackageManager.getApplicationIcon(any(ApplicationInfo.class)))
                 .thenReturn(iconDrawable);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final ImageView iconView = mNotificationInfo.findViewById(R.id.pkgicon);
         assertEquals(iconDrawable, iconView.getDrawable());
     }
@@ -177,7 +183,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_GroupNameHiddenIfNoGroup() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final TextView groupNameView = mNotificationInfo.findViewById(R.id.group_name);
         assertEquals(GONE, groupNameView.getVisibility());
         final TextView groupDividerView = mNotificationInfo.findViewById(R.id.pkg_group_divider);
@@ -193,7 +199,7 @@ public class NotificationInfoTest extends SysuiTestCase {
                 eq("test_group_id"), eq(TEST_PACKAGE_NAME), eq(TEST_UID)))
                 .thenReturn(notificationChannelGroup);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final TextView groupNameView = mNotificationInfo.findViewById(R.id.group_name);
         assertEquals(View.VISIBLE, groupNameView.getVisibility());
         assertEquals("Test Group Name", groupNameView.getText());
@@ -204,7 +210,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_SetsTextChannelName() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final TextView textView = mNotificationInfo.findViewById(R.id.channel_name);
         assertEquals(TEST_CHANNEL_NAME, textView.getText());
     }
@@ -212,7 +218,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_DefaultChannelDoesNotUseChannelName() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mDefaultNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mDefaultNotificationChannel, 1, mSbn, null, null, null, false);
         final TextView textView = mNotificationInfo.findViewById(R.id.channel_name);
         assertEquals(GONE, textView.getVisibility());
     }
@@ -224,7 +230,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         when(mMockINotificationManager.getNumNotificationChannelsForPackage(
                 eq(TEST_PACKAGE_NAME), eq(TEST_UID), anyBoolean())).thenReturn(10);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mDefaultNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mDefaultNotificationChannel, 1, mSbn, null, null, null, false);
         final TextView textView = mNotificationInfo.findViewById(R.id.channel_name);
         assertEquals(VISIBLE, textView.getVisibility());
     }
@@ -232,8 +238,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_UnblockablePackageUsesChannelName() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
         final TextView textView = mNotificationInfo.findViewById(R.id.channel_name);
         assertEquals(VISIBLE, textView.getVisibility());
     }
@@ -241,7 +246,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_BlockButton() throws Exception {
        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final View block = mNotificationInfo.findViewById(R.id.block);
         final View minimize = mNotificationInfo.findViewById(R.id.minimize);
         assertEquals(VISIBLE, block.getVisibility());
@@ -252,7 +257,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testBindNotification_MinButton() throws Exception {
         mSbn.getNotification().flags = Notification.FLAG_FOREGROUND_SERVICE;
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final View block = mNotificationInfo.findViewById(R.id.block);
         final View minimize = mNotificationInfo.findViewById(R.id.minimize);
         assertEquals(GONE, block.getVisibility());
@@ -267,7 +272,7 @@ public class NotificationInfoTest extends SysuiTestCase {
                 (View v, NotificationChannel c, int appUid) -> {
                     assertEquals(mNotificationChannel, c);
                     latch.countDown();
-                }, null, null);
+                }, null, false);
 
         final View settingsButton = mNotificationInfo.findViewById(R.id.info);
         settingsButton.performClick();
@@ -278,7 +283,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_SettingsButtonInvisibleWhenNoClickListener() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         final View settingsButton = mNotificationInfo.findViewById(R.id.info);
         assertTrue(settingsButton.getVisibility() != View.VISIBLE);
     }
@@ -286,11 +291,11 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_SettingsButtonReappearsAfterSecondBind() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
                 TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null,
                 (View v, NotificationChannel c, int appUid) -> {
-                }, null, null);
+                }, null, false);
         final View settingsButton = mNotificationInfo.findViewById(R.id.info);
         assertEquals(View.VISIBLE, settingsButton.getVisibility());
     }
@@ -299,11 +304,11 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testOnClickListenerPassesNullChannelForBundle() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 2, mSbn, null,
+                TEST_PACKAGE_NAME, mNotificationChannel, MULTIPLE_CHANNEL_COUNT, mSbn, null,
                 (View v, NotificationChannel c, int appUid) -> {
                     assertEquals(null, c);
                     latch.countDown();
-                }, null, null);
+                }, null, true);
 
         mNotificationInfo.findViewById(R.id.info).performClick();
         // Verify that listener was triggered.
@@ -315,7 +320,8 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testBindNotification_ChannelNameInvisibleWhenBundleFromDifferentChannels()
             throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 2, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, MULTIPLE_CHANNEL_COUNT, mSbn, null, null,
+                null, true);
         final TextView channelNameView =
                 mNotificationInfo.findViewById(R.id.channel_name);
         assertEquals(GONE, channelNameView.getVisibility());
@@ -325,7 +331,8 @@ public class NotificationInfoTest extends SysuiTestCase {
     @UiThreadTest
     public void testStopInvisibleIfBundleFromDifferentChannels() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 2, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, MULTIPLE_CHANNEL_COUNT, mSbn, null, null,
+                null, true);
         final TextView blockView = mNotificationInfo.findViewById(R.id.block);
         assertEquals(GONE, blockView.getVisibility());
     }
@@ -333,8 +340,8 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testbindNotification_BlockingHelper() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null,
-                null, null, false, true);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false, false,
+                true);
         final TextView view = mNotificationInfo.findViewById(R.id.block_prompt);
         assertEquals(View.VISIBLE, view.getVisibility());
         assertEquals(mContext.getString(R.string.inline_blocking_helper), view.getText());
@@ -343,8 +350,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testbindNotification_UnblockableTextVisibleWhenAppUnblockable() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null,
-                null, Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
         final TextView view = mNotificationInfo.findViewById(R.id.block_prompt);
         assertEquals(View.VISIBLE, view.getVisibility());
         assertEquals(mContext.getString(R.string.notification_unblockable_desc),
@@ -354,7 +360,8 @@ public class NotificationInfoTest extends SysuiTestCase {
     @Test
     public void testBindNotification_DoesNotUpdateNotificationChannel() throws Exception {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
     }
@@ -363,9 +370,10 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testDoesNotUpdateNotificationChannelAfterImportanceChanged() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
     }
@@ -375,9 +383,10 @@ public class NotificationInfoTest extends SysuiTestCase {
             throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.findViewById(R.id.minimize).performClick();
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
     }
@@ -387,9 +396,10 @@ public class NotificationInfoTest extends SysuiTestCase {
             throws Exception {
         int originalImportance = mNotificationChannel.getImportance();
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.handleCloseControls(true, false);
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
         assertEquals(originalImportance, mNotificationChannel.getImportance());
@@ -400,9 +410,11 @@ public class NotificationInfoTest extends SysuiTestCase {
             throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_UNSPECIFIED);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.handleCloseControls(true, false);
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
         assertEquals(IMPORTANCE_UNSPECIFIED, mNotificationChannel.getImportance());
@@ -420,7 +432,7 @@ public class NotificationInfoTest extends SysuiTestCase {
                 null /* checkSaveListener */,
                 null /* onSettingsClick */,
                 null /* onAppSettingsClick */,
-                null /* nonBlockablePkgs */,
+                false /* isNonblockable */,
                 true /* isForBlockingHelper */,
                 false /* isUserSentimentNegative */);
 
@@ -433,10 +445,11 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testNonBlockableAppDoesNotBecomeBlocked() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null,
-                null, Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
     }
@@ -445,12 +458,13 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testBlockChangedCallsUpdateNotificationChannel() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
         mNotificationInfo.handleCloseControls(true, false);
 
+        mTestableLooper.processAllMessages();
         ArgumentCaptor<NotificationChannel> updated =
                 ArgumentCaptor.forClass(NotificationChannel.class);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
@@ -461,13 +475,46 @@ public class NotificationInfoTest extends SysuiTestCase {
     }
 
     @Test
+    public void testBlockChangedCallsUpdateNotificationChannel_blockingHelper() throws Exception {
+        mNotificationChannel.setImportance(IMPORTANCE_LOW);
+        mNotificationInfo.bindNotification(
+                mMockPackageManager,
+                mMockINotificationManager,
+                TEST_PACKAGE_NAME,
+                mNotificationChannel,
+                1 /* numChannels */,
+                mSbn,
+                null /* checkSaveListener */,
+                null /* onSettingsClick */,
+                null /* onAppSettingsClick */,
+                false /* isNonblockable */,
+                true /* isForBlockingHelper */,
+                true /* isUserSentimentNegative */);
+
+        mNotificationInfo.findViewById(R.id.block).performClick();
+        waitForUndoButton();
+        mNotificationInfo.handleCloseControls(true, false);
+
+        mTestableLooper.processAllMessages();
+        ArgumentCaptor<NotificationChannel> updated =
+                ArgumentCaptor.forClass(NotificationChannel.class);
+        verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
+                anyString(), eq(TEST_UID), updated.capture());
+        assertTrue((updated.getValue().getUserLockedFields()
+                & USER_LOCKED_IMPORTANCE) != 0);
+        assertEquals(IMPORTANCE_NONE, updated.getValue().getImportance());
+    }
+
+
+    @Test
     public void testNonBlockableAppDoesNotBecomeMin() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null,
-                null, Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
         mNotificationInfo.findViewById(R.id.minimize).performClick();
         waitForUndoButton();
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 anyString(), eq(TEST_UID), any());
     }
@@ -477,12 +524,13 @@ public class NotificationInfoTest extends SysuiTestCase {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mSbn.getNotification().flags = Notification.FLAG_FOREGROUND_SERVICE;
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.findViewById(R.id.minimize).performClick();
         waitForUndoButton();
         mNotificationInfo.handleCloseControls(true, false);
 
+        mTestableLooper.processAllMessages();
         ArgumentCaptor<NotificationChannel> updated =
                 ArgumentCaptor.forClass(NotificationChannel.class);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
@@ -496,10 +544,11 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testKeepUpdatesNotificationChannel() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.handleCloseControls(true, false);
 
+        mTestableLooper.processAllMessages();
         ArgumentCaptor<NotificationChannel> updated =
                 ArgumentCaptor.forClass(NotificationChannel.class);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
@@ -512,7 +561,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testBlockUndoDoesNotBlockNotificationChannel() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
@@ -520,6 +569,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         waitForStopButton();
         mNotificationInfo.handleCloseControls(true, false);
 
+        mTestableLooper.processAllMessages();
         ArgumentCaptor<NotificationChannel> updated =
                 ArgumentCaptor.forClass(NotificationChannel.class);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
@@ -532,7 +582,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testMinUndoDoesNotMinNotificationChannel() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, false);
 
         mNotificationInfo.findViewById(R.id.minimize).performClick();
         waitForUndoButton();
@@ -540,6 +590,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         waitForStopButton();
         mNotificationInfo.handleCloseControls(true, false);
 
+        mTestableLooper.processAllMessages();
         ArgumentCaptor<NotificationChannel> updated =
                 ArgumentCaptor.forClass(NotificationChannel.class);
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
@@ -552,12 +603,13 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testCloseControlsDoesNotUpdateiMinIfSaveIsFalse() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
 
         mNotificationInfo.findViewById(R.id.minimize).performClick();
         waitForUndoButton();
         mNotificationInfo.handleCloseControls(false, false);
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
@@ -566,12 +618,13 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testCloseControlsDoesNotUpdateIfSaveIsFalse() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
         mNotificationInfo.handleCloseControls(false, false);
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
@@ -582,11 +635,13 @@ public class NotificationInfoTest extends SysuiTestCase {
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
                 TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn,
                 (Runnable saveImportance, StatusBarNotification sbn) -> {
-                }, null, null, Collections.singleton(TEST_PACKAGE_NAME));
+                }, null, null, true);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
         mNotificationInfo.handleCloseControls(true, false);
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, never()).updateNotificationChannelForPackage(
                 eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
@@ -598,11 +653,13 @@ public class NotificationInfoTest extends SysuiTestCase {
                 TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn,
                 (Runnable saveImportance, StatusBarNotification sbn) -> {
                     saveImportance.run();
-                }, null, null, null);
+                }, null, null, false);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
         mNotificationInfo.handleCloseControls(true, false);
+
+        mTestableLooper.processAllMessages();
         verify(mMockINotificationManager, times(1)).updateNotificationChannelForPackage(
                 eq(TEST_PACKAGE_NAME), eq(TEST_UID), eq(mNotificationChannel));
     }
@@ -628,7 +685,7 @@ public class NotificationInfoTest extends SysuiTestCase {
                 TEST_PACKAGE_NAME, mNotificationChannel, 1, sbn, null, null,
                 (View v, Intent intent) -> {
                     latch.countDown();
-                }, null);
+                }, false);
         final TextView settingsLink = mNotificationInfo.findViewById(R.id.app_settings);
         assertEquals(View.VISIBLE, settingsLink.getVisibility());
         settingsLink.performClick();
@@ -653,10 +710,10 @@ public class NotificationInfoTest extends SysuiTestCase {
                 0, null, 0, 0, n, UserHandle.CURRENT, null, 0);
 
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 2, sbn, null, null,
+                TEST_PACKAGE_NAME, mNotificationChannel, MULTIPLE_CHANNEL_COUNT, sbn, null, null,
                 (View v, Intent intent) -> {
                     latch.countDown();
-                }, null);
+                }, false);
         final TextView settingsLink = mNotificationInfo.findViewById(R.id.app_settings);
         assertEquals(View.VISIBLE, settingsLink.getVisibility());
         settingsLink.performClick();
@@ -674,7 +731,8 @@ public class NotificationInfoTest extends SysuiTestCase {
                 0, null, 0, 0, n, UserHandle.CURRENT, null, 0);
 
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 2, sbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, MULTIPLE_CHANNEL_COUNT, sbn, null, null,
+                null, false);
         final TextView settingsLink = mNotificationInfo.findViewById(R.id.app_settings);
         assertEquals(GONE, settingsLink.getVisibility());
     }
@@ -694,7 +752,30 @@ public class NotificationInfoTest extends SysuiTestCase {
                 0, null, 0, 0, n, UserHandle.CURRENT, null, 0);
 
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, sbn, null, null, null, null);
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, sbn, null, null, null, false);
+        final TextView settingsLink = mNotificationInfo.findViewById(R.id.app_settings);
+        assertEquals(GONE, settingsLink.getVisibility());
+    }
+
+    @Test
+    public void testBindHeader_noSettingsLinkWhenIsForBlockingHelper() throws Exception {
+        final String settingsText = "work chats";
+        final ResolveInfo ri = new ResolveInfo();
+        ri.activityInfo = new ActivityInfo();
+        ri.activityInfo.packageName = TEST_PACKAGE_NAME;
+        ri.activityInfo.name = "something";
+        List<ResolveInfo> ris = new ArrayList<>();
+        ris.add(ri);
+        when(mMockPackageManager.queryIntentActivities(any(), anyInt())).thenReturn(ris);
+        mNotificationChannel.setImportance(IMPORTANCE_LOW);
+        Notification n = new Notification.Builder(mContext, mNotificationChannel.getId())
+                .setSettingsText(settingsText).build();
+        StatusBarNotification sbn = new StatusBarNotification(TEST_PACKAGE_NAME, TEST_PACKAGE_NAME,
+                0, null, 0, 0, n, UserHandle.CURRENT, null, 0);
+
+        mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, sbn, null, null, null, false, true,
+                true);
         final TextView settingsLink = mNotificationInfo.findViewById(R.id.app_settings);
         assertEquals(GONE, settingsLink.getVisibility());
     }
@@ -710,8 +791,7 @@ public class NotificationInfoTest extends SysuiTestCase {
         mSbn.getNotification().flags = Notification.FLAG_FOREGROUND_SERVICE;
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
 
         mNotificationInfo.findViewById(R.id.minimize).performClick();
         waitForUndoButton();
@@ -723,8 +803,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testUndoText_block() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
@@ -736,8 +815,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testNoHeaderOnConfirmation() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();
@@ -748,8 +826,7 @@ public class NotificationInfoTest extends SysuiTestCase {
     public void testHeaderOnUndo() throws Exception {
         mNotificationChannel.setImportance(IMPORTANCE_LOW);
         mNotificationInfo.bindNotification(mMockPackageManager, mMockINotificationManager,
-                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null,
-                Collections.singleton(TEST_PACKAGE_NAME));
+                TEST_PACKAGE_NAME, mNotificationChannel, 1, mSbn, null, null, null, true);
 
         mNotificationInfo.findViewById(R.id.block).performClick();
         waitForUndoButton();

@@ -136,6 +136,10 @@
          views where the distance can't be measured -->
     <dimen name="notification_icon_appear_padding">15dp</dimen>
 
+    <!-- Vertical translation of the shelf during animation that happens after the
+    notification panel collapses -->
+    <dimen name="shelf_appear_translation">9dp</dimen>
+
     <!-- The amount the content shifts upwards when transforming into the icon -->
     <dimen name="notification_icon_transform_content_shift">32dp</dimen>
 
@@ -270,13 +274,15 @@
     <!-- The width of the panel that holds the quick settings. -->
     <dimen name="qs_panel_width">@dimen/notification_panel_width</dimen>
 
+    <dimen name="volume_dialog_panel_transparent_padding">8dp</dimen>
+
     <!-- the amount the volume panel should be offset at the end from the view next to it (or
     the screen edge, in portrait-->
     <dimen name="volume_dialog_base_margin">8dp</dimen>
 
     <dimen name="volume_dialog_panel_width">64dp</dimen>
 
-    <dimen name="volume_dialog_slider_height">108dp</dimen>
+    <dimen name="volume_dialog_slider_height">116dp</dimen>
 
     <dimen name="volume_dialog_row_height">252dp</dimen>
 
@@ -286,13 +292,15 @@
 
     <dimen name="volume_dialog_spacer">4dp</dimen>
 
-    <dimen name="volume_dialog_slider_margin_top">22dp</dimen>
+    <dimen name="volume_dialog_slider_margin_top">14dp</dimen>
 
     <dimen name="volume_dialog_slider_margin_bottom">-2dp</dimen>
 
     <dimen name="volume_dialog_row_margin_bottom">8dp</dimen>
 
     <dimen name="volume_dialog_settings_icon_size">16dp</dimen>
+
+    <dimen name="volume_dialog_elevation">9dp</dimen>
 
     <!-- Gravity for the notification panel -->
     <integer name="notification_panel_layout_gravity">0x31</integer><!-- center_horizontal|top -->
@@ -313,8 +321,10 @@
     <dimen name="pull_span_min">25dp</dimen>
 
     <dimen name="qs_tile_height">106dp</dimen>
+    <dimen name="qs_tile_layout_margin_side">9dp</dimen>
     <dimen name="qs_tile_margin_horizontal">18dp</dimen>
     <dimen name="qs_tile_margin_vertical">24dp</dimen>
+    <dimen name="qs_tile_margin_top_bottom">12dp</dimen>
     <dimen name="qs_tile_margin_top">18dp</dimen>
     <dimen name="qs_quick_tile_size">48dp</dimen>
     <!-- Width for the spacer, used between QS tiles. -->
@@ -365,7 +375,7 @@
     <dimen name="qs_header_alarm_icon_size">18dp</dimen>
     <dimen name="qs_header_alarm_text_margin_start">6dp</dimen>
     <dimen name="qs_footer_padding_start">16dp</dimen>
-    <dimen name="qs_footer_padding_end">24dp</dimen>
+    <dimen name="qs_footer_padding_end">16dp</dimen>
     <dimen name="qs_footer_icon_size">16dp</dimen>
 
     <dimen name="qs_notif_collapsed_space">64dp</dimen>
@@ -734,8 +744,6 @@
     <dimen name="volume_expander_margin_end">2dp</dimen>
     <dimen name="volume_expander_margin_top">6dp</dimen>
 
-    <dimen name="volume_panel_elevation">8dp</dimen>
-
     <!-- Padding between icon and text for managed profile toast -->
     <dimen name="managed_profile_toast_padding">4dp</dimen>
 
@@ -836,6 +844,9 @@
 
     <!-- The size of the drag hint text. -->
     <dimen name="recents_drag_hint_text_size">14sp</dimen>
+
+    <!-- The size of corner radius of the arrow in the onboarding toast. -->
+    <dimen name="recents_onboarding_toast_arrow_corner_radius">2dp</dimen>
 
     <!-- The min alpha to apply to a task affiliation group color. -->
     <item name="recents_task_affiliation_color_min_alpha_percentage" format="float" type="dimen">0.6</item>

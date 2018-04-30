@@ -33,9 +33,9 @@ import android.text.Spannable;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.ActionMode;
-import android.view.textclassifier.Logger;
 import android.view.textclassifier.SelectionEvent;
 import android.view.textclassifier.SelectionEvent.InvocationMethod;
+import android.view.textclassifier.SelectionSessionLogger;
 import android.view.textclassifier.TextClassification;
 import android.view.textclassifier.TextClassificationConstants;
 import android.view.textclassifier.TextClassificationManager;
@@ -499,7 +499,8 @@ public final class SelectionActionModeHelper {
             mOriginalEnd = mSelectionEnd = selectionEnd;
             mAllowReset = false;
             maybeInvalidateLogger();
-            mLogger.logSelectionStarted(text, selectionStart,
+            mLogger.logSelectionStarted(mTextView.getTextClassificationSession(),
+                    text, selectionStart,
                     isLink ? SelectionEvent.INVOCATION_LINK : SelectionEvent.INVOCATION_MANUAL);
         }
 
@@ -633,6 +634,7 @@ public final class SelectionActionModeHelper {
                             mSelectionStart, mSelectionEnd,
                             SelectionEvent.ACTION_ABANDON, null /* classification */);
                     mSelectionStart = mSelectionEnd = -1;
+                    mTextView.getTextClassificationSession().destroy();
                     mIsPending = false;
                 }
             }
@@ -661,20 +663,17 @@ public final class SelectionActionModeHelper {
         private static final String LOG_TAG = "SelectionMetricsLogger";
         private static final Pattern PATTERN_WHITESPACE = Pattern.compile("\\s+");
 
-        private final Supplier<TextClassifier> mTextClassificationSession;
-        private final Logger mLogger;
         private final boolean mEditTextLogger;
         private final BreakIterator mTokenIterator;
+
+        @Nullable private TextClassifier mClassificationSession;
         private int mStartIndex;
         private String mText;
 
         SelectionMetricsLogger(TextView textView) {
             Preconditions.checkNotNull(textView);
-            mTextClassificationSession = textView::getTextClassificationSession;
-            mLogger = textView.getTextClassifier().getLogger(
-                    new Logger.Config(textView.getContext(), getWidetType(textView), null));
             mEditTextLogger = textView.isTextEditable();
-            mTokenIterator = mLogger.getTokenIterator(textView.getTextLocale());
+            mTokenIterator = SelectionSessionLogger.getTokenIterator(textView.getTextLocale());
         }
 
         @TextClassifier.WidgetType
@@ -689,6 +688,7 @@ public final class SelectionActionModeHelper {
         }
 
         public void logSelectionStarted(
+                TextClassifier classificationSession,
                 CharSequence text, int index,
                 @InvocationMethod int invocationMethod) {
             try {
@@ -699,9 +699,8 @@ public final class SelectionActionModeHelper {
                 }
                 mTokenIterator.setText(mText);
                 mStartIndex = index;
-                mLogger.logSelectionStartedEvent(invocationMethod, 0);
-                // TODO: Remove the above legacy logging.
-                mTextClassificationSession.get().onSelectionEvent(
+                mClassificationSession = classificationSession;
+                mClassificationSession.onSelectionEvent(
                         SelectionEvent.createSelectionStartedEvent(invocationMethod, 0));
             } catch (Exception e) {
                 // Avoid crashes due to logging.
@@ -716,26 +715,23 @@ public final class SelectionActionModeHelper {
                 Preconditions.checkArgumentInRange(end, start, mText.length(), "end");
                 int[] wordIndices = getWordDelta(start, end);
                 if (selection != null) {
-                    mLogger.logSelectionModifiedEvent(
-                            wordIndices[0], wordIndices[1], selection);
-                    // TODO: Remove the above legacy logging.
-                    mTextClassificationSession.get().onSelectionEvent(
-                            SelectionEvent.createSelectionModifiedEvent(
-                                    wordIndices[0], wordIndices[1], selection));
+                    if (mClassificationSession != null) {
+                        mClassificationSession.onSelectionEvent(
+                                SelectionEvent.createSelectionModifiedEvent(
+                                        wordIndices[0], wordIndices[1], selection));
+                    }
                 } else if (classification != null) {
-                    mLogger.logSelectionModifiedEvent(
-                            wordIndices[0], wordIndices[1], classification);
-                    // TODO: Remove the above legacy logging.
-                    mTextClassificationSession.get().onSelectionEvent(
-                            SelectionEvent.createSelectionModifiedEvent(
-                                    wordIndices[0], wordIndices[1], classification));
+                    if (mClassificationSession != null) {
+                        mClassificationSession.onSelectionEvent(
+                                SelectionEvent.createSelectionModifiedEvent(
+                                        wordIndices[0], wordIndices[1], classification));
+                    }
                 } else {
-                    mLogger.logSelectionModifiedEvent(
-                            wordIndices[0], wordIndices[1]);
-                    // TODO: Remove the above legacy logging.
-                    mTextClassificationSession.get().onSelectionEvent(
-                            SelectionEvent.createSelectionModifiedEvent(
-                                    wordIndices[0], wordIndices[1]));
+                    if (mClassificationSession != null) {
+                        mClassificationSession.onSelectionEvent(
+                                SelectionEvent.createSelectionModifiedEvent(
+                                        wordIndices[0], wordIndices[1]));
+                    }
                 }
             } catch (Exception e) {
                 // Avoid crashes due to logging.
@@ -752,27 +748,21 @@ public final class SelectionActionModeHelper {
                 Preconditions.checkArgumentInRange(end, start, mText.length(), "end");
                 int[] wordIndices = getWordDelta(start, end);
                 if (classification != null) {
-                    mLogger.logSelectionActionEvent(
-                            wordIndices[0], wordIndices[1], action, classification);
-                    // TODO: Remove the above legacy logging.
-                    mTextClassificationSession.get().onSelectionEvent(
-                            SelectionEvent.createSelectionActionEvent(
-                                    wordIndices[0], wordIndices[1], action, classification));
+                    if (mClassificationSession != null) {
+                        mClassificationSession.onSelectionEvent(
+                                SelectionEvent.createSelectionActionEvent(
+                                        wordIndices[0], wordIndices[1], action, classification));
+                    }
                 } else {
-                    mLogger.logSelectionActionEvent(
-                            wordIndices[0], wordIndices[1], action);
-                    // TODO: Remove the above legacy logging.
-                    mTextClassificationSession.get().onSelectionEvent(
-                            SelectionEvent.createSelectionActionEvent(
-                                    wordIndices[0], wordIndices[1], action));
+                    if (mClassificationSession != null) {
+                        mClassificationSession.onSelectionEvent(
+                                SelectionEvent.createSelectionActionEvent(
+                                        wordIndices[0], wordIndices[1], action));
+                    }
                 }
             } catch (Exception e) {
                 // Avoid crashes due to logging.
                 Log.e(LOG_TAG, "" + e.getMessage(), e);
-            } finally {
-                if (SelectionEvent.isTerminal(action)) {
-                    mTextClassificationSession.get().destroy();
-                }
             }
         }
 
@@ -926,9 +916,8 @@ public final class SelectionActionModeHelper {
         /** End index relative to mText. */
         private int mSelectionEnd;
 
-        private final TextSelection.Options mSelectionOptions = new TextSelection.Options();
-        private final TextClassification.Options mClassificationOptions =
-                new TextClassification.Options();
+        @Nullable
+        private LocaleList mDefaultLocales;
 
         /** Trimmed text starting from mTrimStart in mText. */
         private CharSequence mTrimmedText;
@@ -966,9 +955,7 @@ public final class SelectionActionModeHelper {
             Preconditions.checkArgument(selectionEnd > selectionStart);
             mSelectionStart = selectionStart;
             mSelectionEnd = selectionEnd;
-            mClassificationOptions.setDefaultLocales(locales);
-            mSelectionOptions.setDefaultLocales(locales)
-                    .setDarkLaunchAllowed(true);
+            mDefaultLocales = locales;
         }
 
         @WorkerThread
@@ -982,14 +969,17 @@ public final class SelectionActionModeHelper {
             mHot = true;
             trimText();
             final TextSelection selection;
-            if (mContext.getApplicationInfo().targetSdkVersion > Build.VERSION_CODES.O_MR1) {
-                selection = mTextClassifier.get().suggestSelection(
-                        mTrimmedText, mRelativeStart, mRelativeEnd, mSelectionOptions);
+            if (mContext.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.P) {
+                final TextSelection.Request request = new TextSelection.Request.Builder(
+                        mTrimmedText, mRelativeStart, mRelativeEnd)
+                        .setDefaultLocales(mDefaultLocales)
+                        .setDarkLaunchAllowed(true)
+                        .build();
+                selection = mTextClassifier.get().suggestSelection(request);
             } else {
                 // Use old APIs.
                 selection = mTextClassifier.get().suggestSelection(
-                        mTrimmedText, mRelativeStart, mRelativeEnd,
-                        mSelectionOptions.getDefaultLocales());
+                        mTrimmedText, mRelativeStart, mRelativeEnd, mDefaultLocales);
             }
             // Do not classify new selection boundaries if TextClassifier should be dark launched.
             if (!mDarkLaunchEnabled) {
@@ -1024,25 +1014,26 @@ public final class SelectionActionModeHelper {
             if (!Objects.equals(mText, mLastClassificationText)
                     || mSelectionStart != mLastClassificationSelectionStart
                     || mSelectionEnd != mLastClassificationSelectionEnd
-                    || !Objects.equals(
-                            mClassificationOptions.getDefaultLocales(),
-                            mLastClassificationLocales)) {
+                    || !Objects.equals(mDefaultLocales, mLastClassificationLocales)) {
 
                 mLastClassificationText = mText;
                 mLastClassificationSelectionStart = mSelectionStart;
                 mLastClassificationSelectionEnd = mSelectionEnd;
-                mLastClassificationLocales = mClassificationOptions.getDefaultLocales();
+                mLastClassificationLocales = mDefaultLocales;
 
                 trimText();
                 final TextClassification classification;
-                if (mContext.getApplicationInfo().targetSdkVersion > Build.VERSION_CODES.O_MR1) {
-                    classification = mTextClassifier.get().classifyText(
-                            mTrimmedText, mRelativeStart, mRelativeEnd, mClassificationOptions);
+                if (mContext.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.P) {
+                    final TextClassification.Request request =
+                            new TextClassification.Request.Builder(
+                                    mTrimmedText, mRelativeStart, mRelativeEnd)
+                                    .setDefaultLocales(mDefaultLocales)
+                                    .build();
+                    classification = mTextClassifier.get().classifyText(request);
                 } else {
                     // Use old APIs.
                     classification = mTextClassifier.get().classifyText(
-                            mTrimmedText, mRelativeStart, mRelativeEnd,
-                            mClassificationOptions.getDefaultLocales());
+                            mTrimmedText, mRelativeStart, mRelativeEnd, mDefaultLocales);
                 }
                 mLastClassificationResult = new SelectionResult(
                         mSelectionStart, mSelectionEnd, classification, selection);
