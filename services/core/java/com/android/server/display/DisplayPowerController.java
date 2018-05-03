@@ -38,6 +38,7 @@ import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.os.SystemProperties;
 import android.util.MathUtils;
 import android.util.Slog;
 import android.util.Spline;
@@ -423,8 +424,13 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
 
         mScreenBrightnessRangeMinimum = screenBrightnessRangeMinimum;
 
+        String mHeadlessMode = SystemProperties.get("device.mode.headless","false");
+        if ("false".equals(mHeadlessMode)) {
+            mColorFadeEnabled = !ActivityManager.isLowRamDeviceStatic();
+        } else {
+            mColorFadeEnabled = false;
+        }
 
-        mColorFadeEnabled = !ActivityManager.isLowRamDeviceStatic();
         mColorFadeFadesConfig = resources.getBoolean(
                 com.android.internal.R.bool.config_animateScreenLights);
 
