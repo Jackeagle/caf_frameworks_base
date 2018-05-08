@@ -79,6 +79,13 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String EXTRA_PLAYER_SETTING =
             "android.bluetooth.avrcp-controller.profile.extra.PLAYER_SETTING";
 
+    /* Remote supported Features */
+    public static final int BTRC_FEAT_NONE = 0x00;
+    public static final int BTRC_FEAT_METADATA = 0x01;
+    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
+    public static final int BTRC_FEAT_BROWSE = 0x04;
+    public static final int BTRC_FEAT_COVER_ART = 0x08;
+
     private Context mContext;
     private ServiceListener mServiceListener;
     private volatile IBluetoothAvrcpController mService;
@@ -284,6 +291,20 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
             }
         }
         if (service == null) Log.w(TAG, "Proxy not attached to service");
+    }
+
+    public int getSupportedFeatures(BluetoothDevice device) {
+        Log.d(TAG, "getSupportedFeatures dev = ");
+        if (mService != null && isEnabled()) {
+            try {
+                return mService.getSupportedFeatures(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in getSupportedFeatures()", e);
+                return 0;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return 0;
     }
 
     private final ServiceConnection mConnection = new ServiceConnection() {
