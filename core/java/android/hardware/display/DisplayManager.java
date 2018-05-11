@@ -28,6 +28,7 @@ import android.content.Context;
 import android.graphics.Point;
 import android.media.projection.MediaProjection;
 import android.os.Handler;
+import android.util.Pair;
 import android.util.SparseArray;
 import android.view.Display;
 import android.view.Surface;
@@ -535,6 +536,19 @@ public final class DisplayManager {
     }
 
     /**
+     * Set the level of color saturation to apply to the display.
+     * @param level The amount of saturation to apply, between 0 and 1 inclusive.
+     * 0 produces a grayscale image, 1 is normal.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(Manifest.permission.CONTROL_DISPLAY_SATURATION)
+    public void setSaturationLevel(float level) {
+        mGlobal.setSaturationLevel(level);
+    }
+
+    /**
      * Creates a virtual display.
      *
      * @see #createVirtualDisplay(String, int, int, int, Surface, int,
@@ -732,6 +746,22 @@ public final class DisplayManager {
      */
     public void setTemporaryAutoBrightnessAdjustment(float adjustment) {
         mGlobal.setTemporaryAutoBrightnessAdjustment(adjustment);
+    }
+
+    /**
+     * Returns the minimum brightness curve, which guarantess that any brightness curve that dips
+     * below it is rejected by the system.
+     * This prevent auto-brightness from setting the screen so dark as to prevent the user from
+     * resetting or disabling it, and maps lux to the absolute minimum nits that are still readable
+     * in that ambient brightness.
+     *
+     * @return The minimum brightness curve (as lux values and their corresponding nits values).
+     *
+     * @hide
+     */
+    @SystemApi
+    public Pair<float[], float[]> getMinimumBrightnessCurve() {
+        return mGlobal.getMinimumBrightnessCurve();
     }
 
     /**

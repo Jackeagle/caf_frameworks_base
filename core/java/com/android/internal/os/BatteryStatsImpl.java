@@ -21,10 +21,13 @@ import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.bluetooth.BluetoothActivityEnergyInfo;
 import android.bluetooth.UidTraffic;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.ContentObserver;
+import android.hardware.usb.UsbManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkStats;
 import android.net.Uri;
@@ -193,6 +196,7 @@ public class BatteryStatsImpl extends BatteryStats {
     static final int MSG_REPORT_CPU_UPDATE_NEEDED = 1;
     static final int MSG_REPORT_POWER_CHANGE = 2;
     static final int MSG_REPORT_CHARGING = 3;
+    static final int MSG_REPORT_RESET_STATS = 4;
     static final long DELAY_UPDATE_WAKELOCKS = 5*1000;
 
     private final KernelWakelockReader mKernelWakelockReader = new KernelWakelockReader();
@@ -316,6 +320,7 @@ public class BatteryStatsImpl extends BatteryStats {
         public void batteryNeedsCpuUpdate();
         public void batteryPowerChanged(boolean onBattery);
         public void batterySendBroadcast(Intent intent);
+        public void batteryStatsReset();
     }
 
     public interface PlatformIdleStateCallback {
@@ -370,7 +375,11 @@ public class BatteryStatsImpl extends BatteryStats {
                         cb.batterySendBroadcast(intent);
                     }
                     break;
-            }
+                case MSG_REPORT_RESET_STATS:
+                    if (cb != null) {
+                        cb.batteryStatsReset();
+                    }
+                }
         }
     }
 
@@ -766,7 +775,10 @@ public class BatteryStatsImpl extends BatteryStats {
     int mCameraOnNesting;
     StopwatchTimer mCameraOnTimer;
 
-    int mUsbDataState; // 0: unknown, 1: disconnected, 2: connected
+    private static final int USB_DATA_UNKNOWN = 0;
+    private static final int USB_DATA_DISCONNECTED = 1;
+    private static final int USB_DATA_CONNECTED = 2;
+    int mUsbDataState = USB_DATA_UNKNOWN;
 
     int mGpsSignalQualityBin = -1;
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
@@ -5241,8 +5253,30 @@ public class BatteryStatsImpl extends BatteryStats {
         }
     }
 
-    public void noteUsbConnectionStateLocked(boolean connected) {
-        int newState = connected ? 2 : 1;
+    private void registerUsbStateReceiver(Context context) {
+        final IntentFilter usbStateFilter = new IntentFilter();
+        usbStateFilter.addAction(UsbManager.ACTION_USB_STATE);
+        context.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                final boolean state = intent.getBooleanExtra(UsbManager.USB_CONNECTED, false);
+                synchronized (BatteryStatsImpl.this) {
+                    noteUsbConnectionStateLocked(state);
+                }
+            }
+        }, usbStateFilter);
+        synchronized (this) {
+            if (mUsbDataState == USB_DATA_UNKNOWN) {
+                final Intent usbState = context.registerReceiver(null, usbStateFilter);
+                final boolean initState = usbState != null && usbState.getBooleanExtra(
+                        UsbManager.USB_CONNECTED, false);
+                noteUsbConnectionStateLocked(initState);
+            }
+        }
+    }
+
+    private void noteUsbConnectionStateLocked(boolean connected) {
+        int newState = connected ? USB_DATA_CONNECTED : USB_DATA_DISCONNECTED;
         if (mUsbDataState != newState) {
             mUsbDataState = newState;
             if (connected) {
@@ -10911,6 +10945,7 @@ public class BatteryStatsImpl extends BatteryStats {
         initDischarge();
 
         clearHistoryLocked();
+        mHandler.sendEmptyMessage(MSG_REPORT_RESET_STATS);
     }
 
     private void initActiveHistoryEventsLocked(long elapsedRealtimeMs, long uptimeMs) {
@@ -13218,6 +13253,7 @@ public class BatteryStatsImpl extends BatteryStats {
 
     public void systemServicesReady(Context context) {
         mConstants.startObserving(context.getContentResolver());
+        registerUsbStateReceiver(context);
     }
 
     @VisibleForTesting
@@ -13232,18 +13268,23 @@ public class BatteryStatsImpl extends BatteryStats {
                 = "kernel_uid_readers_throttle_time";
         public static final String KEY_UID_REMOVE_DELAY_MS
                 = "uid_remove_delay_ms";
+        public static final String KEY_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS
+                = "external_stats_collection_rate_limit_ms";
 
         private static final boolean DEFAULT_TRACK_CPU_TIMES_BY_PROC_STATE = true;
         private static final boolean DEFAULT_TRACK_CPU_ACTIVE_CLUSTER_TIME = true;
         private static final long DEFAULT_PROC_STATE_CPU_TIMES_READ_DELAY_MS = 5_000;
         private static final long DEFAULT_KERNEL_UID_READERS_THROTTLE_TIME = 10_000;
         private static final long DEFAULT_UID_REMOVE_DELAY_MS = 5L * 60L * 1000L;
+        private static final long DEFAULT_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS = 600_000;
 
         public boolean TRACK_CPU_TIMES_BY_PROC_STATE = DEFAULT_TRACK_CPU_TIMES_BY_PROC_STATE;
         public boolean TRACK_CPU_ACTIVE_CLUSTER_TIME = DEFAULT_TRACK_CPU_ACTIVE_CLUSTER_TIME;
         public long PROC_STATE_CPU_TIMES_READ_DELAY_MS = DEFAULT_PROC_STATE_CPU_TIMES_READ_DELAY_MS;
         public long KERNEL_UID_READERS_THROTTLE_TIME = DEFAULT_KERNEL_UID_READERS_THROTTLE_TIME;
         public long UID_REMOVE_DELAY_MS = DEFAULT_UID_REMOVE_DELAY_MS;
+        public long EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS
+                = DEFAULT_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS;
 
         private ContentResolver mResolver;
         private final KeyValueListParser mParser = new KeyValueListParser(',');
@@ -13289,6 +13330,9 @@ public class BatteryStatsImpl extends BatteryStats {
                                 DEFAULT_KERNEL_UID_READERS_THROTTLE_TIME));
                 updateUidRemoveDelay(
                         mParser.getLong(KEY_UID_REMOVE_DELAY_MS, DEFAULT_UID_REMOVE_DELAY_MS));
+                EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS = mParser.getLong(
+                        KEY_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS,
+                        DEFAULT_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS);
             }
         }
 
@@ -13338,6 +13382,14 @@ public class BatteryStatsImpl extends BatteryStats {
             pw.println(PROC_STATE_CPU_TIMES_READ_DELAY_MS);
             pw.print(KEY_KERNEL_UID_READERS_THROTTLE_TIME); pw.print("=");
             pw.println(KERNEL_UID_READERS_THROTTLE_TIME);
+            pw.print(KEY_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS); pw.print("=");
+            pw.println(EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS);
+        }
+    }
+
+    public long getExternalStatsCollectionRateLimitMs() {
+        synchronized (this) {
+            return mConstants.EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS;
         }
     }
 

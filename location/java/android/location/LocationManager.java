@@ -29,6 +29,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
+import android.annotation.TestApi;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -392,6 +393,18 @@ public class LocationManager {
     }
 
     /**
+     * @hide
+     */
+    @TestApi
+    public String[] getBackgroundThrottlingWhitelist() {
+        try {
+            return mService.getBackgroundThrottlingWhitelist();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * @hide - hide this constructor because it has a parameter
      * of type ILocationManager, which is a system private class. The
      * right way to create an instance of this class is using the
@@ -540,6 +553,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             LocationListener listener) {
+        android.util.SeempLog.record(47);
         checkProvider(provider);
         checkListener(listener);
 
@@ -572,6 +586,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             LocationListener listener, Looper looper) {
+        android.util.SeempLog.record(47);
         checkProvider(provider);
         checkListener(listener);
 
@@ -605,6 +620,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(long minTime, float minDistance, Criteria criteria,
             LocationListener listener, Looper looper) {
+        android.util.SeempLog.record(47);
         checkCriteria(criteria);
         checkListener(listener);
 
@@ -633,6 +649,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(String provider, long minTime, float minDistance,
             PendingIntent intent) {
+        android.util.SeempLog.record(47);
         checkProvider(provider);
         checkPendingIntent(intent);
 
@@ -735,6 +752,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(long minTime, float minDistance, Criteria criteria,
             PendingIntent intent) {
+        android.util.SeempLog.record(47);
         checkCriteria(criteria);
         checkPendingIntent(intent);
 
@@ -764,6 +782,7 @@ public class LocationManager {
      */
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(String provider, LocationListener listener, Looper looper) {
+        android.util.SeempLog.record(64);
         checkProvider(provider);
         checkListener(listener);
 
@@ -794,6 +813,7 @@ public class LocationManager {
      */
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(Criteria criteria, LocationListener listener, Looper looper) {
+        android.util.SeempLog.record(64);
         checkCriteria(criteria);
         checkListener(listener);
 
@@ -817,6 +837,7 @@ public class LocationManager {
      */
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(String provider, PendingIntent intent) {
+        android.util.SeempLog.record(64);
         checkProvider(provider);
         checkPendingIntent(intent);
 
@@ -841,6 +862,7 @@ public class LocationManager {
      */
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestSingleUpdate(Criteria criteria, PendingIntent intent) {
+        android.util.SeempLog.record(64);
         checkCriteria(criteria);
         checkPendingIntent(intent);
 
@@ -910,6 +932,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(LocationRequest request, LocationListener listener,
             Looper looper) {
+        android.util.SeempLog.record(47);
         checkListener(listener);
         requestLocationUpdates(request, listener, looper, null);
     }
@@ -938,6 +961,7 @@ public class LocationManager {
     @SystemApi
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void requestLocationUpdates(LocationRequest request, PendingIntent intent) {
+        android.util.SeempLog.record(47);
         checkPendingIntent(intent);
         requestLocationUpdates(request, null, null, intent);
     }
@@ -984,6 +1008,7 @@ public class LocationManager {
 
     private void requestLocationUpdates(LocationRequest request, LocationListener listener,
             Looper looper, PendingIntent intent) {
+        android.util.SeempLog.record(47);
 
         String packageName = mContext.getPackageName();
 
@@ -1092,6 +1117,7 @@ public class LocationManager {
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public void addProximityAlert(double latitude, double longitude, float radius, long expiration,
             PendingIntent intent) {
+        android.util.SeempLog.record(45);
         checkPendingIntent(intent);
         if (expiration < 0) expiration = Long.MAX_VALUE;
 
@@ -1249,40 +1275,11 @@ public class LocationManager {
     @SystemApi
     @RequiresPermission(WRITE_SECURE_SETTINGS)
     public void setLocationEnabledForUser(boolean enabled, UserHandle userHandle) {
-        final List<String> allProvidersList = getAllProviders();
-        // Update all providers on device plus gps and network provider when disabling location.
-        Set<String> allProvidersSet = new ArraySet<>(allProvidersList.size() + 2);
-        allProvidersSet.addAll(allProvidersList);
-        // When disabling location, disable gps and network provider that could have been enabled by
-        // location mode api.
-        if (enabled == false) {
-            allProvidersSet.add(GPS_PROVIDER);
-            allProvidersSet.add(NETWORK_PROVIDER);
+        try {
+            mService.setLocationEnabledForUser(enabled, userHandle.getIdentifier());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
-        if (allProvidersSet.isEmpty()) {
-            return;
-        }
-        // to ensure thread safety, we write the provider name with a '+' or '-'
-        // and let the SettingsProvider handle it rather than reading and modifying
-        // the list of enabled providers.
-        final String prefix = enabled ? "+" : "-";
-        StringBuilder locationProvidersAllowed = new StringBuilder();
-        for (String provider : allProvidersSet) {
-            checkProvider(provider);
-            if (provider.equals(PASSIVE_PROVIDER)) {
-                continue;
-            }
-            locationProvidersAllowed.append(prefix);
-            locationProvidersAllowed.append(provider);
-            locationProvidersAllowed.append(",");
-        }
-        // Remove the trailing comma
-        locationProvidersAllowed.setLength(locationProvidersAllowed.length() - 1);
-        Settings.Secure.putStringForUser(
-                mContext.getContentResolver(),
-                Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
-                locationProvidersAllowed.toString(),
-                userHandle.getIdentifier());
     }
 
     /**
@@ -1295,22 +1292,11 @@ public class LocationManager {
      */
     @SystemApi
     public boolean isLocationEnabledForUser(UserHandle userHandle) {
-        final String allowedProviders = Settings.Secure.getStringForUser(
-                mContext.getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
-                userHandle.getIdentifier());
-        if (allowedProviders == null) {
-            return false;
+        try {
+            return mService.isLocationEnabledForUser(userHandle.getIdentifier());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
-        final List<String> providerList = Arrays.asList(allowedProviders.split(","));
-        for(String provider : getAllProviders()) {
-            if (provider.equals(PASSIVE_PROVIDER)) {
-                continue;
-            }
-            if (providerList.contains(provider)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -1362,9 +1348,12 @@ public class LocationManager {
     @SystemApi
     public boolean isProviderEnabledForUser(String provider, UserHandle userHandle) {
         checkProvider(provider);
-        String allowedProviders = Settings.Secure.getStringForUser(mContext.getContentResolver(),
-                Settings.Secure.LOCATION_PROVIDERS_ALLOWED, userHandle.getIdentifier());
-        return TextUtils.delimitedStringContains(allowedProviders, ',', provider);
+
+        try {
+            return mService.isProviderEnabledForUser(provider, userHandle.getIdentifier());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     /**
@@ -1383,16 +1372,13 @@ public class LocationManager {
     public boolean setProviderEnabledForUser(
             String provider, boolean enabled, UserHandle userHandle) {
         checkProvider(provider);
-        // to ensure thread safety, we write the provider name with a '+' or '-'
-        // and let the SettingsProvider handle it rather than reading and modifying
-        // the list of enabled providers.
-        if (enabled) {
-            provider = "+" + provider;
-        } else {
-            provider = "-" + provider;
+
+        try {
+            return mService.setProviderEnabledForUser(
+                    provider, enabled, userHandle.getIdentifier());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
-        return Settings.Secure.putStringForUser(mContext.getContentResolver(),
-                Settings.Secure.LOCATION_PROVIDERS_ALLOWED, provider, userHandle.getIdentifier());
     }
 
     /**
@@ -1438,6 +1424,7 @@ public class LocationManager {
      */
     @RequiresPermission(anyOf = {ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION})
     public Location getLastKnownLocation(String provider) {
+        android.util.SeempLog.record(46);
         checkProvider(provider);
         String packageName = mContext.getPackageName();
         LocationRequest request = LocationRequest.createFromDeprecatedProvider(
@@ -1843,6 +1830,7 @@ public class LocationManager {
     @Deprecated
     @RequiresPermission(ACCESS_FINE_LOCATION)
     public boolean addGpsStatusListener(GpsStatus.Listener listener) {
+        android.util.SeempLog.record(43);
         boolean result;
 
         if (mGpsStatusListeners.get(listener) != null) {
@@ -1954,6 +1942,7 @@ public class LocationManager {
     @Deprecated
     @RequiresPermission(ACCESS_FINE_LOCATION)
     public boolean addNmeaListener(GpsStatus.NmeaListener listener) {
+        android.util.SeempLog.record(44);
         boolean result;
 
         if (mGpsNmeaListeners.get(listener) != null) {
@@ -2333,6 +2322,7 @@ public class LocationManager {
      * @return true if the command succeeds.
      */
     public boolean sendExtraCommand(String provider, String command, Bundle extras) {
+        android.util.SeempLog.record(48);
         try {
             return mService.sendExtraCommand(provider, command, extras);
         } catch (RemoteException e) {

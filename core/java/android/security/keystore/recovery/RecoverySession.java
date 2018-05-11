@@ -79,6 +79,7 @@ public class RecoverySession implements AutoCloseable {
 
     /**
      * @deprecated Use {@link #start(String, CertPath, byte[], byte[], List)} instead.
+     * @removed
      */
     @Deprecated
     @RequiresPermission(android.Manifest.permission.RECOVER_KEYSTORE)
@@ -88,28 +89,12 @@ public class RecoverySession implements AutoCloseable {
             @NonNull byte[] vaultChallenge,
             @NonNull List<KeyChainProtectionParams> secrets)
             throws CertificateException, InternalRecoveryServiceException {
-        try {
-            byte[] recoveryClaim =
-                    mRecoveryController.getBinder().startRecoverySession(
-                            mSessionId,
-                            verifierPublicKey,
-                            vaultParams,
-                            vaultChallenge,
-                            secrets);
-            return recoveryClaim;
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        } catch (ServiceSpecificException e) {
-            if (e.errorCode == RecoveryController.ERROR_BAD_CERTIFICATE_FORMAT
-                    || e.errorCode == RecoveryController.ERROR_INVALID_CERTIFICATE) {
-                throw new CertificateException(e.getMessage());
-            }
-            throw mRecoveryController.wrapUnexpectedServiceSpecificException(e);
-        }
+        throw new UnsupportedOperationException();
     }
 
     /**
      * @deprecated Use {@link #start(String, CertPath, byte[], byte[], List)} instead.
+     * @removed
      */
     @Deprecated
     @RequiresPermission(android.Manifest.permission.RECOVER_KEYSTORE)
@@ -119,28 +104,7 @@ public class RecoverySession implements AutoCloseable {
             @NonNull byte[] vaultChallenge,
             @NonNull List<KeyChainProtectionParams> secrets)
             throws CertificateException, InternalRecoveryServiceException {
-        // Wrap the CertPath in a Parcelable so it can be passed via Binder calls.
-        RecoveryCertPath recoveryCertPath =
-                RecoveryCertPath.createRecoveryCertPath(verifierCertPath);
-        try {
-            byte[] recoveryClaim =
-                    mRecoveryController.getBinder().startRecoverySessionWithCertPath(
-                            mSessionId,
-                            /*rootCertificateAlias=*/ "",  // Use the default root cert
-                            recoveryCertPath,
-                            vaultParams,
-                            vaultChallenge,
-                            secrets);
-            return recoveryClaim;
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        } catch (ServiceSpecificException e) {
-            if (e.errorCode == RecoveryController.ERROR_BAD_CERTIFICATE_FORMAT
-                    || e.errorCode == RecoveryController.ERROR_INVALID_CERTIFICATE) {
-                throw new CertificateException(e.getMessage());
-            }
-            throw mRecoveryController.wrapUnexpectedServiceSpecificException(e);
-        }
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -157,8 +121,8 @@ public class RecoverySession implements AutoCloseable {
      * @param vaultChallenge Data passed from server for this recovery session and used to prevent
      *     replay attacks.
      * @param secrets Secrets provided by user, the method only uses type and secret fields.
-     * @return The recovery claim. Claim provides a b binary blob with recovery claim. It is
-     *     encrypted with verifierPublicKey and contains a proof of user secrets, session symmetric
+     * @return The binary blob with recovery claim. It is encrypted with verifierPublicKey
+     * and contains a proof of user secrets possession, session symmetric
      *     key and parameters necessary to identify the counter with the number of failed recovery
      *     attempts.
      * @throws CertificateException if the {@code verifierCertPath} is invalid.
@@ -191,7 +155,7 @@ public class RecoverySession implements AutoCloseable {
         } catch (ServiceSpecificException e) {
             if (e.errorCode == RecoveryController.ERROR_BAD_CERTIFICATE_FORMAT
                     || e.errorCode == RecoveryController.ERROR_INVALID_CERTIFICATE) {
-                throw new CertificateException(e.getMessage());
+                throw new CertificateException("Invalid certificate for recovery session", e);
             }
             throw mRecoveryController.wrapUnexpectedServiceSpecificException(e);
         }
@@ -199,6 +163,7 @@ public class RecoverySession implements AutoCloseable {
 
     /**
      * @deprecated Use {@link #recoverKeyChainSnapshot(byte[], List)} instead.
+     * @removed
      */
     @Deprecated
     @RequiresPermission(android.Manifest.permission.RECOVER_KEYSTORE)
@@ -207,20 +172,7 @@ public class RecoverySession implements AutoCloseable {
             @NonNull List<WrappedApplicationKey> applicationKeys)
             throws SessionExpiredException, DecryptionFailedException,
             InternalRecoveryServiceException {
-        try {
-            return (Map<String, byte[]>) mRecoveryController.getBinder().recoverKeys(
-                    mSessionId, recoveryKeyBlob, applicationKeys);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        } catch (ServiceSpecificException e) {
-            if (e.errorCode == RecoveryController.ERROR_DECRYPTION_FAILED) {
-                throw new DecryptionFailedException(e.getMessage());
-            }
-            if (e.errorCode == RecoveryController.ERROR_SESSION_EXPIRED) {
-                throw new SessionExpiredException(e.getMessage());
-            }
-            throw mRecoveryController.wrapUnexpectedServiceSpecificException(e);
-        }
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -228,7 +180,8 @@ public class RecoverySession implements AutoCloseable {
      *
      * @param recoveryKeyBlob Recovery blob encrypted by symmetric key generated for this session.
      * @param applicationKeys Application keys. Key material can be decrypted using recoveryKeyBlob
-     *     and session.
+     *     and session key generated by {@link #start}.
+     * @return {@code Map} from recovered keys aliases to their references.
      * @throws SessionExpiredException if {@code session} has since been closed.
      * @throws DecryptionFailedException if unable to decrypt the snapshot.
      * @throws InternalRecoveryServiceException if an error occurs internal to the recovery service.
@@ -288,8 +241,7 @@ public class RecoverySession implements AutoCloseable {
     }
 
     /**
-     * Deletes all data associated with {@code session}. Should not be invoked directly but via
-     * {@link RecoverySession#close()}.
+     * Deletes all data associated with {@code session}.
      */
     @RequiresPermission(android.Manifest.permission.RECOVER_KEYSTORE)
     @Override

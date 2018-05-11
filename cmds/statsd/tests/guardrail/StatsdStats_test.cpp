@@ -34,7 +34,7 @@ TEST(StatsdStatsTest, TestValidConfigAdd) {
     const int conditionsCount = 20;
     const int matchersCount = 30;
     const int alertsCount = 10;
-    stats.noteConfigReceived(key, metricsCount, conditionsCount, matchersCount, alertsCount,
+    stats.noteConfigReceived(key, metricsCount, conditionsCount, matchersCount, alertsCount, {},
                              true /*valid config*/);
     vector<uint8_t> output;
     stats.dumpStats(&output, false /*reset stats*/);
@@ -61,7 +61,7 @@ TEST(StatsdStatsTest, TestInvalidConfigAdd) {
     const int conditionsCount = 20;
     const int matchersCount = 30;
     const int alertsCount = 10;
-    stats.noteConfigReceived(key, metricsCount, conditionsCount, matchersCount, alertsCount,
+    stats.noteConfigReceived(key, metricsCount, conditionsCount, matchersCount, alertsCount, {},
                              false /*bad config*/);
     vector<uint8_t> output;
     stats.dumpStats(&output, false);
@@ -82,7 +82,8 @@ TEST(StatsdStatsTest, TestConfigRemove) {
     const int conditionsCount = 20;
     const int matchersCount = 30;
     const int alertsCount = 10;
-    stats.noteConfigReceived(key, metricsCount, conditionsCount, matchersCount, alertsCount, true);
+    stats.noteConfigReceived(key, metricsCount, conditionsCount, matchersCount, alertsCount, {},
+                             true);
     vector<uint8_t> output;
     stats.dumpStats(&output, false);
     StatsdStatsReport report;
@@ -104,7 +105,7 @@ TEST(StatsdStatsTest, TestConfigRemove) {
 TEST(StatsdStatsTest, TestSubStats) {
     StatsdStats stats;
     ConfigKey key(0, 12345);
-    stats.noteConfigReceived(key, 2, 3, 4, 5, true);
+    stats.noteConfigReceived(key, 2, 3, 4, 5, {std::make_pair(123, 456)}, true);
 
     stats.noteMatcherMatched(key, StringToId("matcher1"));
     stats.noteMatcherMatched(key, StringToId("matcher1"));
@@ -128,9 +129,9 @@ TEST(StatsdStatsTest, TestSubStats) {
     stats.noteDataDropped(key);
 
     // dump report -> 3
-    stats.noteMetricsReportSent(key);
-    stats.noteMetricsReportSent(key);
-    stats.noteMetricsReportSent(key);
+    stats.noteMetricsReportSent(key, 0);
+    stats.noteMetricsReportSent(key, 0);
+    stats.noteMetricsReportSent(key, 0);
 
     vector<uint8_t> output;
     stats.dumpStats(&output, true);  // Dump and reset stats
@@ -142,6 +143,10 @@ TEST(StatsdStatsTest, TestSubStats) {
     EXPECT_EQ(2, configReport.broadcast_sent_time_sec_size());
     EXPECT_EQ(1, configReport.data_drop_time_sec_size());
     EXPECT_EQ(3, configReport.dump_report_time_sec_size());
+    EXPECT_EQ(3, configReport.dump_report_data_size_size());
+    EXPECT_EQ(1, configReport.annotation_size());
+    EXPECT_EQ(123, configReport.annotation(0).field_int64());
+    EXPECT_EQ(456, configReport.annotation(0).field_int32());
 
     EXPECT_EQ(2, configReport.matcher_stats_size());
     // matcher1 is the first in the list
@@ -210,7 +215,7 @@ TEST(StatsdStatsTest, TestAtomLog) {
 
     stats.noteAtomLogged(android::util::SENSOR_STATE_CHANGED, now + 1);
     stats.noteAtomLogged(android::util::SENSOR_STATE_CHANGED, now + 2);
-    stats.noteAtomLogged(android::util::DROPBOX_ERROR_CHANGED, now + 3);
+    stats.noteAtomLogged(android::util::APP_CRASH_OCCURRED, now + 3);
     // pulled event, should ignore
     stats.noteAtomLogged(android::util::WIFI_BYTES_TRANSFER, now + 4);
 
@@ -228,7 +233,7 @@ TEST(StatsdStatsTest, TestAtomLog) {
         if (atomStats.tag() == android::util::SENSOR_STATE_CHANGED && atomStats.count() == 3) {
             sensorAtomGood = true;
         }
-        if (atomStats.tag() == android::util::DROPBOX_ERROR_CHANGED && atomStats.count() == 1) {
+        if (atomStats.tag() == android::util::APP_CRASH_OCCURRED && atomStats.count() == 1) {
             dropboxAtomGood = true;
         }
     }
@@ -259,12 +264,12 @@ TEST(StatsdStatsTest, TestTimestampThreshold) {
         timestamps.push_back(i);
     }
     ConfigKey key(0, 12345);
-    stats.noteConfigReceived(key, 2, 3, 4, 5, true);
+    stats.noteConfigReceived(key, 2, 3, 4, 5, {}, true);
 
     for (int i = 0; i < StatsdStats::kMaxTimestampCount; i++) {
         stats.noteDataDropped(key, timestamps[i]);
         stats.noteBroadcastSent(key, timestamps[i]);
-        stats.noteMetricsReportSent(key, timestamps[i]);
+        stats.noteMetricsReportSent(key, 0, timestamps[i]);
     }
 
     int32_t newTimestamp = 10000;
@@ -272,7 +277,7 @@ TEST(StatsdStatsTest, TestTimestampThreshold) {
     // now it should trigger removing oldest timestamp
     stats.noteDataDropped(key, 10000);
     stats.noteBroadcastSent(key, 10000);
-    stats.noteMetricsReportSent(key, 10000);
+    stats.noteMetricsReportSent(key, 0, 10000);
 
     EXPECT_TRUE(stats.mConfigStats.find(key) != stats.mConfigStats.end());
     const auto& configStats = stats.mConfigStats[key];
@@ -280,7 +285,7 @@ TEST(StatsdStatsTest, TestTimestampThreshold) {
     size_t maxCount = StatsdStats::kMaxTimestampCount;
     EXPECT_EQ(maxCount, configStats->broadcast_sent_time_sec.size());
     EXPECT_EQ(maxCount, configStats->data_drop_time_sec.size());
-    EXPECT_EQ(maxCount, configStats->dump_report_time_sec.size());
+    EXPECT_EQ(maxCount, configStats->dump_report_stats.size());
 
     // the oldest timestamp is the second timestamp in history
     EXPECT_EQ(1, configStats->broadcast_sent_time_sec.front());
@@ -290,7 +295,7 @@ TEST(StatsdStatsTest, TestTimestampThreshold) {
     // the last timestamp is the newest timestamp.
     EXPECT_EQ(newTimestamp, configStats->broadcast_sent_time_sec.back());
     EXPECT_EQ(newTimestamp, configStats->data_drop_time_sec.back());
-    EXPECT_EQ(newTimestamp, configStats->dump_report_time_sec.back());
+    EXPECT_EQ(newTimestamp, configStats->dump_report_stats.back().first);
 }
 
 }  // namespace statsd

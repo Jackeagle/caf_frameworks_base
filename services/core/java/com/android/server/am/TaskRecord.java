@@ -203,7 +203,8 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
     String rootAffinity;    // Initial base affinity, or null; does not change from initial root.
     final IVoiceInteractionSession voiceSession;    // Voice interaction session driving task
     final IVoiceInteractor voiceInteractor;         // Associated interactor to provide to app
-    Intent intent;          // The original intent that started the task.
+    Intent intent;          // The original intent that started the task. Note that this value can
+                            // be null.
     Intent affinityIntent;  // Intent of affinity-moved activity that started this task.
     int effectiveUid;       // The current effective uid of the identity of this task.
     ComponentName origActivity; // The non-alias activity component of the intent.
@@ -451,7 +452,7 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
     }
 
     void removeWindowContainer() {
-        mService.mLockTaskController.clearLockedTask(this);
+        mService.getLockTaskController().clearLockedTask(this);
         mWindowContainerController.removeContainer();
         if (!getWindowConfiguration().persistTaskBounds()) {
             // Reset current bounds for task whose bounds shouldn't be persisted so it uses
@@ -897,12 +898,12 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
         // the real activity that will be launched not the alias, so we need to use an intent with
         // the component name pointing to the real activity not the alias in the activity record.
         intent.setComponent(r.realActivity);
-        return this.intent.filterEquals(intent);
+        return intent.filterEquals(this.intent);
     }
 
     boolean returnsToHomeStack() {
         final int returnHomeFlags = FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_TASK_ON_HOME;
-        return (intent.getFlags() & returnHomeFlags) == returnHomeFlags;
+        return intent != null && (intent.getFlags() & returnHomeFlags) == returnHomeFlags;
     }
 
     void setPrevAffiliate(TaskRecord prevAffiliate) {
@@ -927,7 +928,26 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
         if (stack != null && !stack.isInStackLocked(this)) {
             throw new IllegalStateException("Task must be added as a Stack child first.");
         }
+        final ActivityStack oldStack = mStack;
         mStack = stack;
+
+        // If the new {@link TaskRecord} is from a different {@link ActivityStack}, remove this
+        // {@link ActivityRecord} from its current {@link ActivityStack}.
+
+        if (oldStack != mStack) {
+            for (int i = getChildCount() - 1; i >= 0; --i) {
+                final ActivityRecord activity = getChildAt(i);
+
+                if (oldStack != null) {
+                    oldStack.onActivityRemovedFromStack(activity);
+                }
+
+                if (mStack != null) {
+                    stack.onActivityAddedToStack(activity);
+                }
+            }
+        }
+
         onParentChanged();
     }
 
@@ -1232,6 +1252,7 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
 
         index = Math.min(size, index);
         mActivities.add(index, r);
+
         updateEffectiveIntent();
         if (r.isPersistable()) {
             mService.notifyTaskPersisterLocked(this, false);
@@ -1257,7 +1278,7 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
      * @return true if this was the last activity in the task.
      */
     boolean removeActivity(ActivityRecord r) {
-        return removeActivity(r, false /*reparenting*/);
+        return removeActivity(r, false /* reparenting */);
     }
 
     boolean removeActivity(ActivityRecord r, boolean reparenting) {
@@ -1266,7 +1287,7 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
                     "Activity=" + r + " does not belong to task=" + this);
         }
 
-        r.setTask(null /*task*/, reparenting);
+        r.setTask(null /* task */, reparenting /* reparenting */);
 
         if (mActivities.remove(r) && r.fullscreen) {
             // Was previously in list.
@@ -1446,9 +1467,10 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
         }
 
         final String pkg = (realActivity != null) ? realActivity.getPackageName() : null;
+        final LockTaskController lockTaskController = mService.getLockTaskController();
         switch (r.lockTaskLaunchMode) {
             case LOCK_TASK_LAUNCH_MODE_DEFAULT:
-                mLockTaskAuth = mService.mLockTaskController.isPackageWhitelisted(userId, pkg)
+                mLockTaskAuth = lockTaskController.isPackageWhitelisted(userId, pkg)
                         ? LOCK_TASK_AUTH_WHITELISTED : LOCK_TASK_AUTH_PINNABLE;
                 break;
 
@@ -1461,7 +1483,7 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
                 break;
 
             case LOCK_TASK_LAUNCH_MODE_IF_WHITELISTED:
-                mLockTaskAuth = mService.mLockTaskController.isPackageWhitelisted(userId, pkg)
+                mLockTaskAuth = lockTaskController.isPackageWhitelisted(userId, pkg)
                         ? LOCK_TASK_AUTH_LAUNCHABLE : LOCK_TASK_AUTH_PINNABLE;
                 break;
         }
@@ -2144,9 +2166,11 @@ class TaskRecord extends ConfigurationContainer implements TaskWindowContainerLi
             out.endTag(null, TAG_AFFINITYINTENT);
         }
 
-        out.startTag(null, TAG_INTENT);
-        intent.saveToXml(out);
-        out.endTag(null, TAG_INTENT);
+        if (intent != null) {
+            out.startTag(null, TAG_INTENT);
+            intent.saveToXml(out);
+            out.endTag(null, TAG_INTENT);
+        }
 
         final ArrayList<ActivityRecord> activities = mActivities;
         final int numActivities = activities.size();

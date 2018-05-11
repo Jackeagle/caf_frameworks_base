@@ -66,7 +66,7 @@ import libcore.io.Streams;
 /**
  * This is a class for reading and writing Exif tags in a JPEG file or a RAW image file.
  * <p>
- * Supported formats are: JPEG, DNG, CR2, NEF, NRW, ARW, RW2, ORF, PEF, SRW and RAF.
+ * Supported formats are: JPEG, DNG, CR2, NEF, NRW, ARW, RW2, ORF, PEF, SRW, RAF and HEIF.
  * <p>
  * Attribute mutation is supported for JPEG image files.
  */
@@ -1222,7 +1222,7 @@ public class ExifInterface {
             TAG_F_NUMBER, TAG_DIGITAL_ZOOM_RATIO, TAG_EXPOSURE_TIME, TAG_SUBJECT_DISTANCE,
             TAG_GPS_TIMESTAMP));
     // Mappings from tag number to IFD type for pointer tags.
-    private static final HashMap sExifPointerTagMap = new HashMap();
+    private static final HashMap<Integer, Integer> sExifPointerTagMap = new HashMap();
 
     // See JPEG File Interchange Format Version 1.02.
     // The following values are defined for handling JPEG streams. In this implementation, we are
@@ -1299,6 +1299,7 @@ public class ExifInterface {
     private final boolean mIsInputStream;
     private int mMimeType;
     private final HashMap[] mAttributes = new HashMap[EXIF_TAGS.length];
+    private Set<Integer> mAttributesOffsets = new HashSet<>(EXIF_TAGS.length);
     private ByteOrder mExifByteOrder = ByteOrder.BIG_ENDIAN;
     private boolean mHasThumbnail;
     // The following values used for indicating a thumbnail position.
@@ -2524,46 +2525,46 @@ public class ExifInterface {
     private void getHeifAttributes(ByteOrderedDataInputStream in) throws IOException {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
-            if (mSeekableFileDescriptor != null) {
-                retriever.setDataSource(mSeekableFileDescriptor);
-            } else {
-                retriever.setDataSource(new MediaDataSource() {
-                    long mPosition;
+            retriever.setDataSource(new MediaDataSource() {
+                long mPosition;
 
-                    @Override
-                    public void close() throws IOException {}
+                @Override
+                public void close() throws IOException {}
 
-                    @Override
-                    public int readAt(long position, byte[] buffer, int offset, int size)
-                            throws IOException {
-                        if (size == 0) {
-                            return 0;
-                        }
-                        if (position < 0) {
-                            return -1;
-                        }
-                        if (mPosition != position) {
-                            in.seek(position);
-                            mPosition = position;
-                        }
-
-                        int bytesRead = in.read(buffer, offset, size);
-                        if (bytesRead < 0) {
-                            mPosition = -1; // need to seek on next read
-                            return -1;
-                        }
-
-                        mPosition += bytesRead;
-                        return bytesRead;
+                @Override
+                public int readAt(long position, byte[] buffer, int offset, int size)
+                        throws IOException {
+                    if (size == 0) {
+                        return 0;
                     }
-
-                    @Override
-                    public long getSize() throws IOException {
+                    if (position < 0) {
                         return -1;
                     }
-                });
-            }
+                    if (mPosition != position) {
+                        in.seek(position);
+                        mPosition = position;
+                    }
 
+                    int bytesRead = in.read(buffer, offset, size);
+                    if (bytesRead < 0) {
+                        mPosition = -1; // need to seek on next read
+                        return -1;
+                    }
+
+                    mPosition += bytesRead;
+                    return bytesRead;
+                }
+
+                @Override
+                public long getSize() throws IOException {
+                    return -1;
+                }
+            });
+
+            String exifOffsetStr = retriever.extractMetadata(
+                    MediaMetadataRetriever.METADATA_KEY_EXIF_OFFSET);
+            String exifLengthStr = retriever.extractMetadata(
+                    MediaMetadataRetriever.METADATA_KEY_EXIF_LENGTH);
             String hasImage = retriever.extractMetadata(
                     MediaMetadataRetriever.METADATA_KEY_HAS_IMAGE);
             String hasVideo = retriever.extractMetadata(
@@ -2620,6 +2621,30 @@ public class ExifInterface {
 
                 mAttributes[IFD_TYPE_PRIMARY].put(TAG_ORIENTATION,
                         ExifAttribute.createUShort(orientation, mExifByteOrder));
+            }
+
+            if (exifOffsetStr != null && exifLengthStr != null) {
+                int offset = Integer.parseInt(exifOffsetStr);
+                int length = Integer.parseInt(exifLengthStr);
+                if (length <= 6) {
+                    throw new IOException("Invalid exif length");
+                }
+                in.seek(offset);
+                byte[] identifier = new byte[6];
+                if (in.read(identifier) != 6) {
+                    throw new IOException("Can't read identifier");
+                }
+                offset += 6;
+                length -= 6;
+                if (!Arrays.equals(identifier, IDENTIFIER_EXIF_APP1)) {
+                    throw new IOException("Invalid identifier");
+                }
+
+                byte[] bytes = new byte[length];
+                if (in.read(bytes) != length) {
+                    throw new IOException("Can't read exif");
+                }
+                readExifSegment(bytes, IFD_TYPE_PRIMARY);
             }
 
             if (DEBUG) {
@@ -2933,8 +2958,9 @@ public class ExifInterface {
         }
         // See TIFF 6.0 Section 2: TIFF Structure, Figure 1.
         short numberOfDirectoryEntry = dataInputStream.readShort();
-        if (dataInputStream.mPosition + 12 * numberOfDirectoryEntry > dataInputStream.mLength) {
-            // Return if the size of entries is too big.
+        if (dataInputStream.mPosition + 12 * numberOfDirectoryEntry > dataInputStream.mLength
+                || numberOfDirectoryEntry <= 0) {
+            // Return if the size of entries is either too big or negative.
             return;
         }
 
@@ -3025,7 +3051,7 @@ public class ExifInterface {
             }
 
             // Recursively parse IFD when a IFD pointer tag appears.
-            Object nextIfdType = sExifPointerTagMap.get(tagNumber);
+            Integer nextIfdType = sExifPointerTagMap.get(tagNumber);
             if (DEBUG) {
                 Log.d(TAG, "nextIfdType: " + nextIfdType + " byteCount: " + byteCount);
             }
@@ -3059,9 +3085,20 @@ public class ExifInterface {
                 if (DEBUG) {
                     Log.d(TAG, String.format("Offset: %d, tagName: %s", offset, tag.name));
                 }
+
+                // Check if the next IFD offset
+                // 1. Exists within the boundaries of the input stream
+                // 2. Does not point to a previously read IFD.
                 if (offset > 0L && offset < dataInputStream.mLength) {
-                    dataInputStream.seek(offset);
-                    readImageFileDirectory(dataInputStream, (int) nextIfdType);
+                    if (!mAttributesOffsets.contains((int) offset)) {
+                        // Save offset of current IFD to prevent reading an IFD that is already read
+                        mAttributesOffsets.add(dataInputStream.mPosition);
+                        dataInputStream.seek(offset);
+                        readImageFileDirectory(dataInputStream, nextIfdType);
+                    } else {
+                        Log.w(TAG, "Skip jump into the IFD since it has already been read: "
+                                + "IfdType " + nextIfdType + " (at " + offset + ")");
+                    }
                 } else {
                     Log.w(TAG, "Skip jump into the IFD since its offset is invalid: " + offset);
                 }
@@ -3103,16 +3140,27 @@ public class ExifInterface {
             if (DEBUG) {
                 Log.d(TAG, String.format("nextIfdOffset: %d", nextIfdOffset));
             }
-            // The next IFD offset needs to be bigger than 8
-            // since the first IFD offset is at least 8.
-            if (nextIfdOffset > 8 && nextIfdOffset < dataInputStream.mLength) {
-                dataInputStream.seek(nextIfdOffset);
-                if (mAttributes[IFD_TYPE_THUMBNAIL].isEmpty()) {
+            // Check if the next IFD offset
+            // 1. Exists within the boundaries of the input stream
+            // 2. Does not point to a previously read IFD.
+            if (nextIfdOffset > 0L && nextIfdOffset < dataInputStream.mLength) {
+                if (!mAttributesOffsets.contains(nextIfdOffset)) {
+                    // Save offset of current IFD to prevent reading an IFD that is already read.
+                    mAttributesOffsets.add(dataInputStream.mPosition);
+                    dataInputStream.seek(nextIfdOffset);
                     // Do not overwrite thumbnail IFD data if it alreay exists.
-                    readImageFileDirectory(dataInputStream, IFD_TYPE_THUMBNAIL);
-                } else if (mAttributes[IFD_TYPE_PREVIEW].isEmpty()) {
-                    readImageFileDirectory(dataInputStream, IFD_TYPE_PREVIEW);
+                    if (mAttributes[IFD_TYPE_THUMBNAIL].isEmpty()) {
+                        readImageFileDirectory(dataInputStream, IFD_TYPE_THUMBNAIL);
+                    } else if (mAttributes[IFD_TYPE_PREVIEW].isEmpty()) {
+                        readImageFileDirectory(dataInputStream, IFD_TYPE_PREVIEW);
+                    }
+                } else {
+                    Log.w(TAG, "Stop reading file since re-reading an IFD may cause an "
+                            + "infinite loop: " + nextIfdOffset);
                 }
+            } else {
+                Log.w(TAG, "Stop reading file since a wrong offset may cause an infinite loop: "
+                        + nextIfdOffset);
             }
         }
     }

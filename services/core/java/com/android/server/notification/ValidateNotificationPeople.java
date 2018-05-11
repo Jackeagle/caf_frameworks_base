@@ -18,6 +18,7 @@ package com.android.server.notification;
 
 import android.annotation.Nullable;
 import android.app.Notification;
+import android.app.Person;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.ContentObserver;
@@ -332,8 +333,8 @@ public class ValidateNotificationPeople implements NotificationSignalExtractor {
                 return array;
             }
 
-            if (arrayList.get(0) instanceof Notification.Person) {
-                ArrayList<Notification.Person> list = (ArrayList<Notification.Person>) arrayList;
+            if (arrayList.get(0) instanceof Person) {
+                ArrayList<Person> list = (ArrayList<Person>) arrayList;
                 final int N = list.size();
                 String[] array = new String[N];
                 for (int i = 0; i < N; i++) {
@@ -468,12 +469,14 @@ public class ValidateNotificationPeople implements NotificationSignalExtractor {
         private final LinkedList<String> mPendingLookups;
         private final Context mContext;
 
+        // Amount of time to wait for a result from the contacts db before rechecking affinity.
+        private static final long LOOKUP_TIME = 1000;
         private float mContactAffinity = NONE;
         private NotificationRecord mRecord;
 
         private PeopleRankingReconsideration(Context context, String key,
                 LinkedList<String> pendingLookups) {
-            super(key);
+            super(key, LOOKUP_TIME);
             mContext = context;
             mPendingLookups = pendingLookups;
         }

@@ -20,34 +20,63 @@ import static android.net.ConnectivityManager.MULTIPATH_PREFERENCE_HANDOVER;
 import static android.net.ConnectivityManager.MULTIPATH_PREFERENCE_RELIABILITY;
 import static android.net.ConnectivityManager.TYPE_MOBILE;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED;
+import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
+import static android.net.NetworkPolicy.LIMIT_DISABLED;
+import static android.net.NetworkPolicy.WARNING_DISABLED;
+import static android.provider.Settings.Global.NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES;
 
 import static com.android.server.net.NetworkPolicyManagerInternal.QUOTA_TYPE_MULTIPATH;
+import static com.android.server.net.NetworkPolicyManagerService.OPPORTUNISTIC_QUOTA_UNKNOWN;
 
 import android.app.usage.NetworkStatsManager;
 import android.app.usage.NetworkStatsManager.UsageCallback;
+import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.ContentObserver;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkIdentity;
+import android.net.NetworkPolicy;
 import android.net.NetworkPolicyManager;
 import android.net.NetworkRequest;
 import android.net.NetworkStats;
 import android.net.NetworkTemplate;
 import android.net.StringNetworkSpecifier;
+import android.os.BestClock;
 import android.os.Handler;
+import android.os.SystemClock;
+import android.net.Uri;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.telephony.TelephonyManager;
+import android.util.DataUnit;
 import android.util.DebugUtils;
+import android.util.Pair;
+import android.util.Range;
 import android.util.Slog;
 
+import com.android.internal.R;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.server.LocalServices;
 import com.android.server.net.NetworkPolicyManagerInternal;
 import com.android.server.net.NetworkStatsManagerInternal;
 
-import java.util.Calendar;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages multipath data budgets.
@@ -68,6 +97,13 @@ public class MultipathPolicyTracker {
 
     private final Context mContext;
     private final Handler mHandler;
+    private final Clock mClock;
+    private final Dependencies mDeps;
+    private final ContentResolver mResolver;
+    private final ConfigChangeReceiver mConfigChangeReceiver;
+
+    @VisibleForTesting
+    final ContentObserver mSettingsObserver;
 
     private ConnectivityManager mCM;
     private NetworkPolicyManager mNPM;
@@ -76,12 +112,32 @@ public class MultipathPolicyTracker {
     private NetworkCallback mMobileNetworkCallback;
     private NetworkPolicyManager.Listener mPolicyListener;
 
-    // STOPSHIP: replace this with a configurable mechanism.
-    private static final long DEFAULT_DAILY_MULTIPATH_QUOTA = 2_500_000;
+
+    /**
+     * Divider to calculate opportunistic quota from user-set data limit or warning: 5% of user-set
+     * limit.
+     */
+    private static final int OPQUOTA_USER_SETTING_DIVIDER = 20;
+
+    public static class Dependencies {
+        public Clock getClock() {
+            return new BestClock(ZoneOffset.UTC, SystemClock.currentNetworkTimeClock(),
+                    Clock.systemUTC());
+        }
+    }
 
     public MultipathPolicyTracker(Context ctx, Handler handler) {
+        this(ctx, handler, new Dependencies());
+    }
+
+    public MultipathPolicyTracker(Context ctx, Handler handler, Dependencies deps) {
         mContext = ctx;
         mHandler = handler;
+        mClock = deps.getClock();
+        mDeps = deps;
+        mResolver = mContext.getContentResolver();
+        mSettingsObserver = new SettingsObserver(mHandler);
+        mConfigChangeReceiver = new ConfigChangeReceiver();
         // Because we are initialized by the ConnectivityService constructor, we can't touch any
         // connectivity APIs. Service initialization is done in start().
     }
@@ -93,6 +149,14 @@ public class MultipathPolicyTracker {
 
         registerTrackMobileCallback();
         registerNetworkPolicyListener();
+        final Uri defaultSettingUri =
+                Settings.Global.getUriFor(NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES);
+        mResolver.registerContentObserver(defaultSettingUri, false, mSettingsObserver);
+
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
+        mContext.registerReceiverAsUser(
+                mConfigChangeReceiver, UserHandle.ALL, intentFilter, null, mHandler);
     }
 
     public void shutdown() {
@@ -102,6 +166,8 @@ public class MultipathPolicyTracker {
             t.shutdown();
         }
         mMultipathTrackers.clear();
+        mResolver.unregisterContentObserver(mSettingsObserver);
+        mContext.unregisterReceiver(mConfigChangeReceiver);
     }
 
     // Called on an arbitrary binder thread.
@@ -127,9 +193,11 @@ public class MultipathPolicyTracker {
         private long mMultipathBudget;
         private final NetworkTemplate mNetworkTemplate;
         private final UsageCallback mUsageCallback;
+        private NetworkCapabilities mNetworkCapabilities;
 
         public MultipathTracker(Network network, NetworkCapabilities nc) {
             this.network = network;
+            this.mNetworkCapabilities = new NetworkCapabilities(nc);
             try {
                 subId = Integer.parseInt(
                         ((StringNetworkSpecifier) nc.getNetworkSpecifier()).toString());
@@ -166,24 +234,88 @@ public class MultipathPolicyTracker {
             updateMultipathBudget();
         }
 
-        private long getDailyNonDefaultDataUsage() {
-            Calendar start = Calendar.getInstance();
-            Calendar end = (Calendar) start.clone();
-            start.set(Calendar.HOUR_OF_DAY, 0);
-            start.set(Calendar.MINUTE, 0);
-            start.set(Calendar.SECOND, 0);
-            start.set(Calendar.MILLISECOND, 0);
+        public void setNetworkCapabilities(NetworkCapabilities nc) {
+            mNetworkCapabilities = new NetworkCapabilities(nc);
+        }
 
+        // TODO: calculate with proper timezone information
+        private long getDailyNonDefaultDataUsage() {
+            final ZonedDateTime end =
+                    ZonedDateTime.ofInstant(mClock.instant(), ZoneId.systemDefault());
+            final ZonedDateTime start = end.truncatedTo(ChronoUnit.DAYS);
+
+            final long bytes = getNetworkTotalBytes(
+                    start.toInstant().toEpochMilli(),
+                    end.toInstant().toEpochMilli());
+            if (DBG) Slog.d(TAG, "Non-default data usage: " + bytes);
+            return bytes;
+        }
+
+        private long getNetworkTotalBytes(long start, long end) {
             try {
-                final long bytes = LocalServices.getService(NetworkStatsManagerInternal.class)
-                        .getNetworkTotalBytes(mNetworkTemplate, start.getTimeInMillis(),
-                                end.getTimeInMillis());
-                if (DBG) Slog.d(TAG, "Non-default data usage: " + bytes);
-                return bytes;
+                return LocalServices.getService(NetworkStatsManagerInternal.class)
+                        .getNetworkTotalBytes(mNetworkTemplate, start, end);
             } catch (RuntimeException e) {
                 Slog.w(TAG, "Failed to get data usage: " + e);
                 return -1;
             }
+        }
+
+        private NetworkIdentity getTemplateMatchingNetworkIdentity(NetworkCapabilities nc) {
+            return new NetworkIdentity(
+                    ConnectivityManager.TYPE_MOBILE,
+                    0 /* subType, unused for template matching */,
+                    subscriberId,
+                    null /* networkId, unused for matching mobile networks */,
+                    !nc.hasCapability(NET_CAPABILITY_NOT_ROAMING),
+                    !nc.hasCapability(NET_CAPABILITY_NOT_METERED),
+                    false /* defaultNetwork, templates should have DEFAULT_NETWORK_ALL */);
+        }
+
+        private long getRemainingDailyBudget(long limitBytes,
+                Range<ZonedDateTime> cycle) {
+            final long start = cycle.getLower().toInstant().toEpochMilli();
+            final long end = cycle.getUpper().toInstant().toEpochMilli();
+            final long totalBytes = getNetworkTotalBytes(start, end);
+            final long remainingBytes = totalBytes == -1 ? 0 : Math.max(0, limitBytes - totalBytes);
+            // 1 + ((end - now - 1) / millisInDay with integers is equivalent to:
+            // ceil((double)(end - now) / millisInDay)
+            final long remainingDays =
+                    1 + ((end - mClock.millis() - 1) / TimeUnit.DAYS.toMillis(1));
+
+            return remainingBytes / Math.max(1, remainingDays);
+        }
+
+        private long getUserPolicyOpportunisticQuotaBytes() {
+            // Keep the most restrictive applicable policy
+            long minQuota = Long.MAX_VALUE;
+            final NetworkIdentity identity = getTemplateMatchingNetworkIdentity(
+                    mNetworkCapabilities);
+
+            final NetworkPolicy[] policies = mNPM.getNetworkPolicies();
+            for (NetworkPolicy policy : policies) {
+                if (policy.hasCycle() && policy.template.matches(identity)) {
+                    final long cycleStart = policy.cycleIterator().next().getLower()
+                            .toInstant().toEpochMilli();
+                    // Prefer user-defined warning, otherwise use hard limit
+                    final long activeWarning = getActiveWarning(policy, cycleStart);
+                    final long policyBytes = (activeWarning == WARNING_DISABLED)
+                            ? getActiveLimit(policy, cycleStart)
+                            : activeWarning;
+
+                    if (policyBytes != LIMIT_DISABLED && policyBytes != WARNING_DISABLED) {
+                        final long policyBudget = getRemainingDailyBudget(policyBytes,
+                                policy.cycleIterator().next());
+                        minQuota = Math.min(minQuota, policyBudget);
+                    }
+                }
+            }
+
+            if (minQuota == Long.MAX_VALUE) {
+                return OPPORTUNISTIC_QUOTA_UNKNOWN;
+            }
+
+            return minQuota / OPQUOTA_USER_SETTING_DIVIDER;
         }
 
         void updateMultipathBudget() {
@@ -191,17 +323,22 @@ public class MultipathPolicyTracker {
                     .getSubscriptionOpportunisticQuota(this.network, QUOTA_TYPE_MULTIPATH);
             if (DBG) Slog.d(TAG, "Opportunistic quota from data plan: " + quota + " bytes");
 
-            if (quota == 0) {
-                // STOPSHIP: replace this with a configurable mechanism.
-                quota = DEFAULT_DAILY_MULTIPATH_QUOTA;
+            // Fallback to user settings-based quota if not available from phone plan
+            if (quota == OPPORTUNISTIC_QUOTA_UNKNOWN) {
+                quota = getUserPolicyOpportunisticQuotaBytes();
+                if (DBG) Slog.d(TAG, "Opportunistic quota from user policy: " + quota + " bytes");
+            }
+
+            if (quota == OPPORTUNISTIC_QUOTA_UNKNOWN) {
+                quota = getDefaultDailyMultipathQuotaBytes();
                 if (DBG) Slog.d(TAG, "Setting quota: " + quota + " bytes");
             }
 
+            // TODO: re-register if day changed: budget may have run out but should be refreshed.
             if (haveMultipathBudget() && quota == mQuota) {
-                // If we already have a usage callback pending , there's no need to re-register it
+                // If there is already a usage callback pending , there's no need to re-register it
                 // if the quota hasn't changed. The callback will simply fire as expected when the
-                // budget is spent. Also: if we re-register the callback when we're below the
-                // UsageCallback's minimum value of 2MB, we'll overshoot the budget.
+                // budget is spent.
                 if (DBG) Slog.d(TAG, "Quota still " + quota + ", not updating.");
                 return;
             }
@@ -211,7 +348,17 @@ public class MultipathPolicyTracker {
             // ourselves any budget to work with.
             final long usage = getDailyNonDefaultDataUsage();
             final long budget = (usage == -1) ? 0 : Math.max(0, quota - usage);
-            if (budget > 0) {
+
+            // Only consider budgets greater than MIN_THRESHOLD_BYTES, otherwise the callback will
+            // fire late, after data usage went over budget. Also budget should be 0 if remaining
+            // data is close to 0.
+            // This is necessary because the usage callback does not accept smaller thresholds.
+            // Because it snaps everything to MIN_THRESHOLD_BYTES, the lesser of the two evils is
+            // to snap to 0 here.
+            // This will only be called if the total quota for the day changed, not if usage changed
+            // since last time, so even if this is called very often the budget will not snap to 0
+            // as soon as there are less than 2MB left for today.
+            if (budget > NetworkStatsManager.MIN_THRESHOLD_BYTES) {
                 if (DBG) Slog.d(TAG, "Setting callback for " + budget +
                         " bytes on network " + network);
                 registerUsageCallback(budget);
@@ -261,10 +408,37 @@ public class MultipathPolicyTracker {
         }
     }
 
+    private static long getActiveWarning(NetworkPolicy policy, long cycleStart) {
+        return policy.lastWarningSnooze < cycleStart
+                ? policy.warningBytes
+                : WARNING_DISABLED;
+    }
+
+    private static long getActiveLimit(NetworkPolicy policy, long cycleStart) {
+        return policy.lastLimitSnooze < cycleStart
+                ? policy.limitBytes
+                : LIMIT_DISABLED;
+    }
+
     // Only ever updated on the handler thread. Accessed from other binder threads to retrieve
     // the tracker for a specific network.
     private final ConcurrentHashMap <Network, MultipathTracker> mMultipathTrackers =
             new ConcurrentHashMap<>();
+
+    private long getDefaultDailyMultipathQuotaBytes() {
+        final String setting = Settings.Global.getString(mContext.getContentResolver(),
+                NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES);
+        if (setting != null) {
+            try {
+                return Long.parseLong(setting);
+            } catch(NumberFormatException e) {
+                // fall through
+            }
+        }
+
+        return mContext.getResources().getInteger(
+                R.integer.config_networkDefaultDailyMultipathQuotaBytes);
+    }
 
     // TODO: this races with app code that might respond to onAvailable() by immediately calling
     // getMultipathPreference. Fix this by adding to ConnectivityService the ability to directly
@@ -280,6 +454,7 @@ public class MultipathPolicyTracker {
             public void onCapabilitiesChanged(Network network, NetworkCapabilities nc) {
                 MultipathTracker existing = mMultipathTrackers.get(network);
                 if (existing != null) {
+                    existing.setNetworkCapabilities(nc);
                     existing.updateMultipathBudget();
                     return;
                 }
@@ -306,6 +481,15 @@ public class MultipathPolicyTracker {
         mCM.registerNetworkCallback(request, mMobileNetworkCallback, mHandler);
     }
 
+    /**
+     * Update multipath budgets for all trackers. To be called on the mHandler thread.
+     */
+    private void updateAllMultipathBudgets() {
+        for (MultipathTracker t : mMultipathTrackers.values()) {
+            t.updateMultipathBudget();
+        }
+    }
+
     private void maybeUnregisterTrackMobileCallback() {
         if (mMobileNetworkCallback != null) {
             mCM.unregisterNetworkCallback(mMobileNetworkCallback);
@@ -318,11 +502,7 @@ public class MultipathPolicyTracker {
             @Override
             public void onMeteredIfacesChanged(String[] meteredIfaces) {
                 // Dispatched every time opportunistic quota is recalculated.
-                mHandler.post(() -> {
-                    for (MultipathTracker t : mMultipathTrackers.values()) {
-                        t.updateMultipathBudget();
-                    }
-                });
+                mHandler.post(() -> updateAllMultipathBudgets());
             }
         };
         mNPM.registerListener(mPolicyListener);
@@ -330,6 +510,35 @@ public class MultipathPolicyTracker {
 
     private void unregisterNetworkPolicyListener() {
         mNPM.unregisterListener(mPolicyListener);
+    }
+
+    private final class SettingsObserver extends ContentObserver {
+        public SettingsObserver(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            Slog.wtf(TAG, "Should never be reached.");
+        }
+
+        @Override
+        public void onChange(boolean selfChange, Uri uri) {
+            if (!Settings.Global.getUriFor(NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES)
+                    .equals(uri)) {
+                Slog.wtf(TAG, "Unexpected settings observation: " + uri);
+            }
+            if (DBG) Slog.d(TAG, "Settings change: updating budgets.");
+            updateAllMultipathBudgets();
+        }
+    }
+
+    private final class ConfigChangeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (DBG) Slog.d(TAG, "Configuration change: updating budgets.");
+            updateAllMultipathBudgets();
+        }
     }
 
     public void dump(IndentingPrintWriter pw) {

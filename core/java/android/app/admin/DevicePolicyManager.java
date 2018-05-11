@@ -124,6 +124,7 @@ import java.util.concurrent.Executor;
 @SystemService(Context.DEVICE_POLICY_SERVICE)
 @RequiresFeature(PackageManager.FEATURE_DEVICE_ADMIN)
 public class DevicePolicyManager {
+
     private static String TAG = "DevicePolicyManager";
 
     private final Context mContext;
@@ -1168,8 +1169,16 @@ public class DevicePolicyManager {
      * Constant to indicate the feature of mandatory backups. Used as argument to
      * {@link #createAdminSupportIntent(String)}.
      * @see #setMandatoryBackupTransport(ComponentName, ComponentName)
+     * @hide
      */
     public static final String POLICY_MANDATORY_BACKUPS = "policy_mandatory_backups";
+
+    /**
+     * Constant to indicate the feature of suspending app. Use it as the value of
+     * {@link #EXTRA_RESTRICTION}.
+     * @hide
+     */
+    public static final String POLICY_SUSPEND_PACKAGES = "policy_suspend_packages";
 
     /**
      * A String indicating a specific restricted feature. Can be a user restriction from the
@@ -1612,8 +1621,6 @@ public class DevicePolicyManager {
      *     <li>keyguard
      * </ul>
      *
-     * This is the default configuration for LockTask.
-     *
      * @see #setLockTaskFeatures(ComponentName, int)
      */
     public static final int LOCK_TASK_FEATURE_NONE = 0;
@@ -1631,7 +1638,10 @@ public class DevicePolicyManager {
     /**
      * Enable notifications during LockTask mode. This includes notification icons on the status
      * bar, heads-up notifications, and the expandable notification shade. Note that the Quick
-     * Settings panel will still be disabled.
+     * Settings panel remains disabled. This feature flag can only be used in combination with
+     * {@link #LOCK_TASK_FEATURE_HOME}. {@link #setLockTaskFeatures(ComponentName, int)}
+     * throws an {@link IllegalArgumentException} if this feature flag is defined without
+     * {@link #LOCK_TASK_FEATURE_HOME}.
      *
      * @see #setLockTaskFeatures(ComponentName, int)
      */
@@ -1663,6 +1673,9 @@ public class DevicePolicyManager {
      * Enable the global actions dialog during LockTask mode. This is the dialog that shows up when
      * the user long-presses the power button, for example. Note that the user may not be able to
      * power off the device if this flag is not set.
+     *
+     * <p>This flag is enabled by default until {@link #setLockTaskFeatures(ComponentName, int)} is
+     * called for the first time.
      *
      * @see #setLockTaskFeatures(ComponentName, int)
      */
@@ -1745,6 +1758,25 @@ public class DevicePolicyManager {
      * @see #generateKeyPair
      */
     public static final int ID_TYPE_MEID = 8;
+
+    /**
+     * Specifies that the calling app should be granted access to the installed credentials
+     * immediately. Otherwise, access to the credentials will be gated by user approval.
+     * For use with {@link #installKeyPair(ComponentName, PrivateKey, Certificate[], String, int)}
+     *
+     * @see #installKeyPair(ComponentName, PrivateKey, Certificate[], String, int)
+     */
+    public static final int INSTALLKEY_REQUEST_CREDENTIALS_ACCESS = 1;
+
+    /**
+     * Specifies that a user can select the key via the Certificate Selection prompt.
+     * If this flag is not set when calling {@link #installKeyPair}, the key can only be granted
+     * access by implementing {@link android.app.admin.DeviceAdminReceiver#onChoosePrivateKeyAlias}.
+     * For use with {@link #installKeyPair(ComponentName, PrivateKey, Certificate[], String, int)}
+     *
+     * @see #installKeyPair(ComponentName, PrivateKey, Certificate[], String, int)
+     */
+    public static final int INSTALLKEY_SET_USER_SELECTABLE = 2;
 
     /**
      * Broadcast action: sent when the profile owner is set, changed or cleared.
@@ -2723,115 +2755,10 @@ public class DevicePolicyManager {
     }
 
     /**
-     * The maximum number of characters allowed in the password blacklist.
-     */
-    private static final int PASSWORD_BLACKLIST_CHARACTER_LIMIT = 128 * 1000;
-
-    /**
-     * Throws an exception if the password blacklist is too large.
-     *
-     * @hide
-     */
-    public static void enforcePasswordBlacklistSize(List<String> blacklist) {
-        if (blacklist == null) {
-            return;
-        }
-        long characterCount = 0;
-        for (final String item : blacklist) {
-            characterCount += item.length();
-        }
-        if (characterCount > PASSWORD_BLACKLIST_CHARACTER_LIMIT) {
-            throw new IllegalArgumentException("128 thousand blacklist character limit exceeded by "
-                      + (characterCount - PASSWORD_BLACKLIST_CHARACTER_LIMIT) + " characters");
-        }
-    }
-
-    /**
-     * Called by an application that is administering the device to blacklist passwords.
-     * <p>
-     * Any blacklisted password or PIN is prevented from being enrolled by the user or the admin.
-     * Note that the match against the blacklist is case insensitive. The blacklist applies for all
-     * password qualities requested by {@link #setPasswordQuality} however it is not taken into
-     * consideration by {@link #isActivePasswordSufficient}.
-     * <p>
-     * The blacklist can be cleared by passing {@code null} or an empty list. The blacklist is
-     * given a name that is used to track which blacklist is currently set by calling {@link
-     * #getPasswordBlacklistName}. If the blacklist is being cleared, the name is ignored and {@link
-     * #getPasswordBlacklistName} will return {@code null}. The name can only be {@code null} when
-     * the blacklist is being cleared.
-     * <p>
-     * The blacklist is limited to a total of 128 thousand characters rather than limiting to a
-     * number of entries.
-     * <p>
-     * This method can be called on the {@link DevicePolicyManager} instance returned by
-     * {@link #getParentProfileInstance(ComponentName)} in order to set restrictions on the parent
-     * profile.
-     *
-     * @param admin the {@link DeviceAdminReceiver} this request is associated with
-     * @param name name to associate with the blacklist
-     * @param blacklist list of passwords to blacklist or {@code null} to clear the blacklist
-     * @return whether the new blacklist was successfully installed
-     * @throws SecurityException if {@code admin} is not a device or profile owner
-     * @throws IllegalArgumentException if the blacklist surpasses the character limit
-     * @throws NullPointerException if {@code name} is {@code null} when setting a non-empty list
-     *
-     * @see #getPasswordBlacklistName
-     * @see #isActivePasswordSufficient
-     * @see #resetPasswordWithToken
-     */
-    public boolean setPasswordBlacklist(@NonNull ComponentName admin, @Nullable String name,
-            @Nullable List<String> blacklist) {
-        enforcePasswordBlacklistSize(blacklist);
-
-        try {
-            return mService.setPasswordBlacklist(admin, name, blacklist, mParentInstance);
-        } catch (RemoteException re) {
-            throw re.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Get the name of the password blacklist set by the given admin.
-     *
-     * @param admin the {@link DeviceAdminReceiver} this request is associated with
-     * @return the name of the blacklist or {@code null} if no blacklist is set
-     *
-     * @see #setPasswordBlacklist
-     */
-    public @Nullable String getPasswordBlacklistName(@NonNull ComponentName admin) {
-        try {
-            return mService.getPasswordBlacklistName(admin, myUserId(), mParentInstance);
-        } catch (RemoteException re) {
-            throw re.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Test if a given password is blacklisted.
-     *
-     * @param userId the user to valiate for
-     * @param password the password to check against the blacklist
-     * @return whether the password is blacklisted
-     *
-     * @see #setPasswordBlacklist
-     *
-     * @hide
-     */
-    @RequiresPermission(android.Manifest.permission.TEST_BLACKLISTED_PASSWORD)
-    public boolean isPasswordBlacklisted(@UserIdInt int userId, @NonNull String password) {
-        try {
-            return mService.isPasswordBlacklisted(userId, password);
-        } catch (RemoteException re) {
-            throw re.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Determine whether the current password the user has set is sufficient to meet the policy
      * requirements (e.g. quality, minimum length) that have been requested by the admins of this
      * user and its participating profiles. Restrictions on profiles that have a separate challenge
-     * are not taken into account. The user must be unlocked in order to perform the check. The
-     * password blacklist is not considered when checking sufficiency.
+     * are not taken into account. The user must be unlocked in order to perform the check.
      * <p>
      * The calling device admin must have requested
      * {@link DeviceAdminInfo#USES_POLICY_LIMIT_PASSWORD} to be able to call this method; if it has
@@ -4122,7 +4049,11 @@ public class DevicePolicyManager {
      */
     public boolean installKeyPair(@Nullable ComponentName admin, @NonNull PrivateKey privKey,
             @NonNull Certificate[] certs, @NonNull String alias, boolean requestAccess) {
-        return installKeyPair(admin, privKey, certs, alias, requestAccess, true);
+        int flags = INSTALLKEY_SET_USER_SELECTABLE;
+        if (requestAccess) {
+            flags |= INSTALLKEY_REQUEST_CREDENTIALS_ACCESS;
+        }
+        return installKeyPair(admin, privKey, certs, alias, flags);
     }
 
     /**
@@ -4135,8 +4066,8 @@ public class DevicePolicyManager {
      * immediately, without user approval. It is a best practice not to request this unless strictly
      * necessary since it opens up additional security vulnerabilities.
      *
-     * <p>Whether this key is offered to the user for approval at all or not depends on the
-     * {@code isUserSelectable} parameter.
+     * <p>Include {@link #INSTALLKEY_SET_USER_SELECTABLE} in the {@code flags} argument to allow
+     * the user to select the key from a dialog.
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with, or
      *        {@code null} if calling from a delegated certificate installer.
@@ -4146,13 +4077,9 @@ public class DevicePolicyManager {
      *        {@link android.security.KeyChain#getCertificateChain}.
      * @param alias The private key alias under which to install the certificate. If a certificate
      *        with that alias already exists, it will be overwritten.
-     * @param requestAccess {@code true} to request that the calling app be granted access to the
-     *        credentials immediately. Otherwise, access to the credentials will be gated by user
-     *        approval.
-     * @param isUserSelectable {@code true} to indicate that a user can select this key via the
-     *        Certificate Selection prompt, false to indicate that this key can only be granted
-     *        access by implementing
-     *        {@link android.app.admin.DeviceAdminReceiver#onChoosePrivateKeyAlias}.
+     * @param flags Flags to request that the calling app be granted access to the credentials
+     *        and set the key to be user-selectable. See {@link #INSTALLKEY_SET_USER_SELECTABLE} and
+     *        {@link #INSTALLKEY_REQUEST_CREDENTIALS_ACCESS}.
      * @return {@code true} if the keys were installed, {@code false} otherwise.
      * @throws SecurityException if {@code admin} is not {@code null} and not a device or profile
      *         owner.
@@ -4161,9 +4088,12 @@ public class DevicePolicyManager {
      * @see #DELEGATION_CERT_INSTALL
      */
     public boolean installKeyPair(@Nullable ComponentName admin, @NonNull PrivateKey privKey,
-            @NonNull Certificate[] certs, @NonNull String alias, boolean requestAccess,
-            boolean isUserSelectable) {
+            @NonNull Certificate[] certs, @NonNull String alias, int flags) {
         throwIfParentInstance("installKeyPair");
+        boolean requestAccess = (flags & INSTALLKEY_REQUEST_CREDENTIALS_ACCESS)
+                == INSTALLKEY_REQUEST_CREDENTIALS_ACCESS;
+        boolean isUserSelectable = (flags & INSTALLKEY_SET_USER_SELECTABLE)
+                == INSTALLKEY_SET_USER_SELECTABLE;
         try {
             final byte[] pemCert = Credentials.convertToPem(certs[0]);
             byte[] pemChain = null;
@@ -4242,6 +4172,8 @@ public class DevicePolicyManager {
      *         algorithm specification in {@code keySpec} is not {@code RSAKeyGenParameterSpec}
      *         or {@code ECGenParameterSpec}, or if Device ID attestation was requested but the
      *         {@code keySpec} does not contain an attestation challenge.
+     * @throws UnsupportedOperationException if Device ID attestation was requested but the
+     *         underlying hardware does not support it.
      * @see KeyGenParameterSpec.Builder#setAttestationChallenge(byte[])
      */
     public AttestedKeyPair generateKeyPair(@Nullable ComponentName admin,
@@ -4286,6 +4218,15 @@ public class DevicePolicyManager {
         return null;
     }
 
+    /**
+     * Returns {@code true} if the device supports attestation of device identifiers in addition
+     * to key attestation.
+     * @return {@code true} if Device ID attestation is supported.
+     */
+    public boolean isDeviceIdAttestationSupported() {
+        PackageManager pm = mContext.getPackageManager();
+        return pm.hasSystemFeature(PackageManager.FEATURE_DEVICE_ID_ATTESTATION);
+    }
 
     /**
      * Called by a device or profile owner, or delegated certificate installer, to associate
@@ -6257,6 +6198,7 @@ public class DevicePolicyManager {
      * @hide
      */
      @SystemApi
+     @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
      public @Nullable List<String> getPermittedAccessibilityServices(int userId) {
         throwIfParentInstance("getPermittedAccessibilityServices");
         if (mService != null) {
@@ -6359,6 +6301,7 @@ public class DevicePolicyManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
     public @Nullable List<String> getPermittedInputMethodsForCurrentUser() {
         throwIfParentInstance("getPermittedInputMethodsForCurrentUser");
         if (mService != null) {
@@ -6900,8 +6843,7 @@ public class DevicePolicyManager {
      * @param restriction Indicates for which feature the dialog should be displayed. Can be a
      *            user restriction from {@link UserManager}, e.g.
      *            {@link UserManager#DISALLOW_ADJUST_VOLUME}, or one of the constants
-     *            {@link #POLICY_DISABLE_CAMERA}, {@link #POLICY_DISABLE_SCREEN_CAPTURE} or
-     *            {@link #POLICY_MANDATORY_BACKUPS}.
+     *            {@link #POLICY_DISABLE_CAMERA}, {@link #POLICY_DISABLE_SCREEN_CAPTURE}.
      * @return Intent An intent to be used to start the dialog-activity if the restriction is
      *            set by an admin, or null if the restriction does not exist or no admin set it.
      */
@@ -7186,30 +7128,24 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Sets which system features to enable for LockTask mode.
-     * <p>
-     * Feature flags set through this method will only take effect for the duration when the device
-     * is in LockTask mode. If this method is not called, none of the features listed here will be
-     * enabled.
-     * <p>
-     * This function can only be called by the device owner, a profile owner of an affiliated user
-     * or profile, or the profile owner when no device owner is set. See {@link #isAffiliatedUser}.
-     * Any features set via this method will be cleared if the user becomes unaffiliated.
+     * Sets which system features are enabled when the device runs in lock task mode. This method
+     * doesn't affect the features when lock task mode is inactive. Any system features not included
+     * in {@code flags} are implicitly disabled when calling this method. By default, only
+     * {@link #LOCK_TASK_FEATURE_GLOBAL_ACTIONS} is enabled—all the other features are disabled. To
+     * disable the global actions dialog, call this method omitting
+     * {@link #LOCK_TASK_FEATURE_GLOBAL_ACTIONS}.
+     *
+     * <p>This method can only be called by the device owner, a profile owner of an affiliated
+     * user or profile, or the profile owner when no device owner is set. See
+     * {@link #isAffiliatedUser}.
+     * Any features set using this method are cleared if the user becomes unaffiliated.
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
-     * @param flags Bitfield of feature flags:
-     *              {@link #LOCK_TASK_FEATURE_NONE} (default),
-     *              {@link #LOCK_TASK_FEATURE_SYSTEM_INFO},
-     *              {@link #LOCK_TASK_FEATURE_NOTIFICATIONS},
-     *              {@link #LOCK_TASK_FEATURE_HOME},
-     *              {@link #LOCK_TASK_FEATURE_OVERVIEW},
-     *              {@link #LOCK_TASK_FEATURE_GLOBAL_ACTIONS},
-     *              {@link #LOCK_TASK_FEATURE_KEYGUARD}
+     * @param flags The system features enabled during lock task mode.
      * @throws SecurityException if {@code admin} is not the device owner, the profile owner of an
      * affiliated user or profile, or the profile owner when no device owner is set.
      * @see #isAffiliatedUser
-     * @throws SecurityException if {@code admin} is not the device owner or the profile owner.
-     */
+     **/
     public void setLockTaskFeatures(@NonNull ComponentName admin, @LockTaskFeature int flags) {
         throwIfParentInstance("setLockTaskFeatures");
         if (mService != null) {
@@ -7302,11 +7238,12 @@ public class DevicePolicyManager {
     public @interface SystemSettingsWhitelist {}
 
     /**
-     * Called by device owner to update {@link android.provider.Settings.System} settings.
-     * Validation that the value of the setting is in the correct form for the setting type should
-     * be performed by the caller.
+     * Called by a device or profile owner to update {@link android.provider.Settings.System}
+     * settings. Validation that the value of the setting is in the correct form for the setting
+     * type should be performed by the caller.
      * <p>
-     * The settings that can be updated with this method are:
+     * The settings that can be updated by a device owner or profile owner of secondary user with
+     * this method are:
      * <ul>
      * <li>{@link android.provider.Settings.System#SCREEN_BRIGHTNESS}</li>
      * <li>{@link android.provider.Settings.System#SCREEN_BRIGHTNESS_MODE}</li>
@@ -7318,7 +7255,7 @@ public class DevicePolicyManager {
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
      * @param setting The name of the setting to update.
      * @param value The value to update the setting to.
-     * @throws SecurityException if {@code admin} is not a device owner.
+     * @throws SecurityException if {@code admin} is not a device or profile owner.
      */
     public void setSystemSetting(@NonNull ComponentName admin,
             @NonNull @SystemSettingsWhitelist String setting, String value) {
@@ -8853,13 +8790,6 @@ public class DevicePolicyManager {
      *
      * <p> Backup service is off by default when device owner is present.
      *
-     * <p> If backups are made mandatory by specifying a non-null mandatory backup transport using
-     * the {@link DevicePolicyManager#setMandatoryBackupTransport} method, the backup service is
-     * automatically enabled.
-     *
-     * <p> If the backup service is disabled using this method after the mandatory backup transport
-     * has been set, the mandatory backup transport is cleared.
-     *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
      * @param enabled {@code true} to enable the backup service, {@code false} to disable it.
      * @throws SecurityException if {@code admin} is not a device owner.
@@ -8897,6 +8827,8 @@ public class DevicePolicyManager {
      * <p>Only device owner can call this method.
      * <p>If backups were disabled and a non-null backup transport {@link ComponentName} is
      * specified, backups will be enabled.
+     * <p> If the backup service is disabled after the mandatory backup transport has been set, the
+     * mandatory backup transport is cleared.
      *
      * <p>NOTE: The method shouldn't be called on the main thread.
      *
@@ -8904,6 +8836,7 @@ public class DevicePolicyManager {
      * @param backupTransportComponent The backup transport layer to be used for mandatory backups.
      * @return {@code true} if the backup transport was successfully set; {@code false} otherwise.
      * @throws SecurityException if {@code admin} is not a device owner.
+     * @hide
      */
     @WorkerThread
     public boolean setMandatoryBackupTransport(
@@ -8923,6 +8856,7 @@ public class DevicePolicyManager {
      *
      * @return a {@link ComponentName} of the backup transport layer to be used if backups are
      *         mandatory or {@code null} if backups are not mandatory.
+     * @hide
      */
     public ComponentName getMandatoryBackupTransport() {
         throwIfParentInstance("getMandatoryBackupTransport");

@@ -909,7 +909,8 @@ public final class MediaCodecInfo {
             if (mMime.toLowerCase().startsWith("audio/")) {
                 mAudioCaps = AudioCapabilities.create(info, this);
                 mAudioCaps.getDefaultFormat(mDefaultFormat);
-            } else if (mMime.toLowerCase().startsWith("video/")) {
+            } else if (mMime.toLowerCase().startsWith("video/")
+                    || mMime.equalsIgnoreCase(MediaFormat.MIMETYPE_IMAGE_ANDROID_HEIC)) {
                 mVideoCaps = VideoCapabilities.create(info, this);
             }
             if (encoder) {
@@ -2971,6 +2972,8 @@ public final class MediaCodecInfo {
         public static final int AACObjectLD         = 23;
         public static final int AACObjectHE_PS      = 29;
         public static final int AACObjectELD        = 39;
+        /** xHE-AAC (includes USAC) */
+        public static final int AACObjectXHE        = 42;
 
         // from OMX_VIDEO_VP8LEVELTYPE
         public static final int VP8Level_Version0 = 0x01;

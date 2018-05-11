@@ -16,6 +16,8 @@
 
 package android.view;
 
+import static android.util.DisplayMetrics.DENSITY_DEFAULT;
+import static android.util.DisplayMetrics.DENSITY_DEVICE_STABLE;
 import static android.view.DisplayCutoutProto.BOUNDS;
 import static android.view.DisplayCutoutProto.INSETS;
 
@@ -31,6 +33,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.Pair;
 import android.util.PathParser;
 import android.util.proto.ProtoOutputStream;
 
@@ -75,15 +78,19 @@ public final class DisplayCutout {
             false /* copyArguments */);
 
 
+    private static final Pair<Path, DisplayCutout> NULL_PAIR = new Pair<>(null, null);
     private static final Object CACHE_LOCK = new Object();
+
     @GuardedBy("CACHE_LOCK")
     private static String sCachedSpec;
     @GuardedBy("CACHE_LOCK")
     private static int sCachedDisplayWidth;
     @GuardedBy("CACHE_LOCK")
+    private static int sCachedDisplayHeight;
+    @GuardedBy("CACHE_LOCK")
     private static float sCachedDensity;
     @GuardedBy("CACHE_LOCK")
-    private static DisplayCutout sCachedCutout;
+    private static Pair<Path, DisplayCutout> sCachedCutout = NULL_PAIR;
 
     private final Rect mSafeInsets;
     private final Region mBounds;
@@ -347,13 +354,23 @@ public final class DisplayCutout {
     }
 
     /**
-     * Creates an instance according to @android:string/config_mainBuiltInDisplayCutout.
+     * Creates the bounding path according to @android:string/config_mainBuiltInDisplayCutout.
      *
      * @hide
      */
     public static DisplayCutout fromResources(Resources res, int displayWidth, int displayHeight) {
         return fromSpec(res.getString(R.string.config_mainBuiltInDisplayCutout),
-                displayWidth, displayHeight, res.getDisplayMetrics().density);
+                displayWidth, displayHeight, DENSITY_DEVICE_STABLE / (float) DENSITY_DEFAULT);
+    }
+
+    /**
+     * Creates an instance according to @android:string/config_mainBuiltInDisplayCutout.
+     *
+     * @hide
+     */
+    public static Path pathFromResources(Resources res, int displayWidth, int displayHeight) {
+        return pathAndDisplayCutoutFromSpec(res.getString(R.string.config_mainBuiltInDisplayCutout),
+                displayWidth, displayHeight, DENSITY_DEVICE_STABLE / (float) DENSITY_DEFAULT).first;
     }
 
     /**
@@ -364,11 +381,17 @@ public final class DisplayCutout {
     @VisibleForTesting(visibility = PRIVATE)
     public static DisplayCutout fromSpec(String spec, int displayWidth, int displayHeight,
             float density) {
+        return pathAndDisplayCutoutFromSpec(spec, displayWidth, displayHeight, density).second;
+    }
+
+    private static Pair<Path, DisplayCutout> pathAndDisplayCutoutFromSpec(String spec,
+            int displayWidth, int displayHeight, float density) {
         if (TextUtils.isEmpty(spec)) {
-            return null;
+            return NULL_PAIR;
         }
         synchronized (CACHE_LOCK) {
             if (spec.equals(sCachedSpec) && sCachedDisplayWidth == displayWidth
+                    && sCachedDisplayHeight == displayHeight
                     && sCachedDensity == density) {
                 return sCachedCutout;
             }
@@ -398,7 +421,7 @@ public final class DisplayCutout {
             p = PathParser.createPathFromPathData(spec);
         } catch (Throwable e) {
             Log.wtf(TAG, "Could not inflate cutout: ", e);
-            return null;
+            return NULL_PAIR;
         }
 
         final Matrix m = new Matrix();
@@ -414,7 +437,7 @@ public final class DisplayCutout {
                 bottomPath = PathParser.createPathFromPathData(bottomSpec);
             } catch (Throwable e) {
                 Log.wtf(TAG, "Could not inflate bottom cutout: ", e);
-                return null;
+                return NULL_PAIR;
             }
             // Keep top transform
             m.postTranslate(0, displayHeight);
@@ -422,10 +445,11 @@ public final class DisplayCutout {
             p.addPath(bottomPath);
         }
 
-        final DisplayCutout result = fromBounds(p);
+        final Pair<Path, DisplayCutout> result = new Pair<>(p, fromBounds(p));
         synchronized (CACHE_LOCK) {
             sCachedSpec = spec;
             sCachedDisplayWidth = displayWidth;
+            sCachedDisplayHeight = displayHeight;
             sCachedDensity = density;
             sCachedCutout = result;
         }

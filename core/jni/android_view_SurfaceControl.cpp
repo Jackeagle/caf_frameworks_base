@@ -37,7 +37,7 @@
 #include <system/graphics.h>
 #include <ui/DisplayInfo.h>
 #include <ui/FrameStats.h>
-#include <ui/GraphicsTypes.h>
+#include <ui/GraphicTypes.h>
 #include <ui/HdrCapabilities.h>
 #include <ui/Rect.h>
 #include <ui/Region.h>
@@ -327,6 +327,11 @@ static void nativeSetAnimationTransaction(JNIEnv* env, jclass clazz, jlong trans
     transaction->setAnimationTransaction();
 }
 
+static void nativeSetEarlyWakeup(JNIEnv* env, jclass clazz, jlong transactionObj) {
+    auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
+    transaction->setEarlyWakeup();
+}
+
 static void nativeSetLayer(JNIEnv* env, jclass clazz, jlong transactionObj,
         jlong nativeObject, jint zorder) {
     auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
@@ -598,7 +603,7 @@ static jboolean nativeSetActiveConfig(JNIEnv* env, jclass clazz, jobject tokenOb
 static jintArray nativeGetDisplayColorModes(JNIEnv* env, jclass, jobject tokenObj) {
     sp<IBinder> token(ibinderForJavaObject(env, tokenObj));
     if (token == NULL) return NULL;
-    Vector<ColorMode> colorModes;
+    Vector<ui::ColorMode> colorModes;
     if (SurfaceComposerClient::getDisplayColorModes(token, &colorModes) != NO_ERROR ||
             colorModes.isEmpty()) {
         return NULL;
@@ -628,7 +633,7 @@ static jboolean nativeSetActiveColorMode(JNIEnv* env, jclass,
     sp<IBinder> token(ibinderForJavaObject(env, tokenObj));
     if (token == NULL) return JNI_FALSE;
     status_t err = SurfaceComposerClient::setActiveColorMode(token,
-            static_cast<ColorMode>(colorMode));
+            static_cast<ui::ColorMode>(colorMode));
     return err == NO_ERROR ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -872,8 +877,12 @@ static jobject nativeGetHdrCapabilities(JNIEnv* env, jclass clazz, jobject token
     SurfaceComposerClient::getHdrCapabilities(token, &capabilities);
 
     const auto& types = capabilities.getSupportedHdrTypes();
+    std::vector<int32_t> intTypes;
+    for (auto type : types) {
+        intTypes.push_back(static_cast<int32_t>(type));
+    }
     auto typesArray = env->NewIntArray(types.size());
-    env->SetIntArrayRegion(typesArray, 0, types.size(), types.data());
+    env->SetIntArrayRegion(typesArray, 0, intTypes.size(), intTypes.data());
 
     return env->NewObject(gHdrCapabilitiesClassInfo.clazz, gHdrCapabilitiesClassInfo.ctor,
             typesArray, capabilities.getDesiredMaxLuminance(),
@@ -934,6 +943,8 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
             (void*)nativeMergeTransaction },
     {"nativeSetAnimationTransaction", "(J)V",
             (void*)nativeSetAnimationTransaction },
+    {"nativeSetEarlyWakeup", "(J)V",
+            (void*)nativeSetEarlyWakeup },
     {"nativeSetLayer", "(JJI)V",
             (void*)nativeSetLayer },
     {"nativeSetRelativeLayer", "(JJLandroid/os/IBinder;I)V",

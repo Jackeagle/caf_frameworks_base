@@ -320,13 +320,13 @@ public class AudioService extends IAudioService.Stub
         0,  // STREAM_SYSTEM
         0,  // STREAM_RING
         0,  // STREAM_MUSIC
-        0,  // STREAM_ALARM
+        1,  // STREAM_ALARM
         0,  // STREAM_NOTIFICATION
         0,  // STREAM_BLUETOOTH_SCO
         0,  // STREAM_SYSTEM_ENFORCED
         0,  // STREAM_DTMF
         0,  // STREAM_TTS
-        0   // STREAM_ACCESSIBILITY
+        1   // STREAM_ACCESSIBILITY
     };
 
     /* mStreamVolumeAlias[] indicates for each stream if it uses the volume settings
@@ -588,7 +588,7 @@ public class AudioService extends IAudioService.Stub
             AudioSystem.DEVICE_OUT_HDMI_ARC |
             AudioSystem.DEVICE_OUT_SPDIF |
             AudioSystem.DEVICE_OUT_AUX_LINE;
-    int mFullVolumeDevices = AudioSystem.DEVICE_OUT_HEARING_AID;
+    int mFullVolumeDevices = 0;
 
     private final boolean mMonitorRotation;
 
@@ -1208,6 +1208,8 @@ public class AudioService extends IAudioService.Stub
                             System.VOLUME_SETTINGS_INT[a11yStreamAlias];
                     mStreamStates[AudioSystem.STREAM_ACCESSIBILITY].setAllIndexes(
                             mStreamStates[a11yStreamAlias], caller);
+                    mStreamStates[AudioSystem.STREAM_ACCESSIBILITY].refreshRange(
+                            mStreamVolumeAlias[AudioSystem.STREAM_ACCESSIBILITY]);
                 }
             }
             if (sIndependentA11yVolume) {
@@ -1389,7 +1391,15 @@ public class AudioService extends IAudioService.Stub
     }
 
     private int rescaleIndex(int index, int srcStream, int dstStream) {
-        return (index * mStreamStates[dstStream].getMaxIndex() + mStreamStates[srcStream].getMaxIndex() / 2) / mStreamStates[srcStream].getMaxIndex();
+        final int rescaled =
+                (index * mStreamStates[dstStream].getMaxIndex()
+                        + mStreamStates[srcStream].getMaxIndex() / 2)
+                / mStreamStates[srcStream].getMaxIndex();
+        if (rescaled < mStreamStates[dstStream].getMinIndex()) {
+            return mStreamStates[dstStream].getMinIndex();
+        } else {
+            return rescaled;
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -3588,6 +3598,7 @@ public class AudioService extends IAudioService.Stub
         if (btDevice == null) {
             return true;
         }
+
         String address = btDevice.getAddress();
         BluetoothClass btClass = btDevice.getBluetoothClass();
         int outDevice = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO;
@@ -3609,9 +3620,40 @@ public class AudioService extends IAudioService.Stub
         }
 
         String btDeviceName =  btDevice.getName();
+
+        Slog.i(TAG, "handleBtScoActiveDeviceChange: isActive " + isActive +
+             " outDevice " + outDevice + " address " + address + " btDevicename " + btDeviceName);
+
         boolean result = handleDeviceConnection(isActive, outDevice, address, btDeviceName);
+        Slog.i(TAG, "for outDevice " + outDevice + " result is " + result);
+
+        /* When BT process is killed, getting device class may fail during cleanup.
+         * This results in outDevice assigned to DEVICE_OUT_BLUETOOTH_SCO. If
+         * outDevice was added as different device than DEVICE_OUT_BLUETOOTH_SCO
+         * during connection, removal will fail during disconnection. Attempt to
+         * remove outDevice with other possible SCO devices.
+         */
+        if (isActive == false && result == false) {
+           outDevice = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_HEADSET;
+           Slog.w(TAG, "handleBtScoActiveDeviceChange: retrying with outDevice " + outDevice);
+
+           result = handleDeviceConnection(isActive, outDevice, address, btDeviceName);
+
+           Slog.w(TAG, "for outDevice "+ outDevice + " result is " + result);
+        }
+
+        if (isActive == false && result == false) {
+           outDevice = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_CARKIT;
+           Slog.w(TAG, "handleBtScoActiveDeviceChange: retrying with outDevice " + outDevice);
+
+           result = handleDeviceConnection(isActive, outDevice, address, btDeviceName);
+
+           Slog.w(TAG, "for outDevice "+ outDevice + " result is " + result);
+        }
+
         // handleDeviceConnection() && result to make sure the method get executed
         result = handleDeviceConnection(isActive, inDevice, address, btDeviceName) && result;
+        Slog.i(TAG, "for inDevice" + inDevice + " result is " + result);
         return result;
     }
 
@@ -4614,8 +4656,8 @@ public class AudioService extends IAudioService.Stub
     //  4       VolumeStreamState.class
     public class VolumeStreamState {
         private final int mStreamType;
-        private final int mIndexMin;
-        private final int mIndexMax;
+        private int mIndexMin;
+        private int mIndexMax;
 
         private boolean mIsMuted;
         private String mVolumeIndexSettingName;
@@ -4767,6 +4809,8 @@ public class AudioService extends IAudioService.Stub
                 index = getAbsoluteVolumeIndex((getIndex(device) + 5)/10);
             } else if ((device & mFullVolumeDevices) != 0) {
                 index = (mIndexMax + 5)/10;
+            } else if ((device & AudioSystem.DEVICE_OUT_HEARING_AID) != 0) {
+                index = (mIndexMax + 5)/10;
             } else {
                 index = (getIndex(device) + 5)/10;
             }
@@ -4786,6 +4830,8 @@ public class AudioService extends IAudioService.Stub
                                 mAvrcpAbsVolSupported) {
                             index = getAbsoluteVolumeIndex((getIndex(device) + 5)/10);
                         } else if ((device & mFullVolumeDevices) != 0) {
+                            index = (mIndexMax + 5)/10;
+                        } else if ((device & AudioSystem.DEVICE_OUT_HEARING_AID) != 0) {
                             index = (mIndexMax + 5)/10;
                         } else {
                             index = (mIndexMap.valueAt(i) + 5)/10;
@@ -4898,6 +4944,24 @@ public class AudioService extends IAudioService.Stub
 
         public int getMinIndex() {
             return mIndexMin;
+        }
+
+        /**
+         * Updates the min/max index values from another stream. Use this when changing the alias
+         * for the current stream type.
+         * @param sourceStreamType
+         */
+        // must be sync'd on mSettingsLock before VolumeStreamState.class
+        @GuardedBy("VolumeStreamState.class")
+        public void refreshRange(int sourceStreamType) {
+            mIndexMin = MIN_STREAM_VOLUME[sourceStreamType] * 10;
+            mIndexMax = MAX_STREAM_VOLUME[sourceStreamType] * 10;
+            // verify all current volumes are within bounds
+            for (int i = 0 ; i < mIndexMap.size(); i++) {
+                final int device = mIndexMap.keyAt(i);
+                final int index = mIndexMap.valueAt(i);
+                mIndexMap.put(device, getValidIndex(index));
+            }
         }
 
         /**
@@ -5951,7 +6015,11 @@ public class AudioService extends IAudioService.Stub
                 mConnectedDevices.remove(deviceKey);
                 return true;
             }
+            Log.w(TAG, "handleDeviceConnection() failed, deviceKey=" + deviceKey + ", deviceSpec="
+                       + deviceSpec + ", connect=" + connect);
         }
+
+        Slog.e(TAG, "handleDeviceConnection: returning false");
         return false;
     }
 

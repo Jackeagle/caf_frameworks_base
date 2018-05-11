@@ -19,12 +19,11 @@ package com.android.server.locksettings.recoverablekeystore;
 import static android.security.keystore.recovery.KeyChainProtectionParams.TYPE_LOCKSCREEN;
 
 import android.annotation.Nullable;
-import android.annotation.NonNull;
 import android.content.Context;
+import android.security.Scrypt;
 import android.security.keystore.recovery.KeyChainProtectionParams;
 import android.security.keystore.recovery.KeyChainSnapshot;
 import android.security.keystore.recovery.KeyDerivationParams;
-import android.security.keystore.recovery.TrustedRootCertificates;
 import android.security.keystore.recovery.WrappedApplicationKey;
 import android.util.Log;
 
@@ -71,6 +70,15 @@ public class KeySyncTask implements Runnable {
     private static final String LOCK_SCREEN_HASH_ALGORITHM = "SHA-256";
     private static final int TRUSTED_HARDWARE_MAX_ATTEMPTS = 10;
 
+    @VisibleForTesting
+    static final int SCRYPT_PARAM_N = 4096;
+    @VisibleForTesting
+    static final int SCRYPT_PARAM_R = 8;
+    @VisibleForTesting
+    static final int SCRYPT_PARAM_P = 1;
+    @VisibleForTesting
+    static final int SCRYPT_PARAM_OUTLEN_BYTES = 32;
+
     private final RecoverableKeyStoreDb mRecoverableKeyStoreDb;
     private final int mUserId;
     private final int mCredentialType;
@@ -79,6 +87,8 @@ public class KeySyncTask implements Runnable {
     private final PlatformKeyManager mPlatformKeyManager;
     private final RecoverySnapshotStorage mRecoverySnapshotStorage;
     private final RecoverySnapshotListenersStorage mSnapshotListenersStorage;
+    private final TestOnlyInsecureCertificateHelper mTestOnlyInsecureCertificateHelper;
+    private final Scrypt mScrypt;
 
     public static KeySyncTask newInstance(
             Context context,
@@ -98,7 +108,9 @@ public class KeySyncTask implements Runnable {
                 credentialType,
                 credential,
                 credentialUpdated,
-                PlatformKeyManager.getInstance(context, recoverableKeyStoreDb));
+                PlatformKeyManager.getInstance(context, recoverableKeyStoreDb),
+                new TestOnlyInsecureCertificateHelper(),
+                new Scrypt());
     }
 
     /**
@@ -110,6 +122,7 @@ public class KeySyncTask implements Runnable {
      * @param credential The credential, encoded as a {@link String}.
      * @param credentialUpdated signals weather credentials were updated.
      * @param platformKeyManager platform key manager
+     * @param testOnlyInsecureCertificateHelper utility class used for end-to-end tests
      */
     @VisibleForTesting
     KeySyncTask(
@@ -120,7 +133,9 @@ public class KeySyncTask implements Runnable {
             int credentialType,
             String credential,
             boolean credentialUpdated,
-            PlatformKeyManager platformKeyManager) {
+            PlatformKeyManager platformKeyManager,
+            TestOnlyInsecureCertificateHelper testOnlyInsecureCertificateHelper,
+            Scrypt scrypt) {
         mSnapshotListenersStorage = recoverySnapshotListenersStorage;
         mRecoverableKeyStoreDb = recoverableKeyStoreDb;
         mUserId = userId;
@@ -129,6 +144,8 @@ public class KeySyncTask implements Runnable {
         mCredentialUpdated = credentialUpdated;
         mPlatformKeyManager = platformKeyManager;
         mRecoverySnapshotStorage = snapshotStorage;
+        mTestOnlyInsecureCertificateHelper = testOnlyInsecureCertificateHelper;
+        mScrypt = scrypt;
     }
 
     @Override
@@ -189,8 +206,9 @@ public class KeySyncTask implements Runnable {
         PublicKey publicKey;
         String rootCertAlias =
                 mRecoverableKeyStoreDb.getActiveRootOfTrust(mUserId, recoveryAgentUid);
+        rootCertAlias = mTestOnlyInsecureCertificateHelper
+                .getDefaultCertificateAliasIfEmpty(rootCertAlias);
 
-        rootCertAlias = replaceEmptyValueWithSecureDefault(rootCertAlias);
         CertPath certPath = mRecoverableKeyStoreDb.getRecoveryServiceCertPath(mUserId,
                 recoveryAgentUid, rootCertAlias);
         if (certPath != null) {
@@ -212,16 +230,28 @@ public class KeySyncTask implements Runnable {
             return;
         }
 
-        // The only place in this class which uses credential value
-        if (!TrustedRootCertificates.GOOGLE_CLOUD_KEY_VAULT_SERVICE_V1_ALIAS.equals(
-                rootCertAlias)) {
-            // TODO: allow only whitelisted LSKF usage
-            Log.w(TAG, "Untrusted root certificate is used by recovery agent "
+        if (mTestOnlyInsecureCertificateHelper.isTestOnlyCertificateAlias(rootCertAlias)) {
+            Log.w(TAG, "Insecure root certificate is used by recovery agent "
                     + recoveryAgentUid);
+            if (mTestOnlyInsecureCertificateHelper.doesCredentialSupportInsecureMode(
+                    mCredentialType, mCredential)) {
+                Log.w(TAG, "Whitelisted credential is used to generate snapshot by "
+                        + "recovery agent "+ recoveryAgentUid);
+            } else {
+                Log.w(TAG, "Non whitelisted credential is used to generate recovery snapshot by "
+                        + recoveryAgentUid + " - ignore attempt.");
+                return; // User secret will not be used.
+            }
         }
 
+        boolean useScryptToHashCredential = shouldUseScryptToHashCredential();
         byte[] salt = generateSalt();
-        byte[] localLskfHash = hashCredentials(salt, mCredential);
+        byte[] localLskfHash;
+        if (useScryptToHashCredential) {
+            localLskfHash = hashCredentialsByScrypt(salt, mCredential);
+        } else {
+            localLskfHash = hashCredentialsBySaltedSha256(salt, mCredential);
+        }
 
         Map<String, SecretKey> rawKeys;
         try {
@@ -239,8 +269,10 @@ public class KeySyncTask implements Runnable {
             return;
         }
 
-        // TODO: filter raw keys based on the root of trust.
-        // It is the only place in the class where raw key material is used.
+        // Only include insecure key material for test
+        if (mTestOnlyInsecureCertificateHelper.isTestOnlyCertificateAlias(rootCertAlias)) {
+            rawKeys = mTestOnlyInsecureCertificateHelper.keepOnlyWhitelistedInsecureKeys(rawKeys);
+        }
         SecretKey recoveryKey;
         try {
             recoveryKey = generateRecoveryKey();
@@ -291,10 +323,17 @@ public class KeySyncTask implements Runnable {
             Log.e(TAG,"Could not encrypt with recovery key", e);
             return;
         }
+        KeyDerivationParams keyDerivationParams;
+        if (useScryptToHashCredential) {
+            keyDerivationParams = KeyDerivationParams.createScryptParams(
+                    salt, /*memoryDifficulty=*/ SCRYPT_PARAM_N);
+        } else {
+            keyDerivationParams = KeyDerivationParams.createSha256Params(salt);
+        }
         KeyChainProtectionParams metadata = new KeyChainProtectionParams.Builder()
                 .setUserSecretType(TYPE_LOCKSCREEN)
                 .setLockScreenUiFormat(getUiFormat(mCredentialType, mCredential))
-                .setKeyDerivationParams(KeyDerivationParams.createSha256Params(salt))
+                .setKeyDerivationParams(keyDerivationParams)
                 .setSecret(new byte[0])
                 .build();
 
@@ -308,7 +347,6 @@ public class KeySyncTask implements Runnable {
                 .setSnapshotVersion(getSnapshotVersion(recoveryAgentUid, recreateCurrentVersion))
                 .setMaxAttempts(TRUSTED_HARDWARE_MAX_ATTEMPTS)
                 .setCounterId(counterId)
-                .setTrustedHardwarePublicKey(SecureBox.encodePublicKey(publicKey))
                 .setServerParams(vaultHandle)
                 .setKeyChainProtectionParams(metadataList)
                 .setWrappedApplicationKeys(createApplicationKeyEntries(encryptedApplicationKeys))
@@ -431,7 +469,7 @@ public class KeySyncTask implements Runnable {
      * @return The SHA-256 hash.
      */
     @VisibleForTesting
-    static byte[] hashCredentials(byte[] salt, String credentials) {
+    static byte[] hashCredentialsBySaltedSha256(byte[] salt, String credentials) {
         byte[] credentialsBytes = credentials.getBytes(StandardCharsets.UTF_8);
         ByteBuffer byteBuffer = ByteBuffer.allocate(
                 salt.length + credentialsBytes.length + LENGTH_PREFIX_BYTES * 2);
@@ -448,6 +486,12 @@ public class KeySyncTask implements Runnable {
             // Impossible, SHA-256 must be supported on Android.
             throw new RuntimeException(e);
         }
+    }
+
+    private byte[] hashCredentialsByScrypt(byte[] salt, String credentials) {
+        return mScrypt.scrypt(
+                credentials.getBytes(StandardCharsets.UTF_8), salt,
+                SCRYPT_PARAM_N, SCRYPT_PARAM_R, SCRYPT_PARAM_P, SCRYPT_PARAM_OUTLEN_BYTES);
     }
 
     private static SecretKey generateRecoveryKey() throws NoSuchAlgorithmException {
@@ -468,13 +512,7 @@ public class KeySyncTask implements Runnable {
         return keyEntries;
     }
 
-    private @NonNull String replaceEmptyValueWithSecureDefault(
-            @Nullable String rootCertificateAlias) {
-        if (rootCertificateAlias == null || rootCertificateAlias.isEmpty()) {
-            Log.e(TAG, "rootCertificateAlias is null or empty");
-            // Use the default Google Key Vault Service CA certificate if the alias is not provided
-            rootCertificateAlias = TrustedRootCertificates.GOOGLE_CLOUD_KEY_VAULT_SERVICE_V1_ALIAS;
-        }
-        return rootCertificateAlias;
+    private boolean shouldUseScryptToHashCredential() {
+        return mCredentialType == LockPatternUtils.CREDENTIAL_TYPE_PASSWORD;
     }
 }

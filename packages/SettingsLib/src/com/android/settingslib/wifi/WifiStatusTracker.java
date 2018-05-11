@@ -41,8 +41,9 @@ public class WifiStatusTracker extends ConnectivityManager.NetworkCallback {
     private final WifiManager mWifiManager;
     private final NetworkScoreManager mNetworkScoreManager;
     private final ConnectivityManager mConnectivityManager;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final WifiNetworkScoreCache.CacheListener mCacheListener =
-            new WifiNetworkScoreCache.CacheListener(new Handler(Looper.getMainLooper())) {
+            new WifiNetworkScoreCache.CacheListener(mHandler) {
                 @Override
                 public void networkCacheUpdated(List<ScoredNetwork> updatedNetworks) {
                     updateStatusLabel();
@@ -50,7 +51,9 @@ public class WifiStatusTracker extends ConnectivityManager.NetworkCallback {
                 }
             };
     private final NetworkRequest mNetworkRequest = new NetworkRequest.Builder()
-            .clearCapabilities().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build();
+            .clearCapabilities()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build();
     private final ConnectivityManager.NetworkCallback mNetworkCallback = new ConnectivityManager
             .NetworkCallback() {
         @Override
@@ -87,7 +90,8 @@ public class WifiStatusTracker extends ConnectivityManager.NetworkCallback {
             mNetworkScoreManager.registerNetworkScoreCache(NetworkKey.TYPE_WIFI,
                     mWifiNetworkScoreCache, NetworkScoreManager.CACHE_FILTER_CURRENT_NETWORK);
             mWifiNetworkScoreCache.registerListener(mCacheListener);
-            mConnectivityManager.registerNetworkCallback(mNetworkRequest, mNetworkCallback);
+            mConnectivityManager.registerNetworkCallback(
+                    mNetworkRequest, mNetworkCallback, mHandler);
         } else {
             mNetworkScoreManager.unregisterNetworkScoreCache(NetworkKey.TYPE_WIFI,
                     mWifiNetworkScoreCache);
@@ -99,10 +103,9 @@ public class WifiStatusTracker extends ConnectivityManager.NetworkCallback {
     public void handleBroadcast(Intent intent) {
         String action = intent.getAction();
         if (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) {
-            state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
-                    WifiManager.WIFI_STATE_UNKNOWN);
-            enabled = state == WifiManager.WIFI_STATE_ENABLED;
+            updateWifiState();
         } else if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
+            updateWifiState();
             final NetworkInfo networkInfo =
                     intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
             connected = networkInfo != null && networkInfo.isConnected();
@@ -122,6 +125,11 @@ public class WifiStatusTracker extends ConnectivityManager.NetworkCallback {
             updateRssi(intent.getIntExtra(WifiManager.EXTRA_NEW_RSSI, -200));
             updateStatusLabel();
         }
+    }
+
+    private void updateWifiState() {
+        state = mWifiManager.getWifiState();
+        enabled = state == WifiManager.WIFI_STATE_ENABLED;
     }
 
     private void updateRssi(int newRssi) {

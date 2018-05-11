@@ -19,6 +19,7 @@ package android.hardware.display;
 import android.content.pm.ParceledListSlice;
 import android.graphics.Point;
 import android.hardware.display.BrightnessConfiguration;
+import android.hardware.display.Curve;
 import android.hardware.display.IDisplayManagerCallback;
 import android.hardware.display.IVirtualDisplayCallback;
 import android.hardware.display.WifiDisplay;
@@ -65,6 +66,9 @@ interface IDisplayManager {
     // Requires CONFIGURE_DISPLAY_COLOR_MODE
     void requestColorMode(int displayId, int colorMode);
 
+    // Requires CONTROL_DISPLAY_SATURATION
+    void setSaturationLevel(float level);
+
     // Requires CAPTURE_VIDEO_OUTPUT, CAPTURE_SECURE_VIDEO_OUTPUT, or an appropriate
     // MediaProjection token for certain combinations of flags.
     int createVirtualDisplay(in IVirtualDisplayCallback callback,
@@ -109,4 +113,7 @@ interface IDisplayManager {
 
     // Temporarily sets the auto brightness adjustment factor.
     void setTemporaryAutoBrightnessAdjustment(float adjustment);
+
+    // Get the minimum brightness curve.
+    Curve getMinimumBrightnessCurve();
 }

@@ -1145,11 +1145,43 @@ public class NotificationManager {
                 SUPPRESSED_EFFECT_NOTIFICATION_LIST
         };
 
+        private static final int[] SCREEN_OFF_SUPPRESSED_EFFECTS = {
+                SUPPRESSED_EFFECT_SCREEN_OFF,
+                SUPPRESSED_EFFECT_FULL_SCREEN_INTENT,
+                SUPPRESSED_EFFECT_LIGHTS,
+                SUPPRESSED_EFFECT_AMBIENT,
+        };
+
+        private static final int[] SCREEN_ON_SUPPRESSED_EFFECTS = {
+                SUPPRESSED_EFFECT_SCREEN_ON,
+                SUPPRESSED_EFFECT_PEEK,
+                SUPPRESSED_EFFECT_STATUS_BAR,
+                SUPPRESSED_EFFECT_BADGE,
+                SUPPRESSED_EFFECT_NOTIFICATION_LIST
+        };
+
         /**
          * Visual effects to suppress for a notification that is filtered by Do Not Disturb mode.
          * Bitmask of SUPPRESSED_EFFECT_* constants.
          */
         public final int suppressedVisualEffects;
+
+        /**
+         * @hide
+         */
+        public static final int STATE_CHANNELS_BYPASSING_DND = 1 << 0;
+
+        /**
+         * @hide
+         */
+        public static final int STATE_UNSET = -1;
+
+        /**
+         * Notification state information that is necessary to determine Do Not Disturb behavior.
+         * Bitmask of STATE_* constants.
+         * @hide
+         */
+        public final int state;
 
         /**
          * Constructs a policy for Do Not Disturb priority mode behavior.
@@ -1166,7 +1198,7 @@ public class NotificationManager {
          */
         public Policy(int priorityCategories, int priorityCallSenders, int priorityMessageSenders) {
             this(priorityCategories, priorityCallSenders, priorityMessageSenders,
-                    SUPPRESSED_EFFECTS_UNSET);
+                    SUPPRESSED_EFFECTS_UNSET, STATE_UNSET);
         }
 
         /**
@@ -1204,11 +1236,23 @@ public class NotificationManager {
             this.priorityCallSenders = priorityCallSenders;
             this.priorityMessageSenders = priorityMessageSenders;
             this.suppressedVisualEffects = suppressedVisualEffects;
+            this.state = STATE_UNSET;
+        }
+
+        /** @hide */
+        public Policy(int priorityCategories, int priorityCallSenders, int priorityMessageSenders,
+                int suppressedVisualEffects, int state) {
+            this.priorityCategories = priorityCategories;
+            this.priorityCallSenders = priorityCallSenders;
+            this.priorityMessageSenders = priorityMessageSenders;
+            this.suppressedVisualEffects = suppressedVisualEffects;
+            this.state = state;
         }
 
         /** @hide */
         public Policy(Parcel source) {
-            this(source.readInt(), source.readInt(), source.readInt(), source.readInt());
+            this(source.readInt(), source.readInt(), source.readInt(), source.readInt(),
+                    source.readInt());
         }
 
         @Override
@@ -1217,6 +1261,7 @@ public class NotificationManager {
             dest.writeInt(priorityCallSenders);
             dest.writeInt(priorityMessageSenders);
             dest.writeInt(suppressedVisualEffects);
+            dest.writeInt(state);
         }
 
         @Override
@@ -1249,6 +1294,8 @@ public class NotificationManager {
                     + ",priorityMessageSenders=" + prioritySendersToString(priorityMessageSenders)
                     + ",suppressedVisualEffects="
                     + suppressedEffectsToString(suppressedVisualEffects)
+                    + ",areChannelsBypassingDnd=" + (((state & STATE_CHANNELS_BYPASSING_DND) != 0)
+                        ? "true" : "false")
                     + "]";
         }
 
@@ -1295,6 +1342,58 @@ public class NotificationManager {
                 }
             }
             return true;
+        }
+
+        /**
+         * @hide
+         */
+        public static boolean areAnyScreenOffEffectsSuppressed(int effects) {
+            for (int i = 0; i < SCREEN_OFF_SUPPRESSED_EFFECTS.length; i++) {
+                final int effect = SCREEN_OFF_SUPPRESSED_EFFECTS[i];
+                if ((effects & effect) != 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @hide
+         */
+        public static boolean areAnyScreenOnEffectsSuppressed(int effects) {
+            for (int i = 0; i < SCREEN_ON_SUPPRESSED_EFFECTS.length; i++) {
+                final int effect = SCREEN_ON_SUPPRESSED_EFFECTS[i];
+                if ((effects & effect) != 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @hide
+         */
+        public static int toggleScreenOffEffectsSuppressed(int currentEffects, boolean suppress) {
+            return toggleEffects(currentEffects, SCREEN_OFF_SUPPRESSED_EFFECTS, suppress);
+        }
+
+        /**
+         * @hide
+         */
+        public static int toggleScreenOnEffectsSuppressed(int currentEffects, boolean suppress) {
+            return toggleEffects(currentEffects, SCREEN_ON_SUPPRESSED_EFFECTS, suppress);
+        }
+
+        private static int toggleEffects(int currentEffects, int[] effects, boolean suppress) {
+            for (int i = 0; i < effects.length; i++) {
+                final int effect = effects[i];
+                if (suppress) {
+                    currentEffects |= effect;
+                } else {
+                    currentEffects &= ~effect;
+                }
+            }
+            return currentEffects;
         }
 
         public static String suppressedEffectsToString(int effects) {

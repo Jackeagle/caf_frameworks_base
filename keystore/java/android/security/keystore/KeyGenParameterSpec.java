@@ -19,6 +19,7 @@ package android.security.keystore;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.TestApi;
 import android.app.KeyguardManager;
 import android.hardware.fingerprint.FingerprintManager;
 import android.security.GateKeeper;
@@ -259,13 +260,14 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
     private final boolean mRandomizedEncryptionRequired;
     private final boolean mUserAuthenticationRequired;
     private final int mUserAuthenticationValidityDurationSeconds;
-    private final boolean mTrustedUserPresenceRequred;
+    private final boolean mUserPresenceRequired;
     private final byte[] mAttestationChallenge;
     private final boolean mUniqueIdIncluded;
     private final boolean mUserAuthenticationValidWhileOnBody;
     private final boolean mInvalidatedByBiometricEnrollment;
     private final boolean mIsStrongBoxBacked;
     private final boolean mUserConfirmationRequired;
+    private final boolean mUnlockedDeviceRequired;
 
     /**
      * @hide should be built with Builder
@@ -290,13 +292,14 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
             boolean randomizedEncryptionRequired,
             boolean userAuthenticationRequired,
             int userAuthenticationValidityDurationSeconds,
-            boolean trustedUserPresenceRequired,
+            boolean userPresenceRequired,
             byte[] attestationChallenge,
             boolean uniqueIdIncluded,
             boolean userAuthenticationValidWhileOnBody,
             boolean invalidatedByBiometricEnrollment,
             boolean isStrongBoxBacked,
-            boolean userConfirmationRequired) {
+            boolean userConfirmationRequired,
+            boolean unlockedDeviceRequired) {
         if (TextUtils.isEmpty(keyStoreAlias)) {
             throw new IllegalArgumentException("keyStoreAlias must not be empty");
         }
@@ -337,7 +340,7 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
         mBlockModes = ArrayUtils.cloneIfNotEmpty(ArrayUtils.nullToEmpty(blockModes));
         mRandomizedEncryptionRequired = randomizedEncryptionRequired;
         mUserAuthenticationRequired = userAuthenticationRequired;
-        mTrustedUserPresenceRequred = trustedUserPresenceRequired;
+        mUserPresenceRequired = userPresenceRequired;
         mUserAuthenticationValidityDurationSeconds = userAuthenticationValidityDurationSeconds;
         mAttestationChallenge = Utils.cloneIfNotNull(attestationChallenge);
         mUniqueIdIncluded = uniqueIdIncluded;
@@ -345,6 +348,7 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
         mInvalidatedByBiometricEnrollment = invalidatedByBiometricEnrollment;
         mIsStrongBoxBacked = isStrongBoxBacked;
         mUserConfirmationRequired = userConfirmationRequired;
+        mUnlockedDeviceRequired = unlockedDeviceRequired;
     }
 
     /**
@@ -591,9 +595,17 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
     /**
      * Returns {@code true} if the key is authorized to be used only if a test of user presence has
      * been performed between the {@code Signature.initSign()} and {@code Signature.sign()} calls.
+     * It requires that the KeyStore implementation have a direct way to validate the user presence
+     * for example a KeyStore hardware backed strongbox can use a button press that is observable
+     * in hardware. A test for user presence is tangential to authentication. The test can be part
+     * of an authentication step as long as this step can be validated by the hardware protecting
+     * the key and cannot be spoofed. For example, a physical button press can be used as a test of
+     * user presence if the other pins connected to the button are not able to simulate a button
+     * press. There must be no way for the primary processor to fake a button press, or that
+     * button must not be used as a test of user presence.
      */
-    public boolean isTrustedUserPresenceRequired() {
-        return mTrustedUserPresenceRequred;
+    public boolean isUserPresenceRequired() {
+        return mUserPresenceRequired;
     }
 
     /**
@@ -670,6 +682,17 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
     }
 
     /**
+     * Returns {@code true} if the screen must be unlocked for this key to be used for decryption or
+     * signing. Encryption and signature verification will still be available when the screen is
+     * locked.
+     *
+     * @see Builder#setUnlockedDeviceRequired(boolean)
+     */
+    public boolean isUnlockedDeviceRequired() {
+        return mUnlockedDeviceRequired;
+    }
+
+    /**
      * @hide
      */
     public long getBoundToSpecificSecureUserId() {
@@ -700,13 +723,14 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
         private boolean mRandomizedEncryptionRequired = true;
         private boolean mUserAuthenticationRequired;
         private int mUserAuthenticationValidityDurationSeconds = -1;
-        private boolean mTrustedUserPresenceRequired = false;
+        private boolean mUserPresenceRequired = false;
         private byte[] mAttestationChallenge = null;
         private boolean mUniqueIdIncluded = false;
         private boolean mUserAuthenticationValidWhileOnBody;
         private boolean mInvalidatedByBiometricEnrollment = true;
         private boolean mIsStrongBoxBacked = false;
         private boolean mUserConfirmationRequired;
+        private boolean mUnlockedDeviceRequired = false;
 
         /**
          * Creates a new instance of the {@code Builder}.
@@ -762,7 +786,7 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
             mUserAuthenticationRequired = sourceSpec.isUserAuthenticationRequired();
             mUserAuthenticationValidityDurationSeconds =
                 sourceSpec.getUserAuthenticationValidityDurationSeconds();
-            mTrustedUserPresenceRequired = sourceSpec.isTrustedUserPresenceRequired();
+            mUserPresenceRequired = sourceSpec.isUserPresenceRequired();
             mAttestationChallenge = sourceSpec.getAttestationChallenge();
             mUniqueIdIncluded = sourceSpec.isUniqueIdIncluded();
             mUserAuthenticationValidWhileOnBody = sourceSpec.isUserAuthenticationValidWhileOnBody();
@@ -1165,10 +1189,18 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
         /**
          * Sets whether a test of user presence is required to be performed between the
          * {@code Signature.initSign()} and {@code Signature.sign()} method calls.
+         * It requires that the KeyStore implementation have a direct way to validate the user
+         * presence for example a KeyStore hardware backed strongbox can use a button press that
+         * is observable in hardware. A test for user presence is tangential to authentication. The
+         * test can be part of an authentication step as long as this step can be validated by the
+         * hardware protecting the key and cannot be spoofed. For example, a physical button press
+         * can be used as a test of user presence if the other pins connected to the button are not
+         * able to simulate a button press.There must be no way for the primary processor to fake a
+         * button press, or that button must not be used as a test of user presence.
          */
         @NonNull
-        public Builder setTrustedUserPresenceRequired(boolean required) {
-            mTrustedUserPresenceRequired = required;
+        public Builder setUserPresenceRequired(boolean required) {
+            mUserPresenceRequired = required;
             return this;
         }
 
@@ -1212,6 +1244,7 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
          *
          * Sets whether to include a temporary unique ID field in the attestation certificate.
          */
+        @TestApi
         @NonNull
         public Builder setUniqueIdIncluded(boolean uniqueIdIncluded) {
             mUniqueIdIncluded = uniqueIdIncluded;
@@ -1275,6 +1308,19 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
         }
 
         /**
+         * Sets whether the keystore requires the screen to be unlocked before allowing decryption
+         * using this key. If this is set to {@code true}, any attempt to decrypt or sign using this
+         * key while the screen is locked will fail. A locked device requires a PIN, password,
+         * fingerprint, or other trusted factor to access. While the screen is locked, the key can
+         * still be used for encryption or signature verification.
+         */
+        @NonNull
+        public Builder setUnlockedDeviceRequired(boolean unlockedDeviceRequired) {
+            mUnlockedDeviceRequired = unlockedDeviceRequired;
+            return this;
+        }
+
+        /**
          * Builds an instance of {@code KeyGenParameterSpec}.
          */
         @NonNull
@@ -1299,13 +1345,14 @@ public final class KeyGenParameterSpec implements AlgorithmParameterSpec, UserAu
                     mRandomizedEncryptionRequired,
                     mUserAuthenticationRequired,
                     mUserAuthenticationValidityDurationSeconds,
-                    mTrustedUserPresenceRequired,
+                    mUserPresenceRequired,
                     mAttestationChallenge,
                     mUniqueIdIncluded,
                     mUserAuthenticationValidWhileOnBody,
                     mInvalidatedByBiometricEnrollment,
                     mIsStrongBoxBacked,
-                    mUserConfirmationRequired);
+                    mUserConfirmationRequired,
+                    mUnlockedDeviceRequired);
         }
     }
 }

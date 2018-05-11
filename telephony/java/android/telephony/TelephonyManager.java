@@ -27,6 +27,7 @@ import android.annotation.SuppressAutoDoc;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
+import android.annotation.TestApi;
 import android.annotation.WorkerThread;
 import android.app.ActivityThread;
 import android.app.PendingIntent;
@@ -1067,6 +1068,13 @@ public class TelephonyManager {
     public static final int UNKNOWN_CARRIER_ID = -1;
 
     /**
+     * An unknown carrier id list version.
+     * @hide
+     */
+    @TestApi
+    public static final int UNKNOWN_CARRIER_ID_LIST_VERSION = -1;
+
+    /**
      * Broadcast Action: The subscription carrier identity has changed.
      * This intent could be sent on the following events:
      * <ul>
@@ -1115,6 +1123,41 @@ public class TelephonyManager {
      * subscription which has changed.
      */
     public static final String EXTRA_SUBSCRIPTION_ID = "android.telephony.extra.SUBSCRIPTION_ID";
+
+    /**
+     * Broadcast intent action indicating that when data stall recovery is attempted by Telephony,
+     * intended for report every data stall recovery step attempted.
+     *
+     * <p>
+     * The {@link #EXTRA_RECOVERY_ACTION} extra indicates the action associated with the data
+     * stall recovery.
+     * The phone id where the data stall recovery is attempted.
+     *
+     * <p class="note">
+     * Requires the READ_PHONE_STATE permission.
+     *
+     * <p class="note">
+     * This is a protected intent that can only be sent by the system.
+     *
+     * @see #EXTRA_RECOVERY_ACTION
+     *
+     * @hide
+     */
+    // TODO(b/78370030) : Restrict this to system applications only
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
+    public static final String ACTION_DATA_STALL_DETECTED =
+            "android.intent.action.DATA_STALL_DETECTED";
+
+    /**
+     * An int extra used with {@link #ACTION_DATA_STALL_DETECTED} to indicate the
+     * action associated with the data stall recovery.
+     *
+     * @see #ACTION_DATA_STALL_DETECTED
+     *
+     * @hide
+     */
+    public static final String EXTRA_RECOVERY_ACTION = "recoveryAction";
 
     //
     //
@@ -1201,6 +1244,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public String getDeviceId(int slotIndex) {
         // FIXME this assumes phoneId == slotIndex
+        android.util.SeempLog.record_str(8, ""+slotIndex);
         try {
             IPhoneSubInfo info = getSubscriberInfo();
             if (info == null)
@@ -1345,6 +1389,7 @@ public class TelephonyManager {
             android.Manifest.permission.ACCESS_FINE_LOCATION
     })
     public CellLocation getCellLocation() {
+        android.util.SeempLog.record(49);
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) {
@@ -1434,6 +1479,7 @@ public class TelephonyManager {
     @Deprecated
     @RequiresPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
+        android.util.SeempLog.record(50);
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null)
@@ -1833,24 +1879,23 @@ public class TelephonyManager {
     }
 
     /**
-     * Returns the ISO country code equivalent of the current registered
-     * operator's MCC (Mobile Country Code).
+     * Returns the ISO country code equivalent of the MCC (Mobile Country Code) of the current
+     * registered operator, or nearby cell information if not registered.
+     * .
      * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
+     * Note: Result may be unreliable on CDMA networks (use {@link #getPhoneType()} to determine
+     * if on a CDMA network).
      */
     public String getNetworkCountryIso() {
         return getNetworkCountryIsoForPhone(getPhoneId());
     }
 
     /**
-     * Returns the ISO country code equivalent of the current registered
-     * operator's MCC (Mobile Country Code) of a subscription.
+     * Returns the ISO country code equivalent of the MCC (Mobile Country Code) of the current
+     * registered operator, or nearby cell information if not registered.
      * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
+     * Note: Result may be unreliable on CDMA networks (use {@link #getPhoneType()} to determine
+     * if on a CDMA network).
      *
      * @param subId for which Network CountryIso is returned
      * @hide
@@ -2668,6 +2713,7 @@ public class TelephonyManager {
      */
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public String getSimSerialNumber(int subId) {
+        android.util.SeempLog.record_str(388, ""+subId);
         try {
             IPhoneSubInfo info = getSubscriberInfo();
             if (info == null)
@@ -2750,8 +2796,8 @@ public class TelephonyManager {
      * physical slot index 0, to the logical slot 1. The index of the array means the index of the
      * logical slots.
      *
-     * @param physicalSlots Index i in the array representing physical slot for phone i. The array
-     *        size should be same as {@link #getPhoneCount()}.
+     * @param physicalSlots The content of the array represents the physical slot index. The array
+     *        size should be same as {@link #getUiccSlotsInfo()}.
      * @return boolean Return true if the switch succeeds, false if the switch fails.
      * @hide
      */
@@ -2798,6 +2844,7 @@ public class TelephonyManager {
      */
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public String getSubscriberId(int subId) {
+        android.util.SeempLog.record_str(389, ""+subId);
         try {
             IPhoneSubInfo info = getSubscriberInfo();
             if (info == null)
@@ -2960,7 +3007,7 @@ public class TelephonyManager {
             IPhoneSubInfo info = getSubscriberInfo();
             if (info == null)
                 return null;
-            return info.getGroupIdLevel1(mContext.getOpPackageName());
+            return info.getGroupIdLevel1ForSubscriber(getSubId(), mContext.getOpPackageName());
         } catch (RemoteException ex) {
             return null;
         } catch (NullPointerException ex) {
@@ -3027,6 +3074,7 @@ public class TelephonyManager {
             android.Manifest.permission.READ_PHONE_NUMBERS
     })
     public String getLine1Number(int subId) {
+        android.util.SeempLog.record_str(9, ""+subId);
         String number = null;
         try {
             ITelephony telephony = getITelephony();
@@ -5148,7 +5196,12 @@ public class TelephonyManager {
      * {@link #AUTHTYPE_EAP_SIM}
      * @param data authentication challenge data, base64 encoded.
      * See 3GPP TS 31.102 7.1.2 for more details.
-     * @return the response of authentication, or null if not available
+     * @return the response of authentication. This value will be null in the following cases:
+     *   Authentication error, incorrect MAC
+     *   Authentication error, security context not supported
+     *   Key freshness failure
+     *   Authentication error, no memory space available
+     *   Authentication error, no memory space available in EFMUK
      */
     // TODO(b/73660190): This should probably require MODIFY_PHONE_STATE, not
     // READ_PRIVILEGED_PHONE_STATE. It certainly shouldn't reference the permission in Javadoc since
@@ -5169,7 +5222,13 @@ public class TelephonyManager {
      * {@link #AUTHTYPE_EAP_SIM}
      * @param data authentication challenge data, base64 encoded.
      * See 3GPP TS 31.102 7.1.2 for more details.
-     * @return the response of authentication, or null if not available
+     * @return the response of authentication. This value will be null in the following cases only
+     * (see 3GPP TS 31.102 7.3.1):
+     *   Authentication error, incorrect MAC
+     *   Authentication error, security context not supported
+     *   Key freshness failure
+     *   Authentication error, no memory space available
+     *   Authentication error, no memory space available in EFMUK
      * @hide
      */
     public String getIccAuthentication(int subId, int appType, int authType, String data) {
@@ -5504,6 +5563,7 @@ public class TelephonyManager {
      * @deprecated
      * Use {@link
      * #requestNetworkScan(NetworkScanRequest, Executor, TelephonyScanManager.NetworkScanCallback)}
+     * @removed
      */
     @Deprecated
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
@@ -7807,5 +7867,50 @@ public class TelephonyManager {
                 ex.rethrowAsRuntimeException();
             }
         }
+    }
+
+    /**
+     * A test API to override carrier information including mccmnc, imsi, iccid, gid1, gid2,
+     * plmn and spn. This would be handy for, eg, forcing a particular carrier id, carrier's config
+     * (also any country or carrier overlays) to be loaded when using a test SIM with a call box.
+     *
+     * <p>Requires Permission:
+     *   {@link android.Manifest.permission#MODIFY_PHONE_STATE MODIFY_PHONE_STATE}
+     *
+     * @hide
+     */
+    @TestApi
+    public void setCarrierTestOverride(String mccmnc, String imsi, String iccid, String gid1,
+            String gid2, String plmn, String spn) {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null) {
+                telephony.setCarrierTestOverride(
+                        getSubId(), mccmnc, imsi, iccid, gid1, gid2, plmn, spn);
+            }
+        } catch (RemoteException ex) {
+            // This could happen if binder process crashes.
+        }
+    }
+
+    /**
+     * A test API to return installed carrier id list version
+     *
+     * <p>Requires Permission:
+     *   {@link android.Manifest.permission#READ_PRIVILEGED_PHONE_STATE READ_PRIVILEGED_PHONE_STATE}
+     *
+     * @hide
+     */
+    @TestApi
+    public int getCarrierIdListVersion() {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null) {
+                return telephony.getCarrierIdListVersion(getSubId());
+            }
+        } catch (RemoteException ex) {
+            // This could happen if binder process crashes.
+        }
+        return UNKNOWN_CARRIER_ID_LIST_VERSION;
     }
 }

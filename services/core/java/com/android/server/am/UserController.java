@@ -79,6 +79,7 @@ import android.os.storage.StorageManager;
 import android.text.format.DateUtils;
 import android.util.ArraySet;
 import android.util.IntArray;
+import android.util.Log;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -86,6 +87,7 @@ import android.util.SparseIntArray;
 import android.util.TimingsTraceLog;
 import android.util.proto.ProtoOutputStream;
 
+import android.view.Window;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -398,6 +400,10 @@ class UserController implements Handler.Callback {
 
         // Call onBeforeUnlockUser on a worker thread that allows disk I/O
         FgThread.getHandler().post(() -> {
+            if (!StorageManager.isUserKeyUnlocked(userId)) {
+                Slog.w(TAG, "User key got locked unexpectedly, leaving user locked.");
+                return;
+            }
             mInjector.getUserManager().onBeforeUnlockUser(userId);
             synchronized (mLock) {
                 // Do not proceed if unexpected state
@@ -712,14 +718,11 @@ class UserController implements Handler.Callback {
 
     void finishUserStopped(UserState uss) {
         final int userId = uss.mHandle.getIdentifier();
-        boolean stopped;
+        final boolean stopped;
         ArrayList<IStopUserCallback> callbacks;
-        boolean forceStopUser = false;
         synchronized (mLock) {
             callbacks = new ArrayList<>(uss.mStopCallbacks);
-            if (mStartedUsers.get(userId) != uss) {
-                stopped = false;
-            } else if (uss.state != UserState.STATE_SHUTDOWN) {
+            if (mStartedUsers.get(userId) != uss || uss.state != UserState.STATE_SHUTDOWN) {
                 stopped = false;
             } else {
                 stopped = true;
@@ -727,10 +730,10 @@ class UserController implements Handler.Callback {
                 mStartedUsers.remove(userId);
                 mUserLru.remove(Integer.valueOf(userId));
                 updateStartedUserArrayLU();
-                forceStopUser = true;
             }
         }
-        if (forceStopUser) {
+
+        if (stopped) {
             mInjector.getUserManagerInternal().removeUserState(userId);
             mInjector.activityManagerOnUserStopped(userId);
             // Clean up all state and processes associated with the user.
@@ -753,12 +756,23 @@ class UserController implements Handler.Callback {
             if (getUserInfo(userId).isEphemeral()) {
                 mInjector.getUserManager().removeUserEvenWhenDisallowed(userId);
             }
-            // Evict the user's credential encryption key.
-            try {
-                getStorageManager().lockUserKey(userId);
-            } catch (RemoteException re) {
-                throw re.rethrowAsRuntimeException();
-            }
+
+            // Evict the user's credential encryption key. Performed on FgThread to make it
+            // serialized with call to UserManagerService.onBeforeUnlockUser in finishUserUnlocking
+            // to prevent data corruption.
+            FgThread.getHandler().post(() -> {
+                synchronized (mLock) {
+                    if (mStartedUsers.get(userId) != null) {
+                        Slog.w(TAG, "User was restarted, skipping key eviction");
+                        return;
+                    }
+                }
+                try {
+                    getStorageManager().lockUserKey(userId);
+                } catch (RemoteException re) {
+                    throw re.rethrowAsRuntimeException();
+                }
+            });
         }
     }
 
@@ -1184,11 +1198,6 @@ class UserController implements Handler.Callback {
             Slog.w(TAG, "No user info for user #" + targetUserId);
             return false;
         }
-        if (!targetUserInfo.isDemo() && UserManager.isDeviceInDemoMode(mInjector.getContext())) {
-            Slog.w(TAG, "Cannot switch to non-demo user #" + targetUserId
-                    + " when device is in demo mode");
-            return false;
-        }
         if (!targetUserInfo.supportsSwitchTo()) {
             Slog.w(TAG, "Cannot switch to User #" + targetUserId + ": not supported");
             return false;
@@ -1593,6 +1602,7 @@ class UserController implements Handler.Callback {
 
     void onSystemReady() {
         updateCurrentProfileIds();
+        mInjector.reportCurWakefulnessUsageEvent();
     }
 
     /**
@@ -2181,9 +2191,18 @@ class UserController implements Handler.Callback {
 
         void showUserSwitchingDialog(UserInfo fromUser, UserInfo toUser,
                 String switchingFromSystemUserMessage, String switchingToSystemUserMessage) {
-            Dialog d = new UserSwitchingDialog(mService, mService.mContext, fromUser, toUser,
+            Dialog d;
+            if (!mService.mContext.getPackageManager()
+                    .hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
+                d = new UserSwitchingDialog(mService, mService.mContext, fromUser, toUser,
                     true /* above system */, switchingFromSystemUserMessage,
                     switchingToSystemUserMessage);
+            } else {
+                d = new CarUserSwitchingDialog(mService, mService.mContext, fromUser, toUser,
+                    true /* above system */, switchingFromSystemUserMessage,
+                    switchingToSystemUserMessage);
+            }
+
             d.show();
         }
 
@@ -2219,7 +2238,7 @@ class UserController implements Handler.Callback {
 
         protected void clearAllLockedTasks(String reason) {
             synchronized (mService) {
-                mService.mLockTaskController.clearLockedTasks(reason);
+                mService.getLockTaskController().clearLockedTasks(reason);
             }
         }
 

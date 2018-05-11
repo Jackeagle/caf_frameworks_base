@@ -18,14 +18,21 @@ import static android.view.View.MeasureSpec;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static junit.framework.Assert.fail;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.RemoteInput;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.service.notification.StatusBarNotification;
 import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
@@ -34,13 +41,21 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
+import com.android.keyguard.KeyguardHostView.OnDismissAction;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
+import com.android.systemui.statusbar.NotificationData;
+import com.android.systemui.statusbar.SmartReplyController;
+import com.android.systemui.statusbar.phone.KeyguardDismissUtil;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
@@ -50,22 +65,32 @@ public class SmartReplyViewTest extends SysuiTestCase {
     private static final String TEST_ACTION = "com.android.SMART_REPLY_VIEW_ACTION";
 
     private static final String[] TEST_CHOICES = new String[]{"Hello", "What's up?", "I'm here"};
+    private static final String TEST_NOTIFICATION_KEY = "akey";
 
     private static final int WIDTH_SPEC = MeasureSpec.makeMeasureSpec(500, MeasureSpec.EXACTLY);
     private static final int HEIGHT_SPEC = MeasureSpec.makeMeasureSpec(400, MeasureSpec.AT_MOST);
 
     private BlockingQueueIntentReceiver mReceiver;
     private SmartReplyView mView;
+    private View mContainer;
 
     private int mSingleLinePaddingHorizontal;
     private int mDoubleLinePaddingHorizontal;
     private int mSpacing;
 
+    @Mock private SmartReplyController mLogger;
+    private NotificationData.Entry mEntry;
+    private Notification mNotification;
+
     @Before
     public void setUp() {
+        MockitoAnnotations.initMocks(this);
         mReceiver = new BlockingQueueIntentReceiver();
         mContext.registerReceiver(mReceiver, new IntentFilter(TEST_ACTION));
+        mDependency.get(KeyguardDismissUtil.class).setDismissHandler(
+            (action, cancelAction, afterKeyguardGone) -> action.onDismiss());
 
+        mContainer = new View(mContext, null);
         mView = SmartReplyView.inflate(mContext, null);
 
 
@@ -75,6 +100,15 @@ public class SmartReplyViewTest extends SysuiTestCase {
         mDoubleLinePaddingHorizontal = res.getDimensionPixelSize(
                 R.dimen.smart_reply_button_padding_horizontal_double_line);
         mSpacing = res.getDimensionPixelSize(R.dimen.smart_reply_button_spacing);
+
+        mNotification = new Notification.Builder(mContext, "")
+                .setSmallIcon(R.drawable.ic_person)
+                .setContentTitle("Title")
+                .setContentText("Text").build();
+        StatusBarNotification sbn = mock(StatusBarNotification.class);
+        when(sbn.getNotification()).thenReturn(mNotification);
+        when(sbn.getKey()).thenReturn(TEST_NOTIFICATION_KEY);
+        mEntry = new NotificationData.Entry(sbn);
     }
 
     @After
@@ -92,6 +126,57 @@ public class SmartReplyViewTest extends SysuiTestCase {
         assertEquals(TEST_CHOICES[2],
                 RemoteInput.getResultsFromIntent(resultIntent).get(TEST_RESULT_KEY));
         assertEquals(RemoteInput.SOURCE_CHOICE, RemoteInput.getResultsSource(resultIntent));
+    }
+
+    @Test
+    public void testSendSmartReply_keyguardCancelled() throws InterruptedException {
+        mDependency.get(KeyguardDismissUtil.class).setDismissHandler(
+            (action, cancelAction, afterKeyguardGone) -> {
+                if (cancelAction != null) {
+                    cancelAction.run();
+                }
+            });
+        setRepliesFromRemoteInput(TEST_CHOICES);
+
+        mView.getChildAt(2).performClick();
+
+        assertNull(mReceiver.waitForIntent());
+    }
+
+    @Test
+    public void testSendSmartReply_waitsForKeyguard() throws InterruptedException {
+        AtomicReference<OnDismissAction> actionRef = new AtomicReference<>();
+        mDependency.get(KeyguardDismissUtil.class).setDismissHandler(
+            (action, cancelAction, afterKeyguardGone) -> actionRef.set(action));
+        setRepliesFromRemoteInput(TEST_CHOICES);
+
+        mView.getChildAt(2).performClick();
+
+        // No intent until the screen is unlocked.
+        assertNull(mReceiver.waitForIntent());
+
+        actionRef.get().onDismiss();
+
+        // Now the intent should arrive.
+        Intent resultIntent = mReceiver.waitForIntent();
+        assertEquals(TEST_CHOICES[2],
+                RemoteInput.getResultsFromIntent(resultIntent).get(TEST_RESULT_KEY));
+        assertEquals(RemoteInput.SOURCE_CHOICE, RemoteInput.getResultsSource(resultIntent));
+    }
+
+    @Test
+    public void testSendSmartReply_controllerCalled() {
+        setRepliesFromRemoteInput(TEST_CHOICES);
+        mView.getChildAt(2).performClick();
+        verify(mLogger).smartReplySent(mEntry, 2, TEST_CHOICES[2]);
+    }
+
+    @Test
+    public void testSendSmartReply_hidesContainer() {
+        mContainer.setVisibility(View.VISIBLE);
+        setRepliesFromRemoteInput(TEST_CHOICES);
+        mView.getChildAt(0).performClick();
+        assertEquals(View.GONE, mContainer.getVisibility());
     }
 
     @Test
@@ -273,7 +358,7 @@ public class SmartReplyViewTest extends SysuiTestCase {
         PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext, 0,
                 new Intent(TEST_ACTION), 0);
         RemoteInput input = new RemoteInput.Builder(TEST_RESULT_KEY).setChoices(choices).build();
-        mView.setRepliesFromRemoteInput(input, pendingIntent);
+        mView.setRepliesFromRemoteInput(input, pendingIntent, mLogger, mEntry, mContainer);
     }
 
     /** Builds a {@link ViewGroup} whose measures and layout mirror a {@link SmartReplyView}. */
@@ -300,8 +385,9 @@ public class SmartReplyViewTest extends SysuiTestCase {
         }
 
         Button previous = null;
-        for (CharSequence choice : choices) {
-            Button current = SmartReplyView.inflateReplyButton(mContext, mView, choice, null, null);
+        for (int i = 0; i < choices.length; ++i) {
+            Button current = mView.inflateReplyButton(mContext, mView, i, choices[i],
+                    null, null, null, null);
             current.setPadding(paddingHorizontal, current.getPaddingTop(), paddingHorizontal,
                     current.getPaddingBottom());
             if (previous != null) {

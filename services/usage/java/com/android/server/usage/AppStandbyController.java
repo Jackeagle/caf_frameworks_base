@@ -24,6 +24,7 @@ import static android.app.usage.UsageStatsManager.REASON_MAIN_TIMEOUT;
 import static android.app.usage.UsageStatsManager.REASON_MAIN_USAGE;
 import static android.app.usage.UsageStatsManager.REASON_SUB_PREDICTED_RESTORED;
 import static android.app.usage.UsageStatsManager.REASON_SUB_USAGE_ACTIVE_TIMEOUT;
+import static android.app.usage.UsageStatsManager.REASON_SUB_USAGE_EXEMPTED_SYNC_START;
 import static android.app.usage.UsageStatsManager.REASON_SUB_USAGE_MOVE_TO_BACKGROUND;
 import static android.app.usage.UsageStatsManager.REASON_SUB_USAGE_MOVE_TO_FOREGROUND;
 import static android.app.usage.UsageStatsManager.REASON_SUB_USAGE_NOTIFICATION_SEEN;
@@ -62,6 +63,10 @@ import android.content.pm.PackageManagerInternal;
 import android.content.pm.ParceledListSlice;
 import android.database.ContentObserver;
 import android.hardware.display.DisplayManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkInfo;
+import android.net.NetworkRequest;
 import android.net.NetworkScoreManager;
 import android.os.BatteryManager;
 import android.os.BatteryStats;
@@ -76,7 +81,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
-import android.provider.Settings;
+import android.provider.Settings.Global;
 import android.telephony.TelephonyManager;
 import android.util.ArraySet;
 import android.util.KeyValueListParser;
@@ -186,9 +191,11 @@ public class AppStandbyController {
     static final int MSG_ONE_TIME_CHECK_IDLE_STATES = 10;
     /** Check the state of one app: arg1 = userId, arg2 = uid, obj = (String) packageName */
     static final int MSG_CHECK_PACKAGE_IDLE_STATE = 11;
+    static final int MSG_REPORT_EXEMPTED_SYNC_START = 12;
 
     long mCheckIdleIntervalMillis;
     long mAppIdleParoleIntervalMillis;
+    long mAppIdleParoleWindowMillis;
     long mAppIdleParoleDurationMillis;
     long[] mAppStandbyScreenThresholds = SCREEN_TIME_THRESHOLDS;
     long[] mAppStandbyElapsedThresholds = ELAPSED_TIME_THRESHOLDS;
@@ -202,6 +209,8 @@ public class AppStandbyController {
     long mPredictionTimeoutMillis;
     /** Maximum time a sync adapter associated with a CP should keep the buckets elevated. */
     long mSyncAdapterTimeoutMillis;
+    /** Maximum time an exempted sync should keep the buckets elevated. */
+    long mExemptedSyncAdapterTimeoutMillis;
     /** Maximum time a system interaction should keep the buckets elevated. */
     long mSystemInteractionTimeoutMillis;
 
@@ -223,6 +232,7 @@ public class AppStandbyController {
     // TODO: Provide a mechanism to set an external bucketing service
 
     private AppWidgetManager mAppWidgetManager;
+    private ConnectivityManager mConnectivityManager;
     private PowerManager mPowerManager;
     private PackageManager mPackageManager;
     Injector mInjector;
@@ -322,6 +332,7 @@ public class AppStandbyController {
             settingsObserver.updateSettings();
 
             mAppWidgetManager = mContext.getSystemService(AppWidgetManager.class);
+            mConnectivityManager = mContext.getSystemService(ConnectivityManager.class);
             mPowerManager = mContext.getSystemService(PowerManager.class);
 
             mInjector.registerDisplayListener(mDisplayListener, mHandler);
@@ -375,6 +386,21 @@ public class AppStandbyController {
         }
     }
 
+    void reportExemptedSyncStart(String packageName, int userId) {
+        if (!mAppIdleEnabled) return;
+
+        final long elapsedRealtime = mInjector.elapsedRealtime();
+
+        synchronized (mAppIdleLock) {
+            AppUsageHistory appUsage = mAppIdleHistory.reportUsage(packageName, userId,
+                    STANDBY_BUCKET_ACTIVE, REASON_SUB_USAGE_EXEMPTED_SYNC_START,
+                    0,
+                    elapsedRealtime + mExemptedSyncAdapterTimeoutMillis);
+            maybeInformListeners(packageName, userId, elapsedRealtime,
+                    appUsage.currentBucket, appUsage.bucketingReason, false);
+        }
+    }
+
     void setChargingState(boolean charging) {
         synchronized (mAppIdleLock) {
             if (mCharging != charging) {
@@ -395,7 +421,7 @@ public class AppStandbyController {
                     postParoleEndTimeout();
                 } else {
                     mLastAppIdleParoledTime = now;
-                    postNextParoleTimeout(now);
+                    postNextParoleTimeout(now, false);
                 }
                 postParoleStateChanged();
             }
@@ -409,13 +435,18 @@ public class AppStandbyController {
         }
     }
 
-    private void postNextParoleTimeout(long now) {
+    private void postNextParoleTimeout(long now, boolean forced) {
         if (DEBUG) Slog.d(TAG, "Posting MSG_CHECK_PAROLE_TIMEOUT");
         mHandler.removeMessages(MSG_CHECK_PAROLE_TIMEOUT);
         // Compute when the next parole needs to happen. We check more frequently than necessary
         // since the message handler delays are based on elapsedRealTime and not wallclock time.
         // The comparison is done in wallclock time.
         long timeLeft = (mLastAppIdleParoledTime + mAppIdleParoleIntervalMillis) - now;
+        if (forced) {
+            // Set next timeout for the end of the parole window
+            // If parole is not set by the end of the window it will be forced
+            timeLeft += mAppIdleParoleWindowMillis;
+        }
         if (timeLeft < 0) {
             timeLeft = 0;
         }
@@ -634,23 +665,49 @@ public class AppStandbyController {
         return THRESHOLD_BUCKETS[bucketIndex];
     }
 
-    /** Check if it's been a while since last parole and let idle apps do some work */
+    /**
+     * Check if it's been a while since last parole and let idle apps do some work.
+     * If network is not available, delay parole until it is available up until the end of the
+     * parole window. Force the parole to be set if end of the parole window is reached.
+     */
     void checkParoleTimeout() {
         boolean setParoled = false;
+        boolean waitForNetwork = false;
+        NetworkInfo activeNetwork = mConnectivityManager.getActiveNetworkInfo();
+        boolean networkActive = activeNetwork != null &&
+                activeNetwork.isConnected();
+
         synchronized (mAppIdleLock) {
             final long now = mInjector.currentTimeMillis();
             if (!mAppIdleTempParoled) {
                 final long timeSinceLastParole = now - mLastAppIdleParoledTime;
                 if (timeSinceLastParole > mAppIdleParoleIntervalMillis) {
                     if (DEBUG) Slog.d(TAG, "Crossed default parole interval");
-                    setParoled = true;
+                    if (networkActive) {
+                        // If network is active set parole
+                        setParoled = true;
+                    } else {
+                        if (timeSinceLastParole
+                                > mAppIdleParoleIntervalMillis + mAppIdleParoleWindowMillis) {
+                            if (DEBUG) Slog.d(TAG, "Crossed end of parole window, force parole");
+                            setParoled = true;
+                        } else {
+                            if (DEBUG) Slog.d(TAG, "Network unavailable, delaying parole");
+                            waitForNetwork = true;
+                            postNextParoleTimeout(now, true);
+                        }
+                    }
                 } else {
                     if (DEBUG) Slog.d(TAG, "Not long enough to go to parole");
-                    postNextParoleTimeout(now);
+                    postNextParoleTimeout(now, false);
                 }
             }
         }
+        if (waitForNetwork) {
+            mConnectivityManager.registerNetworkCallback(mNetworkRequest, mNetworkCallback);
+        }
         if (setParoled) {
+            // Set parole if network is available
             setAppIdleParoled(true);
         }
     }
@@ -1274,6 +1331,11 @@ public class AppStandbyController {
                 .sendToTarget();
     }
 
+    void postReportExemptedSyncStart(String packageName, int userId) {
+        mHandler.obtainMessage(MSG_REPORT_EXEMPTED_SYNC_START, userId, 0, packageName)
+                .sendToTarget();
+    }
+
     void dumpUser(IndentingPrintWriter idpw, int userId, String pkg) {
         synchronized (mAppIdleLock) {
             mAppIdleHistory.dump(idpw, userId, pkg);
@@ -1295,6 +1357,10 @@ public class AppStandbyController {
 
         pw.print("  mAppIdleParoleIntervalMillis=");
         TimeUtils.formatDuration(mAppIdleParoleIntervalMillis, pw);
+        pw.println();
+
+        pw.print("  mAppIdleParoleWindowMillis=");
+        TimeUtils.formatDuration(mAppIdleParoleWindowMillis, pw);
         pw.println();
 
         pw.print("  mAppIdleParoleDurationMillis=");
@@ -1373,8 +1439,10 @@ public class AppStandbyController {
         boolean isAppIdleEnabled() {
             final boolean buildFlag = mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_enableAutoPowerModes);
-            final boolean runtimeFlag = Settings.Global.getInt(mContext.getContentResolver(),
-                    Settings.Global.APP_STANDBY_ENABLED, 1) == 1;
+            final boolean runtimeFlag = Global.getInt(mContext.getContentResolver(),
+                    Global.APP_STANDBY_ENABLED, 1) == 1
+                    && Global.getInt(mContext.getContentResolver(),
+                    Global.ADAPTIVE_BATTERY_MANAGEMENT_ENABLED, 1) == 1;
             return buildFlag && runtimeFlag;
         }
 
@@ -1423,8 +1491,8 @@ public class AppStandbyController {
         }
 
         String getAppIdleSettings() {
-            return Settings.Global.getString(mContext.getContentResolver(),
-                    Settings.Global.APP_IDLE_CONSTANTS);
+            return Global.getString(mContext.getContentResolver(),
+                    Global.APP_IDLE_CONSTANTS);
         }
     }
 
@@ -1488,6 +1556,11 @@ public class AppStandbyController {
                     checkAndUpdateStandbyState((String) msg.obj, msg.arg1, msg.arg2,
                             mInjector.elapsedRealtime());
                     break;
+
+                case MSG_REPORT_EXEMPTED_SYNC_START:
+                    reportExemptedSyncStart((String) msg.obj, msg.arg1);
+                    break;
+
                 default:
                     super.handleMessage(msg);
                     break;
@@ -1507,6 +1580,17 @@ public class AppStandbyController {
             }
         }
     }
+
+    private final NetworkRequest mNetworkRequest = new NetworkRequest.Builder().build();
+
+    private final ConnectivityManager.NetworkCallback mNetworkCallback
+            = new ConnectivityManager.NetworkCallback() {
+        @Override
+        public void onAvailable(Network network) {
+            mConnectivityManager.unregisterNetworkCallback(this);
+            checkParoleTimeout();
+        }
+    };
 
     private final DisplayManager.DisplayListener mDisplayListener
             = new DisplayManager.DisplayListener() {
@@ -1528,7 +1612,7 @@ public class AppStandbyController {
     };
 
     /**
-     * Observe settings changes for {@link Settings.Global#APP_IDLE_CONSTANTS}.
+     * Observe settings changes for {@link Global#APP_IDLE_CONSTANTS}.
      */
     private class SettingsObserver extends ContentObserver {
         /**
@@ -1540,6 +1624,7 @@ public class AppStandbyController {
         private static final String KEY_IDLE_DURATION = "idle_duration2";
         private static final String KEY_WALLCLOCK_THRESHOLD = "wallclock_threshold";
         private static final String KEY_PAROLE_INTERVAL = "parole_interval";
+        private static final String KEY_PAROLE_WINDOW = "parole_window";
         private static final String KEY_PAROLE_DURATION = "parole_duration";
         private static final String KEY_SCREEN_TIME_THRESHOLDS = "screen_thresholds";
         private static final String KEY_ELAPSED_TIME_THRESHOLDS = "elapsed_thresholds";
@@ -1550,6 +1635,7 @@ public class AppStandbyController {
                 "system_update_usage_duration";
         private static final String KEY_PREDICTION_TIMEOUT = "prediction_timeout";
         private static final String KEY_SYNC_ADAPTER_HOLD_DURATION = "sync_adapter_duration";
+        private static final String KEY_EXEMPTED_SYNC_HOLD_DURATION = "exempted_sync_duration";
         private static final String KEY_SYSTEM_INTERACTION_HOLD_DURATION =
                 "system_interaction_duration";
         public static final long DEFAULT_STRONG_USAGE_TIMEOUT = 1 * ONE_HOUR;
@@ -1557,6 +1643,7 @@ public class AppStandbyController {
         public static final long DEFAULT_SYSTEM_UPDATE_TIMEOUT = 2 * ONE_HOUR;
         public static final long DEFAULT_SYSTEM_INTERACTION_TIMEOUT = 10 * ONE_MINUTE;
         public static final long DEFAULT_SYNC_ADAPTER_TIMEOUT = 10 * ONE_MINUTE;
+        public static final long DEFAULT_EXEMPTED_SYNC_TIMEOUT = 10 * ONE_MINUTE;
 
         private final KeyValueListParser mParser = new KeyValueListParser(',');
 
@@ -1565,10 +1652,11 @@ public class AppStandbyController {
         }
 
         void registerObserver() {
-            mContext.getContentResolver().registerContentObserver(Settings.Global.getUriFor(
-                    Settings.Global.APP_IDLE_CONSTANTS), false, this);
-            mContext.getContentResolver().registerContentObserver(Settings.Global.getUriFor(
-                    Settings.Global.APP_STANDBY_ENABLED), false, this);
+            final ContentResolver cr = mContext.getContentResolver();
+            cr.registerContentObserver(Global.getUriFor(Global.APP_IDLE_CONSTANTS), false, this);
+            cr.registerContentObserver(Global.getUriFor(Global.APP_STANDBY_ENABLED), false, this);
+            cr.registerContentObserver(Global.getUriFor(Global.ADAPTIVE_BATTERY_MANAGEMENT_ENABLED),
+                    false, this);
         }
 
         @Override
@@ -1580,11 +1668,14 @@ public class AppStandbyController {
         void updateSettings() {
             if (DEBUG) {
                 Slog.d(TAG,
-                        "appidle=" + Settings.Global.getString(mContext.getContentResolver(),
-                                Settings.Global.APP_STANDBY_ENABLED));
-                Slog.d(TAG, "appidleconstants=" + Settings.Global.getString(
+                        "appidle=" + Global.getString(mContext.getContentResolver(),
+                                Global.APP_STANDBY_ENABLED));
+                Slog.d(TAG,
+                        "adaptivebat=" + Global.getString(mContext.getContentResolver(),
+                                Global.ADAPTIVE_BATTERY_MANAGEMENT_ENABLED));
+                Slog.d(TAG, "appidleconstants=" + Global.getString(
                         mContext.getContentResolver(),
-                        Settings.Global.APP_IDLE_CONSTANTS));
+                        Global.APP_IDLE_CONSTANTS));
             }
             // Check if app_idle_enabled has changed
             setAppIdleEnabled(mInjector.isAppIdleEnabled());
@@ -1603,6 +1694,10 @@ public class AppStandbyController {
                 // Default: 24 hours between paroles
                 mAppIdleParoleIntervalMillis = mParser.getDurationMillis(KEY_PAROLE_INTERVAL,
                         COMPRESS_TIME ? ONE_MINUTE * 10 : 24 * 60 * ONE_MINUTE);
+
+                // Default: 2 hours to wait on network
+                mAppIdleParoleWindowMillis = mParser.getDurationMillis(KEY_PAROLE_WINDOW,
+                        COMPRESS_TIME ? ONE_MINUTE * 2 : 2 * 60 * ONE_MINUTE);
 
                 mAppIdleParoleDurationMillis = mParser.getDurationMillis(KEY_PAROLE_DURATION,
                         COMPRESS_TIME ? ONE_MINUTE : 10 * ONE_MINUTE); // 10 minutes
@@ -1632,6 +1727,9 @@ public class AppStandbyController {
                 mSyncAdapterTimeoutMillis = mParser.getDurationMillis
                         (KEY_SYNC_ADAPTER_HOLD_DURATION,
                                 COMPRESS_TIME ? ONE_MINUTE : DEFAULT_SYNC_ADAPTER_TIMEOUT);
+                mExemptedSyncAdapterTimeoutMillis = mParser.getDurationMillis
+                        (KEY_EXEMPTED_SYNC_HOLD_DURATION,
+                                COMPRESS_TIME ? ONE_MINUTE : DEFAULT_EXEMPTED_SYNC_TIMEOUT);
                 mSystemInteractionTimeoutMillis = mParser.getDurationMillis
                         (KEY_SYSTEM_INTERACTION_HOLD_DURATION,
                                 COMPRESS_TIME ? ONE_MINUTE : DEFAULT_SYSTEM_INTERACTION_TIMEOUT);

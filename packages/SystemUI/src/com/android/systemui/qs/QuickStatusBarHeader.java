@@ -26,11 +26,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.provider.AlarmClock;
+import android.service.notification.ZenModeConfig;
 import android.support.annotation.VisibleForTesting;
 import android.text.format.DateUtils;
 import android.util.AttributeSet;
@@ -47,27 +49,30 @@ import com.android.systemui.BatteryMeterView;
 import com.android.systemui.Dependency;
 import com.android.systemui.Prefs;
 import com.android.systemui.R;
-import com.android.systemui.R.id;
-import com.android.systemui.SysUiServiceProvider;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.qs.QSDetail.Callback;
-import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.phone.PhoneStatusBarView;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
 import com.android.systemui.statusbar.phone.StatusBarIconController.TintedIconManager;
+import com.android.systemui.statusbar.policy.Clock;
+import com.android.systemui.statusbar.phone.StatusIconContainer;
 import com.android.systemui.statusbar.policy.DarkIconDispatcher;
 import com.android.systemui.statusbar.policy.DarkIconDispatcher.DarkReceiver;
+import com.android.systemui.statusbar.policy.DateView;
 import com.android.systemui.statusbar.policy.NextAlarmController;
+import com.android.systemui.statusbar.policy.ZenModeController;
 
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * View that contains the top-most bits of the screen (primarily the status bar with date, time, and
  * battery) and also contains the {@link QuickQSPanel} along with some of the panel's inner
  * contents.
  */
-public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue.Callbacks,
-        View.OnClickListener, NextAlarmController.NextAlarmChangeCallback {
+public class QuickStatusBarHeader extends RelativeLayout implements
+        View.OnClickListener, NextAlarmController.NextAlarmChangeCallback,
+        ZenModeController.Callback {
     private static final String TAG = "QuickStatusBarHeader";
     private static final boolean DEBUG = false;
 
@@ -91,8 +96,8 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     private TouchAnimator mStatusIconsAlphaAnimator;
     private TouchAnimator mHeaderTextContainerAlphaAnimator;
 
+    private View mSystemIconsView;
     private View mQuickQsStatusIcons;
-    private View mDate;
     private View mHeaderTextContainerView;
     /** View containing the next alarm and ringer mode info. */
     private View mStatusContainer;
@@ -108,8 +113,12 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     private View mStatusSeparator;
     private ImageView mRingerModeIcon;
     private TextView mRingerModeTextView;
+    private BatteryMeterView mBatteryMeterView;
+    private Clock mClockView;
+    private DateView mDateView;
 
     private NextAlarmController mAlarmController;
+    private ZenModeController mZenController;
     /** Counts how many times the long press tooltip has been shown to the user. */
     private int mShownCount;
 
@@ -129,6 +138,7 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     public QuickStatusBarHeader(Context context, AttributeSet attrs) {
         super(context, attrs);
         mAlarmController = Dependency.get(NextAlarmController.class);
+        mZenController = Dependency.get(ZenModeController.class);
         mShownCount = getStoredShownCount();
     }
 
@@ -137,10 +147,11 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
         super.onFinishInflate();
 
         mHeaderQsPanel = findViewById(R.id.quick_qs_panel);
-        mDate = findViewById(R.id.date);
-        mDate.setOnClickListener(this);
+        mSystemIconsView = findViewById(R.id.quick_status_bar_system_icons);
         mQuickQsStatusIcons = findViewById(R.id.quick_qs_status_icons);
-        mIconManager = new TintedIconManager(findViewById(R.id.statusIcons));
+        StatusIconContainer iconContainer = findViewById(R.id.statusIcons);
+        iconContainer.setShouldRestrictIcons(false);
+        mIconManager = new TintedIconManager(iconContainer);
 
         // Views corresponding to the header info section (e.g. tooltip and next alarm).
         mHeaderTextContainerView = findViewById(R.id.header_text_container);
@@ -161,28 +172,56 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
 
         // Set light text on the header icons because they will always be on a black background
         applyDarkness(R.id.clock, tintArea, 0, DarkIconDispatcher.DEFAULT_ICON_TINT);
-        applyDarkness(id.signal_cluster, tintArea, intensity, colorForeground);
 
         // Set the correct tint for the status icons so they contrast
         mIconManager.setTint(fillColor);
 
-        BatteryMeterView battery = findViewById(R.id.battery);
-        battery.setForceShowPercent(true);
+        mBatteryMeterView = findViewById(R.id.battery);
+        mBatteryMeterView.setForceShowPercent(true);
+        mClockView = findViewById(R.id.clock);
+        mDateView = findViewById(R.id.date);
+        mDateView.setOnClickListener(this);
     }
 
     private void updateStatusText() {
+        boolean changed = updateRingerStatus() || updateAlarmStatus();
+
+        if (changed) {
+            boolean alarmVisible = mNextAlarmTextView.getVisibility() == View.VISIBLE;
+            boolean ringerVisible = mRingerModeTextView.getVisibility() == View.VISIBLE;
+            mStatusSeparator.setVisibility(alarmVisible && ringerVisible ? View.VISIBLE
+                    : View.GONE);
+            updateTooltipShow();
+        }
+    }
+
+    private boolean updateRingerStatus() {
+        boolean isOriginalVisible = mRingerModeTextView.getVisibility() == View.VISIBLE;
+        CharSequence originalRingerText = mRingerModeTextView.getText();
+
         boolean ringerVisible = false;
-        if (mRingerMode == AudioManager.RINGER_MODE_VIBRATE) {
-            mRingerModeIcon.setImageResource(R.drawable.stat_sys_ringer_vibrate);
-            mRingerModeTextView.setText(R.string.volume_ringer_status_vibrate);
-            ringerVisible = true;
-        } else if (mRingerMode == AudioManager.RINGER_MODE_SILENT) {
-            mRingerModeIcon.setImageResource(R.drawable.stat_sys_ringer_silent);
-            mRingerModeTextView.setText(R.string.volume_ringer_status_silent);
-            ringerVisible = true;
+        if (!ZenModeConfig.isZenOverridingRinger(mZenController.getZen(),
+                mZenController.getConfig())) {
+            if (mRingerMode == AudioManager.RINGER_MODE_VIBRATE) {
+                mRingerModeIcon.setImageResource(R.drawable.stat_sys_ringer_vibrate);
+                mRingerModeTextView.setText(R.string.qs_status_phone_vibrate);
+                ringerVisible = true;
+            } else if (mRingerMode == AudioManager.RINGER_MODE_SILENT) {
+                mRingerModeIcon.setImageResource(R.drawable.stat_sys_ringer_silent);
+                mRingerModeTextView.setText(R.string.qs_status_phone_muted);
+                ringerVisible = true;
+            }
         }
         mRingerModeIcon.setVisibility(ringerVisible ? View.VISIBLE : View.GONE);
         mRingerModeTextView.setVisibility(ringerVisible ? View.VISIBLE : View.GONE);
+
+        return isOriginalVisible != ringerVisible ||
+                !Objects.equals(originalRingerText, mRingerModeTextView.getText());
+    }
+
+    private boolean updateAlarmStatus() {
+        boolean isOriginalVisible = mNextAlarmTextView.getVisibility() == View.VISIBLE;
+        CharSequence originalAlarmText = mNextAlarmTextView.getText();
 
         boolean alarmVisible = false;
         if (mNextAlarm != null) {
@@ -191,10 +230,10 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
         }
         mNextAlarmIcon.setVisibility(alarmVisible ? View.VISIBLE : View.GONE);
         mNextAlarmTextView.setVisibility(alarmVisible ? View.VISIBLE : View.GONE);
-        mStatusSeparator.setVisibility(alarmVisible && ringerVisible ? View.VISIBLE : View.GONE);
-        updateTooltipShow();
-    }
 
+        return isOriginalVisible != alarmVisible ||
+                !Objects.equals(originalAlarmText, mNextAlarmTextView.getText());
+    }
 
     private void applyDarkness(int id, Rect tintArea, float intensity, int color) {
         View v = findViewById(id);
@@ -205,15 +244,21 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
 
     private int fillColorForIntensity(float intensity, Context context) {
         if (intensity == 0) {
-            return context.getColor(R.color.light_mode_icon_color_dual_tone_fill);
+            return context.getColor(R.color.light_mode_icon_color_single_tone);
         }
-        return context.getColor(R.color.dark_mode_icon_color_dual_tone_fill);
+        return context.getColor(R.color.dark_mode_icon_color_single_tone);
     }
 
     @Override
     protected void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         updateResources();
+
+        // Update color schemes in landscape to use wallpaperTextColor
+        boolean shouldUseWallpaperTextColor =
+                newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE;
+        mBatteryMeterView.useWallpaperTextColor(shouldUseWallpaperTextColor);
+        mClockView.useWallpaperTextColor(shouldUseWallpaperTextColor);
     }
 
     @Override
@@ -223,10 +268,21 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     }
 
     private void updateResources() {
-        // Update height, especially due to landscape mode restricting space.
+        Resources resources = mContext.getResources();
+
+        // Update height for a few views, especially due to landscape mode restricting space.
         mHeaderTextContainerView.getLayoutParams().height =
-                mContext.getResources().getDimensionPixelSize(R.dimen.qs_header_tooltip_height);
+                resources.getDimensionPixelSize(R.dimen.qs_header_tooltip_height);
         mHeaderTextContainerView.setLayoutParams(mHeaderTextContainerView.getLayoutParams());
+
+        mSystemIconsView.getLayoutParams().height = resources.getDimensionPixelSize(
+                com.android.internal.R.dimen.quick_qs_offset_height);
+        mSystemIconsView.setLayoutParams(mSystemIconsView.getLayoutParams());
+
+        getLayoutParams().height = resources.getDimensionPixelSize(mQsDisabled
+                ? com.android.internal.R.dimen.quick_qs_offset_height
+                : com.android.internal.R.dimen.quick_qs_total_height);
+        setLayoutParams(getLayoutParams());
 
         updateStatusIconAlphaAnimator();
         updateHeaderTextContainerAlphaAnimator();
@@ -295,20 +351,19 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
                 TOOLTIP_NOT_YET_SHOWN_COUNT);
     }
 
-    @Override
     public void disable(int state1, int state2, boolean animate) {
         final boolean disabled = (state2 & DISABLE2_QUICK_SETTINGS) != 0;
         if (disabled == mQsDisabled) return;
         mQsDisabled = disabled;
         mHeaderQsPanel.setDisabledByPolicy(disabled);
-        final int rawHeight = (int) getResources().getDimension(
-                com.android.internal.R.dimen.quick_qs_total_height);
-        getLayoutParams().height = disabled ? (rawHeight - mHeaderQsPanel.getHeight()) : rawHeight;
+        mHeaderTextContainerView.setVisibility(mQsDisabled ? View.GONE : View.VISIBLE);
+        mQuickQsStatusIcons.setVisibility(mQsDisabled ? View.GONE : View.VISIBLE);
+        updateResources();
     }
 
     @Override
     public void onAttachedToWindow() {
-        SysUiServiceProvider.getComponent(getContext(), CommandQueue.class).addCallbacks(this);
+        super.onAttachedToWindow();
         Dependency.get(StatusBarIconController.class).addIconGroup(mIconManager);
         requestApplyInsets();
     }
@@ -318,9 +373,12 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
         Pair<Integer, Integer> padding = PhoneStatusBarView.cornerCutoutMargins(
                 insets.getDisplayCutout(), getDisplay());
         if (padding == null) {
-            setPadding(0, 0, 0, 0);
+            mSystemIconsView.setPaddingRelative(
+                    getResources().getDimensionPixelSize(R.dimen.status_bar_padding_start), 0,
+                    getResources().getDimensionPixelSize(R.dimen.status_bar_padding_end), 0);
         } else {
-            setPadding(padding.first, 0, padding.second, 0);
+            mSystemIconsView.setPadding(padding.first, 0, padding.second, 0);
+
         }
         return super.onApplyWindowInsets(insets);
     }
@@ -329,7 +387,6 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     @VisibleForTesting
     public void onDetachedFromWindow() {
         setListening(false);
-        SysUiServiceProvider.getComponent(getContext(), CommandQueue.class).removeCallbacks(this);
         Dependency.get(StatusBarIconController.class).removeIconGroup(mIconManager);
         super.onDetachedFromWindow();
     }
@@ -342,10 +399,12 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
         mListening = listening;
 
         if (listening) {
+            mZenController.addCallback(this);
             mAlarmController.addCallback(this);
             mContext.registerReceiver(mRingerReceiver,
                     new IntentFilter(AudioManager.INTERNAL_RINGER_MODE_CHANGED_ACTION));
         } else {
+            mZenController.removeCallback(this);
             mAlarmController.removeCallback(this);
             mContext.unregisterReceiver(mRingerReceiver);
         }
@@ -353,7 +412,7 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
 
     @Override
     public void onClick(View v) {
-        if(v == mDate){
+        if(v == mDateView){
             Dependency.get(ActivityStarter.class).postStartActivityDismissingKeyguard(new Intent(
                     AlarmClock.ACTION_SHOW_ALARMS),0);
         }
@@ -362,6 +421,17 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     @Override
     public void onNextAlarmChanged(AlarmManager.AlarmClockInfo nextAlarm) {
         mNextAlarm = nextAlarm;
+        updateStatusText();
+    }
+
+    @Override
+    public void onZenChanged(int zen) {
+        updateStatusText();
+
+    }
+
+    @Override
+    public void onConfigChanged(ZenModeConfig config) {
         updateStatusText();
     }
 
@@ -499,9 +569,8 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
         mHeaderQsPanel.setHost(host, null /* No customization in header */);
 
         // Use SystemUI context to get battery meter colors, and let it use the default tint (white)
-        BatteryMeterView battery = findViewById(R.id.battery);
-        battery.setColorsFromContext(mHost.getContext());
-        battery.onDarkChanged(new Rect(), 0, DarkIconDispatcher.DEFAULT_ICON_TINT);
+        mBatteryMeterView.setColorsFromContext(mHost.getContext());
+        mBatteryMeterView.onDarkChanged(new Rect(), 0, DarkIconDispatcher.DEFAULT_ICON_TINT);
     }
 
     public void setCallback(Callback qsPanelCallback) {
@@ -522,5 +591,4 @@ public class QuickStatusBarHeader extends RelativeLayout implements CommandQueue
     public static float getColorIntensity(@ColorInt int color) {
         return color == Color.WHITE ? 0 : 1;
     }
-
 }

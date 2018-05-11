@@ -1312,7 +1312,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (prevWinMode != WINDOWING_MODE_UNDEFINED && winMode == WINDOWING_MODE_PINNED) {
             // Entering PiP from fullscreen, reset the snap fraction
             mDisplayContent.mPinnedStackControllerLocked.resetReentrySnapFraction(this);
-        } else if (prevWinMode == WINDOWING_MODE_PINNED && winMode != WINDOWING_MODE_UNDEFINED) {
+        } else if (prevWinMode == WINDOWING_MODE_PINNED && winMode != WINDOWING_MODE_UNDEFINED
+                && !isHidden()) {
             // Leaving PiP to fullscreen, save the snap fraction based on the pre-animation bounds
             // for the next re-entry into PiP (assuming the activity is not hidden or destroyed)
             final TaskStack pinnedStack = mDisplayContent.getPinnedStack();
@@ -1485,7 +1486,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (w == null || winHint != null && w != winHint) {
             return;
         }
-        final boolean surfaceReady = w.hasDrawnLw()  // Regular case
+        final boolean surfaceReady = w.isDrawnLw()  // Regular case
                 || w.mWinAnimator.mSurfaceDestroyDeferred  // The preserved surface is still ready.
                 || w.isDragResizeChanged();  // Waiting for relayoutWindow to call preserveSurface.
         final boolean needsLetterbox = w.isLetterboxedAppWindow() && fillsParent() && surfaceReady;
@@ -1661,7 +1662,9 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     }
 
     SurfaceControl getAppAnimationLayer() {
-        return getAppAnimationLayer(needsZBoost());
+        return getAppAnimationLayer(isActivityTypeHome() ? ANIMATION_LAYER_HOME
+                : needsZBoost() ? ANIMATION_LAYER_BOOSTED
+                : ANIMATION_LAYER_STANDARD);
     }
 
     @Override
@@ -1714,7 +1717,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                     adapter = new LocalAnimationAdapter(
                             new WindowAnimationSpec(a, mTmpPoint, mTmpRect,
                                     mService.mAppTransition.canSkipFirstFrame(),
-                                    mService.mAppTransition.getAppStackClipMode()),
+                                    mService.mAppTransition.getAppStackClipMode(),
+                                    true /* isAppAnimation */),
                             mService.mSurfaceAnimationRunner);
                     if (a.getZAdjustment() == Animation.ZORDER_TOP) {
                         mNeedsZBoost = true;
@@ -1887,7 +1891,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 "AppWindowToken");
 
         clearThumbnail();
-        setClientHidden(hiddenRequested);
+        setClientHidden(isHidden() && hiddenRequested);
 
         if (mService.mInputMethodTarget != null && mService.mInputMethodTarget.mAppToken == this) {
             getDisplayContent().computeImeTarget(true /* updateImeTarget */);

@@ -28,10 +28,10 @@ import static android.app.ActivityManager.START_SUCCESS;
 import static android.app.ActivityManager.START_TASK_TO_FRONT;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
+import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_PRIMARY;
 import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_SECONDARY;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
-import static android.content.Intent.ACTION_INSTALL_INSTANT_APP_PACKAGE;
 import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP;
 import static android.content.Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT;
@@ -46,6 +46,7 @@ import static android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED;
 import static android.content.Intent.FLAG_ACTIVITY_RETAIN_IN_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP;
 import static android.content.pm.ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
+import static android.content.pm.ActivityInfo.LAUNCH_MULTIPLE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_TOP;
@@ -102,6 +103,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.service.voice.IVoiceInteractionSession;
 import android.text.TextUtils;
+import android.util.BoostFramework;
 import android.util.EventLog;
 import android.util.Pools.SynchronizedPool;
 import android.util.Slog;
@@ -177,6 +179,8 @@ class ActivityStarter {
 
     private IVoiceInteractionSession mVoiceSession;
     private IVoiceInteractor mVoiceInteractor;
+
+    public BoostFramework mPerf = null;
 
     // Last activity record we attempted to start
     private final ActivityRecord[] mLastStartActivityRecord = new ActivityRecord[1];
@@ -313,6 +317,12 @@ class ActivityStarter {
         WaitResult waitResult;
 
         /**
+         * If set to {@code true}, allows this activity start to look into
+         * {@link PendingRemoteAnimationRegistry}
+         */
+        boolean allowPendingRemoteAnimationRegistryLookup;
+
+        /**
          * Indicates that we should wait for the result of the start request. This flag is set when
          * {@link ActivityStarter#setMayWait(int)} is called.
          * {@see ActivityStarter#startActivityMayWait}.
@@ -359,6 +369,7 @@ class ActivityStarter {
             waitResult = null;
             mayWait = false;
             avoidMoveToFront = false;
+            allowPendingRemoteAnimationRegistryLookup = true;
         }
 
         /**
@@ -394,6 +405,8 @@ class ActivityStarter {
             waitResult = request.waitResult;
             mayWait = request.mayWait;
             avoidMoveToFront = request.avoidMoveToFront;
+            allowPendingRemoteAnimationRegistryLookup
+                    = request.allowPendingRemoteAnimationRegistryLookup;
         }
     }
 
@@ -404,6 +417,7 @@ class ActivityStarter {
         mSupervisor = supervisor;
         mInterceptor = interceptor;
         reset(true);
+        mPerf = new BoostFramework();
     }
 
     /**
@@ -476,7 +490,8 @@ class ActivityStarter {
                         mRequest.resultWho, mRequest.requestCode, mRequest.startFlags,
                         mRequest.profilerInfo, mRequest.waitResult, mRequest.globalConfig,
                         mRequest.activityOptions, mRequest.ignoreTargetSecurity, mRequest.userId,
-                        mRequest.inTask, mRequest.reason);
+                        mRequest.inTask, mRequest.reason,
+                        mRequest.allowPendingRemoteAnimationRegistryLookup);
             } else {
                 return startActivity(mRequest.caller, mRequest.intent, mRequest.ephemeralIntent,
                         mRequest.resolvedType, mRequest.activityInfo, mRequest.resolveInfo,
@@ -485,7 +500,8 @@ class ActivityStarter {
                         mRequest.callingUid, mRequest.callingPackage, mRequest.realCallingPid,
                         mRequest.realCallingUid, mRequest.startFlags, mRequest.activityOptions,
                         mRequest.ignoreTargetSecurity, mRequest.componentSpecified,
-                        mRequest.outActivity, mRequest.inTask, mRequest.reason);
+                        mRequest.outActivity, mRequest.inTask, mRequest.reason,
+                        mRequest.allowPendingRemoteAnimationRegistryLookup);
             }
         } finally {
             onExecutionComplete();
@@ -516,7 +532,8 @@ class ActivityStarter {
             IBinder resultTo, String resultWho, int requestCode, int callingPid, int callingUid,
             String callingPackage, int realCallingPid, int realCallingUid, int startFlags,
             SafeActivityOptions options, boolean ignoreTargetSecurity, boolean componentSpecified,
-            ActivityRecord[] outActivity, TaskRecord inTask, String reason) {
+            ActivityRecord[] outActivity, TaskRecord inTask, String reason,
+            boolean allowPendingRemoteAnimationRegistryLookup) {
 
         if (TextUtils.isEmpty(reason)) {
             throw new IllegalArgumentException("Need to specify a reason.");
@@ -529,7 +546,7 @@ class ActivityStarter {
                 aInfo, rInfo, voiceSession, voiceInteractor, resultTo, resultWho, requestCode,
                 callingPid, callingUid, callingPackage, realCallingPid, realCallingUid, startFlags,
                 options, ignoreTargetSecurity, componentSpecified, mLastStartActivityRecord,
-                inTask);
+                inTask, allowPendingRemoteAnimationRegistryLookup);
 
         if (outActivity != null) {
             // mLastStartActivityRecord[0] is set in the call to startActivity above.
@@ -559,7 +576,7 @@ class ActivityStarter {
             String callingPackage, int realCallingPid, int realCallingUid, int startFlags,
             SafeActivityOptions options,
             boolean ignoreTargetSecurity, boolean componentSpecified, ActivityRecord[] outActivity,
-            TaskRecord inTask) {
+            TaskRecord inTask, boolean allowPendingRemoteAnimationRegistryLookup) {
         int err = ActivityManager.START_SUCCESS;
         // Pull the optional Ephemeral Installer-only bundle out of the options early.
         final Bundle verificationBundle
@@ -708,8 +725,11 @@ class ActivityStarter {
         ActivityOptions checkedOptions = options != null
                 ? options.getOptions(intent, aInfo, callerApp, mSupervisor)
                 : null;
-        checkedOptions = mService.getActivityStartController().getPendingRemoteAnimationRegistry()
-                .overrideOptionsIfNeeded(callingPackage, checkedOptions);
+        if (allowPendingRemoteAnimationRegistryLookup) {
+            checkedOptions = mService.getActivityStartController()
+                    .getPendingRemoteAnimationRegistry()
+                    .overrideOptionsIfNeeded(callingPackage, checkedOptions);
+        }
         if (mService.mController != null) {
             try {
                 // The Intent we give to the watcher has the extra data
@@ -902,14 +922,22 @@ class ActivityStarter {
         final int clearTaskFlags = FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK;
         boolean clearedTask = (mLaunchFlags & clearTaskFlags) == clearTaskFlags
                 && mReuseTask != null;
-        if (startedActivityStack.inPinnedWindowingMode()
-                && (result == START_TASK_TO_FRONT || result == START_DELIVERED_TO_TOP
-                || clearedTask)) {
-            // The activity was already running in the pinned stack so it wasn't started, but either
-            // brought to the front or the new intent was delivered to it since it was already in
-            // front. Notify anyone interested in this piece of information.
-            mService.mTaskChangeNotificationController.notifyPinnedActivityRestartAttempt(
-                    clearedTask);
+        if (result == START_TASK_TO_FRONT || result == START_DELIVERED_TO_TOP || clearedTask) {
+            // The activity was already running so it wasn't started, but either brought to the
+            // front or the new intent was delivered to it since it was already in front. Notify
+            // anyone interested in this piece of information.
+            switch (startedActivityStack.getWindowingMode()) {
+                case WINDOWING_MODE_PINNED:
+                    mService.mTaskChangeNotificationController.notifyPinnedActivityRestartAttempt(
+                            clearedTask);
+                    break;
+                case WINDOWING_MODE_SPLIT_SCREEN_PRIMARY:
+                    final ActivityStack homeStack = mSupervisor.mHomeStack;
+                    if (homeStack != null && homeStack.shouldBeVisible(null /* starting */)) {
+                        mService.mWindowManager.showRecentApps();
+                    }
+                    break;
+            }
         }
     }
 
@@ -919,7 +947,8 @@ class ActivityStarter {
             IBinder resultTo, String resultWho, int requestCode, int startFlags,
             ProfilerInfo profilerInfo, WaitResult outResult,
             Configuration globalConfig, SafeActivityOptions options, boolean ignoreTargetSecurity,
-            int userId, TaskRecord inTask, String reason) {
+            int userId, TaskRecord inTask, String reason,
+            boolean allowPendingRemoteAnimationRegistryLookup) {
         // Refuse possible leaked file descriptors
         if (intent != null && intent.hasFileDescriptors()) {
             throw new IllegalArgumentException("File descriptors passed in Intent");
@@ -965,7 +994,8 @@ class ActivityStarter {
                 if (profileLockedAndParentUnlockingOrUnlocked) {
                     rInfo = mSupervisor.resolveIntent(intent, resolvedType, userId,
                             PackageManager.MATCH_DIRECT_BOOT_AWARE
-                                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE);
+                                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE,
+                            Binder.getCallingUid());
                 }
             }
         }
@@ -1060,7 +1090,8 @@ class ActivityStarter {
             int res = startActivity(caller, intent, ephemeralIntent, resolvedType, aInfo, rInfo,
                     voiceSession, voiceInteractor, resultTo, resultWho, requestCode, callingPid,
                     callingUid, callingPackage, realCallingPid, realCallingUid, startFlags, options,
-                    ignoreTargetSecurity, componentSpecified, outRecord, inTask, reason);
+                    ignoreTargetSecurity, componentSpecified, outRecord, inTask, reason,
+                    allowPendingRemoteAnimationRegistryLookup);
 
             Binder.restoreCallingIdentity(origId);
 
@@ -1146,9 +1177,10 @@ class ActivityStarter {
             // If we are not able to proceed, disassociate the activity from the task. Leaving an
             // activity in an incomplete state can lead to issues, such as performing operations
             // without a window container.
-            if (!ActivityManager.isStartResultSuccessful(result)
-                    && mStartActivity.getTask() != null) {
-                mStartActivity.getTask().removeActivity(mStartActivity);
+            final ActivityStack stack = mStartActivity.getStack();
+            if (!ActivityManager.isStartResultSuccessful(result) && stack != null) {
+                stack.finishActivityLocked(mStartActivity, RESULT_CANCELED,
+                        null /* intentResultData */, "startActivity", true /* oomAdj */);
             }
             mService.mWindowManager.continueSurfaceLayout();
         }
@@ -1198,16 +1230,27 @@ class ActivityStarter {
             // When the flags NEW_TASK and CLEAR_TASK are set, then the task gets reused but
             // still needs to be a lock task mode violation since the task gets cleared out and
             // the device would otherwise leave the locked task.
-            if (mService.mLockTaskController.isLockTaskModeViolation(reusedActivity.getTask(),
+            if (mService.getLockTaskController().isLockTaskModeViolation(reusedActivity.getTask(),
                     (mLaunchFlags & (FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK))
                             == (FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK))) {
                 Slog.e(TAG, "startActivityUnchecked: Attempt to violate Lock Task Mode");
                 return START_RETURN_LOCK_TASK_MODE_VIOLATION;
             }
 
-            if (mStartActivity.getTask() == null) {
+            // True if we are clearing top and resetting of a standard (default) launch mode
+            // ({@code LAUNCH_MULTIPLE}) activity. The existing activity will be finished.
+            final boolean clearTopAndResetStandardLaunchMode =
+                    (mLaunchFlags & (FLAG_ACTIVITY_CLEAR_TOP | FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
+                            == (FLAG_ACTIVITY_CLEAR_TOP | FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                    && mLaunchMode == LAUNCH_MULTIPLE;
+
+            // If mStartActivity does not have a task associated with it, associate it with the
+            // reused activity's task. Do not do so if we're clearing top and resetting for a
+            // standard launchMode activity.
+            if (mStartActivity.getTask() == null && !clearTopAndResetStandardLaunchMode) {
                 mStartActivity.setTask(reusedActivity.getTask());
             }
+
             if (reusedActivity.getTask().intent == null) {
                 // This task was started because of movement of the activity based on affinity...
                 // Now that we are actually launching it, we can assign the base intent.
@@ -1266,17 +1309,21 @@ class ActivityStarter {
                 resumeTargetStackIfNeeded();
                 return START_RETURN_INTENT_TO_CALLER;
             }
-            setTaskFromIntentActivity(reusedActivity);
 
-            if (!mAddingToTask && mReuseTask == null) {
-                // We didn't do anything...  but it was needed (a.k.a., client don't use that
-                // intent!)  And for paranoia, make sure we have correctly resumed the top activity.
-                resumeTargetStackIfNeeded();
-                if (outActivity != null && outActivity.length > 0) {
-                    outActivity[0] = reusedActivity;
+            if (reusedActivity != null) {
+                setTaskFromIntentActivity(reusedActivity);
+
+                if (!mAddingToTask && mReuseTask == null) {
+                    // We didn't do anything...  but it was needed (a.k.a., client don't use that
+                    // intent!)  And for paranoia, make sure we have correctly resumed the top activity.
+
+                    resumeTargetStackIfNeeded();
+                    if (outActivity != null && outActivity.length > 0) {
+                        outActivity[0] = reusedActivity;
+                    }
+
+                    return mMovedToFront ? START_TASK_TO_FRONT : START_DELIVERED_TO_TOP;
                 }
-
-                return mMovedToFront ? START_TASK_TO_FRONT : START_DELIVERED_TO_TOP;
             }
         }
 
@@ -1335,6 +1382,12 @@ class ActivityStarter {
         if (mStartActivity.resultTo == null && mInTask == null && !mAddingToTask
                 && (mLaunchFlags & FLAG_ACTIVITY_NEW_TASK) != 0) {
             newTask = true;
+            String packageName= mService.mContext.getPackageName();
+            if (mPerf != null) {
+                mStartActivity.perfActivityBoostHandler =
+                    mPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                                        packageName, -1, BoostFramework.Launch.BOOST_V1);
+            }
             result = setTaskFromReuseOrCreateNewTask(taskToAffiliate, topStack);
         } else if (mSourceRecord != null) {
             result = setTaskFromSourceRecord();
@@ -1995,7 +2048,7 @@ class ActivityStarter {
             mStartActivity.setTaskToAffiliateWith(taskToAffiliate);
         }
 
-        if (mService.mLockTaskController.isLockTaskModeViolation(mStartActivity.getTask())) {
+        if (mService.getLockTaskController().isLockTaskModeViolation(mStartActivity.getTask())) {
             Slog.e(TAG, "Attempted Lock Task Mode violation mStartActivity=" + mStartActivity);
             return START_RETURN_LOCK_TASK_MODE_VIOLATION;
         }
@@ -2018,11 +2071,16 @@ class ActivityStarter {
     }
 
     private int setTaskFromSourceRecord() {
-        if (mService.mLockTaskController.isLockTaskModeViolation(mSourceRecord.getTask())) {
+        if (mService.getLockTaskController().isLockTaskModeViolation(mSourceRecord.getTask())) {
             Slog.e(TAG, "Attempted Lock Task Mode violation mStartActivity=" + mStartActivity);
             return START_RETURN_LOCK_TASK_MODE_VIOLATION;
         }
-
+        String packageName= mService.mContext.getPackageName();
+        if (mPerf != null) {
+            mStartActivity.perfActivityBoostHandler =
+                mPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+                                    packageName, -1, BoostFramework.Launch.BOOST_V1);
+        }
         final TaskRecord sourceTask = mSourceRecord.getTask();
         final ActivityStack sourceStack = mSourceRecord.getStack();
         // We only want to allow changing stack in two cases:
@@ -2112,7 +2170,7 @@ class ActivityStarter {
     private int setTaskFromInTask() {
         // The caller is asking that the new activity be started in an explicit
         // task it has provided to us.
-        if (mService.mLockTaskController.isLockTaskModeViolation(mInTask)) {
+        if (mService.getLockTaskController().isLockTaskModeViolation(mInTask)) {
             Slog.e(TAG, "Attempted Lock Task Mode violation mStartActivity=" + mStartActivity);
             return START_RETURN_LOCK_TASK_MODE_VIOLATION;
         }
@@ -2538,6 +2596,11 @@ class ActivityStarter {
         mRequest.mayWait = true;
         mRequest.userId = userId;
 
+        return this;
+    }
+
+    ActivityStarter setAllowPendingRemoteAnimationRegistryLookup(boolean allowLookup) {
+        mRequest.allowPendingRemoteAnimationRegistryLookup = allowLookup;
         return this;
     }
 

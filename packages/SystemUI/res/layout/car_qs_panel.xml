@@ -29,28 +29,20 @@
 
     <RelativeLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:id="@+id/user_switcher_container"
         android:clipChildren="false"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/car_user_switcher_container_height"
-        android:layout_gravity="center_horizontal" >
+        android:layout_height="@dimen/car_user_switcher_container_height">
 
-        <com.android.systemui.statusbar.car.UserGridView
+        <com.android.systemui.statusbar.car.UserGridRecyclerView
             android:id="@+id/user_grid"
-            android:clipChildren="false"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="@dimen/car_margin"
-            android:layout_marginRight="@dimen/car_margin"
-            android:layout_above="@id/user_switcher_page_indicator" />
-
-        <com.android.systemui.statusbar.car.PageIndicator
-            android:id="@+id/user_switcher_page_indicator"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/car_page_indicator_dot_diameter"
-            android:layout_marginBottom="@dimen/car_page_indicator_margin_bottom"
-            android:alpha="0"
-            android:layout_alignParentBottom="true" />
+            android:layout_height="match_parent"
+            app:dayNightStyle="force_night"
+            app:showPagedListViewDivider="false"
+            app:gutter="both"
+            app:itemSpacing="@dimen/car_user_switcher_vertical_spacing_between_users"/>
 
     </RelativeLayout>
 

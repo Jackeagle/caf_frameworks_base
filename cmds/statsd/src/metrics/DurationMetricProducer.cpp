@@ -61,7 +61,7 @@ DurationMetricProducer::DurationMetricProducer(const ConfigKey& key, const Durat
                                                const bool nesting,
                                                const sp<ConditionWizard>& wizard,
                                                const FieldMatcher& internalDimensions,
-                                               const uint64_t startTimeNs)
+                                               const int64_t startTimeNs)
     : MetricProducer(metric.id(), key, startTimeNs, conditionIndex, wizard),
       mAggregationType(metric.aggregation_type()),
       mStartIndex(startIndex),
@@ -122,7 +122,7 @@ DurationMetricProducer::DurationMetricProducer(const ConfigKey& key, const Durat
         }
     }
     VLOG("metric %lld created. bucket size %lld start_time: %lld", (long long)metric.id(),
-         (long long)mBucketSizeNs, (long long)mStartTimeNs);
+         (long long)mBucketSizeNs, (long long)mTimeBaseNs);
 }
 
 DurationMetricProducer::~DurationMetricProducer() {
@@ -154,13 +154,13 @@ unique_ptr<DurationTracker> DurationMetricProducer::createDurationTracker(
             return make_unique<OringDurationTracker>(
                     mConfigKey, mMetricId, eventKey, mWizard, mConditionTrackerIndex,
                     mDimensionsInCondition, mNested, mCurrentBucketStartTimeNs, mCurrentBucketNum,
-                    mStartTimeNs, mBucketSizeNs, mConditionSliced,
+                    mTimeBaseNs, mBucketSizeNs, mConditionSliced,
                     mHasLinksToAllConditionDimensionsInTracker, mAnomalyTrackers);
         case DurationMetric_AggregationType_MAX_SPARSE:
             return make_unique<MaxDurationTracker>(
                     mConfigKey, mMetricId, eventKey, mWizard, mConditionTrackerIndex,
                     mDimensionsInCondition, mNested, mCurrentBucketStartTimeNs, mCurrentBucketNum,
-                    mStartTimeNs, mBucketSizeNs, mConditionSliced,
+                    mTimeBaseNs, mBucketSizeNs, mConditionSliced,
                     mHasLinksToAllConditionDimensionsInTracker, mAnomalyTrackers);
     }
 }
@@ -170,7 +170,7 @@ unique_ptr<DurationTracker> DurationMetricProducer::createDurationTracker(
 // 2. No condition in dimension
 // 3. The links covers all dimension fields in the sliced child condition predicate.
 void DurationMetricProducer::onSlicedConditionMayChangeLocked_opt1(bool condition,
-                                                                   const uint64_t eventTime) {
+                                                                   const int64_t eventTime) {
     if (mMetric2ConditionLinks.size() != 1 ||
         !mHasLinksToAllConditionDimensionsInTracker ||
         !mDimensionsInCondition.empty()) {
@@ -243,7 +243,7 @@ void DurationMetricProducer::onSlicedConditionMayChangeLocked_opt1(bool conditio
 // 1. If combination condition, logical operation is AND, only one sliced child predicate.
 // 2. Has dimensions_in_condition and it equals to the output dimensions of the sliced predicate.
 void DurationMetricProducer::onSlicedConditionMayChangeLocked_opt2(bool condition,
-                                                                   const uint64_t eventTime) {
+                                                                   const int64_t eventTime) {
     if (mMetric2ConditionLinks.size() > 1 || !mSameConditionDimensionsInTracker) {
         return;
     }
@@ -308,11 +308,14 @@ void DurationMetricProducer::onSlicedConditionMayChangeLocked_opt2(bool conditio
                     if (mMetric2ConditionLinks.size() == 0 ||
                         trueDim.contains(linkedConditionDimensionKey)) {
                         if (!whatIt.second.empty()) {
+                            auto newEventKey = MetricDimensionKey(whatIt.first, trueDim);
+                            if (hitGuardRailLocked(newEventKey)) {
+                                continue;
+                            }
                             unique_ptr<DurationTracker> newTracker =
                                 whatIt.second.begin()->second->clone(eventTime);
                             if (newTracker != nullptr) {
-                                newTracker->setEventKey(
-                                    MetricDimensionKey(whatIt.first, trueDim));
+                                newTracker->setEventKey(newEventKey);
                                 newTracker->onConditionChanged(true, eventTime);
                                 whatIt.second[trueDim] = std::move(newTracker);
                             }
@@ -325,7 +328,7 @@ void DurationMetricProducer::onSlicedConditionMayChangeLocked_opt2(bool conditio
 }
 
 void DurationMetricProducer::onSlicedConditionMayChangeLocked(bool overallCondition,
-                                                              const uint64_t eventTime) {
+                                                              const int64_t eventTime) {
     VLOG("Metric %lld onSlicedConditionMayChange", (long long)mMetricId);
     flushIfNeededLocked(eventTime);
 
@@ -370,11 +373,14 @@ void DurationMetricProducer::onSlicedConditionMayChangeLocked(bool overallCondit
         for (const auto& conditionDimension : conditionDimensionsKeySet) {
             for (auto& whatIt : mCurrentSlicedDurationTrackerMap) {
                 if (!whatIt.second.empty()) {
+                    auto newEventKey = MetricDimensionKey(whatIt.first, conditionDimension);
+                    if (hitGuardRailLocked(newEventKey)) {
+                        continue;
+                    }
                     unique_ptr<DurationTracker> newTracker =
                         whatIt.second.begin()->second->clone(eventTime);
                     if (newTracker != nullptr) {
-                        newTracker->setEventKey(MetricDimensionKey(
-                                whatIt.first, conditionDimension));
+                        newTracker->setEventKey(MetricDimensionKey(newEventKey));
                         newTracker->onSlicedConditionMayChange(overallCondition, eventTime);
                         whatIt.second[conditionDimension] = std::move(newTracker);
                     }
@@ -397,10 +403,13 @@ void DurationMetricProducer::onSlicedConditionMayChangeLocked(bool overallCondit
             for (const auto& conditionDimension : conditionDimensionsKeys) {
                 if (!whatIt.second.empty() &&
                     whatIt.second.find(conditionDimension) == whatIt.second.end()) {
+                    auto newEventKey = MetricDimensionKey(whatIt.first, conditionDimension);
+                    if (hitGuardRailLocked(newEventKey)) {
+                        continue;
+                    }
                     auto newTracker = whatIt.second.begin()->second->clone(eventTime);
                     if (newTracker != nullptr) {
-                        newTracker->setEventKey(
-                            MetricDimensionKey(whatIt.first, conditionDimension));
+                        newTracker->setEventKey(newEventKey);
                         newTracker->onSlicedConditionMayChange(overallCondition, eventTime);
                         whatIt.second[conditionDimension] = std::move(newTracker);
                     }
@@ -411,7 +420,7 @@ void DurationMetricProducer::onSlicedConditionMayChangeLocked(bool overallCondit
 }
 
 void DurationMetricProducer::onConditionChangedLocked(const bool conditionMet,
-                                                      const uint64_t eventTime) {
+                                                      const int64_t eventTime) {
     VLOG("Metric %lld onConditionChanged", (long long)mMetricId);
     mCondition = conditionMet;
     flushIfNeededLocked(eventTime);
@@ -424,14 +433,19 @@ void DurationMetricProducer::onConditionChangedLocked(const bool conditionMet,
     }
 }
 
-void DurationMetricProducer::dropDataLocked(const uint64_t dropTimeNs) {
+void DurationMetricProducer::dropDataLocked(const int64_t dropTimeNs) {
     flushIfNeededLocked(dropTimeNs);
     mPastBuckets.clear();
 }
 
-void DurationMetricProducer::onDumpReportLocked(const uint64_t dumpTimeNs,
+void DurationMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
+                                                const bool include_current_partial_bucket,
                                                 ProtoOutputStream* protoOutput) {
-    flushIfNeededLocked(dumpTimeNs);
+    if (include_current_partial_bucket) {
+        flushLocked(dumpTimeNs);
+    } else {
+        flushIfNeededLocked(dumpTimeNs);
+    }
     if (mPastBuckets.empty()) {
         VLOG(" Duration metric, empty return");
         return;
@@ -483,8 +497,8 @@ void DurationMetricProducer::onDumpReportLocked(const uint64_t dumpTimeNs,
     mPastBuckets.clear();
 }
 
-void DurationMetricProducer::flushIfNeededLocked(const uint64_t& eventTimeNs) {
-    uint64_t currentBucketEndTimeNs = getCurrentBucketEndTimeNs();
+void DurationMetricProducer::flushIfNeededLocked(const int64_t& eventTimeNs) {
+    int64_t currentBucketEndTimeNs = getCurrentBucketEndTimeNs();
 
     if (currentBucketEndTimeNs > eventTimeNs) {
         return;
@@ -513,7 +527,7 @@ void DurationMetricProducer::flushIfNeededLocked(const uint64_t& eventTimeNs) {
     mCurrentBucketNum += numBucketsForward;
 }
 
-void DurationMetricProducer::flushCurrentBucketLocked(const uint64_t& eventTimeNs) {
+void DurationMetricProducer::flushCurrentBucketLocked(const int64_t& eventTimeNs) {
     for (auto whatIt = mCurrentSlicedDurationTrackerMap.begin();
             whatIt != mCurrentSlicedDurationTrackerMap.end();) {
         for (auto it = whatIt->second.begin(); it != whatIt->second.end();) {
@@ -552,15 +566,35 @@ void DurationMetricProducer::dumpStatesLocked(FILE* out, bool verbose) const {
 }
 
 bool DurationMetricProducer::hitGuardRailLocked(const MetricDimensionKey& newKey) {
-    // 1. Report the tuple count if the tuple count > soft limit
-    if (mCurrentSlicedDurationTrackerMap.size() > StatsdStats::kDimensionKeySizeSoftLimit - 1) {
-        size_t newTupleCount = mCurrentSlicedDurationTrackerMap.size() + 1;
-        StatsdStats::getInstance().noteMetricDimensionSize(mConfigKey, mMetricId, newTupleCount);
-        // 2. Don't add more tuples, we are above the allowed threshold. Drop the data.
-        if (newTupleCount > StatsdStats::kDimensionKeySizeHardLimit) {
-            ALOGE("DurationMetric %lld dropping data for dimension key %s",
-                (long long)mMetricId, newKey.toString().c_str());
-            return true;
+    auto whatIt = mCurrentSlicedDurationTrackerMap.find(newKey.getDimensionKeyInWhat());
+    if (whatIt != mCurrentSlicedDurationTrackerMap.end()) {
+        auto condIt = whatIt->second.find(newKey.getDimensionKeyInCondition());
+        if (condIt != whatIt->second.end()) {
+            return false;
+        }
+        if (whatIt->second.size() > StatsdStats::kDimensionKeySizeSoftLimit - 1) {
+            size_t newTupleCount = whatIt->second.size() + 1;
+            StatsdStats::getInstance().noteMetricDimensionInConditionSize(
+                    mConfigKey, mMetricId, newTupleCount);
+            // 2. Don't add more tuples, we are above the allowed threshold. Drop the data.
+            if (newTupleCount > StatsdStats::kDimensionKeySizeHardLimit) {
+                ALOGE("DurationMetric %lld dropping data for condition dimension key %s",
+                    (long long)mMetricId, newKey.getDimensionKeyInCondition().toString().c_str());
+                return true;
+            }
+        }
+    } else {
+        // 1. Report the tuple count if the tuple count > soft limit
+        if (mCurrentSlicedDurationTrackerMap.size() > StatsdStats::kDimensionKeySizeSoftLimit - 1) {
+            size_t newTupleCount = mCurrentSlicedDurationTrackerMap.size() + 1;
+            StatsdStats::getInstance().noteMetricDimensionSize(
+                    mConfigKey, mMetricId, newTupleCount);
+            // 2. Don't add more tuples, we are above the allowed threshold. Drop the data.
+            if (newTupleCount > StatsdStats::kDimensionKeySizeHardLimit) {
+                ALOGE("DurationMetric %lld dropping data for what dimension key %s",
+                    (long long)mMetricId, newKey.getDimensionKeyInWhat().toString().c_str());
+                return true;
+            }
         }
     }
     return false;
@@ -615,8 +649,8 @@ void DurationMetricProducer::onMatchedLogEventInternalLocked(
 
 void DurationMetricProducer::onMatchedLogEventLocked(const size_t matcherIndex,
                                                      const LogEvent& event) {
-    uint64_t eventTimeNs = event.GetElapsedTimestampNs();
-    if (eventTimeNs < mStartTimeNs) {
+    int64_t eventTimeNs = event.GetElapsedTimestampNs();
+    if (eventTimeNs < mTimeBaseNs) {
         return;
     }
 

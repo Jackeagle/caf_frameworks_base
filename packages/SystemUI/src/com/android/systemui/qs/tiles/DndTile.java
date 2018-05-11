@@ -36,6 +36,7 @@ import android.provider.Settings.Global;
 import android.service.notification.ZenModeConfig;
 import android.service.notification.ZenModeConfig.ZenRule;
 import android.service.quicksettings.Tile;
+import android.text.TextUtils;
 import android.util.Slog;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -143,26 +144,41 @@ public class DndTile extends QSTileImpl<BooleanState> {
     public void showDetail(boolean show) {
         int zenDuration = Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.ZEN_DURATION, 0);
-        switch (zenDuration) {
-            case Settings.Global.ZEN_DURATION_PROMPT:
-                mUiHandler.post(() -> {
-                    Dialog mDialog = new EnableZenModeDialog(mContext).createDialog();
-                    mDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
-                    SystemUIDialog.setShowForAllUsers(mDialog, true);
-                    SystemUIDialog.registerDismissListener(mDialog);
-                    SystemUIDialog.setWindowOnTop(mDialog);
-                    mUiHandler.post(() -> mDialog.show());
-                    mHost.collapsePanels();
-                });
-                break;
-            case Settings.Global.ZEN_DURATION_FOREVER:
-                mController.setZen(Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS, null, TAG);
-                break;
-            default:
-                Uri conditionId = ZenModeConfig.toTimeCondition(mContext, zenDuration,
-                        ActivityManager.getCurrentUser(), true).id;
-                mController.setZen(Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS,
-                        conditionId, TAG);
+        boolean showOnboarding = Settings.Global.getInt(mContext.getContentResolver(),
+                Settings.Global.SHOW_ZEN_UPGRADE_NOTIFICATION, 0) != 0;
+        if (showOnboarding) {
+            // don't show on-boarding again or notification ever
+            Settings.Global.putInt(mContext.getContentResolver(),
+                    Global.SHOW_ZEN_UPGRADE_NOTIFICATION, 0);
+            // turn on DND
+            mController.setZen(Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS, null, TAG);
+            // show on-boarding screen
+            Intent intent = new Intent(Settings.ZEN_MODE_ONBOARDING);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            Dependency.get(ActivityStarter.class).postStartActivityDismissingKeyguard(intent, 0);
+        } else {
+            switch (zenDuration) {
+                case Settings.Global.ZEN_DURATION_PROMPT:
+                    mUiHandler.post(() -> {
+                        Dialog mDialog = new EnableZenModeDialog(mContext).createDialog();
+                        mDialog.getWindow().setType(
+                                WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
+                        SystemUIDialog.setShowForAllUsers(mDialog, true);
+                        SystemUIDialog.registerDismissListener(mDialog);
+                        SystemUIDialog.setWindowOnTop(mDialog);
+                        mUiHandler.post(() -> mDialog.show());
+                        mHost.collapsePanels();
+                    });
+                    break;
+                case Settings.Global.ZEN_DURATION_FOREVER:
+                    mController.setZen(Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS, null, TAG);
+                    break;
+                default:
+                    Uri conditionId = ZenModeConfig.toTimeCondition(mContext, zenDuration,
+                            ActivityManager.getCurrentUser(), true).id;
+                    mController.setZen(Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS,
+                            conditionId, TAG);
+            }
         }
     }
 
@@ -208,25 +224,27 @@ public class DndTile extends QSTileImpl<BooleanState> {
         state.state = state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
         state.slash.isSlashed = !state.value;
         state.label = getTileLabel();
-        state.secondaryLabel = ZenModeConfig.getDescription(mContext,zen != Global.ZEN_MODE_OFF,
-                mController.getConfig());
+        state.secondaryLabel = TextUtils.emptyIfNull(ZenModeConfig.getDescription(mContext,
+                zen != Global.ZEN_MODE_OFF, mController.getConfig(), false));
         state.icon = ResourceIcon.get(R.drawable.ic_qs_dnd_on);
         checkIfRestrictionEnforcedByAdminOnly(state, UserManager.DISALLOW_ADJUST_VOLUME);
         switch (zen) {
             case Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS:
-                state.contentDescription = mContext.getString(
-                        R.string.accessibility_quick_settings_dnd_priority_on) + ", "
+                state.contentDescription =
+                        mContext.getString(R.string.accessibility_quick_settings_dnd) + ", "
                         + state.secondaryLabel;
                 break;
             case Global.ZEN_MODE_NO_INTERRUPTIONS:
-                state.contentDescription = mContext.getString(
-                        R.string.accessibility_quick_settings_dnd_none_on) + ", "
-                        + state.secondaryLabel;
+                state.contentDescription =
+                        mContext.getString(R.string.accessibility_quick_settings_dnd) + ", " +
+                        mContext.getString(R.string.accessibility_quick_settings_dnd_none_on)
+                                + ", " + state.secondaryLabel;
                 break;
             case ZEN_MODE_ALARMS:
-                state.contentDescription = mContext.getString(
-                        R.string.accessibility_quick_settings_dnd_alarms_on) + ", "
-                        + state.secondaryLabel;
+                state.contentDescription =
+                        mContext.getString(R.string.accessibility_quick_settings_dnd) + ", " +
+                        mContext.getString(R.string.accessibility_quick_settings_dnd_alarms_on)
+                                + ", " + state.secondaryLabel;
                 break;
             default:
                 state.contentDescription = mContext.getString(

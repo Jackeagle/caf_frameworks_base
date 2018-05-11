@@ -97,6 +97,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         doNothing().when(mGroupManager).collapseAllGroups();
         doNothing().when(mExpandHelper).cancelImmediately();
         doNothing().when(notificationShelf).setAnimationsEnabled(anyBoolean());
+        doNothing().when(notificationShelf).fadeInTranslating();
     }
 
     @Test
@@ -137,6 +138,19 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         mStackScroller.updateEmptyShadeView(true);
 
         verify(mEmptyShadeView).setText(R.string.empty_shade_text);
+    }
+
+    @Test
+    public void updateEmptyView_noNotificationsToDndSuppressing() {
+        mStackScroller.setEmptyShadeView(mEmptyShadeView);
+        when(mEmptyShadeView.willBeGone()).thenReturn(true);
+        when(mBar.areNotificationsHidden()).thenReturn(false);
+        mStackScroller.updateEmptyShadeView(true);
+        verify(mEmptyShadeView).setText(R.string.empty_shade_text);
+
+        when(mBar.areNotificationsHidden()).thenReturn(true);
+        mStackScroller.updateEmptyShadeView(true);
+        verify(mEmptyShadeView).setText(R.string.dnd_suppressing_shade_text);
     }
 
     @Test

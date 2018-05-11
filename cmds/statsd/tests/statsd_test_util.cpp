@@ -18,12 +18,17 @@ namespace android {
 namespace os {
 namespace statsd {
 
+
 AtomMatcher CreateSimpleAtomMatcher(const string& name, int atomId) {
     AtomMatcher atom_matcher;
     atom_matcher.set_id(StringToId(name));
     auto simple_atom_matcher = atom_matcher.mutable_simple_atom_matcher();
     simple_atom_matcher->set_atom_id(atomId);
     return atom_matcher;
+}
+
+AtomMatcher CreateTemperatureAtomMatcher() {
+    return CreateSimpleAtomMatcher("TemperatureMatcher", android::util::TEMPERATURE);
 }
 
 AtomMatcher CreateScheduledJobStateChangedAtomMatcher(const string& name,
@@ -152,42 +157,42 @@ AtomMatcher CreateSyncEndAtomMatcher() {
 }
 
 AtomMatcher CreateActivityForegroundStateChangedAtomMatcher(
-    const string& name, ActivityForegroundStateChanged::Activity activity) {
+    const string& name, ActivityForegroundStateChanged::State state) {
     AtomMatcher atom_matcher;
     atom_matcher.set_id(StringToId(name));
     auto simple_atom_matcher = atom_matcher.mutable_simple_atom_matcher();
     simple_atom_matcher->set_atom_id(android::util::ACTIVITY_FOREGROUND_STATE_CHANGED);
     auto field_value_matcher = simple_atom_matcher->add_field_value_matcher();
     field_value_matcher->set_field(4);  // Activity field.
-    field_value_matcher->set_eq_int(activity);
+    field_value_matcher->set_eq_int(state);
     return atom_matcher;
 }
 
 AtomMatcher CreateMoveToBackgroundAtomMatcher() {
     return CreateActivityForegroundStateChangedAtomMatcher(
-        "MoveToBackground", ActivityForegroundStateChanged::MOVE_TO_BACKGROUND);
+        "Background", ActivityForegroundStateChanged::BACKGROUND);
 }
 
 AtomMatcher CreateMoveToForegroundAtomMatcher() {
     return CreateActivityForegroundStateChangedAtomMatcher(
-        "MoveToForeground", ActivityForegroundStateChanged::MOVE_TO_FOREGROUND);
+        "Foreground", ActivityForegroundStateChanged::FOREGROUND);
 }
 
 AtomMatcher CreateProcessLifeCycleStateChangedAtomMatcher(
-    const string& name, ProcessLifeCycleStateChanged::Event event) {
+    const string& name, ProcessLifeCycleStateChanged::State state) {
     AtomMatcher atom_matcher;
     atom_matcher.set_id(StringToId(name));
     auto simple_atom_matcher = atom_matcher.mutable_simple_atom_matcher();
     simple_atom_matcher->set_atom_id(android::util::PROCESS_LIFE_CYCLE_STATE_CHANGED);
     auto field_value_matcher = simple_atom_matcher->add_field_value_matcher();
     field_value_matcher->set_field(3);  // Process state field.
-    field_value_matcher->set_eq_int(event);
+    field_value_matcher->set_eq_int(state);
     return atom_matcher;
 }
 
 AtomMatcher CreateProcessCrashAtomMatcher() {
     return CreateProcessLifeCycleStateChangedAtomMatcher(
-        "ProcessCrashed", ProcessLifeCycleStateChanged::PROCESS_CRASHED);
+        "Crashed", ProcessLifeCycleStateChanged::CRASHED);
 }
 
 Predicate CreateScheduledJobPredicate() {
@@ -241,8 +246,8 @@ Predicate CreateIsSyncingPredicate() {
 Predicate CreateIsInBackgroundPredicate() {
     Predicate predicate;
     predicate.set_id(StringToId("IsInBackground"));
-    predicate.mutable_simple_predicate()->set_start(StringToId("MoveToBackground"));
-    predicate.mutable_simple_predicate()->set_stop(StringToId("MoveToForeground"));
+    predicate.mutable_simple_predicate()->set_start(StringToId("Background"));
+    predicate.mutable_simple_predicate()->set_stop(StringToId("Foreground"));
     return predicate;
 }
 
@@ -373,25 +378,25 @@ std::unique_ptr<LogEvent> CreateReleaseWakelockEvent(
 }
 
 std::unique_ptr<LogEvent> CreateActivityForegroundStateChangedEvent(
-    const int uid, const ActivityForegroundStateChanged::Activity activity, uint64_t timestampNs) {
+    const int uid, const ActivityForegroundStateChanged::State state, uint64_t timestampNs) {
     auto event = std::make_unique<LogEvent>(
         android::util::ACTIVITY_FOREGROUND_STATE_CHANGED, timestampNs);
     event->write(uid);
     event->write("pkg_name");
     event->write("class_name");
-    event->write(activity);
+    event->write(state);
     event->init();
     return event;
 }
 
 std::unique_ptr<LogEvent> CreateMoveToBackgroundEvent(const int uid, uint64_t timestampNs) {
     return CreateActivityForegroundStateChangedEvent(
-        uid, ActivityForegroundStateChanged::MOVE_TO_BACKGROUND, timestampNs);
+        uid, ActivityForegroundStateChanged::BACKGROUND, timestampNs);
 }
 
 std::unique_ptr<LogEvent> CreateMoveToForegroundEvent(const int uid, uint64_t timestampNs) {
     return CreateActivityForegroundStateChangedEvent(
-        uid, ActivityForegroundStateChanged::MOVE_TO_FOREGROUND, timestampNs);
+        uid, ActivityForegroundStateChanged::FOREGROUND, timestampNs);
 }
 
 std::unique_ptr<LogEvent> CreateSyncStateChangedEvent(
@@ -418,19 +423,19 @@ std::unique_ptr<LogEvent> CreateSyncEndEvent(
 }
 
 std::unique_ptr<LogEvent> CreateProcessLifeCycleStateChangedEvent(
-    const int uid, const ProcessLifeCycleStateChanged::Event event, uint64_t timestampNs) {
+    const int uid, const ProcessLifeCycleStateChanged::State state, uint64_t timestampNs) {
     auto logEvent = std::make_unique<LogEvent>(
         android::util::PROCESS_LIFE_CYCLE_STATE_CHANGED, timestampNs);
     logEvent->write(uid);
     logEvent->write("");
-    logEvent->write(event);
+    logEvent->write(state);
     logEvent->init();
     return logEvent;
 }
 
 std::unique_ptr<LogEvent> CreateAppCrashEvent(const int uid, uint64_t timestampNs) {
     return CreateProcessLifeCycleStateChangedEvent(
-        uid, ProcessLifeCycleStateChanged::PROCESS_CRASHED, timestampNs);
+        uid, ProcessLifeCycleStateChanged::CRASHED, timestampNs);
 }
 
 std::unique_ptr<LogEvent> CreateIsolatedUidChangedEvent(
@@ -444,16 +449,18 @@ std::unique_ptr<LogEvent> CreateIsolatedUidChangedEvent(
     return logEvent;
 }
 
-sp<StatsLogProcessor> CreateStatsLogProcessor(const long timeBaseSec, const StatsdConfig& config,
-                                              const ConfigKey& key) {
+sp<StatsLogProcessor> CreateStatsLogProcessor(const int64_t timeBaseNs, const int64_t currentTimeNs,
+                                              const StatsdConfig& config, const ConfigKey& key) {
     sp<UidMap> uidMap = new UidMap();
     sp<AlarmMonitor> anomalyAlarmMonitor =
         new AlarmMonitor(1,  [](const sp<IStatsCompanionService>&, int64_t){},
                 [](const sp<IStatsCompanionService>&){});
-    sp<AlarmMonitor> periodicAlarmMonitor;
+    sp<AlarmMonitor> periodicAlarmMonitor =
+        new AlarmMonitor(1,  [](const sp<IStatsCompanionService>&, int64_t){},
+                [](const sp<IStatsCompanionService>&){});
     sp<StatsLogProcessor> processor = new StatsLogProcessor(
-        uidMap, anomalyAlarmMonitor, periodicAlarmMonitor, timeBaseSec, [](const ConfigKey&){});
-    processor->OnConfigUpdated(key, config);
+        uidMap, anomalyAlarmMonitor, periodicAlarmMonitor, timeBaseNs, [](const ConfigKey&){});
+    processor->OnConfigUpdated(currentTimeNs, key, config);
     return processor;
 }
 

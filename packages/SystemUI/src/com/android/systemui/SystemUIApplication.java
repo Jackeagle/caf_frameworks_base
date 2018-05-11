@@ -29,30 +29,16 @@ import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.util.ArraySet;
-import android.util.TimingsTraceLog;
 import android.util.Log;
+import android.util.TimingsTraceLog;
 
-import com.android.systemui.globalactions.GlobalActionsComponent;
-import com.android.systemui.keyboard.KeyboardUI;
-import com.android.systemui.keyguard.KeyguardViewMediator;
-import com.android.systemui.media.RingtonePlayer;
-import com.android.systemui.pip.PipUI;
 import com.android.systemui.plugins.OverlayPlugin;
 import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.PluginManager;
-import com.android.systemui.power.PowerUI;
-import com.android.systemui.recents.Recents;
-import com.android.systemui.shortcut.ShortcutKeyDispatcher;
-import com.android.systemui.stackdivider.Divider;
-import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.statusbar.phone.StatusBarWindowManager;
-import com.android.systemui.usb.StorageNotification;
 import com.android.systemui.util.NotificationChannels;
-import com.android.systemui.util.leak.GarbageMonitor;
-import com.android.systemui.volume.VolumeUI;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,8 +69,8 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
         SystemUIFactory.createFromConfig(this);
 
         if (Process.myUserHandle().equals(UserHandle.SYSTEM)) {
-            IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
-            filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
+            IntentFilter bootCompletedFilter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+            bootCompletedFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
             registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
@@ -99,8 +85,22 @@ public class SystemUIApplication extends Application implements SysUiServiceProv
                             mServices[i].onBootCompleted();
                         }
                     }
+
+
                 }
-            }, filter);
+            }, bootCompletedFilter);
+
+            IntentFilter localeChangedFilter = new IntentFilter(Intent.ACTION_LOCALE_CHANGED);
+            registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (Intent.ACTION_LOCALE_CHANGED.equals(intent.getAction())) {
+                        if (!mBootCompleted) return;
+                        // Update names of SystemUi notification channels
+                        NotificationChannels.createAll(context);
+                    }
+                }
+            }, localeChangedFilter);
         } else {
             // We don't need to startServices for sub-process that is doing some tasks.
             // (screenshots, sweetsweetdesserts or tuner ..)

@@ -451,6 +451,8 @@ message GlobalSettingsProto {
         // If set to 1, {@link Secure#LOCATION_MODE} will be set to {@link
         // Secure#LOCATION_MODE_OFF} temporarily for all users.
         optional SettingProto global_kill_switch = 5 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        optional SettingProto gnss_satellite_blacklist = 6 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        optional SettingProto gnss_hal_location_request_duration_millis = 7 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional Location location = 69;
 
@@ -672,8 +674,10 @@ message GlobalSettingsProto {
         option (android.msg_privacy).dest = DEST_LOCAL;
 
         // The requested Private DNS mode and an accompanying specifier.
-        optional SettingProto dns_mode = 1;
-        optional SettingProto dns_specifier = 2;
+        // msg_privacy settings don't apply to sub messages, only to primitive
+        // fields, so these must also be explicitly set to LOCAL.
+        optional SettingProto dns_mode = 1 [ (android.privacy).dest = DEST_LOCAL ];
+        optional SettingProto dns_specifier = 2 [ (android.privacy).dest = DEST_LOCAL ];
     }
     optional Private private = 96;
 

@@ -26,6 +26,7 @@ import android.security.keystore.recovery.RecoveryController;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.android.server.locksettings.recoverablekeystore.TestOnlyInsecureCertificateHelper;
 import com.android.server.locksettings.recoverablekeystore.WrappedKey;
 import com.android.server.locksettings.recoverablekeystore.storage.RecoverableKeyStoreDbContract.KeysEntry;
 import com.android.server.locksettings.recoverablekeystore.storage.RecoverableKeyStoreDbContract.RecoveryServiceMetadataEntry;
@@ -62,6 +63,7 @@ public class RecoverableKeyStoreDb {
     private static final String CERT_PATH_ENCODING = "PkiPath";
 
     private final RecoverableKeyStoreDbHelper mKeyStoreDbHelper;
+    private final TestOnlyInsecureCertificateHelper mTestOnlyInsecureCertificateHelper;
 
     /**
      * A new instance, storing the database in the user directory of {@code context}.
@@ -77,6 +79,7 @@ public class RecoverableKeyStoreDb {
 
     private RecoverableKeyStoreDb(RecoverableKeyStoreDbHelper keyStoreDbHelper) {
         this.mKeyStoreDbHelper = keyStoreDbHelper;
+        this.mTestOnlyInsecureCertificateHelper = new TestOnlyInsecureCertificateHelper();
     }
 
     /**
@@ -288,7 +291,7 @@ public class RecoverableKeyStoreDb {
     }
 
     /**
-     * Sets the {@code generationId} of the platform key for the account owned by {@code userId}.
+     * Sets the {@code generationId} of the platform key for user {@code userId}.
      *
      * @return The primary key ID of the relation.
      */
@@ -786,11 +789,20 @@ public class RecoverableKeyStoreDb {
     }
 
     /**
-     * Updates the snapshot version.
+     * Updates a flag indicating that a new snapshot should be created.
+     * It will be {@code false} until the first application key is added.
+     * After that, the flag will be set to true, if one of the following values is updated:
+     * <ul>
+     *     <li> List of application keys
+     *     <li> Server params.
+     *     <li> Lock-screen secret.
+     *     <li> Lock-screen secret type.
+     *     <li> Trusted hardware certificate.
+     * </ul>
      *
      * @param userId The userId of the profile the application is running under.
      * @param uid The uid of the application.
-     * @param pending The server parameters.
+     * @param pending Should create snapshot flag.
      * @return The primary key of the inserted row, or -1 if failed.
      *
      * @hide
@@ -806,7 +818,7 @@ public class RecoverableKeyStoreDb {
      *
      * @param userId The userId of the profile the application is running under.
      * @param uid The uid of the application who initialized the local recovery components.
-     * @return snapshot outdated flag.
+     * @return should create snapshot flag
      *
      * @hide
      */
@@ -988,6 +1000,7 @@ public class RecoverableKeyStoreDb {
      * @hide
      */
     private byte[] getBytes(int userId, int uid, String rootAlias, String key) {
+        rootAlias = mTestOnlyInsecureCertificateHelper.getDefaultCertificateAliasIfEmpty(rootAlias);
         SQLiteDatabase db = mKeyStoreDbHelper.getReadableDatabase();
 
         String[] projection = {
@@ -1046,6 +1059,7 @@ public class RecoverableKeyStoreDb {
      * @hide
      */
     private long setBytes(int userId, int uid, String rootAlias, String key, byte[] value) {
+        rootAlias = mTestOnlyInsecureCertificateHelper.getDefaultCertificateAliasIfEmpty(rootAlias);
         SQLiteDatabase db = mKeyStoreDbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(key, value);
@@ -1072,6 +1086,7 @@ public class RecoverableKeyStoreDb {
      * @hide
      */
     private Long getLong(int userId, int uid, String rootAlias, String key) {
+        rootAlias = mTestOnlyInsecureCertificateHelper.getDefaultCertificateAliasIfEmpty(rootAlias);
         SQLiteDatabase db = mKeyStoreDbHelper.getReadableDatabase();
 
         String[] projection = {
@@ -1131,6 +1146,7 @@ public class RecoverableKeyStoreDb {
      */
 
     private long setLong(int userId, int uid, String rootAlias, String key, long value) {
+        rootAlias = mTestOnlyInsecureCertificateHelper.getDefaultCertificateAliasIfEmpty(rootAlias);
         SQLiteDatabase db = mKeyStoreDbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(key, value);

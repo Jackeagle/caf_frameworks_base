@@ -27,36 +27,35 @@
     <!-- Do not translate. Defines the slots for the right-hand side icons.  That is to say, the
          icons in the status bar that are not notifications. -->
     <string-array name="config_statusBarIcons">
+        <item><xliff:g id="id">@string/status_bar_alarm_clock</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_rotate</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_headset</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_data_saver</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_managed_profile</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_ime</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_sync_failing</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_sync_active</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_cast</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_hotspot</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_location</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_bluetooth</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_nfc</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_tty</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_speakerphone</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_zen</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_mute</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_volume</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_vpn</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_ethernet</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_wifi</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_mobile</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_airplane</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_cdma_eri</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_data_connection</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_phone_evdo_signal</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_phone_signal</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_battery</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_alarm_clock</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_secure</xliff:g></item>
-        <item><xliff:g id="id">@string/status_bar_clock</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_bluetooth</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_managed_profile</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_cast</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_vpn</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_mute</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_volume</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_location</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_zen</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_ethernet</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_wifi</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_hotspot</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_mobile</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_airplane</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_battery</xliff:g></item>
     </string-array>
 
     <string translatable="false" name="status_bar_rotate">rotate</string>
@@ -327,6 +326,13 @@
          device behaviour is controlled by Settings.Global.NETWORK_METERED_MULTIPATH_PREFERENCE.
          This is the default value of that setting. -->
     <integer translatable="false" name="config_networkMeteredMultipathPreference">0</integer>
+
+    <!-- Default daily multipath budget used by ConnectivityManager.getMultipathPreference()
+         on metered networks. This default quota only used if quota could not be determined from
+         data plan or data limit/warning set by the user. The value that is actually used is
+         controlled by Settings.Global.NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES. This is the
+         default value of that setting. -->
+    <integer translatable="false" name="config_networkDefaultDailyMultipathQuotaBytes">2500000</integer>
 
     <!-- List of regexpressions describing the interface (if any) that represent tetherable
          USB interfaces.  If the device doesn't want to support tethering over USB this should
@@ -640,6 +646,9 @@
 
     <!-- Boolean indicating associated network selection is allowed -->
     <bool translatable="false" name="config_wifi_framework_enable_associated_network_selection">true</bool>
+
+    <!-- Boolean indicating whether single radio chain scan results are to be used for network selection -->
+    <bool translatable="false" name="config_wifi_framework_use_single_radio_chain_scan_results_network_selection">false</bool>
 
     <!-- Boolean indicating that wifi only link configuratios that have exact same credentials (i.e PSK) -->
     <bool translatable="false" name="config_wifi_only_link_same_credential_configurations">true</bool>
@@ -968,6 +977,9 @@
     -->
     <integer name="config_longPressOnBackBehavior">0</integer>
 
+    <!-- Allows activities to be launched on a long press on power during device setup. -->
+    <bool name="config_allowStartActivityForLongPressOnPowerInSetup">false</bool>
+
     <!-- Control the behavior when the user short presses the power button.
             0 - Nothing
             1 - Go to sleep (doze)
@@ -1280,6 +1292,32 @@
          in darkness (although they may not be visible in a bright room). -->
     <integer name="config_screenBrightnessDark">1</integer>
 
+    <!-- Array of lux values to define the minimum brightness curve, which guarantees that any
+         brightness curve that dips below it is rejected by the system.
+         This prevents auto-brightness from setting the screen so dark as to prevent the user from
+         resetting or disabling it.
+
+         The values must be non-negative and strictly increasing, and correspond to the values in
+         the config_minimumBrightnessCurveNits array. -->
+    <array name="config_minimumBrightnessCurveLux">
+        <item>0.0</item>
+        <item>2000.0</item>
+        <item>4000.0</item>
+    </array>
+
+    <!-- Array of nits values to define the minimum brightness curve, which guarantees that any
+         brightness curve that dips below it is rejected by the system.
+         This should map lux to the absolute minimum nits that are still readable in that ambient
+         brightness.
+
+         The values must be non-negative and non-decreasing, and correspond to the values in the
+         config_minimumBrightnessCurveLux array. -->
+    <array name="config_minimumBrightnessCurveNits">
+        <item>0.0</item>
+        <item>50.0</item>
+        <item>90.0</item>
+    </array>
+
     <!-- Array of light sensor lux values to define our levels for auto backlight brightness support.
          The N entries of this array define N + 1 control points as follows:
          (1-based arrays)
@@ -1430,6 +1468,9 @@
 
     <!-- True if WallpaperService is enabled -->
     <bool name="config_enableWallpaperService">true</bool>
+
+    <!-- True if the device should block turning display on at boot until wallpaper is ready -->
+    <bool name="config_checkWallpaperAtBoot">true</bool>
 
     <!-- Class name of WallpaperManagerService. -->
     <string name="config_wallpaperManagerServiceName">com.android.server.wallpaper.WallpaperManagerService</string>
@@ -1600,6 +1641,9 @@
         <item>network,false,false,false,false,true,true,true,1,2</item>
         -->
     </string-array>
+
+    <!-- Component name of the combo network location provider. -->
+    <string name="config_comboNetworkLocationProvider" translatable="false">com.qualcomm.location</string>
 
     <!-- Boolean indicating if current platform supports bluetooth SCO for off call
     use cases -->
@@ -2240,6 +2284,10 @@
          mirror the content of the default display. -->
     <bool name="config_localDisplaysMirrorContent">true</bool>
 
+    <!-- Indicates whether local non-default displays are private.
+         {@see android.view.Display#FLAG_PRIVATE} -->
+    <bool name="config_localDisplaysPrivate">false</bool>
+
     <!-- The default mode for the default display. One of the following values (See Display.java):
              0 - COLOR_MODE_DEFAULT
              7 - COLOR_MODE_SRGB
@@ -2574,6 +2622,9 @@
     <!-- Flag indicating which package name can access the persistent data partition -->
     <string name="config_persistentDataPackageName" translatable="false"></string>
 
+    <!--  Define optional package verifier name -->
+    <string name="config_optionalPackageVerifierName" translatable="false"></string>
+
     <!-- Flag indicating apps will skip sending hold request before merge. In this case
         IMS service implementation will do both.i.e.hold followed by merge. -->
     <bool name="skipHoldBeforeMerge">true</bool>
@@ -2807,6 +2858,9 @@
 
     <!-- For performance and storage reasons, limit the number of fingerprints per user -->
     <integer name="config_fingerprintMaxTemplatesPerUser">5</integer>
+
+    <!-- Specify if the fingerprint hardware support gestures-->
+    <bool name="config_fingerprintSupportsGestures">false</bool>
 
     <!-- This config is used to force VoiceInteractionService to start on certain low ram devices.
          It declares the package name of VoiceInteractionService that should be started. -->
@@ -3360,4 +3414,10 @@
 
     <!-- Package name for ManagedProvisioning which is responsible for provisioning work profiles. -->
     <string name="config_managed_provisioning_package" translatable="false">com.android.managedprovisioning</string>
+
+    <!-- The duration (in milliseconds) for the outgoing sms authorization request to timeout.-->
+    <integer name="config_sms_authorization_timeout_ms">0</integer>
+
+    <!-- Enable sms authorization framework-->
+    <bool name="config_sms_authorization_enabled">false</bool>
 </resources>

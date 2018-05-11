@@ -39,11 +39,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import android.os.Parcel;
 import android.support.test.runner.AndroidJUnit4;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.util.ArraySet;
+
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,6 +55,8 @@ import java.util.Set;
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 public class NetworkCapabilitiesTest {
+    private static final String TEST_SSID = "TEST_SSID";
+
     @Test
     public void testMaybeMarkCapabilitiesRestricted() {
         // verify EIMS is restricted
@@ -259,19 +263,35 @@ public class NetworkCapabilitiesTest {
             .addCapability(NET_CAPABILITY_EIMS)
             .addCapability(NET_CAPABILITY_NOT_METERED);
         assertEqualsThroughMarshalling(netCap);
+        netCap.setSSID(TEST_SSID);
+        assertEqualsThroughMarshalling(netCap);
     }
 
     @Test
     public void testOemPaid() {
         NetworkCapabilities nc = new NetworkCapabilities();
-        nc.maybeMarkCapabilitiesRestricted();
+        // By default OEM_PAID is neither in the unwanted or required lists and the network is not
+        // restricted.
+        assertFalse(nc.hasUnwantedCapability(NET_CAPABILITY_OEM_PAID));
         assertFalse(nc.hasCapability(NET_CAPABILITY_OEM_PAID));
+        nc.maybeMarkCapabilitiesRestricted();
         assertTrue(nc.hasCapability(NET_CAPABILITY_NOT_RESTRICTED));
 
+        // Adding OEM_PAID to capability list should make network restricted.
         nc.addCapability(NET_CAPABILITY_OEM_PAID);
+        nc.addCapability(NET_CAPABILITY_INTERNET);  // Combine with unrestricted capability.
         nc.maybeMarkCapabilitiesRestricted();
         assertTrue(nc.hasCapability(NET_CAPABILITY_OEM_PAID));
         assertFalse(nc.hasCapability(NET_CAPABILITY_NOT_RESTRICTED));
+
+        // Now let's make request for OEM_PAID network.
+        NetworkCapabilities nr = new NetworkCapabilities();
+        nr.addCapability(NET_CAPABILITY_OEM_PAID);
+        nr.maybeMarkCapabilitiesRestricted();
+        assertTrue(nr.satisfiedByNetworkCapabilities(nc));
+
+        // Request fails for network with the default capabilities.
+        assertFalse(nr.satisfiedByNetworkCapabilities(new NetworkCapabilities()));
     }
 
     @Test
@@ -286,7 +306,8 @@ public class NetworkCapabilitiesTest {
         request.addUnwantedCapability(NET_CAPABILITY_WIFI_P2P);
         request.addUnwantedCapability(NET_CAPABILITY_NOT_METERED);
         assertTrue(request.satisfiedByNetworkCapabilities(network));
-        assertArrayEquals(new int[] {NET_CAPABILITY_WIFI_P2P, NET_CAPABILITY_NOT_METERED},
+        assertArrayEquals(new int[] {NET_CAPABILITY_WIFI_P2P,
+                        NET_CAPABILITY_NOT_METERED},
                 request.getUnwantedCapabilities());
 
         // This is a default capability, just want to make sure its there because we use it below.
@@ -339,6 +360,21 @@ public class NetworkCapabilitiesTest {
     }
 
     @Test
+    public void testSSID() {
+        NetworkCapabilities nc1 = new NetworkCapabilities();
+        NetworkCapabilities nc2 = new NetworkCapabilities();
+        assertTrue(nc2.satisfiedBySSID(nc1));
+
+        nc1.setSSID(TEST_SSID);
+        assertTrue(nc2.satisfiedBySSID(nc1));
+        nc2.setSSID("different " + TEST_SSID);
+        assertFalse(nc2.satisfiedBySSID(nc1));
+
+        assertTrue(nc1.satisfiedByImmutableNetworkCapabilities(nc2));
+        assertFalse(nc1.satisfiedByNetworkCapabilities(nc2));
+    }
+
+    @Test
     public void testCombineCapabilities() {
         NetworkCapabilities nc1 = new NetworkCapabilities();
         NetworkCapabilities nc2 = new NetworkCapabilities();
@@ -359,6 +395,19 @@ public class NetworkCapabilitiesTest {
         // will never be satisfied.
         assertTrue(nc2.hasCapability(NET_CAPABILITY_NOT_ROAMING));
         assertTrue(nc2.hasUnwantedCapability(NET_CAPABILITY_NOT_ROAMING));
+
+        nc1.setSSID(TEST_SSID);
+        nc2.combineCapabilities(nc1);
+        assertTrue(TEST_SSID.equals(nc2.getSSID()));
+
+        // Because they now have the same SSID, the folllowing call should not throw
+        nc2.combineCapabilities(nc1);
+
+        nc1.setSSID("different " + TEST_SSID);
+        try {
+            nc2.combineCapabilities(nc1);
+            fail("Expected IllegalStateException: can't combine different SSIDs");
+        } catch (IllegalStateException expected) {}
     }
 
     @Test

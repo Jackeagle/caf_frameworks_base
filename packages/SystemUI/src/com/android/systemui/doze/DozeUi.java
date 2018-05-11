@@ -109,7 +109,13 @@ public class DozeUi implements DozeMachine.Part {
         switch (newState) {
             case DOZE_AOD:
                 if (oldState == DOZE_AOD_PAUSED) {
+                    // Whenever turning on the display, it's necessary to push a new frame.
+                    // The display buffers will be empty and need to be filled.
                     mHost.dozeTimeTick();
+                    // The first frame may arrive when the display isn't ready yet.
+                    mHandler.postDelayed(mWakeLock.wrap(mHost::dozeTimeTick), 100);
+                    // The the delayed frame may arrive when the display isn't ready yet either.
+                    mHandler.postDelayed(mWakeLock.wrap(mHost::dozeTimeTick), 1000);
                 }
                 scheduleTimeTick();
                 break;

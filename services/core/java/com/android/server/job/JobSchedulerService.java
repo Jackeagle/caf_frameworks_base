@@ -127,7 +127,7 @@ import java.util.function.Predicate;
  * Any function with the suffix 'Locked' also needs to lock on {@link #mJobs}.
  * @hide
  */
-public final class JobSchedulerService extends com.android.server.SystemService
+public class JobSchedulerService extends com.android.server.SystemService
         implements StateChangedListener, JobCompletedListener {
     public static final String TAG = "JobScheduler";
     public static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
@@ -248,6 +248,7 @@ public final class JobSchedulerService extends com.android.server.SystemService
     static final int WORKING_INDEX = 1;
     static final int FREQUENT_INDEX = 2;
     static final int RARE_INDEX = 3;
+    static final int NEVER_INDEX = 4;
 
     /**
      * Bookkeeping about when jobs last run.  We keep our own record in heartbeat time,
@@ -780,6 +781,10 @@ public final class JobSchedulerService extends com.android.server.SystemService
         @Override public void onUidCachedChanged(int uid, boolean cached) {
         }
     };
+
+    public Context getTestableContext() {
+        return getContext();
+    }
 
     public Object getLock() {
         return mLock;
@@ -2428,11 +2433,11 @@ public final class JobSchedulerService extends com.android.server.SystemService
 
     public static int standbyBucketToBucketIndex(int bucket) {
         // Normalize AppStandby constants to indices into our bookkeeping
-        if (bucket == UsageStatsManager.STANDBY_BUCKET_NEVER) return 4;
-        else if (bucket >= UsageStatsManager.STANDBY_BUCKET_RARE) return 3;
-        else if (bucket >= UsageStatsManager.STANDBY_BUCKET_FREQUENT) return 2;
-        else if (bucket >= UsageStatsManager.STANDBY_BUCKET_WORKING_SET) return 1;
-        else return 0;
+        if (bucket == UsageStatsManager.STANDBY_BUCKET_NEVER) return NEVER_INDEX;
+        else if (bucket > UsageStatsManager.STANDBY_BUCKET_FREQUENT) return RARE_INDEX;
+        else if (bucket > UsageStatsManager.STANDBY_BUCKET_WORKING_SET) return FREQUENT_INDEX;
+        else if (bucket > UsageStatsManager.STANDBY_BUCKET_ACTIVE) return WORKING_INDEX;
+        else return ACTIVE_INDEX;
     }
 
     // Static to support external callers

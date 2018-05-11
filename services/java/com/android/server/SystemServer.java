@@ -740,7 +740,6 @@ public final class SystemServer {
         NetworkStatsService networkStats = null;
         NetworkPolicyManagerService networkPolicy = null;
         ConnectivityService connectivity = null;
-        NetworkScoreService networkScore = null;
         NsdService serviceDiscovery= null;
         WindowManagerService wm = null;
         SerialService serial = null;
@@ -1128,12 +1127,7 @@ public final class SystemServer {
             }
 
             traceBeginAndSlog("StartNetworkScoreService");
-            try {
-                networkScore = new NetworkScoreService(context);
-                ServiceManager.addService(Context.NETWORK_SCORE_SERVICE, networkScore);
-            } catch (Throwable e) {
-                reportWtf("starting Network Score Service", e);
-            }
+            mSystemServiceManager.startService(NetworkScoreService.Lifecycle.class);
             traceEnd();
 
             traceBeginAndSlog("StartNetworkStatsService");
@@ -1155,45 +1149,47 @@ public final class SystemServer {
             }
             traceEnd();
 
-            if (context.getPackageManager().hasSystemFeature(
-                        PackageManager.FEATURE_WIFI)) {
-                // Wifi Service must be started first for wifi-related services.
-                traceBeginAndSlog("StartWifi");
-                mSystemServiceManager.startService(WIFI_SERVICE_CLASS);
-                traceEnd();
-                traceBeginAndSlog("StartWifiScanning");
-                mSystemServiceManager.startService(
-                    "com.android.server.wifi.scanner.WifiScanningService");
-                traceEnd();
-            }
+            if (!mOnlyCore) {
+                if (context.getPackageManager().hasSystemFeature(
+                            PackageManager.FEATURE_WIFI)) {
+                    // Wifi Service must be started first for wifi-related services.
+                    traceBeginAndSlog("StartWifi");
+                    mSystemServiceManager.startService(WIFI_SERVICE_CLASS);
+                    traceEnd();
+                    traceBeginAndSlog("StartWifiScanning");
+                    mSystemServiceManager.startService(
+                        "com.android.server.wifi.scanner.WifiScanningService");
+                    traceEnd();
+                }
 
-            if (context.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_WIFI_RTT)) {
-                traceBeginAndSlog("StartRttService");
-                mSystemServiceManager.startService(
-                    "com.android.server.wifi.rtt.RttService");
-                traceEnd();
-            }
+                if (context.getPackageManager().hasSystemFeature(
+                    PackageManager.FEATURE_WIFI_RTT)) {
+                    traceBeginAndSlog("StartRttService");
+                    mSystemServiceManager.startService(
+                        "com.android.server.wifi.rtt.RttService");
+                    traceEnd();
+                }
 
-            if (context.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_WIFI_AWARE)) {
-                traceBeginAndSlog("StartWifiAware");
-                mSystemServiceManager.startService(WIFI_AWARE_SERVICE_CLASS);
-                traceEnd();
-            }
+                if (context.getPackageManager().hasSystemFeature(
+                    PackageManager.FEATURE_WIFI_AWARE)) {
+                    traceBeginAndSlog("StartWifiAware");
+                    mSystemServiceManager.startService(WIFI_AWARE_SERVICE_CLASS);
+                    traceEnd();
+                }
 
-            if (context.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_WIFI_DIRECT)) {
-                traceBeginAndSlog("StartWifiP2P");
-                mSystemServiceManager.startService(WIFI_P2P_SERVICE_CLASS);
-                traceEnd();
-            }
+                if (context.getPackageManager().hasSystemFeature(
+                    PackageManager.FEATURE_WIFI_DIRECT)) {
+                    traceBeginAndSlog("StartWifiP2P");
+                    mSystemServiceManager.startService(WIFI_P2P_SERVICE_CLASS);
+                    traceEnd();
+                }
 
-            if (context.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_LOWPAN)) {
-                traceBeginAndSlog("StartLowpan");
-                mSystemServiceManager.startService(LOWPAN_SERVICE_CLASS);
-                traceEnd();
+                if (context.getPackageManager().hasSystemFeature(
+                    PackageManager.FEATURE_LOWPAN)) {
+                    traceBeginAndSlog("StartLowpan");
+                    mSystemServiceManager.startService(LOWPAN_SERVICE_CLASS);
+                    traceEnd();
+                }
             }
 
             if (enableWigig) {
@@ -1813,7 +1809,6 @@ public final class SystemServer {
         final NetworkStatsService networkStatsF = networkStats;
         final NetworkPolicyManagerService networkPolicyF = networkPolicy;
         final ConnectivityService connectivityF = connectivity;
-        final NetworkScoreService networkScoreF = networkScore;
         final LocationManagerService locationF = location;
         final CountryDetectorService countryDetectorF = countryDetector;
         final NetworkTimeUpdateService networkTimeUpdaterF = networkTimeUpdater;
@@ -1872,13 +1867,6 @@ public final class SystemServer {
                 startSystemUi(context, windowManagerF);
             } catch (Throwable e) {
                 reportWtf("starting System UI", e);
-            }
-            traceEnd();
-            traceBeginAndSlog("MakeNetworkScoreReady");
-            try {
-                if (networkScoreF != null) networkScoreF.systemReady();
-            } catch (Throwable e) {
-                reportWtf("making Network Score Service ready", e);
             }
             traceEnd();
             traceBeginAndSlog("MakeNetworkManagementServiceReady");
@@ -2002,13 +1990,6 @@ public final class SystemServer {
             }
             traceEnd();
 
-            traceBeginAndSlog("MakeNetworkScoreServiceReady");
-            try {
-                if (networkScoreF != null) networkScoreF.systemRunning();
-            } catch (Throwable e) {
-                reportWtf("Notifying NetworkScoreService running", e);
-            }
-            traceEnd();
             traceBeginAndSlog("IncidentDaemonReady");
             try {
                 // TODO: Switch from checkService to getService once it's always

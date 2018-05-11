@@ -22,8 +22,9 @@ import android.content.Intent;
 import android.os.PowerManager;
 import android.provider.Settings.Global;
 import android.provider.Settings.Secure;
-import android.support.annotation.VisibleForTesting;
+import android.util.KeyValueListParser;
 import android.util.Log;
+import android.util.Slog;
 
 /**
  * Utilities related to battery saver.
@@ -48,13 +49,35 @@ public class BatterySaverUtils {
     public static final String ACTION_SHOW_AUTO_SAVER_SUGGESTION
             = "PNW.autoSaverSuggestion";
 
-    /**
-     * We show the auto battery saver suggestion notification when the user manually enables
-     * battery saver for the START_NTH time through the END_NTH time.
-     * (We won't show it for END_NTH + 1 time and after.)
-     */
-    private static final int AUTO_SAVER_SUGGESTION_START_NTH = 4;
-    private static final int AUTO_SAVER_SUGGESTION_END_NTH = 8;
+    private static class Parameters {
+        private final Context mContext;
+
+        /**
+         * We show the auto battery saver suggestion notification when the user manually enables
+         * battery saver for the START_NTH time through the END_NTH time.
+         * (We won't show it for END_NTH + 1 time and after.)
+         */
+        private static final int AUTO_SAVER_SUGGESTION_START_NTH = 4;
+        private static final int AUTO_SAVER_SUGGESTION_END_NTH = 8;
+
+        public final int startNth;
+        public final int endNth;
+
+        public Parameters(Context context) {
+            mContext = context;
+
+            final String newValue = Global.getString(mContext.getContentResolver(),
+                    Global.LOW_POWER_MODE_SUGGESTION_PARAMS);
+            final KeyValueListParser parser = new KeyValueListParser(',');
+            try {
+                parser.setString(newValue);
+            } catch (IllegalArgumentException e) {
+                Slog.wtf(TAG, "Bad constants: " + newValue);
+            }
+            startNth = parser.getInt("start_nth", AUTO_SAVER_SUGGESTION_START_NTH);
+            endNth = parser.getInt("end_nth", AUTO_SAVER_SUGGESTION_END_NTH);
+        }
+    }
 
     /**
      * Enable / disable battery saver by user request.
@@ -85,8 +108,10 @@ public class BatterySaverUtils {
                         Secure.getInt(cr, Secure.LOW_POWER_MANUAL_ACTIVATION_COUNT, 0) + 1;
                 Secure.putInt(cr, Secure.LOW_POWER_MANUAL_ACTIVATION_COUNT, count);
 
-                if ((count >= AUTO_SAVER_SUGGESTION_START_NTH)
-                        && (count <= AUTO_SAVER_SUGGESTION_END_NTH)
+                final Parameters parameters = new Parameters(context);
+
+                if ((count >= parameters.startNth)
+                        && (count <= parameters.endNth)
                         && Global.getInt(cr, Global.LOW_POWER_MODE_TRIGGER_LEVEL, 0) == 0
                         && Secure.getInt(cr,
                         Secure.SUPPRESS_AUTO_BATTERY_SAVER_SUGGESTION, 0) == 0) {
@@ -123,15 +148,32 @@ public class BatterySaverUtils {
         Secure.putInt(context.getContentResolver(), Secure.LOW_POWER_WARNING_ACKNOWLEDGED, 1);
     }
 
+    /**
+     * Don't show the automatic battery suggestion notification in the future.
+     */
     public static void suppressAutoBatterySaver(Context context) {
         Secure.putInt(context.getContentResolver(),
                 Secure.SUPPRESS_AUTO_BATTERY_SAVER_SUGGESTION, 1);
     }
 
-    public static void scheduleAutoBatterySaver(Context context, int level) {
+    /**
+     * Set the automatic battery saver trigger level to {@code level}.
+     */
+    public static void setAutoBatterySaverTriggerLevel(Context context, int level) {
+        if (level > 0) {
+            suppressAutoBatterySaver(context);
+        }
+        Global.putInt(context.getContentResolver(), Global.LOW_POWER_MODE_TRIGGER_LEVEL, level);
+    }
+
+    /**
+     * Set the automatic battery saver trigger level to {@code level}, but only when
+     * automatic battery saver isn't enabled yet.
+     */
+    public static void ensureAutoBatterySaver(Context context, int level) {
         if (Global.getInt(context.getContentResolver(), Global.LOW_POWER_MODE_TRIGGER_LEVEL, 0)
                 == 0) {
-            Global.putInt(context.getContentResolver(), Global.LOW_POWER_MODE_TRIGGER_LEVEL, level);
+            setAutoBatterySaverTriggerLevel(context, level);
         }
     }
 }

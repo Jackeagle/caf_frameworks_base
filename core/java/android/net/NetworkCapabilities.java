@@ -17,6 +17,7 @@
 package android.net;
 
 import android.annotation.IntDef;
+import android.annotation.SystemApi;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -70,6 +71,7 @@ public final class NetworkCapabilities implements Parcelable {
             mUids = nc.mUids;
             mEstablishingVpnAppUid = nc.mEstablishingVpnAppUid;
             mUnwantedNetworkCapabilities = nc.mUnwantedNetworkCapabilities;
+            mSSID = nc.mSSID;
         }
     }
 
@@ -85,6 +87,7 @@ public final class NetworkCapabilities implements Parcelable {
         mSignalStrength = SIGNAL_STRENGTH_UNSPECIFIED;
         mUids = null;
         mEstablishingVpnAppUid = INVALID_UID;
+        mSSID = null;
     }
 
     /**
@@ -253,9 +256,8 @@ public final class NetworkCapabilities implements Parcelable {
     /**
      * Indicates that this network is not congested.
      * <p>
-     * When a network is congested, the device should defer network traffic that
-     * can be done at a later time without breaking developer contracts.
-     * @hide
+     * When a network is congested, applications should defer network traffic
+     * that can be done at a later time, such as uploading analytics.
      */
     public static final int NET_CAPABILITY_NOT_CONGESTED = 20;
 
@@ -276,6 +278,7 @@ public final class NetworkCapabilities implements Parcelable {
      * this network can be used by system apps to upload telemetry data.
      * @hide
      */
+    @SystemApi
     public static final int NET_CAPABILITY_OEM_PAID = 22;
 
     private static final int MIN_NET_CAPABILITY = NET_CAPABILITY_MMS;
@@ -316,7 +319,7 @@ public final class NetworkCapabilities implements Parcelable {
 
     /**
      * Capabilities that suggest that a network is restricted.
-     * {@see #maybeMarkCapabilitiesRestricted}.
+     * {@see #maybeMarkCapabilitiesRestricted}, {@see #FORCE_RESTRICTED_CAPABILITIES}
      */
     @VisibleForTesting
     /* package */ static final long RESTRICTED_CAPABILITIES =
@@ -327,7 +330,13 @@ public final class NetworkCapabilities implements Parcelable {
             (1 << NET_CAPABILITY_IA) |
             (1 << NET_CAPABILITY_IMS) |
             (1 << NET_CAPABILITY_RCS) |
-            (1 << NET_CAPABILITY_XCAP) |
+            (1 << NET_CAPABILITY_XCAP);
+
+    /**
+     * Capabilities that force network to be restricted.
+     * {@see #maybeMarkCapabilitiesRestricted}.
+     */
+    private static final long FORCE_RESTRICTED_CAPABILITIES =
             (1 << NET_CAPABILITY_OEM_PAID);
 
     /**
@@ -531,16 +540,21 @@ public final class NetworkCapabilities implements Parcelable {
      * @hide
      */
     public void maybeMarkCapabilitiesRestricted() {
+        // Check if we have any capability that forces the network to be restricted.
+        final boolean forceRestrictedCapability =
+                (mNetworkCapabilities & FORCE_RESTRICTED_CAPABILITIES) != 0;
+
         // Verify there aren't any unrestricted capabilities.  If there are we say
-        // the whole thing is unrestricted.
+        // the whole thing is unrestricted unless it is forced to be restricted.
         final boolean hasUnrestrictedCapabilities =
-                ((mNetworkCapabilities & UNRESTRICTED_CAPABILITIES) != 0);
+                (mNetworkCapabilities & UNRESTRICTED_CAPABILITIES) != 0;
 
         // Must have at least some restricted capabilities.
         final boolean hasRestrictedCapabilities =
-                ((mNetworkCapabilities & RESTRICTED_CAPABILITIES) != 0);
+                (mNetworkCapabilities & RESTRICTED_CAPABILITIES) != 0;
 
-        if (hasRestrictedCapabilities && !hasUnrestrictedCapabilities) {
+        if (forceRestrictedCapability
+                || (hasRestrictedCapabilities && !hasUnrestrictedCapabilities)) {
             removeCapability(NET_CAPABILITY_NOT_RESTRICTED);
         }
     }
@@ -909,7 +923,7 @@ public final class NetworkCapabilities implements Parcelable {
     /**
      * Sets the signal strength. This is a signed integer, with higher values indicating a stronger
      * signal. The exact units are bearer-dependent. For example, Wi-Fi uses the same RSSI units
-     * reported by WifiManager.
+     * reported by wifi code.
      * <p>
      * Note that when used to register a network callback, this specifies the minimum acceptable
      * signal strength. When received as the state of an existing network it specifies the current
@@ -1041,7 +1055,7 @@ public final class NetworkCapabilities implements Parcelable {
     }
 
     /**
-     * Tests if the set of UIDs that this network applies to is the same of the passed set of UIDs.
+     * Tests if the set of UIDs that this network applies to is the same as the passed network.
      * <p>
      * This test only checks whether equal range objects are in both sets. It will
      * return false if the ranges are not exactly the same, even if the covered UIDs
@@ -1131,6 +1145,62 @@ public final class NetworkCapabilities implements Parcelable {
         mUids.addAll(nc.mUids);
     }
 
+
+    /**
+     * The SSID of the network, or null if not applicable or unknown.
+     * <p>
+     * This is filled in by wifi code.
+     * @hide
+     */
+    private String mSSID;
+
+    /**
+     * Sets the SSID of this network.
+     * @hide
+     */
+    public NetworkCapabilities setSSID(String ssid) {
+        mSSID = ssid;
+        return this;
+    }
+
+    /**
+     * Gets the SSID of this network, or null if none or unknown.
+     * @hide
+     */
+    public String getSSID() {
+        return mSSID;
+    }
+
+    /**
+     * Tests if the SSID of this network is the same as the SSID of the passed network.
+     * @hide
+     */
+    public boolean equalsSSID(NetworkCapabilities nc) {
+        return Objects.equals(mSSID, nc.mSSID);
+    }
+
+    /**
+     * Check if the SSID requirements of this object are matched by the passed object.
+     * @hide
+     */
+    public boolean satisfiedBySSID(NetworkCapabilities nc) {
+        return mSSID == null || mSSID.equals(nc.mSSID);
+    }
+
+    /**
+     * Combine SSIDs of the capabilities.
+     * <p>
+     * This is only legal if either the SSID of this object is null, or both SSIDs are
+     * equal.
+     * @hide
+     */
+    private void combineSSIDs(NetworkCapabilities nc) {
+        if (mSSID != null && !mSSID.equals(nc.mSSID)) {
+            throw new IllegalStateException("Can't combine two SSIDs");
+        }
+        setSSID(nc.mSSID);
+    }
+
     /**
      * Combine a set of Capabilities to this one.  Useful for coming up with the complete set
      * @hide
@@ -1142,6 +1212,7 @@ public final class NetworkCapabilities implements Parcelable {
         combineSpecifiers(nc);
         combineSignalStrength(nc);
         combineUids(nc);
+        combineSSIDs(nc);
     }
 
     /**
@@ -1160,7 +1231,8 @@ public final class NetworkCapabilities implements Parcelable {
                 && (onlyImmutable || satisfiedByLinkBandwidths(nc))
                 && satisfiedBySpecifier(nc)
                 && (onlyImmutable || satisfiedBySignalStrength(nc))
-                && (onlyImmutable || satisfiedByUids(nc)));
+                && (onlyImmutable || satisfiedByUids(nc))
+                && (onlyImmutable || satisfiedBySSID(nc)));
     }
 
     /**
@@ -1247,7 +1319,8 @@ public final class NetworkCapabilities implements Parcelable {
                 && equalsLinkBandwidths(that)
                 && equalsSignalStrength(that)
                 && equalsSpecifier(that)
-                && equalsUids(that));
+                && equalsUids(that)
+                && equalsSSID(that));
     }
 
     @Override
@@ -1262,7 +1335,8 @@ public final class NetworkCapabilities implements Parcelable {
                 + (mLinkDownBandwidthKbps * 19)
                 + Objects.hashCode(mNetworkSpecifier) * 23
                 + (mSignalStrength * 29)
-                + Objects.hashCode(mUids) * 31;
+                + Objects.hashCode(mUids) * 31
+                + Objects.hashCode(mSSID) * 37;
     }
 
     @Override
@@ -1279,6 +1353,7 @@ public final class NetworkCapabilities implements Parcelable {
         dest.writeParcelable((Parcelable) mNetworkSpecifier, flags);
         dest.writeInt(mSignalStrength);
         dest.writeArraySet(mUids);
+        dest.writeString(mSSID);
     }
 
     public static final Creator<NetworkCapabilities> CREATOR =
@@ -1296,6 +1371,7 @@ public final class NetworkCapabilities implements Parcelable {
                 netCap.mSignalStrength = in.readInt();
                 netCap.mUids = (ArraySet<UidRange>) in.readArraySet(
                         null /* ClassLoader, null for default */);
+                netCap.mSSID = in.readString();
                 return netCap;
             }
             @Override
@@ -1344,6 +1420,10 @@ public final class NetworkCapabilities implements Parcelable {
         }
         if (mEstablishingVpnAppUid != INVALID_UID) {
             sb.append(" EstablishingAppUid: ").append(mEstablishingVpnAppUid);
+        }
+
+        if (null != mSSID) {
+            sb.append(" SSID: ").append(mSSID);
         }
 
         sb.append("]");

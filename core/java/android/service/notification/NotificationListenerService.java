@@ -28,6 +28,7 @@ import android.app.Notification.Builder;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
 import android.app.NotificationManager;
+import android.app.Person;
 import android.app.Service;
 import android.companion.CompanionDeviceManager;
 import android.content.ComponentName;
@@ -806,7 +807,8 @@ public abstract class NotificationListenerService extends Service {
      * @return An array of active notifications, sorted in natural order.
      */
     public StatusBarNotification[] getActiveNotifications() {
-        return getActiveNotifications(null, TRIM_FULL);
+        StatusBarNotification[] activeNotifications = getActiveNotifications(null, TRIM_FULL);
+        return activeNotifications != null ? activeNotifications : new StatusBarNotification[0];
     }
 
     /**
@@ -841,7 +843,8 @@ public abstract class NotificationListenerService extends Service {
      */
     @SystemApi
     public StatusBarNotification[] getActiveNotifications(int trim) {
-        return getActiveNotifications(null, trim);
+        StatusBarNotification[] activeNotifications = getActiveNotifications(null, trim);
+        return activeNotifications != null ? activeNotifications : new StatusBarNotification[0];
     }
 
     /**
@@ -857,7 +860,8 @@ public abstract class NotificationListenerService extends Service {
      * same order as the key list.
      */
     public StatusBarNotification[] getActiveNotifications(String[] keys) {
-        return getActiveNotifications(keys, TRIM_FULL);
+        StatusBarNotification[] activeNotifications = getActiveNotifications(keys, TRIM_FULL);
+        return activeNotifications != null ? activeNotifications : new StatusBarNotification[0];
     }
 
     /**
@@ -889,6 +893,9 @@ public abstract class NotificationListenerService extends Service {
 
     private StatusBarNotification[] cleanUpNotificationList(
             ParceledListSlice<StatusBarNotification> parceledList) {
+        if (parceledList == null || parceledList.getList() == null) {
+            return new StatusBarNotification[0];
+        }
         List<StatusBarNotification> list = parceledList.getList();
         ArrayList<StatusBarNotification> corruptNotifications = null;
         int N = list.size();
@@ -1195,13 +1202,13 @@ public abstract class NotificationListenerService extends Service {
      */
     private void maybePopulatePeople(Notification notification) {
         if (getContext().getApplicationInfo().targetSdkVersion < Build.VERSION_CODES.P) {
-            ArrayList<Notification.Person> people = notification.extras.getParcelableArrayList(
+            ArrayList<Person> people = notification.extras.getParcelableArrayList(
                     Notification.EXTRA_PEOPLE_LIST);
             if (people != null && people.isEmpty()) {
                 int size = people.size();
                 String[] peopleArray = new String[size];
                 for (int i = 0; i < size; i++) {
-                    Notification.Person person = people.get(i);
+                    Person person = people.get(i);
                     peopleArray[i] = person.resolveToLegacyUri();
                 }
                 notification.extras.putStringArray(Notification.EXTRA_PEOPLE, peopleArray);

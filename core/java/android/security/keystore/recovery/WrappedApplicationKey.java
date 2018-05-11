@@ -42,6 +42,21 @@ public final class WrappedApplicationKey implements Parcelable {
     // The only supported format is AES-256 symmetric key.
     private byte[] mEncryptedKeyMaterial;
 
+    // IMPORTANT! PLEASE READ!
+    // -----------------------
+    // If you edit this file (e.g., to add new fields), please MAKE SURE to also do the following:
+    // - Update the #writeToParcel(Parcel) method below
+    // - Update the #(Parcel) constructor below
+    // - Update android.security.keystore.recovery.KeyChainSnapshotTest to make sure nobody
+    //     accidentally breaks your fields in the Parcel in the future.
+    // - Update com.android.server.locksettings.recoverablekeystore.serialization
+    //     .KeyChainSnapshotSerializer to correctly serialize your new field
+    // - Update com.android.server.locksettings.recoverablekeystore.serialization
+    //     .KeyChainSnapshotSerializer to correctly deserialize your new field
+    // - Update com.android.server.locksettings.recoverablekeystore.serialization
+    //     .KeychainSnapshotSerializerTest to make sure nobody breaks serialization of your field
+    //     in the future.
+
     /**
      * Builder for creating {@link WrappedApplicationKey}.
      */
@@ -61,10 +76,11 @@ public final class WrappedApplicationKey implements Parcelable {
 
         /**
          * @deprecated AOSP does not associate keys with accounts. This may be done by system app.
+         * @removed
          */
         @Deprecated
         public Builder setAccount(@NonNull byte[] account) {
-            return this;
+            throw new UnsupportedOperationException();
         }
 
         /**
@@ -119,10 +135,11 @@ public final class WrappedApplicationKey implements Parcelable {
 
     /**
      * @deprecated AOSP does not associate keys with accounts. This may be done by system app.
+     * @removed
      */
     @Deprecated
     public @NonNull byte[] getAccount() {
-        return new byte[0];
+        throw new UnsupportedOperationException();
     }
 
     public static final Parcelable.Creator<WrappedApplicationKey> CREATOR =

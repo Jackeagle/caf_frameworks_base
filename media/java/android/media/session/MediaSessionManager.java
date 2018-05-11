@@ -47,6 +47,7 @@ import android.view.KeyEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 /**
@@ -342,14 +343,21 @@ public final class MediaSessionManager {
     }
 
     /**
-     * Returns whether the app is trusted.
+     * Checks whether the remote user is a trusted app.
      * <p>
      * An app is trusted if the app holds the android.Manifest.permission.MEDIA_CONTENT_CONTROL
      * permission or has an enabled notification listener.
      *
-     * @param userInfo The remote user info
+     * @param userInfo The remote user info from either
+     *            {@link MediaSession#getCurrentControllerInfo()} or
+     *            {@link MediaBrowserService#getCurrentBrowserInfo()}.
+     * @return {@code true} if the remote user is trusted and its package name matches with the UID.
+     *            {@code false} otherwise.
      */
-    public boolean isTrustedForMediaControl(RemoteUserInfo userInfo) {
+    public boolean isTrustedForMediaControl(@NonNull RemoteUserInfo userInfo) {
+        if (userInfo == null) {
+            throw new IllegalArgumentException("userInfo may not be null");
+        }
         if (userInfo.getPackageName() == null) {
             return false;
         }
@@ -813,6 +821,11 @@ public final class MediaSessionManager {
             return TextUtils.equals(mPackageName, otherUserInfo.mPackageName)
                     && mPid == otherUserInfo.mPid
                     && mUid == otherUserInfo.mUid;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(mPackageName, mPid, mUid);
         }
     }
 

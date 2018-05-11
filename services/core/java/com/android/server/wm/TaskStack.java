@@ -33,12 +33,11 @@ import static android.view.WindowManager.DOCKED_LEFT;
 import static android.view.WindowManager.DOCKED_RIGHT;
 import static android.view.WindowManager.DOCKED_TOP;
 import static com.android.server.wm.DragResizeMode.DRAG_RESIZE_MODE_DOCKED_DIVIDER;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_TASK_MOVEMENT;
-import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.StackProto.ADJUSTED_BOUNDS;
 import static com.android.server.wm.StackProto.ADJUSTED_FOR_IME;
 import static com.android.server.wm.StackProto.ADJUST_DIVIDER_AMOUNT;
 import static com.android.server.wm.StackProto.ADJUST_IME_AMOUNT;
+import static com.android.server.wm.StackProto.ANIMATING_BOUNDS;
 import static com.android.server.wm.StackProto.ANIMATION_BACKGROUND_SURFACE_IS_DIMMING;
 import static com.android.server.wm.StackProto.BOUNDS;
 import static com.android.server.wm.StackProto.DEFER_REMOVAL;
@@ -47,6 +46,8 @@ import static com.android.server.wm.StackProto.ID;
 import static com.android.server.wm.StackProto.MINIMIZE_AMOUNT;
 import static com.android.server.wm.StackProto.TASKS;
 import static com.android.server.wm.StackProto.WINDOW_CONTAINER;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_TASK_MOVEMENT;
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.CallSuper;
 import android.content.res.Configuration;
@@ -62,12 +63,10 @@ import android.util.proto.ProtoOutputStream;
 import android.view.DisplayInfo;
 import android.view.Surface;
 import android.view.SurfaceControl;
-
 import com.android.internal.policy.DividerSnapAlgorithm;
 import com.android.internal.policy.DividerSnapAlgorithm.SnapTarget;
 import com.android.internal.policy.DockedDividerUtils;
 import com.android.server.EventLogTags;
-
 import java.io.PrintWriter;
 
 public class TaskStack extends WindowContainer<Task> implements
@@ -752,8 +751,9 @@ public class TaskStack extends WindowContainer<Task> implements
      * Used to make room for shadows in the pinned windowing mode.
      */
     int getStackOutset() {
-        if (inPinnedWindowingMode()) {
-            final DisplayMetrics displayMetrics = getDisplayContent().getDisplayMetrics();
+        DisplayContent displayContent = getDisplayContent();
+        if (inPinnedWindowingMode() && displayContent != null) {
+            final DisplayMetrics displayMetrics = displayContent.getDisplayMetrics();
 
             // We multiply by two to match the client logic for converting view elevation
             // to insets, as in {@link WindowManager.LayoutParams#setSurfaceInsets}
@@ -827,6 +827,14 @@ public class TaskStack extends WindowContainer<Task> implements
                     mTmpRect2, mTmpRect3)) {
                 bounds = new Rect(mTmpRect3);
             }
+        }
+
+        if (inSplitScreenSecondaryWindowingMode()) {
+            // When the stack is resized due to entering split screen secondary, offset the
+            // windows to compensate for the new stack position.
+            forAllWindows(w -> {
+                w.mWinAnimator.setOffsetPositionForStackResize(true);
+            }, true);
         }
 
         updateDisplayInfo(bounds);
@@ -1333,6 +1341,20 @@ public class TaskStack extends WindowContainer<Task> implements
         return mMinimizeAmount != 0f;
     }
 
+    /**
+     * @return {@code true} if we have a {@link Task} that is animating (currently only used for the
+     *         recents animation); {@code false} otherwise.
+     */
+    boolean isTaskAnimating() {
+        for (int j = mChildren.size() - 1; j >= 0; j--) {
+            final Task task = mChildren.get(j);
+            if (task.isTaskAnimating()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @CallSuper
     @Override
     public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
@@ -1351,6 +1373,7 @@ public class TaskStack extends WindowContainer<Task> implements
         proto.write(ADJUST_IME_AMOUNT, mAdjustImeAmount);
         proto.write(ADJUST_DIVIDER_AMOUNT, mAdjustDividerAmount);
         mAdjustedBounds.writeToProto(proto, ADJUSTED_BOUNDS);
+        proto.write(ANIMATING_BOUNDS, mBoundsAnimating);
         proto.end(token);
     }
 
@@ -1685,6 +1708,28 @@ public class TaskStack extends WindowContainer<Task> implements
                 // I don't believe you...
             }
         }
+    }
+
+    @Override
+    public boolean shouldDeferStartOnMoveToFullscreen() {
+        // Workaround for the recents animation -- normally we need to wait for the new activity to
+        // show before starting the PiP animation, but because we start and show the home activity
+        // early for the recents animation prior to the PiP animation starting, there is no
+        // subsequent all-drawn signal. In this case, we can skip the pause when the home stack is
+        // already visible and drawn.
+        final TaskStack homeStack = mDisplayContent.getHomeStack();
+        if (homeStack == null) {
+            return true;
+        }
+        final Task homeTask = homeStack.getTopChild();
+        if (homeTask == null) {
+            return true;
+        }
+        final AppWindowToken homeApp = homeTask.getTopVisibleAppToken();
+        if (!homeTask.isVisible() || homeApp == null) {
+            return true;
+        }
+        return !homeApp.allDrawn;
     }
 
     /**

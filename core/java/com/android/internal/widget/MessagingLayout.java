@@ -21,6 +21,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.StyleRes;
 import android.app.Notification;
+import android.app.Person;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -79,9 +80,9 @@ public class MessagingLayout extends FrameLayout {
     private Icon mLargeIcon;
     private boolean mIsOneToOne;
     private ArrayList<MessagingGroup> mAddedGroups = new ArrayList<>();
-    private Notification.Person mUser;
+    private Person mUser;
     private CharSequence mNameReplacement;
-    private boolean mIsCollapsed;
+    private boolean mDisplayImagesAtEnd;
 
     public MessagingLayout(@NonNull Context context) {
         super(context);
@@ -128,8 +129,8 @@ public class MessagingLayout extends FrameLayout {
     }
 
     @RemotableViewMethod
-    public void setIsCollapsed(boolean isCollapsed) {
-        mIsCollapsed = isCollapsed;
+    public void setDisplayImagesAtEnd(boolean atEnd) {
+        mDisplayImagesAtEnd = atEnd;
     }
 
     @RemotableViewMethod
@@ -148,7 +149,9 @@ public class MessagingLayout extends FrameLayout {
         }
         addRemoteInputHistoryToMessages(newMessages,
                 extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY));
-        bind(newMessages, newHistoricMessages);
+        boolean showSpinner =
+                extras.getBoolean(Notification.EXTRA_SHOW_REMOTE_INPUT_SPINNER, false);
+        bind(newMessages, newHistoricMessages, showSpinner);
     }
 
     private void addRemoteInputHistoryToMessages(
@@ -160,17 +163,18 @@ public class MessagingLayout extends FrameLayout {
         for (int i = remoteInputHistory.length - 1; i >= 0; i--) {
             CharSequence message = remoteInputHistory[i];
             newMessages.add(new Notification.MessagingStyle.Message(
-                    message, 0, (Notification.Person) null));
+                    message, 0, (Person) null, true /* remoteHistory */));
         }
     }
 
     private void bind(List<Notification.MessagingStyle.Message> newMessages,
-            List<Notification.MessagingStyle.Message> newHistoricMessages) {
+            List<Notification.MessagingStyle.Message> newHistoricMessages,
+            boolean showSpinner) {
 
         List<MessagingMessage> historicMessages = createMessages(newHistoricMessages,
                 true /* isHistoric */);
         List<MessagingMessage> messages = createMessages(newMessages, false /* isHistoric */);
-        addMessagesToGroups(historicMessages, messages);
+        addMessagesToGroups(historicMessages, messages, showSpinner);
 
         // Let's remove the remaining messages
         mMessages.forEach(REMOVE_MESSAGE);
@@ -296,31 +300,31 @@ public class MessagingLayout extends FrameLayout {
         mIsOneToOne = oneToOne;
     }
 
-    public void setUser(Notification.Person user) {
+    public void setUser(Person user) {
         mUser = user;
         if (mUser.getIcon() == null) {
             Icon userIcon = Icon.createWithResource(getContext(),
                     com.android.internal.R.drawable.messaging_user);
             userIcon.setTint(mLayoutColor);
-            mUser.setIcon(userIcon);
+            mUser = mUser.toBuilder().setIcon(userIcon).build();
         }
     }
 
     private void addMessagesToGroups(List<MessagingMessage> historicMessages,
-            List<MessagingMessage> messages) {
+            List<MessagingMessage> messages, boolean showSpinner) {
         // Let's first find our groups!
         List<List<MessagingMessage>> groups = new ArrayList<>();
-        List<Notification.Person> senders = new ArrayList<>();
+        List<Person> senders = new ArrayList<>();
 
         // Lets first find the groups
         findGroups(historicMessages, messages, groups, senders);
 
         // Let's now create the views and reorder them accordingly
-        createGroupViews(groups, senders);
+        createGroupViews(groups, senders, showSpinner);
     }
 
     private void createGroupViews(List<List<MessagingMessage>> groups,
-            List<Notification.Person> senders) {
+            List<Person> senders, boolean showSpinner) {
         mGroups.clear();
         for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
             List<MessagingMessage> group = groups.get(groupIndex);
@@ -337,14 +341,15 @@ public class MessagingLayout extends FrameLayout {
                 newGroup = MessagingGroup.createGroup(mMessagingLinearLayout);
                 mAddedGroups.add(newGroup);
             }
-            newGroup.setDisplayAvatarsAtEnd(mIsCollapsed);
+            newGroup.setDisplayImagesAtEnd(mDisplayImagesAtEnd);
             newGroup.setLayoutColor(mLayoutColor);
-            Notification.Person sender = senders.get(groupIndex);
+            Person sender = senders.get(groupIndex);
             CharSequence nameOverride = null;
             if (sender != mUser && mNameReplacement != null) {
                 nameOverride = mNameReplacement;
             }
             newGroup.setSender(sender, nameOverride);
+            newGroup.setSending(groupIndex == (groups.size() - 1) && showSpinner);
             mGroups.add(newGroup);
 
             if (mMessagingLinearLayout.indexOfChild(newGroup) != groupIndex) {
@@ -357,7 +362,7 @@ public class MessagingLayout extends FrameLayout {
 
     private void findGroups(List<MessagingMessage> historicMessages,
             List<MessagingMessage> messages, List<List<MessagingMessage>> groups,
-            List<Notification.Person> senders) {
+            List<Person> senders) {
         CharSequence currentSenderKey = null;
         List<MessagingMessage> currentGroup = null;
         int histSize = historicMessages.size();
@@ -369,7 +374,7 @@ public class MessagingLayout extends FrameLayout {
                 message = messages.get(i - histSize);
             }
             boolean isNewGroup = currentGroup == null;
-            Notification.Person sender = message.getMessage().getSenderPerson();
+            Person sender = message.getMessage().getSenderPerson();
             CharSequence key = sender == null ? null
                     : sender.getKey() == null ? sender.getName() : sender.getKey();
             isNewGroup |= !TextUtils.equals(key, currentSenderKey);

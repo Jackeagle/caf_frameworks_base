@@ -18,6 +18,7 @@ package com.android.server.locksettings.recoverablekeystore;
 
 import static android.security.keystore.recovery.RecoveryController.ERROR_BAD_CERTIFICATE_FORMAT;
 import static android.security.keystore.recovery.RecoveryController.ERROR_DECRYPTION_FAILED;
+import static android.security.keystore.recovery.RecoveryController.ERROR_DOWNGRADE_CERTIFICATE;
 import static android.security.keystore.recovery.RecoveryController.ERROR_INSECURE_USER;
 import static android.security.keystore.recovery.RecoveryController.ERROR_INVALID_KEY_FORMAT;
 import static android.security.keystore.recovery.RecoveryController.ERROR_INVALID_CERTIFICATE;
@@ -31,7 +32,6 @@ import android.annotation.Nullable;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.os.Binder;
-import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.UserHandle;
@@ -39,7 +39,6 @@ import android.security.keystore.recovery.KeyChainProtectionParams;
 import android.security.keystore.recovery.KeyChainSnapshot;
 import android.security.keystore.recovery.RecoveryCertPath;
 import android.security.keystore.recovery.RecoveryController;
-import android.security.keystore.recovery.TrustedRootCertificates;
 import android.security.keystore.recovery.WrappedApplicationKey;
 import android.security.KeyStore;
 import android.util.ArrayMap;
@@ -48,12 +47,12 @@ import android.util.Log;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.HexDump;
 import com.android.internal.util.Preconditions;
-import com.android.server.locksettings.recoverablekeystore.certificate.CertUtils;
-import com.android.server.locksettings.recoverablekeystore.certificate.SigXml;
-import com.android.server.locksettings.recoverablekeystore.storage.ApplicationKeyStorage;
 import com.android.server.locksettings.recoverablekeystore.certificate.CertParsingException;
+import com.android.server.locksettings.recoverablekeystore.certificate.CertUtils;
 import com.android.server.locksettings.recoverablekeystore.certificate.CertValidationException;
 import com.android.server.locksettings.recoverablekeystore.certificate.CertXml;
+import com.android.server.locksettings.recoverablekeystore.certificate.SigXml;
+import com.android.server.locksettings.recoverablekeystore.storage.ApplicationKeyStorage;
 import com.android.server.locksettings.recoverablekeystore.storage.RecoverableKeyStoreDb;
 import com.android.server.locksettings.recoverablekeystore.storage.RecoverySessionStorage;
 import com.android.server.locksettings.recoverablekeystore.storage.RecoverySnapshotStorage;
@@ -100,8 +99,8 @@ public class RecoverableKeyStoreManager {
     private final RecoverableKeyGenerator mRecoverableKeyGenerator;
     private final RecoverySnapshotStorage mSnapshotStorage;
     private final PlatformKeyManager mPlatformKeyManager;
-    private final KeyStore mKeyStore;
     private final ApplicationKeyStorage mApplicationKeyStorage;
+    private final TestOnlyInsecureCertificateHelper mTestCertHelper;
 
     /**
      * Returns a new or existing instance.
@@ -126,14 +125,14 @@ public class RecoverableKeyStoreManager {
 
             mInstance = new RecoverableKeyStoreManager(
                     context.getApplicationContext(),
-                    keystore,
                     db,
                     new RecoverySessionStorage(),
                     Executors.newSingleThreadExecutor(),
-                    new RecoverySnapshotStorage(),
+                    RecoverySnapshotStorage.newInstance(),
                     new RecoverySnapshotListenersStorage(),
                     platformKeyManager,
-                    applicationKeyStorage);
+                    applicationKeyStorage,
+                    new TestOnlyInsecureCertificateHelper());
         }
         return mInstance;
     }
@@ -141,16 +140,15 @@ public class RecoverableKeyStoreManager {
     @VisibleForTesting
     RecoverableKeyStoreManager(
             Context context,
-            KeyStore keystore,
             RecoverableKeyStoreDb recoverableKeyStoreDb,
             RecoverySessionStorage recoverySessionStorage,
             ExecutorService executorService,
             RecoverySnapshotStorage snapshotStorage,
             RecoverySnapshotListenersStorage listenersStorage,
             PlatformKeyManager platformKeyManager,
-            ApplicationKeyStorage applicationKeyStorage) {
+            ApplicationKeyStorage applicationKeyStorage,
+            TestOnlyInsecureCertificateHelper TestOnlyInsecureCertificateHelper) {
         mContext = context;
-        mKeyStore = keystore;
         mDatabase = recoverableKeyStoreDb;
         mRecoverySessionStorage = recoverySessionStorage;
         mExecutorService = executorService;
@@ -158,6 +156,7 @@ public class RecoverableKeyStoreManager {
         mSnapshotStorage = snapshotStorage;
         mPlatformKeyManager = platformKeyManager;
         mApplicationKeyStorage = applicationKeyStorage;
+        mTestCertHelper = TestOnlyInsecureCertificateHelper;
 
         try {
             mRecoverableKeyGenerator = RecoverableKeyGenerator.newInstance(mDatabase);
@@ -168,16 +167,22 @@ public class RecoverableKeyStoreManager {
     }
 
     /**
-     * @deprecated Use {@link #initRecoveryServiceWithSigFile(String, byte[], byte[])} instead.
+     * Used by {@link #initRecoveryServiceWithSigFile(String, byte[], byte[])}.
      */
-    public void initRecoveryService(
+    @VisibleForTesting
+    void initRecoveryService(
             @NonNull String rootCertificateAlias, @NonNull byte[] recoveryServiceCertFile)
             throws RemoteException {
         checkRecoverKeyStorePermission();
         int userId = UserHandle.getCallingUserId();
         int uid = Binder.getCallingUid();
-        rootCertificateAlias = replaceEmptyValueWithSecureDefault(rootCertificateAlias);
 
+        rootCertificateAlias
+                = mTestCertHelper.getDefaultCertificateAliasIfEmpty(rootCertificateAlias);
+        if (!mTestCertHelper.isValidRootCertificateAlias(rootCertificateAlias)) {
+            throw new ServiceSpecificException(
+                    ERROR_INVALID_CERTIFICATE, "Invalid root certificate alias");
+        }
         // Always set active alias to the argument of the last call to initRecoveryService method,
         // even if cert file is incorrect.
         String activeRootAlias = mDatabase.getActiveRootOfTrust(userId, uid);
@@ -195,25 +200,22 @@ public class RecoverableKeyStoreManager {
         try {
             certXml = CertXml.parse(recoveryServiceCertFile);
         } catch (CertParsingException e) {
-            // TODO: Do not use raw key bytes anymore once the other components are updated
             Log.d(TAG, "Failed to parse the input as a cert file: " + HexDump.toHexString(
                     recoveryServiceCertFile));
-            PublicKey publicKey = parseEcPublicKey(recoveryServiceCertFile);
-            if (mDatabase.setRecoveryServicePublicKey(userId, uid, publicKey) > 0) {
-                mDatabase.setShouldCreateSnapshot(userId, uid, true);
-            }
-            Log.d(TAG, "Successfully set the input as the raw public key");
-            return;
+            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT, e.getMessage());
         }
 
         // Check serial number
         long newSerial = certXml.getSerial();
         Long oldSerial = mDatabase.getRecoveryServiceCertSerial(userId, uid, rootCertificateAlias);
-        if (oldSerial != null && oldSerial >= newSerial) {
+        if (oldSerial != null && oldSerial >= newSerial
+                && !mTestCertHelper.isTestOnlyCertificateAlias(rootCertificateAlias)) {
             if (oldSerial == newSerial) {
                 Log.i(TAG, "The cert file serial number is the same, so skip updating.");
             } else {
                 Log.e(TAG, "The cert file serial number is older than the one in database.");
+                throw new ServiceSpecificException(ERROR_DOWNGRADE_CERTIFICATE,
+                        "The cert file serial number is older than the one in database.");
             }
             return;
         }
@@ -221,18 +223,15 @@ public class RecoverableKeyStoreManager {
 
         // Randomly choose and validate an endpoint certificate from the list
         CertPath certPath;
-        X509Certificate rootCert = getRootCertificate(rootCertificateAlias);
+        X509Certificate rootCert =
+                mTestCertHelper.getRootCertificate(rootCertificateAlias);
         try {
             Log.d(TAG, "Getting and validating a random endpoint certificate");
             certPath = certXml.getRandomEndpointCert(rootCert);
         } catch (CertValidationException e) {
             Log.e(TAG, "Invalid endpoint cert", e);
-            throw new ServiceSpecificException(
-                    ERROR_INVALID_CERTIFICATE, "Failed to validate certificate.");
+            throw new ServiceSpecificException(ERROR_INVALID_CERTIFICATE, e.getMessage());
         }
-
-        boolean wasInitialized = mDatabase.getRecoveryServiceCertPath(userId, uid,
-                rootCertificateAlias) != null;
 
         // Save the chosen and validated certificate into database
         try {
@@ -241,16 +240,17 @@ public class RecoverableKeyStoreManager {
                     certPath) > 0) {
                 mDatabase.setRecoveryServiceCertSerial(userId, uid, rootCertificateAlias,
                         newSerial);
-                if (wasInitialized) {
-                    Log.i(TAG, "This is a certificate change. Snapshot pending.");
+                if (mDatabase.getSnapshotVersion(userId, uid) != null) {
                     mDatabase.setShouldCreateSnapshot(userId, uid, true);
+                    Log.i(TAG, "This is a certificate change. Snapshot must be updated");
+                } else {
+                    Log.i(TAG, "This is a certificate change. Snapshot didn't exist");
                 }
                 mDatabase.setCounterId(userId, uid, new SecureRandom().nextLong());
             }
         } catch (CertificateEncodingException e) {
             Log.e(TAG, "Failed to encode CertPath", e);
-            throw new ServiceSpecificException(
-                    ERROR_BAD_CERTIFICATE_FORMAT, "Failed to encode CertPath.");
+            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT, e.getMessage());
         }
     }
 
@@ -270,7 +270,8 @@ public class RecoverableKeyStoreManager {
             @NonNull byte[] recoveryServiceSigFile)
             throws RemoteException {
         checkRecoverKeyStorePermission();
-        rootCertificateAlias = replaceEmptyValueWithSecureDefault(rootCertificateAlias);
+        rootCertificateAlias =
+                mTestCertHelper.getDefaultCertificateAliasIfEmpty(rootCertificateAlias);
         Preconditions.checkNotNull(recoveryServiceCertFile, "recoveryServiceCertFile is null");
         Preconditions.checkNotNull(recoveryServiceSigFile, "recoveryServiceSigFile is null");
 
@@ -280,36 +281,21 @@ public class RecoverableKeyStoreManager {
         } catch (CertParsingException e) {
             Log.d(TAG, "Failed to parse the sig file: " + HexDump.toHexString(
                     recoveryServiceSigFile));
-            throw new ServiceSpecificException(
-                    ERROR_BAD_CERTIFICATE_FORMAT, "Failed to parse the sig file.");
+            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT, e.getMessage());
         }
 
-        X509Certificate rootCert = getRootCertificate(rootCertificateAlias);
+        X509Certificate rootCert =
+                mTestCertHelper.getRootCertificate(rootCertificateAlias);
         try {
             sigXml.verifyFileSignature(rootCert, recoveryServiceCertFile);
         } catch (CertValidationException e) {
             Log.d(TAG, "The signature over the cert file is invalid."
                     + " Cert: " + HexDump.toHexString(recoveryServiceCertFile)
                     + " Sig: " + HexDump.toHexString(recoveryServiceSigFile));
-            throw new ServiceSpecificException(
-                    ERROR_INVALID_CERTIFICATE, "The signature over the cert file is invalid.");
+            throw new ServiceSpecificException(ERROR_INVALID_CERTIFICATE, e.getMessage());
         }
 
         initRecoveryService(rootCertificateAlias, recoveryServiceCertFile);
-    }
-
-    private PublicKey parseEcPublicKey(@NonNull byte[] bytes) throws ServiceSpecificException {
-        try {
-            KeyFactory kf = KeyFactory.getInstance("EC");
-            X509EncodedKeySpec pkSpec = new X509EncodedKeySpec(bytes);
-            return kf.generatePublic(pkSpec);
-        } catch (NoSuchAlgorithmException e) {
-            Log.wtf(TAG, "EC algorithm not available. AOSP must support this.", e);
-            throw new ServiceSpecificException(ERROR_SERVICE_INTERNAL_ERROR, e.getMessage());
-        } catch (InvalidKeySpecException e) {
-            throw new ServiceSpecificException(
-                    ERROR_BAD_CERTIFICATE_FORMAT, "Not a valid X509 certificate.");
-        }
     }
 
     /**
@@ -364,8 +350,12 @@ public class RecoverableKeyStoreManager {
             return;
         }
 
-        Log.i(TAG, "Updated server params. Snapshot pending.");
-        mDatabase.setShouldCreateSnapshot(userId, uid, true);
+        if (mDatabase.getSnapshotVersion(userId, uid) != null) {
+            mDatabase.setShouldCreateSnapshot(userId, uid, true);
+            Log.i(TAG, "Updated server params. Snapshot must be updated");
+        } else {
+            Log.i(TAG, "Updated server params. Snapshot didn't exist");
+        }
     }
 
     /**
@@ -421,7 +411,12 @@ public class RecoverableKeyStoreManager {
         }
 
         Log.i(TAG, "Updated secret types. Snapshot pending.");
-        mDatabase.setShouldCreateSnapshot(userId, uid, true);
+        if (mDatabase.getSnapshotVersion(userId, uid) != null) {
+            mDatabase.setShouldCreateSnapshot(userId, uid, true);
+            Log.i(TAG, "Updated secret types. Snapshot must be updated");
+        } else {
+            Log.i(TAG, "Updated secret types. Snapshot didn't exist");
+        }
     }
 
     /**
@@ -450,7 +445,8 @@ public class RecoverableKeyStoreManager {
      *
      * @hide
      */
-    public @NonNull byte[] startRecoverySession(
+    @VisibleForTesting
+    @NonNull byte[] startRecoverySession(
             @NonNull String sessionId,
             @NonNull byte[] verifierPublicKey,
             @NonNull byte[] vaultParams,
@@ -469,8 +465,7 @@ public class RecoverableKeyStoreManager {
         try {
             publicKey = KeySyncUtils.deserializePublicKey(verifierPublicKey);
         } catch (InvalidKeySpecException e) {
-            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT,
-                    "Not a valid X509 key");
+            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT, e.getMessage());
         }
         // The raw public key bytes contained in vaultParams must match the ones given in
         // verifierPublicKey; otherwise, the user secret may be decrypted by a key that is not owned
@@ -524,7 +519,8 @@ public class RecoverableKeyStoreManager {
             @NonNull List<KeyChainProtectionParams> secrets)
             throws RemoteException {
         checkRecoverKeyStorePermission();
-        rootCertificateAlias = replaceEmptyValueWithSecureDefault(rootCertificateAlias);
+        rootCertificateAlias =
+                mTestCertHelper.getDefaultCertificateAliasIfEmpty(rootCertificateAlias);
         Preconditions.checkNotNull(sessionId, "invalid session");
         Preconditions.checkNotNull(verifierCertPath, "verifierCertPath is null");
         Preconditions.checkNotNull(vaultParams, "vaultParams is null");
@@ -534,12 +530,12 @@ public class RecoverableKeyStoreManager {
         try {
             certPath = verifierCertPath.getCertPath();
         } catch (CertificateException e) {
-            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT,
-                    "Failed decode the certificate path");
+            throw new ServiceSpecificException(ERROR_BAD_CERTIFICATE_FORMAT, e.getMessage());
         }
 
         try {
-            CertUtils.validateCertPath(getRootCertificate(rootCertificateAlias), certPath);
+            CertUtils.validateCertPath(
+                    mTestCertHelper.getRootCertificate(rootCertificateAlias), certPath);
         } catch (CertValidationException e) {
             Log.e(TAG, "Failed to validate the given cert path", e);
             throw new ServiceSpecificException(ERROR_INVALID_CERTIFICATE, e.getMessage());
@@ -554,45 +550,6 @@ public class RecoverableKeyStoreManager {
 
         return startRecoverySession(
                 sessionId, verifierPublicKey, vaultParams, vaultChallenge, secrets);
-    }
-
-    /**
-     * Invoked by a recovery agent after a successful recovery claim is sent to the remote vault
-     * service.
-     *
-     * @param sessionId The session ID used to generate the claim. See
-     *     {@link #startRecoverySession(String, byte[], byte[], byte[], List)}.
-     * @param encryptedRecoveryKey The encrypted recovery key blob returned by the remote vault
-     *     service.
-     * @param applicationKeys The encrypted key blobs returned by the remote vault service. These
-     *     were wrapped with the recovery key.
-     * @return Map from alias to raw key material.
-     * @throws RemoteException if an error occurred recovering the keys.
-     */
-    public @NonNull Map<String, byte[]> recoverKeys(
-            @NonNull String sessionId,
-            @NonNull byte[] encryptedRecoveryKey,
-            @NonNull List<WrappedApplicationKey> applicationKeys)
-            throws RemoteException {
-        checkRecoverKeyStorePermission();
-        Preconditions.checkNotNull(sessionId, "invalid session");
-        Preconditions.checkNotNull(encryptedRecoveryKey, "encryptedRecoveryKey is null");
-        Preconditions.checkNotNull(applicationKeys, "encryptedRecoveryKey is null");
-        int uid = Binder.getCallingUid();
-        RecoverySessionStorage.Entry sessionEntry = mRecoverySessionStorage.get(uid, sessionId);
-        if (sessionEntry == null) {
-            throw new ServiceSpecificException(ERROR_SESSION_EXPIRED,
-                    String.format(Locale.US,
-                    "Application uid=%d does not have pending session '%s'", uid, sessionId));
-        }
-
-        try {
-            byte[] recoveryKey = decryptRecoveryKey(sessionEntry, encryptedRecoveryKey);
-            return recoverApplicationKeys(recoveryKey, applicationKeys);
-        } finally {
-            sessionEntry.destroy();
-            mRecoverySessionStorage.remove(uid);
-        }
     }
 
     /**
@@ -665,40 +622,6 @@ public class RecoverableKeyStoreManager {
      */
     private @Nullable String getAlias(int userId, int uid, String alias) {
         return mApplicationKeyStorage.getGrantAlias(userId, uid, alias);
-    }
-
-    /**
-     * Deprecated
-     * Generates a key named {@code alias} in the recoverable store for the calling uid. Then
-     * returns the raw key material.
-     *
-     * <p>TODO: Once AndroidKeyStore has added move api, do not return raw bytes.
-     *
-     * @deprecated
-     * @hide
-     */
-    public byte[] generateAndStoreKey(@NonNull String alias) throws RemoteException {
-        checkRecoverKeyStorePermission();
-        int uid = Binder.getCallingUid();
-        int userId = UserHandle.getCallingUserId();
-
-        PlatformEncryptionKey encryptionKey;
-        try {
-            encryptionKey = mPlatformKeyManager.getEncryptKey(userId);
-        } catch (NoSuchAlgorithmException e) {
-            // Impossible: all algorithms must be supported by AOSP
-            throw new RuntimeException(e);
-        } catch (KeyStoreException | UnrecoverableKeyException e) {
-            throw new ServiceSpecificException(ERROR_SERVICE_INTERNAL_ERROR, e.getMessage());
-        } catch (InsecureUserException e) {
-            throw new ServiceSpecificException(ERROR_INSECURE_USER, e.getMessage());
-        }
-
-        try {
-            return mRecoverableKeyGenerator.generateAndStoreKey(encryptionKey, userId, uid, alias);
-        } catch (KeyStoreException | InvalidKeyException | RecoverableKeyStorageException e) {
-            throw new ServiceSpecificException(ERROR_SERVICE_INTERNAL_ERROR, e.getMessage());
-        }
     }
 
     /**
@@ -783,8 +706,6 @@ public class RecoverableKeyStoreManager {
 
         int uid = Binder.getCallingUid();
         int userId = UserHandle.getCallingUserId();
-
-        // TODO: Refactor RecoverableKeyGenerator to wrap the PlatformKey logic
 
         PlatformEncryptionKey encryptionKey;
         try {
@@ -963,27 +884,6 @@ public class RecoverableKeyStoreManager {
         } catch (InsecureUserException e) {
             Log.e(TAG, "InsecureUserException during lock screen secret update", e);
         }
-    }
-
-    private X509Certificate getRootCertificate(String rootCertificateAlias) throws RemoteException {
-        rootCertificateAlias = replaceEmptyValueWithSecureDefault(rootCertificateAlias);
-        X509Certificate rootCertificate =
-                TrustedRootCertificates.getRootCertificate(rootCertificateAlias);
-        if (rootCertificate == null) {
-            throw new ServiceSpecificException(
-                    ERROR_INVALID_CERTIFICATE, "The provided root certificate alias is invalid");
-        }
-        return rootCertificate;
-    }
-
-    private @NonNull String replaceEmptyValueWithSecureDefault(
-            @Nullable String rootCertificateAlias) {
-        if (rootCertificateAlias == null || rootCertificateAlias.isEmpty()) {
-            Log.e(TAG, "rootCertificateAlias is null or empty");
-            // Use the default Google Key Vault Service CA certificate if the alias is not provided
-            rootCertificateAlias = TrustedRootCertificates.GOOGLE_CLOUD_KEY_VAULT_SERVICE_V1_ALIAS;
-        }
-        return rootCertificateAlias;
     }
 
     private void checkRecoverKeyStorePermission() {

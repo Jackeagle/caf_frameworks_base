@@ -2413,11 +2413,16 @@ public class AccessibilityNodeInfo implements Parcelable {
 
     /**
      * Returns whether node represents a heading.
+     * <p><strong>Note:</strong> Returns {@code true} if either {@link #setHeading(boolean)}
+     * marks this node as a heading or if the node has a {@link CollectionItemInfo} that marks
+     * it as such, to accomodate apps that use the now-deprecated API.</p>
      *
      * @return {@code true} if the node is a heading, {@code false} otherwise.
      */
     public boolean isHeading() {
-        return getBooleanProperty(BOOLEAN_PROPERTY_IS_HEADING);
+        if (getBooleanProperty(BOOLEAN_PROPERTY_IS_HEADING)) return true;
+        CollectionItemInfo itemInfo = getCollectionItemInfo();
+        return ((itemInfo != null) && itemInfo.mHeading);
     }
 
     /**
@@ -3437,6 +3442,7 @@ public class AccessibilityNodeInfo implements Parcelable {
         mPackageName = other.mPackageName;
         mClassName = other.mClassName;
         mText = other.mText;
+        mOriginalText = other.mOriginalText;
         mHintText = other.mHintText;
         mError = other.mError;
         mContentDescription = other.mContentDescription;
@@ -3872,6 +3878,24 @@ public class AccessibilityNodeInfo implements Parcelable {
         return client.findAccessibilityNodeInfoByAccessibilityId(mConnectionId,
                 mWindowId, accessibilityId, false, FLAG_PREFETCH_PREDECESSORS
                         | FLAG_PREFETCH_DESCENDANTS | FLAG_PREFETCH_SIBLINGS, null);
+    }
+
+    /** @hide */
+    public static String idToString(long accessibilityId) {
+        int accessibilityViewId = getAccessibilityViewId(accessibilityId);
+        int virtualDescendantId = getVirtualDescendantId(accessibilityId);
+        return virtualDescendantId == AccessibilityNodeProvider.HOST_VIEW_ID
+                ? idItemToString(accessibilityViewId)
+                : idItemToString(accessibilityViewId) + ":" + idItemToString(virtualDescendantId);
+    }
+
+    private static String idItemToString(int item) {
+        switch (item) {
+            case ROOT_ITEM_ID: return "ROOT";
+            case UNDEFINED_ITEM_ID: return "UNDEFINED";
+            case AccessibilityNodeProvider.HOST_VIEW_ID: return "HOST";
+            default: return "" + item;
+        }
     }
 
     /**

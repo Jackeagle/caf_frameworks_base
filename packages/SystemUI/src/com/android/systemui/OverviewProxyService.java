@@ -39,7 +39,9 @@ import com.android.systemui.recents.events.activity.DockedFirstAnimationFrameEve
 import com.android.systemui.recents.misc.SystemServicesProxy;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
+import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.GraphicBufferCompat;
+import com.android.systemui.stackdivider.Divider;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.statusbar.policy.CallbackController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -50,6 +52,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
 import static com.android.systemui.shared.system.NavigationBarCompat.FLAG_DISABLE_SWIPE_UP;
 import static com.android.systemui.shared.system.NavigationBarCompat.InteractionType;
 
@@ -71,11 +74,12 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private final DeviceProvisionedController mDeviceProvisionedController
             = Dependency.get(DeviceProvisionedController.class);
     private final List<OverviewProxyListener> mConnectionCallbacks = new ArrayList<>();
+    private final Intent mQuickStepIntent;
 
     private IOverviewProxy mOverviewProxy;
     private int mConnectionBackoffAttempts;
-    private CharSequence mOnboardingText;
     private @InteractionType int mInteractionFlags;
+    private boolean mIsEnabled;
 
     private ISystemUiProxy mSysUiProxy = new ISystemUiProxy.Stub() {
 
@@ -114,8 +118,17 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             }
         }
 
-        public void setRecentsOnboardingText(CharSequence text) {
-            mOnboardingText = text;
+        public void onOverviewShown(boolean fromHome) {
+            long token = Binder.clearCallingIdentity();
+            try {
+                mHandler.post(() -> {
+                    for (int i = mConnectionCallbacks.size() - 1; i >= 0; --i) {
+                        mConnectionCallbacks.get(i).onOverviewShown(fromHome);
+                    }
+                });
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
         }
 
         public void setInteractionState(@InteractionType int flags) {
@@ -130,14 +143,36 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                     });
                 }
             } finally {
+                Prefs.putInt(mContext, Prefs.Key.QUICK_STEP_INTERACTION_FLAGS, mInteractionFlags);
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        public Rect getNonMinimizedSplitScreenSecondaryBounds() {
+            long token = Binder.clearCallingIdentity();
+            try {
+                Divider divider = ((SystemUIApplication) mContext).getComponent(Divider.class);
+                if (divider != null) {
+                    return divider.getView().getNonMinimizedSplitScreenSecondaryBounds();
+                }
+                return null;
+            } finally {
                 Binder.restoreCallingIdentity(token);
             }
         }
     };
 
-    private final BroadcastReceiver mLauncherAddedReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver mLauncherStateChangedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            updateEnabledState();
+
+            // When launcher service is disabled, reset interaction flags because it is inactive
+            if (!isEnabled()) {
+                mInteractionFlags = 0;
+                Prefs.remove(mContext, Prefs.Key.QUICK_STEP_INTERACTION_FLAGS);
+            }
+
             // Reconnect immediately, instead of waiting for resume to arrive.
             startConnectionToCurrentUser();
         }
@@ -196,17 +231,21 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         mConnectionBackoffAttempts = 0;
         mRecentsComponentName = ComponentName.unflattenFromString(context.getString(
                 com.android.internal.R.string.config_recentsComponentName));
+        mQuickStepIntent = new Intent(ACTION_QUICKSTEP)
+                .setPackage(mRecentsComponentName.getPackageName());
+        mInteractionFlags = Prefs.getInt(mContext, Prefs.Key.QUICK_STEP_INTERACTION_FLAGS, 0);
 
         // Listen for the package update changes.
         if (SystemServicesProxy.getInstance(context)
                 .isSystemUser(mDeviceProvisionedController.getCurrentUser())) {
+            updateEnabledState();
             mDeviceProvisionedController.addCallback(mDeviceProvisionedCallback);
             IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);
             filter.addDataScheme("package");
             filter.addDataSchemeSpecificPart(mRecentsComponentName.getPackageName(),
                     PatternMatcher.PATTERN_LITERAL);
             filter.addAction(Intent.ACTION_PACKAGE_CHANGED);
-            mContext.registerReceiver(mLauncherAddedReceiver, filter);
+            mContext.registerReceiver(mLauncherStateChangedReceiver, filter);
         }
     }
 
@@ -222,15 +261,20 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         disconnectFromLauncherService();
 
         // If user has not setup yet or already connected, do not try to connect
-        if (!mDeviceProvisionedController.isCurrentUserSetup()) {
+        if (!mDeviceProvisionedController.isCurrentUserSetup() || !isEnabled()) {
             return;
         }
         mHandler.removeCallbacks(mConnectionRunnable);
         Intent launcherServiceIntent = new Intent(ACTION_QUICKSTEP)
                 .setPackage(mRecentsComponentName.getPackageName());
-        boolean bound = mContext.bindServiceAsUser(launcherServiceIntent,
-                mOverviewServiceConnection, Context.BIND_AUTO_CREATE,
-                UserHandle.of(mDeviceProvisionedController.getCurrentUser()));
+        boolean bound = false;
+        try {
+            bound = mContext.bindServiceAsUser(launcherServiceIntent,
+                    mOverviewServiceConnection, Context.BIND_AUTO_CREATE,
+                    UserHandle.of(mDeviceProvisionedController.getCurrentUser()));
+        } catch (SecurityException e) {
+            Log.e(TAG_OPS, "Unable to bind because of security error", e);
+        }
         if (!bound) {
             // Retry after exponential backoff timeout
             final long timeoutMs = (long) Math.scalb(BACKOFF_MILLIS, mConnectionBackoffAttempts);
@@ -243,6 +287,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     public void addCallback(OverviewProxyListener listener) {
         mConnectionCallbacks.add(listener);
         listener.onConnectionChanged(mOverviewProxy != null);
+        listener.onInteractionFlagsChanged(mInteractionFlags);
     }
 
     @Override
@@ -251,15 +296,15 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     }
 
     public boolean shouldShowSwipeUpUI() {
-        return getProxy() != null && ((mInteractionFlags & FLAG_DISABLE_SWIPE_UP) == 0);
+        return isEnabled() && ((mInteractionFlags & FLAG_DISABLE_SWIPE_UP) == 0);
+    }
+
+    public boolean isEnabled() {
+        return mIsEnabled;
     }
 
     public IOverviewProxy getProxy() {
         return mOverviewProxy;
-    }
-
-    public CharSequence getOnboardingText() {
-        return mOnboardingText;
     }
 
     public int getInteractionFlags() {
@@ -287,6 +332,18 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         }
     }
 
+    public void notifyQuickScrubStarted() {
+        for (int i = mConnectionCallbacks.size() - 1; i >= 0; --i) {
+            mConnectionCallbacks.get(i).onQuickScrubStarted();
+        }
+    }
+
+    private void updateEnabledState() {
+        mIsEnabled = mContext.getPackageManager().resolveServiceAsUser(mQuickStepIntent,
+                MATCH_DIRECT_BOOT_UNAWARE,
+                ActivityManagerWrapper.getInstance().getCurrentUserId()) != null;
+    }
+
     @Override
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println(TAG_OPS + " state:");
@@ -300,5 +357,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         default void onConnectionChanged(boolean isConnected) {}
         default void onQuickStepStarted() {}
         default void onInteractionFlagsChanged(@InteractionType int flags) {}
+        default void onOverviewShown(boolean fromHome) {}
+        default void onQuickScrubStarted() {}
     }
 }

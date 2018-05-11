@@ -36,6 +36,7 @@ import android.annotation.StringRes;
 import android.annotation.StyleRes;
 import android.annotation.XmlRes;
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.app.assist.AssistStructure;
 import android.content.ClipData;
 import android.content.ClipDescription;
@@ -316,7 +317,6 @@ import java.util.function.Supplier;
  * @attr ref android.R.styleable#TextView_autoSizeMaxTextSize
  * @attr ref android.R.styleable#TextView_autoSizeStepGranularity
  * @attr ref android.R.styleable#TextView_autoSizePresetSizes
- * @attr ref android.R.styleable#TextView_accessibilityHeading
  */
 @RemoteView
 public class TextView extends View implements ViewTreeObserver.OnPreDrawListener {
@@ -416,7 +416,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private int mCurTextColor;
     private int mCurHintTextColor;
     private boolean mFreezesText;
-    private boolean mIsAccessibilityHeading;
 
     private Editable.Factory mEditableFactory = Editable.Factory.getInstance();
     private Spannable.Factory mSpannableFactory = Spannable.Factory.getInstance();
@@ -1293,8 +1292,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 case com.android.internal.R.styleable.TextView_lineHeight:
                     lineHeight = a.getDimensionPixelSize(attr, -1);
                     break;
-                case com.android.internal.R.styleable.TextView_accessibilityHeading:
-                    mIsAccessibilityHeading = a.getBoolean(attr, false);
             }
         }
 
@@ -5208,32 +5205,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (lineHeight != fontHeight) {
             // Set lineSpacingExtra by the difference of lineSpacing with lineHeight
             setLineSpacing(lineHeight - fontHeight, 1f);
-        }
-    }
-
-    /**
-     * Gets whether this view is a heading for accessibility purposes.
-     *
-     * @return {@code true} if the view is a heading, {@code false} otherwise.
-     *
-     * @attr ref android.R.styleable#TextView_accessibilityHeading
-     */
-    public boolean isAccessibilityHeading() {
-        return mIsAccessibilityHeading;
-    }
-
-    /**
-     * Set if view is a heading for a section of content for accessibility purposes.
-     *
-     * @param isHeading {@code true} if the view is a heading, {@code false} otherwise.
-     *
-     * @attr ref android.R.styleable#TextView_accessibilityHeading
-     */
-    public void setAccessibilityHeading(boolean isHeading) {
-        if (isHeading != mIsAccessibilityHeading) {
-            mIsAccessibilityHeading = isHeading;
-            notifyViewAccessibilityStateChangedIfNeeded(
-                    AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED);
         }
     }
 
@@ -9379,7 +9350,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         final int selectionStart = getSelectionStart();
         final int selectionEnd = getSelectionEnd();
 
-        return selectionStart >= 0 && selectionStart != selectionEnd;
+        return selectionStart >= 0 && selectionEnd > 0 && selectionStart != selectionEnd;
     }
 
     String getSelectedText() {
@@ -10832,7 +10803,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         info.setText(getTextForAccessibility());
         info.setHintText(mHint);
         info.setShowingHintText(isShowingHint());
-        info.setHeading(mIsAccessibilityHeading);
 
         if (mBufferType == BufferType.EDITABLE) {
             info.setEditable(true);
@@ -11541,6 +11511,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     /**
      * Returns a session-aware text classifier.
+     * This method creates one if none already exists or the current one is destroyed.
      */
     @NonNull
     TextClassifier getTextClassificationSession() {
@@ -11623,15 +11594,20 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             final int start = spanned.getSpanStart(clickedSpan);
             final int end = spanned.getSpanEnd(clickedSpan);
             if (start >= 0 && end <= mText.length() && start < end) {
-                final TextClassification.Options options = new TextClassification.Options()
-                        .setDefaultLocales(getTextLocales());
+                final TextClassification.Request request = new TextClassification.Request.Builder(
+                        mText, start, end)
+                        .setDefaultLocales(getTextLocales())
+                        .build();
                 final Supplier<TextClassification> supplier = () ->
-                        getTextClassifier().classifyText(mText, start, end, options);
+                        getTextClassifier().classifyText(request);
                 final Consumer<TextClassification> consumer = classification -> {
                     if (classification != null) {
-                        final Intent intent = classification.getIntent();
-                        if (intent != null) {
-                            TextClassification.fireIntent(mContext, intent);
+                        if (!classification.getActions().isEmpty()) {
+                            try {
+                                classification.getActions().get(0).getActionIntent().send();
+                            } catch (PendingIntent.CanceledException e) {
+                                Log.e(LOG_TAG, "Error sending PendingIntent", e);
+                            }
                         } else {
                             Log.d(LOG_TAG, "No link action to perform");
                         }

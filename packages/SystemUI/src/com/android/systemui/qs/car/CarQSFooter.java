@@ -29,7 +29,6 @@ import com.android.systemui.R;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.qs.QSFooter;
 import com.android.systemui.qs.QSPanel;
-import com.android.systemui.statusbar.car.UserGridView;
 import com.android.systemui.statusbar.phone.MultiUserSwitch;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.UserInfoController;
@@ -115,11 +114,9 @@ public class CarQSFooter extends RelativeLayout implements QSFooter,
         }
     }
 
-    @Nullable
     @Override
-    public View getExpandView() {
+    public void setExpandClickListener(OnClickListener onClickListener) {
         // No view that should expand/collapse the quick settings.
-        return null;
     }
 
     @Override

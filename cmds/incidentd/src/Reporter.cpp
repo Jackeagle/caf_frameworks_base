@@ -37,6 +37,10 @@
  */
 static const char* INCIDENT_DIRECTORY = "/data/misc/incidents/";
 
+namespace android {
+namespace os {
+namespace incidentd {
+
 // ================================================================================
 ReportRequest::ReportRequest(const IncidentReportArgs& a,
                              const sp<IIncidentReportStatusListener>& l, int f)
@@ -102,8 +106,7 @@ Reporter::Reporter() : Reporter(INCIDENT_DIRECTORY) { isTest = false; };
 Reporter::Reporter(const char* directory) : batch() {
     char buf[100];
 
-    // TODO: Make the max size smaller for user builds.
-    mMaxSize = 100 * 1024 * 1024;
+    mMaxSize = 30 * 1024 * 1024;  // incident reports can take up to 30MB on disk
     mMaxCount = 100;
 
     // string ends up with '/' is a directory
@@ -320,3 +323,7 @@ Reporter::run_report_status_t Reporter::upload_backlog() {
 
     return REPORT_FINISHED;
 }
+
+}  // namespace incidentd
+}  // namespace os
+}  // namespace android

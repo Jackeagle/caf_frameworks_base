@@ -39,6 +39,7 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -4062,7 +4063,8 @@ public class Editor {
                 item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
                 mAssistClickHandlers.put(item, TextClassification.createIntentOnClickListener(
                         TextClassification.createPendingIntent(mTextView.getContext(),
-                                textClassification.getIntent())));
+                                textClassification.getIntent(),
+                                createAssistMenuItemPendingIntentRequestCode())));
             }
             final int count = textClassification.getActions().size();
             for (int i = 1; i < count; i++) {
@@ -4120,7 +4122,9 @@ public class Editor {
                 final Intent intent = assistMenuItem.getIntent();
                 if (intent != null) {
                     onClickListener = TextClassification.createIntentOnClickListener(
-                            TextClassification.createPendingIntent(mTextView.getContext(), intent));
+                            TextClassification.createPendingIntent(
+                                    mTextView.getContext(), intent,
+                                    createAssistMenuItemPendingIntentRequestCode()));
                 }
             }
             if (onClickListener != null) {
@@ -4129,6 +4133,14 @@ public class Editor {
             }
             // We tried our best.
             return true;
+        }
+
+        private int createAssistMenuItemPendingIntentRequestCode() {
+            return mTextView.hasSelection()
+                    ? mTextView.getText().subSequence(
+                            mTextView.getSelectionStart(), mTextView.getSelectionEnd())
+                            .hashCode()
+                    : 0;
         }
 
         private boolean shouldEnableAssistMenuItems() {
@@ -4585,8 +4597,8 @@ public class Editor {
             return mContainer.isShowing();
         }
 
-        private boolean isVisible() {
-            // Always show a dragging handle.
+        private boolean shouldShow() {
+            // A dragging handle should always be shown.
             if (mIsDragging) {
                 return true;
             }
@@ -4597,6 +4609,10 @@ public class Editor {
 
             return mTextView.isPositionVisible(
                     mPositionX + mHotspotX + getHorizontalOffset(), mPositionY);
+        }
+
+        private void setVisible(final boolean visible) {
+            mContainer.getContentView().setVisibility(visible ? VISIBLE : INVISIBLE);
         }
 
         public abstract int getCurrentCursorOffset();
@@ -4692,7 +4708,7 @@ public class Editor {
                     onHandleMoved();
                 }
 
-                if (isVisible()) {
+                if (shouldShow()) {
                     // Transform to the window coordinates to follow the view tranformation.
                     final int[] pts = { mPositionX + mHotspotX + getHorizontalOffset(), mPositionY};
                     mTextView.transformFromViewToWindowSpace(pts);
@@ -4743,6 +4759,15 @@ public class Editor {
 
         protected int getCursorOffset() {
             return 0;
+        }
+
+        private boolean tooLargeTextForMagnifier() {
+            final float magnifierContentHeight = Math.round(
+                    mMagnifierAnimator.mMagnifier.getHeight()
+                            / mMagnifierAnimator.mMagnifier.getZoom());
+            final Paint.FontMetrics fontMetrics = mTextView.getPaint().getFontMetrics();
+            final float glyphHeight = fontMetrics.descent - fontMetrics.ascent;
+            return glyphHeight > magnifierContentHeight;
         }
 
         /**
@@ -4824,14 +4849,47 @@ public class Editor {
             return true;
         }
 
-        private boolean tooLargeTextForMagnifier() {
-            final float magnifierContentHeight = Math.round(
-                    mMagnifierAnimator.mMagnifier.getHeight()
-                            / mMagnifierAnimator.mMagnifier.getZoom());
-            final Paint.FontMetrics fontMetrics = mTextView.getPaint().getFontMetrics();
-            final float glyphHeight = fontMetrics.descent - fontMetrics.ascent;
-            return glyphHeight > magnifierContentHeight;
+        private boolean handleOverlapsMagnifier(@NonNull final HandleView handle,
+                @NonNull final Rect magnifierRect) {
+            final PopupWindow window = handle.mContainer;
+            if (!window.hasDecorView()) {
+                return false;
+            }
+            final Rect handleRect = new Rect(
+                    window.getDecorViewLayoutParams().x,
+                    window.getDecorViewLayoutParams().y,
+                    window.getDecorViewLayoutParams().x + window.getContentView().getWidth(),
+                    window.getDecorViewLayoutParams().y + window.getContentView().getHeight());
+            return Rect.intersects(handleRect, magnifierRect);
         }
+
+        private @Nullable HandleView getOtherSelectionHandle() {
+            final SelectionModifierCursorController controller = getSelectionController();
+            if (controller == null || !controller.isActive()) {
+                return null;
+            }
+            return controller.mStartHandle != this
+                    ? controller.mStartHandle
+                    : controller.mEndHandle;
+        }
+
+        private final Magnifier.Callback mHandlesVisibilityCallback = new Magnifier.Callback() {
+            @Override
+            public void onOperationComplete() {
+                final Point magnifierTopLeft = mMagnifierAnimator.mMagnifier.getWindowCoords();
+                if (magnifierTopLeft == null) {
+                    return;
+                }
+                final Rect magnifierRect = new Rect(magnifierTopLeft.x, magnifierTopLeft.y,
+                        magnifierTopLeft.x + mMagnifierAnimator.mMagnifier.getWidth(),
+                        magnifierTopLeft.y + mMagnifierAnimator.mMagnifier.getHeight());
+                setVisible(!handleOverlapsMagnifier(HandleView.this, magnifierRect));
+                final HandleView otherHandle = getOtherSelectionHandle();
+                if (otherHandle != null) {
+                    otherHandle.setVisible(!handleOverlapsMagnifier(otherHandle, magnifierRect));
+                }
+            }
+        };
 
         protected final void updateMagnifier(@NonNull final MotionEvent event) {
             if (mMagnifierAnimator == null) {
@@ -4846,6 +4904,9 @@ public class Editor {
                 mRenderCursorRegardlessTiming = true;
                 mTextView.invalidateCursorPath();
                 suspendBlink();
+                mMagnifierAnimator.mMagnifier
+                        .setOnOperationCompleteCallback(mHandlesVisibilityCallback);
+
                 mMagnifierAnimator.show(showPosInView.x, showPosInView.y);
             } else {
                 dismissMagnifier();
@@ -4857,6 +4918,11 @@ public class Editor {
                 mMagnifierAnimator.dismiss();
                 mRenderCursorRegardlessTiming = false;
                 resumeBlink();
+                setVisible(true);
+                final HandleView otherHandle = getOtherSelectionHandle();
+                if (otherHandle != null) {
+                    otherHandle.setVisible(true);
+                }
             }
         }
 
@@ -6011,7 +6077,9 @@ public class Editor {
             mSwitchedLines = false;
             final int selectionStart = mTextView.getSelectionStart();
             final int selectionEnd = mTextView.getSelectionEnd();
-            if (selectionStart > selectionEnd) {
+            if (selectionStart < 0 || selectionEnd < 0) {
+                Selection.removeSelection((Spannable) mTextView.getText());
+            } else if (selectionStart > selectionEnd) {
                 Selection.setSelection((Spannable) mTextView.getText(),
                         selectionEnd, selectionStart);
             }

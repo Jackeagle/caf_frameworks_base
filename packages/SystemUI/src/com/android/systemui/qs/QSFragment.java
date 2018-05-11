@@ -14,9 +14,12 @@
 
 package com.android.systemui.qs;
 
+import static android.app.StatusBarManager.DISABLE2_QUICK_SETTINGS;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.Fragment;
+import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Bundle;
@@ -35,12 +38,14 @@ import android.widget.FrameLayout.LayoutParams;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
 import com.android.systemui.R.id;
+import com.android.systemui.SysUiServiceProvider;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.qs.customize.QSCustomizer;
+import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.phone.NotificationsQuickSettingsContainer;
 import com.android.systemui.statusbar.stack.StackStateAnimator;
 
-public class QSFragment extends Fragment implements QS {
+public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
     private static final String TAG = "QS";
     private static final boolean DEBUG = false;
     private static final String EXTRA_EXPANDED = "expanded";
@@ -65,6 +70,7 @@ public class QSFragment extends Fragment implements QS {
     private int mLayoutDirection;
     private QSFooter mFooter;
     private float mLastQSExpansion = -1;
+    private boolean mQsDisabled;
 
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
@@ -99,6 +105,13 @@ public class QSFragment extends Fragment implements QS {
             mQSCustomizer.setEditLocation(x, y);
             mQSCustomizer.restoreInstanceState(savedInstanceState);
         }
+        SysUiServiceProvider.getComponent(getContext(), CommandQueue.class).addCallbacks(this);
+    }
+
+    @Override
+    public void onDestroyView() {
+        SysUiServiceProvider.getComponent(getContext(), CommandQueue.class).removeCallbacks(this);
+        super.onDestroyView();
     }
 
     @Override
@@ -176,6 +189,17 @@ public class QSFragment extends Fragment implements QS {
         }
     }
 
+    @Override
+    public void disable(int state1, int state2, boolean animate) {
+        final boolean disabled = (state2 & DISABLE2_QUICK_SETTINGS) != 0;
+        if (disabled == mQsDisabled) return;
+        mQsDisabled = disabled;
+        mContainer.disable(state1, state2, animate);
+        mHeader.disable(state1, state2, animate);
+        mFooter.disable(state1, state2, animate);
+        updateQsState();
+    }
+
     private void updateQsState() {
         final boolean expandVisually = mQsExpanded || mStackScrollerOverscrolling
                 || mHeaderAnimating;
@@ -186,12 +210,13 @@ public class QSFragment extends Fragment implements QS {
                 : View.INVISIBLE);
         mHeader.setExpanded((mKeyguardShowing && !mHeaderAnimating)
                 || (mQsExpanded && !mStackScrollerOverscrolling));
-        mFooter.setVisibility((mQsExpanded || !mKeyguardShowing || mHeaderAnimating)
+        mFooter.setVisibility(
+                !mQsDisabled && (mQsExpanded || !mKeyguardShowing || mHeaderAnimating)
                 ? View.VISIBLE
                 : View.INVISIBLE);
         mFooter.setExpanded((mKeyguardShowing && !mHeaderAnimating)
                 || (mQsExpanded && !mStackScrollerOverscrolling));
-        mQSPanel.setVisibility(expandVisually ? View.VISIBLE : View.INVISIBLE);
+        mQSPanel.setVisibility(!mQsDisabled && expandVisually ? View.VISIBLE : View.INVISIBLE);
     }
 
     public QSPanel getQsPanel() {
@@ -215,11 +240,6 @@ public class QSFragment extends Fragment implements QS {
     @Override
     public void setHeaderClickable(boolean clickable) {
         if (DEBUG) Log.d(TAG, "setHeaderClickable " + clickable);
-
-        View expandView = mFooter.getExpandView();
-        if (expandView != null) {
-            expandView.setClickable(clickable);
-        }
     }
 
     @Override
@@ -291,6 +311,7 @@ public class QSFragment extends Fragment implements QS {
         mHeader.setExpansion(mKeyguardShowing, expansion, panelTranslationY);
         mFooter.setExpansion(mKeyguardShowing ? 1 : expansion);
         mQSPanel.getQsTileRevealController().setExpansion(expansion);
+        mQSPanel.getTileLayout().setExpansion(expansion);
         mQSPanel.setTranslationY(translationScaleY * heightDiff);
         mQSDetail.setFullyExpanded(fullyExpanded);
 
@@ -343,11 +364,7 @@ public class QSFragment extends Fragment implements QS {
 
     @Override
     public void setExpandClickListener(OnClickListener onClickListener) {
-        View expandView = mFooter.getExpandView();
-
-        if (expandView != null) {
-            expandView.setOnClickListener(onClickListener);
-        }
+        mFooter.setExpandClickListener(onClickListener);
     }
 
     @Override
@@ -359,7 +376,6 @@ public class QSFragment extends Fragment implements QS {
         // The customize state changed, so our height changed.
         mContainer.updateExpansion();
         mQSPanel.setVisibility(!mQSCustomizer.isCustomizing() ? View.VISIBLE : View.INVISIBLE);
-        mHeader.setVisibility(!mQSCustomizer.isCustomizing() ? View.VISIBLE : View.INVISIBLE);
         mFooter.setVisibility(!mQSCustomizer.isCustomizing() ? View.VISIBLE : View.INVISIBLE);
         // Let the panel know the position changed and it needs to update where notifications
         // and whatnot are.

@@ -30,6 +30,7 @@ import android.test.suitebuilder.annotation.SmallTest;
 import com.android.server.UiServiceTestCase;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -203,6 +204,32 @@ public class ScheduleCalendarTest extends UiServiceTestCase {
         mScheduleCalendar.setSchedule(mScheduleInfo);
 
         assertTrue(mScheduleCalendar.shouldExitForAlarm(1000));
+    }
+
+    @Ignore
+    @Test
+    public void testShouldExitForAlarm_oldAlarm() {
+        // Cal: today 2:15pm
+        Calendar cal = new GregorianCalendar();
+        cal.set(Calendar.HOUR_OF_DAY, 14);
+        cal.set(Calendar.MINUTE, 15);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+
+        // ScheduleInfo: today 12:16pm  - today 3:15pm
+        mScheduleInfo.days = new int[] {getTodayDay()};
+        mScheduleInfo.startHour = 12;
+        mScheduleInfo.endHour = 3;
+        mScheduleInfo.startMinute = 16;
+        mScheduleInfo.endMinute = 15;
+        mScheduleInfo.exitAtAlarm = true;
+        mScheduleInfo.nextAlarm = 1000; // very old alarm
+
+        mScheduleCalendar.setSchedule(mScheduleInfo);
+        assertTrue(mScheduleCalendar.isInSchedule(cal.getTimeInMillis()));
+
+        // don't exit for an alarm if it's an old alarm
+        assertFalse(mScheduleCalendar.shouldExitForAlarm(1000));
     }
 
     @Test

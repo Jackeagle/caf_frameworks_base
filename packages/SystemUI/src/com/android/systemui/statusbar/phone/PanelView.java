@@ -497,7 +497,7 @@ public abstract class PanelView extends FrameLayout {
                 mUpdateFlingVelocity = vel;
             }
         } else if (mPanelClosedOnDown && !mHeadsUpManager.hasPinnedHeadsUp() && !mTracking
-                && !mStatusBar.isBouncerShowing()) {
+                && !mStatusBar.isBouncerShowing() && !mStatusBar.isKeyguardFadingAway()) {
             long timePassed = SystemClock.uptimeMillis() - mDownTime;
             if (timePassed < ViewConfiguration.getLongPressTimeout()) {
                 // Lets show the user that he can actually expand the panel
@@ -847,7 +847,7 @@ public abstract class PanelView extends FrameLayout {
     }
 
     @Override
-    protected void onLayout (boolean changed, int left, int top, int right, int bottom) {
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         mStatusBar.onPanelLaidOut();
         requestPanelHeightUpdate();
@@ -1107,13 +1107,10 @@ public abstract class PanelView extends FrameLayout {
         }
         cancelPeek();
         notifyExpandingStarted();
-        startUnlockHintAnimationPhase1(new Runnable() {
-            @Override
-            public void run() {
-                notifyExpandingFinished();
-                onUnlockHintFinished();
-                mHintAnimationRunning = false;
-            }
+        startUnlockHintAnimationPhase1(() -> {
+            notifyExpandingFinished();
+            onUnlockHintFinished();
+            mHintAnimationRunning = false;
         });
         onUnlockHintStarted();
         mHintAnimationRunning = true;

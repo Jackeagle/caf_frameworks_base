@@ -20,13 +20,15 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.RequiresPermission;
-import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.content.Context;
 import android.os.Binder;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
+import android.os.ServiceSpecificException;
+import android.system.ErrnoException;
+import android.system.OsConstants;
 import android.util.AndroidException;
 import android.util.Log;
 
@@ -140,6 +142,7 @@ public final class IpSecManager {
         }
     }
 
+    private final Context mContext;
     private final IIpSecService mService;
 
     /**
@@ -172,11 +175,16 @@ public final class IpSecManager {
         public void close() {
             try {
                 mService.releaseSecurityParameterIndex(mResourceId);
-                mResourceId = INVALID_RESOURCE_ID;
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
+            } catch (Exception e) {
+                // On close we swallow all random exceptions since failure to close is not
+                // actionable by the user.
+                Log.e(TAG, "Failed to close " + this + ", Exception=" + e);
+            } finally {
+                mResourceId = INVALID_RESOURCE_ID;
+                mCloseGuard.close();
             }
-            mCloseGuard.close();
         }
 
         /** Check that the SPI was closed properly. */
@@ -227,7 +235,6 @@ public final class IpSecManager {
                     throw new RuntimeException(
                             "Invalid Resource ID returned by IpSecService: " + status);
                 }
-
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -238,6 +245,17 @@ public final class IpSecManager {
         @VisibleForTesting
         public int getResourceId() {
             return mResourceId;
+        }
+
+        @Override
+        public String toString() {
+            return new StringBuilder()
+                .append("SecurityParameterIndex{spi=")
+                .append(mSpi)
+                .append(",resourceId=")
+                .append(mResourceId)
+                .append("}")
+                .toString();
         }
     }
 
@@ -261,7 +279,11 @@ public final class IpSecManager {
                     mService,
                     destinationAddress,
                     IpSecManager.INVALID_SECURITY_PARAMETER_INDEX);
+        } catch (ServiceSpecificException e) {
+            throw rethrowUncheckedExceptionFromServiceSpecificException(e);
         } catch (SpiUnavailableException unlikely) {
+            // Because this function allocates a totally random SPI, it really shouldn't ever
+            // fail to allocate an SPI; we simply need this because the exception is checked.
             throw new ResourceUnavailableException("No SPIs available");
         }
     }
@@ -274,7 +296,8 @@ public final class IpSecManager {
      *
      * @param destinationAddress the destination address for traffic bearing the requested SPI.
      *     For inbound traffic, the destination should be an address currently assigned on-device.
-     * @param requestedSpi the requested SPI, or '0' to allocate a random SPI
+     * @param requestedSpi the requested SPI. The range 1-255 is reserved and may not be used. See
+     *     RFC 4303 Section 2.1.
      * @return the reserved SecurityParameterIndex
      * @throws {@link #ResourceUnavailableException} indicating that too many SPIs are
      *     currently allocated for this user
@@ -288,7 +311,11 @@ public final class IpSecManager {
         if (requestedSpi == IpSecManager.INVALID_SECURITY_PARAMETER_INDEX) {
             throw new IllegalArgumentException("Requested SPI must be a valid (non-zero) SPI");
         }
-        return new SecurityParameterIndex(mService, destinationAddress, requestedSpi);
+        try {
+            return new SecurityParameterIndex(mService, destinationAddress, requestedSpi);
+        } catch (ServiceSpecificException e) {
+            throw rethrowUncheckedExceptionFromServiceSpecificException(e);
+        }
     }
 
     /**
@@ -304,6 +331,19 @@ public final class IpSecManager {
      * other IP address will result in an IOException. In addition, reads and writes on the socket
      * will throw IOException if the user deactivates the transform (by calling {@link
      * IpSecTransform#close()}) without calling {@link #removeTransportModeTransforms}.
+     *
+     * <p>Note that when applied to TCP sockets, calling {@link IpSecTransform#close()} on an
+     * applied transform before completion of graceful shutdown may result in the shutdown sequence
+     * failing to complete. As such, applications requiring graceful shutdown MUST close the socket
+     * prior to deactivating the applied transform. Socket closure may be performed asynchronously
+     * (in batches), so the returning of a close function does not guarantee shutdown of a socket.
+     * Setting an SO_LINGER timeout results in socket closure being performed synchronously, and is
+     * sufficient to ensure shutdown.
+     *
+     * Specifically, if the transform is deactivated (by calling {@link IpSecTransform#close()}),
+     * prior to the socket being closed, the standard [FIN - FIN/ACK - ACK], or the reset [RST]
+     * packets are dropped due to the lack of a valid Transform. Similarly, if a socket without the
+     * SO_LINGER option set is closed, the delayed/batched FIN packets may be dropped.
      *
      * <h4>Rekey Procedure</h4>
      *
@@ -322,6 +362,9 @@ public final class IpSecManager {
      */
     public void applyTransportModeTransform(@NonNull Socket socket,
             @PolicyDirection int direction, @NonNull IpSecTransform transform) throws IOException {
+        // Ensure creation of FD. See b/77548890 for more details.
+        socket.getSoLinger();
+
         applyTransportModeTransform(socket.getFileDescriptor$(), direction, transform);
     }
 
@@ -373,6 +416,19 @@ public final class IpSecManager {
      * will throw IOException if the user deactivates the transform (by calling {@link
      * IpSecTransform#close()}) without calling {@link #removeTransportModeTransforms}.
      *
+     * <p>Note that when applied to TCP sockets, calling {@link IpSecTransform#close()} on an
+     * applied transform before completion of graceful shutdown may result in the shutdown sequence
+     * failing to complete. As such, applications requiring graceful shutdown MUST close the socket
+     * prior to deactivating the applied transform. Socket closure may be performed asynchronously
+     * (in batches), so the returning of a close function does not guarantee shutdown of a socket.
+     * Setting an SO_LINGER timeout results in socket closure being performed synchronously, and is
+     * sufficient to ensure shutdown.
+     *
+     * Specifically, if the transform is deactivated (by calling {@link IpSecTransform#close()}),
+     * prior to the socket being closed, the standard [FIN - FIN/ACK - ACK], or the reset [RST]
+     * packets are dropped due to the lack of a valid Transform. Similarly, if a socket without the
+     * SO_LINGER option set is closed, the delayed/batched FIN packets may be dropped.
+     *
      * <h4>Rekey Procedure</h4>
      *
      * <p>When applying a new tranform to a socket in the outbound direction, the previous transform
@@ -394,6 +450,8 @@ public final class IpSecManager {
         // constructor takes control and closes the user's FD when we exit the method.
         try (ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(socket)) {
             mService.applyTransportModeTransform(pfd, direction, transform.getResourceId());
+        } catch (ServiceSpecificException e) {
+            throw rethrowCheckedExceptionFromServiceSpecificException(e);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -413,6 +471,9 @@ public final class IpSecManager {
      * @throws IOException indicating that the transform could not be removed from the socket
      */
     public void removeTransportModeTransforms(@NonNull Socket socket) throws IOException {
+        // Ensure creation of FD. See b/77548890 for more details.
+        socket.getSoLinger();
+
         removeTransportModeTransforms(socket.getFileDescriptor$());
     }
 
@@ -449,6 +510,8 @@ public final class IpSecManager {
     public void removeTransportModeTransforms(@NonNull FileDescriptor socket) throws IOException {
         try (ParcelFileDescriptor pfd = ParcelFileDescriptor.dup(socket)) {
             mService.removeTransportModeTransforms(pfd);
+        } catch (ServiceSpecificException e) {
+            throw rethrowCheckedExceptionFromServiceSpecificException(e);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -476,7 +539,7 @@ public final class IpSecManager {
      * signalling and UDP encapsulated IPsec traffic. Instances can be obtained by calling {@link
      * IpSecManager#openUdpEncapsulationSocket}. The provided socket cannot be re-bound by the
      * caller. The caller should not close the {@code FileDescriptor} returned by {@link
-     * #getSocket}, but should use {@link #close} instead.
+     * #getFileDescriptor}, but should use {@link #close} instead.
      *
      * <p>Allowing the user to close or unbind a UDP encapsulation socket could impact the traffic
      * of the next user who binds to that port. To prevent this scenario, these sockets are held
@@ -515,8 +578,8 @@ public final class IpSecManager {
             mCloseGuard.open("constructor");
         }
 
-        /** Get the wrapped socket. */
-        public FileDescriptor getSocket() {
+        /** Get the encapsulation socket's file descriptor. */
+        public FileDescriptor getFileDescriptor() {
             if (mPfd == null) {
                 return null;
             }
@@ -542,6 +605,13 @@ public final class IpSecManager {
                 mResourceId = INVALID_RESOURCE_ID;
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
+            } catch (Exception e) {
+                // On close we swallow all random exceptions since failure to close is not
+                // actionable by the user.
+                Log.e(TAG, "Failed to close " + this + ", Exception=" + e);
+            } finally {
+                mResourceId = INVALID_RESOURCE_ID;
+                mCloseGuard.close();
             }
 
             try {
@@ -550,7 +620,6 @@ public final class IpSecManager {
                 Log.e(TAG, "Failed to close UDP Encapsulation Socket with Port= " + mPort);
                 throw e;
             }
-            mCloseGuard.close();
         }
 
         /** Check that the socket was closed properly. */
@@ -566,6 +635,17 @@ public final class IpSecManager {
         @VisibleForTesting
         public int getResourceId() {
             return mResourceId;
+        }
+
+        @Override
+        public String toString() {
+            return new StringBuilder()
+                .append("UdpEncapsulationSocket{port=")
+                .append(mPort)
+                .append(",resourceId=")
+                .append(mResourceId)
+                .append("}")
+                .toString();
         }
     };
 
@@ -594,7 +674,11 @@ public final class IpSecManager {
         if (port == 0) {
             throw new IllegalArgumentException("Specified port must be a valid port number!");
         }
-        return new UdpEncapsulationSocket(mService, port);
+        try {
+            return new UdpEncapsulationSocket(mService, port);
+        } catch (ServiceSpecificException e) {
+            throw rethrowCheckedExceptionFromServiceSpecificException(e);
+        }
     }
 
     /**
@@ -617,7 +701,11 @@ public final class IpSecManager {
     @NonNull
     public UdpEncapsulationSocket openUdpEncapsulationSocket()
             throws IOException, ResourceUnavailableException {
-        return new UdpEncapsulationSocket(mService, 0);
+        try {
+            return new UdpEncapsulationSocket(mService, 0);
+        } catch (ServiceSpecificException e) {
+            throw rethrowCheckedExceptionFromServiceSpecificException(e);
+        }
     }
 
     /**
@@ -632,8 +720,8 @@ public final class IpSecManager {
      * to create Network objects which are accessible to the Android system.
      * @hide
      */
-    @SystemApi
     public static final class IpSecTunnelInterface implements AutoCloseable {
+        private final String mOpPackageName;
         private final IIpSecService mService;
         private final InetAddress mRemoteAddress;
         private final InetAddress mLocalAddress;
@@ -655,13 +743,16 @@ public final class IpSecManager {
          * tunneled traffic.
          *
          * @param address the local address for traffic inside the tunnel
+         * @param prefixLen length of the InetAddress prefix
          * @hide
          */
-        @SystemApi
         @RequiresPermission(android.Manifest.permission.MANAGE_IPSEC_TUNNELS)
-        public void addAddress(@NonNull LinkAddress address) throws IOException {
+        public void addAddress(@NonNull InetAddress address, int prefixLen) throws IOException {
             try {
-                mService.addAddressToTunnelInterface(mResourceId, address);
+                mService.addAddressToTunnelInterface(
+                        mResourceId, new LinkAddress(address, prefixLen), mOpPackageName);
+            } catch (ServiceSpecificException e) {
+                throw rethrowCheckedExceptionFromServiceSpecificException(e);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -673,22 +764,26 @@ public final class IpSecManager {
          * <p>Remove an address which was previously added to the IpSecTunnelInterface
          *
          * @param address to be removed
+         * @param prefixLen length of the InetAddress prefix
          * @hide
          */
-        @SystemApi
         @RequiresPermission(android.Manifest.permission.MANAGE_IPSEC_TUNNELS)
-        public void removeAddress(@NonNull LinkAddress address) throws IOException {
+        public void removeAddress(@NonNull InetAddress address, int prefixLen) throws IOException {
             try {
-                mService.removeAddressFromTunnelInterface(mResourceId, address);
+                mService.removeAddressFromTunnelInterface(
+                        mResourceId, new LinkAddress(address, prefixLen), mOpPackageName);
+            } catch (ServiceSpecificException e) {
+                throw rethrowCheckedExceptionFromServiceSpecificException(e);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
         }
 
-        private IpSecTunnelInterface(@NonNull IIpSecService service,
+        private IpSecTunnelInterface(@NonNull Context ctx, @NonNull IIpSecService service,
                 @NonNull InetAddress localAddress, @NonNull InetAddress remoteAddress,
                 @NonNull Network underlyingNetwork)
                 throws ResourceUnavailableException, IOException {
+            mOpPackageName = ctx.getOpPackageName();
             mService = service;
             mLocalAddress = localAddress;
             mRemoteAddress = remoteAddress;
@@ -700,7 +795,8 @@ public final class IpSecManager {
                                 localAddress.getHostAddress(),
                                 remoteAddress.getHostAddress(),
                                 underlyingNetwork,
-                                new Binder());
+                                new Binder(),
+                                mOpPackageName);
                 switch (result.status) {
                     case Status.OK:
                         break;
@@ -729,12 +825,17 @@ public final class IpSecManager {
         @Override
         public void close() {
             try {
-                mService.deleteTunnelInterface(mResourceId);
-                mResourceId = INVALID_RESOURCE_ID;
+                mService.deleteTunnelInterface(mResourceId, mOpPackageName);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
+            } catch (Exception e) {
+                // On close we swallow all random exceptions since failure to close is not
+                // actionable by the user.
+                Log.e(TAG, "Failed to close " + this + ", Exception=" + e);
+            } finally {
+                mResourceId = INVALID_RESOURCE_ID;
+                mCloseGuard.close();
             }
-            mCloseGuard.close();
         }
 
         /** Check that the Interface was closed properly. */
@@ -750,6 +851,17 @@ public final class IpSecManager {
         @VisibleForTesting
         public int getResourceId() {
             return mResourceId;
+        }
+
+        @Override
+        public String toString() {
+            return new StringBuilder()
+                .append("IpSecTunnelInterface{ifname=")
+                .append(mInterfaceName)
+                .append(",resourceId=")
+                .append(mResourceId)
+                .append("}")
+                .toString();
         }
     }
 
@@ -768,13 +880,17 @@ public final class IpSecManager {
      * @throws ResourceUnavailableException indicating that too many encapsulation sockets are open
      * @hide
      */
-    @SystemApi
     @NonNull
     @RequiresPermission(android.Manifest.permission.MANAGE_IPSEC_TUNNELS)
     public IpSecTunnelInterface createIpSecTunnelInterface(@NonNull InetAddress localAddress,
             @NonNull InetAddress remoteAddress, @NonNull Network underlyingNetwork)
             throws ResourceUnavailableException, IOException {
-        return new IpSecTunnelInterface(mService, localAddress, remoteAddress, underlyingNetwork);
+        try {
+            return new IpSecTunnelInterface(
+                    mContext, mService, localAddress, remoteAddress, underlyingNetwork);
+        } catch (ServiceSpecificException e) {
+            throw rethrowCheckedExceptionFromServiceSpecificException(e);
+        }
     }
 
     /**
@@ -794,13 +910,15 @@ public final class IpSecManager {
      *         layer failure.
      * @hide
      */
-    @SystemApi
     @RequiresPermission(android.Manifest.permission.MANAGE_IPSEC_TUNNELS)
     public void applyTunnelModeTransform(@NonNull IpSecTunnelInterface tunnel,
             @PolicyDirection int direction, @NonNull IpSecTransform transform) throws IOException {
         try {
             mService.applyTunnelModeTransform(
-                    tunnel.getResourceId(), direction, transform.getResourceId());
+                    tunnel.getResourceId(), direction,
+                    transform.getResourceId(), mContext.getOpPackageName());
+        } catch (ServiceSpecificException e) {
+            throw rethrowCheckedExceptionFromServiceSpecificException(e);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -812,7 +930,48 @@ public final class IpSecManager {
      * @param context the application context for this manager
      * @hide
      */
-    public IpSecManager(IIpSecService service) {
+    public IpSecManager(Context ctx, IIpSecService service) {
+        mContext = ctx;
         mService = checkNotNull(service, "missing service");
+    }
+
+    private static void maybeHandleServiceSpecificException(ServiceSpecificException sse) {
+        // OsConstants are late binding, so switch statements can't be used.
+        if (sse.errorCode == OsConstants.EINVAL) {
+            throw new IllegalArgumentException(sse);
+        } else if (sse.errorCode == OsConstants.EAGAIN) {
+            throw new IllegalStateException(sse);
+        } else if (sse.errorCode == OsConstants.EOPNOTSUPP) {
+            throw new UnsupportedOperationException(sse);
+        }
+    }
+
+    /**
+     * Convert an Errno SSE to the correct Unchecked exception type.
+     *
+     * This method never actually returns.
+     */
+    // package
+    static RuntimeException
+            rethrowUncheckedExceptionFromServiceSpecificException(ServiceSpecificException sse) {
+        maybeHandleServiceSpecificException(sse);
+        throw new RuntimeException(sse);
+    }
+
+    /**
+     * Convert an Errno SSE to the correct Checked or Unchecked exception type.
+     *
+     * This method may throw IOException, or it may throw an unchecked exception; it will never
+     * actually return.
+     */
+    // package
+    static IOException rethrowCheckedExceptionFromServiceSpecificException(
+            ServiceSpecificException sse) throws IOException {
+        // First see if this is an unchecked exception of a type we know.
+        // If so, then we prefer the unchecked (specific) type of exception.
+        maybeHandleServiceSpecificException(sse);
+        // If not, then all we can do is provide the SSE in the form of an IOException.
+        throw new ErrnoException(
+                "IpSec encountered errno=" + sse.errorCode, sse.errorCode).rethrowAsIOException();
     }
 }

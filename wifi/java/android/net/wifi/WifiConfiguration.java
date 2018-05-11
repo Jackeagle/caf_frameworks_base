@@ -25,11 +25,15 @@ import android.net.MacAddress;
 import android.net.ProxyInfo;
 import android.net.StaticIpConfiguration;
 import android.net.Uri;
+import android.net.wifi.WifiInfo;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemClock;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.BackupUtils;
+import android.util.Log;
+import android.util.TimeUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -76,6 +80,8 @@ public class WifiConfiguration implements Parcelable {
 
     /** {@hide} */
     private String mPasspointManagementObjectTree;
+    /** {@hide} */
+    private static final int MAXIMUM_RANDOM_MAC_GENERATION_RETRY = 3;
 
     /**
      * Recognized key management schemes.
@@ -607,37 +613,6 @@ public class WifiConfiguration implements Parcelable {
 
     /**
      * @hide
-     * Last time the system tried to connect and failed.
-     */
-    public long lastConnectionFailure;
-
-    /**
-     * @hide
-     * Last time the system tried to roam and failed because of authentication failure or DHCP
-     * RENEW failure.
-     */
-    public long lastRoamingFailure;
-
-    /** @hide */
-    public static int ROAMING_FAILURE_IP_CONFIG = 1;
-    /** @hide */
-    public static int ROAMING_FAILURE_AUTH_FAILURE = 2;
-
-    /**
-     * @hide
-     * Initial amount of time this Wifi configuration gets blacklisted for network switching
-     * because of roaming failure
-     */
-    public long roamingFailureBlackListTimeMilli = 1000;
-
-    /**
-     * @hide
-     * Last roaming failure reason code
-     */
-    public int lastRoamingFailureReason;
-
-    /**
-     * @hide
      * Last time the system was disconnected to this configuration.
      */
     public long lastDisconnected;
@@ -798,27 +773,37 @@ public class WifiConfiguration implements Parcelable {
      * @hide
      * Randomized MAC address to use with this particular network
      */
+    @NonNull
     private MacAddress mRandomizedMacAddress;
 
     /**
      * @hide
      * Checks if the given MAC address can be used for Connected Mac Randomization
-     * by verifying that it is non-null, unicast, and locally assigned.
+     * by verifying that it is non-null, unicast, locally assigned, and not default mac.
      * @param mac MacAddress to check
      * @return true if mac is good to use
      */
-    private boolean isValidMacAddressForRandomization(MacAddress mac) {
-        return mac != null && !mac.isMulticastAddress() && mac.isLocallyAssigned();
+    public static boolean isValidMacAddressForRandomization(MacAddress mac) {
+        return mac != null && !mac.isMulticastAddress() && mac.isLocallyAssigned()
+                && !MacAddress.fromString(WifiInfo.DEFAULT_MAC_ADDRESS).equals(mac);
     }
 
     /**
      * @hide
      * Returns Randomized MAC address to use with the network.
-     * If it is not set/valid, create a new randomized address.
+     * If it is not set/valid, creates a new randomized address.
+     * If it can't generate a valid mac, returns the default MAC.
      */
-    public MacAddress getOrCreateRandomizedMacAddress() {
-        if (!isValidMacAddressForRandomization(mRandomizedMacAddress)) {
+    public @NonNull MacAddress getOrCreateRandomizedMacAddress() {
+        int randomMacGenerationCount = 0;
+        while (!isValidMacAddressForRandomization(mRandomizedMacAddress)
+                && randomMacGenerationCount < MAXIMUM_RANDOM_MAC_GENERATION_RETRY) {
             mRandomizedMacAddress = MacAddress.createRandomUnicastAddress();
+            randomMacGenerationCount++;
+        }
+
+        if (!isValidMacAddressForRandomization(mRandomizedMacAddress)) {
+            mRandomizedMacAddress = MacAddress.fromString(WifiInfo.DEFAULT_MAC_ADDRESS);
         }
         return mRandomizedMacAddress;
     }
@@ -828,10 +813,7 @@ public class WifiConfiguration implements Parcelable {
      * Returns MAC address set to be the local randomized MAC address.
      * Does not guarantee that the returned address is valid for use.
      */
-    public MacAddress getRandomizedMacAddress() {
-        if (mRandomizedMacAddress == null) {
-            mRandomizedMacAddress = MacAddress.ALL_ZEROS_ADDRESS;
-        }
+    public @NonNull MacAddress getRandomizedMacAddress() {
         return mRandomizedMacAddress;
     }
 
@@ -839,7 +821,11 @@ public class WifiConfiguration implements Parcelable {
      * @hide
      * @param mac MacAddress to change into
      */
-    public void setRandomizedMacAddress(MacAddress mac) {
+    public void setRandomizedMacAddress(@NonNull MacAddress mac) {
+        if (mac == null) {
+            Log.e(TAG, "setRandomizedMacAddress received null MacAddress.");
+            return;
+        }
         mRandomizedMacAddress = mac;
     }
 
@@ -1532,7 +1518,7 @@ public class WifiConfiguration implements Parcelable {
         creatorUid = -1;
         shared = true;
         dtimInterval = 0;
-        mRandomizedMacAddress = MacAddress.ALL_ZEROS_ADDRESS;
+        mRandomizedMacAddress = MacAddress.fromString(WifiInfo.DEFAULT_MAC_ADDRESS);
     }
 
     /**
@@ -1605,8 +1591,9 @@ public class WifiConfiguration implements Parcelable {
         }
         if (mNetworkSelectionStatus.getConnectChoice() != null) {
             sbuf.append(" connect choice: ").append(mNetworkSelectionStatus.getConnectChoice());
-            sbuf.append(" connect choice set time: ").append(mNetworkSelectionStatus
-                    .getConnectChoiceTimestamp());
+            sbuf.append(" connect choice set time: ")
+                    .append(TimeUtils.logTimeOfDay(
+                            mNetworkSelectionStatus.getConnectChoiceTimestamp()));
         }
         sbuf.append(" hasEverConnected: ")
                 .append(mNetworkSelectionStatus.getHasEverConnected()).append("\n");
@@ -1709,7 +1696,7 @@ public class WifiConfiguration implements Parcelable {
             sbuf.append(" networkSelectionBSSID="
                     + mNetworkSelectionStatus.getNetworkSelectionBSSID());
         }
-        long now_ms = System.currentTimeMillis();
+        long now_ms = SystemClock.elapsedRealtime();
         if (mNetworkSelectionStatus.getDisableTime() != NetworkSelectionStatus
                 .INVALID_NETWORK_SELECTION_DISABLE_TIMESTAMP) {
             sbuf.append('\n');
@@ -1731,35 +1718,9 @@ public class WifiConfiguration implements Parcelable {
 
         if (this.lastConnected != 0) {
             sbuf.append('\n');
-            long diff = now_ms - this.lastConnected;
-            if (diff <= 0) {
-                sbuf.append("lastConnected since <incorrect>");
-            } else {
-                sbuf.append("lastConnected: ").append(Long.toString(diff / 1000)).append("sec ");
-            }
+            sbuf.append("lastConnected: ").append(TimeUtils.logTimeOfDay(this.lastConnected));
+            sbuf.append(" ");
         }
-        if (this.lastConnectionFailure != 0) {
-            sbuf.append('\n');
-            long diff = now_ms - this.lastConnectionFailure;
-            if (diff <= 0) {
-                sbuf.append("lastConnectionFailure since <incorrect> ");
-            } else {
-                sbuf.append("lastConnectionFailure: ").append(Long.toString(diff / 1000));
-                sbuf.append("sec ");
-            }
-        }
-        if (this.lastRoamingFailure != 0) {
-            sbuf.append('\n');
-            long diff = now_ms - this.lastRoamingFailure;
-            if (diff <= 0) {
-                sbuf.append("lastRoamingFailure since <incorrect> ");
-            } else {
-                sbuf.append("lastRoamingFailure: ").append(Long.toString(diff / 1000));
-                sbuf.append("sec ");
-            }
-        }
-        sbuf.append("roamingFailureBlackListTimeMilli: ").
-                append(Long.toString(this.roamingFailureBlackListTimeMilli));
         sbuf.append('\n');
         if (this.linkedConfigurations != null) {
             for (String key : this.linkedConfigurations.keySet()) {
@@ -2104,10 +2065,6 @@ public class WifiConfiguration implements Parcelable {
 
             lastConnected = source.lastConnected;
             lastDisconnected = source.lastDisconnected;
-            lastConnectionFailure = source.lastConnectionFailure;
-            lastRoamingFailure = source.lastRoamingFailure;
-            lastRoamingFailureReason = source.lastRoamingFailureReason;
-            roamingFailureBlackListTimeMilli = source.roamingFailureBlackListTimeMilli;
             numScorerOverride = source.numScorerOverride;
             numScorerOverrideAndSwitchedNetwork = source.numScorerOverrideAndSwitchedNetwork;
             numAssociation = source.numAssociation;
@@ -2173,10 +2130,6 @@ public class WifiConfiguration implements Parcelable {
         dest.writeInt(lastUpdateUid);
         dest.writeString(creatorName);
         dest.writeString(lastUpdateName);
-        dest.writeLong(lastConnectionFailure);
-        dest.writeLong(lastRoamingFailure);
-        dest.writeInt(lastRoamingFailureReason);
-        dest.writeLong(roamingFailureBlackListTimeMilli);
         dest.writeInt(numScorerOverride);
         dest.writeInt(numScorerOverrideAndSwitchedNetwork);
         dest.writeInt(numAssociation);
@@ -2242,10 +2195,6 @@ public class WifiConfiguration implements Parcelable {
                 config.lastUpdateUid = in.readInt();
                 config.creatorName = in.readString();
                 config.lastUpdateName = in.readString();
-                config.lastConnectionFailure = in.readLong();
-                config.lastRoamingFailure = in.readLong();
-                config.lastRoamingFailureReason = in.readInt();
-                config.roamingFailureBlackListTimeMilli = in.readLong();
                 config.numScorerOverride = in.readInt();
                 config.numScorerOverrideAndSwitchedNetwork = in.readInt();
                 config.numAssociation = in.readInt();

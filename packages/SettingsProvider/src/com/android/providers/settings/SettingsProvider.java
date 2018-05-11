@@ -2935,7 +2935,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 162;
+            private static final int SETTINGS_VERSION = 164;
 
             private final int mUserId;
 
@@ -3707,6 +3707,39 @@ public class SettingsProvider extends ContentProvider {
                     }
 
                     currentVersion = 162;
+                }
+
+                if (currentVersion == 162) {
+                    // Version 162: Add a gesture for silencing phones
+                    final SettingsState settings = getGlobalSettingsLocked();
+                    final Setting currentSetting = settings.getSettingLocked(
+                            Global.SHOW_ZEN_UPGRADE_NOTIFICATION);
+                    if (!currentSetting.isNull()
+                            && TextUtils.equals("0", currentSetting.getValue())) {
+                        settings.insertSettingLocked(
+                                Global.SHOW_ZEN_UPGRADE_NOTIFICATION, "1",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 163;
+                }
+
+                if (currentVersion == 163) {
+                    // Version 163: Update default value of
+                    // MAX_SOUND_TRIGGER_DETECTION_SERVICE_OPS_PER_DAY from old to new default
+                    final SettingsState settings = getGlobalSettingsLocked();
+                    final Setting currentSetting = settings.getSettingLocked(
+                            Global.MAX_SOUND_TRIGGER_DETECTION_SERVICE_OPS_PER_DAY);
+                    if (currentSetting.isDefaultFromSystem()) {
+                        settings.insertSettingLocked(
+                                Settings.Global.MAX_SOUND_TRIGGER_DETECTION_SERVICE_OPS_PER_DAY,
+                                Integer.toString(getContext().getResources().getInteger(
+                                        R.integer
+                                        .def_max_sound_trigger_detection_service_ops_per_day)),
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 164;
                 }
 
                 // vXXX: Add new settings above this point.

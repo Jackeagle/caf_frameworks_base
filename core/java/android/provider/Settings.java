@@ -142,6 +142,22 @@ public final class Settings {
             "android.settings.LOCATION_SOURCE_SETTINGS";
 
     /**
+     * Activity Action: Show scanning settings to allow configuration of Wi-Fi
+     * and Bluetooth scanning settings.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_LOCATION_SCANNING_SETTINGS =
+            "android.settings.LOCATION_SCANNING_SETTINGS";
+
+    /**
      * Activity Action: Show settings to allow configuration of users.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -1177,6 +1193,23 @@ public final class Settings {
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_ZEN_MODE_SETTINGS = "android.settings.ZEN_MODE_SETTINGS";
+
+    /**
+     * Activity Action: Show Zen Mode visual effects configuration settings.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ZEN_MODE_BLOCKED_EFFECTS_SETTINGS =
+            "android.settings.ZEN_MODE_BLOCKED_EFFECTS_SETTINGS";
+
+    /**
+     * Activity Action: Show Zen Mode onboarding activity.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ZEN_MODE_ONBOARDING = "android.settings.ZEN_MODE_ONBOARDING";
 
     /**
      * Activity Action: Show Zen Mode (aka Do Not Disturb) priority configuration settings.
@@ -2322,6 +2355,7 @@ public final class Settings {
         /** @hide */
         public static String getStringForUser(ContentResolver resolver, String name,
                 int userHandle) {
+            android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -2349,6 +2383,7 @@ public final class Settings {
         /** @hide */
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
                 int userHandle) {
+            android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -3113,6 +3148,9 @@ public final class Settings {
          */
         public static final String DISPLAY_COLOR_MODE = "display_color_mode";
 
+        private static final Validator DISPLAY_COLOR_MODE_VALIDATOR =
+                new SettingsValidators.InclusiveIntegerRangeValidator(0, 2);
+
         /**
          * The amount of time in milliseconds before the device goes to sleep or begins
          * to dream after a period of inactivity.  This value is also known as the
@@ -3132,9 +3170,6 @@ public final class Settings {
          * The screen backlight brightness between 0 and 255.
          */
         public static final String SCREEN_BRIGHTNESS = "screen_brightness";
-
-        private static final Validator SCREEN_BRIGHTNESS_VALIDATOR =
-                new SettingsValidators.InclusiveIntegerRangeValidator(0, 255);
 
         /**
          * The screen backlight brightness between 0 and 255.
@@ -3753,17 +3788,6 @@ public final class Settings {
                 new SettingsValidators.InclusiveIntegerRangeValidator(0, 3);
 
         /**
-         * User-selected RTT mode. When on, outgoing and incoming calls will be answered as RTT
-         * calls when supported by the device and carrier. Boolean value.
-         * 0 = OFF
-         * 1 = ON
-         */
-        public static final String RTT_CALLING_MODE = "rtt_calling_mode";
-
-        /** @hide */
-        public static final Validator RTT_CALLING_MODE_VALIDATOR = BOOLEAN_VALIDATOR;
-
-        /**
          * Whether the sounds effects (key clicks, lid open ...) are enabled. The value is
          * boolean (1 or 0).
          */
@@ -4071,7 +4095,6 @@ public final class Settings {
             FONT_SCALE,
             DIM_SCREEN,
             SCREEN_OFF_TIMEOUT,
-            SCREEN_BRIGHTNESS,
             SCREEN_BRIGHTNESS_MODE,
             SCREEN_AUTO_BRIGHTNESS_ADJ,
             SCREEN_BRIGHTNESS_FOR_VR,
@@ -4088,7 +4111,6 @@ public final class Settings {
             DTMF_TONE_WHEN_DIALING,
             DTMF_TONE_TYPE_WHEN_DIALING,
             HEARING_AID,
-            RTT_CALLING_MODE,
             TTY_MODE,
             MASTER_MONO,
             SOUND_EFFECTS_ENABLED,
@@ -4108,6 +4130,7 @@ public final class Settings {
             SHOW_BATTERY_PERCENT,
             NOTIFICATION_VIBRATION_INTENSITY,
             HAPTIC_FEEDBACK_INTENSITY,
+            DISPLAY_COLOR_MODE
         };
 
         /**
@@ -4220,6 +4243,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(LOCK_TO_APP_ENABLED);
             PRIVATE_SETTINGS.add(EGG_MODE);
             PRIVATE_SETTINGS.add(SHOW_BATTERY_PERCENT);
+            PRIVATE_SETTINGS.add(DISPLAY_COLOR_MODE);
         }
 
         /**
@@ -4241,8 +4265,8 @@ public final class Settings {
             VALIDATORS.put(NEXT_ALARM_FORMATTED, NEXT_ALARM_FORMATTED_VALIDATOR);
             VALIDATORS.put(FONT_SCALE, FONT_SCALE_VALIDATOR);
             VALIDATORS.put(DIM_SCREEN, DIM_SCREEN_VALIDATOR);
+            VALIDATORS.put(DISPLAY_COLOR_MODE, DISPLAY_COLOR_MODE_VALIDATOR);
             VALIDATORS.put(SCREEN_OFF_TIMEOUT, SCREEN_OFF_TIMEOUT_VALIDATOR);
-            VALIDATORS.put(SCREEN_BRIGHTNESS, SCREEN_BRIGHTNESS_VALIDATOR);
             VALIDATORS.put(SCREEN_BRIGHTNESS_FOR_VR, SCREEN_BRIGHTNESS_FOR_VR_VALIDATOR);
             VALIDATORS.put(SCREEN_BRIGHTNESS_MODE, SCREEN_BRIGHTNESS_MODE_VALIDATOR);
             VALIDATORS.put(MODE_RINGER_STREAMS_AFFECTED, MODE_RINGER_STREAMS_AFFECTED_VALIDATOR);
@@ -4287,7 +4311,6 @@ public final class Settings {
             VALIDATORS.put(DTMF_TONE_TYPE_WHEN_DIALING, DTMF_TONE_TYPE_WHEN_DIALING_VALIDATOR);
             VALIDATORS.put(HEARING_AID, HEARING_AID_VALIDATOR);
             VALIDATORS.put(TTY_MODE, TTY_MODE_VALIDATOR);
-            VALIDATORS.put(RTT_CALLING_MODE, RTT_CALLING_MODE_VALIDATOR);
             VALIDATORS.put(NOTIFICATION_LIGHT_PULSE, NOTIFICATION_LIGHT_PULSE_VALIDATOR);
             VALIDATORS.put(POINTER_LOCATION, POINTER_LOCATION_VALIDATOR);
             VALIDATORS.put(SHOW_TOUCHES, SHOW_TOUCHES_VALIDATOR);
@@ -6660,6 +6683,17 @@ public final class Settings {
         private static final Validator TTY_MODE_ENABLED_VALIDATOR = BOOLEAN_VALIDATOR;
 
         /**
+         * User-selected RTT mode. When on, outgoing and incoming calls will be answered as RTT
+         * calls when supported by the device and carrier. Boolean value.
+         * 0 = OFF
+         * 1 = ON
+         */
+        public static final String RTT_CALLING_MODE = "rtt_calling_mode";
+
+        private static final Validator RTT_CALLING_MODE_VALIDATOR = BOOLEAN_VALIDATOR;
+
+        /**
+        /**
          * Controls whether settings backup is enabled.
          * Type: int ( 0 = disabled, 1 = enabled )
          * @hide
@@ -7383,6 +7417,17 @@ public final class Settings {
                 BOOLEAN_VALIDATOR;
 
         /**
+         * Whether the swipe up gesture to switch apps should be enabled.
+         *
+         * @hide
+         */
+        public static final String SWIPE_UP_TO_SWITCH_APPS_ENABLED =
+                "swipe_up_to_switch_apps_enabled";
+
+        private static final Validator SWIPE_UP_TO_SWITCH_APPS_ENABLED_VALIDATOR =
+                BOOLEAN_VALIDATOR;
+
+        /**
          * Whether or not the smart camera lift trigger that launches the camera when the user moves
          * the phone into a position for taking photos should be enabled.
          *
@@ -7809,6 +7854,14 @@ public final class Settings {
                 "suppress_auto_battery_saver_suggestion";
 
         /**
+         * List of packages, which data need to be unconditionally cleared before full restore.
+         * Type: string
+         * @hide
+         */
+        public static final String PACKAGES_TO_CLEAR_DATA_BEFORE_FULL_RESTORE =
+                "packages_to_clear_data_before_full_restore";
+
+        /**
          * This are the settings to be backed up.
          *
          * NOTE: Settings are backed up and restored in the order they appear
@@ -7877,6 +7930,7 @@ public final class Settings {
             PREFERRED_TTY_MODE,
             ENHANCED_VOICE_PRIVACY_ENABLED,
             TTY_MODE_ENABLED,
+            RTT_CALLING_MODE,
             INCALL_POWER_BUTTON_BEHAVIOR,
             NIGHT_DISPLAY_CUSTOM_START_TIME,
             NIGHT_DISPLAY_CUSTOM_END_TIME,
@@ -7884,6 +7938,7 @@ public final class Settings {
             NIGHT_DISPLAY_AUTO_MODE,
             SYNC_PARENT_SOUNDS,
             CAMERA_DOUBLE_TWIST_TO_FLIP_ENABLED,
+            SWIPE_UP_TO_SWITCH_APPS_ENABLED,
             CAMERA_DOUBLE_TAP_POWER_GESTURE_DISABLED,
             SYSTEM_NAVIGATION_KEYS_ENABLED,
             QS_TILES,
@@ -8006,6 +8061,7 @@ public final class Settings {
             VALIDATORS.put(ENHANCED_VOICE_PRIVACY_ENABLED,
                     ENHANCED_VOICE_PRIVACY_ENABLED_VALIDATOR);
             VALIDATORS.put(TTY_MODE_ENABLED, TTY_MODE_ENABLED_VALIDATOR);
+            VALIDATORS.put(RTT_CALLING_MODE, RTT_CALLING_MODE_VALIDATOR);
             VALIDATORS.put(INCALL_POWER_BUTTON_BEHAVIOR, INCALL_POWER_BUTTON_BEHAVIOR_VALIDATOR);
             VALIDATORS.put(NIGHT_DISPLAY_CUSTOM_START_TIME,
                     NIGHT_DISPLAY_CUSTOM_START_TIME_VALIDATOR);
@@ -8016,6 +8072,8 @@ public final class Settings {
             VALIDATORS.put(SYNC_PARENT_SOUNDS, SYNC_PARENT_SOUNDS_VALIDATOR);
             VALIDATORS.put(CAMERA_DOUBLE_TWIST_TO_FLIP_ENABLED,
                     CAMERA_DOUBLE_TWIST_TO_FLIP_ENABLED_VALIDATOR);
+            VALIDATORS.put(SWIPE_UP_TO_SWITCH_APPS_ENABLED,
+                    SWIPE_UP_TO_SWITCH_APPS_ENABLED_VALIDATOR);
             VALIDATORS.put(CAMERA_DOUBLE_TAP_POWER_GESTURE_DISABLED,
                     CAMERA_DOUBLE_TAP_POWER_GESTURE_DISABLED_VALIDATOR);
             VALIDATORS.put(SYSTEM_NAVIGATION_KEYS_ENABLED,
@@ -8704,6 +8762,17 @@ public final class Settings {
         public static final String EUICC_PROVISIONED = "euicc_provisioned";
 
         /**
+         * List of ISO country codes in which eUICC UI is shown. Country codes should be separated
+         * by comma.
+         *
+         * <p>Used to hide eUICC UI from users who are currently in countries no carriers support
+         * eUICC.
+         * @hide
+         */
+        //TODO(b/77914569) Changes this to System Api.
+        public static final String EUICC_SUPPORTED_COUNTRIES = "euicc_supported_countries";
+
+        /**
          * Whether any activity can be resized. When this is true, any
          * activity, regardless of manifest values, can be resized for multi-window.
          * (0 = false, 1 = true)
@@ -8926,6 +8995,20 @@ public final class Settings {
        public static final String NETSTATS_UID_TAG_ROTATE_AGE = "netstats_uid_tag_rotate_age";
        /** {@hide} */
        public static final String NETSTATS_UID_TAG_DELETE_AGE = "netstats_uid_tag_delete_age";
+
+       /** {@hide} */
+       public static final String NETPOLICY_QUOTA_ENABLED = "netpolicy_quota_enabled";
+       /** {@hide} */
+       public static final String NETPOLICY_QUOTA_UNLIMITED = "netpolicy_quota_unlimited";
+       /** {@hide} */
+       public static final String NETPOLICY_QUOTA_LIMITED = "netpolicy_quota_limited";
+       /** {@hide} */
+       public static final String NETPOLICY_QUOTA_FRAC_JOBS = "netpolicy_quota_frac_jobs";
+       /** {@hide} */
+       public static final String NETPOLICY_QUOTA_FRAC_MULTIPATH = "netpolicy_quota_frac_multipath";
+
+       /** {@hide} */
+       public static final String NETPOLICY_OVERRIDE_ENABLED = "netpolicy_override_enabled";
 
        /**
         * User preference for which network(s) should be used. Only the
@@ -9212,8 +9295,8 @@ public final class Settings {
         public static final String CARRIER_APP_WHITELIST = "carrier_app_whitelist";
 
         /**
-         * Map of package name to application names.  Package names must be lower cased as they are
-         * used as a key in the map.  The application names cannot and will not be localized.
+         * Map of package name to application names. The application names cannot and will not be
+         * localized. App names may not contain colons or semicolons.
          *
          * The value is "packageName1:appName1;packageName2:appName2;..."
          * @hide
@@ -9299,6 +9382,15 @@ public final class Settings {
         */
        public static final String NETWORK_METERED_MULTIPATH_PREFERENCE =
                "network_metered_multipath_preference";
+
+        /**
+         * Default daily multipath budget used by ConnectivityManager.getMultipathPreference()
+         * on metered networks. This default quota is only used if quota could not be determined
+         * from data plan or data limit/warning set by the user.
+         * @hide
+         */
+        public static final String NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES =
+                "network_default_daily_multipath_quota_bytes";
 
         /**
          * Network watchlist last report time.
@@ -10685,6 +10777,7 @@ public final class Settings {
          * track_cpu_active_cluster_time (boolean)
          * read_binary_cpu_time          (boolean)
          * proc_state_cpu_times_read_delay_ms (long)
+         * external_stats_collection_rate_limit_ms (long)
          * </pre>
          *
          * <p>
@@ -10705,13 +10798,26 @@ public final class Settings {
         public static final String SYNC_MANAGER_CONSTANTS = "sync_manager_constants";
 
         /**
-         * Whether or not App Standby feature is enabled. This controls throttling of apps
-         * based on usage patterns and predictions.
+         * Whether or not App Standby feature is enabled by system. This controls throttling of apps
+         * based on usage patterns and predictions. Platform will turn on this feature if both this
+         * flag and {@link #ADAPTIVE_BATTERY_MANAGEMENT_ENABLED} is on.
          * Type: int (0 for false, 1 for true)
          * Default: 1
          * @hide
+         * @see #ADAPTIVE_BATTERY_MANAGEMENT_ENABLED
          */
         public static final String APP_STANDBY_ENABLED = "app_standby_enabled";
+
+        /**
+         * Whether or not adaptive battery feature is enabled by user. Platform will turn on this
+         * feature if both this flag and {@link #APP_STANDBY_ENABLED} is on.
+         * Type: int (0 for false, 1 for true)
+         * Default: 1
+         * @hide
+         * @see #APP_STANDBY_ENABLED
+         */
+        public static final String ADAPTIVE_BATTERY_MANAGEMENT_ENABLED =
+                "adaptive_battery_management_enabled";
 
         /**
          * Whether or not app auto restriction is enabled. When it is enabled, settings app will
@@ -10787,6 +10893,15 @@ public final class Settings {
          */
         public static final String TIME_ONLY_MODE_CONSTANTS
                 = "time_only_mode_constants";
+
+        /**
+         * Whether of not to send keycode sleep for ungaze when Home is the foreground activity on
+         * watch type devices.
+         * Type: int (0 for false, 1 for true)
+         * Default: 0
+         * @hide
+         */
+        public static final String UNGAZE_SLEEP_ENABLED = "ungaze_sleep_enabled";
 
         /**
          * Whether or not Network Watchlist feature is enabled.
@@ -11053,12 +11168,27 @@ public final class Settings {
          */
         public static final String LOW_POWER_MODE_TRIGGER_LEVEL_MAX = "low_power_trigger_level_max";
 
-         /**
+        /**
+         * See com.android.settingslib.fuelgauge.BatterySaverUtils.
+         * @hide
+         */
+        public static final String LOW_POWER_MODE_SUGGESTION_PARAMS =
+                "low_power_mode_suggestion_params";
+
+        /**
          * If not 0, the activity manager will aggressively finish activities and
          * processes as soon as they are no longer needed.  If 0, the normal
          * extended lifetime is used.
          */
         public static final String ALWAYS_FINISH_ACTIVITIES = "always_finish_activities";
+
+        /**
+         * If nonzero, all system error dialogs will be hidden.  For example, the
+         * crash and ANR dialogs will not be shown, and the system will just proceed
+         * as if they had been accepted by the user.
+         * @hide
+         */
+        public static final String HIDE_ERROR_DIALOGS = "hide_error_dialogs";
 
         /**
          * Use Dock audio output for media:
@@ -11677,6 +11807,38 @@ public final class Settings {
         @TestApi
         public static final String HIDDEN_API_BLACKLIST_EXEMPTIONS =
                 "hidden_api_blacklist_exemptions";
+
+        /**
+         * Sampling rate for hidden API access event logs, as an integer in the range 0 to 0x10000
+         * inclusive.
+         *
+         * @hide
+         */
+        public static final String HIDDEN_API_ACCESS_LOG_SAMPLING_RATE =
+                "hidden_api_access_log_sampling_rate";
+
+        /**
+         * Hidden API enforcement policy for apps targeting SDK versions prior to the latest
+         * version.
+         *
+         * Values correspond to @{@link
+         * android.content.pm.ApplicationInfo.HiddenApiEnforcementPolicy}
+         *
+         * @hide
+         */
+        public static final String HIDDEN_API_POLICY_PRE_P_APPS =
+                "hidden_api_policy_pre_p_apps";
+
+        /**
+         * Hidden API enforcement policy for apps targeting the current SDK version.
+         *
+         * Values correspond to @{@link
+         * android.content.pm.ApplicationInfo.HiddenApiEnforcementPolicy}
+         *
+         * @hide
+         */
+        public static final String HIDDEN_API_POLICY_P_APPS =
+                "hidden_api_policy_p_apps";
 
         /**
          * Timeout for a single {@link android.media.soundtrigger.SoundTriggerDetectionService}
@@ -12517,6 +12679,31 @@ public final class Settings {
          */
          public static final String SWAP_ENABLED = "swap_enabled";
 
+        /**
+         * Blacklist of GNSS satellites.
+         *
+         * This is a list of integers separated by commas to represent pairs of (constellation,
+         * svid). Thus, the number of integers should be even.
+         *
+         * E.g.: "3,0,5,24" denotes (constellation=3, svid=0) and (constellation=5, svid=24) are
+         * blacklisted. Note that svid=0 denotes all svids in the
+         * constellation are blacklisted.
+         *
+         * @hide
+         */
+        public static final String GNSS_SATELLITE_BLACKLIST = "gnss_satellite_blacklist";
+
+        /**
+         * Duration of updates in millisecond for GNSS location request from HAL to framework.
+         *
+         * If zero, the GNSS location request feature is disabled.
+         *
+         * The value is a non-negative long.
+         *
+         * @hide
+         */
+        public static final String GNSS_HAL_LOCATION_REQUEST_DURATION_MILLIS =
+                "gnss_hal_location_request_duration_millis";
     }
 
     /**

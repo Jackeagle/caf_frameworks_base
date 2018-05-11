@@ -32,12 +32,11 @@ import com.android.systemui.R;
 import com.android.systemui.plugins.qs.QSIconView;
 import com.android.systemui.plugins.qs.QSTile;
 
-
 import java.util.Objects;
 
 /** View that represents a standard quick settings tile. **/
 public class QSTileView extends QSTileBaseView {
-    private static final int DEFAULT_MAX_LINES = 2;
+    private static final int MAX_LABEL_LINES = 2;
     private static final boolean DUAL_TARGET_ALLOWED = false;
     private View mDivider;
     protected TextView mLabel;
@@ -87,27 +86,23 @@ public class QSTileView extends QSTileBaseView {
         mLabelContainer.setClipChildren(false);
         mLabelContainer.setClipToPadding(false);
         mLabel = mLabelContainer.findViewById(R.id.tile_label);
-        mLabel.setSelected(true); // Allow marquee to work.
         mPadLock = mLabelContainer.findViewById(R.id.restricted_padlock);
         mDivider = mLabelContainer.findViewById(R.id.underline);
         mExpandIndicator = mLabelContainer.findViewById(R.id.expand_indicator);
         mExpandSpace = mLabelContainer.findViewById(R.id.expand_space);
         mSecondLine = mLabelContainer.findViewById(R.id.app_label);
         mSecondLine.setAlpha(.6f);
-        mSecondLine.setSelected(true); // Allow marquee to work.
         addView(mLabelContainer);
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (mLabel.getMaxLines() != DEFAULT_MAX_LINES) {
-            mLabel.setMaxLines(DEFAULT_MAX_LINES);
-        }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        // Remeasure view if the secondary label text will be cut off.
-        if (!TextUtils.isEmpty(mSecondLine.getText())
-                && mSecondLine.getLineHeight() > mSecondLine.getHeight()) {
+        // Remeasure view if the primary label requires more then 2 lines or the secondary label
+        // text will be cut off.
+        if (mLabel.getLineCount() > MAX_LABEL_LINES || !TextUtils.isEmpty(mSecondLine.getText())
+                        && mSecondLine.getLineHeight() > mSecondLine.getHeight()) {
             mLabel.setSingleLine();
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }

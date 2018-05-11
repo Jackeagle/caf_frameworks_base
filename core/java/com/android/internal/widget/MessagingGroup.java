@@ -20,8 +20,10 @@ import android.annotation.AttrRes;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.StyleRes;
-import android.app.Notification;
+import android.app.Person;
 import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Icon;
@@ -29,6 +31,7 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Pools;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,6 +39,7 @@ import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.RemoteViews;
 
 import com.android.internal.R;
@@ -58,17 +62,20 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
     private CharSequence mAvatarName = "";
     private Icon mAvatarIcon;
     private int mTextColor;
+    private int mSendingTextColor;
     private List<MessagingMessage> mMessages;
     private ArrayList<MessagingMessage> mAddedMessages = new ArrayList<>();
     private boolean mFirstLayout;
     private boolean mIsHidingAnimated;
     private boolean mNeedsGeneratedAvatar;
-    private Notification.Person mSender;
-    private boolean mAvatarsAtEnd;
+    private Person mSender;
+    private boolean mImagesAtEnd;
     private ViewGroup mImageContainer;
     private MessagingImageMessage mIsolatedMessage;
     private boolean mTransformingImages;
     private Point mDisplaySize = new Point();
+    private ProgressBar mSendingSpinner;
+    private View mSendingSpinnerContainer;
 
     public MessagingGroup(@NonNull Context context) {
         super(context);
@@ -96,6 +103,8 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         mSenderName.addOnLayoutChangeListener(MessagingLayout.MESSAGING_PROPERTY_ANIMATOR);
         mAvatarView = findViewById(R.id.message_icon);
         mImageContainer = findViewById(R.id.messaging_group_icon_container);
+        mSendingSpinner = findViewById(R.id.messaging_group_sending_progress);
+        mSendingSpinnerContainer = findViewById(R.id.messaging_group_sending_progress_container);
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
         mDisplaySize.x = displayMetrics.widthPixels;
         mDisplaySize.y = displayMetrics.heightPixels;
@@ -126,7 +135,7 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         return position;
     }
 
-    public void setSender(Notification.Person sender, CharSequence nameOverride) {
+    public void setSender(Person sender, CharSequence nameOverride) {
         mSender = sender;
         if (nameOverride == null) {
             nameOverride = sender.getName();
@@ -139,17 +148,37 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         mAvatarView.setVisibility(VISIBLE);
         mSenderName.setVisibility(VISIBLE);
         mTextColor = getNormalTextColor();
+        mSendingTextColor = calculateSendingTextColor();
+    }
+
+    public void setSending(boolean sending) {
+        int visibility = sending ? View.VISIBLE : View.GONE;
+        if (mSendingSpinnerContainer.getVisibility() != visibility) {
+            mSendingSpinnerContainer.setVisibility(visibility);
+            updateMessageColor();
+        }
     }
 
     private int getNormalTextColor() {
         return mContext.getColor(R.color.notification_secondary_text_color_light);
     }
 
+    private int calculateSendingTextColor() {
+        TypedValue alphaValue = new TypedValue();
+        mContext.getResources().getValue(
+                R.dimen.notification_secondary_text_disabled_alpha, alphaValue, true);
+        float alpha = alphaValue.getFloat();
+        return Color.valueOf(
+                Color.red(mTextColor),
+                Color.green(mTextColor),
+                Color.blue(mTextColor),
+                alpha).toArgb();
+    }
+
     public void setAvatar(Icon icon) {
         mAvatarIcon = icon;
         mAvatarView.setImageIcon(icon);
         mAvatarSymbol = "";
-        mLayoutColor = 0;
         mAvatarName = "";
     }
 
@@ -321,13 +350,26 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
                 || layoutColor != mLayoutColor) {
             setAvatar(cachedIcon);
             mAvatarSymbol = avatarSymbol;
-            mLayoutColor = layoutColor;
+            setLayoutColor(layoutColor);
             mAvatarName = avatarName;
         }
     }
 
     public void setLayoutColor(int layoutColor) {
-        mLayoutColor = layoutColor;
+        if (layoutColor != mLayoutColor){
+            mLayoutColor = layoutColor;
+            mSendingSpinner.setIndeterminateTintList(ColorStateList.valueOf(mLayoutColor));
+        }
+    }
+
+    private void updateMessageColor() {
+        if (mMessages != null) {
+            int color = mSendingSpinnerContainer.getVisibility() == View.VISIBLE
+                    ? mSendingTextColor : mTextColor;
+            for (MessagingMessage message : mMessages) {
+                message.setColor(message.getMessage().isRemoteInputHistory() ? color : mTextColor);
+            }
+        }
     }
 
     public void setMessages(List<MessagingMessage> group) {
@@ -336,13 +378,12 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         MessagingImageMessage isolatedMessage = null;
         for (int messageIndex = 0; messageIndex < group.size(); messageIndex++) {
             MessagingMessage message = group.get(messageIndex);
-            message.setColor(mTextColor);
             if (message.getGroup() != this) {
                 message.setMessagingGroup(this);
                 mAddedMessages.add(message);
             }
             boolean isImage = message instanceof MessagingImageMessage;
-            if (mAvatarsAtEnd && isImage) {
+            if (mImagesAtEnd && isImage) {
                 isolatedMessage = (MessagingImageMessage) message;
             } else {
                 if (removeFromParentIfDifferent(message, mMessageContainer)) {
@@ -375,7 +416,14 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
             mImageContainer.removeAllViews();
         }
         mIsolatedMessage = isolatedMessage;
+        updateImageContainerVisibility();
         mMessages = group;
+        updateMessageColor();
+    }
+
+    private void updateImageContainerVisibility() {
+        mImageContainer.setVisibility(mIsolatedMessage != null && mImagesAtEnd
+                ? View.VISIBLE : View.GONE);
     }
 
     /**
@@ -466,7 +514,7 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         return mNeedsGeneratedAvatar;
     }
 
-    public Notification.Person getSender() {
+    public Person getSender() {
         return mSender;
     }
 
@@ -474,10 +522,10 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         mTransformingImages = transformingImages;
     }
 
-    public void setDisplayAvatarsAtEnd(boolean atEnd) {
-        if (mAvatarsAtEnd != atEnd) {
-            mAvatarsAtEnd = atEnd;
-            mImageContainer.setVisibility(atEnd ? View.VISIBLE : View.GONE);
+    public void setDisplayImagesAtEnd(boolean atEnd) {
+        if (mImagesAtEnd != atEnd) {
+            mImagesAtEnd = atEnd;
+            updateImageContainerVisibility();
         }
     }
 

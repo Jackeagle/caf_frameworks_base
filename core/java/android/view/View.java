@@ -697,6 +697,7 @@ import java.util.function.Predicate;
  * security policy. See also {@link MotionEvent#FLAG_WINDOW_IS_OBSCURED}.
  * </p>
  *
+ * @attr ref android.R.styleable#View_accessibilityHeading
  * @attr ref android.R.styleable#View_alpha
  * @attr ref android.R.styleable#View_background
  * @attr ref android.R.styleable#View_clickable
@@ -2955,7 +2956,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *     1                             PFLAG3_SCREEN_READER_FOCUSABLE
      *    1                              PFLAG3_AGGREGATED_VISIBLE
      *   1                               PFLAG3_AUTOFILLID_EXPLICITLY_SET
-     *  1                                available
+     *  1                                PFLAG3_ACCESSIBILITY_HEADING
      * |-------|-------|-------|-------|
      */
 
@@ -3251,6 +3252,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * {@link #setAutofillId(AutofillId)}.
      */
     private static final int PFLAG3_AUTOFILLID_EXPLICITLY_SET = 0x40000000;
+
+    /**
+     * Indicates if the View is a heading for accessibility purposes
+     */
+    private static final int PFLAG3_ACCESSIBILITY_HEADING = 0x80000000;
 
     /* End of masks for mPrivateFlags3 */
 
@@ -4320,7 +4326,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         OnCapturedPointerListener mOnCapturedPointerListener;
 
-        private ArrayList<OnKeyFallbackListener> mKeyFallbackListeners;
+        private ArrayList<OnUnhandledKeyEventListener> mUnhandledKeyListeners;
     }
 
     ListenerInfo mListenerInfo;
@@ -5475,6 +5481,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 case R.styleable.View_outlineAmbientShadowColor:
                     setOutlineAmbientShadowColor(a.getColor(attr, Color.BLACK));
                     break;
+                case com.android.internal.R.styleable.View_accessibilityHeading:
+                    setAccessibilityHeading(a.getBoolean(attr, false));
             }
         }
 
@@ -8795,6 +8803,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         info.addAction(AccessibilityAction.ACTION_SHOW_ON_SCREEN);
         populateAccessibilityNodeInfoDrawingOrderInParent(info);
         info.setPaneTitle(mAccessibilityPaneTitle);
+        info.setHeading(isAccessibilityHeading());
     }
 
     /**
@@ -10398,7 +10407,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @param willNotCacheDrawing true if this view does not cache its
      *        drawing, false otherwise
+     *
+     * @deprecated The view drawing cache was largely made obsolete with the introduction of
+     * hardware-accelerated rendering in API 11. With hardware-acceleration, intermediate cache
+     * layers are largely unnecessary and can easily result in a net loss in performance due to the
+     * cost of creating and updating the layer. In the rare cases where caching layers are useful,
+     * such as for alpha animations, {@link #setLayerType(int, Paint)} handles this with hardware
+     * rendering. For software-rendered snapshots of a small part of the View hierarchy or
+     * individual Views it is recommended to create a {@link Canvas} from either a {@link Bitmap} or
+     * {@link android.graphics.Picture} and call {@link #draw(Canvas)} on the View. However these
+     * software-rendered usages are discouraged and have compatibility issues with hardware-only
+     * rendering features such as {@link android.graphics.Bitmap.Config#HARDWARE Config.HARDWARE}
+     * bitmaps, real-time shadows, and outline clipping. For screenshots of the UI for feedback
+     * reports or unit testing the {@link PixelCopy} API is recommended.
      */
+    @Deprecated
     public void setWillNotCacheDrawing(boolean willNotCacheDrawing) {
         setFlags(willNotCacheDrawing ? WILL_NOT_CACHE_DRAWING : 0, WILL_NOT_CACHE_DRAWING);
     }
@@ -10407,8 +10430,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * Returns whether or not this View can cache its drawing or not.
      *
      * @return true if this view does not cache its drawing, false otherwise
+     *
+     * @deprecated The view drawing cache was largely made obsolete with the introduction of
+     * hardware-accelerated rendering in API 11. With hardware-acceleration, intermediate cache
+     * layers are largely unnecessary and can easily result in a net loss in performance due to the
+     * cost of creating and updating the layer. In the rare cases where caching layers are useful,
+     * such as for alpha animations, {@link #setLayerType(int, Paint)} handles this with hardware
+     * rendering. For software-rendered snapshots of a small part of the View hierarchy or
+     * individual Views it is recommended to create a {@link Canvas} from either a {@link Bitmap} or
+     * {@link android.graphics.Picture} and call {@link #draw(Canvas)} on the View. However these
+     * software-rendered usages are discouraged and have compatibility issues with hardware-only
+     * rendering features such as {@link android.graphics.Bitmap.Config#HARDWARE Config.HARDWARE}
+     * bitmaps, real-time shadows, and outline clipping. For screenshots of the UI for feedback
+     * reports or unit testing the {@link PixelCopy} API is recommended.
      */
     @ViewDebug.ExportedProperty(category = "drawing")
+    @Deprecated
     public boolean willNotCacheDrawing() {
         return (mViewFlags & WILL_NOT_CACHE_DRAWING) == WILL_NOT_CACHE_DRAWING;
     }
@@ -10754,11 +10791,37 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *                              accessibility tools.
      */
     public void setScreenReaderFocusable(boolean screenReaderFocusable) {
+        updatePflags3AndNotifyA11yIfChanged(PFLAG3_SCREEN_READER_FOCUSABLE, screenReaderFocusable);
+    }
+
+    /**
+     * Gets whether this view is a heading for accessibility purposes.
+     *
+     * @return {@code true} if the view is a heading, {@code false} otherwise.
+     *
+     * @attr ref android.R.styleable#View_accessibilityHeading
+     */
+    public boolean isAccessibilityHeading() {
+        return (mPrivateFlags3 & PFLAG3_ACCESSIBILITY_HEADING) != 0;
+    }
+
+    /**
+     * Set if view is a heading for a section of content for accessibility purposes.
+     *
+     * @param isHeading {@code true} if the view is a heading, {@code false} otherwise.
+     *
+     * @attr ref android.R.styleable#View_accessibilityHeading
+     */
+    public void setAccessibilityHeading(boolean isHeading) {
+        updatePflags3AndNotifyA11yIfChanged(PFLAG3_ACCESSIBILITY_HEADING, isHeading);
+    }
+
+    private void updatePflags3AndNotifyA11yIfChanged(int mask, boolean newValue) {
         int pflags3 = mPrivateFlags3;
-        if (screenReaderFocusable) {
-            pflags3 |= PFLAG3_SCREEN_READER_FOCUSABLE;
+        if (newValue) {
+            pflags3 |= mask;
         } else {
-            pflags3 &= ~PFLAG3_SCREEN_READER_FOCUSABLE;
+            pflags3 &= ~mask;
         }
 
         if (pflags3 != mPrivateFlags3) {
@@ -11763,6 +11826,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return null;
     }
 
+    /** @hide */
+    View getSelfOrParentImportantForA11y() {
+        if (isImportantForAccessibility()) return this;
+        ViewParent parent = getParentForAccessibility();
+        if (parent instanceof View) return (View) parent;
+        return null;
+    }
+
     /**
      * Adds the children of this View relevant for accessibility to the given list
      * as output. Since some Views are not important for accessibility the added
@@ -12425,6 +12496,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         final int actionMasked = event.getActionMasked();
         if (actionMasked == MotionEvent.ACTION_DOWN) {
+            android.util.SeempLog.record(3);
             // Defensive cleanup for new gesture
             stopNestedScroll();
         }
@@ -13081,6 +13153,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event the KeyEvent object that defines the button action
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        android.util.SeempLog.record(4);
         if (KeyEvent.isConfirmKey(keyCode)) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -13133,6 +13206,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event   The KeyEvent object that defines the button action.
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        android.util.SeempLog.record(5);
         if (KeyEvent.isConfirmKey(keyCode)) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -13647,6 +13721,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return True if the event was handled, false otherwise.
      */
     public boolean onTouchEvent(MotionEvent event) {
+        android.util.SeempLog.record(3);
         final float x = event.getX();
         final float y = event.getY();
         final int viewFlags = mViewFlags;
@@ -13917,11 +13992,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         mAttachInfo.mUnbufferedDispatchRequested = true;
     }
 
+    private boolean hasSize() {
+        return (mBottom > mTop) && (mRight > mLeft);
+    }
+
     private boolean canTakeFocus() {
         return ((mViewFlags & VISIBILITY_MASK) == VISIBLE)
                 && ((mViewFlags & FOCUSABLE) == FOCUSABLE)
                 && ((mViewFlags & ENABLED_MASK) == ENABLED)
-                && (sCanFocusZeroSized || !isLayoutValid() || (mBottom > mTop) && (mRight > mLeft));
+                && (sCanFocusZeroSized || !isLayoutValid() || hasSize());
     }
 
     /**
@@ -13982,7 +14061,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                             || focusableChangedByAuto == 0
                             || viewRootImpl == null
                             || viewRootImpl.mThread == Thread.currentThread()) {
-                        shouldNotifyFocusableAvailable = true;
+                        shouldNotifyFocusableAvailable = canTakeFocus();
                     }
                 }
             }
@@ -14001,11 +14080,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
                 needGlobalAttributesUpdate(true);
 
-                // a view becoming visible is worth notifying the parent
-                // about in case nothing has focus.  even if this specific view
-                // isn't focusable, it may contain something that is, so let
-                // the root view try to give this focus if nothing else does.
-                shouldNotifyFocusableAvailable = true;
+                // a view becoming visible is worth notifying the parent about in case nothing has
+                // focus. Even if this specific view isn't focusable, it may contain something that
+                // is, so let the root view try to give this focus if nothing else does.
+                shouldNotifyFocusableAvailable = hasSize();
             }
         }
 
@@ -14014,16 +14092,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // a view becoming enabled should notify the parent as long as the view is also
                 // visible and the parent wasn't already notified by becoming visible during this
                 // setFlags invocation.
-                shouldNotifyFocusableAvailable = true;
+                shouldNotifyFocusableAvailable = canTakeFocus();
             } else {
                 if (isFocused()) clearFocus();
             }
         }
 
-        if (shouldNotifyFocusableAvailable) {
-            if (mParent != null && canTakeFocus()) {
-                mParent.focusableViewAvailable(this);
-            }
+        if (shouldNotifyFocusableAvailable && mParent != null) {
+            mParent.focusableViewAvailable(this);
         }
 
         /* Check if the GONE bit has changed */
@@ -14977,10 +15053,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void setAlpha(@FloatRange(from=0.0, to=1.0) float alpha) {
         ensureTransformationInfo();
         if (mTransformationInfo.mAlpha != alpha) {
-            // Report visibility changes, which can affect children, to accessibility
-            if ((alpha == 0) ^ (mTransformationInfo.mAlpha == 0)) {
-                notifySubtreeAccessibilityStateChangedIfNeeded();
-            }
+            float oldAlpha = mTransformationInfo.mAlpha;
             mTransformationInfo.mAlpha = alpha;
             if (onSetAlpha((int) (alpha * 255))) {
                 mPrivateFlags |= PFLAG_ALPHA_SET;
@@ -14991,6 +15064,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 mPrivateFlags &= ~PFLAG_ALPHA_SET;
                 invalidateViewProperty(true, false);
                 mRenderNode.setAlpha(getFinalAlpha());
+            }
+            // Report visibility changes, which can affect children, to accessibility
+            if ((alpha == 0) ^ (oldAlpha == 0)) {
+                notifySubtreeAccessibilityStateChangedIfNeeded();
             }
         }
     }
@@ -20223,22 +20300,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         int solidColor = getSolidColor();
         if (solidColor == 0) {
-            final int flags = Canvas.HAS_ALPHA_LAYER_SAVE_FLAG;
-
             if (drawTop) {
-                canvas.saveLayer(left, top, right, top + length, null, flags);
+                canvas.saveUnclippedLayer(left, top, right, top + length);
             }
 
             if (drawBottom) {
-                canvas.saveLayer(left, bottom - length, right, bottom, null, flags);
+                canvas.saveUnclippedLayer(left, bottom - length, right, bottom);
             }
 
             if (drawLeft) {
-                canvas.saveLayer(left, top, left + length, bottom, null, flags);
+                canvas.saveUnclippedLayer(left, top, left + length, bottom);
             }
 
             if (drawRight) {
-                canvas.saveLayer(right - length, top, right, bottom, null, flags);
+                canvas.saveUnclippedLayer(right - length, top, right, bottom);
             }
         } else {
             scrollabilityCache.setFadeColor(solidColor);
@@ -20629,7 +20704,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             if (canTakeFocus()) {
                 // We have a robust focus, so parents should no longer be wanting focus.
                 clearParentsWantFocus();
-            } else if (!getViewRootImpl().isInLayout()) {
+            } else if (getViewRootImpl() == null || !getViewRootImpl().isInLayout()) {
                 // This is a weird case. Most-likely the user, rather than ViewRootImpl, called
                 // layout. In this case, there's no guarantee that parent layouts will be evaluated
                 // and thus the safest action is to clear focus here.
@@ -25881,26 +25956,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Interface definition for a callback to be invoked when a hardware key event is
-     * dispatched to this view during the fallback phase. This means no view in the hierarchy
-     * has handled this event.
+     * Interface definition for a callback to be invoked when a hardware key event hasn't
+     * been handled by the view hierarchy.
      */
-    public interface OnKeyFallbackListener {
+    public interface OnUnhandledKeyEventListener {
         /**
-         * Called when a hardware key is dispatched to a view in the fallback phase. This allows
-         * listeners to respond to events after the view hierarchy has had a chance to respond.
-         * <p>Key presses in software keyboards will generally NOT trigger this method,
-         * although some may elect to do so in some situations. Do not assume a
-         * software input method has to be key-based; even if it is, it may use key presses
-         * in a different way than you expect, so there is no way to reliably catch soft
-         * input key presses.
+         * Called when a hardware key is dispatched to a view after being unhandled during normal
+         * {@link KeyEvent} dispatch.
          *
          * @param v The view the key has been dispatched to.
-         * @param event The KeyEvent object containing full information about
-         *        the event.
-         * @return True if the listener has consumed the event, false otherwise.
+         * @param event The KeyEvent object containing information about the event.
+         * @return {@code true} if the listener has consumed the event, {@code false} otherwise.
          */
-        boolean onKeyFallback(View v, KeyEvent event);
+        boolean onUnhandledKeyEvent(View v, KeyEvent event);
     }
 
     /**
@@ -27599,21 +27667,36 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return sUseDefaultFocusHighlight;
     }
 
-  /**
+    /**
+     * Dispatch a previously unhandled {@link KeyEvent} to this view. Unlike normal key dispatch,
+     * this dispatches to ALL child views until it is consumed. The dispatch order is z-order
+     * (visually on-top views first).
+     *
+     * @param evt the previously unhandled {@link KeyEvent}.
+     * @return the {@link View} which consumed the event or {@code null} if not consumed.
+     */
+    View dispatchUnhandledKeyEvent(KeyEvent evt) {
+        if (onUnhandledKeyEvent(evt)) {
+            return this;
+        }
+        return null;
+    }
+
+    /**
      * Allows this view to handle {@link KeyEvent}s which weren't handled by normal dispatch. This
      * occurs after the normal view hierarchy dispatch, but before the window callback. By default,
      * this will dispatch into all the listeners registered via
-     * {@link #addKeyFallbackListener(OnKeyFallbackListener)} in last-in-first-out order (most
-     * recently added will receive events first).
+     * {@link #addOnUnhandledKeyEventListener(OnUnhandledKeyEventListener)} in last-in-first-out
+     * order (most recently added will receive events first).
      *
-     * @param event A not-previously-handled event.
+     * @param event An unhandled event.
      * @return {@code true} if the event was handled, {@code false} otherwise.
-     * @see #addKeyFallbackListener
+     * @see #addOnUnhandledKeyEventListener
      */
-    public boolean onKeyFallback(@NonNull KeyEvent event) {
-        if (mListenerInfo != null && mListenerInfo.mKeyFallbackListeners != null) {
-            for (int i = mListenerInfo.mKeyFallbackListeners.size() - 1; i >= 0; --i) {
-                if (mListenerInfo.mKeyFallbackListeners.get(i).onKeyFallback(this, event)) {
+    boolean onUnhandledKeyEvent(@NonNull KeyEvent event) {
+        if (mListenerInfo != null && mListenerInfo.mUnhandledKeyListeners != null) {
+            for (int i = mListenerInfo.mUnhandledKeyListeners.size() - 1; i >= 0; --i) {
+                if (mListenerInfo.mUnhandledKeyListeners.get(i).onUnhandledKeyEvent(this, event)) {
                     return true;
                 }
             }
@@ -27621,31 +27704,47 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return false;
     }
 
-    /**
-     * Adds a listener which will receive unhandled {@link KeyEvent}s.
-     * @param listener the receiver of fallback {@link KeyEvent}s.
-     * @see #onKeyFallback(KeyEvent)
-     */
-    public void addKeyFallbackListener(OnKeyFallbackListener listener) {
-        ArrayList<OnKeyFallbackListener> fallbacks = getListenerInfo().mKeyFallbackListeners;
-        if (fallbacks == null) {
-            fallbacks = new ArrayList<>();
-            getListenerInfo().mKeyFallbackListeners = fallbacks;
-        }
-        fallbacks.add(listener);
+    boolean hasUnhandledKeyListener() {
+        return (mListenerInfo != null && mListenerInfo.mUnhandledKeyListeners != null
+                && !mListenerInfo.mUnhandledKeyListeners.isEmpty());
     }
 
     /**
-     * Removes a listener which will receive unhandled {@link KeyEvent}s.
-     * @param listener the receiver of fallback {@link KeyEvent}s.
-     * @see #onKeyFallback(KeyEvent)
+     * Adds a listener which will receive unhandled {@link KeyEvent}s. This must be called on the
+     * UI thread.
+     *
+     * @param listener a receiver of unhandled {@link KeyEvent}s.
+     * @see #removeOnUnhandledKeyEventListener
      */
-    public void removeKeyFallbackListener(OnKeyFallbackListener listener) {
+    public void addOnUnhandledKeyEventListener(OnUnhandledKeyEventListener listener) {
+        ArrayList<OnUnhandledKeyEventListener> listeners = getListenerInfo().mUnhandledKeyListeners;
+        if (listeners == null) {
+            listeners = new ArrayList<>();
+            getListenerInfo().mUnhandledKeyListeners = listeners;
+        }
+        listeners.add(listener);
+        if (listeners.size() == 1 && mParent instanceof ViewGroup) {
+            ((ViewGroup) mParent).incrementChildUnhandledKeyListeners();
+        }
+    }
+
+    /**
+     * Removes a listener which will receive unhandled {@link KeyEvent}s. This must be called on the
+     * UI thread.
+     *
+     * @param listener a receiver of unhandled {@link KeyEvent}s.
+     * @see #addOnUnhandledKeyEventListener
+     */
+    public void removeOnUnhandledKeyEventListener(OnUnhandledKeyEventListener listener) {
         if (mListenerInfo != null) {
-            if (mListenerInfo.mKeyFallbackListeners != null) {
-                mListenerInfo.mKeyFallbackListeners.remove(listener);
-                if (mListenerInfo.mKeyFallbackListeners.isEmpty()) {
-                    mListenerInfo.mKeyFallbackListeners = null;
+            if (mListenerInfo.mUnhandledKeyListeners != null
+                    && !mListenerInfo.mUnhandledKeyListeners.isEmpty()) {
+                mListenerInfo.mUnhandledKeyListeners.remove(listener);
+                if (mListenerInfo.mUnhandledKeyListeners.isEmpty()) {
+                    mListenerInfo.mUnhandledKeyListeners = null;
+                    if (mParent instanceof ViewGroup) {
+                        ((ViewGroup) mParent).decrementChildUnhandledKeyListeners();
+                    }
                 }
             }
         }

@@ -42,8 +42,8 @@ public class PowerUtilTest {
     public static final long THIRTY_HOURS_MILLIS = Duration.ofHours(30).toMillis();
     public static final String NORMAL_CASE_EXPECTED_PREFIX = "Should last until about";
     public static final String ENHANCED_SUFFIX = " based on your usage";
-    // matches a time (ex: '1:15 PM', '2 AM')
-    public static final String TIME_OF_DAY_REGEX = " (\\d)+:?(\\d)* (AM)|(PM)";
+    // matches a time (ex: '1:15 PM', '2 AM', '23:00')
+    public static final String TIME_OF_DAY_REGEX = " (\\d)+:?(\\d)* ((AM)*)|((PM)*)";
     // matches a percentage with parenthesis (ex: '(10%)')
     public static final String PERCENTAGE_REGEX = " \\(\\d?\\d%\\)";
 
@@ -174,5 +174,19 @@ public class PowerUtilTest {
         assertThat(info).isEqualTo("More than 2 days remaining");
         // Add percentage to string when provided
         assertThat(info2).isEqualTo("More than 2 days remaining (10%)");
+    }
+
+    @Test
+    public void testRoundToNearestThreshold_roundsCorrectly() {
+        // test some pretty normal values
+        assertThat(PowerUtil.roundTimeToNearestThreshold(1200, 1000)).isEqualTo(1000);
+        assertThat(PowerUtil.roundTimeToNearestThreshold(800, 1000)).isEqualTo(1000);
+        assertThat(PowerUtil.roundTimeToNearestThreshold(1000, 1000)).isEqualTo(1000);
+
+        // test the weird stuff
+        assertThat(PowerUtil.roundTimeToNearestThreshold(80, -200)).isEqualTo(0);
+        assertThat(PowerUtil.roundTimeToNearestThreshold(-150, 100)).isEqualTo(200);
+        assertThat(PowerUtil.roundTimeToNearestThreshold(-120, 100)).isEqualTo(100);
+        assertThat(PowerUtil.roundTimeToNearestThreshold(-200, -75)).isEqualTo(225);
     }
 }

@@ -440,6 +440,14 @@ public class CarrierConfigManager {
     public static final String KEY_VILTE_DATA_IS_METERED_BOOL = "vilte_data_is_metered_bool";
 
     /**
+     * Flag indicating whether we should reset UT capability or not for IMS deregistration
+     * and for IMS feature state not ready
+     * @hide
+     */
+    public static final String KEY_IGNORE_RESET_UT_CAPABILITY_BOOL =
+            "ignore_reset_ut_capability_bool";
+
+    /**
      * Flag specifying whether WFC over IMS should be available for carrier: independent of
      * carrier provisioning. If false: hard disabled. If true: then depends on carrier
      * provisioning, availability etc.
@@ -1013,11 +1021,13 @@ public class CarrierConfigManager {
     /**
      * Unconditionally override the carrier name string using #KEY_CARRIER_NAME_STRING.
      *
-     * If true, then the carrier display name will be #KEY_CARRIER_NAME_STRING, unconditionally.
+     * If true, then the carrier name string will be #KEY_CARRIER_NAME_STRING, unconditionally.
      *
      * <p>If false, then the override will be performed conditionally and the
      * #KEY_CARRIER_NAME_STRING will have the lowest-precedence; it will only be used in the event
-     * that the name string would otherwise be empty, allowing it to serve as a last-resort.
+     * that the name string would otherwise be empty, allowing it to serve as a last-resort. If
+     * used, this value functions in place of the SPN on any/all ICC records for the corresponding
+     * subscription.
      */
     public static final String KEY_CARRIER_NAME_OVERRIDE_BOOL = "carrier_name_override_bool";
 
@@ -1697,6 +1707,15 @@ public class CarrierConfigManager {
             "data_warning_threshold_bytes_long";
 
     /**
+     * Controls if the device should automatically notify the user as they reach
+     * their cellular data warning. When set to {@code false} the carrier is
+     * expected to have implemented their own notification mechanism.
+     * @hide
+     */
+    public static final String KEY_DATA_WARNING_NOTIFICATION_BOOL =
+            "data_warning_notification_bool";
+
+    /**
      * Controls the cellular data limit.
      * <p>
      * If the user uses more than this amount of data in their billing cycle, as defined by
@@ -1709,6 +1728,24 @@ public class CarrierConfigManager {
      */
     public static final String KEY_DATA_LIMIT_THRESHOLD_BYTES_LONG =
             "data_limit_threshold_bytes_long";
+
+    /**
+     * Controls if the device should automatically notify the user as they reach
+     * their cellular data limit. When set to {@code false} the carrier is
+     * expected to have implemented their own notification mechanism.
+     * @hide
+     */
+    public static final String KEY_DATA_LIMIT_NOTIFICATION_BOOL =
+            "data_limit_notification_bool";
+
+    /**
+     * Controls if the device should automatically notify the user when rapid
+     * cellular data usage is observed. When set to {@code false} the carrier is
+     * expected to have implemented their own notification mechanism.
+     * @hide
+     */
+    public static final String KEY_DATA_RAPID_NOTIFICATION_BOOL =
+            "data_rapid_notification_bool";
 
     /**
      * Offset to be reduced from rsrp threshold while calculating signal strength level.
@@ -1932,6 +1969,15 @@ public class CarrierConfigManager {
     public static final String KEY_WCDMA_DEFAULT_SIGNAL_STRENGTH_MEASUREMENT_STRING =
             "wcdma_default_signal_strength_measurement_string";
 
+    /**
+     * When a partial sms / mms message stay in raw table for too long without being completed,
+     * we expire them and delete them from the raw table. This carrier config defines the
+     * expiration time.
+     * @hide
+     */
+    public static final String KEY_UNDELIVERED_SMS_MESSAGE_EXPIRATION_TIME =
+            "undelivered_sms_message_expiration_time";
+
     /** The default value for every variable. */
     private final static PersistableBundle sDefaults;
 
@@ -1957,6 +2003,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CONFIG_TELEPHONY_USE_OWN_NUMBER_FOR_VOICEMAIL_BOOL, false);
         sDefaults.putBoolean(KEY_IGNORE_DATA_ENABLED_CHANGED_FOR_VIDEO_CALLS, true);
         sDefaults.putBoolean(KEY_VILTE_DATA_IS_METERED_BOOL, true);
+        sDefaults.putBoolean(KEY_IGNORE_RESET_UT_CAPABILITY_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ENABLED_BOOL, false);
@@ -1967,7 +2014,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CARRIER_FORCE_DISABLE_ETWS_CMAS_TEST_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_VOLTE_PROVISIONING_REQUIRED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_VOLTE_OVERRIDE_WFC_PROVISIONING_BOOL, false);
-        sDefaults.putBoolean(KEY_CARRIER_VOLTE_TTY_SUPPORTED_BOOL, false);
+        sDefaults.putBoolean(KEY_CARRIER_VOLTE_TTY_SUPPORTED_BOOL, true);
         sDefaults.putBoolean(KEY_CARRIER_ALLOW_TURNOFF_IMS_BOOL, true);
         sDefaults.putBoolean(KEY_CARRIER_IMS_GBA_REQUIRED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_INSTANT_LETTERING_AVAILABLE_BOOL, false);
@@ -2052,9 +2099,14 @@ public class CarrierConfigManager {
                 new String[]{"default", "mms", "dun", "supl"});
         sDefaults.putStringArray(KEY_CARRIER_METERED_ROAMING_APN_TYPES_STRINGS,
                 new String[]{"default", "mms", "dun", "supl"});
-        // By default all APNs are unmetered if the device is on IWLAN.
+        // By default all APNs should be unmetered if the device is on IWLAN. However, we add
+        // default APN as metered here as a workaround for P because in some cases, a data
+        // connection was brought up on cellular, but later on the device camped on IWLAN. That
+        // data connection was incorrectly treated as unmetered due to the current RAT IWLAN.
+        // Marking it as metered for now can workaround the issue.
+        // Todo: This will be fixed in Q when IWLAN full refactoring is completed.
         sDefaults.putStringArray(KEY_CARRIER_METERED_IWLAN_APN_TYPES_STRINGS,
-                new String[]{});
+                new String[]{"default"});
         sDefaults.putBoolean(KEY_CDMA_CW_CF_ENABLED_BOOL, false);
 
         sDefaults.putIntArray(KEY_ONLY_SINGLE_DC_ALLOWED_INT_ARRAY,
@@ -2179,7 +2231,10 @@ public class CarrierConfigManager {
 
         sDefaults.putInt(KEY_MONTHLY_DATA_CYCLE_DAY_INT, DATA_CYCLE_USE_PLATFORM_DEFAULT);
         sDefaults.putLong(KEY_DATA_WARNING_THRESHOLD_BYTES_LONG, DATA_CYCLE_USE_PLATFORM_DEFAULT);
+        sDefaults.putBoolean(KEY_DATA_WARNING_NOTIFICATION_BOOL, true);
         sDefaults.putLong(KEY_DATA_LIMIT_THRESHOLD_BYTES_LONG, DATA_CYCLE_USE_PLATFORM_DEFAULT);
+        sDefaults.putBoolean(KEY_DATA_LIMIT_NOTIFICATION_BOOL, true);
+        sDefaults.putBoolean(KEY_DATA_RAPID_NOTIFICATION_BOOL, true);
 
         // Rat families: {GPRS, EDGE}, {EVDO, EVDO_A, EVDO_B}, {UMTS, HSPA, HSDPA, HSUPA, HSPAP},
         // {LTE, LTE_CA}
@@ -2202,7 +2257,7 @@ public class CarrierConfigManager {
         sDefaults.putStringArray(KEY_FILTERED_CNAP_NAMES_STRING_ARRAY, null);
         sDefaults.putBoolean(KEY_EDITABLE_WFC_ROAMING_MODE_BOOL, false);
         sDefaults.putBoolean(KEY_STK_DISABLE_LAUNCH_BROWSER_BOOL, false);
-        sDefaults.putBoolean(KEY_PERSIST_LPP_MODE_BOOL, false);
+        sDefaults.putBoolean(KEY_PERSIST_LPP_MODE_BOOL, true);
         sDefaults.putStringArray(KEY_CARRIER_WIFI_STRING_ARRAY, null);
         sDefaults.putInt(KEY_PREF_NETWORK_NOTIFICATION_DELAY_INT, -1);
         sDefaults.putInt(KEY_EMERGENCY_NOTIFICATION_DELAY_INT, -1);

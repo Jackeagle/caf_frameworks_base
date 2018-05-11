@@ -34,27 +34,29 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkUtils;
 import android.net.Uri;
+import android.net.dns.ResolvUtil;
 import android.os.Binder;
 import android.os.INetworkManagementService;
-import android.os.Handler;
 import android.os.UserHandle;
 import android.provider.Settings;
-import android.system.GaiException;
-import android.system.OsConstants;
-import android.system.StructAddrinfo;
 import android.text.TextUtils;
+import android.util.Pair;
 import android.util.Slog;
 
 import com.android.server.connectivity.MockableSystemProperties;
 
-import libcore.io.Libcore;
-
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.Set;
 import java.util.StringJoiner;
 
 
@@ -64,10 +66,56 @@ import java.util.StringJoiner;
  * This class it NOT designed for concurrent access. Furthermore, all non-static
  * methods MUST be called from ConnectivityService's thread.
  *
+ * [ Private DNS ]
+ * The code handling Private DNS is spread across several components, but this
+ * seems like the least bad place to collect all the observations.
+ *
+ * Private DNS handling and updating occurs in response to several different
+ * events. Each is described here with its corresponding intended handling.
+ *
+ * [A] Event: A new network comes up.
+ * Mechanics:
+ *     [1] ConnectivityService gets notifications from NetworkAgents.
+ *     [2] in updateNetworkInfo(), the first time the NetworkAgent goes into
+ *         into CONNECTED state, the Private DNS configuration is retrieved,
+ *         programmed, and strict mode hostname resolution (if applicable) is
+ *         enqueued in NetworkAgent's NetworkMonitor, via a call to
+ *         handlePerNetworkPrivateDnsConfig().
+ *     [3] Re-resolution of strict mode hostnames that fail to return any
+ *         IP addresses happens inside NetworkMonitor; it sends itself a
+ *         delayed CMD_EVALUATE_PRIVATE_DNS message in a simple backoff
+ *         schedule.
+ *     [4] Successfully resolved hostnames are sent to ConnectivityService
+ *         inside an EVENT_PRIVATE_DNS_CONFIG_RESOLVED message. The resolved
+ *         IP addresses are programmed into netd via:
+ *
+ *             updatePrivateDns() -> updateDnses()
+ *
+ *         both of which make calls into DnsManager.
+ *     [5] Upon a successful hostname resolution NetworkMonitor initiates a
+ *         validation attempt in the form of a lookup for a one-time hostname
+ *         that uses Private DNS.
+ *
+ * [B] Event: Private DNS settings are changed.
+ * Mechanics:
+ *     [1] ConnectivityService gets notifications from its SettingsObserver.
+ *     [2] handlePrivateDnsSettingsChanged() is called, which calls
+ *         handlePerNetworkPrivateDnsConfig() and the process proceeds
+ *         as if from A.3 above.
+ *
+ * [C] Event: An application calls ConnectivityManager#reportBadNetwork().
+ * Mechanics:
+ *     [1] NetworkMonitor is notified and initiates a reevaluation, which
+ *         always bypasses Private DNS.
+ *     [2] Once completed, NetworkMonitor checks if strict mode is in operation
+ *         and if so enqueues another evaluation of Private DNS, as if from
+ *         step A.5 above.
+ *
  * @hide
  */
 public class DnsManager {
     private static final String TAG = DnsManager.class.getSimpleName();
+    private static final PrivateDnsConfig PRIVATE_DNS_OFF = new PrivateDnsConfig();
 
     /* Defaults for resolver parameters. */
     private static final int DNS_RESOLVER_DEFAULT_SAMPLE_VALIDITY_SECONDS = 1800;
@@ -126,35 +174,116 @@ public class DnsManager {
     }
 
     public static PrivateDnsConfig tryBlockingResolveOf(Network network, String name) {
-        final StructAddrinfo hints = new StructAddrinfo();
-        // Unnecessary, but expressly no AI_ADDRCONFIG.
-        hints.ai_flags = 0;
-        // Fetch all IP addresses at once to minimize re-resolution.
-        hints.ai_family = OsConstants.AF_UNSPEC;
-        hints.ai_socktype = OsConstants.SOCK_DGRAM;
-
         try {
-            final InetAddress[] ips = Libcore.os.android_getaddrinfo(name, hints, network.netId);
-            if (ips != null && ips.length > 0) {
-                return new PrivateDnsConfig(name, ips);
-            }
-        } catch (GaiException ignored) {}
-
-        return null;
+            final InetAddress[] ips = ResolvUtil.blockingResolveAllLocally(network, name);
+            return new PrivateDnsConfig(name, ips);
+        } catch (UnknownHostException uhe) {
+            return new PrivateDnsConfig(name, null);
+        }
     }
 
     public static Uri[] getPrivateDnsSettingsUris() {
-        final Uri[] uris = new Uri[2];
-        uris[0] = Settings.Global.getUriFor(PRIVATE_DNS_MODE);
-        uris[1] = Settings.Global.getUriFor(PRIVATE_DNS_SPECIFIER);
-        return uris;
+        return new Uri[]{
+            Settings.Global.getUriFor(PRIVATE_DNS_MODE),
+            Settings.Global.getUriFor(PRIVATE_DNS_SPECIFIER),
+        };
+    }
+
+    public static class PrivateDnsValidationUpdate {
+        final public int netId;
+        final public InetAddress ipAddress;
+        final public String hostname;
+        final public boolean validated;
+
+        public PrivateDnsValidationUpdate(int netId, InetAddress ipAddress,
+                String hostname, boolean validated) {
+            this.netId = netId;
+            this.ipAddress = ipAddress;
+            this.hostname = hostname;
+            this.validated = validated;
+        }
+    }
+
+    private static class PrivateDnsValidationStatuses {
+        enum ValidationStatus {
+            IN_PROGRESS,
+            FAILED,
+            SUCCEEDED
+        }
+
+        // Validation statuses of <hostname, ipAddress> pairs for a single netId
+        // Caution : not thread-safe. As mentioned in the top file comment, all
+        // methods of this class must only be called on ConnectivityService's thread.
+        private Map<Pair<String, InetAddress>, ValidationStatus> mValidationMap;
+
+        private PrivateDnsValidationStatuses() {
+            mValidationMap = new HashMap<>();
+        }
+
+        private boolean hasValidatedServer() {
+            for (ValidationStatus status : mValidationMap.values()) {
+                if (status == ValidationStatus.SUCCEEDED) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void updateTrackedDnses(String[] ipAddresses, String hostname) {
+            Set<Pair<String, InetAddress>> latestDnses = new HashSet<>();
+            for (String ipAddress : ipAddresses) {
+                try {
+                    latestDnses.add(new Pair(hostname,
+                            InetAddress.parseNumericAddress(ipAddress)));
+                } catch (IllegalArgumentException e) {}
+            }
+            // Remove <hostname, ipAddress> pairs that should not be tracked.
+            for (Iterator<Map.Entry<Pair<String, InetAddress>, ValidationStatus>> it =
+                    mValidationMap.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry<Pair<String, InetAddress>, ValidationStatus> entry = it.next();
+                if (!latestDnses.contains(entry.getKey())) {
+                    it.remove();
+                }
+            }
+            // Add new <hostname, ipAddress> pairs that should be tracked.
+            for (Pair<String, InetAddress> p : latestDnses) {
+                if (!mValidationMap.containsKey(p)) {
+                    mValidationMap.put(p, ValidationStatus.IN_PROGRESS);
+                }
+            }
+        }
+
+        private void updateStatus(PrivateDnsValidationUpdate update) {
+            Pair<String, InetAddress> p = new Pair(update.hostname,
+                    update.ipAddress);
+            if (!mValidationMap.containsKey(p)) {
+                return;
+            }
+            if (update.validated) {
+                mValidationMap.put(p, ValidationStatus.SUCCEEDED);
+            } else {
+                mValidationMap.put(p, ValidationStatus.FAILED);
+            }
+        }
+
+        private LinkProperties fillInValidatedPrivateDns(LinkProperties lp) {
+            lp.setValidatedPrivateDnsServers(Collections.EMPTY_LIST);
+            mValidationMap.forEach((key, value) -> {
+                    if (value == ValidationStatus.SUCCEEDED) {
+                        lp.addValidatedPrivateDnsServer(key.second);
+                    }
+                });
+            return lp;
+        }
     }
 
     private final Context mContext;
     private final ContentResolver mContentResolver;
     private final INetworkManagementService mNMS;
     private final MockableSystemProperties mSystemProperties;
+    // TODO: Replace these Maps with SparseArrays.
     private final Map<Integer, PrivateDnsConfig> mPrivateDnsMap;
+    private final Map<Integer, PrivateDnsValidationStatuses> mPrivateDnsValidationMap;
 
     private int mNumDnsEntries;
     private int mSampleValidity;
@@ -170,6 +299,7 @@ public class DnsManager {
         mNMS = nms;
         mSystemProperties = sp;
         mPrivateDnsMap = new HashMap<>();
+        mPrivateDnsValidationMap = new HashMap<>();
 
         // TODO: Create and register ContentObservers to track every setting
         // used herein, posting messages to respond to changes.
@@ -181,6 +311,7 @@ public class DnsManager {
 
     public void removeNetwork(Network network) {
         mPrivateDnsMap.remove(network.netId);
+        mPrivateDnsValidationMap.remove(network.netId);
     }
 
     public PrivateDnsConfig updatePrivateDns(Network network, PrivateDnsConfig cfg) {
@@ -188,6 +319,36 @@ public class DnsManager {
         return (cfg != null)
                 ? mPrivateDnsMap.put(network.netId, cfg)
                 : mPrivateDnsMap.remove(network.netId);
+    }
+
+    public void updatePrivateDnsStatus(int netId, LinkProperties lp) {
+        // Use the PrivateDnsConfig data pushed to this class instance
+        // from ConnectivityService.
+        final PrivateDnsConfig privateDnsCfg = mPrivateDnsMap.getOrDefault(netId,
+                PRIVATE_DNS_OFF);
+
+        final boolean useTls = privateDnsCfg.useTls;
+        final PrivateDnsValidationStatuses statuses =
+                useTls ? mPrivateDnsValidationMap.get(netId) : null;
+        final boolean validated = (null != statuses) && statuses.hasValidatedServer();
+        final boolean strictMode = privateDnsCfg.inStrictMode();
+        final String tlsHostname = strictMode ? privateDnsCfg.hostname : null;
+        final boolean usingPrivateDns = strictMode || validated;
+
+        lp.setUsePrivateDns(usingPrivateDns);
+        lp.setPrivateDnsServerName(tlsHostname);
+        if (usingPrivateDns && null != statuses) {
+            statuses.fillInValidatedPrivateDns(lp);
+        } else {
+            lp.setValidatedPrivateDnsServers(Collections.EMPTY_LIST);
+        }
+    }
+
+    public void updatePrivateDnsValidation(PrivateDnsValidationUpdate update) {
+        final PrivateDnsValidationStatuses statuses =
+                mPrivateDnsValidationMap.get(update.netId);
+        if (statuses == null) return;
+        statuses.updateStatus(update);
     }
 
     public void setDnsConfigurationForNetwork(
@@ -203,12 +364,13 @@ public class DnsManager {
         // NetworkMonitor to decide which networks need validation and runs the
         // blocking calls to resolve Private DNS strict mode hostnames.
         //
-        // At this time we do attempt to enable Private DNS on non-Internet
+        // At this time we do not attempt to enable Private DNS on non-Internet
         // networks like IMS.
-        final PrivateDnsConfig privateDnsCfg = mPrivateDnsMap.get(netId);
+        final PrivateDnsConfig privateDnsCfg = mPrivateDnsMap.getOrDefault(netId,
+                PRIVATE_DNS_OFF);
 
-        final boolean useTls = (privateDnsCfg != null) && privateDnsCfg.useTls;
-        final boolean strictMode = (privateDnsCfg != null) && privateDnsCfg.inStrictMode();
+        final boolean useTls = privateDnsCfg.useTls;
+        final boolean strictMode = privateDnsCfg.inStrictMode();
         final String tlsHostname = strictMode ? privateDnsCfg.hostname : "";
         final String[] tlsServers =
                 strictMode ? NetworkUtils.makeStrings(
@@ -217,6 +379,17 @@ public class DnsManager {
                               .collect(Collectors.toList()))
                 : useTls ? assignedServers  // Opportunistic
                 : new String[0];            // Off
+
+        // Prepare to track the validation status of the DNS servers in the
+        // resolver config when private DNS is in opportunistic or strict mode.
+        if (useTls) {
+            if (!mPrivateDnsValidationMap.containsKey(netId)) {
+                mPrivateDnsValidationMap.put(netId, new PrivateDnsValidationStatuses());
+            }
+            mPrivateDnsValidationMap.get(netId).updateTrackedDnses(tlsServers, tlsHostname);
+        } else {
+            mPrivateDnsValidationMap.remove(netId);
+        }
 
         Slog.d(TAG, String.format("setDnsConfigurationForNetwork(%d, %s, %s, %s, %s, %s)",
                 netId, Arrays.toString(assignedServers), Arrays.toString(domainStrs),

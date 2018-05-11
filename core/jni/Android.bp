@@ -37,6 +37,7 @@ cc_library_shared {
     cpp_std: "c++17",
 
     srcs: [
+        "android_util_SeempLog.cpp",
         "AndroidRuntime.cpp",
         "com_android_internal_content_NativeLibraryHelper.cpp",
         "com_google_android_gles_jni_EGLImpl.cpp",
@@ -195,6 +196,7 @@ cc_library_shared {
         "android_content_res_ObbScanner.cpp",
         "android_content_res_Configuration.cpp",
         "android_animation_PropertyValuesHolder.cpp",
+        "android_security_Scrypt.cpp",
         "com_android_internal_net_NetworkStatsFactory.cpp",
         "com_android_internal_os_ClassLoaderFactory.cpp",
         "com_android_internal_os_FuseAppLoop.cpp",
@@ -229,6 +231,7 @@ cc_library_shared {
         "libseccomp_policy",
         "libselinux",
         "libgrallocusage",
+        "libscrypt_static",
     ],
 
     shared_libs: [

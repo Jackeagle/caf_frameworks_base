@@ -60,7 +60,6 @@ public class SettingsBackupTest {
                     Settings.System.ALARM_ALERT, // backup candidate?
                     Settings.System.ALARM_ALERT_CACHE, // internal cache
                     Settings.System.APPEND_FOR_LAST_AUDIBLE, // suffix deprecated since API 2
-                    Settings.System.DISPLAY_COLOR_MODE, // bug?
                     Settings.System.EGG_MODE, // I am the lolrus
                     Settings.System.END_BUTTON_BEHAVIOR, // bug?
                     Settings.System
@@ -72,6 +71,7 @@ public class SettingsBackupTest {
                     Settings.System.NOTIFICATION_SOUND_CACHE, // internal cache
                     Settings.System.POINTER_LOCATION, // backup candidate?
                     Settings.System.RINGTONE_CACHE, // internal cache
+                    Settings.System.SCREEN_BRIGHTNESS, // removed in P
                     Settings.System.SETUP_WIZARD_HAS_RUN, // Only used by SuW
                     Settings.System.SHOW_GTALK_SERVICE_STATUS, // candidate for backup?
                     Settings.System.SHOW_TOUCHES, // bug?
@@ -98,6 +98,7 @@ public class SettingsBackupTest {
     private static final Set<String> BACKUP_BLACKLISTED_GLOBAL_SETTINGS =
             newHashSet(
                     Settings.Global.ACTIVITY_MANAGER_CONSTANTS,
+                    Settings.Global.ADAPTIVE_BATTERY_MANAGEMENT_ENABLED,
                     Settings.Global.ADB_ENABLED,
                     Settings.Global.ADD_USERS_WHEN_LOCKED,
                     Settings.Global.AIRPLANE_MODE_ON,
@@ -228,6 +229,7 @@ public class SettingsBackupTest {
                     Settings.Global.EPHEMERAL_COOKIE_MAX_SIZE_BYTES,
                     Settings.Global.ERROR_LOGCAT_PREFIX,
                     Settings.Global.EUICC_PROVISIONED,
+                    Settings.Global.EUICC_SUPPORTED_COUNTRIES,
                     Settings.Global.EUICC_FACTORY_RESET_TIMEOUT_MILLIS,
                     Settings.Global.FANCY_IME_ANIMATIONS,
                     Settings.Global.FORCE_ALLOW_ON_EXTERNAL,
@@ -239,12 +241,18 @@ public class SettingsBackupTest {
                     Settings.Global.GLOBAL_HTTP_PROXY_HOST,
                     Settings.Global.GLOBAL_HTTP_PROXY_PAC,
                     Settings.Global.GLOBAL_HTTP_PROXY_PORT,
+                    Settings.Global.GNSS_HAL_LOCATION_REQUEST_DURATION_MILLIS,
+                    Settings.Global.GNSS_SATELLITE_BLACKLIST,
                     Settings.Global.GPRS_REGISTER_CHECK_PERIOD_MS,
                     Settings.Global.HDMI_CONTROL_AUTO_DEVICE_OFF_ENABLED,
                     Settings.Global.HDMI_CONTROL_AUTO_WAKEUP_ENABLED,
                     Settings.Global.HDMI_CONTROL_ENABLED,
                     Settings.Global.HDMI_SYSTEM_AUDIO_CONTROL_ENABLED,
                     Settings.Global.HEADS_UP_NOTIFICATIONS_ENABLED,
+                    Settings.Global.HIDDEN_API_ACCESS_LOG_SAMPLING_RATE,
+                    Settings.Global.HIDDEN_API_POLICY_P_APPS,
+                    Settings.Global.HIDDEN_API_POLICY_PRE_P_APPS,
+                    Settings.Global.HIDE_ERROR_DIALOGS,
                     Settings.Global.HTTP_PROXY,
                     HYBRID_SYSUI_BATTERY_WARNING_FLAGS,
                     Settings.Global.INET_CONDITION_DEBOUNCE_DOWN_DELAY,
@@ -267,6 +275,7 @@ public class SettingsBackupTest {
                     Settings.Global.LOW_POWER_MODE,
                     Settings.Global.LOW_POWER_MODE_TRIGGER_LEVEL_MAX,
                     Settings.Global.LOW_POWER_MODE_STICKY,
+                    Settings.Global.LOW_POWER_MODE_SUGGESTION_PARAMS,
                     Settings.Global.LTE_SERVICE_FORCED,
                     Settings.Global.MAX_NOTIFICATION_ENQUEUE_RATE,
                     Settings.Global.MAX_SOUND_TRIGGER_DETECTION_SERVICE_OPS_PER_DAY,
@@ -299,7 +308,14 @@ public class SettingsBackupTest {
                     Settings.Global.NETSTATS_UID_TAG_DELETE_AGE,
                     Settings.Global.NETSTATS_UID_TAG_PERSIST_BYTES,
                     Settings.Global.NETSTATS_UID_TAG_ROTATE_AGE,
+                    Settings.Global.NETPOLICY_QUOTA_ENABLED,
+                    Settings.Global.NETPOLICY_QUOTA_UNLIMITED,
+                    Settings.Global.NETPOLICY_QUOTA_LIMITED,
+                    Settings.Global.NETPOLICY_QUOTA_FRAC_JOBS,
+                    Settings.Global.NETPOLICY_QUOTA_FRAC_MULTIPATH,
+                    Settings.Global.NETPOLICY_OVERRIDE_ENABLED,
                     Settings.Global.NETWORK_AVOID_BAD_WIFI,
+                    Settings.Global.NETWORK_DEFAULT_DAILY_MULTIPATH_QUOTA_BYTES,
                     Settings.Global.NETWORK_METERED_MULTIPATH_PREFERENCE,
                     Settings.Global.NETWORK_WATCHLIST_LAST_REPORT_TIME,
                     Settings.Global.NETWORK_PREFERENCE,
@@ -408,6 +424,7 @@ public class SettingsBackupTest {
                     Settings.Global.UNINSTALLED_INSTANT_APP_MIN_CACHE_PERIOD,
                     Settings.Global.UNINSTALLED_INSTANT_APP_MAX_CACHE_PERIOD,
                     Settings.Global.UNUSED_STATIC_SHARED_LIB_MIN_CACHE_PERIOD,
+                    Settings.Global.UNGAZE_SLEEP_ENABLED,
                     Settings.Global.UNLOCK_SOUND,
                     Settings.Global.USE_GOOGLE_MAIL,
                     Settings.Global.VT_IMS_ENABLED,
@@ -587,7 +604,8 @@ public class SettingsBackupTest {
                  Settings.Secure.BLUETOOTH_ON_WHILE_DRIVING,
                  Settings.Secure.LOW_POWER_MANUAL_ACTIVATION_COUNT,
                  Settings.Secure.LOW_POWER_WARNING_ACKNOWLEDGED,
-                 Settings.Secure.SUPPRESS_AUTO_BATTERY_SAVER_SUGGESTION);
+                 Settings.Secure.SUPPRESS_AUTO_BATTERY_SAVER_SUGGESTION,
+                 Settings.Secure.PACKAGES_TO_CLEAR_DATA_BEFORE_FULL_RESTORE);
 
     @Test
     public void systemSettingsBackedUpOrBlacklisted() {

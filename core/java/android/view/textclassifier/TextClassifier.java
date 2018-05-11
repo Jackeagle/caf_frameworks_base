@@ -33,7 +33,6 @@ import android.text.util.Linkify;
 import android.text.util.Linkify.LinkifyMask;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-import android.util.Slog;
 
 import com.android.internal.util.Preconditions;
 
@@ -42,8 +41,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Interface for providing text classification related features.
@@ -156,76 +156,44 @@ public interface TextClassifier {
      *
      * <p><strong>NOTE: </strong>Call on a worker thread.
      *
-     * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
+     * <p><strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
      * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
      *
-     * @param text text providing context for the selected text (which is specified
-     *      by the sub sequence starting at selectionStartIndex and ending at selectionEndIndex)
-     * @param selectionStartIndex start index of the selected part of text
-     * @param selectionEndIndex end index of the selected part of text
-     * @param options optional input parameters
-     *
-     * @throws IllegalArgumentException if text is null; selectionStartIndex is negative;
-     *      selectionEndIndex is greater than text.length() or not greater than selectionStartIndex
-     *
-     * @see #suggestSelection(CharSequence, int, int)
+     * @param request the text selection request
      */
     @WorkerThread
     @NonNull
-    default TextSelection suggestSelection(
-            @NonNull CharSequence text,
-            @IntRange(from = 0) int selectionStartIndex,
-            @IntRange(from = 0) int selectionEndIndex,
-            @Nullable TextSelection.Options options) {
-        Utils.validate(text, selectionStartIndex, selectionEndIndex, false);
-        return new TextSelection.Builder(selectionStartIndex, selectionEndIndex).build();
+    default TextSelection suggestSelection(@NonNull TextSelection.Request request) {
+        Preconditions.checkNotNull(request);
+        Utils.checkMainThread();
+        return new TextSelection.Builder(request.getStartIndex(), request.getEndIndex()).build();
     }
 
     /**
      * Returns suggested text selection start and end indices, recognized entity types, and their
      * associated confidence scores. The entity types are ordered from highest to lowest scoring.
      *
-     * <p><b>NOTE:</b> Do not implement. The default implementation of this method calls
-     * {@link #suggestSelection(CharSequence, int, int, TextSelection.Options)}. If that method
-     * calls this method, a stack overflow error will happen.
-     *
      * <p><strong>NOTE: </strong>Call on a worker thread.
      *
-     * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
+     * <p><strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
      * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
+     *
+     * <p><b>NOTE:</b> Do not implement. The default implementation of this method calls
+     * {@link #suggestSelection(TextSelection.Request)}. If that method calls this method,
+     * a stack overflow error will happen.
      *
      * @param text text providing context for the selected text (which is specified
      *      by the sub sequence starting at selectionStartIndex and ending at selectionEndIndex)
      * @param selectionStartIndex start index of the selected part of text
      * @param selectionEndIndex end index of the selected part of text
+     * @param defaultLocales ordered list of locale preferences that may be used to
+     *      disambiguate the provided text. If no locale preferences exist, set this to null
+     *      or an empty locale list.
      *
      * @throws IllegalArgumentException if text is null; selectionStartIndex is negative;
      *      selectionEndIndex is greater than text.length() or not greater than selectionStartIndex
      *
-     * @see #suggestSelection(CharSequence, int, int, TextSelection.Options)
-     */
-    @WorkerThread
-    @NonNull
-    default TextSelection suggestSelection(
-            @NonNull CharSequence text,
-            @IntRange(from = 0) int selectionStartIndex,
-            @IntRange(from = 0) int selectionEndIndex) {
-        return suggestSelection(text, selectionStartIndex, selectionEndIndex,
-                (TextSelection.Options) null);
-    }
-
-    /**
-     * See {@link #suggestSelection(CharSequence, int, int)} or
-     * {@link #suggestSelection(CharSequence, int, int, TextSelection.Options)}.
-     *
-     * <p><strong>NOTE: </strong>Call on a worker thread.
-     *
-     * <p><b>NOTE:</b> Do not implement. The default implementation of this method calls
-     * {@link #suggestSelection(CharSequence, int, int, TextSelection.Options)}. If that method
-     * calls this method, a stack overflow error will happen.
-     *
-     * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
-     * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
+     * @see #suggestSelection(TextSelection.Request)
      */
     @WorkerThread
     @NonNull
@@ -234,10 +202,31 @@ public interface TextClassifier {
             @IntRange(from = 0) int selectionStartIndex,
             @IntRange(from = 0) int selectionEndIndex,
             @Nullable LocaleList defaultLocales) {
-        final TextSelection.Options options = (defaultLocales != null)
-                ? new TextSelection.Options().setDefaultLocales(defaultLocales)
-                : null;
-        return suggestSelection(text, selectionStartIndex, selectionEndIndex, options);
+        final TextSelection.Request request = new TextSelection.Request.Builder(
+                text, selectionStartIndex, selectionEndIndex)
+                .setDefaultLocales(defaultLocales)
+                .build();
+        return suggestSelection(request);
+    }
+
+    // TODO: Remove once apps can build against the latest sdk.
+    /** @hide */
+    default TextSelection suggestSelection(
+            @NonNull CharSequence text,
+            @IntRange(from = 0) int selectionStartIndex,
+            @IntRange(from = 0) int selectionEndIndex,
+            @Nullable TextSelection.Options options) {
+        if (options == null) {
+            return suggestSelection(new TextSelection.Request.Builder(
+                    text, selectionStartIndex, selectionEndIndex).build());
+        } else if (options.getRequest() != null) {
+            return suggestSelection(options.getRequest());
+        } else {
+            return suggestSelection(
+                    new TextSelection.Request.Builder(text, selectionStartIndex, selectionEndIndex)
+                            .setDefaultLocales(options.getDefaultLocales())
+                            .build());
+        }
     }
 
     /**
@@ -249,25 +238,13 @@ public interface TextClassifier {
      * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
      * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
      *
-     * @param text text providing context for the text to classify (which is specified
-     *      by the sub sequence starting at startIndex and ending at endIndex)
-     * @param startIndex start index of the text to classify
-     * @param endIndex end index of the text to classify
-     * @param options optional input parameters
-     *
-     * @throws IllegalArgumentException if text is null; startIndex is negative;
-     *      endIndex is greater than text.length() or not greater than startIndex
-     *
-     * @see #classifyText(CharSequence, int, int)
+     * @param request the text classification request
      */
     @WorkerThread
     @NonNull
-    default TextClassification classifyText(
-            @NonNull CharSequence text,
-            @IntRange(from = 0) int startIndex,
-            @IntRange(from = 0) int endIndex,
-            @Nullable TextClassification.Options options) {
-        Utils.validate(text, startIndex, endIndex, false);
+    default TextClassification classifyText(@NonNull TextClassification.Request request) {
+        Preconditions.checkNotNull(request);
+        Utils.checkMainThread();
         return TextClassification.EMPTY;
     }
 
@@ -278,8 +255,8 @@ public interface TextClassifier {
      * <p><strong>NOTE: </strong>Call on a worker thread.
      *
      * <p><b>NOTE:</b> Do not implement. The default implementation of this method calls
-     * {@link #classifyText(CharSequence, int, int, TextClassification.Options)}. If that method
-     * calls this method, a stack overflow error will happen.
+     * {@link #classifyText(TextClassification.Request)}. If that method calls this method,
+     * a stack overflow error will happen.
      *
      * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
      * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
@@ -288,33 +265,14 @@ public interface TextClassifier {
      *      by the sub sequence starting at startIndex and ending at endIndex)
      * @param startIndex start index of the text to classify
      * @param endIndex end index of the text to classify
+     * @param defaultLocales ordered list of locale preferences that may be used to
+     *      disambiguate the provided text. If no locale preferences exist, set this to null
+     *      or an empty locale list.
      *
      * @throws IllegalArgumentException if text is null; startIndex is negative;
      *      endIndex is greater than text.length() or not greater than startIndex
      *
-     * @see #classifyText(CharSequence, int, int, TextClassification.Options)
-     */
-    @WorkerThread
-    @NonNull
-    default TextClassification classifyText(
-            @NonNull CharSequence text,
-            @IntRange(from = 0) int startIndex,
-            @IntRange(from = 0) int endIndex) {
-        return classifyText(text, startIndex, endIndex, (TextClassification.Options) null);
-    }
-
-    /**
-     * See {@link #classifyText(CharSequence, int, int, TextClassification.Options)} or
-     * {@link #classifyText(CharSequence, int, int)}.
-     *
-     * <p><strong>NOTE: </strong>Call on a worker thread.
-     *
-     * <p><b>NOTE:</b> Do not implement. The default implementation of this method calls
-     * {@link #classifyText(CharSequence, int, int, TextClassification.Options)}. If that method
-     * calls this method, a stack overflow error will happen.
-     *
-     * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
-     * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
+     * @see #classifyText(TextClassification.Request)
      */
     @WorkerThread
     @NonNull
@@ -323,10 +281,31 @@ public interface TextClassifier {
             @IntRange(from = 0) int startIndex,
             @IntRange(from = 0) int endIndex,
             @Nullable LocaleList defaultLocales) {
-        final TextClassification.Options options = (defaultLocales != null)
-                ? new TextClassification.Options().setDefaultLocales(defaultLocales)
-                : null;
-        return classifyText(text, startIndex, endIndex, options);
+        final TextClassification.Request request = new TextClassification.Request.Builder(
+                text, startIndex, endIndex)
+                .setDefaultLocales(defaultLocales)
+                .build();
+        return classifyText(request);
+    }
+
+    // TODO: Remove once apps can build against the latest sdk.
+    /** @hide */
+    default TextClassification classifyText(
+            @NonNull CharSequence text,
+            @IntRange(from = 0) int startIndex,
+            @IntRange(from = 0) int endIndex,
+            @Nullable TextClassification.Options options) {
+        if (options == null) {
+            return classifyText(
+                    new TextClassification.Request.Builder(text, startIndex, endIndex).build());
+        } else if (options.getRequest() != null) {
+            return classifyText(options.getRequest());
+        } else {
+            return classifyText(new TextClassification.Request.Builder(text, startIndex, endIndex)
+                    .setDefaultLocales(options.getDefaultLocales())
+                    .setReferenceTime(options.getReferenceTime())
+                    .build());
+        }
     }
 
     /**
@@ -338,48 +317,32 @@ public interface TextClassifier {
      * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
      * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
      *
-     * @param text the text to generate annotations for
-     * @param options configuration for link generation
+     * @param request the text links request
      *
-     * @throws IllegalArgumentException if text is null or the text is too long for the
-     *      TextClassifier implementation.
-     *
-     * @see #generateLinks(CharSequence)
      * @see #getMaxGenerateLinksTextLength()
      */
     @WorkerThread
     @NonNull
+    default TextLinks generateLinks(@NonNull TextLinks.Request request) {
+        Preconditions.checkNotNull(request);
+        Utils.checkMainThread();
+        return new TextLinks.Builder(request.getText().toString()).build();
+    }
+
+    // TODO: Remove once apps can build against the latest sdk.
+    /** @hide */
     default TextLinks generateLinks(
             @NonNull CharSequence text, @Nullable TextLinks.Options options) {
-        Utils.validate(text, false);
-        return new TextLinks.Builder(text.toString()).build();
-    }
-
-    /**
-     * Generates and returns a {@link TextLinks} that may be applied to the text to annotate it with
-     * links information.
-     *
-     * <p><strong>NOTE: </strong>Call on a worker thread.
-     *
-     * <p><b>NOTE:</b> Do not implement. The default implementation of this method calls
-     * {@link #generateLinks(CharSequence, TextLinks.Options)}. If that method calls this method,
-     * a stack overflow error will happen.
-     *
-     * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
-     * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
-     *
-     * @param text the text to generate annotations for
-     *
-     * @throws IllegalArgumentException if text is null or the text is too long for the
-     *      TextClassifier implementation.
-     *
-     * @see #generateLinks(CharSequence, TextLinks.Options)
-     * @see #getMaxGenerateLinksTextLength()
-     */
-    @WorkerThread
-    @NonNull
-    default TextLinks generateLinks(@NonNull CharSequence text) {
-        return generateLinks(text, null);
+        if (options == null) {
+            return generateLinks(new TextLinks.Request.Builder(text).build());
+        } else if (options.getRequest() != null) {
+            return generateLinks(options.getRequest());
+        } else {
+            return generateLinks(new TextLinks.Request.Builder(text)
+                    .setDefaultLocales(options.getDefaultLocales())
+                    .setEntityConfig(options.getEntityConfig())
+                    .build());
+        }
     }
 
     /**
@@ -388,24 +351,11 @@ public interface TextClassifier {
      * <strong>NOTE: </strong>If a TextClassifier has been destroyed, calls to this method should
      * throw an {@link IllegalStateException}. See {@link #isDestroyed()}.
      *
-     * @see #generateLinks(CharSequence)
-     * @see #generateLinks(CharSequence, TextLinks.Options)
+     * @see #generateLinks(TextLinks.Request)
      */
     @WorkerThread
     default int getMaxGenerateLinksTextLength() {
         return Integer.MAX_VALUE;
-    }
-
-    /**
-     * Returns a helper for logging TextClassifier related events.
-     *
-     * @param config logger configuration
-     * @hide
-     */
-    @WorkerThread
-    default Logger getLogger(@NonNull Logger.Config config) {
-        Preconditions.checkNotNull(config);
-        return Logger.DISABLED;
     }
 
     /**
@@ -467,9 +417,15 @@ public interface TextClassifier {
          *
          * @param hints Hints for the TextClassifier to determine what types of entities to find.
          */
-        public static EntityConfig create(@Nullable Collection<String> hints) {
+        public static EntityConfig createWithHints(@Nullable Collection<String> hints) {
             return new EntityConfig(/* useHints */ true, hints,
                     /* includedEntityTypes */null, /* excludedEntityTypes */ null);
+        }
+
+        // TODO: Remove once apps can build against the latest sdk.
+        /** @hide */
+        public static EntityConfig create(@Nullable Collection<String> hints) {
+            return createWithHints(hints);
         }
 
         /**
@@ -495,9 +451,16 @@ public interface TextClassifier {
          * @param entityTypes Complete set of entities, e.g. {@link #TYPE_URL} to find.
          *
          */
-        public static EntityConfig createWithEntityList(@Nullable Collection<String> entityTypes) {
+        public static EntityConfig createWithExplicitEntityList(
+                @Nullable Collection<String> entityTypes) {
             return new EntityConfig(/* useHints */ false, /* hints */ null,
                     /* includedEntityTypes */ entityTypes, /* excludedEntityTypes */ null);
+        }
+
+        // TODO: Remove once apps can build against the latest sdk.
+        /** @hide */
+        public static EntityConfig createWithEntityList(@Nullable Collection<String> entityTypes) {
+            return createWithExplicitEntityList(entityTypes);
         }
 
         /**
@@ -507,21 +470,15 @@ public interface TextClassifier {
          *
          * This method is intended for use by TextClassifier implementations.
          */
-        public List<String> resolveEntityListModifications(@NonNull Collection<String> entities) {
-            final ArrayList<String> finalList = new ArrayList<>();
+        public Collection<String> resolveEntityListModifications(
+                @NonNull Collection<String> entities) {
+            final Set<String> finalSet = new HashSet();
             if (mUseHints) {
-                for (String entity : entities) {
-                    if (!mExcludedEntityTypes.contains(entity)) {
-                        finalList.add(entity);
-                    }
-                }
+                finalSet.addAll(entities);
             }
-            for (String entity : mIncludedEntityTypes) {
-                if (!mExcludedEntityTypes.contains(entity) && !finalList.contains(entity)) {
-                    finalList.add(entity);
-                }
-            }
-            return finalList;
+            finalSet.addAll(mIncludedEntityTypes);
+            finalSet.removeAll(mExcludedEntityTypes);
+            return finalSet;
         }
 
         /**
@@ -584,42 +541,25 @@ public interface TextClassifier {
          *      endIndex is greater than text.length() or is not greater than startIndex;
          *      options is null
          */
-        public static void validate(
-                @NonNull CharSequence text, int startIndex, int endIndex,
-                boolean allowInMainThread) {
+        static void checkArgument(@NonNull CharSequence text, int startIndex, int endIndex) {
             Preconditions.checkArgument(text != null);
             Preconditions.checkArgument(startIndex >= 0);
             Preconditions.checkArgument(endIndex <= text.length());
             Preconditions.checkArgument(endIndex > startIndex);
-            checkMainThread(allowInMainThread);
         }
 
-        /**
-         * @throws IllegalArgumentException if text is null or options is null
-         */
-        public static void validate(@NonNull CharSequence text, boolean allowInMainThread) {
-            Preconditions.checkArgument(text != null);
-            checkMainThread(allowInMainThread);
-        }
-
-        /**
-         * @throws IllegalArgumentException if text is null; the text is too long or options is null
-         */
-        public static void validate(@NonNull CharSequence text, int maxLength,
-                boolean allowInMainThread) {
-            validate(text, allowInMainThread);
+        static void checkTextLength(CharSequence text, int maxLength) {
             Preconditions.checkArgumentInRange(text.length(), 0, maxLength, "text.length()");
         }
 
         /**
          * Generates links using legacy {@link Linkify}.
          */
-        public static TextLinks generateLegacyLinks(
-                @NonNull CharSequence text, @NonNull TextLinks.Options options) {
-            final String string = Preconditions.checkNotNull(text).toString();
+        public static TextLinks generateLegacyLinks(@NonNull TextLinks.Request request) {
+            final String string = request.getText().toString();
             final TextLinks.Builder links = new TextLinks.Builder(string);
 
-            final List<String> entities = Preconditions.checkNotNull(options).getEntityConfig()
+            final Collection<String> entities = request.getEntityConfig()
                     .resolveEntityListModifications(Collections.emptyList());
             if (entities.contains(TextClassifier.TYPE_URL)) {
                 addLinks(links, string, TextClassifier.TYPE_URL);
@@ -670,9 +610,9 @@ public interface TextClassifier {
             return scores;
         }
 
-        private static void checkMainThread(boolean allowInMainThread) {
-            if (!allowInMainThread && Looper.myLooper() == Looper.getMainLooper()) {
-                Slog.w(DEFAULT_LOG_TAG, "TextClassifier called on main thread");
+        static void checkMainThread() {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                Log.w(DEFAULT_LOG_TAG, "TextClassifier called on main thread");
             }
         }
     }

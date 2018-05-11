@@ -196,7 +196,7 @@ framework_docs_LOCAL_DROIDDOC_OPTIONS := \
     -since $(SRC_API_DIR)/25.txt 25 \
     -since $(SRC_API_DIR)/26.txt 26 \
     -since $(SRC_API_DIR)/27.txt 27 \
-    -since ./frameworks/base/api/current.txt P \
+    -since $(SRC_API_DIR)/28.txt 28 \
     -werror -lerror -hide 111 -hide 113 -hide 125 -hide 126 -hide 127 -hide 128 \
     -overview $(LOCAL_PATH)/core/java/overview.html \
 
@@ -251,6 +251,11 @@ framework_docs_LOCAL_DROIDDOC_OPTIONS += \
 framework_docs_LOCAL_DROIDDOC_OPTIONS += \
 		-federate SupportLib https://developer.android.com \
 		-federationapi SupportLib prebuilts/sdk/current/support-api.txt
+
+# Federate AndroidX references against local API file.
+framework_docs_LOCAL_DROIDDOC_OPTIONS += \
+		-federate AndroidX https://developer.android.com \
+		-federationapi AndroidX prebuilts/sdk/current/androidx-api.txt
 
 # ====  Public API diff ===========================
 include $(CLEAR_VARS)

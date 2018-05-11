@@ -109,6 +109,48 @@ public class AppOpsManager {
      */
     public static final int MODE_DEFAULT = 3;
 
+    /**
+     * Metrics about an op when its uid is persistent.
+     * @hide
+     */
+    public static final int UID_STATE_PERSISTENT = 0;
+
+    /**
+     * Metrics about an op when its uid is at the top.
+     * @hide
+     */
+    public static final int UID_STATE_TOP = 1;
+
+    /**
+     * Metrics about an op when its uid is running a foreground service.
+     * @hide
+     */
+    public static final int UID_STATE_FOREGROUND_SERVICE = 2;
+
+    /**
+     * Metrics about an op when its uid is in the foreground for any other reasons.
+     * @hide
+     */
+    public static final int UID_STATE_FOREGROUND = 3;
+
+    /**
+     * Metrics about an op when its uid is in the background for any reason.
+     * @hide
+     */
+    public static final int UID_STATE_BACKGROUND = 4;
+
+    /**
+     * Metrics about an op when its uid is cached.
+     * @hide
+     */
+    public static final int UID_STATE_CACHED = 5;
+
+    /**
+     * Number of uid states we track.
+     * @hide
+     */
+    public static final int _NUM_UID_STATE = 6;
+
     // when adding one of these:
     //  - increment _NUM_OP
     //  - define an OPSTR_* constant (marked as @SystemApi)
@@ -272,8 +314,10 @@ public class AppOpsManager {
     public static final int OP_ACCEPT_HANDOVER = 74;
     /** @hide Create and Manage IPsec Tunnels */
     public static final int OP_MANAGE_IPSEC_TUNNELS = 75;
+    /** @hide Any app start foreground service. */
+    public static final int OP_START_FOREGROUND = 76;
     /** @hide */
-    public static final int _NUM_OP = 76;
+    public static final int _NUM_OP = 77;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -512,6 +556,9 @@ public class AppOpsManager {
     /** @hide */
     @SystemApi @TestApi
     public static final String OPSTR_MANAGE_IPSEC_TUNNELS = "android:manage_ipsec_tunnels";
+    /** @hide */
+    @SystemApi @TestApi
+    public static final String OPSTR_START_FOREGROUND = "android:start_foreground";
 
     // Warning: If an permission is added here it also has to be added to
     // com.android.packageinstaller.permission.utils.EventLogger
@@ -560,6 +607,7 @@ public class AppOpsManager {
             OP_SYSTEM_ALERT_WINDOW,
             OP_WRITE_SETTINGS,
             OP_REQUEST_INSTALL_PACKAGES,
+            OP_START_FOREGROUND,
     };
 
     /**
@@ -647,6 +695,7 @@ public class AppOpsManager {
             OP_BIND_ACCESSIBILITY_SERVICE,
             OP_ACCEPT_HANDOVER,
             OP_MANAGE_IPSEC_TUNNELS,
+            OP_START_FOREGROUND,
     };
 
     /**
@@ -729,6 +778,7 @@ public class AppOpsManager {
             OPSTR_BIND_ACCESSIBILITY_SERVICE,
             OPSTR_ACCEPT_HANDOVER,
             OPSTR_MANAGE_IPSEC_TUNNELS,
+            OPSTR_START_FOREGROUND,
     };
 
     /**
@@ -812,6 +862,7 @@ public class AppOpsManager {
             "BIND_ACCESSIBILITY_SERVICE",
             "ACCEPT_HANDOVER",
             "MANAGE_IPSEC_TUNNELS",
+            "START_FOREGROUND",
     };
 
     /**
@@ -895,6 +946,7 @@ public class AppOpsManager {
             Manifest.permission.BIND_ACCESSIBILITY_SERVICE,
             Manifest.permission.ACCEPT_HANDOVER,
             null, // no permission for OP_MANAGE_IPSEC_TUNNELS
+            Manifest.permission.FOREGROUND_SERVICE,
     };
 
     /**
@@ -979,6 +1031,7 @@ public class AppOpsManager {
             null, // OP_BIND_ACCESSIBILITY_SERVICE
             null, // ACCEPT_HANDOVER
             null, // MANAGE_IPSEC_TUNNELS
+            null, // START_FOREGROUND
     };
 
     /**
@@ -1062,6 +1115,7 @@ public class AppOpsManager {
             false, // OP_BIND_ACCESSIBILITY_SERVICE
             false, // ACCEPT_HANDOVER
             false, // MANAGE_IPSEC_HANDOVERS
+            false, // START_FOREGROUND
     };
 
     /**
@@ -1137,13 +1191,14 @@ public class AppOpsManager {
             AppOpsManager.MODE_DEFAULT,  // OP_REQUEST_INSTALL_PACKAGES
             AppOpsManager.MODE_ALLOWED,  // OP_PICTURE_IN_PICTURE
             AppOpsManager.MODE_DEFAULT,  // OP_INSTANT_APP_START_FOREGROUND
-            AppOpsManager.MODE_ALLOWED, // ANSWER_PHONE_CALLS
+            AppOpsManager.MODE_ALLOWED,  // ANSWER_PHONE_CALLS
             AppOpsManager.MODE_ALLOWED,  // OP_RUN_ANY_IN_BACKGROUND
             AppOpsManager.MODE_ALLOWED,  // OP_CHANGE_WIFI_STATE
             AppOpsManager.MODE_ALLOWED,  // REQUEST_DELETE_PACKAGES
             AppOpsManager.MODE_ALLOWED,  // OP_BIND_ACCESSIBILITY_SERVICE
             AppOpsManager.MODE_ALLOWED,  // ACCEPT_HANDOVER
             AppOpsManager.MODE_ERRORED,  // MANAGE_IPSEC_TUNNELS
+            AppOpsManager.MODE_ALLOWED,  // OP_START_FOREGROUND
     };
 
     /**
@@ -1230,6 +1285,7 @@ public class AppOpsManager {
             false, // OP_BIND_ACCESSIBILITY_SERVICE
             false, // ACCEPT_HANDOVER
             false, // MANAGE_IPSEC_TUNNELS
+            false, // START_FOREGROUND
     };
 
     /**
@@ -1457,8 +1513,8 @@ public class AppOpsManager {
     public static class OpEntry implements Parcelable {
         private final int mOp;
         private final int mMode;
-        private final long mTime;
-        private final long mRejectTime;
+        private final long[] mTimes;
+        private final long[] mRejectTimes;
         private final int mDuration;
         private final int mProxyUid;
         private final String mProxyPackageName;
@@ -1467,8 +1523,23 @@ public class AppOpsManager {
                 int proxyUid, String proxyPackage) {
             mOp = op;
             mMode = mode;
-            mTime = time;
-            mRejectTime = rejectTime;
+            mTimes = new long[_NUM_UID_STATE];
+            mRejectTimes = new long[_NUM_UID_STATE];
+            mTimes[0] = time;
+            mRejectTimes[0] = rejectTime;
+            mDuration = duration;
+            mProxyUid = proxyUid;
+            mProxyPackageName = proxyPackage;
+        }
+
+        public OpEntry(int op, int mode, long[] times, long[] rejectTimes, int duration,
+                int proxyUid, String proxyPackage) {
+            mOp = op;
+            mMode = mode;
+            mTimes = new long[_NUM_UID_STATE];
+            mRejectTimes = new long[_NUM_UID_STATE];
+            System.arraycopy(times, 0, mTimes, 0, _NUM_UID_STATE);
+            System.arraycopy(rejectTimes, 0, mRejectTimes, 0, _NUM_UID_STATE);
             mDuration = duration;
             mProxyUid = proxyUid;
             mProxyPackageName = proxyPackage;
@@ -1483,11 +1554,31 @@ public class AppOpsManager {
         }
 
         public long getTime() {
-            return mTime;
+            long time = 0;
+            for (int i = 0; i < _NUM_UID_STATE; i++) {
+                if (mTimes[i] > time) {
+                    time = mTimes[i];
+                }
+            }
+            return time;
+        }
+
+        public long getTimeFor(int uidState) {
+            return mTimes[uidState];
         }
 
         public long getRejectTime() {
-            return mRejectTime;
+            long time = 0;
+            for (int i = 0; i < _NUM_UID_STATE; i++) {
+                if (mRejectTimes[i] > time) {
+                    time = mTimes[i];
+                }
+            }
+            return time;
+        }
+
+        public long getRejectTimeFor(int uidState) {
+            return mRejectTimes[uidState];
         }
 
         public boolean isRunning() {
@@ -1495,7 +1586,7 @@ public class AppOpsManager {
         }
 
         public int getDuration() {
-            return mDuration == -1 ? (int)(System.currentTimeMillis()-mTime) : mDuration;
+            return mDuration;
         }
 
         public int getProxyUid() {
@@ -1515,8 +1606,8 @@ public class AppOpsManager {
         public void writeToParcel(Parcel dest, int flags) {
             dest.writeInt(mOp);
             dest.writeInt(mMode);
-            dest.writeLong(mTime);
-            dest.writeLong(mRejectTime);
+            dest.writeLongArray(mTimes);
+            dest.writeLongArray(mRejectTimes);
             dest.writeInt(mDuration);
             dest.writeInt(mProxyUid);
             dest.writeString(mProxyPackageName);
@@ -1525,8 +1616,8 @@ public class AppOpsManager {
         OpEntry(Parcel source) {
             mOp = source.readInt();
             mMode = source.readInt();
-            mTime = source.readLong();
-            mRejectTime = source.readLong();
+            mTimes = source.createLongArray();
+            mRejectTimes = source.createLongArray();
             mDuration = source.readInt();
             mProxyUid = source.readInt();
             mProxyPackageName = source.readString();

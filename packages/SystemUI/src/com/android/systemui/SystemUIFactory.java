@@ -20,11 +20,12 @@ import android.app.AlarmManager;
 import android.content.Context;
 import android.util.ArrayMap;
 import android.util.Log;
-import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.internal.logging.MetricsLogger;
+import com.android.internal.util.function.TriConsumer;
 import com.android.internal.widget.LockPatternUtils;
+import com.android.internal.colorextraction.ColorExtractor.GradientColors;
 import com.android.keyguard.ViewMediatorCallback;
 import com.android.systemui.Dependency.DependencyProvider;
 import com.android.systemui.classifier.FalsingManager;
@@ -41,19 +42,20 @@ import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.NotificationViewHierarchyManager;
 import com.android.systemui.statusbar.ScrimView;
+import com.android.systemui.statusbar.SmartReplyController;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.phone.DozeParameters;
 import com.android.systemui.statusbar.phone.KeyguardBouncer;
-import com.android.systemui.statusbar.phone.LightBarController;
+import com.android.systemui.statusbar.phone.KeyguardDismissUtil;
 import com.android.systemui.statusbar.phone.LockIcon;
 import com.android.systemui.statusbar.phone.LockscreenWallpaper;
 import com.android.systemui.statusbar.phone.NotificationGroupManager;
 import com.android.systemui.statusbar.phone.NotificationIconAreaController;
 import com.android.systemui.statusbar.phone.ScrimController;
+import com.android.systemui.statusbar.phone.ScrimState;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
-import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.SmartReplyConstants;
 
 import java.util.function.Consumer;
@@ -94,17 +96,19 @@ public class SystemUIFactory {
     }
 
     public KeyguardBouncer createKeyguardBouncer(Context context, ViewMediatorCallback callback,
-            LockPatternUtils lockPatternUtils,
-            ViewGroup container, DismissCallbackRegistry dismissCallbackRegistry) {
+            LockPatternUtils lockPatternUtils,  ViewGroup container,
+            DismissCallbackRegistry dismissCallbackRegistry,
+            KeyguardBouncer.BouncerExpansionCallback expansionCallback) {
         return new KeyguardBouncer(context, callback, lockPatternUtils, container,
-                dismissCallbackRegistry, FalsingManager.getInstance(context));
+                dismissCallbackRegistry, FalsingManager.getInstance(context), expansionCallback);
     }
 
-    public ScrimController createScrimController(LightBarController lightBarController,
-            ScrimView scrimBehind, ScrimView scrimInFront, LockscreenWallpaper lockscreenWallpaper,
+    public ScrimController createScrimController(ScrimView scrimBehind, ScrimView scrimInFront,
+            LockscreenWallpaper lockscreenWallpaper,
+            TriConsumer<ScrimState, Float, GradientColors> scrimStateListener,
             Consumer<Integer> scrimVisibleListener, DozeParameters dozeParameters,
             AlarmManager alarmManager) {
-        return new ScrimController(lightBarController, scrimBehind, scrimInFront,
+        return new ScrimController(scrimBehind, scrimInFront, scrimStateListener,
                 scrimVisibleListener, dozeParameters, alarmManager);
     }
 
@@ -142,5 +146,7 @@ public class SystemUIFactory {
         providers.put(NotificationViewHierarchyManager.class,
                 () -> new NotificationViewHierarchyManager(context));
         providers.put(NotificationEntryManager.class, () -> new NotificationEntryManager(context));
+        providers.put(KeyguardDismissUtil.class, KeyguardDismissUtil::new);
+        providers.put(SmartReplyController.class, () -> new SmartReplyController());
     }
 }

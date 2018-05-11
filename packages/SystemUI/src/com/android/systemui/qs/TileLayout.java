@@ -23,6 +23,7 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
     protected int mCellHeight;
     protected int mCellMarginHorizontal;
     protected int mCellMarginVertical;
+    protected int mSidePadding;
 
     protected final ArrayList<TileRecord> mRecords = new ArrayList<>();
     private int mCellMarginTop;
@@ -80,6 +81,7 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
         mCellMarginHorizontal = res.getDimensionPixelSize(R.dimen.qs_tile_margin_horizontal);
         mCellMarginVertical= res.getDimensionPixelSize(R.dimen.qs_tile_margin_vertical);
         mCellMarginTop = res.getDimensionPixelSize(R.dimen.qs_tile_margin_top);
+        mSidePadding = res.getDimensionPixelOffset(R.dimen.qs_tile_layout_margin_side);
         if (mColumns != columns) {
             mColumns = columns;
             requestLayout();
@@ -91,9 +93,9 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         final int numTiles = mRecords.size();
-        final int width = MeasureSpec.getSize(widthMeasureSpec);
+        final int width = MeasureSpec.getSize(widthMeasureSpec) - mPaddingLeft - mPaddingRight;
         final int numRows = (numTiles + mColumns - 1) / mColumns;
-        mCellWidth = (width - (mCellMarginHorizontal * (mColumns + 1))) / mColumns;
+        mCellWidth = (width - mSidePadding * 2 - (mCellMarginHorizontal * mColumns)) / mColumns;
 
         // Measure each QS tile.
         View previousView = this;
@@ -157,6 +159,6 @@ public class TileLayout extends ViewGroup implements QSTileLayout {
     }
 
     private int getColumnStart(int column) {
-        return column * (mCellWidth + mCellMarginHorizontal) + mCellMarginHorizontal;
+        return column * (mCellWidth + mCellMarginHorizontal) + mCellMarginHorizontal + mPaddingLeft;
     }
 }

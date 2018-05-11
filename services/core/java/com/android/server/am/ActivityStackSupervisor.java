@@ -43,6 +43,7 @@ import static android.app.WindowConfiguration.activityTypeToString;
 import static android.app.WindowConfiguration.windowingModeToString;
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.graphics.Rect.copyOrNull;
 import static android.os.PowerManager.PARTIAL_WAKE_LOCK;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.Trace.TRACE_TAG_ACTIVITY_MANAGER;
@@ -250,6 +251,20 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     // Used to indicate that pausing an activity should occur immediately without waiting for
     // the activity callback indicating that it has completed pausing
     static final boolean PAUSE_IMMEDIATELY = true;
+
+    /** True if the docked stack is currently being resized. */
+    private boolean mDockedStackResizing;
+
+    /**
+     * True if there are pending docked bounds that need to be applied after
+     * {@link #mDockedStackResizing} is reset to false.
+     */
+    private boolean mHasPendingDockedBounds;
+    private Rect mPendingDockedBounds;
+    private Rect mPendingTempDockedTaskBounds;
+    private Rect mPendingTempDockedTaskInsetBounds;
+    private Rect mPendingTempOtherTaskBounds;
+    private Rect mPendingTempOtherTaskInsetBounds;
 
     /**
      * The modes which affect which tasks are returned when calling
@@ -671,6 +686,14 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
     ActivityStack getFocusedStack() {
         return mFocusedStack;
+    }
+
+    boolean isFocusable(ConfigurationContainer container, boolean alwaysFocusable) {
+        if (container.inSplitScreenPrimaryWindowingMode() && mIsDockMinimized) {
+            return false;
+        }
+
+        return container.getWindowConfiguration().canReceiveKeys() || alwaysFocusable;
     }
 
     ActivityStack getLastStack() {
@@ -1193,6 +1216,18 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     }
 
     ActivityRecord topRunningActivityLocked() {
+        return topRunningActivityLocked(false /* considerKeyguardState */);
+    }
+
+    /**
+     * Returns the top running activity in the focused stack. In the case the focused stack has no
+     * such activity, the next focusable stack on top of a display is returned.
+     * @param considerKeyguardState Indicates whether the locked state should be considered. if
+     *                            {@code true} and the keyguard is locked, only activities that
+     *                            can be shown on top of the keyguard will be considered.
+     * @return The top running activity. {@code null} if none is available.
+     */
+    ActivityRecord topRunningActivityLocked(boolean considerKeyguardState) {
         final ActivityStack focusedStack = mFocusedStack;
         ActivityRecord r = focusedStack.topRunningActivityLocked();
         if (r != null) {
@@ -1211,16 +1246,33 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             if (display == null) {
                 continue;
             }
-            for (int j = display.getChildCount() - 1; j >= 0; --j) {
-                final ActivityStack stack = display.getChildAt(j);
-                if (stack != focusedStack && stack.isTopStackOnDisplay() && stack.isFocusable()) {
-                    r = stack.topRunningActivityLocked();
-                    if (r != null) {
-                        return r;
-                    }
-                }
+
+            // TODO: We probably want to consider the top fullscreen stack as we could have a pinned
+            // stack on top.
+            final ActivityStack topStack = display.getTopStack();
+
+            // Only consider focusable top stacks other than the current focused one.
+            if (topStack == null || !topStack.isFocusable() || topStack == focusedStack) {
+                continue;
+            }
+
+            final ActivityRecord topActivity = topStack.topRunningActivityLocked();
+
+            // Skip if no top activity.
+            if (topActivity == null) {
+                continue;
+            }
+
+            final boolean keyguardLocked = getKeyguardController().isKeyguardLocked();
+
+            // This activity can be considered the top running activity if we are not
+            // considering the locked state, the keyguard isn't locked, or we can show when
+            // locked.
+            if (!considerKeyguardState || !keyguardLocked || topActivity.canShowWhenLocked()) {
+                return topActivity;
             }
         }
+
         return null;
     }
 
@@ -1270,10 +1322,11 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     }
 
     ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId) {
-        return resolveIntent(intent, resolvedType, userId, 0);
+        return resolveIntent(intent, resolvedType, userId, 0, Binder.getCallingUid());
     }
 
-    ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId, int flags) {
+    ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId, int flags,
+            int filterCallingUid) {
         synchronized (mService) {
             try {
                 Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "resolveIntent");
@@ -1284,7 +1337,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                     modifiedFlags |= PackageManager.MATCH_INSTANT;
                 }
                 return mService.getPackageManagerInternalLocked().resolveIntent(
-                        intent, resolvedType, modifiedFlags, userId, true);
+                        intent, resolvedType, modifiedFlags, userId, true, filterCallingUid);
 
             } finally {
                 Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
@@ -1293,8 +1346,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     }
 
     ActivityInfo resolveActivity(Intent intent, String resolvedType, int startFlags,
-            ProfilerInfo profilerInfo, int userId) {
-        final ResolveInfo rInfo = resolveIntent(intent, resolvedType, userId);
+            ProfilerInfo profilerInfo, int userId, int filterCallingUid) {
+        final ResolveInfo rInfo = resolveIntent(intent, resolvedType, userId, 0, filterCallingUid);
         return resolveActivity(intent, rInfo, startFlags, profilerInfo);
     }
 
@@ -1377,12 +1430,13 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             mService.updateLruProcessLocked(app, true, null);
             mService.updateOomAdjLocked();
 
+            final LockTaskController lockTaskController = mService.getLockTaskController();
             if (task.mLockTaskAuth == LOCK_TASK_AUTH_LAUNCHABLE
                     || task.mLockTaskAuth == LOCK_TASK_AUTH_LAUNCHABLE_PRIV
                     || (task.mLockTaskAuth == LOCK_TASK_AUTH_WHITELISTED
-                            && mService.mLockTaskController.getLockTaskModeState()
-                            == LOCK_TASK_MODE_LOCKED)) {
-                mService.mLockTaskController.startLockTaskMode(task, false, 0 /* blank UID */);
+                            && lockTaskController.getLockTaskModeState()
+                                    == LOCK_TASK_MODE_LOCKED)) {
+                lockTaskController.startLockTaskMode(task, false, 0 /* blank UID */);
             }
 
             try {
@@ -1462,11 +1516,9 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 // Set desired final state.
                 final ActivityLifecycleItem lifecycleItem;
                 if (andResume) {
-                    lifecycleItem = ResumeActivityItem.obtain(mService.isNextTransitionForward())
-                            .setDescription(r.getLifecycleDescription("realStartActivityLocked"));
+                    lifecycleItem = ResumeActivityItem.obtain(mService.isNextTransitionForward());
                 } else {
-                    lifecycleItem = PauseActivityItem.obtain()
-                            .setDescription(r.getLifecycleDescription("realStartActivityLocked"));
+                    lifecycleItem = PauseActivityItem.obtain();
                 }
                 clientTransaction.setLifecycleStateRequest(lifecycleItem);
 
@@ -1585,7 +1637,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                     // to run in multiple processes, because this is actually
                     // part of the framework so doesn't make sense to track as a
                     // separate apk in the process.
-                    app.addPackage(r.info.packageName, r.info.applicationInfo.versionCode,
+                    app.addPackage(r.info.packageName, r.info.applicationInfo.longVersionCode,
                             mService.mProcessStats);
                 }
                 realStartActivityLocked(r, app, andResume, checkConfig);
@@ -2132,15 +2184,22 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         }
     }
 
-    TaskRecord finishTopRunningActivityLocked(ProcessRecord app, String reason) {
+    /**
+     * Finish the topmost activities in all stacks that belong to the crashed app.
+     * @param app The app that crashed.
+     * @param reason Reason to perform this action.
+     * @return The task that was finished in this stack, {@code null} if haven't found any.
+     */
+    TaskRecord finishTopCrashedActivitiesLocked(ProcessRecord app, String reason) {
         TaskRecord finishedTask = null;
         ActivityStack focusedStack = getFocusedStack();
         for (int displayNdx = mActivityDisplays.size() - 1; displayNdx >= 0; --displayNdx) {
             final ActivityDisplay display = mActivityDisplays.valueAt(displayNdx);
-            final int numStacks = display.getChildCount();
-            for (int stackNdx = 0; stackNdx < numStacks; ++stackNdx) {
+            // It is possible that request to finish activity might also remove its task and stack,
+            // so we need to be careful with indexes in the loop and check child count every time.
+            for (int stackNdx = 0; stackNdx < display.getChildCount(); ++stackNdx) {
                 final ActivityStack stack = display.getChildAt(stackNdx);
-                TaskRecord t = stack.finishTopRunningActivityLocked(app, reason);
+                final TaskRecord t = stack.finishTopCrashedActivityLocked(app, reason);
                 if (stack == focusedStack || finishedTask == null) {
                     finishedTask = t;
                 }
@@ -2709,6 +2768,28 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 moveTasksToFullscreenStackInSurfaceTransaction(fromStack, toDisplayId, onTop));
     }
 
+    void setSplitScreenResizing(boolean resizing) {
+        if (resizing == mDockedStackResizing) {
+            return;
+        }
+
+        mDockedStackResizing = resizing;
+        mWindowManager.setDockedStackResizing(resizing);
+
+        if (!resizing && mHasPendingDockedBounds) {
+            resizeDockedStackLocked(mPendingDockedBounds, mPendingTempDockedTaskBounds,
+                    mPendingTempDockedTaskInsetBounds, mPendingTempOtherTaskBounds,
+                    mPendingTempOtherTaskInsetBounds, PRESERVE_WINDOWS);
+
+            mHasPendingDockedBounds = false;
+            mPendingDockedBounds = null;
+            mPendingTempDockedTaskBounds = null;
+            mPendingTempDockedTaskInsetBounds = null;
+            mPendingTempOtherTaskBounds = null;
+            mPendingTempOtherTaskInsetBounds = null;
+        }
+    }
+
     void resizeDockedStackLocked(Rect dockedBounds, Rect tempDockedTaskBounds,
             Rect tempDockedTaskInsetBounds, Rect tempOtherTaskBounds, Rect tempOtherTaskInsetBounds,
             boolean preserveWindows) {
@@ -2730,6 +2811,15 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         if (stack == null) {
             Slog.w(TAG, "resizeDockedStackLocked: docked stack not found");
             return;
+        }
+
+        if (mDockedStackResizing) {
+            mHasPendingDockedBounds = true;
+            mPendingDockedBounds = copyOrNull(dockedBounds);
+            mPendingTempDockedTaskBounds = copyOrNull(tempDockedTaskBounds);
+            mPendingTempDockedTaskInsetBounds = copyOrNull(tempDockedTaskInsetBounds);
+            mPendingTempOtherTaskBounds = copyOrNull(tempOtherTaskBounds);
+            mPendingTempOtherTaskInsetBounds = copyOrNull(tempOtherTaskInsetBounds);
         }
 
         Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "am.resizeDockedStack");
@@ -2764,6 +2854,11 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                         continue;
                     }
                     if (!current.affectedBySplitScreenResize()) {
+                        continue;
+                    }
+                    if (mDockedStackResizing && !current.isTopActivityVisible()) {
+                        // Non-visible stacks get resized once we're done with the resize
+                        // interaction.
                         continue;
                     }
                     // Need to set windowing mode here before we try to get the dock bounds.
@@ -2908,7 +3003,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         if (tr != null) {
             tr.removeTaskActivitiesLocked(pauseImmediately, reason);
             cleanUpRemovedTaskLocked(tr, killProcess, removeFromRecents);
-            mService.mLockTaskController.clearLockedTask(tr);
+            mService.getLockTaskController().clearLockedTask(tr);
             if (tr.isPersistable) {
                 mService.notifyTaskPersisterLocked(null, true);
             }
@@ -3849,7 +3944,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         pw.print(mRecentTasks.isRecentsComponentHomeActivity(mCurrentUser));
 
         getKeyguardController().dump(pw, prefix);
-        mService.mLockTaskController.dump(pw, prefix);
+        mService.getLockTaskController().dump(pw, prefix);
     }
 
     public void writeToProto(ProtoOutputStream proto, long fieldId) {
@@ -4702,7 +4797,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             userId = task.userId;
             return mService.getActivityStartController().startActivityInPackage(
                     task.mCallingUid, callingPid, callingUid, callingPackage, intent, null, null,
-                    null, 0, 0, options, userId, task, "startActivityFromRecents");
+                    null, 0, 0, options, userId, task, "startActivityFromRecents",
+                    false /* validateIncomingUser */);
         } finally {
             if (windowingMode == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY && task != null) {
                 // If we are launching the task in the docked stack, put it into resizing mode so

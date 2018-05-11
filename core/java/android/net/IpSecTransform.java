@@ -22,13 +22,13 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.RequiresPermission;
-import android.annotation.SystemApi;
 import android.content.Context;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.ServiceSpecificException;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -130,12 +130,15 @@ public final class IpSecTransform implements AutoCloseable {
         synchronized (this) {
             try {
                 IIpSecService svc = getIpSecService();
-                IpSecTransformResponse result = svc.createTransform(mConfig, new Binder());
+                IpSecTransformResponse result = svc.createTransform(
+                        mConfig, new Binder(), mContext.getOpPackageName());
                 int status = result.status;
                 checkResultStatus(status);
                 mResourceId = result.resourceId;
                 Log.d(TAG, "Added Transform with Id " + mResourceId);
                 mCloseGuard.open("build");
+            } catch (ServiceSpecificException e) {
+                throw IpSecManager.rethrowUncheckedExceptionFromServiceSpecificException(e);
             } catch (RemoteException e) {
                 throw e.rethrowAsRuntimeException();
             }
@@ -180,6 +183,10 @@ public final class IpSecTransform implements AutoCloseable {
             stopNattKeepalive();
         } catch (RemoteException e) {
             throw e.rethrowAsRuntimeException();
+        } catch (Exception e) {
+            // On close we swallow all random exceptions since failure to close is not
+            // actionable by the user.
+            Log.e(TAG, "Failed to close " + this + ", Exception=" + e);
         } finally {
             mResourceId = INVALID_RESOURCE_ID;
             mCloseGuard.close();
@@ -249,7 +256,6 @@ public final class IpSecTransform implements AutoCloseable {
      *
      * @hide
      */
-    @SystemApi
     public static class NattKeepaliveCallback {
         /** The specified {@code Network} is not connected. */
         public static final int ERROR_INVALID_NETWORK = 1;
@@ -280,7 +286,6 @@ public final class IpSecTransform implements AutoCloseable {
      *
      * @hide
      */
-    @SystemApi
     @RequiresPermission(anyOf = {
             android.Manifest.permission.MANAGE_IPSEC_TUNNELS,
             android.Manifest.permission.PACKET_KEEPALIVE_OFFLOAD
@@ -323,7 +328,6 @@ public final class IpSecTransform implements AutoCloseable {
      *
      * @hide
      */
-    @SystemApi
     @RequiresPermission(anyOf = {
             android.Manifest.permission.MANAGE_IPSEC_TUNNELS,
             android.Manifest.permission.PACKET_KEEPALIVE_OFFLOAD
@@ -476,7 +480,6 @@ public final class IpSecTransform implements AutoCloseable {
          * @throws IOException indicating other errors
          * @hide
          */
-        @SystemApi
         @NonNull
         @RequiresPermission(android.Manifest.permission.MANAGE_IPSEC_TUNNELS)
         public IpSecTransform buildTunnelModeTransform(
@@ -505,5 +508,14 @@ public final class IpSecTransform implements AutoCloseable {
             mContext = context;
             mConfig = new IpSecConfig();
         }
+    }
+
+    @Override
+    public String toString() {
+        return new StringBuilder()
+            .append("IpSecTransform{resourceId=")
+            .append(mResourceId)
+            .append("}")
+            .toString();
     }
 }

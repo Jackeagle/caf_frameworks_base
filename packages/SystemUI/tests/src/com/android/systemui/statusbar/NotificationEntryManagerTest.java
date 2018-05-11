@@ -37,18 +37,15 @@ import android.app.AppOpsManager;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.UserHandle;
 import android.service.notification.NotificationListenerService;
-import android.service.notification.NotificationRankingUpdate;
 import android.service.notification.StatusBarNotification;
 import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+import android.util.ArraySet;
 import android.widget.FrameLayout;
 
 import com.android.internal.logging.MetricsLogger;
@@ -56,11 +53,12 @@ import com.android.internal.statusbar.IStatusBarService;
 import com.android.systemui.ForegroundServiceController;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
-import com.android.systemui.UiOffloadThread;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.phone.NotificationGroupManager;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
+
+import junit.framework.Assert;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -285,13 +283,12 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
         com.android.systemui.util.Assert.isNotMainThread();
 
         when(mForegroundServiceController.getStandardLayoutKey(anyInt(), anyString()))
-                .thenReturn("something");
+                .thenReturn(mEntry.key);
         mEntry.row = mRow;
         mEntryManager.getNotificationData().add(mEntry);
 
-
         mHandler.post(() -> {
-            mEntryManager.updateNotificationsForAppOps(
+            mEntryManager.updateNotificationsForAppOp(
                     AppOpsManager.OP_CAMERA, mEntry.notification.getUid(),
                     mEntry.notification.getPackageName(), true);
         });
@@ -309,10 +306,105 @@ public class NotificationEntryManagerTest extends SysuiTestCase {
         when(mForegroundServiceController.getStandardLayoutKey(anyInt(), anyString()))
                 .thenReturn(null);
         mHandler.post(() -> {
-            mEntryManager.updateNotificationsForAppOps(AppOpsManager.OP_CAMERA, 1000, "pkg", true);
+            mEntryManager.updateNotificationsForAppOp(AppOpsManager.OP_CAMERA, 1000, "pkg", true);
         });
         waitForIdleSync(mHandler);
 
         verify(mPresenter, never()).updateNotificationViews();
+    }
+
+    @Test
+    public void testAddNotificationExistingAppOps() {
+        mEntry.row = mRow;
+        mEntryManager.getNotificationData().add(mEntry);
+        ArraySet<Integer> expected = new ArraySet<>();
+        expected.add(3);
+        expected.add(235);
+        expected.add(1);
+
+        when(mForegroundServiceController.getAppOps(mEntry.notification.getUserId(),
+                mEntry.notification.getPackageName())).thenReturn(expected);
+        when(mForegroundServiceController.getStandardLayoutKey(
+                mEntry.notification.getUserId(),
+                mEntry.notification.getPackageName())).thenReturn(mEntry.key);
+
+        mEntryManager.tagForeground(mEntry.notification);
+
+        Assert.assertEquals(expected.size(), mEntry.mActiveAppOps.size());
+        for (int op : expected) {
+            assertTrue("Entry missing op " + op, mEntry.mActiveAppOps.contains(op));
+        }
+    }
+
+    @Test
+    public void testAdd_noExistingAppOps() {
+        mEntry.row = mRow;
+        mEntryManager.getNotificationData().add(mEntry);
+        when(mForegroundServiceController.getStandardLayoutKey(
+                mEntry.notification.getUserId(),
+                mEntry.notification.getPackageName())).thenReturn(mEntry.key);
+        when(mForegroundServiceController.getAppOps(mEntry.notification.getUserId(),
+                mEntry.notification.getPackageName())).thenReturn(null);
+
+        mEntryManager.tagForeground(mEntry.notification);
+        Assert.assertEquals(0, mEntry.mActiveAppOps.size());
+    }
+
+    @Test
+    public void testAdd_existingAppOpsNotForegroundNoti() {
+        mEntry.row = mRow;
+        mEntryManager.getNotificationData().add(mEntry);
+        ArraySet<Integer> ops = new ArraySet<>();
+        ops.add(3);
+        ops.add(235);
+        ops.add(1);
+        when(mForegroundServiceController.getAppOps(mEntry.notification.getUserId(),
+                mEntry.notification.getPackageName())).thenReturn(ops);
+        when(mForegroundServiceController.getStandardLayoutKey(
+                mEntry.notification.getUserId(),
+                mEntry.notification.getPackageName())).thenReturn("something else");
+
+        mEntryManager.tagForeground(mEntry.notification);
+        Assert.assertEquals(0, mEntry.mActiveAppOps.size());
+    }
+
+    @Test
+    public void testRebuildWithRemoteInput_noExistingInputNoSpinner() {
+        StatusBarNotification newSbn =
+                mEntryManager.rebuildNotificationWithRemoteInput(mEntry, "A Reply", false);
+        CharSequence[] messages = newSbn.getNotification().extras
+                .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY);
+        Assert.assertEquals(1, messages.length);
+        Assert.assertEquals("A Reply", messages[0]);
+        Assert.assertFalse(newSbn.getNotification().extras
+                .getBoolean(Notification.EXTRA_SHOW_REMOTE_INPUT_SPINNER, false));
+    }
+
+    @Test
+    public void testRebuildWithRemoteInput_noExistingInputWithSpinner() {
+        StatusBarNotification newSbn =
+                mEntryManager.rebuildNotificationWithRemoteInput(mEntry, "A Reply", true);
+        CharSequence[] messages = newSbn.getNotification().extras
+                .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY);
+        Assert.assertEquals(1, messages.length);
+        Assert.assertEquals("A Reply", messages[0]);
+        Assert.assertTrue(newSbn.getNotification().extras
+                .getBoolean(Notification.EXTRA_SHOW_REMOTE_INPUT_SPINNER, false));
+    }
+
+    @Test
+    public void testRebuildWithRemoteInput_withExistingInput() {
+        // Setup a notification entry with 1 remote input.
+        StatusBarNotification newSbn =
+                mEntryManager.rebuildNotificationWithRemoteInput(mEntry, "A Reply", false);
+        NotificationData.Entry entry = new NotificationData.Entry(newSbn);
+
+        // Try rebuilding to add another reply.
+        newSbn = mEntryManager.rebuildNotificationWithRemoteInput(entry, "Reply 2", true);
+        CharSequence[] messages = newSbn.getNotification().extras
+                .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY);
+        Assert.assertEquals(2, messages.length);
+        Assert.assertEquals("Reply 2", messages[0]);
+        Assert.assertEquals("A Reply", messages[1]);
     }
 }

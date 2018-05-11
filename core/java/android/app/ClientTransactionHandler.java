@@ -24,9 +24,9 @@ import android.content.res.Configuration;
 import android.os.IBinder;
 import android.util.MergedConfiguration;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.content.ReferrerIntent;
 
-import java.io.PrintWriter;
 import java.util.List;
 
 /**
@@ -48,7 +48,8 @@ public abstract class ClientTransactionHandler {
      * Execute transaction immediately without scheduling it. This is used for local requests, so
      * it will also recycle the transaction.
      */
-    void executeTransaction(ClientTransaction transaction) {
+    @VisibleForTesting
+    public void executeTransaction(ClientTransaction transaction) {
         transaction.preExecute(this);
         getTransactionExecutor().execute(transaction);
         transaction.recycle();
@@ -120,7 +121,7 @@ public abstract class ClientTransactionHandler {
             Configuration overrideConfig, int displayId);
 
     /** Deliver result from another activity. */
-    public abstract void handleSendResult(IBinder token, List<ResultInfo> results);
+    public abstract void handleSendResult(IBinder token, List<ResultInfo> results, String reason);
 
     /** Deliver multi-window mode change notification. */
     public abstract void handleMultiWindowModeChanged(IBinder token, boolean isInMultiWindowMode,
@@ -190,11 +191,4 @@ public abstract class ClientTransactionHandler {
      *                       Used to check if we should report relaunch to WM.
      * */
     public abstract void reportRelaunch(IBinder token, PendingTransactionActions pendingActions);
-
-    /**
-     * Debugging output.
-     * @param pw {@link PrintWriter} to write logs to.
-     * @param prefix Prefix to prepend to output.
-     */
-    public abstract void dump(PrintWriter pw, String prefix);
 }

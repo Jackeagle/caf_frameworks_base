@@ -30,7 +30,10 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 
+import android.app.ActivityOptions;
 import com.android.server.wm.DisplayWindowController;
+
+import org.junit.Rule;
 import org.mockito.invocation.InvocationOnMock;
 
 import android.app.IApplicationThread;
@@ -47,6 +50,11 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.service.voice.IVoiceInteractionSession;
 import android.support.test.InstrumentationRegistry;
+import android.testing.DexmakerShareClassLoaderRule;
+
+
+import com.android.internal.app.IVoiceInteractor;
+
 import com.android.server.AttributeCache;
 import com.android.server.wm.AppWindowContainerController;
 import com.android.server.wm.PinnedStackWindowController;
@@ -58,11 +66,16 @@ import org.junit.After;
 import org.junit.Before;
 import org.mockito.MockitoAnnotations;
 
+
 /**
  * A base class to handle common operations in activity related unit tests.
  */
 public class ActivityTestsBase {
     private static boolean sOneTimeSetupDone = false;
+
+    @Rule
+    public final DexmakerShareClassLoaderRule mDexmakerShareClassLoaderRule =
+            new DexmakerShareClassLoaderRule();
 
     private final Context mContext = InstrumentationRegistry.getContext();
     private HandlerThread mHandlerThread;
@@ -77,9 +90,6 @@ public class ActivityTestsBase {
     public void setUp() throws Exception {
         if (!sOneTimeSetupDone) {
             sOneTimeSetupDone = true;
-
-            // Allows to mock package local classes and methods
-            System.setProperty("dexmaker.share_classloader", "true");
             MockitoAnnotations.initMocks(this);
         }
         mHandlerThread = new HandlerThread("ActivityTestsBaseThread");
@@ -122,6 +132,7 @@ public class ActivityTestsBase {
         private int mUid;
         private boolean mCreateTask;
         private ActivityStack mStack;
+        private int mActivityFlags;
 
         ActivityBuilder(ActivityManagerService service) {
             mService = service;
@@ -139,6 +150,11 @@ public class ActivityTestsBase {
 
         ActivityBuilder setTask(TaskRecord task) {
             mTaskRecord = task;
+            return this;
+        }
+
+        ActivityBuilder setActivityFlags(int flags) {
+            mActivityFlags = flags;
             return this;
         }
 
@@ -176,6 +192,8 @@ public class ActivityTestsBase {
             aInfo.applicationInfo = new ApplicationInfo();
             aInfo.applicationInfo.packageName = mComponent.getPackageName();
             aInfo.applicationInfo.uid = mUid;
+            aInfo.flags |= mActivityFlags;
+
             final ActivityRecord activity = new ActivityRecord(mService, null /* caller */,
                     0 /* launchedFromPid */, 0, null, intent, null,
                     aInfo /*aInfo*/, new Configuration(), null /* resultTo */, null /* resultWho */,
@@ -187,8 +205,8 @@ public class ActivityTestsBase {
                 mTaskRecord.addActivityToTop(activity);
             }
 
-            activity.setProcess(new ProcessRecord(null, mService.mContext.getApplicationInfo(),
-                    "name", 12345));
+            activity.setProcess(new ProcessRecord(null, null,
+                    mService.mContext.getApplicationInfo(), "name", 12345));
             activity.app.thread = mock(IApplicationThread.class);
 
             return activity;
@@ -210,6 +228,7 @@ public class ActivityTestsBase {
         private int mTaskId = 0;
         private int mUserId = 0;
         private IVoiceInteractionSession mVoiceSession;
+        private boolean mCreateStack = true;
 
         private ActivityStack mStack;
 
@@ -224,6 +243,15 @@ public class ActivityTestsBase {
 
         TaskBuilder setPackage(String packageName) {
             mPackage = packageName;
+            return this;
+        }
+
+        /**
+         * Set to {@code true} by default, set to {@code false} to prevent the task from
+         * automatically creating a parent stack.
+         */
+        TaskBuilder setCreateStack(boolean createStack) {
+            mCreateStack = createStack;
             return this;
         }
 
@@ -253,7 +281,7 @@ public class ActivityTestsBase {
         }
 
         TaskRecord build() {
-            if (mStack == null) {
+            if (mStack == null && mCreateStack) {
                 mStack = mSupervisor.getDefaultDisplay().createStack(
                         WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, true /* onTop */);
             }
@@ -271,16 +299,37 @@ public class ActivityTestsBase {
             intent.setComponent(mComponent);
             intent.setFlags(mFlags);
 
-            final TaskRecord task = new TaskRecord(mSupervisor.mService, mTaskId, aInfo,
+            final TestTaskRecord task = new TestTaskRecord(mSupervisor.mService, mTaskId, aInfo,
                     intent /*intent*/, mVoiceSession, null /*_voiceInteractor*/);
             task.userId = mUserId;
-            mSupervisor.setFocusStackUnchecked("test", mStack);
-            mStack.addTask(task, true, "creating test task");
-            task.setStack(mStack);
-            task.setWindowContainerController(mock(TaskWindowContainerController.class));
+
+            if (mStack != null) {
+                mSupervisor.setFocusStackUnchecked("test", mStack);
+                mStack.addTask(task, true, "creating test task");
+                task.setStack(mStack);
+                task.setWindowContainerController();
+            }
+
             task.touchActiveTime();
 
             return task;
+        }
+
+        private static class TestTaskRecord extends TaskRecord {
+            TestTaskRecord(ActivityManagerService service, int _taskId, ActivityInfo info,
+                       Intent _intent, IVoiceInteractionSession _voiceSession,
+                       IVoiceInteractor _voiceInteractor) {
+                super(service, _taskId, info, _intent, _voiceSession, _voiceInteractor);
+            }
+
+            @Override
+            void createWindowContainer(boolean onTop, boolean showForAllUsers) {
+                setWindowContainerController();
+            }
+
+            private void setWindowContainerController() {
+                setWindowContainerController(mock(TaskWindowContainerController.class));
+            }
         }
     }
 
@@ -290,6 +339,7 @@ public class ActivityTestsBase {
      */
     protected static class TestActivityManagerService extends ActivityManagerService {
         private ClientLifecycleManager mLifecycleManager;
+        private LockTaskController mLockTaskController;
 
         TestActivityManagerService(Context context) {
             super(context);
@@ -307,6 +357,14 @@ public class ActivityTestsBase {
                 return super.getLifecycleManager();
             }
             return mLifecycleManager;
+        }
+
+        public LockTaskController getLockTaskController() {
+            if (mLockTaskController == null) {
+                mLockTaskController = spy(super.getLockTaskController());
+            }
+
+            return mLockTaskController;
         }
 
         void setLifecycleManager(ClientLifecycleManager manager) {
@@ -439,7 +497,7 @@ public class ActivityTestsBase {
     }
 
     /**
-     * Overrided of {@link ActivityStack} that tracks test metrics, such as the number of times a
+     * Overridden {@link ActivityStack} that tracks test metrics, such as the number of times a
      * method is called. Note that its functionality depends on the implementations of the
      * construction arguments.
      */
@@ -524,6 +582,12 @@ public class ActivityTestsBase {
                 default:
                     return super.supportsSplitScreenWindowingMode();
             }
+        }
+
+        @Override
+        void startActivityLocked(ActivityRecord r, ActivityRecord focusedTopActivity,
+                                 boolean newTask, boolean keepCurTransition,
+                                 ActivityOptions options) {
         }
     }
 }

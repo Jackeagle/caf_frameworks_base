@@ -798,35 +798,39 @@ class LinkCommand {
       return;
     }
 
-    xml::Attribute* attr = manifest_xml->root->FindAttribute(xml::kSchemaAndroid, "versionCode");
-    if (attr != nullptr) {
-      Maybe<std::string>& compile_sdk_version = options_.manifest_fixer_options.compile_sdk_version;
-      if (BinaryPrimitive* prim = ValueCast<BinaryPrimitive>(attr->compiled_value.get())) {
-        switch (prim->value.dataType) {
-          case Res_value::TYPE_INT_DEC:
-            compile_sdk_version = StringPrintf("%" PRId32, static_cast<int32_t>(prim->value.data));
-            break;
-          case Res_value::TYPE_INT_HEX:
-            compile_sdk_version = StringPrintf("%" PRIx32, prim->value.data);
-            break;
-          default:
-            break;
+    if (!options_.manifest_fixer_options.compile_sdk_version) {
+      xml::Attribute* attr = manifest_xml->root->FindAttribute(xml::kSchemaAndroid, "versionCode");
+      if (attr != nullptr) {
+        Maybe<std::string>& compile_sdk_version = options_.manifest_fixer_options.compile_sdk_version;
+        if (BinaryPrimitive* prim = ValueCast<BinaryPrimitive>(attr->compiled_value.get())) {
+          switch (prim->value.dataType) {
+            case Res_value::TYPE_INT_DEC:
+              compile_sdk_version = StringPrintf("%" PRId32, static_cast<int32_t>(prim->value.data));
+              break;
+            case Res_value::TYPE_INT_HEX:
+              compile_sdk_version = StringPrintf("%" PRIx32, prim->value.data);
+              break;
+            default:
+              break;
+          }
+        } else if (String* str = ValueCast<String>(attr->compiled_value.get())) {
+          compile_sdk_version = *str->value;
+        } else {
+          compile_sdk_version = attr->value;
         }
-      } else if (String* str = ValueCast<String>(attr->compiled_value.get())) {
-        compile_sdk_version = *str->value;
-      } else {
-        compile_sdk_version = attr->value;
       }
     }
 
-    attr = manifest_xml->root->FindAttribute(xml::kSchemaAndroid, "versionName");
-    if (attr != nullptr) {
-      Maybe<std::string>& compile_sdk_version_codename =
-          options_.manifest_fixer_options.compile_sdk_version_codename;
-      if (String* str = ValueCast<String>(attr->compiled_value.get())) {
-        compile_sdk_version_codename = *str->value;
-      } else {
-        compile_sdk_version_codename = attr->value;
+    if (!options_.manifest_fixer_options.compile_sdk_version_codename) {
+      xml::Attribute* attr = manifest_xml->root->FindAttribute(xml::kSchemaAndroid, "versionName");
+      if (attr != nullptr) {
+        Maybe<std::string>& compile_sdk_version_codename =
+            options_.manifest_fixer_options.compile_sdk_version_codename;
+        if (String* str = ValueCast<String>(attr->compiled_value.get())) {
+          compile_sdk_version_codename = *str->value;
+        } else {
+          compile_sdk_version_codename = attr->value;
+        }
       }
     }
   }
@@ -1073,7 +1077,7 @@ class LinkCommand {
 
       case OutputFormat::kProto: {
         pb::ResourceTable pb_table;
-        SerializeTableToPb(*table, &pb_table);
+        SerializeTableToPb(*table, &pb_table, context_->GetDiagnostics());
         return io::CopyProtoToArchive(context_, &pb_table, kProtoResourceTablePath,
                                       ArchiveEntry::kCompress, writer);
       } break;
@@ -2102,6 +2106,13 @@ int Link(const std::vector<StringPiece>& args, IDiagnostics* diagnostics) {
           .OptionalFlag("--version-name",
                         "Version name to inject into the AndroidManifest.xml if none is present.",
                         &options.manifest_fixer_options.version_name_default)
+          .OptionalFlag("--compile-sdk-version-code",
+                        "Version code (integer) to inject into the AndroidManifest.xml if none is\n"
+                        "present.",
+                        &options.manifest_fixer_options.compile_sdk_version)
+          .OptionalFlag("--compile-sdk-version-name",
+                        "Version name to inject into the AndroidManifest.xml if none is present.",
+                        &options.manifest_fixer_options.compile_sdk_version_codename)
           .OptionalSwitch("--shared-lib", "Generates a shared Android runtime library.",
                           &shared_lib)
           .OptionalSwitch("--static-lib", "Generate a static Android library.", &static_lib)
@@ -2159,7 +2170,11 @@ int Link(const std::vector<StringPiece>& args, IDiagnostics* diagnostics) {
                             "Syntax: path/to/output.apk:<config>[,<config>[...]].\n"
                             "On Windows, use a semicolon ';' separator instead.",
                             &split_args)
-          .OptionalSwitch("-v", "Enables verbose logging.", &verbose);
+          .OptionalSwitch("-v", "Enables verbose logging.", &verbose)
+          .OptionalSwitch("--debug-mode",
+                          "Inserts android:debuggable=\"true\" in to the application node of the\n"
+                          "manifest, making the application debuggable even on production devices.",
+                          &options.manifest_fixer_options.debug_mode);
 
   if (!flags.Parse("aapt2 link", args, &std::cerr)) {
     return 1;

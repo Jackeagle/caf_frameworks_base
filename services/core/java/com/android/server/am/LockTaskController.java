@@ -285,6 +285,16 @@ public class LockTaskController {
         return false;
     }
 
+    /**
+     * @return the root task of the lock task.
+     */
+    TaskRecord getRootTask() {
+        if (mLockTaskModeTasks.isEmpty()) {
+            return null;
+        }
+        return mLockTaskModeTasks.get(0);
+    }
+
     private boolean isLockTaskModeViolationInternal(TaskRecord task, boolean isNewClearTask) {
         // TODO: Double check what's going on here. If the task is already in lock task mode, it's
         // likely whitelisted, so will return false below.
@@ -545,11 +555,12 @@ public class LockTaskController {
             return;
         }
 
-        if (mLockTaskModeTasks.isEmpty()) {
+        final Intent taskIntent = task.intent;
+        if (mLockTaskModeTasks.isEmpty() && taskIntent != null) {
             mSupervisor.mRecentTasks.onLockTaskModeStateChanged(lockTaskModeState, task.userId);
             // Start lock task on the handler thread
             mHandler.post(() -> performStartLockTask(
-                    task.intent.getComponent().getPackageName(),
+                    taskIntent.getComponent().getPackageName(),
                     task.userId,
                     lockTaskModeState));
         }

@@ -29,9 +29,11 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
+import android.app.usage.UsageStatsManagerInternal;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.ContentResolver;
+import android.content.ContentResolver.SyncExemption;
 import android.content.Context;
 import android.content.ISyncAdapter;
 import android.content.ISyncAdapterUnsyncableAccountCallback;
@@ -46,11 +48,12 @@ import android.content.SyncAdaptersCache;
 import android.content.SyncInfo;
 import android.content.SyncResult;
 import android.content.SyncStatusInfo;
+import android.content.SyncStatusInfo.Stats;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManagerInternal;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.PackageManagerInternal;
 import android.content.pm.ProviderInfo;
 import android.content.pm.RegisteredServicesCache;
 import android.content.pm.RegisteredServicesCacheListener;
@@ -70,6 +73,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.RemoteCallback;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -85,24 +89,26 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.Slog;
 
-import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
-import com.android.internal.notification.SystemNotificationChannels;
-import com.android.internal.util.ArrayUtils;
-import com.android.server.LocalServices;
-import com.android.server.SystemService;
-import com.android.server.job.JobSchedulerInternal;
-import com.google.android.collect.Lists;
-import com.google.android.collect.Maps;
-
 import com.android.internal.R;
 import com.android.internal.app.IBatteryStats;
+import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
+import com.android.internal.notification.SystemNotificationChannels;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.internal.util.function.QuadConsumer;
+import com.android.server.DeviceIdleController;
+import com.android.server.LocalServices;
+import com.android.server.SystemService;
 import com.android.server.accounts.AccountManagerService;
 import com.android.server.backup.AccountSyncSettingsBackupHelper;
 import com.android.server.content.SyncStorageEngine.AuthorityInfo;
 import com.android.server.content.SyncStorageEngine.EndPoint;
 import com.android.server.content.SyncStorageEngine.OnSyncRequestListener;
+import com.android.server.job.JobSchedulerInternal;
+
+import com.google.android.collect.Lists;
+import com.google.android.collect.Maps;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -118,6 +124,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -238,7 +245,7 @@ public class SyncManager {
     /** Track whether the device has already been provisioned. */
     private volatile boolean mProvisioned;
 
-    protected SyncAdaptersCache mSyncAdapters;
+    protected final SyncAdaptersCache mSyncAdapters;
 
     private final Random mRand;
 
@@ -419,6 +426,17 @@ public class SyncManager {
                 }
             };
 
+    private final BroadcastReceiver mOtherIntentsReceiver =
+            new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (Intent.ACTION_TIME_CHANGED.equals(intent.getAction())) {
+                        mSyncStorageEngine.setClockValid();
+                        return;
+                    }
+                }
+            };
+
     private BroadcastReceiver mUserIntentReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -550,10 +568,6 @@ public class SyncManager {
         return mJobScheduler;
     }
 
-    /**
-     * Should only be created after {@link ContentService#systemReady()} so that
-     * {@link PackageManager} is ready to query.
-     */
     public SyncManager(Context context, boolean factoryTest) {
         // Initialize the SyncStorageEngine first, before registering observers
         // and creating threads and so on; it may fail if the disk is full.
@@ -566,9 +580,9 @@ public class SyncManager {
         mSyncStorageEngine.setOnSyncRequestListener(new OnSyncRequestListener() {
             @Override
             public void onSyncRequest(SyncStorageEngine.EndPoint info, int reason, Bundle extras,
-                    boolean isAppStandbyExempted) {
+                    @SyncExemption int syncExemptionFlag) {
                 scheduleSync(info.account, info.userId, reason, info.provider, extras,
-                        AuthorityInfo.UNDEFINED, isAppStandbyExempted);
+                        AuthorityInfo.UNDEFINED, syncExemptionFlag);
             }
         });
 
@@ -599,7 +613,7 @@ public class SyncManager {
                     scheduleSync(null, UserHandle.USER_ALL,
                             SyncOperation.REASON_SERVICE_CHANGED,
                             type.authority, null, AuthorityInfo.UNDEFINED,
-                            /*isAppStandbyExempted=*/ false);
+                            ContentResolver.SYNC_EXEMPTION_NONE);
                 }
             }
         }, mSyncHandler);
@@ -631,6 +645,9 @@ public class SyncManager {
         mContext.registerReceiverAsUser(
                 mUserIntentReceiver, UserHandle.ALL, intentFilter, null, null);
 
+        intentFilter = new IntentFilter(Intent.ACTION_TIME_CHANGED);
+        context.registerReceiver(mOtherIntentsReceiver, intentFilter);
+
         if (!factoryTest) {
             mNotificationMgr = (NotificationManager)
                     context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -649,7 +666,7 @@ public class SyncManager {
                 scheduleSync(account, UserHandle.getUserId(uid),
                         SyncOperation.REASON_ACCOUNTS_UPDATED,
                         null, null, AuthorityInfo.SYNCABLE_NO_ACCOUNT_ACCESS,
-                        /*isAppStandbyExempted=*/ false);
+                        ContentResolver.SYNC_EXEMPTION_NONE);
             }
         });
 
@@ -883,9 +900,9 @@ public class SyncManager {
      */
     public void scheduleSync(Account requestedAccount, int userId, int reason,
             String requestedAuthority, Bundle extras, int targetSyncState,
-            boolean isAppStandbyExempted) {
+            @SyncExemption int syncExemptionFlag) {
         scheduleSync(requestedAccount, userId, reason, requestedAuthority, extras, targetSyncState,
-                0 /* min delay */, true /* checkIfAccountReady */, isAppStandbyExempted);
+                0 /* min delay */, true /* checkIfAccountReady */, syncExemptionFlag);
     }
 
     /**
@@ -894,7 +911,7 @@ public class SyncManager {
     private void scheduleSync(Account requestedAccount, int userId, int reason,
             String requestedAuthority, Bundle extras, int targetSyncState,
             final long minDelayMillis, boolean checkIfAccountReady,
-            boolean isAppStandbyExempted) {
+            @SyncExemption int syncExemptionFlag) {
         final boolean isLoggable = Log.isLoggable(TAG, Log.VERBOSE);
         if (extras == null) {
             extras = new Bundle();
@@ -904,7 +921,7 @@ public class SyncManager {
                     + requestedAuthority
                     + " reason=" + reason
                     + " checkIfAccountReady=" + checkIfAccountReady
-                    + " isAppStandbyExempted=" + isAppStandbyExempted);
+                    + " syncExemptionFlag=" + syncExemptionFlag);
         }
 
         AccountAndUser[] accounts = null;
@@ -947,9 +964,13 @@ public class SyncManager {
         } else if (requestedAuthority == null) {
             source = SyncStorageEngine.SOURCE_POLL;
         } else {
-            // This isn't strictly server, since arbitrary callers can (and do) request
-            // a non-forced two-way sync on a specific url.
-            source = SyncStorageEngine.SOURCE_SERVER;
+            if (extras.containsKey("feed")) {
+                source = SyncStorageEngine.SOURCE_FEED;
+            } else{
+                // This isn't strictly server, since arbitrary callers can (and do) request
+                // a non-forced two-way sync on a specific url.
+                source = SyncStorageEngine.SOURCE_OTHER;
+            }
         }
 
         for (AccountAndUser account : accounts) {
@@ -1016,7 +1037,7 @@ public class SyncManager {
                                     scheduleSync(account.account, userId, reason, authority,
                                             finalExtras, targetSyncState, minDelayMillis,
                                             true /* checkIfAccountReady */,
-                                            isAppStandbyExempted);
+                                            syncExemptionFlag);
                                 }
                             }
                         ));
@@ -1027,7 +1048,8 @@ public class SyncManager {
                 final boolean isAlwaysSyncable = syncAdapterInfo.type.isAlwaysSyncable();
                 if (!checkIfAccountReady && isSyncable < 0 && isAlwaysSyncable) {
                     mSyncStorageEngine.setIsSyncable(
-                            account.account, account.userId, authority, AuthorityInfo.SYNCABLE);
+                            account.account, account.userId, authority, AuthorityInfo.SYNCABLE,
+                            SyncLogger.CALLING_UID_SELF);
                     isSyncable = AuthorityInfo.SYNCABLE;
                 }
 
@@ -1067,7 +1089,7 @@ public class SyncManager {
                         sendOnUnsyncableAccount(mContext, syncAdapterInfo, account.userId,
                                 () -> scheduleSync(account.account, account.userId, reason,
                                         authority, finalExtras, targetSyncState, minDelayMillis,
-                                        false, isAppStandbyExempted));
+                                        false, syncExemptionFlag));
                     } else {
                         // Initialisation sync.
                         Bundle newExtras = new Bundle();
@@ -1086,7 +1108,7 @@ public class SyncManager {
                                 new SyncOperation(account.account, account.userId,
                                         owningUid, owningPackage, reason, source,
                                         authority, newExtras, allowParallelSyncs,
-                                        isAppStandbyExempted),
+                                        syncExemptionFlag),
                                 minDelayMillis
                         );
                     }
@@ -1103,7 +1125,7 @@ public class SyncManager {
                     postScheduleSyncMessage(
                             new SyncOperation(account.account, account.userId,
                                     owningUid, owningPackage, reason, source,
-                                    authority, extras, allowParallelSyncs, isAppStandbyExempted),
+                                    authority, extras, allowParallelSyncs, syncExemptionFlag),
                             minDelayMillis
                     );
                 }
@@ -1217,12 +1239,12 @@ public class SyncManager {
      * ms to batch syncs.
      */
     public void scheduleLocalSync(Account account, int userId, int reason, String authority,
-            boolean isAppStandbyExempted) {
+            @SyncExemption int syncExemptionFlag) {
         final Bundle extras = new Bundle();
         extras.putBoolean(ContentResolver.SYNC_EXTRAS_UPLOAD, true);
         scheduleSync(account, userId, reason, authority, extras,
                 AuthorityInfo.UNDEFINED, LOCAL_SYNC_DELAY, true /* checkIfAccountReady */,
-                isAppStandbyExempted);
+                syncExemptionFlag);
     }
 
     public SyncAdapterType[] getSyncAdapterTypes(int userId) {
@@ -1493,7 +1515,7 @@ public class SyncManager {
 
         // If any of the duplicate ones has exemption, then we inherit it.
         if (!syncOperation.isPeriodic) {
-            boolean inheritAppStandbyExemption = false;
+            int inheritedSyncExemptionFlag = ContentResolver.SYNC_EXEMPTION_NONE;
 
             // Check currently running syncs
             for (ActiveSyncContext asc: mActiveSyncContexts) {
@@ -1534,10 +1556,11 @@ public class SyncManager {
                 // This means the duplicate one has a negative expected run time, but it hasn't
                 // been executed possibly because of app-standby.
 
-                if (syncOperation.isAppStandbyExempted
-                        && (minDelay == 0)
-                        && !syncToRun.isAppStandbyExempted) {
+                if ((minDelay == 0)
+                        && (syncToRun.syncExemptionFlag < syncOperation.syncExemptionFlag)) {
                     syncToRun = syncOperation;
+                    inheritedSyncExemptionFlag =
+                            Math.max(inheritedSyncExemptionFlag, syncToRun.syncExemptionFlag);
                 }
             }
 
@@ -1551,9 +1574,8 @@ public class SyncManager {
                         if (isLoggable) {
                             Slog.v(TAG, "Cancelling duplicate sync " + op);
                         }
-                        if (op.isAppStandbyExempted) {
-                            inheritAppStandbyExemption = true;
-                        }
+                        inheritedSyncExemptionFlag =
+                                Math.max(inheritedSyncExemptionFlag, op.syncExemptionFlag);
                         cancelJob(op, "scheduleSyncOperationH-duplicate");
                     }
                 }
@@ -1570,8 +1592,9 @@ public class SyncManager {
             }
 
             // If any of the duplicates had exemption, we exempt the current one.
-            if (inheritAppStandbyExemption) {
-                syncOperation.isAppStandbyExempted = true;
+            //
+            if (inheritedSyncExemptionFlag > ContentResolver.SYNC_EXEMPTION_NONE) {
+                syncOperation.syncExemptionFlag = inheritedSyncExemptionFlag;
             }
         }
 
@@ -1591,7 +1614,7 @@ public class SyncManager {
 
         // Note this logic means when an exempted sync fails,
         // the back-off one will inherit it too, and will be exempted from app-standby.
-        final int jobFlags = syncOperation.isAppStandbyExempted
+        final int jobFlags = syncOperation.isAppStandbyExempted()
                 ? JobInfo.FLAG_EXEMPT_FROM_APP_STANDBY : 0;
 
         JobInfo.Builder b = new JobInfo.Builder(syncOperation.jobId,
@@ -1613,6 +1636,19 @@ public class SyncManager {
 
         if (syncOperation.extras.getBoolean(ContentResolver.SYNC_EXTRAS_REQUIRE_CHARGING)) {
             b.setRequiresCharging(true);
+        }
+
+        if (syncOperation.syncExemptionFlag
+                == ContentResolver.SYNC_EXEMPTION_ACTIVE_WITH_TEMP) {
+            DeviceIdleController.LocalService dic =
+                    LocalServices.getService(DeviceIdleController.LocalService.class);
+            if (dic != null) {
+                dic.addPowerSaveTempWhitelistApp(Process.SYSTEM_UID,
+                        syncOperation.owningPackage,
+                        mConstants.getKeyExemptionTempWhitelistDurationInSeconds() * 1000,
+                        UserHandle.getUserId(syncOperation.owningUid),
+                        /* sync=*/ false, "sync by top app");
+            }
         }
 
         getJobScheduler().scheduleAsPackage(b.build(), syncOperation.owningPackage,
@@ -1736,7 +1772,7 @@ public class SyncManager {
                 mContext.getOpPackageName());
         for (Account account : accounts) {
             scheduleSync(account, userId, SyncOperation.REASON_USER_START, null, null,
-                    AuthorityInfo.NOT_INITIALIZED, /*isAppStandbyExempted=*/ false);
+                    AuthorityInfo.NOT_INITIALIZED, ContentResolver.SYNC_EXEMPTION_NONE);
         }
     }
 
@@ -1930,7 +1966,10 @@ public class SyncManager {
 
     protected void dump(FileDescriptor fd, PrintWriter pw, boolean dumpAll) {
         final IndentingPrintWriter ipw = new IndentingPrintWriter(pw, "  ");
-        dumpSyncState(ipw);
+
+        final SyncAdapterStateFetcher buckets = new SyncAdapterStateFetcher();
+
+        dumpSyncState(ipw, buckets);
         mConstants.dump(pw, "");
         dumpSyncAdapters(ipw);
 
@@ -1941,6 +1980,9 @@ public class SyncManager {
     }
 
     static String formatTime(long time) {
+        if (time == 0) {
+            return "N/A";
+        }
         Time tobj = new Time();
         tobj.set(time);
         return tobj.format("%Y-%m-%d %H:%M:%S");
@@ -1991,7 +2033,7 @@ public class SyncManager {
         return ret;
     }
 
-    protected void dumpPendingSyncs(PrintWriter pw) {
+    protected void dumpPendingSyncs(PrintWriter pw, SyncAdapterStateFetcher buckets) {
         List<SyncOperation> pendingSyncs = getAllPendingSyncs();
 
         pw.print("Pending Syncs: ");
@@ -2001,14 +2043,14 @@ public class SyncManager {
         int count = 0;
         for (SyncOperation op: pendingSyncs) {
             if (!op.isPeriodic) {
-                pw.println(op.dump(null, false));
+                pw.println(op.dump(null, false, buckets));
                 count++;
             }
         }
         pw.println();
     }
 
-    protected void dumpPeriodicSyncs(PrintWriter pw) {
+    protected void dumpPeriodicSyncs(PrintWriter pw, SyncAdapterStateFetcher buckets) {
         List<SyncOperation> pendingSyncs = getAllPendingSyncs();
 
         pw.print("Periodic Syncs: ");
@@ -2018,7 +2060,7 @@ public class SyncManager {
         int count = 0;
         for (SyncOperation op: pendingSyncs) {
             if (op.isPeriodic) {
-                pw.println(op.dump(null, false));
+                pw.println(op.dump(null, false, buckets));
                 count++;
             }
         }
@@ -2075,7 +2117,7 @@ public class SyncManager {
         return true;
     }
 
-    protected void dumpSyncState(PrintWriter pw) {
+    protected void dumpSyncState(PrintWriter pw, SyncAdapterStateFetcher buckets) {
         final StringBuilder sb = new StringBuilder();
 
         pw.print("Data connected: "); pw.println(mDataConnectionIsConnected);
@@ -2116,6 +2158,7 @@ public class SyncManager {
         pw.print("Memory low: "); pw.println(mStorageIsLow);
         pw.print("Device idle: "); pw.println(mDeviceIsIdle);
         pw.print("Reported active: "); pw.println(mReportedSyncActive);
+        pw.print("Clock valid: "); pw.println(mSyncStorageEngine.isClockValid());
 
         final AccountAndUser[] accounts = AccountManagerService.getSingleton().getAllAccounts();
 
@@ -2150,39 +2193,48 @@ public class SyncManager {
             sb.setLength(0);
             pw.print(formatDurationHMS(sb, durationInSeconds));
             pw.print(" - ");
-            pw.print(activeSyncContext.mSyncOperation.dump(pm, false));
+            pw.print(activeSyncContext.mSyncOperation.dump(pm, false, buckets));
             pw.println();
         }
         pw.println();
 
-        dumpPendingSyncs(pw);
-        dumpPeriodicSyncs(pw);
+        dumpPendingSyncs(pw, buckets);
+        dumpPeriodicSyncs(pw, buckets);
 
         // Join the installed sync adapter with the accounts list and emit for everything.
         pw.println("Sync Status");
 
         final ArrayList<Pair<EndPoint, SyncStatusInfo>> statuses = new ArrayList<>();
 
+        mSyncStorageEngine.resetTodayStats(/* force=*/ false);
+
         for (AccountAndUser account : accounts) {
             pw.printf("Account %s u%d %s\n",
                     account.account.name, account.userId, account.account.type);
 
             pw.println("=======================================================================");
-            final PrintTable table = new PrintTable(13);
+            final PrintTable table = new PrintTable(16);
             table.set(0, 0,
                     "Authority", // 0
                     "Syncable",  // 1
                     "Enabled",   // 2
-                    "Delay",     // 3
-                    "Loc",       // 4
-                    "Poll",      // 5
-                    "Per",       // 6
-                    "Serv",      // 7
-                    "User",      // 8
-                    "Tot",       // 9
-                    "Time",      // 10
-                    "Last Sync", // 11
-                    "Backoff"    // 12
+
+                    "Stats",     // 3 "Total", "Today" or "Yesterday".
+
+                    "Loc",       // 4 # of syncs with local sources. (including failures/cancels. )
+                    "Poll",      // 5 "poll" syncs.
+                    "Per",       // 6 Periodic syncs.
+                    "Feed",      // 7 Syncs with a "feed" extra. (subscribedfeeds?)
+                    "User",      // 8 User-initiated
+                    "Othr",      // 9 Other sources.
+
+                    "Tot",       // 10 Total syncs (including failures / cancels)
+                    "Fail",      // 11 (Failure)
+                    "Can",       // 12 (Cancel)
+
+                    "Time",      // 13 Total time
+                    "Last Sync", // 14
+                    "Backoff"    // 15
             );
 
             final List<RegisteredServicesCache.ServiceInfo<SyncAdapterType>> sorted =
@@ -2216,37 +2268,50 @@ public class SyncManager {
                 }
                 table.set(row, 0, authority, settings.syncable, settings.enabled);
 
-                sb.setLength(0);
-                table.set(row, 4,
-                        status.numSourceLocal,
-                        status.numSourcePoll,
-                        status.numSourcePeriodic,
-                        status.numSourceServer,
-                        status.numSourceUser,
-                        status.numSyncs,
-                        formatDurationHMS(sb, status.totalElapsedTime));
+                QuadConsumer<String, Stats, Function<Integer, String>, Integer> c =
+                        (label, stats, filter, r) -> {
+                    sb.setLength(0);
+                    table.set(r, 3,
+                            label,
+                            filter.apply(stats.numSourceLocal),
+                            filter.apply(stats.numSourcePoll),
+                            filter.apply(stats.numSourcePeriodic),
+                            filter.apply(stats.numSourceFeed),
+                            filter.apply(stats.numSourceUser),
+                            filter.apply(stats.numSourceOther),
+                            filter.apply(stats.numSyncs),
+                            filter.apply(stats.numFailures),
+                            filter.apply(stats.numCancels),
+                            formatDurationHMS(sb, stats.totalElapsedTime));
+                };
+                c.accept("Total", status.totalStats, (i) -> Integer.toString(i), row);
+                c.accept("Today", status.todayStats, this::zeroToEmpty, row + 1);
+                c.accept("Yestr", status.yesterdayStats, this::zeroToEmpty, row + 2);
+
+                final int LAST_SYNC = 14;
+                final int BACKOFF = LAST_SYNC + 1;
 
                 int row1 = row;
                 if (settings.delayUntil > now) {
-                    table.set(row1++, 12, "D: " + (settings.delayUntil - now) / 1000);
+                    table.set(row1++, BACKOFF, "D: " + (settings.delayUntil - now) / 1000);
                     if (settings.backoffTime > now) {
-                        table.set(row1++, 12, "B: " + (settings.backoffTime - now) / 1000);
-                        table.set(row1++, 12, settings.backoffDelay / 1000);
+                        table.set(row1++, BACKOFF, "B: " + (settings.backoffTime - now) / 1000);
+                        table.set(row1++, BACKOFF, settings.backoffDelay / 1000);
                     }
                 }
 
                 row1 = row;
                 if (status.lastSuccessTime != 0) {
-                    table.set(row1++, 11, SyncStorageEngine.SOURCES[status.lastSuccessSource]
+                    table.set(row1++, LAST_SYNC, SyncStorageEngine.SOURCES[status.lastSuccessSource]
                             + " " + "SUCCESS");
-                    table.set(row1++, 11, formatTime(status.lastSuccessTime));
+                    table.set(row1++, LAST_SYNC, formatTime(status.lastSuccessTime));
                 }
                 if (status.lastFailureTime != 0) {
-                    table.set(row1++, 11, SyncStorageEngine.SOURCES[status.lastFailureSource]
+                    table.set(row1++, LAST_SYNC, SyncStorageEngine.SOURCES[status.lastFailureSource]
                             + " " + "FAILURE");
-                    table.set(row1++, 11, formatTime(status.lastFailureTime));
+                    table.set(row1++, LAST_SYNC, formatTime(status.lastFailureTime));
                     //noinspection UnusedAssignment
-                    table.set(row1++, 11, status.lastFailureMesg);
+                    table.set(row1++, LAST_SYNC, status.lastFailureMesg);
                 }
             }
             table.writeTo(pw);
@@ -2256,6 +2321,7 @@ public class SyncManager {
 
         pw.println();
         pw.println("Per Adapter History");
+        pw.println("(SERVER is now split up to FEED and OTHER)");
 
         for (int i = 0; i < statuses.size(); i++) {
             final Pair<EndPoint, SyncStatusInfo> event = statuses.get(i);
@@ -2271,14 +2337,33 @@ public class SyncManager {
             pw.print("]");
             pw.println();
 
+            pw.println("    Per source last syncs:");
+            for (int j = 0; j < SyncStorageEngine.SOURCES.length; j++) {
+                pw.print("      ");
+                pw.print(String.format("%8s", SyncStorageEngine.SOURCES[j]));
+                pw.print("  Success: ");
+                pw.print(formatTime(event.second.perSourceLastSuccessTimes[j]));
+
+                pw.print("  Failure: ");
+                pw.println(formatTime(event.second.perSourceLastFailureTimes[j]));
+            }
+
+            pw.println("    Last syncs:");
             for (int j = 0; j < event.second.getEventCount(); j++) {
-                pw.print("    ");
+                pw.print("      ");
                 pw.print(formatTime(event.second.getEventTime(j)));
                 pw.print(' ');
                 pw.print(event.second.getEvent(j));
                 pw.println();
             }
+            if (event.second.getEventCount() == 0) {
+                pw.println("      N/A");
+            }
         }
+    }
+
+    private String zeroToEmpty(int value) {
+        return (value != 0) ? Integer.toString(value) : "";
     }
 
     private void dumpTimeSec(PrintWriter pw, long time) {
@@ -2441,6 +2526,7 @@ public class SyncManager {
 
             pw.println();
             pw.println("Recent Sync History");
+            pw.println("(SERVER is now split up to FEED and OTHER)");
             final String format = "  %-" + maxAccount + "s  %-" + maxAuthority + "s %s\n";
             final Map<String, Long> lastTimeMap = Maps.newHashMap();
             final PackageManager pm = mContext.getPackageManager();
@@ -2507,6 +2593,7 @@ public class SyncManager {
             }
             pw.println();
             pw.println("Recent Sync History Extras");
+            pw.println("(SERVER is now split up to FEED and OTHER)");
             for (int i = 0; i < N; i++) {
                 final SyncStorageEngine.SyncHistoryItem item = items.get(i);
                 final Bundle extras = item.extras;
@@ -3086,6 +3173,10 @@ public class SyncManager {
             final boolean isLoggable = Log.isLoggable(TAG, Log.VERBOSE);
             if (isLoggable) Slog.v(TAG, op.toString());
 
+            // At this point, we know the device has been connected to the server, so
+            // assume the clock is correct.
+            mSyncStorageEngine.setClockValid();
+
             mSyncJobService.markSyncStarted(op.jobId);
 
             if (mStorageIsLow) {
@@ -3219,7 +3310,7 @@ public class SyncManager {
                 scheduleSync(syncTargets.account, syncTargets.userId,
                         SyncOperation.REASON_ACCOUNTS_UPDATED, syncTargets.provider,
                         null, AuthorityInfo.NOT_INITIALIZED,
-                        /*isAppStandbyExempted=*/ false);
+                        ContentResolver.SYNC_EXEMPTION_NONE);
             }
         }
 
@@ -3286,7 +3377,7 @@ public class SyncManager {
                     syncAdapterInfo.componentName.getPackageName(), SyncOperation.REASON_PERIODIC,
                     SyncStorageEngine.SOURCE_PERIODIC, extras,
                     syncAdapterInfo.type.allowParallelSyncs(), true, SyncOperation.NO_JOB_ID,
-                    pollFrequencyMillis, flexMillis, /*isAppStandbyExempted=*/ false);
+                    pollFrequencyMillis, flexMillis, ContentResolver.SYNC_EXEMPTION_NONE);
 
             final int syncOpState = computeSyncOpState(op);
             switch (syncOpState) {
@@ -3431,6 +3522,15 @@ public class SyncManager {
                     Slog.v(TAG, syncContext.toString());
                 }
             }
+            if (op.isAppStandbyExempted()) {
+                final UsageStatsManagerInternal usmi = LocalServices.getService(
+                        UsageStatsManagerInternal.class);
+                if (usmi != null) {
+                    usmi.reportExemptedSyncStart(op.owningPackage,
+                            UserHandle.getUserId(op.owningUid));
+                }
+            }
+
             // Connect to the sync adapter.
             int targetUid;
             ComponentName targetComponent;
@@ -3604,7 +3704,7 @@ public class SyncManager {
 
                     syncOperation.retries++;
                     if (syncOperation.retries > mConstants.getMaxRetriesWithAppStandbyExemption()) {
-                        syncOperation.isAppStandbyExempted = false;
+                        syncOperation.syncExemptionFlag = ContentResolver.SYNC_EXEMPTION_NONE;
                     }
 
                     // the operation failed so increase the backoff time
@@ -3672,7 +3772,7 @@ public class SyncManager {
                                 syncOperation.reason,
                                 syncOperation.syncSource, info.provider, new Bundle(),
                                 syncOperation.allowParallelSyncs,
-                                syncOperation.isAppStandbyExempted));
+                                syncOperation.syncExemptionFlag));
             }
         }
 
@@ -3987,5 +4087,9 @@ public class SyncManager {
     private void wtfWithLog(String message) {
         Slog.wtf(TAG, message);
         mLogger.log("WTF: ", message);
+    }
+
+    public void resetTodayStats() {
+        mSyncStorageEngine.resetTodayStats(/*force=*/ true);
     }
 }

@@ -66,7 +66,8 @@ statsd_common_src := \
     src/subscriber/IncidentdReporter.cpp \
     src/subscriber/SubscriberReporter.cpp \
     src/HashableDimensionKey.cpp \
-    src/guardrail/StatsdStats.cpp
+    src/guardrail/StatsdStats.cpp \
+    src/socket/StatsSocketListener.cpp
 
 statsd_common_c_includes := \
     $(LOCAL_PATH)/src \
@@ -96,7 +97,10 @@ statsd_common_shared_libraries := \
     android.hardware.health@2.0 \
     android.hardware.power@1.0 \
     android.hardware.power@1.1 \
-    android.hardware.thermal@1.0
+    android.hardware.thermal@1.0 \
+    libpackagelistparser \
+    libsysutils \
+    libcutils
 
 # =========
 # statsd
@@ -202,13 +206,18 @@ LOCAL_SRC_FILES := \
     tests/statsd_test_util.cpp \
     tests/e2e/WakelockDuration_e2e_test.cpp \
     tests/e2e/MetricConditionLink_e2e_test.cpp \
+    tests/e2e/Alarm_e2e_test.cpp \
     tests/e2e/Attribution_e2e_test.cpp \
     tests/e2e/GaugeMetric_e2e_push_test.cpp \
+    tests/e2e/GaugeMetric_e2e_pull_test.cpp \
+    tests/e2e/ValueMetric_pull_e2e_test.cpp \
     tests/e2e/DimensionInCondition_e2e_combination_AND_cond_test.cpp \
     tests/e2e/DimensionInCondition_e2e_combination_OR_cond_test.cpp \
     tests/e2e/DimensionInCondition_e2e_simple_cond_test.cpp \
     tests/e2e/Anomaly_count_e2e_test.cpp \
-    tests/e2e/Anomaly_duration_sum_e2e_test.cpp
+    tests/e2e/Anomaly_duration_sum_e2e_test.cpp \
+    tests/e2e/ConfigTtl_e2e_test.cpp \
+    tests/e2e/PartialBucket_e2e_test.cpp
 
 LOCAL_STATIC_LIBRARIES := \
     $(statsd_common_static_libraries) \

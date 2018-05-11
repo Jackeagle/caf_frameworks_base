@@ -71,9 +71,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Manages the lifecycle of application-provided services bound by system server.
@@ -110,7 +108,7 @@ abstract public class ManagedServices {
     protected final Object mMutex;
     private final UserProfiles mUserProfiles;
     private final IPackageManager mPm;
-    private final UserManager mUm;
+    protected final UserManager mUm;
     private final Config mConfig;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
 
@@ -401,15 +399,20 @@ abstract public class ManagedServices {
             approvedByType = new ArrayMap<>();
             mApproved.put(userId, approvedByType);
         }
+
+        ArraySet<String> approvedList = approvedByType.get(isPrimary);
+        if (approvedList == null) {
+            approvedList = new ArraySet<>();
+            approvedByType.put(isPrimary, approvedList);
+        }
+
         String[] approvedArray = approved.split(ENABLED_SERVICES_SEPARATOR);
-        final ArraySet<String> approvedList = new ArraySet<>();
         for (String pkgOrComponent : approvedArray) {
             String approvedItem = getApprovedValue(pkgOrComponent);
             if (approvedItem != null) {
                 approvedList.add(approvedItem);
             }
         }
-        approvedByType.put(isPrimary, approvedList);
     }
 
     protected boolean isComponentEnabledForPackage(String pkg) {
@@ -467,8 +470,12 @@ abstract public class ManagedServices {
                 mApproved.getOrDefault(userId, new ArrayMap<>());
         for (int i = 0; i < allowedByType.size(); i++) {
             final ArraySet<String> allowed = allowedByType.valueAt(i);
-            allowedComponents.addAll(allowed.stream().map(ComponentName::unflattenFromString)
-                    .filter(out -> out != null).collect(Collectors.toList()));
+            for (int j = 0; j < allowed.size(); j++) {
+                ComponentName cn = ComponentName.unflattenFromString(allowed.valueAt(j));
+                if (cn != null) {
+                    allowedComponents.add(cn);
+                }
+            }
         }
         return allowedComponents;
     }
@@ -479,10 +486,12 @@ abstract public class ManagedServices {
                 mApproved.getOrDefault(userId, new ArrayMap<>());
         for (int i = 0; i < allowedByType.size(); i++) {
             final ArraySet<String> allowed = allowedByType.valueAt(i);
-            allowedPackages.addAll(
-                    allowed.stream().map(this::getPackageName).
-                            filter(value -> !TextUtils.isEmpty(value))
-                            .collect(Collectors.toList()));
+            for (int j = 0; j < allowed.size(); j++) {
+                String pkgName = getPackageName(allowed.valueAt(j));
+                if (!TextUtils.isEmpty(pkgName)) {
+                    allowedPackages.add(pkgName);
+                }
+            }
         }
         return allowedPackages;
     }
@@ -920,7 +929,11 @@ abstract public class ManagedServices {
                 Slog.v(TAG, "    disconnecting old " + getCaption() + ": " + info.service);
                 removeServiceLocked(i);
                 if (info.connection != null) {
-                    mContext.unbindService(info.connection);
+                    try {
+                        mContext.unbindService(info.connection);
+                    } catch (IllegalArgumentException e) {
+                        Slog.e(TAG, "failed to unbind " + name, e);
+                    }
                 }
             }
         }
@@ -982,7 +995,11 @@ abstract public class ManagedServices {
                     Slog.w(TAG, getCaption() + " binding died: " + name);
                     synchronized (mMutex) {
                         mServicesBinding.remove(servicesBindingTag);
-                        mContext.unbindService(this);
+                        try {
+                            mContext.unbindService(this);
+                        } catch (IllegalArgumentException e) {
+                            Slog.e(TAG, "failed to unbind " + name, e);
+                        }
                         if (!mServicesRebinding.contains(servicesBindingTag)) {
                             mServicesRebinding.add(servicesBindingTag);
                             mHandler.postDelayed(new Runnable() {

@@ -83,7 +83,8 @@ public class ZenModeConfig implements Parcelable {
     private static final int DAY_MINUTES = 24 * 60;
     private static final int ZERO_VALUE_MS = 10 * SECONDS_MS;
 
-    // Default allow categories set in readXml() from default_zen_mode_config.xml, fallback values:
+    // Default allow categories set in readXml() from default_zen_mode_config.xml,
+    // fallback/upgrade values:
     private static final boolean DEFAULT_ALLOW_ALARMS = true;
     private static final boolean DEFAULT_ALLOW_MEDIA = true;
     private static final boolean DEFAULT_ALLOW_SYSTEM = false;
@@ -94,10 +95,11 @@ public class ZenModeConfig implements Parcelable {
     private static final boolean DEFAULT_ALLOW_REPEAT_CALLERS = false;
     private static final boolean DEFAULT_ALLOW_SCREEN_OFF = false;
     private static final boolean DEFAULT_ALLOW_SCREEN_ON = false;
+    private static final boolean DEFAULT_CHANNELS_BYPASSING_DND = false;
     private static final int DEFAULT_SUPPRESSED_VISUAL_EFFECTS =
             Policy.getAllSuppressedVisualEffects();
 
-    public static final int XML_VERSION = 6;
+    public static final int XML_VERSION = 7;
     public static final String ZEN_TAG = "zen";
     private static final String ZEN_ATT_VERSION = "version";
     private static final String ZEN_ATT_USER = "user";
@@ -117,6 +119,8 @@ public class ZenModeConfig implements Parcelable {
     private static final String ALLOW_ATT_SCREEN_ON = "visualScreenOn";
     private static final String DISALLOW_TAG = "disallow";
     private static final String DISALLOW_ATT_VISUAL_EFFECTS = "visualEffects";
+    private static final String STATE_TAG = "state";
+    private static final String STATE_ATT_CHANNELS_BYPASSING_DND = "areChannelsBypassingDnd";
 
     private static final String CONDITION_ATT_ID = "id";
     private static final String CONDITION_ATT_SUMMARY = "summary";
@@ -153,6 +157,7 @@ public class ZenModeConfig implements Parcelable {
     public int suppressedVisualEffects = DEFAULT_SUPPRESSED_VISUAL_EFFECTS;
     public boolean allowWhenScreenOff = DEFAULT_ALLOW_SCREEN_OFF;
     public boolean allowWhenScreenOn = DEFAULT_ALLOW_SCREEN_ON;
+    public boolean areChannelsBypassingDnd = DEFAULT_CHANNELS_BYPASSING_DND;
     public int version;
 
     public ZenRule manualRule;
@@ -186,6 +191,7 @@ public class ZenModeConfig implements Parcelable {
         allowMedia = source.readInt() == 1;
         allowSystem = source.readInt() == 1;
         suppressedVisualEffects = source.readInt();
+        areChannelsBypassingDnd = source.readInt() == 1;
     }
 
     @Override
@@ -219,6 +225,7 @@ public class ZenModeConfig implements Parcelable {
         dest.writeInt(allowMedia ? 1 : 0);
         dest.writeInt(allowSystem ? 1 : 0);
         dest.writeInt(suppressedVisualEffects);
+        dest.writeInt(areChannelsBypassingDnd ? 1 : 0);
     }
 
     @Override
@@ -238,6 +245,7 @@ public class ZenModeConfig implements Parcelable {
                 .append(",allowWhenScreenOff=").append(allowWhenScreenOff)
                 .append(",allowWhenScreenOn=").append(allowWhenScreenOn)
                 .append(",suppressedVisualEffects=").append(suppressedVisualEffects)
+                .append(",areChannelsBypassingDnd=").append(areChannelsBypassingDnd)
                 .append(",automaticRules=").append(automaticRules)
                 .append(",manualRule=").append(manualRule)
                 .append(']').toString();
@@ -302,6 +310,11 @@ public class ZenModeConfig implements Parcelable {
             ZenRule.appendDiff(d, "automaticRule[" + rule + "]", fromRule, toRule);
         }
         ZenRule.appendDiff(d, "manualRule", manualRule, to.manualRule);
+
+        if (areChannelsBypassingDnd != to.areChannelsBypassingDnd) {
+            d.addLine("areChannelsBypassingDnd", areChannelsBypassingDnd,
+                    to.areChannelsBypassingDnd);
+        }
         return d;
     }
 
@@ -396,7 +409,8 @@ public class ZenModeConfig implements Parcelable {
                 && other.user == user
                 && Objects.equals(other.automaticRules, automaticRules)
                 && Objects.equals(other.manualRule, manualRule)
-                && other.suppressedVisualEffects == suppressedVisualEffects;
+                && other.suppressedVisualEffects == suppressedVisualEffects
+                && other.areChannelsBypassingDnd == areChannelsBypassingDnd;
     }
 
     @Override
@@ -405,7 +419,7 @@ public class ZenModeConfig implements Parcelable {
                 allowRepeatCallers, allowMessages,
                 allowCallsFrom, allowMessagesFrom, allowReminders, allowEvents,
                 allowWhenScreenOff, allowWhenScreenOn, user, automaticRules, manualRule,
-                suppressedVisualEffects);
+                suppressedVisualEffects, areChannelsBypassingDnd);
     }
 
     private static String toDayList(int[] days) {
@@ -510,6 +524,9 @@ public class ZenModeConfig implements Parcelable {
                         automaticRule.id = id;
                         rt.automaticRules.put(id, automaticRule);
                     }
+                } else if (STATE_TAG.equals(tag)) {
+                    rt.areChannelsBypassingDnd = safeBoolean(parser,
+                            STATE_ATT_CHANNELS_BYPASSING_DND, DEFAULT_CHANNELS_BYPASSING_DND);
                 }
             }
         }
@@ -560,6 +577,12 @@ public class ZenModeConfig implements Parcelable {
             writeRuleXml(automaticRule, out);
             out.endTag(null, AUTOMATIC_TAG);
         }
+
+        out.startTag(null, STATE_TAG);
+        out.attribute(null, STATE_ATT_CHANNELS_BYPASSING_DND,
+                Boolean.toString(areChannelsBypassingDnd));
+        out.endTag(null, STATE_TAG);
+
         out.endTag(null, ZEN_TAG);
     }
 
@@ -742,7 +765,8 @@ public class ZenModeConfig implements Parcelable {
         priorityCallSenders = sourceToPrioritySenders(allowCallsFrom, priorityCallSenders);
         priorityMessageSenders = sourceToPrioritySenders(allowMessagesFrom, priorityMessageSenders);
         return new Policy(priorityCategories, priorityCallSenders, priorityMessageSenders,
-                suppressedVisualEffects);
+                suppressedVisualEffects, areChannelsBypassingDnd
+                ? Policy.STATE_CHANNELS_BYPASSING_DND : 0);
     }
 
     /**
@@ -793,6 +817,9 @@ public class ZenModeConfig implements Parcelable {
                 allowMessagesFrom);
         if (policy.suppressedVisualEffects != Policy.SUPPRESSED_EFFECTS_UNSET) {
             suppressedVisualEffects = policy.suppressedVisualEffects;
+        }
+        if (policy.state != Policy.STATE_UNSET) {
+            areChannelsBypassingDnd = (policy.state & Policy.STATE_CHANNELS_BYPASSING_DND) != 0;
         }
     }
 
@@ -1464,8 +1491,19 @@ public class ZenModeConfig implements Parcelable {
                 & NotificationManager.Policy.PRIORITY_CATEGORY_EVENTS) != 0;
         boolean allowRepeatCallers = (policy.priorityCategories
                 & NotificationManager.Policy.PRIORITY_CATEGORY_REPEAT_CALLERS) != 0;
+        boolean areChannelsBypassingDnd = (policy.state & Policy.STATE_CHANNELS_BYPASSING_DND) != 0;
         return !allowReminders && !allowCalls && !allowMessages && !allowEvents
-                && !allowRepeatCallers;
+                && !allowRepeatCallers && !areChannelsBypassingDnd;
+    }
+
+    /**
+     * Determines if DND is currently overriding the ringer
+     */
+    public static boolean isZenOverridingRinger(int zen, ZenModeConfig zenConfig) {
+        return zen == Global.ZEN_MODE_NO_INTERRUPTIONS
+                || zen == Global.ZEN_MODE_ALARMS
+                || (zen == Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS
+                && ZenModeConfig.areAllPriorityOnlyNotificationZenSoundsMuted(zenConfig));
     }
 
     /**
@@ -1473,7 +1511,8 @@ public class ZenModeConfig implements Parcelable {
      */
     public static boolean areAllPriorityOnlyNotificationZenSoundsMuted(ZenModeConfig config) {
         return !config.allowReminders && !config.allowCalls && !config.allowMessages
-                && !config.allowEvents && !config.allowRepeatCallers;
+                && !config.allowEvents && !config.allowRepeatCallers
+                && !config.areChannelsBypassingDnd;
     }
 
     /**
@@ -1487,14 +1526,18 @@ public class ZenModeConfig implements Parcelable {
     /**
      * Returns a description of the current do not disturb settings from config.
      * - If turned on manually and end time is known, returns end time.
+     * - If turned on manually and end time is on forever until turned off, return null if
+     * describeForeverCondition is false, else return String describing indefinite behavior
      * - If turned on by an automatic rule, returns the automatic rule name.
      * - If on due to an app, returns the app name.
      * - If there's a combination of rules/apps that trigger, then shows the one that will
      *  last the longest if applicable.
-     * @return null if do not disturb is off.
+     * @return null if DND is off or describeForeverCondition is false and
+     * DND is on forever (until turned off)
      */
-    public static String getDescription(Context context, boolean zenOn, ZenModeConfig config) {
-        if (!zenOn) {
+    public static String getDescription(Context context, boolean zenOn, ZenModeConfig config,
+            boolean describeForeverCondition) {
+        if (!zenOn || config == null) {
             return null;
         }
 
@@ -1513,8 +1556,11 @@ public class ZenModeConfig implements Parcelable {
             } else {
                 if (id == null) {
                     // Do not disturb manually triggered to remain on forever until turned off
-                    // No subtext
-                    return null;
+                    if (describeForeverCondition) {
+                        return context.getString(R.string.zen_mode_forever);
+                    } else {
+                        return null;
+                    }
                 } else {
                     latestEndTime = tryParseCountdownConditionId(id);
                     if (latestEndTime > 0) {

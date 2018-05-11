@@ -38,20 +38,52 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.MonthDay;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * A class that represents a local system update policy set by the device owner.
+ * Determines when over-the-air system updates are installed on a device. Only a device policy
+ * controller (DPC) running in device owner mode can set an update policy for the device—by calling
+ * the {@code DevicePolicyManager} method
+ * {@link DevicePolicyManager#setSystemUpdatePolicy setSystemUpdatePolicy()}. An update
+ * policy affects the pending system update (if there is one) and any future updates for the device.
+ *
+ * <p>If a policy is set on a device, the system doesn't notify the user about updates.</p>
+ * <h3>Example</h3>
+ *
+ * <p>The example below shows how a DPC might set a maintenance window for system updates:</p>
+ * <pre><code>
+ * private final MAINTENANCE_WINDOW_START = 1380; // 11pm
+ * private final MAINTENANCE_WINDOW_END = 120; // 2am
+ *
+ * // ...
+ *
+ * // Create the system update policy
+ * SystemUpdatePolicy policy = SystemUpdatePolicy.createWindowedInstallPolicy(
+ *     MAINTENANCE_WINDOW_START, MAINTENANCE_WINDOW_END);
+ *
+ * // Get a DevicePolicyManager instance to set the policy on the device
+ * DevicePolicyManager dpm =
+ *     (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+ * ComponentName adminComponent = getComponentName(context);
+ * dpm.setSystemUpdatePolicy(adminComponent, policy);
+ * </code></pre>
+ *
+ * <h3>Developer guide</h3>
+ * To learn more about managing system updates, read
+ * <a href="{@docRoot}/work/dpc/security.html#control_remote_software_updates">Control remote
+ * software updates</a>.
  *
  * @see DevicePolicyManager#setSystemUpdatePolicy
  * @see DevicePolicyManager#getSystemUpdatePolicy
  */
-public class SystemUpdatePolicy implements Parcelable {
+public final class SystemUpdatePolicy implements Parcelable {
     private static final String TAG = "SystemUpdatePolicy";
 
     /** @hide */
@@ -69,44 +101,37 @@ public class SystemUpdatePolicy implements Parcelable {
     private static final int TYPE_UNKNOWN = -1;
 
     /**
-     * Install system update automatically as soon as one is available.
+     * Installs system updates (without user interaction) as soon as they become available. Setting
+     * this policy type immediately installs any pending updates that might be postponed or waiting
+     * for a maintenance window.
      */
     public static final int TYPE_INSTALL_AUTOMATIC = 1;
 
     /**
-     * Install system update automatically within a daily maintenance window. An update can be
-     * delayed for a maximum of 30 days, after which the policy will no longer be effective and the
-     * system will revert back to its normal behavior as if no policy were set.
+     * Installs system updates (without user interaction) during a daily maintenance window. Set the
+     * start and end of the daily maintenance window, as minutes of the day, when creating a new
+     * {@code TYPE_INSTALL_WINDOWED} policy. See
+     * {@link #createWindowedInstallPolicy createWindowedInstallPolicy()}.
      *
-     * <p>After this policy expires, resetting it to any policy other than
-     * {@link #TYPE_INSTALL_AUTOMATIC} will produce no effect, as the 30-day maximum delay has
-     * already been used up.
-     * The {@link #TYPE_INSTALL_AUTOMATIC} policy will still take effect to install the delayed
-     * system update immediately.
-     *
-     * <p>Re-applying this policy or changing it to {@link #TYPE_POSTPONE} within the 30-day period
-     * will <i>not</i> extend policy expiration.
-     * However, the expiration will be recalculated when a new system update is made available.
+     * <p>No connectivity, not enough disk space, or a low battery are typical reasons Android might
+     * not install a system update in the daily maintenance window. After 30 days trying to install
+     * an update in the maintenance window (regardless of policy changes in this period), the system
+     * prompts the device user to install the update.
      */
     public static final int TYPE_INSTALL_WINDOWED = 2;
 
     /**
-     * Incoming system updates (except for security updates) will be blocked for a maximum of 30
-     * days, after which the policy will no longer be effective and the system will revert back to
-     * its normal behavior as if no policy were set.
+     * Postpones the installation of system updates for 30 days. After the 30-day period has ended,
+     * the system prompts the device user to install the update.
      *
-     * <p><b>Note:</b> security updates (e.g. monthly security patches) may <i>not</i> be affected
-     * by this policy, depending on the policy set by the device manufacturer and carrier.
+     * <p>The system limits each update to one 30-day postponement. The period begins when the
+     * system first postpones the update and setting new {@code TYPE_POSTPONE} policies won’t extend
+     * the period. If, after 30 days the update isn’t installed (through policy changes), the system
+     * prompts the user to install the update.
      *
-     * <p>After this policy expires, resetting it to any policy other than
-     * {@link #TYPE_INSTALL_AUTOMATIC} will produce no effect, as the 30-day maximum delay has
-     * already been used up.
-     * The {@link #TYPE_INSTALL_AUTOMATIC} policy will still take effect to install the delayed
-     * system update immediately.
-     *
-     * <p>Re-applying this policy or changing it to {@link #TYPE_INSTALL_WINDOWED} within the 30-day
-     * period will <i>not</i> extend policy expiration.
-     * However, the expiration will be recalculated when a new system update is made available.
+     * <p><strong>Note</strong>: Device manufacturers or carriers might choose to exempt important
+     * security updates from a postponement policy. Exempted updates notify the device user when
+     * they become available.
      */
     public static final int TYPE_POSTPONE = 3;
 
@@ -163,6 +188,7 @@ public class SystemUpdatePolicy implements Parcelable {
                 ERROR_NEW_FREEZE_PERIOD_TOO_CLOSE,
                 ERROR_COMBINED_FREEZE_PERIOD_TOO_LONG,
                 ERROR_COMBINED_FREEZE_PERIOD_TOO_CLOSE,
+                ERROR_UNKNOWN,
         })
         @Retention(RetentionPolicy.SOURCE)
         @interface ValidationFailureType {}
@@ -171,33 +197,38 @@ public class SystemUpdatePolicy implements Parcelable {
         public static final int ERROR_NONE = 0;
 
         /**
+         * Validation failed with unknown error.
+         */
+        public static final int ERROR_UNKNOWN = 1;
+
+        /**
          * The freeze periods contains duplicates, periods that overlap with each
          * other or periods whose start and end joins.
          */
-        public static final int ERROR_DUPLICATE_OR_OVERLAP = 1;
+        public static final int ERROR_DUPLICATE_OR_OVERLAP = 2;
 
         /**
          * There exists at least one freeze period whose length exceeds 90 days.
          */
-        public static final int ERROR_NEW_FREEZE_PERIOD_TOO_LONG = 2;
+        public static final int ERROR_NEW_FREEZE_PERIOD_TOO_LONG = 3;
 
         /**
          * There exists some freeze period which starts within 60 days of the preceding period's
          * end time.
          */
-        public static final int ERROR_NEW_FREEZE_PERIOD_TOO_CLOSE = 3;
+        public static final int ERROR_NEW_FREEZE_PERIOD_TOO_CLOSE = 4;
 
         /**
          * The device has been in a freeze period and when combining with the new freeze period
          * to be set, it will result in the total freeze period being longer than 90 days.
          */
-        public static final int ERROR_COMBINED_FREEZE_PERIOD_TOO_LONG = 4;
+        public static final int ERROR_COMBINED_FREEZE_PERIOD_TOO_LONG = 5;
 
         /**
          * The device has been in a freeze period and some new freeze period to be set is less
          * than 60 days from the end of the last freeze period the device went through.
          */
-        public static final int ERROR_COMBINED_FREEZE_PERIOD_TOO_CLOSE = 5;
+        public static final int ERROR_COMBINED_FREEZE_PERIOD_TOO_CLOSE = 6;
 
         @ValidationFailureType
         private final int mErrorCode;
@@ -272,7 +303,7 @@ public class SystemUpdatePolicy implements Parcelable {
     private int mMaintenanceWindowStart;
     private int mMaintenanceWindowEnd;
 
-    private final ArrayList<FreezeInterval> mFreezePeriods;
+    private final ArrayList<FreezePeriod> mFreezePeriods;
 
     private SystemUpdatePolicy() {
         mPolicyType = TYPE_UNKNOWN;
@@ -295,16 +326,20 @@ public class SystemUpdatePolicy implements Parcelable {
      * Create a policy object and set it to: new system update will only be installed automatically
      * when the system clock is inside a daily maintenance window. If the start and end times are
      * the same, the window is considered to include the <i>whole 24 hours</i>. That is, updates can
-     * install at any time. If the given window in invalid, an {@link IllegalArgumentException}
-     * will be thrown. If start time is later than end time, the window is considered spanning
+     * install at any time. If start time is later than end time, the window is considered spanning
      * midnight (i.e. the end time denotes a time on the next day). The maintenance window will last
-     * for 30 days, after which the system will revert back to its normal behavior as if no policy
-     * were set.
+     * for 30 days for any given update, after which the window will no longer be effective and
+     * the pending update will be made available for manual installation as if no system update
+     * policy were set on the device. See {@link #TYPE_INSTALL_WINDOWED} for the details of this
+     * policy's behavior.
      *
      * @param startTime the start of the maintenance window, measured as the number of minutes from
      *            midnight in the device's local time. Must be in the range of [0, 1440).
      * @param endTime the end of the maintenance window, measured as the number of minutes from
      *            midnight in the device's local time. Must be in the range of [0, 1440).
+     * @throws IllegalArgumentException If the {@code startTime} or {@code endTime} isn't in the
+     *            accepted range.
+     * @return The configured policy.
      * @see #TYPE_INSTALL_WINDOWED
      */
     public static SystemUpdatePolicy createWindowedInstallPolicy(int startTime, int endTime) {
@@ -321,8 +356,7 @@ public class SystemUpdatePolicy implements Parcelable {
 
     /**
      * Create a policy object and set it to block installation for a maximum period of 30 days.
-     * After expiration the system will revert back to its normal behavior as if no policy were
-     * set.
+     * To learn more about this policy's behavior, see {@link #TYPE_POSTPONE}.
      *
      * <p><b>Note: </b> security updates (e.g. monthly security patches) will <i>not</i> be affected
      * by this policy.
@@ -336,10 +370,9 @@ public class SystemUpdatePolicy implements Parcelable {
     }
 
     /**
-     * Returns the type of system update policy.
+     * Returns the type of system update policy, or -1 if no policy has been set.
      *
-     * @return an integer, either one of {@link #TYPE_INSTALL_AUTOMATIC},
-     * {@link #TYPE_INSTALL_WINDOWED} and {@link #TYPE_POSTPONE}, or -1 if no policy has been set.
+     @return The policy type or -1 if the type isn't set.
      */
     @SystemUpdatePolicyType
     public int getPolicyType() {
@@ -415,24 +448,16 @@ public class SystemUpdatePolicy implements Parcelable {
      * be blocked and cannot be installed. When the device is outside the freeze periods, the normal
      * policy behavior will apply.
      * <p>
-     * Each freeze period is defined by a starting and finishing date (both inclusive). Since the
-     * freeze period repeats annually, both of these dates are simply represented by integers
-     * counting the number of days since year start, similar to {@link LocalDate#getDayOfYear()}. We
-     * do not consider leap year when handling freeze period so the valid range of the integer is
-     * always [1,365] (see last section for more details on leap year). If the finishing date is
-     * smaller than the starting date, the freeze period is considered to be spanning across
-     * year-end.
-     * <p>
      * Each individual freeze period is allowed to be at most 90 days long, and adjacent freeze
      * periods need to be at least 60 days apart. Also, the list of freeze periods should not
      * contain duplicates or overlap with each other. If any of these conditions is not met, a
      * {@link ValidationFailedException} will be thrown.
      * <p>
-     * Handling of leap year: we do not consider leap year when handling freeze period, in
-     * particular,
+     * Handling of leap year: we ignore leap years in freeze period calculations, in particular,
      * <ul>
-     * <li>When a freeze period is defined by the day of year, February 29th does not count as one
-     * day, so day 59 is February 28th while day 60 is March 1st.</li>
+     * <li>When a freeze period is defined, February 29th is disregarded so even though a freeze
+     * period can be specified to start or end on February 29th, it will be treated as if the period
+     * started or ended on February 28th.</li>
      * <li>When applying freeze period behavior to the device, a system clock of February 29th is
      * treated as if it were February 28th</li>
      * <li>When calculating the number of days of a freeze period or separation between two freeze
@@ -444,12 +469,10 @@ public class SystemUpdatePolicy implements Parcelable {
      *         requirement set above
      * @return this instance
      */
-    public SystemUpdatePolicy setFreezePeriods(List<Pair<Integer, Integer>> freezePeriods) {
-        List<FreezeInterval> newPeriods = freezePeriods.stream().map(
-                p -> new FreezeInterval(p.first, p.second)).collect(Collectors.toList());
-        FreezeInterval.validatePeriods(newPeriods);
+    public SystemUpdatePolicy setFreezePeriods(List<FreezePeriod> freezePeriods) {
+        FreezePeriod.validatePeriods(freezePeriods);
         mFreezePeriods.clear();
-        mFreezePeriods.addAll(newPeriods);
+        mFreezePeriods.addAll(freezePeriods);
         return this;
     }
 
@@ -458,12 +481,8 @@ public class SystemUpdatePolicy implements Parcelable {
      *
      * @return the list of freeze periods, or an empty list if none was set.
      */
-    public List<Pair<Integer, Integer>> getFreezePeriods() {
-        List<Pair<Integer, Integer>> result = new ArrayList<>(mFreezePeriods.size());
-        for (FreezeInterval interval : mFreezePeriods) {
-            result.add(new Pair<>(interval.mStartDay, interval.mEndDay));
-        }
-        return result;
+    public List<FreezePeriod> getFreezePeriods() {
+        return Collections.unmodifiableList(mFreezePeriods);
     }
 
     /**
@@ -472,7 +491,7 @@ public class SystemUpdatePolicy implements Parcelable {
      * @hide
      */
     public Pair<LocalDate, LocalDate> getCurrentFreezePeriod(LocalDate now) {
-        for (FreezeInterval interval : mFreezePeriods) {
+        for (FreezePeriod interval : mFreezePeriods) {
             if (interval.contains(now)) {
                 return interval.toCurrentOrFutureRealDates(now);
             }
@@ -485,10 +504,10 @@ public class SystemUpdatePolicy implements Parcelable {
      * is not within a freeze period.
      */
     private long timeUntilNextFreezePeriod(long now) {
-        List<FreezeInterval> sortedPeriods = FreezeInterval.canonicalizeIntervals(mFreezePeriods);
+        List<FreezePeriod> sortedPeriods = FreezePeriod.canonicalizePeriods(mFreezePeriods);
         LocalDate nowDate = millisToDate(now);
         LocalDate nextFreezeStart = null;
-        for (FreezeInterval interval : sortedPeriods) {
+        for (FreezePeriod interval : sortedPeriods) {
             if (interval.after(nowDate)) {
                 nextFreezeStart = interval.toCurrentOrFutureRealDates(nowDate).first;
                 break;
@@ -506,13 +525,13 @@ public class SystemUpdatePolicy implements Parcelable {
 
     /** @hide */
     public void validateFreezePeriods() {
-        FreezeInterval.validatePeriods(mFreezePeriods);
+        FreezePeriod.validatePeriods(mFreezePeriods);
     }
 
     /** @hide */
     public void validateAgainstPreviousFreezePeriod(LocalDate prevPeriodStart,
             LocalDate prevPeriodEnd, LocalDate now) {
-        FreezeInterval.validateAgainstPreviousFreezePeriod(mFreezePeriods, prevPeriodStart,
+        FreezePeriod.validateAgainstPreviousFreezePeriod(mFreezePeriods, prevPeriodStart,
                 prevPeriodEnd, now);
     }
 
@@ -521,10 +540,10 @@ public class SystemUpdatePolicy implements Parcelable {
      * updates and how long this action is valid for, given the current system update policy. Its
      * action could be one of the following
      * <ul>
-     * <li> {@code TYPE_INSTALL_AUTOMATIC} system updates should be installed immedately and without
-     * user intervention as soon as they become available.
-     * <li> {@code TYPE_POSTPONE} system updates should be postponed for a maximum of 30 days
-     * <li> {@code TYPE_PAUSE} system updates should be postponed indefinitely until further notice
+     * <li> {@link #TYPE_INSTALL_AUTOMATIC} system updates should be installed immedately and
+     * without user intervention as soon as they become available.
+     * <li> {@link #TYPE_POSTPONE} system updates should be postponed for a maximum of 30 days
+     * <li> {@link #TYPE_PAUSE} system updates should be postponed indefinitely until further notice
      * </ul>
      *
      * The effective time measures how long this installation option is valid for from the queried
@@ -535,18 +554,38 @@ public class SystemUpdatePolicy implements Parcelable {
      */
     @SystemApi
     public static class InstallationOption {
+        /** @hide */
+        @IntDef(prefix = { "TYPE_" }, value = {
+                TYPE_INSTALL_AUTOMATIC,
+                TYPE_PAUSE,
+                TYPE_POSTPONE
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        @interface InstallationOptionType {}
+
+        @InstallationOptionType
         private final int mType;
         private long mEffectiveTime;
 
-        InstallationOption(int type, long effectiveTime) {
+        InstallationOption(@InstallationOptionType int type, long effectiveTime) {
             this.mType = type;
             this.mEffectiveTime = effectiveTime;
         }
 
-        public int getType() {
+        /**
+         * Returns the type of the current installation option, could be one of
+         * {@link #TYPE_INSTALL_AUTOMATIC}, {@link #TYPE_POSTPONE} and {@link #TYPE_PAUSE}.
+         * @return type of installation option.
+         */
+        public @InstallationOptionType int getType() {
             return mType;
         }
 
+        /**
+         * Returns how long the current installation option in effective for, starting from the time
+         * of query.
+         * @return the effective time in milliseconds.
+         */
         public long getEffectiveTime() {
             return mEffectiveTime;
         }
@@ -667,9 +706,11 @@ public class SystemUpdatePolicy implements Parcelable {
         int freezeCount = mFreezePeriods.size();
         dest.writeInt(freezeCount);
         for (int i = 0; i < freezeCount; i++) {
-            FreezeInterval interval = mFreezePeriods.get(i);
-            dest.writeInt(interval.mStartDay);
-            dest.writeInt(interval.mEndDay);
+            FreezePeriod interval = mFreezePeriods.get(i);
+            dest.writeInt(interval.getStart().getMonthValue());
+            dest.writeInt(interval.getStart().getDayOfMonth());
+            dest.writeInt(interval.getEnd().getMonthValue());
+            dest.writeInt(interval.getEnd().getDayOfMonth());
         }
     }
 
@@ -686,8 +727,9 @@ public class SystemUpdatePolicy implements Parcelable {
                     int freezeCount = source.readInt();
                     policy.mFreezePeriods.ensureCapacity(freezeCount);
                     for (int i = 0; i < freezeCount; i++) {
-                        policy.mFreezePeriods.add(
-                                new FreezeInterval(source.readInt(), source.readInt()));
+                        MonthDay start = MonthDay.of(source.readInt(), source.readInt());
+                        MonthDay end = MonthDay.of(source.readInt(), source.readInt());
+                        policy.mFreezePeriods.add(new FreezePeriod(start, end));
                     }
                     return policy;
                 }
@@ -730,9 +772,9 @@ public class SystemUpdatePolicy implements Parcelable {
                     if (!parser.getName().equals(KEY_FREEZE_TAG)) {
                         continue;
                     }
-                    policy.mFreezePeriods.add(new FreezeInterval(
-                            Integer.parseInt(parser.getAttributeValue(null, KEY_FREEZE_START)),
-                            Integer.parseInt(parser.getAttributeValue(null, KEY_FREEZE_END))));
+                    policy.mFreezePeriods.add(new FreezePeriod(
+                            MonthDay.parse(parser.getAttributeValue(null, KEY_FREEZE_START)),
+                            MonthDay.parse(parser.getAttributeValue(null, KEY_FREEZE_END))));
                 }
                 return policy;
             }
@@ -751,10 +793,10 @@ public class SystemUpdatePolicy implements Parcelable {
         out.attribute(null, KEY_INSTALL_WINDOW_START, Integer.toString(mMaintenanceWindowStart));
         out.attribute(null, KEY_INSTALL_WINDOW_END, Integer.toString(mMaintenanceWindowEnd));
         for (int i = 0; i < mFreezePeriods.size(); i++) {
-            FreezeInterval interval = mFreezePeriods.get(i);
+            FreezePeriod interval = mFreezePeriods.get(i);
             out.startTag(null, KEY_FREEZE_TAG);
-            out.attribute(null, KEY_FREEZE_START, Integer.toString(interval.mStartDay));
-            out.attribute(null, KEY_FREEZE_END, Integer.toString(interval.mEndDay));
+            out.attribute(null, KEY_FREEZE_START, interval.getStart().toString());
+            out.attribute(null, KEY_FREEZE_END, interval.getEnd().toString());
             out.endTag(null, KEY_FREEZE_TAG);
         }
     }

@@ -28,6 +28,9 @@
     <string name="keyguard_password_entry_touch_hint" msgid="5790410752696806482"><font size="17">"የይለፍ ቃል ለመተየብ ይንኩ"</font></string>
     <string name="keyguard_password_enter_password_code" msgid="595980919238127672">"ለመክፈት የይለፍ ቃል ይተይቡ"</string>
     <string name="keyguard_password_enter_pin_password_code" msgid="7504123374204446086">"ለመክፈት ፒን ይተይቡ"</string>
+    <string name="keyguard_enter_your_pin" msgid="7152989016739952871">"የእርስዎን ፒን ያስገቡ"</string>
+    <string name="keyguard_enter_your_pattern" msgid="3915717164691787047">"ስርዓተ-ጥለትዎን ያስገቡ"</string>
+    <string name="keyguard_enter_your_password" msgid="5761514484663983731">"ይለፍ ቃልዎን ያስገቡ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="6535018036285012028">"ትክክል ያልሆነ ፒን  ኮድ።"</string>
     <string name="keyguard_sim_error_message_short" msgid="592109500618448312">"ልክ ያልሆነ ካርድ።"</string>
     <string name="keyguard_charged" msgid="2222329688813033109">"ባትሪ ሞልቷል"</string>
@@ -137,10 +140,7 @@
       <item quantity="other">መሣሪያው ለ<xliff:g id="NUMBER_1">%d</xliff:g> ሰዓቶች አልተከፈተም ነበር። የይለፍ ቃል ያረጋግጡ።</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"አልታወቀም"</string>
-    <plurals name="kg_password_default_pin_message" formatted="false" msgid="6203676909479972943">
-      <item quantity="one">የሲም ፒን ያስገቡ፣ <xliff:g id="NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል።</item>
-      <item quantity="other">የሲም ፒን ያስገቡ፣ <xliff:g id="NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል።</item>
-    </plurals>
+    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="one">ሲም አሁን ተሰናክሏል። ለመቀጠል የPUK ኮድ ያስገቡ። ሲም እስከመጨረሻው መጠቀም የማይቻል ከመሆኑ በፊት <xliff:g id="_NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል። ዝርዝሮችን ለማግኘት የአገልግሎት አቅራቢን ያነጋግሩ።</item>
       <item quantity="other">ሲም አሁን ተሰናክሏል። ለመቀጠል የPUK ኮድ ያስገቡ። ሲም እስከመጨረሻው መጠቀም የማይቻል ከመሆኑ በፊት <xliff:g id="_NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል። ዝርዝሮችን ለማግኘት የአገልግሎት አቅራቢን ያነጋግሩ።</item>

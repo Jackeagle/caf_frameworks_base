@@ -523,7 +523,7 @@ class RecentTasks {
         }
         for (int i = mTasks.size() - 1; i >= 0; --i) {
             final TaskRecord tr = mTasks.get(i);
-            if (tr.userId == userId && !mService.mLockTaskController.isTaskWhitelisted(tr)) {
+            if (tr.userId == userId && !mService.getLockTaskController().isTaskWhitelisted(tr)) {
                 remove(tr);
             }
         }
@@ -534,8 +534,8 @@ class RecentTasks {
             final TaskRecord tr = mTasks.get(i);
             final String taskPackageName =
                     tr.getBaseIntent().getComponent().getPackageName();
-            if (tr.userId != userId) return;
-            if (!taskPackageName.equals(packageName)) return;
+            if (tr.userId != userId) continue;
+            if (!taskPackageName.equals(packageName)) continue;
 
             mService.mStackSupervisor.removeTaskByIdLocked(tr.taskId, true, REMOVE_FROM_RECENTS,
                     "remove-package-task");
@@ -550,7 +550,7 @@ class RecentTasks {
                 continue;
             }
 
-            ComponentName cn = tr.intent.getComponent();
+            ComponentName cn = tr.intent != null ? tr.intent.getComponent() : null;
             final boolean sameComponent = cn != null && cn.getPackageName().equals(packageName)
                     && (filterByClasses == null || filterByClasses.contains(cn.getClassName()));
             if (sameComponent) {
@@ -1155,6 +1155,11 @@ class RecentTasks {
                 }
         }
 
+        // If we're in lock task mode, ignore the root task
+        if (task == mService.getLockTaskController().getRootTask()) {
+            return false;
+        }
+
         return true;
     }
 
@@ -1250,7 +1255,7 @@ class RecentTasks {
         for (int i = 0; i < recentsCount; i++) {
             final TaskRecord tr = mTasks.get(i);
             if (task != tr) {
-                if (!task.hasCompatibleActivityType(tr)) {
+                if (!task.hasCompatibleActivityType(tr) || task.userId != tr.userId) {
                     continue;
                 }
                 final Intent trIntent = tr.intent;

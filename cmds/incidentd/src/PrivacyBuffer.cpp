@@ -23,7 +23,9 @@
 #include <android/util/protobuf.h>
 #include <cutils/log.h>
 
-using namespace android::util;
+namespace android {
+namespace os {
+namespace incidentd {
 
 /**
  * Write the field to buf based on the wire type, iterator will point to next field.
@@ -32,7 +34,7 @@ using namespace android::util;
 void PrivacyBuffer::writeFieldOrSkip(uint32_t fieldTag, bool skip) {
     uint8_t wireType = read_wire_type(fieldTag);
     size_t bytesToWrite = 0;
-    uint32_t varint = 0;
+    uint64_t varint = 0;
 
     switch (wireType) {
         case WIRE_TYPE_VARINT:
@@ -140,3 +142,7 @@ status_t PrivacyBuffer::flush(int fd) {
     }
     return NO_ERROR;
 }
+
+}  // namespace incidentd
+}  // namespace os
+}  // namespace android

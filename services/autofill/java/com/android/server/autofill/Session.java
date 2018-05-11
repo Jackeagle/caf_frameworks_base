@@ -99,6 +99,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -270,7 +271,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
 
                 // Sanitize structure before it's sent to service.
                 final ComponentName componentNameFromApp = structure.getActivityComponent();
-                if (!mComponentName.equals(componentNameFromApp)) {
+                if (componentNameFromApp == null || !mComponentName.getPackageName()
+                        .equals(componentNameFromApp.getPackageName())) {
                     Slog.w(TAG, "Activity " + mComponentName + " forged different component on "
                             + "AssistStructure: " + componentNameFromApp);
                     structure.setActivityComponent(mComponentName);
@@ -1400,6 +1402,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
          *   the current values of all fields in the screen.
          */
         if (saveInfo == null) {
+            if (sVerbose) Slog.w(TAG, "showSaveLocked(): no saveInfo from service");
             return true;
         }
 
@@ -1970,8 +1973,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                     return;
                 }
 
-                if (value != null && !value.equals(viewState.getCurrentValue())) {
-                    if (value.isEmpty()
+                if (!Objects.equals(value, viewState.getCurrentValue())) {
+                    if ((value == null || value.isEmpty())
                             && viewState.getCurrentValue() != null
                             && viewState.getCurrentValue().isText()
                             && viewState.getCurrentValue().getTextValue() != null
@@ -1992,18 +1995,26 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                     // Must check if this update was caused by autofilling the view, in which
                     // case we just update the value, but not the UI.
                     final AutofillValue filledValue = viewState.getAutofilledValue();
-                    if (value.equals(filledValue)) {
+                    if (filledValue != null && filledValue.equals(value)) {
+                        if (sVerbose) {
+                            Slog.v(TAG, "ignoring autofilled change on id " + id);
+                        }
                         return;
                     }
                     // Update the internal state...
                     viewState.setState(ViewState.STATE_CHANGED);
 
                     //..and the UI
-                    if (value.isText()) {
-                        getUiForShowing().filterFillUi(value.getTextValue().toString(), this);
+                    final String filterText;
+                    if (value == null || !value.isText()) {
+                        filterText = null;
                     } else {
-                        getUiForShowing().filterFillUi(null, this);
+                        final CharSequence text = value.getTextValue();
+                        // Text should never be null, but it doesn't hurt to check to avoid a
+                        // system crash...
+                        filterText = (text == null) ? null : text.toString();
                     }
+                    getUiForShowing().filterFillUi(filterText, this);
                 }
                 break;
             case ACTION_VIEW_ENTERED:
@@ -2140,11 +2151,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             if (saveTriggerId != null) {
                 writeLog(MetricsEvent.AUTOFILL_EXPLICIT_SAVE_TRIGGER_DEFINITION);
             }
-            int flags = saveInfo.getFlags();
-            if (mCompatMode) {
-                flags |= SaveInfo.FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE;
-            }
-            mSaveOnAllViewsInvisible = (flags & SaveInfo.FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE) != 0;
+            mSaveOnAllViewsInvisible =
+                    (saveInfo.getFlags() & SaveInfo.FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE) != 0;
 
             // We only need to track views if we want to save once they become invisible.
             if (mSaveOnAllViewsInvisible) {
@@ -2502,8 +2510,10 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         }
 
         pw.print(prefix); pw.print("mHasCallback: "); pw.println(mHasCallback);
-        pw.print(prefix); pw.print("mClientState: "); pw.println(
-                Helper.bundleToString(mClientState));
+        if (mClientState != null) {
+            pw.print(prefix); pw.print("mClientState: "); pw.print(mClientState.getSize()); pw
+                .println(" bytes");
+        }
         pw.print(prefix); pw.print("mCompatMode: "); pw.println(mCompatMode);
         pw.print(prefix); pw.print("mUrlBar: ");
         if (mUrlBar == null) {

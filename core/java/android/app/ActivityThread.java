@@ -173,7 +173,6 @@ import java.net.InetAddress;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -223,9 +222,6 @@ public final class ActivityThread extends ClientTransactionHandler {
     // Whether to invoke an activity callback after delivering new configuration.
     private static final boolean REPORT_TO_ACTIVITY = true;
 
-    // Maximum number of recent tokens to maintain for debugging purposes
-    private static final int MAX_DESTROYED_ACTIVITIES = 10;
-
     /**
      * Denotes an invalid sequence number corresponding to a process state change.
      */
@@ -258,8 +254,6 @@ public final class ActivityThread extends ClientTransactionHandler {
     final H mH = new H();
     final Executor mExecutor = new HandlerExecutor(mH);
     final ArrayMap<IBinder, ActivityClientRecord> mActivities = new ArrayMap<>();
-    final ArrayList<DestroyedActivityInfo> mRecentDestroyedActivities = new ArrayList<>();
-
     // List of new activities (via ActivityRecord.nextIdle) that should
     // be reported when next we idle.
     ActivityClientRecord mNewActivities = null;
@@ -338,26 +332,6 @@ public final class ActivityThread extends ClientTransactionHandler {
         @Override
         public int hashCode() {
             return ((authority != null) ? authority.hashCode() : 0) ^ userId;
-        }
-    }
-
-    /**
-     * TODO(b/71506345): Remove this once bug is resolved.
-     */
-    private static final class DestroyedActivityInfo {
-        private final Integer mToken;
-        private final String mReason;
-        private final long mTime;
-
-        DestroyedActivityInfo(Integer token, String reason) {
-            mToken = token;
-            mReason = reason;
-            mTime = System.currentTimeMillis();
-        }
-
-        void dump(PrintWriter pw, String prefix) {
-            pw.println(prefix + "[token:" + mToken + " | time:" + mTime + " | reason:" + mReason
-                    + "]");
         }
     }
 
@@ -2195,32 +2169,6 @@ public final class ActivityThread extends ClientTransactionHandler {
         pw.println(String.format(format, objs));
     }
 
-    @Override
-    public void dump(PrintWriter pw, String prefix) {
-        pw.println(prefix + "Activities:");
-
-        if (!mActivities.isEmpty()) {
-            final Iterator<Map.Entry<IBinder, ActivityClientRecord>> activitiesIterator =
-                    mActivities.entrySet().iterator();
-
-            while (activitiesIterator.hasNext()) {
-                final ArrayMap.Entry<IBinder, ActivityClientRecord> entry =
-                        activitiesIterator.next();
-                pw.println(prefix + "  [token:" + entry.getKey().hashCode() + " record:"
-                        + entry.getValue().toString() + "]");
-            }
-        }
-
-        if (!mRecentDestroyedActivities.isEmpty()) {
-            pw.println(prefix + "Recent destroyed activities:");
-            for (int i = 0, size = mRecentDestroyedActivities.size(); i < size; i++) {
-                final DestroyedActivityInfo info = mRecentDestroyedActivities.get(i);
-                pw.print(prefix);
-                info.dump(pw, "  ");
-            }
-        }
-    }
-
     public static void dumpMemInfoTable(PrintWriter pw, Debug.MemoryInfo memInfo, boolean checkin,
             boolean dumpFullInfo, boolean dumpDalvik, boolean dumpSummaryOnly,
             int pid, String processName,
@@ -3736,54 +3684,64 @@ public final class ActivityThread extends ClientTransactionHandler {
         //Slog.i(TAG, "Running services: " + mServices);
     }
 
-    ActivityClientRecord performResumeActivity(IBinder token, boolean finalStateRequest,
+    /**
+     * Resume the activity.
+     * @param token Target activity token.
+     * @param finalStateRequest Flag indicating if this is part of final state resolution for a
+     *                          transaction.
+     * @param reason Reason for performing the action.
+     *
+     * @return The {@link ActivityClientRecord} that was resumed, {@code null} otherwise.
+     */
+    @VisibleForTesting
+    public ActivityClientRecord performResumeActivity(IBinder token, boolean finalStateRequest,
             String reason) {
-        ActivityClientRecord r = mActivities.get(token);
-        if (localLOGV) Slog.v(TAG, "Performing resume of " + r
-                + " finished=" + r.activity.mFinished);
-        if (r != null && !r.activity.mFinished) {
-            if (r.getLifecycleState() == ON_RESUME) {
-                if (!finalStateRequest) {
-                    final RuntimeException e = new IllegalStateException(
-                            "Trying to resume activity which is already resumed");
-                    Slog.e(TAG, e.getMessage(), e);
-                    Slog.e(TAG, r.getStateString());
-                    // TODO(lifecycler): A double resume request is possible when an activity
-                    // receives two consequent transactions with relaunch requests and "resumed"
-                    // final state requests and the second relaunch is omitted. We still try to
-                    // handle two resume requests for the final state. For cases other than this
-                    // one, we don't expect it to happen.
-                }
-                return null;
+        final ActivityClientRecord r = mActivities.get(token);
+        if (localLOGV) {
+            Slog.v(TAG, "Performing resume of " + r + " finished=" + r.activity.mFinished);
+        }
+        if (r == null || r.activity.mFinished) {
+            return null;
+        }
+        if (r.getLifecycleState() == ON_RESUME) {
+            if (!finalStateRequest) {
+                final RuntimeException e = new IllegalStateException(
+                        "Trying to resume activity which is already resumed");
+                Slog.e(TAG, e.getMessage(), e);
+                Slog.e(TAG, r.getStateString());
+                // TODO(lifecycler): A double resume request is possible when an activity
+                // receives two consequent transactions with relaunch requests and "resumed"
+                // final state requests and the second relaunch is omitted. We still try to
+                // handle two resume requests for the final state. For cases other than this
+                // one, we don't expect it to happen.
             }
-            if (finalStateRequest) {
-                r.hideForNow = false;
-                r.activity.mStartedActivity = false;
+            return null;
+        }
+        if (finalStateRequest) {
+            r.hideForNow = false;
+            r.activity.mStartedActivity = false;
+        }
+        try {
+            r.activity.onStateNotSaved();
+            r.activity.mFragments.noteStateNotSaved();
+            checkAndBlockForNetworkAccess();
+            if (r.pendingIntents != null) {
+                deliverNewIntents(r, r.pendingIntents);
+                r.pendingIntents = null;
             }
-            try {
-                r.activity.onStateNotSaved();
-                r.activity.mFragments.noteStateNotSaved();
-                checkAndBlockForNetworkAccess();
-                if (r.pendingIntents != null) {
-                    deliverNewIntents(r, r.pendingIntents);
-                    r.pendingIntents = null;
-                }
-                if (r.pendingResults != null) {
-                    deliverResults(r, r.pendingResults);
-                    r.pendingResults = null;
-                }
-                r.activity.performResume(r.startsNotResumed, reason);
+            if (r.pendingResults != null) {
+                deliverResults(r, r.pendingResults, reason);
+                r.pendingResults = null;
+            }
+            r.activity.performResume(r.startsNotResumed, reason);
 
-                r.state = null;
-                r.persistentState = null;
-                r.setState(ON_RESUME);
-            } catch (Exception e) {
-                if (!mInstrumentation.onException(r.activity, e)) {
-                    throw new RuntimeException(
-                        "Unable to resume activity "
-                        + r.intent.getComponent().toShortString()
-                        + ": " + e.toString(), e);
-                }
+            r.state = null;
+            r.persistentState = null;
+            r.setState(ON_RESUME);
+        } catch (Exception e) {
+            if (!mInstrumentation.onException(r.activity, e)) {
+                throw new RuntimeException("Unable to resume activity "
+                        + r.intent.getComponent().toShortString() + ": " + e.toString(), e);
             }
         }
         return r;
@@ -3816,126 +3774,115 @@ public final class ActivityThread extends ClientTransactionHandler {
 
         // TODO Push resumeArgs into the activity for consideration
         final ActivityClientRecord r = performResumeActivity(token, finalStateRequest, reason);
+        if (r == null) {
+            // We didn't actually resume the activity, so skipping any follow-up actions.
+            return;
+        }
 
-        if (r != null) {
-            final Activity a = r.activity;
+        final Activity a = r.activity;
 
-            if (localLOGV) Slog.v(
-                TAG, "Resume " + r + " started activity: " +
-                a.mStartedActivity + ", hideForNow: " + r.hideForNow
-                + ", finished: " + a.mFinished);
+        if (localLOGV) {
+            Slog.v(TAG, "Resume " + r + " started activity: " + a.mStartedActivity
+                    + ", hideForNow: " + r.hideForNow + ", finished: " + a.mFinished);
+        }
 
-            final int forwardBit = isForward ?
-                    WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION : 0;
+        final int forwardBit = isForward
+                ? WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION : 0;
 
-            // If the window hasn't yet been added to the window manager,
-            // and this guy didn't finish itself or start another activity,
-            // then go ahead and add the window.
-            boolean willBeVisible = !a.mStartedActivity;
-            if (!willBeVisible) {
-                try {
-                    willBeVisible = ActivityManager.getService().willActivityBeVisible(
-                            a.getActivityToken());
-                } catch (RemoteException e) {
-                    throw e.rethrowFromSystemServer();
+        // If the window hasn't yet been added to the window manager,
+        // and this guy didn't finish itself or start another activity,
+        // then go ahead and add the window.
+        boolean willBeVisible = !a.mStartedActivity;
+        if (!willBeVisible) {
+            try {
+                willBeVisible = ActivityManager.getService().willActivityBeVisible(
+                        a.getActivityToken());
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        if (r.window == null && !a.mFinished && willBeVisible) {
+            r.window = r.activity.getWindow();
+            View decor = r.window.getDecorView();
+            decor.setVisibility(View.INVISIBLE);
+            ViewManager wm = a.getWindowManager();
+            WindowManager.LayoutParams l = r.window.getAttributes();
+            a.mDecor = decor;
+            l.type = WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+            l.softInputMode |= forwardBit;
+            if (r.mPreserveWindow) {
+                a.mWindowAdded = true;
+                r.mPreserveWindow = false;
+                // Normally the ViewRoot sets up callbacks with the Activity
+                // in addView->ViewRootImpl#setView. If we are instead reusing
+                // the decor view we have to notify the view root that the
+                // callbacks may have changed.
+                ViewRootImpl impl = decor.getViewRootImpl();
+                if (impl != null) {
+                    impl.notifyChildRebuilt();
                 }
             }
-            if (r.window == null && !a.mFinished && willBeVisible) {
-                r.window = r.activity.getWindow();
-                View decor = r.window.getDecorView();
-                decor.setVisibility(View.INVISIBLE);
-                ViewManager wm = a.getWindowManager();
-                WindowManager.LayoutParams l = r.window.getAttributes();
-                a.mDecor = decor;
-                l.type = WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
-                l.softInputMode |= forwardBit;
-                if (r.mPreserveWindow) {
+            if (a.mVisibleFromClient) {
+                if (!a.mWindowAdded) {
                     a.mWindowAdded = true;
-                    r.mPreserveWindow = false;
-                    // Normally the ViewRoot sets up callbacks with the Activity
-                    // in addView->ViewRootImpl#setView. If we are instead reusing
-                    // the decor view we have to notify the view root that the
-                    // callbacks may have changed.
-                    ViewRootImpl impl = decor.getViewRootImpl();
-                    if (impl != null) {
-                        impl.notifyChildRebuilt();
-                    }
+                    wm.addView(decor, l);
+                } else {
+                    // The activity will get a callback for this {@link LayoutParams} change
+                    // earlier. However, at that time the decor will not be set (this is set
+                    // in this method), so no action will be taken. This call ensures the
+                    // callback occurs with the decor set.
+                    a.onWindowAttributesChanged(l);
                 }
-                if (a.mVisibleFromClient) {
-                    if (!a.mWindowAdded) {
-                        a.mWindowAdded = true;
-                        wm.addView(decor, l);
-                    } else {
-                        // The activity will get a callback for this {@link LayoutParams} change
-                        // earlier. However, at that time the decor will not be set (this is set
-                        // in this method), so no action will be taken. This call ensures the
-                        // callback occurs with the decor set.
-                        a.onWindowAttributesChanged(l);
-                    }
-                }
+            }
 
             // If the window has already been added, but during resume
             // we started another activity, then don't yet make the
             // window visible.
-            } else if (!willBeVisible) {
-                if (localLOGV) Slog.v(
-                    TAG, "Launch " + r + " mStartedActivity set");
-                r.hideForNow = true;
+        } else if (!willBeVisible) {
+            if (localLOGV) Slog.v(TAG, "Launch " + r + " mStartedActivity set");
+            r.hideForNow = true;
+        }
+
+        // Get rid of anything left hanging around.
+        cleanUpPendingRemoveWindows(r, false /* force */);
+
+        // The window is now visible if it has been added, we are not
+        // simply finishing, and we are not starting another activity.
+        if (!r.activity.mFinished && willBeVisible && r.activity.mDecor != null && !r.hideForNow) {
+            if (r.newConfig != null) {
+                performConfigurationChangedForActivity(r, r.newConfig);
+                if (DEBUG_CONFIGURATION) {
+                    Slog.v(TAG, "Resuming activity " + r.activityInfo.name + " with newConfig "
+                            + r.activity.mCurrentConfig);
+                }
+                r.newConfig = null;
             }
-
-            // Get rid of anything left hanging around.
-            cleanUpPendingRemoveWindows(r, false /* force */);
-
-            // The window is now visible if it has been added, we are not
-            // simply finishing, and we are not starting another activity.
-            if (!r.activity.mFinished && willBeVisible
-                    && r.activity.mDecor != null && !r.hideForNow) {
-                if (r.newConfig != null) {
-                    performConfigurationChangedForActivity(r, r.newConfig);
-                    if (DEBUG_CONFIGURATION) Slog.v(TAG, "Resuming activity "
-                            + r.activityInfo.name + " with newConfig " + r.activity.mCurrentConfig);
-                    r.newConfig = null;
-                }
-                if (localLOGV) Slog.v(TAG, "Resuming " + r + " with isForward="
-                        + isForward);
-                WindowManager.LayoutParams l = r.window.getAttributes();
-                if ((l.softInputMode
-                        & WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION)
-                        != forwardBit) {
-                    l.softInputMode = (l.softInputMode
-                            & (~WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION))
-                            | forwardBit;
-                    if (r.activity.mVisibleFromClient) {
-                        ViewManager wm = a.getWindowManager();
-                        View decor = r.window.getDecorView();
-                        wm.updateViewLayout(decor, l);
-                    }
-                }
-
-                r.activity.mVisibleFromServer = true;
-                mNumVisibleActivities++;
+            if (localLOGV) Slog.v(TAG, "Resuming " + r + " with isForward=" + isForward);
+            WindowManager.LayoutParams l = r.window.getAttributes();
+            if ((l.softInputMode
+                    & WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION)
+                    != forwardBit) {
+                l.softInputMode = (l.softInputMode
+                        & (~WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION))
+                        | forwardBit;
                 if (r.activity.mVisibleFromClient) {
-                    r.activity.makeVisible();
+                    ViewManager wm = a.getWindowManager();
+                    View decor = r.window.getDecorView();
+                    wm.updateViewLayout(decor, l);
                 }
             }
 
-            r.nextIdle = mNewActivities;
-            mNewActivities = r;
-            if (localLOGV) {
-                Slog.v(TAG, "Scheduling idle handler for " + r);
-            }
-            Looper.myQueue().addIdleHandler(new Idler());
-        } else {
-            // If an exception was thrown when trying to resume, then
-            // just end this activity.
-            try {
-                ActivityManager.getService()
-                    .finishActivity(token, Activity.RESULT_CANCELED, null,
-                            Activity.DONT_FINISH_TASK_WITH_ACTIVITY);
-            } catch (RemoteException ex) {
-                throw ex.rethrowFromSystemServer();
+            r.activity.mVisibleFromServer = true;
+            mNumVisibleActivities++;
+            if (r.activity.mVisibleFromClient) {
+                r.activity.makeVisible();
             }
         }
+
+        r.nextIdle = mNewActivities;
+        mNewActivities = r;
+        if (localLOGV) Slog.v(TAG, "Scheduling idle handler for " + r);
+        Looper.myQueue().addIdleHandler(new Idler());
     }
 
     @Override
@@ -4352,7 +4299,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         WindowManagerGlobal.getInstance().reportNewConfiguration(mConfiguration);
     }
 
-    private void deliverResults(ActivityClientRecord r, List<ResultInfo> results) {
+    private void deliverResults(ActivityClientRecord r, List<ResultInfo> results, String reason) {
         final int N = results.size();
         for (int i=0; i<N; i++) {
             ResultInfo ri = results.get(i);
@@ -4364,7 +4311,7 @@ public final class ActivityThread extends ClientTransactionHandler {
                 if (DEBUG_RESULTS) Slog.v(TAG,
                         "Delivering result to activity " + r + " : " + ri);
                 r.activity.dispatchActivityResult(ri.mResultWho,
-                        ri.mRequestCode, ri.mResultCode, ri.mData);
+                        ri.mRequestCode, ri.mResultCode, ri.mData, reason);
             } catch (Exception e) {
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException(
@@ -4377,7 +4324,7 @@ public final class ActivityThread extends ClientTransactionHandler {
     }
 
     @Override
-    public void handleSendResult(IBinder token, List<ResultInfo> results) {
+    public void handleSendResult(IBinder token, List<ResultInfo> results, String reason) {
         ActivityClientRecord r = mActivities.get(token);
         if (DEBUG_RESULTS) Slog.v(TAG, "Handling send result to " + r);
         if (r != null) {
@@ -4412,9 +4359,9 @@ public final class ActivityThread extends ClientTransactionHandler {
                 }
             }
             checkAndBlockForNetworkAccess();
-            deliverResults(r, results);
+            deliverResults(r, results, reason);
             if (resumed) {
-                r.activity.performResume(false, "handleSendResult");
+                r.activity.performResume(false, reason);
                 r.activity.mTemporaryPause = false;
             }
         }
@@ -4474,12 +4421,6 @@ public final class ActivityThread extends ClientTransactionHandler {
             r.setState(ON_DESTROY);
         }
         mActivities.remove(token);
-        mRecentDestroyedActivities.add(0, new DestroyedActivityInfo(token.hashCode(), reason));
-
-        final int recentDestroyedActivitiesSize = mRecentDestroyedActivities.size();
-        if (recentDestroyedActivitiesSize > MAX_DESTROYED_ACTIVITIES) {
-            mRecentDestroyedActivities.remove(recentDestroyedActivitiesSize - 1);
-        }
         StrictMode.decrementExpectedActivityCount(activityClass);
         return r;
     }
@@ -5501,7 +5442,8 @@ public final class ActivityThread extends ClientTransactionHandler {
      * runtime's instruction set is.
      */
     private String getInstrumentationLibrary(ApplicationInfo appInfo, InstrumentationInfo insInfo) {
-        if (appInfo.primaryCpuAbi != null && appInfo.secondaryCpuAbi != null) {
+        if (appInfo.primaryCpuAbi != null && appInfo.secondaryCpuAbi != null
+                && appInfo.secondaryCpuAbi.equals(insInfo.secondaryCpuAbi)) {
             // Get the instruction set supported by the secondary ABI. In the presence
             // of a native bridge this might be different than the one secondary ABI used.
             String secondaryIsa =
@@ -5737,6 +5679,16 @@ public final class ActivityThread extends ClientTransactionHandler {
                         "Unable to find instrumentation info for: " + data.instrumentationName);
             }
 
+            // Warn of potential ABI mismatches.
+            if (!Objects.equals(data.appInfo.primaryCpuAbi, ii.primaryCpuAbi)
+                    || !Objects.equals(data.appInfo.secondaryCpuAbi, ii.secondaryCpuAbi)) {
+                Slog.w(TAG, "Package uses different ABI(s) than its instrumentation: "
+                        + "package[" + data.appInfo.packageName + "]: "
+                        + data.appInfo.primaryCpuAbi + ", " + data.appInfo.secondaryCpuAbi
+                        + " instrumentation[" + ii.packageName + "]: "
+                        + ii.primaryCpuAbi + ", " + ii.secondaryCpuAbi);
+            }
+
             mInstrumentationPackageName = ii.packageName;
             mInstrumentationAppDir = ii.sourceDir;
             mInstrumentationSplitAppDirs = ii.splitSourceDirs;
@@ -5881,7 +5833,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         } finally {
             // If the app targets < O-MR1, or doesn't change the thread policy
             // during startup, clobber the policy to maintain behavior of b/36951662
-            if (data.appInfo.targetSdkVersion <= Build.VERSION_CODES.O
+            if (data.appInfo.targetSdkVersion < Build.VERSION_CODES.O_MR1
                     || StrictMode.getThreadPolicy().equals(writesAllowedPolicy)) {
                 StrictMode.setThreadPolicy(savedPolicy);
             }

@@ -21,30 +21,37 @@ import static android.provider.Settings.Global.SHOW_TEMPERATURE_WARNING;
 
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.BatteryManager;
 import android.os.HardwarePropertiesManager;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper.RunWithLooper;
 import android.testing.TestableResources;
 import android.test.suitebuilder.annotation.SmallTest;
 
+import com.android.settingslib.utils.ThreadUtils;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.power.PowerUI.WarningsUI;
 import com.android.systemui.statusbar.phone.StatusBar;
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidTestingRunner.class)
 @RunWithLooper
@@ -58,19 +65,23 @@ public class PowerUITest extends SysuiTestCase {
     public static final int BELOW_WARNING_BUCKET = -1;
     public static final long BELOW_HYBRID_THRESHOLD = TimeUnit.HOURS.toMillis(2);
     public static final long ABOVE_HYBRID_THRESHOLD = TimeUnit.HOURS.toMillis(4);
+    private static final long ABOVE_CHARGE_CYCLE_THRESHOLD = Duration.ofHours(8).toMillis();
     private HardwarePropertiesManager mHardProps;
     private WarningsUI mMockWarnings;
     private PowerUI mPowerUI;
     private EnhancedEstimates mEnhancedEstimates;
+    @Mock private PowerManager mPowerManager;
 
     @Before
     public void setup() {
+        MockitoAnnotations.initMocks(this);
         mMockWarnings = mDependency.injectMockDependency(WarningsUI.class);
         mEnhancedEstimates = mDependency.injectMockDependency(EnhancedEstimates.class);
         mHardProps = mock(HardwarePropertiesManager.class);
 
         mContext.putComponent(StatusBar.class, mock(StatusBar.class));
         mContext.addMockSystemService(Context.HARDWARE_PROPERTIES_SERVICE, mHardProps);
+        mContext.addMockSystemService(Context.POWER_SERVICE, mPowerManager);
 
         createPowerUi();
     }
@@ -198,6 +209,7 @@ public class PowerUITest extends SysuiTestCase {
         when(mEnhancedEstimates.isHybridNotificationEnabled()).thenReturn(true);
         when(mEnhancedEstimates.getLowWarningThreshold()).thenReturn(PowerUI.THREE_HOURS_IN_MILLIS);
         when(mEnhancedEstimates.getSevereWarningThreshold()).thenReturn(ONE_HOUR_MILLIS);
+        mPowerUI.mBatteryLevel = 10;
         mPowerUI.start();
 
         // unplugged device that would show the non-hybrid notification and the hybrid
@@ -213,6 +225,7 @@ public class PowerUITest extends SysuiTestCase {
         when(mEnhancedEstimates.isHybridNotificationEnabled()).thenReturn(true);
         when(mEnhancedEstimates.getLowWarningThreshold()).thenReturn(PowerUI.THREE_HOURS_IN_MILLIS);
         when(mEnhancedEstimates.getSevereWarningThreshold()).thenReturn(ONE_HOUR_MILLIS);
+        mPowerUI.mBatteryLevel = 10;
         mPowerUI.start();
 
         // unplugged device that would show the non-hybrid but not the hybrid
@@ -254,13 +267,14 @@ public class PowerUITest extends SysuiTestCase {
    }
 
     @Test
-    public void testShouldShowLowBatteryWarning_deviceBatteryStatusUnkown_returnsNoShow() {
+    public void testShouldShowLowBatteryWarning_deviceBatteryStatusUnknown_returnsNoShow() {
         when(mEnhancedEstimates.isHybridNotificationEnabled()).thenReturn(true);
         when(mEnhancedEstimates.getLowWarningThreshold()).thenReturn(PowerUI.THREE_HOURS_IN_MILLIS);
         when(mEnhancedEstimates.getSevereWarningThreshold()).thenReturn(ONE_HOUR_MILLIS);
         mPowerUI.start();
 
-        // Unknown battery status device that would show the neither due
+        // Unknown battery status device that would show the neither due to the battery status being
+        // unknown
         boolean shouldShow =
                 mPowerUI.shouldShowLowBatteryWarning(UNPLUGGED, UNPLUGGED, ABOVE_WARNING_BUCKET,
                         BELOW_WARNING_BUCKET, BELOW_HYBRID_THRESHOLD,
@@ -295,6 +309,9 @@ public class PowerUITest extends SysuiTestCase {
 
         mPowerUI.maybeShowBatteryWarning(UNPLUGGED, UNPLUGGED, ABOVE_WARNING_BUCKET,
                 ABOVE_WARNING_BUCKET);
+
+        // reduce battery level to handle time based trigger -> level trigger interactions
+        mPowerUI.mBatteryLevel = 10;
         boolean shouldShow =
                 mPowerUI.shouldShowLowBatteryWarning(UNPLUGGED, UNPLUGGED, ABOVE_WARNING_BUCKET,
                         ABOVE_WARNING_BUCKET, BELOW_HYBRID_THRESHOLD,
@@ -398,6 +415,38 @@ public class PowerUITest extends SysuiTestCase {
                 mPowerUI.shouldDismissLowBatteryWarning(UNPLUGGED, BELOW_WARNING_BUCKET,
                         ABOVE_WARNING_BUCKET, ABOVE_HYBRID_THRESHOLD, POWER_SAVER_OFF);
         assertTrue(shouldDismiss);
+    }
+
+    @Test
+    public void testShouldDismissLowBatteryWarning_powerSaverModeEnabled()
+            throws InterruptedException {
+        when(mPowerManager.isPowerSaveMode()).thenReturn(true);
+
+        mPowerUI.start();
+        mPowerUI.mReceiver.onReceive(mContext,
+                new Intent(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED));
+
+        CountDownLatch latch = new CountDownLatch(1);
+        ThreadUtils.postOnBackgroundThread(() -> latch.countDown());
+        latch.await(5, TimeUnit.SECONDS);
+
+        verify(mMockWarnings).dismissLowBatteryWarning();
+    }
+
+    @Test
+    public void testShouldNotDismissLowBatteryWarning_powerSaverModeDisabled()
+            throws InterruptedException {
+        when(mPowerManager.isPowerSaveMode()).thenReturn(false);
+
+        mPowerUI.start();
+        mPowerUI.mReceiver.onReceive(mContext,
+                new Intent(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED));
+
+        CountDownLatch latch = new CountDownLatch(1);
+        ThreadUtils.postOnBackgroundThread(() -> latch.countDown());
+        latch.await(5, TimeUnit.SECONDS);
+
+        verify(mMockWarnings, never()).dismissLowBatteryWarning();
     }
 
     private void setCurrentTemp(float temp) {

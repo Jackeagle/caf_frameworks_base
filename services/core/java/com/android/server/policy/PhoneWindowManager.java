@@ -87,6 +87,7 @@ import static android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
 import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
+import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_BOOT_PROGRESS;
 import static android.view.WindowManager.LayoutParams.TYPE_DISPLAY_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
@@ -393,6 +394,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
             .build();
 
+    /**
+     * Broadcast Action: WiFi Display video is enabled or disabled
+     *
+     * <p>The intent will have the following extra values:</p>
+     * <ul>
+     *    <li><em>state</em> - 0 for disabled, 1 for enabled. </li>
+     * </ul>
+     */
+
+    private static final String ACTION_WIFI_DISPLAY_VIDEO =
+                                        "org.codeaurora.intent.action.WIFI_DISPLAY_VIDEO";
+
+
     // The panic gesture may become active only after the keyguard is dismissed and the immersive
     // app shows again. If that doesn't happen for 30s we drop the gesture.
     private static final long PANIC_GESTURE_EXPIRATION = 30000;
@@ -624,6 +638,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mTranslucentDecorEnabled = true;
     boolean mUseTvRouting;
     int mVeryLongPressTimeout;
+    boolean mAllowStartActivityForLongPressOnPowerDuringSetup;
 
     private boolean mHandleVolumeKeysInWM;
 
@@ -853,6 +868,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_STATUS = 0;
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_NAVIGATION = 1;
+    private boolean mWifiDisplayConnected = false;
+    private int mWifiDisplayCustomRotation = -1;
 
     private class PolicyHandler extends Handler {
         @Override
@@ -1336,6 +1353,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mHandler.post(mHiddenNavPanic);
         }
 
+        // Abort possibly stuck animations.
+        mHandler.post(mWindowManagerFuncs::triggerAnimationFailsafe);
+
         // Latch power key state to detect screenshot chord.
         if (interactive && !mScreenshotChordPowerKeyTriggered
                 && (event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0) {
@@ -1625,7 +1645,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     : mKeyguardDelegate.isShowing();
             if (!keyguardActive) {
                 Intent intent = new Intent(Intent.ACTION_VOICE_ASSIST);
-                startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
+                if (mAllowStartActivityForLongPressOnPowerDuringSetup) {
+                    mContext.startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
+                } else {
+                    startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
+                }
             }
             break;
         }
@@ -2137,6 +2161,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 com.android.internal.R.integer.config_shortPressOnSleepBehavior);
         mVeryLongPressTimeout = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_veryLongPressTimeout);
+        mAllowStartActivityForLongPressOnPowerDuringSetup = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_allowStartActivityForLongPressOnPowerInSetup);
 
         mUseTvRouting = AudioSystem.getPlatformType(mContext) == AudioSystem.PLATFORM_TELEVISION;
 
@@ -2260,6 +2286,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mWindowManagerFuncs.registerPointerEventListener(mSystemGestures);
 
         mVibrator = (Vibrator)context.getSystemService(Context.VIBRATOR_SERVICE);
+
+        /* Register for WIFI Display Intents */
+        IntentFilter wifiDisplayFilter = new IntentFilter(ACTION_WIFI_DISPLAY_VIDEO);
+        Intent wifidisplayIntent = context.registerReceiver(
+                                        mWifiDisplayReceiver, wifiDisplayFilter);
         mLongPressVibePattern = getLongIntArray(mContext.getResources(),
                 com.android.internal.R.array.config_longPressVibePattern);
         mCalendarDateVibePattern = getLongIntArray(mContext.getResources(),
@@ -2563,6 +2594,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                     | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                     | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+            lp.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
             if (ActivityManager.isHighEndGfx()) {
                 lp.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
                 lp.privateFlags |=
@@ -4386,6 +4418,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      * given the situation with the keyguard.
      */
     void launchHomeFromHotKey(final boolean awakenFromDreams, final boolean respectKeyguard) {
+        // Abort possibly stuck animations.
+        mHandler.post(mWindowManagerFuncs::triggerAnimationFailsafe);
+
         if (respectKeyguard) {
             if (isKeyguardShowingAndNotOccluded()) {
                 // don't launch home if keyguard showing
@@ -4818,6 +4853,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // For layout, the status bar is always at the top with our fixed height.
         displayFrames.mStable.top = displayFrames.mUnrestricted.top
                 + mStatusBarHeightForRotation[displayFrames.mRotation];
+        // Make sure the status bar covers the entire cutout height
+        displayFrames.mStable.top = Math.max(displayFrames.mStable.top,
+                displayFrames.mDisplayCutoutSafe.top);
 
         // Tell the bar controller where the collapsed status bar content is
         mTmpRect.set(mStatusBar.getContentFrameLw());
@@ -4994,13 +5032,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private void setAttachedWindowFrames(WindowState win, int fl, int adjust, WindowState attached,
             boolean insetDecors, Rect pf, Rect df, Rect of, Rect cf, Rect vf,
             DisplayFrames displayFrames) {
-        if (win.getSurfaceLayer() > mDockLayer && attached.getSurfaceLayer() < mDockLayer) {
-            // Here's a special case: if this attached window is a panel that is above the dock
-            // window, and the window it is attached to is below the dock window, then the frames we
-            // computed for the window it is attached to can not be used because the dock is
-            // effectively part of the underlying window and the attached window is floating on top
-            // of the whole thing. So, we ignore the attached window and explicitly compute the
-            // frames that would be appropriate without the dock.
+        if (!win.isInputMethodTarget() && attached.isInputMethodTarget()) {
+            // Here's a special case: if the child window is not the 'dock window'
+            // or input method target, and the window it is attached to is below
+            // the dock window, then the frames we computed for the window it is
+            // attached to can not be used because the dock is effectively part
+            // of the underlying window and the attached window is floating on top
+            // of the whole thing. So, we ignore the attached window and explicitly
+            // compute the frames that would be appropriate without the dock.
             vf.set(displayFrames.mDock);
             cf.set(displayFrames.mDock);
             of.set(displayFrames.mDock);
@@ -5027,7 +5066,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 cf.set(attached.getContentFrameLw());
                 if (attached.isVoiceInteraction()) {
                     cf.intersectUnchecked(displayFrames.mVoiceContent);
-                } else if (attached.getSurfaceLayer() < mDockLayer) {
+                } else if (win.isInputMethodTarget() || attached.isInputMethodTarget()) {
                     cf.intersectUnchecked(displayFrames.mContent);
                 }
             }
@@ -5421,6 +5460,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final boolean attachedInParent = attached != null && !layoutInScreen;
         final boolean requestedHideNavigation =
                 (requestedSysUiFl & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0;
+
+        // TYPE_BASE_APPLICATION windows are never considered floating here because they don't get
+        // cropped / shifted to the displayFrame in WindowState.
+        final boolean floatingInScreenWindow = !attrs.isFullscreen() && layoutInScreen
+                && type != TYPE_BASE_APPLICATION;
+
         // Ensure that windows with a DEFAULT or NEVER display cutout mode are laid out in
         // the cutout safe zone.
         if (cutoutMode != LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS) {
@@ -5455,7 +5500,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
             // Windows that are attached to a parent and laid out in said parent already avoid
             // the cutout according to that parent and don't need to be further constrained.
-            if (!attachedInParent) {
+            // Floating IN_SCREEN windows get what they ask for and lay out in the full screen.
+            // They will later be cropped or shifted using the displayFrame in WindowState,
+            // which prevents overlap with the DisplayCutout.
+            if (!attachedInParent && !floatingInScreenWindow) {
                 mTmpRect.set(pf);
                 pf.intersectUnchecked(displayCutoutSafeExceptMaybeBars);
                 parentFrameWasClippedByDisplayCutout |= !mTmpRect.equals(pf);
@@ -5518,7 +5566,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         win.computeFrameLw(pf, df, of, cf, vf, dcf, sf, osf, displayFrames.mDisplayCutout,
                 parentFrameWasClippedByDisplayCutout);
-
         // Dock windows carve out the bottom of the screen, so normal windows
         // can't appear underneath them.
         if (type == TYPE_INPUT_METHOD && win.isVisibleLw()
@@ -6087,6 +6134,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 && (policyFlags & WindowManagerPolicy.FLAG_VIRTUAL) != 0
                 && (!isNavBarVirtKey || mNavBarVirtualKeyHapticFeedbackEnabled)
                 && event.getRepeatCount() == 0;
+
+        // Cancel any pending remote recents animations before handling the button itself. In the
+        // case where we are going home and the recents animation has already started, just cancel
+        // the recents animation, leaving the home stack in place for the pending start activity
+        if (isNavBarVirtKey && !down) {
+            boolean isHomeKey = keyCode == KeyEvent.KEYCODE_HOME;
+            mActivityManagerInternal.cancelRecentsAnimation(!isHomeKey);
+        }
 
         // Handle special keys.
         switch (keyCode) {
@@ -6760,6 +6815,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+
+    BroadcastReceiver mWifiDisplayReceiver = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(ACTION_WIFI_DISPLAY_VIDEO)) {
+                int state = intent.getIntExtra("state", 0);
+                if(state == 1) {
+                    mWifiDisplayConnected = true;
+                } else {
+                    mWifiDisplayConnected = false;
+                }
+                mWifiDisplayCustomRotation =
+                    intent.getIntExtra("wfd_UIBC_rot", -1);
+                updateRotation(true);
+            }
+        }
+    };
+
     // Called on the PowerManager's Notifier thread.
     @Override
     public void startedGoingToSleep(int why) {
@@ -7199,7 +7272,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     @Override
-    public int rotationForOrientationLw(int orientation, int lastRotation) {
+    public int rotationForOrientationLw(int orientation, int lastRotation, boolean defaultDisplay) {
         if (false) {
             Slog.v(TAG, "rotationForOrientationLw(orient="
                         + orientation + ", last=" + lastRotation
@@ -7220,7 +7293,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
 
             final int preferredRotation;
-            if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
+            if (!defaultDisplay) {
+                // For secondary displays we ignore things like displays sensors, docking mode and
+                // rotation lock, and always prefer a default rotation.
+                preferredRotation = Surface.ROTATION_0;
+            } else if (mLidState == LID_OPEN && mLidOpenRotation >= 0) {
                 // Ignore sensor when lid switch is open and rotation is forced.
                 preferredRotation = mLidOpenRotation;
             } else if (mDockMode == Intent.EXTRA_DOCK_STATE_CAR
@@ -7239,10 +7316,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 // enable 180 degree rotation while docked.
                 preferredRotation = mDeskDockEnablesAccelerometer
                         ? sensorRotation : mDeskDockRotation;
-            } else if (mHdmiPlugged && mDemoHdmiRotationLock) {
+            } else if ((mHdmiPlugged || mWifiDisplayConnected) && mDemoHdmiRotationLock) {
                 // Ignore sensor when plugged into HDMI when demo HDMI rotation lock enabled.
                 // Note that the dock orientation overrides the HDMI orientation.
                 preferredRotation = mDemoHdmiRotation;
+            } else if (mWifiDisplayConnected && (mWifiDisplayCustomRotation > -1)) {
+                // Ignore sensor when WFD is active and UIBC rotation is enabled
+                 preferredRotation = mWifiDisplayCustomRotation;
             } else if (mHdmiPlugged && mDockMode == Intent.EXTRA_DOCK_STATE_UNDOCKED
                     && mUndockedHdmiRotation >= 0) {
                 // Ignore sensor when plugged into HDMI and an undocked orientation has
@@ -8027,29 +8107,35 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private VibrationEffect getVibrationEffect(int effectId) {
         long[] pattern;
         switch (effectId) {
-            case HapticFeedbackConstants.LONG_PRESS:
-                pattern = mLongPressVibePattern;
-                break;
             case HapticFeedbackConstants.CLOCK_TICK:
+            case HapticFeedbackConstants.CONTEXT_CLICK:
                 return VibrationEffect.get(VibrationEffect.EFFECT_TICK);
+            case HapticFeedbackConstants.KEYBOARD_RELEASE:
+            case HapticFeedbackConstants.TEXT_HANDLE_MOVE:
+            case HapticFeedbackConstants.VIRTUAL_KEY_RELEASE:
+            case HapticFeedbackConstants.ENTRY_BUMP:
+            case HapticFeedbackConstants.DRAG_CROSSING:
+            case HapticFeedbackConstants.GESTURE_END:
+                return VibrationEffect.get(VibrationEffect.EFFECT_TICK, false);
+            case HapticFeedbackConstants.KEYBOARD_TAP: // == KEYBOARD_PRESS
+            case HapticFeedbackConstants.VIRTUAL_KEY:
+            case HapticFeedbackConstants.EDGE_RELEASE:
+            case HapticFeedbackConstants.CONFIRM:
+            case HapticFeedbackConstants.GESTURE_START:
+                return VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
+            case HapticFeedbackConstants.LONG_PRESS:
+            case HapticFeedbackConstants.EDGE_SQUEEZE:
+                return VibrationEffect.get(VibrationEffect.EFFECT_HEAVY_CLICK);
+            case HapticFeedbackConstants.REJECT:
+                return VibrationEffect.get(VibrationEffect.EFFECT_DOUBLE_CLICK);
+
             case HapticFeedbackConstants.CALENDAR_DATE:
                 pattern = mCalendarDateVibePattern;
                 break;
             case HapticFeedbackConstants.SAFE_MODE_ENABLED:
                 pattern = mSafeModeEnabledVibePattern;
                 break;
-            case HapticFeedbackConstants.CONTEXT_CLICK:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TICK);
-            case HapticFeedbackConstants.VIRTUAL_KEY:
-                return VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
-            case HapticFeedbackConstants.VIRTUAL_KEY_RELEASE:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TICK, false);
-            case HapticFeedbackConstants.KEYBOARD_PRESS:  // == HapticFeedbackConstants.KEYBOARD_TAP
-                return VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
-            case HapticFeedbackConstants.KEYBOARD_RELEASE:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TICK, false);
-            case HapticFeedbackConstants.TEXT_HANDLE_MOVE:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TICK, false);
+
             default:
                 return null;
         }
@@ -8668,6 +8754,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         pw.print(prefix);
                 pw.print("mShortPressOnWindowBehavior=");
                 pw.println(shortPressOnWindowBehaviorToString(mShortPressOnWindowBehavior));
+        pw.print(prefix);
+                pw.print("mAllowStartActivityForLongPressOnPowerDuringSetup=");
+                pw.println(mAllowStartActivityForLongPressOnPowerDuringSetup);
         pw.print(prefix);
                 pw.print("mHasSoftInput="); pw.print(mHasSoftInput);
                 pw.print(" mDismissImeOnBackKeyPressed="); pw.println(mDismissImeOnBackKeyPressed);

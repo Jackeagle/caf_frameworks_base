@@ -122,8 +122,9 @@ class AppWarnings {
             return;
         }
 
-        if (ActivityManager.isRunningInTestHarness()
-                && !mAlwaysShowUnsupportedCompileSdkWarningActivities.contains(r.realActivity)) {
+        // TODO(b/75318890): Need to move this to when the app actually crashes.
+        if (/*ActivityManager.isRunningInTestHarness()
+                &&*/ !mAlwaysShowUnsupportedCompileSdkWarningActivities.contains(r.realActivity)) {
             // Don't show warning if we are running in a test harness and we don't have to always
             // show for this activity.
             return;

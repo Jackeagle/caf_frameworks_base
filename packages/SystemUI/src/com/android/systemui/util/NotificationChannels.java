@@ -39,8 +39,7 @@ public class NotificationChannels extends SystemUI {
     public static String BATTERY     = "BAT";
     public static String HINTS       = "HNT";
 
-    @VisibleForTesting
-    static void createAll(Context context) {
+    public static void createAll(Context context) {
         final NotificationManager nm = context.getSystemService(NotificationManager.class);
         final NotificationChannel batteryChannel = new NotificationChannel(BATTERY,
                 context.getString(R.string.notification_channel_battery),
@@ -52,19 +51,16 @@ public class NotificationChannels extends SystemUI {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
                 .build());
         batteryChannel.setBlockableSystem(true);
-        batteryChannel.setBypassDnd(true);
 
         final NotificationChannel alerts = new NotificationChannel(
                 ALERTS,
                 context.getString(R.string.notification_channel_alerts),
                 NotificationManager.IMPORTANCE_HIGH);
-        alerts.setBypassDnd(true);
 
         final NotificationChannel general = new NotificationChannel(
                 GENERAL,
                 context.getString(R.string.notification_channel_general),
                 NotificationManager.IMPORTANCE_MIN);
-        general.setBypassDnd(true);
 
         final NotificationChannel storage = new NotificationChannel(
                 STORAGE,
@@ -72,7 +68,6 @@ public class NotificationChannels extends SystemUI {
                 isTv(context)
                         ? NotificationManager.IMPORTANCE_DEFAULT
                         : NotificationManager.IMPORTANCE_LOW);
-        storage.setBypassDnd(true);
 
         final NotificationChannel hint = new NotificationChannel(
                 HINTS,
@@ -120,7 +115,6 @@ public class NotificationChannels extends SystemUI {
 
         screenshotChannel.setSound(Uri.parse(""), // silent
                 new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build());
-        screenshotChannel.setBypassDnd(true);
         screenshotChannel.setBlockableSystem(true);
 
         if (legacySS != null) {

@@ -38,6 +38,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.internal.statusbar.IStatusBarService;
+import com.android.internal.statusbar.NotificationVisibility;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Dumpable;
@@ -47,7 +48,6 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
-import java.util.List;
 
 /**
  * Handles keeping track of the current user, profiles, and various things related to hiding
@@ -130,8 +130,13 @@ public class NotificationLockscreenUserManager implements Dumpable {
                     }
                 }
                 if (notificationKey != null) {
+                    final int count =
+                            mEntryManager.getNotificationData().getActiveNotifications().size();
+                    final int rank = mEntryManager.getNotificationData().getRank(notificationKey);
+                    final NotificationVisibility nv = NotificationVisibility.obtain(notificationKey,
+                            rank, count, true);
                     try {
-                        mBarService.onNotificationClick(notificationKey);
+                        mBarService.onNotificationClick(notificationKey, nv);
                     } catch (RemoteException e) {
                         /* ignore */
                     }
@@ -352,7 +357,8 @@ public class NotificationLockscreenUserManager implements Dumpable {
             final boolean allowedByUser = 0 != Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS, 0, userHandle);
-            final boolean allowedByDpm = adminAllowsUnredactedNotifications(userHandle);
+            final boolean allowedByDpm = adminAllowsKeyguardFeature(userHandle,
+                    DevicePolicyManager.KEYGUARD_DISABLE_UNREDACTED_NOTIFICATIONS);
             final boolean allowed = allowedByUser && allowedByDpm;
             mUsersAllowingPrivateNotifications.append(userHandle, allowed);
             return allowed;
@@ -361,13 +367,13 @@ public class NotificationLockscreenUserManager implements Dumpable {
         return mUsersAllowingPrivateNotifications.get(userHandle);
     }
 
-    private boolean adminAllowsUnredactedNotifications(int userHandle) {
+    private boolean adminAllowsKeyguardFeature(int userHandle, int feature) {
         if (userHandle == UserHandle.USER_ALL) {
             return true;
         }
-        final int dpmFlags = mDevicePolicyManager.getKeyguardDisabledFeatures(null /* admin */,
-                userHandle);
-        return (dpmFlags & DevicePolicyManager.KEYGUARD_DISABLE_UNREDACTED_NOTIFICATIONS) == 0;
+        final int dpmFlags =
+                mDevicePolicyManager.getKeyguardDisabledFeatures(null /* admin */, userHandle);
+        return (dpmFlags & feature) == 0;
     }
 
     /**
@@ -389,14 +395,17 @@ public class NotificationLockscreenUserManager implements Dumpable {
      * "public" (secure & locked) mode?
      */
     private boolean userAllowsNotificationsInPublic(int userHandle) {
-        if (isCurrentProfile(userHandle)) {
+        if (isCurrentProfile(userHandle) && userHandle != mCurrentUserId) {
             return true;
         }
 
         if (mUsersAllowingNotifications.indexOfKey(userHandle) < 0) {
-            final boolean allowed = 0 != Settings.Secure.getIntForUser(
+            final boolean allowedByUser = 0 != Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS, 0, userHandle);
+            final boolean allowedByDpm = adminAllowsKeyguardFeature(userHandle,
+                    DevicePolicyManager.KEYGUARD_DISABLE_SECURE_NOTIFICATIONS);
+            final boolean allowed = allowedByUser && allowedByDpm;
             mUsersAllowingNotifications.append(userHandle, allowed);
             return allowed;
         }
@@ -427,7 +436,6 @@ public class NotificationLockscreenUserManager implements Dumpable {
         return mEntryManager.getNotificationData().getVisibilityOverride(key) ==
                 Notification.VISIBILITY_PRIVATE;
     }
-
 
     private void updateCurrentProfilesCache() {
         synchronized (mCurrentProfiles) {

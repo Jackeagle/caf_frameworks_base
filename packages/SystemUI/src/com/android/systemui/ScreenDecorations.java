@@ -14,6 +14,10 @@
 
 package com.android.systemui;
 
+import static android.view.Surface.ROTATION_0;
+import static android.view.Surface.ROTATION_180;
+import static android.view.Surface.ROTATION_270;
+import static android.view.Surface.ROTATION_90;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
@@ -21,12 +25,14 @@ import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_M
 import static com.android.systemui.tuner.TunablePadding.FLAG_START;
 import static com.android.systemui.tuner.TunablePadding.FLAG_END;
 
+import android.annotation.Dimension;
 import android.app.Fragment;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
@@ -41,6 +47,7 @@ import android.view.DisplayCutout;
 import android.view.DisplayInfo;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.Surface;
 import android.view.View;
 import android.view.View.OnLayoutChangeListener;
 import android.view.ViewGroup;
@@ -71,6 +78,8 @@ public class ScreenDecorations extends SystemUI implements Tunable {
             SystemProperties.getBoolean("debug.screenshot_rounded_corners", false);
 
     private int mRoundedDefault;
+    private int mRoundedDefaultTop;
+    private int mRoundedDefaultBottom;
     private View mOverlay;
     private View mBottomOverlay;
     private float mDensity;
@@ -82,9 +91,14 @@ public class ScreenDecorations extends SystemUI implements Tunable {
         mWindowManager = mContext.getSystemService(WindowManager.class);
         mRoundedDefault = mContext.getResources().getDimensionPixelSize(
                 R.dimen.rounded_corner_radius);
-        if (mRoundedDefault != 0 || shouldDrawCutout()) {
+        mRoundedDefaultTop = mContext.getResources().getDimensionPixelSize(
+                R.dimen.rounded_corner_radius_top);
+        mRoundedDefaultBottom = mContext.getResources().getDimensionPixelSize(
+                R.dimen.rounded_corner_radius_bottom);
+        if (hasRoundedCorners() || shouldDrawCutout()) {
             setupDecorations();
         }
+
         int padding = mContext.getResources().getDimensionPixelSize(
                 R.dimen.rounded_corner_content_padding);
         if (padding != 0) {
@@ -201,13 +215,21 @@ public class ScreenDecorations extends SystemUI implements Tunable {
     private void updateWindowVisibility(View overlay) {
         boolean visibleForCutout = shouldDrawCutout()
                 && overlay.findViewById(R.id.display_cutout).getVisibility() == View.VISIBLE;
-        boolean visibleForRoundedCorners = mRoundedDefault > 0;
+        boolean visibleForRoundedCorners = hasRoundedCorners();
         overlay.setVisibility(visibleForCutout || visibleForRoundedCorners
                 ? View.VISIBLE : View.GONE);
     }
 
+    private boolean hasRoundedCorners() {
+        return mRoundedDefault > 0 || mRoundedDefaultBottom > 0 || mRoundedDefaultTop > 0;
+    }
+
     private boolean shouldDrawCutout() {
-        return mContext.getResources().getBoolean(
+        return shouldDrawCutout(mContext);
+    }
+
+    static boolean shouldDrawCutout(Context context) {
+        return context.getResources().getBoolean(
                 com.android.internal.R.bool.config_fillMainBuiltInDisplayCutout);
     }
 
@@ -273,14 +295,26 @@ public class ScreenDecorations extends SystemUI implements Tunable {
         if (mOverlay == null) return;
         if (SIZE.equals(key)) {
             int size = mRoundedDefault;
-            try {
-                size = (int) (Integer.parseInt(newValue) * mDensity);
-            } catch (Exception e) {
+            int sizeTop = mRoundedDefaultTop;
+            int sizeBottom = mRoundedDefaultBottom;
+            if (newValue != null) {
+                try {
+                    size = (int) (Integer.parseInt(newValue) * mDensity);
+                } catch (Exception e) {
+                }
             }
-            setSize(mOverlay.findViewById(R.id.left), size);
-            setSize(mOverlay.findViewById(R.id.right), size);
-            setSize(mBottomOverlay.findViewById(R.id.left), size);
-            setSize(mBottomOverlay.findViewById(R.id.right), size);
+
+            if (sizeTop == 0) {
+                sizeTop = size;
+            }
+            if (sizeBottom == 0) {
+                sizeBottom = size;
+            }
+
+            setSize(mOverlay.findViewById(R.id.left), sizeTop);
+            setSize(mOverlay.findViewById(R.id.right), sizeTop);
+            setSize(mBottomOverlay.findViewById(R.id.left), sizeBottom);
+            setSize(mBottomOverlay.findViewById(R.id.right), sizeBottom);
         }
     }
 
@@ -359,6 +393,7 @@ public class ScreenDecorations extends SystemUI implements Tunable {
             if (!mBoundingPath.isEmpty()) {
                 mPaint.setColor(Color.BLACK);
                 mPaint.setStyle(Paint.Style.FILL);
+                mPaint.setAntiAlias(true);
                 canvas.drawPath(mBoundingPath, mPaint);
             }
         }
@@ -385,10 +420,10 @@ public class ScreenDecorations extends SystemUI implements Tunable {
             mBoundingRect.setEmpty();
             mBoundingPath.reset();
             int newVisible;
-            if (hasCutout()) {
+            if (shouldDrawCutout(getContext()) && hasCutout()) {
                 mBounds.set(mInfo.displayCutout.getBounds());
                 localBounds(mBoundingRect);
-                mInfo.displayCutout.getBounds().getBoundaryPath(mBoundingPath);
+                updateBoundingPath();
                 invalidate();
                 newVisible = VISIBLE;
             } else {
@@ -397,6 +432,44 @@ public class ScreenDecorations extends SystemUI implements Tunable {
             if (newVisible != getVisibility()) {
                 setVisibility(newVisible);
                 mVisibilityChangedListener.run();
+            }
+        }
+
+        private void updateBoundingPath() {
+            int lw = mInfo.logicalWidth;
+            int lh = mInfo.logicalHeight;
+
+            boolean flipped = mInfo.rotation == ROTATION_90 || mInfo.rotation == ROTATION_270;
+
+            int dw = flipped ? lh : lw;
+            int dh = flipped ? lw : lh;
+
+            mBoundingPath.set(DisplayCutout.pathFromResources(getResources(), dw, dh));
+            Matrix m = new Matrix();
+            transformPhysicalToLogicalCoordinates(mInfo.rotation, dw, dh, m);
+            mBoundingPath.transform(m);
+        }
+
+        private static void transformPhysicalToLogicalCoordinates(@Surface.Rotation int rotation,
+                @Dimension int physicalWidth, @Dimension int physicalHeight, Matrix out) {
+            switch (rotation) {
+                case ROTATION_0:
+                    out.reset();
+                    break;
+                case ROTATION_90:
+                    out.setRotate(270);
+                    out.postTranslate(0, physicalWidth);
+                    break;
+                case ROTATION_180:
+                    out.setRotate(180);
+                    out.postTranslate(physicalWidth, physicalHeight);
+                    break;
+                case ROTATION_270:
+                    out.setRotate(90);
+                    out.postTranslate(physicalHeight, 0);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown rotation: " + rotation);
             }
         }
 
