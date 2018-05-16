@@ -79,6 +79,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
     private static final int EMERGENCY_VOICE_CONTROLLER = 200;
     private static final int EMERGENCY_NO_SUB = 300;
     private static final int EMERGENCY_ASSUMED_VOICE_CONTROLLER = 400;
+    private static final String ACTION_EMBMS_STATUS = "com.qualcomm.intent.EMBMS_STATUS";
 
     private final Context mContext;
     private final TelephonyManager mPhone;
@@ -140,6 +141,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
     ServiceState mLastServiceState;
     private boolean mUserSetup;
     private boolean mSimDetected;
+    private boolean mIsEmbmsActive;
 
     /**
      * Construct this controller object and register for updates.
@@ -246,6 +248,10 @@ public class NetworkControllerImpl extends BroadcastReceiver
         filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         filter.addAction(ConnectivityManager.INET_CONDITION_ACTION);
         filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+        //TODO:Replace this check when regional specific config is added
+        if (MobileSignalController.isCarrierOneSupported()) {
+            filter.addAction(ACTION_EMBMS_STATUS);
+        }
         mContext.registerReceiver(this, filter, null, mReceiverHandler);
         mListening = true;
 
@@ -435,7 +441,14 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 // emergency state.
                 recalculateEmergency();
             }
-        } else {
+        } else if (action.equals(ACTION_EMBMS_STATUS)) {
+            mIsEmbmsActive = intent.getBooleanExtra("ACTIVE", false);
+            Log.d(TAG,"EMBMS_STATUS On Receive:isEmbmsactive=" + mIsEmbmsActive);
+            for (int i = 0; i < mMobileSignalControllers.size(); i++) {
+                 MobileSignalController controller = mMobileSignalControllers.valueAt(i);
+                 controller.notifyListeners();
+            }
+         } else {
             int subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY,
                     SubscriptionManager.INVALID_SUBSCRIPTION_ID);
             if (SubscriptionManager.isValidSubscriptionId(subId)) {
@@ -469,6 +482,10 @@ public class NetworkControllerImpl extends BroadcastReceiver
             controller.setConfiguration(mConfig);
         }
         refreshLocale();
+    }
+
+    public boolean isEmbmsActive() {
+        return mIsEmbmsActive;
     }
 
     private void updateMobileControllers() {
