@@ -45,9 +45,11 @@ import com.android.systemui.qs.QSHost.Callback;
 import com.android.systemui.qs.customize.QSCustomizer;
 import com.android.systemui.qs.external.CustomTile;
 import com.android.systemui.settings.BrightnessController;
+import com.android.systemui.settings.SimSwitchController;
 import com.android.systemui.settings.ToggleSliderView;
 import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.BrightnessMirrorController.BrightnessMirrorListener;
+import com.android.systemui.statusbar.policy.MobileSignalController;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.tuner.TunerService.Tunable;
 
@@ -62,6 +64,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
     protected final Context mContext;
     protected final ArrayList<TileRecord> mRecords = new ArrayList<TileRecord>();
     protected final View mBrightnessView;
+    protected View mSimSwitcherView = null;
     private final H mHandler = new H();
     private final View mPageIndicator;
     private final MetricsLogger mMetricsLogger = Dependency.get(MetricsLogger.class);
@@ -73,6 +76,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
 
     private QSDetail.Callback mCallback;
     private BrightnessController mBrightnessController;
+    private SimSwitchController mSimSwitchController;
     protected QSTileHost mHost;
 
     protected QSSecurityFooter mFooter;
@@ -95,6 +99,13 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
         mContext = context;
 
         setOrientation(VERTICAL);
+
+        if (MobileSignalController.isCarrierOneSupported()) {
+            mSimSwitcherView = LayoutInflater.from(context).inflate(
+                    R.layout.sim_switcher, this, false);
+            addView(mSimSwitcherView);
+            mSimSwitchController = new SimSwitchController(getContext(), mSimSwitcherView, this);
+        }
 
         mBrightnessView = LayoutInflater.from(context).inflate(
                 R.layout.quick_settings_brightness_dialog, this, false);

@@ -166,6 +166,10 @@ public class QSTileHost implements QSHost, Tunable, PluginListener<QSFactory> {
         return mTileSpecs.indexOf(spec);
     }
 
+    public StatusBar getStatusBar() {
+        return mStatusBar;
+    }
+
     @Override
     public void onTuningChanged(String key, String newValue) {
         if (!TILES_SETTING.equals(key)) {
