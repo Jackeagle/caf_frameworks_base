@@ -68,7 +68,7 @@ public interface NetworkController extends CallbackController<SignalCallback>, D
                 int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
                 int stackedDataIcon, int stackedVoiceIcon, String typeContentDescription,
                 String description, boolean isWide, int subId, boolean roaming,
-                int embmsIconId);
+                int embmsIconId, int imsIconId, boolean isImsOverWifi);
     }
 
     public interface EmergencyListener {

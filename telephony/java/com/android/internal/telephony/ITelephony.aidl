@@ -1093,6 +1093,12 @@ interface ITelephony {
      */
     boolean isWifiCallingAvailable();
 
+    /*
+     * Returns the Status of VOWIFI calling
+     * using subId
+     */
+    boolean isVoWifiCallingAvailableForSubscriber(int subId);
+
     /**
      * Returns the Status of Volte
      */
@@ -1102,6 +1108,12 @@ interface ITelephony {
      * Returns the Status of VT (video telephony)
      */
     boolean isVideoTelephonyAvailable();
+
+    /**
+     * Returns the Status of Video telephony wifi calling
+     * using subId
+     */
+    boolean isVideoTelephonyWifiCallingAvailableForSubscriber(int subId);
 
     /**
       * Returns the unique device ID of phone, for example, the IMEI for
