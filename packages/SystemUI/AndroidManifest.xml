@@ -26,6 +26,9 @@
          referenced by the core OS. -->
     <permission android:name="android.permission.systemui.IDENTITY"
         android:protectionLevel="signature" />
+    <permission android:name="org.codeaurora.ims.permission.ONCLICK"
+        android:protectionLevel="signatureOrSystem" />
+    <uses-permission android:name="org.codeaurora.ims.permission.ONCLICK" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
