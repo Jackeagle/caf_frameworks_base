@@ -196,7 +196,7 @@ static int read_memtrack_memory(struct memtrack_proc* p, int pid,
 {
     int err = memtrack_proc_get(p, pid);
     if (err != 0) {
-        ALOGW("failed to get memory consumption info: %d", err);
+       // ALOGW("failed to get memory consumption info: %d", err);
         return err;
     }
 
