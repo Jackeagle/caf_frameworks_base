@@ -98,6 +98,7 @@ public class SettingsBackupTest {
     private static final Set<String> BACKUP_BLACKLISTED_GLOBAL_SETTINGS =
             newHashSet(
                     Settings.Global.ACTIVITY_MANAGER_CONSTANTS,
+                    Settings.Global.ADAPTIVE_BATTERY_MANAGEMENT_ENABLED,
                     Settings.Global.ADB_ENABLED,
                     Settings.Global.ADD_USERS_WHEN_LOCKED,
                     Settings.Global.AIRPLANE_MODE_ON,
@@ -228,6 +229,7 @@ public class SettingsBackupTest {
                     Settings.Global.EPHEMERAL_COOKIE_MAX_SIZE_BYTES,
                     Settings.Global.ERROR_LOGCAT_PREFIX,
                     Settings.Global.EUICC_PROVISIONED,
+                    Settings.Global.EUICC_SUPPORTED_COUNTRIES,
                     Settings.Global.EUICC_FACTORY_RESET_TIMEOUT_MILLIS,
                     Settings.Global.FANCY_IME_ANIMATIONS,
                     Settings.Global.FORCE_ALLOW_ON_EXTERNAL,
@@ -239,6 +241,7 @@ public class SettingsBackupTest {
                     Settings.Global.GLOBAL_HTTP_PROXY_HOST,
                     Settings.Global.GLOBAL_HTTP_PROXY_PAC,
                     Settings.Global.GLOBAL_HTTP_PROXY_PORT,
+                    Settings.Global.GNSS_HAL_LOCATION_REQUEST_DURATION_MILLIS,
                     Settings.Global.GNSS_SATELLITE_BLACKLIST,
                     Settings.Global.GPRS_REGISTER_CHECK_PERIOD_MS,
                     Settings.Global.HDMI_CONTROL_AUTO_DEVICE_OFF_ENABLED,
@@ -463,6 +466,7 @@ public class SettingsBackupTest {
                     Settings.Global.WIFI_ON,
                     Settings.Global.WIFI_P2P_DEVICE_NAME,
                     Settings.Global.WIFI_REENABLE_DELAY_MS,
+                    Settings.Global.WIFI_RTT_BACKGROUND_EXEC_GAP_MS,
                     Settings.Global.WIFI_SAVED_STATE,
                     Settings.Global.WIFI_SCAN_ALWAYS_AVAILABLE,
                     Settings.Global.WIFI_SCAN_INTERVAL_WHEN_P2P_CONNECTED_MS,

@@ -344,8 +344,8 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             } else if (GLOBAL_ACTION_KEY_SETTINGS.equals(actionKey)) {
                 mItems.add(getSettingsAction());
             } else if (GLOBAL_ACTION_KEY_LOCKDOWN.equals(actionKey)) {
-                if (Settings.Secure.getInt(mContext.getContentResolver(),
-                            Settings.Secure.LOCKDOWN_IN_POWER_MENU, 0) != 0
+                if (Settings.Secure.getIntForUser(mContext.getContentResolver(),
+                            Settings.Secure.LOCKDOWN_IN_POWER_MENU, 0, getCurrentUser().id) != 0
                         && shouldDisplayLockdown()) {
                     mItems.add(getLockdownAction());
                     mHasLockdownButton = true;
@@ -1380,6 +1380,15 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             mHardwareLayout = HardwareUiLayout.get(mListView);
             mHardwareLayout.setOutsideTouchListener(view -> dismiss());
             setTitle(R.string.global_actions);
+            mListView.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+                @Override
+                public boolean dispatchPopulateAccessibilityEvent(
+                        View host, AccessibilityEvent event) {
+                    // Populate the title here, just as Activity does
+                    event.getText().add(mContext.getString(R.string.global_actions));
+                    return true;
+                }
+            });
         }
 
         private void updateList() {

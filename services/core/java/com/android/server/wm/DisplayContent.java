@@ -393,6 +393,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     /** Temporary float array to retrieve 3x3 matrix values. */
     private final float[] mTmpFloats = new float[9];
 
+    private MagnificationSpec mMagnificationSpec;
+
     private final Consumer<WindowState> mUpdateWindowsForAnimator = w -> {
         WindowStateAnimator winAnimator = w.mWinAnimator;
         final AppWindowToken atoken = w.mAppToken;
@@ -3190,6 +3192,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
          */
         SurfaceControl mAppAnimationLayer = null;
         SurfaceControl mBoostedAppAnimationLayer = null;
+        SurfaceControl mHomeAppAnimationLayer = null;
 
         /**
          * Given that the split-screen divider does not have an AppWindowToken, it
@@ -3552,6 +3555,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             int layer = 0;
             int layerForAnimationLayer = 0;
             int layerForBoostedAnimationLayer = 0;
+            int layerForHomeAnimationLayer = 0;
 
             for (int state = 0; state <= ALWAYS_ON_TOP_STATE; state++) {
                 for (int i = 0; i < mChildren.size(); i++) {
@@ -3578,6 +3582,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                         layerForBoostedAnimationLayer = layer++;
                     }
                 }
+                if (state == HOME_STACK_STATE) {
+                    layerForHomeAnimationLayer = layer++;
+                }
             }
             if (mAppAnimationLayer != null) {
                 t.setLayer(mAppAnimationLayer, layerForAnimationLayer);
@@ -3585,11 +3592,22 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             if (mBoostedAppAnimationLayer != null) {
                 t.setLayer(mBoostedAppAnimationLayer, layerForBoostedAnimationLayer);
             }
+            if (mHomeAppAnimationLayer != null) {
+                t.setLayer(mHomeAppAnimationLayer, layerForHomeAnimationLayer);
+            }
         }
 
         @Override
-        SurfaceControl getAppAnimationLayer(boolean boosted) {
-            return boosted ? mBoostedAppAnimationLayer : mAppAnimationLayer;
+        SurfaceControl getAppAnimationLayer(@AnimationLayer int animationLayer) {
+            switch (animationLayer) {
+                case ANIMATION_LAYER_BOOSTED:
+                    return mBoostedAppAnimationLayer;
+                case ANIMATION_LAYER_HOME:
+                    return mHomeAppAnimationLayer;
+                case ANIMATION_LAYER_STANDARD:
+                default:
+                    return mAppAnimationLayer;
+            }
         }
 
         SurfaceControl getSplitScreenDividerAnchor() {
@@ -3606,12 +3624,16 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 mBoostedAppAnimationLayer = makeChildSurface(null)
                         .setName("boostedAnimationLayer")
                         .build();
+                mHomeAppAnimationLayer = makeChildSurface(null)
+                        .setName("homeAnimationLayer")
+                        .build();
                 mSplitScreenDividerAnchor = makeChildSurface(null)
                         .setName("splitScreenDividerAnchor")
                         .build();
                 getPendingTransaction()
                         .show(mAppAnimationLayer)
                         .show(mBoostedAppAnimationLayer)
+                        .show(mHomeAppAnimationLayer)
                         .show(mSplitScreenDividerAnchor);
                 scheduleAnimation();
             } else {
@@ -3619,6 +3641,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 mAppAnimationLayer = null;
                 mBoostedAppAnimationLayer.destroy();
                 mBoostedAppAnimationLayer = null;
+                mHomeAppAnimationLayer.destroy();
+                mHomeAppAnimationLayer = null;
                 mSplitScreenDividerAnchor.destroy();
                 mSplitScreenDividerAnchor = null;
             }
@@ -3815,8 +3839,20 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     }
 
     void applyMagnificationSpec(MagnificationSpec spec) {
+        if (spec.scale != 1.0) {
+            mMagnificationSpec = spec;
+        } else {
+            mMagnificationSpec = null;
+        }
+
         applyMagnificationSpec(getPendingTransaction(), spec);
         getPendingTransaction().apply();
+    }
+
+    void reapplyMagnificationSpec() {
+        if (mMagnificationSpec != null) {
+            applyMagnificationSpec(getPendingTransaction(), mMagnificationSpec);
+        }
     }
 
     @Override
@@ -3884,7 +3920,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * with {@link #WindowState#assignLayer}
      */
     void assignRelativeLayerForImeTargetChild(SurfaceControl.Transaction t, WindowContainer child) {
-        t.setRelativeLayer(child.getSurfaceControl(), mImeWindowsContainers.getSurfaceControl(), 1);
+        child.assignRelativeLayer(t, mImeWindowsContainers.getSurfaceControl(), 1);
     }
 
     @Override

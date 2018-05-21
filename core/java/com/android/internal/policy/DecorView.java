@@ -41,7 +41,6 @@ import java.util.List;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
-import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -55,7 +54,6 @@ import android.graphics.Region;
 import android.graphics.Shader;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.os.RemoteException;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -310,10 +308,8 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
     public void onDraw(Canvas c) {
         super.onDraw(c);
 
-        // When we are resizing, we need the fallback background to cover the area where we have our
-        // system bar background views as the navigation bar will be hidden during resizing.
-        mBackgroundFallback.draw(isResizing() ? this : mContentRoot, mContentRoot, c,
-                mWindow.mContentParent);
+        mBackgroundFallback.draw(this, mContentRoot, c, mWindow.mContentParent,
+                mStatusColorViewState.view, mNavigationColorViewState.view);
     }
 
     @Override
@@ -1841,6 +1837,13 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
             DecorContext decorContext = (DecorContext) context;
             decorContext.setPhoneWindow(mWindow);
         }
+    }
+
+    @Override
+    public Resources getResources() {
+        // Make sure the Resources object is propogated from the Context since it can be updated in
+        // the Context object.
+        return getContext().getResources();
     }
 
     @Override

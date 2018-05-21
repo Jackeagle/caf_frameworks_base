@@ -173,7 +173,6 @@ import java.net.InetAddress;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -223,9 +222,6 @@ public final class ActivityThread extends ClientTransactionHandler {
     // Whether to invoke an activity callback after delivering new configuration.
     private static final boolean REPORT_TO_ACTIVITY = true;
 
-    // Maximum number of recent tokens to maintain for debugging purposes
-    private static final int MAX_DESTROYED_ACTIVITIES = 10;
-
     /**
      * Denotes an invalid sequence number corresponding to a process state change.
      */
@@ -258,8 +254,6 @@ public final class ActivityThread extends ClientTransactionHandler {
     final H mH = new H();
     final Executor mExecutor = new HandlerExecutor(mH);
     final ArrayMap<IBinder, ActivityClientRecord> mActivities = new ArrayMap<>();
-    final ArrayList<DestroyedActivityInfo> mRecentDestroyedActivities = new ArrayList<>();
-
     // List of new activities (via ActivityRecord.nextIdle) that should
     // be reported when next we idle.
     ActivityClientRecord mNewActivities = null;
@@ -338,26 +332,6 @@ public final class ActivityThread extends ClientTransactionHandler {
         @Override
         public int hashCode() {
             return ((authority != null) ? authority.hashCode() : 0) ^ userId;
-        }
-    }
-
-    /**
-     * TODO(b/71506345): Remove this once bug is resolved.
-     */
-    private static final class DestroyedActivityInfo {
-        private final Integer mToken;
-        private final String mReason;
-        private final long mTime;
-
-        DestroyedActivityInfo(Integer token, String reason) {
-            mToken = token;
-            mReason = reason;
-            mTime = System.currentTimeMillis();
-        }
-
-        void dump(PrintWriter pw, String prefix) {
-            pw.println(prefix + "[token:" + mToken + " | time:" + mTime + " | reason:" + mReason
-                    + "]");
         }
     }
 
@@ -1581,6 +1555,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         public static final int APPLICATION_INFO_CHANGED = 156;
         public static final int RUN_ISOLATED_ENTRY_POINT = 158;
         public static final int EXECUTE_TRANSACTION = 159;
+        public static final int RELAUNCH_ACTIVITY = 160;
 
         String codeToString(int code) {
             if (DEBUG_MESSAGES) {
@@ -1624,6 +1599,7 @@ public final class ActivityThread extends ClientTransactionHandler {
                     case APPLICATION_INFO_CHANGED: return "APPLICATION_INFO_CHANGED";
                     case RUN_ISOLATED_ENTRY_POINT: return "RUN_ISOLATED_ENTRY_POINT";
                     case EXECUTE_TRANSACTION: return "EXECUTE_TRANSACTION";
+                    case RELAUNCH_ACTIVITY: return "RELAUNCH_ACTIVITY";
                 }
             }
             return Integer.toString(code);
@@ -1805,6 +1781,9 @@ public final class ActivityThread extends ClientTransactionHandler {
                         transaction.recycle();
                     }
                     // TODO(lifecycler): Recycle locally scheduled transactions.
+                    break;
+                case RELAUNCH_ACTIVITY:
+                    handleRelaunchActivityLocally((IBinder) msg.obj);
                     break;
             }
             Object obj = msg.obj;
@@ -2193,32 +2172,6 @@ public final class ActivityThread extends ClientTransactionHandler {
 
     static void printRow(PrintWriter pw, String format, Object...objs) {
         pw.println(String.format(format, objs));
-    }
-
-    @Override
-    public void dump(PrintWriter pw, String prefix) {
-        pw.println(prefix + "Activities:");
-
-        if (!mActivities.isEmpty()) {
-            final Iterator<Map.Entry<IBinder, ActivityClientRecord>> activitiesIterator =
-                    mActivities.entrySet().iterator();
-
-            while (activitiesIterator.hasNext()) {
-                final ArrayMap.Entry<IBinder, ActivityClientRecord> entry =
-                        activitiesIterator.next();
-                pw.println(prefix + "  [token:" + entry.getKey().hashCode() + " record:"
-                        + entry.getValue().toString() + "]");
-            }
-        }
-
-        if (!mRecentDestroyedActivities.isEmpty()) {
-            pw.println(prefix + "Recent destroyed activities:");
-            for (int i = 0, size = mRecentDestroyedActivities.size(); i < size; i++) {
-                final DestroyedActivityInfo info = mRecentDestroyedActivities.get(i);
-                pw.print(prefix);
-                info.dump(pw, "  ");
-            }
-        }
     }
 
     public static void dumpMemInfoTable(PrintWriter pw, Debug.MemoryInfo memInfo, boolean checkin,
@@ -2735,7 +2688,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         // TODO(lifecycler): Can't switch to use #handleLaunchActivity() because it will try to
         // call #reportSizeConfigurations(), but the server might not know anything about the
         // activity if it was launched from LocalAcvitivyManager.
-        return performLaunchActivity(r);
+        return performLaunchActivity(r, null /* customIntent */);
     }
 
     public final Activity getActivity(IBinder token) {
@@ -2820,7 +2773,7 @@ public final class ActivityThread extends ClientTransactionHandler {
     }
 
     /**  Core implementation of activity launch. */
-    private Activity performLaunchActivity(ActivityClientRecord r) {
+    private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
         ActivityInfo aInfo = r.activityInfo;
         if (r.packageInfo == null) {
             r.packageInfo = getPackageInfo(aInfo.applicationInfo, r.compatInfo,
@@ -2890,6 +2843,9 @@ public final class ActivityThread extends ClientTransactionHandler {
                         r.embeddedID, r.lastNonConfigurationInstances, config,
                         r.referrer, r.voiceInteractor, window, r.configCallback);
 
+                if (customIntent != null) {
+                    activity.mIntent = customIntent;
+                }
                 r.lastNonConfigurationInstances = null;
                 checkAndBlockForNetworkAccess();
                 activity.mStartedActivity = false;
@@ -3034,7 +2990,7 @@ public final class ActivityThread extends ClientTransactionHandler {
      */
     @Override
     public Activity handleLaunchActivity(ActivityClientRecord r,
-            PendingTransactionActions pendingActions) {
+            PendingTransactionActions pendingActions, Intent customIntent) {
         // If we are getting ready to gc after going to the background, well
         // we are back active so skip it.
         unscheduleGcIdler();
@@ -3057,7 +3013,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
         WindowManagerGlobal.initialize();
 
-        final Activity a = performLaunchActivity(r);
+        final Activity a = performLaunchActivity(r, customIntent);
 
         if (a != null) {
             r.createdConfig = new Configuration(mConfiguration);
@@ -3782,7 +3738,7 @@ public final class ActivityThread extends ClientTransactionHandler {
                 r.pendingIntents = null;
             }
             if (r.pendingResults != null) {
-                deliverResults(r, r.pendingResults);
+                deliverResults(r, r.pendingResults, reason);
                 r.pendingResults = null;
             }
             r.activity.performResume(r.startsNotResumed, reason);
@@ -4333,7 +4289,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         for (Map.Entry<IBinder, ActivityClientRecord> entry : mActivities.entrySet()) {
             final Activity activity = entry.getValue().activity;
             if (!activity.mFinished) {
-                handleRelaunchActivityLocally(entry.getKey());
+                scheduleRelaunchActivity(entry.getKey());
             }
         }
     }
@@ -4351,7 +4307,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         WindowManagerGlobal.getInstance().reportNewConfiguration(mConfiguration);
     }
 
-    private void deliverResults(ActivityClientRecord r, List<ResultInfo> results) {
+    private void deliverResults(ActivityClientRecord r, List<ResultInfo> results, String reason) {
         final int N = results.size();
         for (int i=0; i<N; i++) {
             ResultInfo ri = results.get(i);
@@ -4363,7 +4319,7 @@ public final class ActivityThread extends ClientTransactionHandler {
                 if (DEBUG_RESULTS) Slog.v(TAG,
                         "Delivering result to activity " + r + " : " + ri);
                 r.activity.dispatchActivityResult(ri.mResultWho,
-                        ri.mRequestCode, ri.mResultCode, ri.mData);
+                        ri.mRequestCode, ri.mResultCode, ri.mData, reason);
             } catch (Exception e) {
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException(
@@ -4376,7 +4332,7 @@ public final class ActivityThread extends ClientTransactionHandler {
     }
 
     @Override
-    public void handleSendResult(IBinder token, List<ResultInfo> results) {
+    public void handleSendResult(IBinder token, List<ResultInfo> results, String reason) {
         ActivityClientRecord r = mActivities.get(token);
         if (DEBUG_RESULTS) Slog.v(TAG, "Handling send result to " + r);
         if (r != null) {
@@ -4411,9 +4367,9 @@ public final class ActivityThread extends ClientTransactionHandler {
                 }
             }
             checkAndBlockForNetworkAccess();
-            deliverResults(r, results);
+            deliverResults(r, results, reason);
             if (resumed) {
-                r.activity.performResume(false, "handleSendResult");
+                r.activity.performResume(false, reason);
                 r.activity.mTemporaryPause = false;
             }
         }
@@ -4473,12 +4429,6 @@ public final class ActivityThread extends ClientTransactionHandler {
             r.setState(ON_DESTROY);
         }
         mActivities.remove(token);
-        mRecentDestroyedActivities.add(0, new DestroyedActivityInfo(token.hashCode(), reason));
-
-        final int recentDestroyedActivitiesSize = mRecentDestroyedActivities.size();
-        if (recentDestroyedActivitiesSize > MAX_DESTROYED_ACTIVITIES) {
-            mRecentDestroyedActivities.remove(recentDestroyedActivitiesSize - 1);
-        }
         StrictMode.decrementExpectedActivityCount(activityClass);
         return r;
     }
@@ -4717,21 +4667,29 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
     }
 
-    /** Performs the activity relaunch locally vs. requesting from system-server. */
-    void handleRelaunchActivityLocally(IBinder token) {
-        if (Looper.myLooper() != getLooper()) {
-            throw new IllegalStateException("Must be called from main thread");
-        }
+    /**
+     * Post a message to relaunch the activity. We do this instead of launching it immediately,
+     * because this will destroy the activity from which it was called and interfere with the
+     * lifecycle changes it was going through before. We need to make sure that we have finished
+     * handling current transaction item before relaunching the activity.
+     */
+    void scheduleRelaunchActivity(IBinder token) {
+        sendMessage(H.RELAUNCH_ACTIVITY, token);
+    }
 
+    /** Performs the activity relaunch locally vs. requesting from system-server. */
+    private void handleRelaunchActivityLocally(IBinder token) {
         final ActivityClientRecord r = mActivities.get(token);
         if (r == null) {
+            Log.w(TAG, "Activity to relaunch no longer exists");
             return;
         }
 
         final int prevState = r.getLifecycleState();
 
-        if (prevState < ON_RESUME) {
-            Log.w(TAG, "Activity needs to be already resumed in other to be relaunched.");
+        if (prevState < ON_RESUME || prevState > ON_STOP) {
+            Log.w(TAG, "Activity state must be in [ON_RESUME..ON_STOP] in order to be relaunched,"
+                    + "current state is " + prevState);
             return;
         }
 
@@ -4757,6 +4715,8 @@ public final class ActivityThread extends ClientTransactionHandler {
             List<ResultInfo> pendingResults, List<ReferrerIntent> pendingIntents,
             PendingTransactionActions pendingActions, boolean startsNotResumed,
             Configuration overrideConfig, String reason) {
+        // Preserve last used intent, it may be set from Activity#setIntent().
+        final Intent customIntent = r.activity.mIntent;
         // Need to ensure state is saved.
         if (!r.paused) {
             performPauseActivity(r, false, reason, null /* pendingActions */);
@@ -4789,7 +4749,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         r.startsNotResumed = startsNotResumed;
         r.overrideConfig = overrideConfig;
 
-        handleLaunchActivity(r, pendingActions);
+        handleLaunchActivity(r, pendingActions, customIntent);
     }
 
     @Override
@@ -5391,8 +5351,8 @@ public final class ActivityThread extends ClientTransactionHandler {
                                         }
                                     }
                                 }
-                                final List<String> oldPaths =
-                                        sPackageManager.getPreviousCodePaths(packageName);
+                                final ArrayList<String> oldPaths = new ArrayList<>();
+                                LoadedApk.makePaths(this, pkgInfo.getApplicationInfo(), oldPaths);
                                 pkgInfo.updateApplicationInfo(aInfo, oldPaths);
                             } catch (RemoteException e) {
                             }
@@ -5500,7 +5460,8 @@ public final class ActivityThread extends ClientTransactionHandler {
      * runtime's instruction set is.
      */
     private String getInstrumentationLibrary(ApplicationInfo appInfo, InstrumentationInfo insInfo) {
-        if (appInfo.primaryCpuAbi != null && appInfo.secondaryCpuAbi != null) {
+        if (appInfo.primaryCpuAbi != null && appInfo.secondaryCpuAbi != null
+                && appInfo.secondaryCpuAbi.equals(insInfo.secondaryCpuAbi)) {
             // Get the instruction set supported by the secondary ABI. In the presence
             // of a native bridge this might be different than the one secondary ABI used.
             String secondaryIsa =
@@ -5569,6 +5530,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         Process.setArgV0(data.processName);
         android.ddm.DdmHandleAppName.setAppName(data.processName,
                                                 UserHandle.myUserId());
+        VMRuntime.setProcessPackageName(data.appInfo.packageName);
 
         if (mProfiler.profileFd != null) {
             mProfiler.startProfiling();
@@ -5734,6 +5696,16 @@ public final class ActivityThread extends ClientTransactionHandler {
             } catch (PackageManager.NameNotFoundException e) {
                 throw new RuntimeException(
                         "Unable to find instrumentation info for: " + data.instrumentationName);
+            }
+
+            // Warn of potential ABI mismatches.
+            if (!Objects.equals(data.appInfo.primaryCpuAbi, ii.primaryCpuAbi)
+                    || !Objects.equals(data.appInfo.secondaryCpuAbi, ii.secondaryCpuAbi)) {
+                Slog.w(TAG, "Package uses different ABI(s) than its instrumentation: "
+                        + "package[" + data.appInfo.packageName + "]: "
+                        + data.appInfo.primaryCpuAbi + ", " + data.appInfo.secondaryCpuAbi
+                        + " instrumentation[" + ii.packageName + "]: "
+                        + ii.primaryCpuAbi + ", " + ii.secondaryCpuAbi);
             }
 
             mInstrumentationPackageName = ii.packageName;

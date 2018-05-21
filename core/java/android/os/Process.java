@@ -416,6 +416,13 @@ public class Process {
      **/
     public static final int THREAD_GROUP_RT_APP = 6;
 
+    /**
+     * Thread group for bound foreground services that should
+     * have additional CPU restrictions during screen off
+     * @hide
+     **/
+    public static final int THREAD_GROUP_RESTRICTED = 7;
+
     public static final int SIGNAL_QUIT = 3;
     public static final int SIGNAL_KILL = 9;
     public static final int SIGNAL_USR1 = 10;
@@ -748,6 +755,30 @@ public class Process {
      * Always sets cpusets.
      */
     public static final native void setProcessGroup(int pid, int group)
+            throws IllegalArgumentException, SecurityException;
+
+    /**
+     * Sets the scheduling group for processes in the same cgroup.procs of uid and pid
+     * @hide
+     * @param uid The user identifier of the process to change.
+     * @param pid The identifier of the process to change.
+     * @param group The target group for this process from THREAD_GROUP_*.
+     *
+     * @throws IllegalArgumentException Throws IllegalArgumentException if
+     * <var>tid</var> does not exist.
+     * @throws SecurityException Throws SecurityException if your process does
+     * not have permission to modify the given thread, or to use the given
+     * priority.
+     *
+     * group == THREAD_GROUP_DEFAULT means to move all non-background priority
+     * threads to the foreground scheduling group, but to leave background
+     * priority threads alone.  group == THREAD_GROUP_BG_NONINTERACTIVE moves all
+     * threads, regardless of priority, to the background scheduling group.
+     * group == THREAD_GROUP_FOREGROUND is not allowed.
+     *
+     * Always sets cpusets.
+     */
+    public static final native void setCgroupProcsProcessGroup(int uid, int pid, int group)
             throws IllegalArgumentException, SecurityException;
 
     /**
