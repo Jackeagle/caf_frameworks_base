@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"SIM カードは PUK でロックされています。"</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"SIM カードのロックを解除しています…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"PIN エリア"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"SIM PIN エリア"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"SIM PUK エリア"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"次のアラームを <xliff:g id="ALARM">%1$s</xliff:g> に設定しました"</string>
@@ -140,7 +142,10 @@
       <item quantity="one">端末のロックが <xliff:g id="NUMBER_0">%d</xliff:g> 時間、解除されていません。パスワードを確認してください。</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"認識されませんでした"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="other">SIM PIN を入力してください。入力できるのはあと <xliff:g id="NUMBER_1">%d</xliff:g> 回です。</item>
+      <item quantity="one">SIM PIN を入力してください。入力できるのはあと <xliff:g id="NUMBER_0">%d</xliff:g> 回です。この回数を超えた場合は、携帯通信会社にお問い合わせください。</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="other">SIM が無効になりました。続行するには PUK コードを入力してください。入力できるのはあと <xliff:g id="_NUMBER_1">%d</xliff:g> 回です。この回数を超えると SIM は完全に使用できなくなります。詳しくは携帯通信会社にお問い合わせください。</item>
       <item quantity="one">SIM が無効になりました。続行するには PUK コードを入力してください。入力できるのはあと <xliff:g id="_NUMBER_0">%d</xliff:g> 回です。この回数を超えると SIM は完全に使用できなくなります。詳しくは携帯通信会社にお問い合わせください。</item>

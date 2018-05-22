@@ -108,6 +108,8 @@ public final class ActiveServices {
 
     private static final boolean LOG_SERVICE_START_STOP = false;
 
+    private static final boolean SHOW_DUNGEON_NOTIFICATION = false;
+
     // How long we wait for a service to finish executing.
     static final int SERVICE_TIMEOUT = 20*1000;
 
@@ -426,13 +428,9 @@ public final class ActiveServices {
         }
 
         // If we're starting indirectly (e.g. from PendingIntent), figure out whether
-        // we're launching into an app in a background state.
-        final int uidState = mAm.getUidStateLocked(r.appInfo.uid);
-        if (DEBUG_SERVICE) {
-            Slog.v(TAG_SERVICE, "Uid state " + uidState + " indirect starting " + r.shortName);
-        }
-        final boolean bgLaunch = (uidState >
-                ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
+        // we're launching into an app in a background state.  This keys off of the same
+        // idleness state tracking as e.g. O+ background service start policy.
+        final boolean bgLaunch = !mAm.isUidActiveLocked(r.appInfo.uid);
 
         // If the app has strict background restrictions, we treat any bg service
         // start analogously to the legacy-app forced-restrictions case, regardless
@@ -950,6 +948,10 @@ public final class ActiveServices {
             smap.mActiveForegroundAppsChanged = false;
         }
 
+        if (!SHOW_DUNGEON_NOTIFICATION) {
+            return;
+        }
+
         final NotificationManager nm = (NotificationManager) mAm.mContext.getSystemService(
                 Context.NOTIFICATION_SERVICE);
         final Context context = mAm.mContext;
@@ -1201,10 +1203,13 @@ public final class ActiveServices {
 
                 if (!ignoreForeground &&
                         appRestrictedAnyInBackground(r.appInfo.uid, r.packageName)) {
-                    ignoreForeground = true;
                     Slog.w(TAG,
                             "Service.startForeground() not allowed due to bg restriction: service "
                             + r.shortName);
+                    // Back off of any foreground expectations around this service, since we've
+                    // just turned down its fg request.
+                    updateServiceForegroundLocked(r.app, false);
+                    ignoreForeground = true;
                 }
 
                 // Apps under strict background restrictions simply don't get to have foreground

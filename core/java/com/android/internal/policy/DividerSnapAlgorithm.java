@@ -344,7 +344,7 @@ public class DividerSnapAlgorithm {
             if (dockedSide == DOCKED_LEFT) {
                 position += mInsets.left;
             } else if (dockedSide == DOCKED_RIGHT) {
-                position = mDisplayWidth - position - mInsets.right;
+                position = mDisplayWidth - position - mInsets.right - mDividerSize;
             }
         }
         mTargets.add(new SnapTarget(position, position, SnapTarget.FLAG_NONE));
@@ -368,6 +368,14 @@ public class DividerSnapAlgorithm {
             return mTargets.get(index - 1);
         }
         return snapTarget;
+    }
+
+    /**
+     * @return whether or not there are more than 1 split targets that do not include the two
+     * dismiss targets, used in deciding to display the middle target for accessibility
+     */
+    public boolean showMiddleSplitTargetForAccessibility() {
+        return (mTargets.size() - 2) > 1;
     }
 
     public boolean isFirstSplitTargetAvailable() {

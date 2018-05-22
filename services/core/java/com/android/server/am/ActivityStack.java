@@ -17,6 +17,7 @@
 package com.android.server.am;
 
 import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SPLIT_SCREEN;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
@@ -520,11 +521,11 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     @Override
     public void setWindowingMode(int windowingMode) {
         setWindowingMode(windowingMode, false /* animate */, false /* showRecents */,
-                false /* enteringSplitScreenMode */);
+                false /* enteringSplitScreenMode */, false /* deferEnsuringVisibility */);
     }
 
     void setWindowingMode(int preferredWindowingMode, boolean animate, boolean showRecents,
-            boolean enteringSplitScreenMode) {
+            boolean enteringSplitScreenMode, boolean deferEnsuringVisibility) {
         final boolean creating = mWindowContainerController == null;
         final int currentMode = getWindowingMode();
         final ActivityDisplay display = getDisplay();
@@ -560,7 +561,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 // doesn't support split-screen mode, go ahead an dismiss split-screen and display a
                 // warning toast about it.
                 mService.mTaskChangeNotificationController.notifyActivityDismissingDockedStack();
-                display.getSplitScreenPrimaryStack().setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+                display.getSplitScreenPrimaryStack().setWindowingMode(WINDOWING_MODE_FULLSCREEN,
+                        false /* animate */, false /* showRecents */,
+                        false /* enteringSplitScreenMode */, true /* deferEnsuringVisibility */);
             }
         }
 
@@ -651,9 +654,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
             wm.continueSurfaceLayout();
         }
 
-        // Don't ensure visible activities if the windowing mode change was a side effect of us
-        // entering split-screen mode.
-        if (!enteringSplitScreenMode) {
+        if (!deferEnsuringVisibility) {
             mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, PRESERVE_WINDOWS);
             mStackSupervisor.resumeFocusedStackTopActivityLocked();
         }
@@ -1795,6 +1796,14 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
             final int otherWindowingMode = other.getWindowingMode();
 
             if (otherWindowingMode == WINDOWING_MODE_FULLSCREEN) {
+                // In this case the home stack isn't resizeable even though we are in split-screen
+                // mode. We still want the primary splitscreen stack to be visible as there will be
+                // a slight hint of it in the status bar area above the non-resizeable home
+                // activity.
+                if (windowingMode == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY
+                        && other.getActivityType() == ACTIVITY_TYPE_HOME) {
+                    return true;
+                }
                 if (other.isStackTranslucent(starting)) {
                     // Can be visible behind a translucent fullscreen stack.
                     continue;

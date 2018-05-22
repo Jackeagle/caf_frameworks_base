@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"सिम कार्ड PUK-लॉक केलेले आहे."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"सिम कार्ड अनलॉक करत आहे…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"पिन क्षेत्र"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"सिम पिन क्षेत्र"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"सिम PUK क्षेत्र"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"पुढील अलार्म <xliff:g id="ALARM">%1$s</xliff:g> साठी सेट केला"</string>
@@ -140,7 +142,10 @@
       <item quantity="other">डिव्हाइस <xliff:g id="NUMBER_1">%d</xliff:g> तासांसाठी अनलॉक केले गेले नाही. पासवर्डची खात्री करा.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"ओळखले नाही"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="one">सिम पिन एंटर करा, तुमच्याकडे <xliff:g id="NUMBER_1">%d</xliff:g> प्रयत्न शिल्लक आहे.</item>
+      <item quantity="other">सिम पिन एंटर करा, तुमच्याकडे <xliff:g id="NUMBER_1">%d</xliff:g> प्रयत्न शिल्लक आहेत.</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="one">सिम आता बंद केलेले आहे. सुरू ठेवण्यासाठी PUK कोड टाका. सिम कायमचे बंद होण्याआधी तुमच्याकडे <xliff:g id="_NUMBER_1">%d</xliff:g> प्रयत्न शिल्लक आहे. तपशीलांसाठी वाहकाशी संपर्क साधा.</item>
       <item quantity="other">सिम आता बंद केलेले आहे. सुरू ठेवण्यासाठी PUK कोड टाका. सिम कायमचे बंद होण्याआधी तुमच्याकडे <xliff:g id="_NUMBER_1">%d</xliff:g> प्रयत्न शिल्लक आहेत. तपशीलांसाठी वाहकाशी संपर्क साधा.</item>

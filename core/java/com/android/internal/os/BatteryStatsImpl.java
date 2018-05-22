@@ -585,6 +585,7 @@ public class BatteryStatsImpl extends BatteryStats {
                 boolean onBatteryScreenOff);
         Future<?> scheduleCpuSyncDueToWakelockChange(long delayMillis);
         void cancelCpuSyncDueToWakelockChange();
+        Future<?> scheduleSyncDueToBatteryLevelChange(long delayMillis);
     }
 
     public Handler mHandler;
@@ -4083,7 +4084,8 @@ public class BatteryStatsImpl extends BatteryStats {
 
     boolean ensureStartClockTime(final long currentTime) {
         final long ABOUT_ONE_YEAR = 365*24*60*60*1000L;
-        if (currentTime > ABOUT_ONE_YEAR && mStartClockTime < (currentTime-ABOUT_ONE_YEAR)) {
+        if ((currentTime > ABOUT_ONE_YEAR && mStartClockTime < (currentTime-ABOUT_ONE_YEAR))
+                || (mStartClockTime > currentTime)) {
             // If the start clock time has changed by more than a year, then presumably
             // the previous time was completely bogus.  So we are going to figure out a
             // new time based on how much time has elapsed since we started counting.
@@ -5070,7 +5072,8 @@ public class BatteryStatsImpl extends BatteryStats {
                     + Integer.toHexString(mHistoryCur.states));
             addHistoryRecordLocked(elapsedRealtime, uptime);
             mMobileRadioPowerState = powerState;
-            StatsLog.write(StatsLog.MOBILE_RADIO_POWER_STATE_CHANGED, uid, powerState);
+            StatsLog.write_non_chained(StatsLog.MOBILE_RADIO_POWER_STATE_CHANGED, uid, null,
+                    powerState);
             if (active) {
                 mMobileRadioActiveTimer.startRunningLocked(elapsedRealtime);
                 mMobileRadioActivePerAppTimer.startRunningLocked(elapsedRealtime);
@@ -5823,7 +5826,8 @@ public class BatteryStatsImpl extends BatteryStats {
                     + Integer.toHexString(mHistoryCur.states));
             addHistoryRecordLocked(elapsedRealtime, uptime);
             mWifiRadioPowerState = powerState;
-            StatsLog.write(StatsLog.WIFI_RADIO_POWER_STATE_CHANGED, uid, powerState);
+            StatsLog.write_non_chained(StatsLog.WIFI_RADIO_POWER_STATE_CHANGED, uid, null,
+                    powerState);
         }
     }
 
@@ -12614,7 +12618,8 @@ public class BatteryStatsImpl extends BatteryStats {
 
                 // TODO(adamlesinski): Schedule the creation of a HistoryStepDetails record
                 // which will pull external stats.
-                scheduleSyncExternalStatsLocked("battery-level", ExternalStatsSync.UPDATE_ALL);
+                mExternalSync.scheduleSyncDueToBatteryLevelChange(
+                        mConstants.BATTERY_LEVEL_COLLECTION_DELAY_MS);
             }
             if (mHistoryCur.batteryStatus != status) {
                 mHistoryCur.batteryStatus = (byte)status;
@@ -13270,6 +13275,8 @@ public class BatteryStatsImpl extends BatteryStats {
                 = "uid_remove_delay_ms";
         public static final String KEY_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS
                 = "external_stats_collection_rate_limit_ms";
+        public static final String KEY_BATTERY_LEVEL_COLLECTION_DELAY_MS
+                = "battery_level_collection_delay_ms";
 
         private static final boolean DEFAULT_TRACK_CPU_TIMES_BY_PROC_STATE = true;
         private static final boolean DEFAULT_TRACK_CPU_ACTIVE_CLUSTER_TIME = true;
@@ -13277,6 +13284,7 @@ public class BatteryStatsImpl extends BatteryStats {
         private static final long DEFAULT_KERNEL_UID_READERS_THROTTLE_TIME = 10_000;
         private static final long DEFAULT_UID_REMOVE_DELAY_MS = 5L * 60L * 1000L;
         private static final long DEFAULT_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS = 600_000;
+        private static final long DEFAULT_BATTERY_LEVEL_COLLECTION_DELAY_MS = 300_000;
 
         public boolean TRACK_CPU_TIMES_BY_PROC_STATE = DEFAULT_TRACK_CPU_TIMES_BY_PROC_STATE;
         public boolean TRACK_CPU_ACTIVE_CLUSTER_TIME = DEFAULT_TRACK_CPU_ACTIVE_CLUSTER_TIME;
@@ -13285,6 +13293,8 @@ public class BatteryStatsImpl extends BatteryStats {
         public long UID_REMOVE_DELAY_MS = DEFAULT_UID_REMOVE_DELAY_MS;
         public long EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS
                 = DEFAULT_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS;
+        public long BATTERY_LEVEL_COLLECTION_DELAY_MS
+                = DEFAULT_BATTERY_LEVEL_COLLECTION_DELAY_MS;
 
         private ContentResolver mResolver;
         private final KeyValueListParser mParser = new KeyValueListParser(',');
@@ -13333,6 +13343,9 @@ public class BatteryStatsImpl extends BatteryStats {
                 EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS = mParser.getLong(
                         KEY_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS,
                         DEFAULT_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS);
+                BATTERY_LEVEL_COLLECTION_DELAY_MS = mParser.getLong(
+                        KEY_BATTERY_LEVEL_COLLECTION_DELAY_MS,
+                        DEFAULT_BATTERY_LEVEL_COLLECTION_DELAY_MS);
             }
         }
 
@@ -13384,6 +13397,8 @@ public class BatteryStatsImpl extends BatteryStats {
             pw.println(KERNEL_UID_READERS_THROTTLE_TIME);
             pw.print(KEY_EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS); pw.print("=");
             pw.println(EXTERNAL_STATS_COLLECTION_RATE_LIMIT_MS);
+            pw.print(KEY_BATTERY_LEVEL_COLLECTION_DELAY_MS); pw.print("=");
+            pw.println(BATTERY_LEVEL_COLLECTION_DELAY_MS);
         }
     }
 

@@ -86,6 +86,7 @@ import android.util.MemoryIntArray;
 import android.view.textservice.TextServicesManager;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.app.ColorDisplayController;
 import com.android.internal.widget.ILockSettings;
 
 import java.io.IOException;
@@ -1784,6 +1785,12 @@ public final class Settings {
     public static final int USER_SETUP_PERSONALIZATION_STARTED = 1;
 
     /**
+     * User has snoozed personalization and will complete it later.
+     * @hide
+     */
+    public static final int USER_SETUP_PERSONALIZATION_PAUSED = 2;
+
+    /**
      * User has completed setup personalization.
      * @hide
      */
@@ -1794,6 +1801,7 @@ public final class Settings {
     @IntDef({
             USER_SETUP_PERSONALIZATION_NOT_STARTED,
             USER_SETUP_PERSONALIZATION_STARTED,
+            USER_SETUP_PERSONALIZATION_PAUSED,
             USER_SETUP_PERSONALIZATION_COMPLETE
     })
     public @interface UserSetupPersonalization {}
@@ -3149,7 +3157,9 @@ public final class Settings {
         public static final String DISPLAY_COLOR_MODE = "display_color_mode";
 
         private static final Validator DISPLAY_COLOR_MODE_VALIDATOR =
-                new SettingsValidators.InclusiveIntegerRangeValidator(0, 2);
+                new SettingsValidators.InclusiveIntegerRangeValidator(
+                        ColorDisplayController.COLOR_MODE_NATURAL,
+                        ColorDisplayController.COLOR_MODE_AUTOMATIC);
 
         /**
          * The amount of time in milliseconds before the device goes to sleep or begins
@@ -8894,6 +8904,14 @@ public final class Settings {
         public static final String PRIV_APP_OOB_ENABLED = "priv_app_oob_enabled";
 
         /**
+         * Comma separated list of privileged package names, which will be running out-of-box APK.
+         * Default: "ALL"
+         *
+         * @hide
+         */
+        public static final String PRIV_APP_OOB_LIST = "priv_app_oob_list";
+
+        /**
          * The interval in milliseconds at which location requests will be throttled when they are
          * coming from the background.
          *
@@ -9534,6 +9552,15 @@ public final class Settings {
         */
        public static final String WIFI_SCAN_ALWAYS_AVAILABLE =
                 "wifi_scan_always_enabled";
+
+        /**
+         * The interval in milliseconds at which wifi rtt ranging requests will be throttled when
+         * they are coming from the background.
+         *
+         * @hide
+         */
+        public static final String WIFI_RTT_BACKGROUND_EXEC_GAP_MS =
+                "wifi_rtt_background_exec_gap_ms";
 
         /**
          * Whether soft AP will shut down after a timeout period when no devices are connected.
@@ -10400,6 +10427,25 @@ public final class Settings {
         public static final String ACTIVITY_MANAGER_CONSTANTS = "activity_manager_constants";
 
         /**
+         * App ops specific settings.
+         * This is encoded as a key=value list, separated by commas. Ex:
+         *
+         * "state_settle_time=10000"
+         *
+         * The following keys are supported:
+         *
+         * <pre>
+         * state_settle_time                (long)
+         * </pre>
+         *
+         * <p>
+         * Type: string
+         * @hide
+         * @see com.android.server.AppOpsService.Constants
+         */
+        public static final String APP_OPS_CONSTANTS = "app_ops_constants";
+
+        /**
          * Device Idle (Doze) specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          *
@@ -10603,18 +10649,30 @@ public final class Settings {
          * App standby (app idle) specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          * <p>
-         * "idle_duration=5000,parole_interval=4500"
+         * "idle_duration=5000,parole_interval=4500,screen_thresholds=0/0/60000/120000"
          * <p>
          * All durations are in millis.
+         * Array values are separated by forward slashes
          * The following keys are supported:
          *
          * <pre>
-         * idle_duration2       (long)
-         * wallclock_threshold  (long)
-         * parole_interval      (long)
-         * parole_duration      (long)
+         * parole_interval                  (long)
+         * parole_window                    (long)
+         * parole_duration                  (long)
+         * screen_thresholds                (long[4])
+         * elapsed_thresholds               (long[4])
+         * strong_usage_duration            (long)
+         * notification_seen_duration       (long)
+         * system_update_usage_duration     (long)
+         * prediction_timeout               (long)
+         * sync_adapter_duration            (long)
+         * exempted_sync_duration           (long)
+         * system_interaction_duration      (long)
+         * stable_charging_threshold        (long)
          *
          * idle_duration        (long) // This is deprecated and used to circumvent b/26355386.
+         * idle_duration2       (long) // deprecated
+         * wallclock_threshold  (long) // deprecated
          * </pre>
          *
          * <p>
@@ -10778,6 +10836,7 @@ public final class Settings {
          * read_binary_cpu_time          (boolean)
          * proc_state_cpu_times_read_delay_ms (long)
          * external_stats_collection_rate_limit_ms (long)
+         * battery_level_collection_delay_ms (long)
          * </pre>
          *
          * <p>
@@ -12399,7 +12458,7 @@ public final class Settings {
           */
         public static final String MULTI_SIM_SMS_SUBSCRIPTION = "multi_sim_sms";
 
-       /**
+        /**
           * Used to provide option to user to select subscription during send SMS.
           * The value 1 - enable, 0 - disable
           * @hide
@@ -12539,6 +12598,28 @@ public final class Settings {
          */
         public static final String NOTIFICATION_SNOOZE_OPTIONS =
                 "notification_snooze_options";
+
+        /**
+         * Settings key for the ratio of notification dismissals to notification views - one of the
+         * criteria for showing the notification blocking helper.
+         *
+         * <p>The value is a float ranging from 0.0 to 1.0 (the closer to 0.0, the more intrusive
+         * the blocking helper will be).
+         *
+         * @hide
+         */
+        public static final String BLOCKING_HELPER_DISMISS_TO_VIEW_RATIO_LIMIT =
+                "blocking_helper_dismiss_to_view_ratio";
+
+        /**
+         * Settings key for the longest streak of dismissals  - one of the criteria for showing the
+         * notification blocking helper.
+         *
+         * <p>The value is an integer greater than 0.
+         *
+         * @hide
+         */
+        public static final String BLOCKING_HELPER_STREAK_LIMIT = "blocking_helper_streak_limit";
 
         /**
          * Configuration flags for SQLite Compatibility WAL. Encoded as a key-value list, separated

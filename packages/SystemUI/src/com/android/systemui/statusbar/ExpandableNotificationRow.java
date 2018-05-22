@@ -76,6 +76,7 @@ import com.android.systemui.statusbar.NotificationGuts.GutsContent;
 import com.android.systemui.statusbar.notification.AboveShelfChangedListener;
 import com.android.systemui.statusbar.notification.ActivityLaunchAnimator;
 import com.android.systemui.statusbar.notification.HybridNotificationView;
+import com.android.systemui.statusbar.notification.NotificationCounters;
 import com.android.systemui.statusbar.notification.NotificationInflater;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.NotificationViewWrapper;
@@ -468,6 +469,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         updateNotificationColor();
         if (mMenuRow != null) {
             mMenuRow.onNotificationUpdated(mStatusBarNotification);
+            mMenuRow.setAppName(mAppName);
         }
         if (mIsSummaryWithChildren) {
             mChildrenContainer.recreateNotificationHeader(mExpandClickListener);
@@ -1252,6 +1254,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 Dependency.get(NotificationBlockingHelperManager.class);
         boolean isBlockingHelperShown = manager.perhapsShowBlockingHelper(this, mMenuRow);
 
+        Dependency.get(MetricsLogger.class).count(NotificationCounters.NOTIFICATION_DISMISSED, 1);
+
         // Continue with dismiss since we don't want the blocking helper to be directly associated
         // with a certain notification.
         performDismiss(fromAccessibility);
@@ -1632,6 +1636,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 mTranslateableViews.get(i).setTranslationX(0);
             }
             invalidateOutline();
+            getEntry().expandedIcon.setScrollX(0);
         }
 
         mMenuRow.resetMenu();
@@ -2595,6 +2600,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     protected boolean disallowSingleClick(MotionEvent event) {
+        if (areGutsExposed()) {
+            return false;
+        }
         float x = event.getX();
         float y = event.getY();
         NotificationHeaderView header = getVisibleNotificationHeader();

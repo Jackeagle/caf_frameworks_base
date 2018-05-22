@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"ಸಿಮ್‌ ಕಾರ್ಡ್ PUK-ಲಾಕ್ ಆಗಿದೆ."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"ಸಿಮ್‌ ಕಾರ್ಡ್ ಅನ್‌ಲಾಕ್ ಮಾಡಲಾಗುತ್ತಿದೆ…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"ಪಿನ್ ಪ್ರದೇಶ"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"ಸಿಮ್ ಪಿನ್ ಪ್ರದೇಶ"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"ಸಿಮ್ PUK ಪ್ರದೇಶ"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"<xliff:g id="ALARM">%1$s</xliff:g> ಗಂಟೆಗೆ ಮುಂದಿನ ಅಲಾರಮ್ ಹೊಂದಿಸಲಾಗಿದೆ"</string>
@@ -140,7 +142,10 @@
       <item quantity="other">ಸಾಧನವನ್ನು <xliff:g id="NUMBER_1">%d</xliff:g> ಗಂಟೆಗಳವರೆಗೆ ಅನ್‌ಲಾಕ್‌ ಮಾಡಿರಲಿಲ್ಲ. ಪಾಸ್‌ವರ್ಡ್‌ ಖಚಿತಪಡಿಸಿ.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"ಗುರುತಿಸಲಾಗಿಲ್ಲ"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="one">ಸಿಮ್ ಪಿನ್ ನಮೂದಿಸಿ. ನಿಮ್ಮಲ್ಲಿ <xliff:g id="NUMBER_1">%d</xliff:g> ಪ್ರಯತ್ನಗಳು ಬಾಕಿ ಉಳಿದಿವೆ.</item>
+      <item quantity="other">ಸಿಮ್ ಪಿನ್ ನಮೂದಿಸಿ. ನಿಮ್ಮಲ್ಲಿ <xliff:g id="NUMBER_1">%d</xliff:g> ಪ್ರಯತ್ನಗಳು ಬಾಕಿ ಉಳಿದಿವೆ.</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="one">ಸಿಮ್ ಅನ್ನು ಈಗ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಮುಂದುವರಿಸಲು PUK ಕೋಡ್ ನಮೂದಿಸಿ. ಸಿಮ್ ಶಾಶ್ವತವಾಗಿ ನಿಷ್ಪ್ರಯೋಜಕವಾಗುವ ಮುನ್ನ ನಿಮ್ಮಲ್ಲಿ <xliff:g id="_NUMBER_1">%d</xliff:g> ಪ್ರಯತ್ನಗಳು ಬಾಕಿ ಉಳಿದಿವೆ. ವಿವರಗಳಿಗಾಗಿ ವಾಹಕವನ್ನು ಸಂಪರ್ಕಿಸಿ.</item>
       <item quantity="other">ಸಿಮ್ ಅನ್ನು ಈಗ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಮುಂದುವರಿಸಲು PUK ಕೋಡ್ ನಮೂದಿಸಿ. ಸಿಮ್ ಶಾಶ್ವತವಾಗಿ ನಿಷ್ಪ್ರಯೋಜಕವಾಗುವ ಮುನ್ನ ನಿಮ್ಮಲ್ಲಿ <xliff:g id="_NUMBER_1">%d</xliff:g> ಪ್ರಯತ್ನಗಳು ಬಾಕಿ ಉಳಿದಿವೆ. ವಿವರಗಳಿಗಾಗಿ ವಾಹಕವನ್ನು ಸಂಪರ್ಕಿಸಿ.</item>

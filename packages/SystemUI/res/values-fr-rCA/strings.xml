@@ -32,7 +32,7 @@
     <string name="status_bar_no_notifications_title" msgid="4755261167193833213">"Aucune notification"</string>
     <string name="status_bar_ongoing_events_title" msgid="1682504513316879202">"En cours"</string>
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"Notifications"</string>
-    <string name="battery_low_title" msgid="6456385927409742437">"Pile faible"</string>
+    <string name="battery_low_title" msgid="9187898087363540349">"La pile sera bientôt épuisée"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"<xliff:g id="PERCENTAGE">%s</xliff:g> restants"</string>
     <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"Il reste <xliff:g id="PERCENTAGE">%s</xliff:g>, environ <xliff:g id="TIME">%s</xliff:g> en fonction de votre usage"</string>
     <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"Il reste <xliff:g id="PERCENTAGE">%s</xliff:g>, environ <xliff:g id="TIME">%s</xliff:g>"</string>
@@ -95,8 +95,8 @@
     <string name="accessibility_unlock_button" msgid="128158454631118828">"Déverrouiller"</string>
     <string name="accessibility_waiting_for_fingerprint" msgid="4808860050517462885">"En attente de l\'empreinte digitale"</string>
     <string name="accessibility_unlock_without_fingerprint" msgid="7541705575183694446">"Déverrouiller le système sans utiliser votre empreinte digitale"</string>
-    <!-- no translation found for accessibility_send_smart_reply (7766727839703044493) -->
-    <skip />
+    <string name="accessibility_scanning_face" msgid="769545173211758586">"Numérisation du visage en cours…"</string>
+    <string name="accessibility_send_smart_reply" msgid="7766727839703044493">"Envoyer"</string>
     <string name="unlock_label" msgid="8779712358041029439">"déverrouiller"</string>
     <string name="phone_label" msgid="2320074140205331708">"Ouvrir le téléphone"</string>
     <string name="voice_assist_label" msgid="3956854378310019854">"ouvrir l\'assistance vocale"</string>
@@ -210,10 +210,8 @@
     <string name="accessibility_quick_settings_airplane_on" msgid="6406141469157599296">"Mode Avion : activé"</string>
     <string name="accessibility_quick_settings_airplane_changed_off" msgid="66846307818850664">"Le mode Avion est désactivé."</string>
     <string name="accessibility_quick_settings_airplane_changed_on" msgid="8983005603505087728">"Le mode Avion est activé."</string>
-    <!-- no translation found for accessibility_quick_settings_dnd_none_on (2960643943620637020) -->
-    <skip />
-    <!-- no translation found for accessibility_quick_settings_dnd_alarms_on (3357131899365865386) -->
-    <skip />
+    <string name="accessibility_quick_settings_dnd_none_on" msgid="2960643943620637020">"aucune interruption"</string>
+    <string name="accessibility_quick_settings_dnd_alarms_on" msgid="3357131899365865386">"alarmes seulement"</string>
     <string name="accessibility_quick_settings_dnd" msgid="6607873236717185815">"Ne pas déranger."</string>
     <string name="accessibility_quick_settings_dnd_changed_off" msgid="898107593453022935">"Le mode « Ne pas déranger » a bien été désactivé."</string>
     <string name="accessibility_quick_settings_dnd_changed_on" msgid="4483780856613561039">"Le mode « Ne pas déranger » a bien été activé."</string>
@@ -372,6 +370,8 @@
     <string name="recents_accessibility_split_screen_top" msgid="9056056469282256287">"Écran partagé dans le haut"</string>
     <string name="recents_accessibility_split_screen_left" msgid="8987144699630620019">"Écran partagé à la gauche"</string>
     <string name="recents_accessibility_split_screen_right" msgid="275069779299592867">"Écran partagé à la droite"</string>
+    <!-- no translation found for quick_step_accessibility_toggle_overview (7171470775439860480) -->
+    <skip />
     <string name="expanded_header_battery_charged" msgid="5945855970267657951">"Chargée"</string>
     <string name="expanded_header_battery_charging" msgid="205623198487189724">"Charge en cours..."</string>
     <string name="expanded_header_battery_charging_with_time" msgid="457559884275395376">"Chargée dans <xliff:g id="CHARGING_TIME">%s</xliff:g>"</string>
@@ -545,6 +545,12 @@
     <string name="volume_stream_content_description_mute" msgid="3625049841390467354">"%1$s. Touchez pour couper le son. Il est possible de couper le son des services d\'accessibilité."</string>
     <string name="volume_stream_content_description_vibrate_a11y" msgid="6427727603978431301">"%1$s. Touchez pour activer les vibrations."</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="8995013018414535494">"%1$s. Touchez pour couper le son."</string>
+    <!-- no translation found for volume_ringer_hint_mute (9199811307292269601) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_unmute (6602880133293060368) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_vibrate (4036802135666515202) -->
+    <skip />
     <string name="volume_dialog_title" msgid="7272969888820035876">"Commandes de volume de %s"</string>
     <string name="volume_dialog_ringer_guidance_ring" msgid="3360373718388509040">"Les appels et les notifications seront annoncés par une sonnerie (<xliff:g id="VOLUME_LEVEL">%1$s</xliff:g>)"</string>
     <string name="output_title" msgid="5355078100792942802">"Sortie multimédia"</string>
@@ -610,20 +616,22 @@
     <string name="inline_minimize_button" msgid="966233327974702195">"Réduire"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"Continuer à afficher les notifications de cette application?"</string>
     <string name="notification_unblockable_desc" msgid="1037434112919403708">"Ces notifications ne peuvent pas être désactivées"</string>
-    <string name="notification_appops_camera_active" msgid="730959943016785931">"l\'appareil photo"</string>
-    <string name="notification_appops_microphone_active" msgid="1546319728924580686">"le microphone"</string>
-    <string name="notification_appops_overlay_active" msgid="633813008357934729">"superpose du contenu par-dessus d\'autres applications à l\'écran"</string>
-    <plurals name="notification_appops" formatted="false" msgid="1258122060887196817">
-      <item quantity="one">Cette application <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> et <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>.</item>
-      <item quantity="other">Cette application <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> et <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>.</item>
-    </plurals>
-    <plurals name="notification_using" formatted="false" msgid="2211008461429037973">
-      <item quantity="one">utilise <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> et <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g></item>
-      <item quantity="other">utilise <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> et <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g></item>
-    </plurals>
-    <string name="notification_appops_settings" msgid="1028328314935908050">"Paramètres"</string>
-    <!-- no translation found for notification_appops_ok (1156966426011011434) -->
+    <!-- no translation found for appops_camera (8100147441602585776) -->
     <skip />
+    <!-- no translation found for appops_microphone (741508267659494555) -->
+    <skip />
+    <!-- no translation found for appops_overlay (6165912637560323464) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic (1576901651150187433) -->
+    <skip />
+    <!-- no translation found for appops_camera_overlay (8869400080809298814) -->
+    <skip />
+    <!-- no translation found for appops_mic_overlay (4835157962857919804) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic_overlay (6718768197048030993) -->
+    <skip />
+    <string name="notification_appops_settings" msgid="1028328314935908050">"Paramètres"</string>
+    <string name="notification_appops_ok" msgid="1156966426011011434">"OK"</string>
     <string name="notification_channel_controls_opened_accessibility" msgid="6553950422055908113">"Les paramètres des notifications pour <xliff:g id="APP_NAME">%1$s</xliff:g> sont ouverts"</string>
     <string name="notification_channel_controls_closed_accessibility" msgid="7521619812603693144">"Les paramètres des notifications pour <xliff:g id="APP_NAME">%1$s</xliff:g> sont fermés"</string>
     <string name="notification_channel_switch_accessibility" msgid="3420796005601900717">"Autoriser les notifications de cette chaîne"</string>
@@ -857,4 +865,5 @@
     <string name="auto_saver_enabled_text" msgid="874711029884777579">"La fonction Économie d\'énergie s\'activera automatiquement une fois que la pile sera en dessous de <xliff:g id="PERCENTAGE">%d</xliff:g> %%."</string>
     <string name="open_saver_setting_action" msgid="8314624730997322529">"Paramètres"</string>
     <string name="auto_saver_okay_action" msgid="2701221740227683650">"OK"</string>
+    <string name="heap_dump_tile_name" msgid="9141031328971226374">"Capturer mémoire SysUI"</string>
 </resources>

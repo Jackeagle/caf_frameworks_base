@@ -240,6 +240,8 @@
     <string name="accessibility_waiting_for_fingerprint">Waiting for fingerprint</string>
     <!-- Accessibility action of the unlock button when fingerpint is on (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_unlock_without_fingerprint">Unlock without using your fingerprint</string>
+    <!-- Content description of the Trusted Face icon for accessibility. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_scanning_face">Scanning face</string>
     <!-- Click action label for accessibility for the smart reply buttons (not shown on-screen).". [CHAR LIMIT=NONE] -->
     <string name="accessibility_send_smart_reply">Send</string>
     <!-- Click action label for accessibility for the unlock button. [CHAR LIMIT=NONE] -->
@@ -860,6 +862,9 @@
     <!-- Recents: Accessibility split to the right -->
     <string name="recents_accessibility_split_screen_right">Split screen to the right</string>
 
+    <!-- QuickStep: Accessibility to toggle overview [CHAR LIMIT=40] -->
+    <string name="quick_step_accessibility_toggle_overview">Toggle Overview</string>
+
     <!-- Expanded Status Bar Header: Battery Charged [CHAR LIMIT=40] -->
     <string name="expanded_header_battery_charged">Charged</string>
 
@@ -1358,6 +1363,13 @@
     <string name="volume_stream_content_description_vibrate_a11y">%1$s. Tap to set to vibrate.</string>
     <string name="volume_stream_content_description_mute_a11y">%1$s. Tap to mute.</string>
 
+    <!-- Hint for accessibility. For example: double tap to mute [CHAR_LIMIT=NONE] -->
+    <string name="volume_ringer_hint_mute">mute</string>
+    <!-- Hint for accessibility. For example: double tap to unmute [CHAR_LIMIT=NONE] -->
+    <string name="volume_ringer_hint_unmute">unmute</string>
+    <!-- Hint for accessibility. For example: double tap to vibrate [CHAR_LIMIT=NONE] -->
+    <string name="volume_ringer_hint_vibrate">vibrate</string>
+
     <string name="volume_dialog_title">%s volume controls</string>
 
     <string name="volume_dialog_ringer_guidance_ring">Calls and notifications will ring (<xliff:g id="volume level" example="56">%1$s</xliff:g>)</string>
@@ -1565,21 +1577,20 @@
     <!-- Notification: Control panel: Label that displays when the app's notifications cannot be blocked. -->
     <string name="notification_unblockable_desc">These notifications can\'t be turned off</string>
 
-    <string name="notification_appops_camera_active">camera</string>
-
-    <string name="notification_appops_microphone_active">microphone</string>
-
-    <string name="notification_appops_overlay_active">displaying over other apps on your screen</string>
-
-    <plurals name="notification_appops">
-        <item quantity="one">This app is <xliff:g id="performing activity" example="using the camera">%1$s</xliff:g>.</item>
-        <item quantity="other">This app is <xliff:g id="performing activity" example="using the camera">%1$s</xliff:g> and <xliff:g id="performing activity" example="using the microphone">%2$s</xliff:g>.</item>
-    </plurals>
-
-    <plurals name="notification_using">
-        <item quantity="one">using the <xliff:g id="performing activity" example="camera">%1$s</xliff:g></item>
-        <item quantity="other">using the <xliff:g id="performing activity" example="camera">%1$s</xliff:g> and <xliff:g id="performing activity" example="microphone">%2$s</xliff:g></item>
-    </plurals>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_camera">This app is using the camera.</string>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_microphone">This app is using the microphone.</string>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_overlay">This app is displaying over other apps on your screen.</string>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_camera_mic">This app is using the microphone and camera.</string>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_camera_overlay">This app is displaying over other apps on your screen and using the camera.</string>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_mic_overlay">This app is displaying over other apps on your screen and using the microphone.</string>
+    <!-- Notification Inline controls: describes what the app is doing in the background [CHAR_LIMIT=NONE] -->
+    <string name="appops_camera_mic_overlay">This app is displaying over other apps on your screen and using the microphone and camera.</string>
 
     <string name="notification_appops_settings">Settings</string>
     <string name="notification_appops_ok">OK</string>
@@ -2232,4 +2243,9 @@
 
     <!-- URl of the webpage that explains battery saver. -->
     <string name="help_uri_battery_saver_learn_more_link_target" translatable="false"></string>
+
+    <!-- Name for a quick settings tile, used only by platform developers, to extract the SystemUI process memory and send it to another
+         app for debugging. Will not be seen by users. [CHAR LIMIT=20] -->
+    <string name="heap_dump_tile_name">Dump SysUI Heap</string>
+
 </resources>

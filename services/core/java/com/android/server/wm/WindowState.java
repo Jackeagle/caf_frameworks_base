@@ -808,6 +808,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     void onParentSet() {
         super.onParentSet();
         setDrawnStateEvaluated(false /*evaluated*/);
+
+        getDisplayContent().reapplyMagnificationSpec();
     }
 
     @Override
@@ -3865,9 +3867,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         windowInfo.title = mAttrs.accessibilityTitle;
         // Panel windows have no public way to set the a11y title directly. Use the
         // regular title as a fallback.
-        if (TextUtils.isEmpty(windowInfo.title)
-                && (mAttrs.type >= WindowManager.LayoutParams.FIRST_SUB_WINDOW)
-                && (mAttrs.type <= WindowManager.LayoutParams.LAST_SUB_WINDOW)) {
+        final boolean isPanelWindow = (mAttrs.type >= WindowManager.LayoutParams.FIRST_SUB_WINDOW)
+                && (mAttrs.type <= WindowManager.LayoutParams.LAST_SUB_WINDOW);
+        // Accessibility overlays should have titles that work for accessibility, and can't set
+        // the a11y title themselves.
+        final boolean isAccessibilityOverlay =
+                windowInfo.type == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+        if (TextUtils.isEmpty(windowInfo.title) && (isPanelWindow || isAccessibilityOverlay)) {
             windowInfo.title = mAttrs.getTitle();
         }
         windowInfo.accessibilityIdOfAnchor = mAttrs.accessibilityIdOfAnchor;
@@ -3991,32 +3997,33 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return false;
     }
 
+    private boolean applyImeWindowsIfNeeded(ToBooleanFunction<WindowState> callback,
+            boolean traverseTopToBottom) {
+        // If this window is the current IME target, so we need to process the IME windows
+        // directly above it. The exception is if we are in split screen
+        // in which case we process the IME at the DisplayContent level to
+        // ensure it is above the docked divider.
+        if (isInputMethodTarget() && !inSplitScreenWindowingMode()) {
+            if (getDisplayContent().forAllImeWindows(callback, traverseTopToBottom)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean applyInOrderWithImeWindows(ToBooleanFunction<WindowState> callback,
             boolean traverseTopToBottom) {
         if (traverseTopToBottom) {
-            if (isInputMethodTarget()) {
-                // This window is the current IME target, so we need to process the IME windows
-                // directly above it.
-                if (getDisplayContent().forAllImeWindows(callback, traverseTopToBottom)) {
-                    return true;
-                }
-            }
-            if (callback.apply(this)) {
+            if (applyImeWindowsIfNeeded(callback, traverseTopToBottom)
+                    || callback.apply(this)) {
                 return true;
             }
         } else {
-            if (callback.apply(this)) {
+            if (callback.apply(this)
+                    || applyImeWindowsIfNeeded(callback, traverseTopToBottom)) {
                 return true;
             }
-            if (isInputMethodTarget()) {
-                // This window is the current IME target, so we need to process the IME windows
-                // directly above it.
-                if (getDisplayContent().forAllImeWindows(callback, traverseTopToBottom)) {
-                    return true;
-                }
-            }
         }
-
         return false;
     }
 
@@ -4270,6 +4277,24 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
+    private boolean skipDecorCrop() {
+        // The decor frame is used to specify the region not covered by the system
+        // decorations (nav bar, status bar). In case this is empty, for example with
+        // FLAG_TRANSLUCENT_NAVIGATION, we don't need to do any cropping.
+        if (mDecorFrame.isEmpty()) {
+            return true;
+        }
+
+        // But if we have a frame, and are an application window, then we must be cropped.
+        if (mAppToken != null) {
+            return false;
+        }
+
+        // For non application windows, we may be allowed to extend over the decor bars
+        // depending on our type and permissions assosciated with our token.
+        return mToken.canLayerAboveSystemBars();
+    }
+
     /**
      * Calculate the window crop according to system decor policy. In general this is
      * the system decor rect (see #calculateSystemDecorRect), but we also have some
@@ -4287,7 +4312,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             policyCrop.intersect(-mCompatFrame.left, -mCompatFrame.top,
                     displayInfo.logicalWidth - mCompatFrame.left,
                     displayInfo.logicalHeight - mCompatFrame.top);
-        } else if (mDecorFrame.isEmpty()) {
+        } else if (skipDecorCrop()) {
             // Windows without policy decor aren't cropped.
             policyCrop.set(0, 0, mCompatFrame.width(), mCompatFrame.height());
         } else {

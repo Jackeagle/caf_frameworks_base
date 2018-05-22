@@ -235,6 +235,7 @@ import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
 import android.view.Display;
 import android.view.DisplayCutout;
+import android.view.DisplayInfo;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.IApplicationToken;
@@ -820,9 +821,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mHavePendingMediaKeyRepeatWithWakeLock;
 
     private int mCurrentUserId;
-
-    /* Whether accessibility is magnifying the screen */
-    private boolean mScreenMagnificationActive;
 
     // Maps global key codes to the components that will handle them.
     private GlobalKeyManager mGlobalKeyManager;
@@ -6135,14 +6133,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 && (!isNavBarVirtKey || mNavBarVirtualKeyHapticFeedbackEnabled)
                 && event.getRepeatCount() == 0;
 
-        // Cancel any pending remote recents animations before handling the button itself. In the
-        // case where we are going home and the recents animation has already started, just cancel
-        // the recents animation, leaving the home stack in place for the pending start activity
-        if (isNavBarVirtKey && !down) {
-            boolean isHomeKey = keyCode == KeyEvent.KEYCODE_HOME;
-            mActivityManagerInternal.cancelRecentsAnimation(!isHomeKey);
-        }
-
         // Handle special keys.
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK: {
@@ -7253,14 +7243,35 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     @Override
-    public boolean isDockSideAllowed(int dockSide) {
+    public boolean isDockSideAllowed(int dockSide, int originalDockSide, int displayWidth,
+            int displayHeight, int displayRotation) {
+        final int barPosition = navigationBarPosition(displayWidth, displayHeight, displayRotation);
+        return isDockSideAllowed(dockSide, originalDockSide, barPosition, mNavigationBarCanMove);
+    }
 
-        // We do not allow all dock sides at which the navigation bar touches the docked stack.
-        if (!mNavigationBarCanMove) {
-            return dockSide == DOCKED_TOP || dockSide == DOCKED_LEFT || dockSide == DOCKED_RIGHT;
-        } else {
-            return dockSide == DOCKED_TOP || dockSide == DOCKED_LEFT;
+    @VisibleForTesting
+    static boolean isDockSideAllowed(int dockSide, int originalDockSide,
+            int navBarPosition, boolean navigationBarCanMove) {
+        if (dockSide == DOCKED_TOP) {
+            return true;
         }
+
+        if (navigationBarCanMove) {
+            // Only allow the dockside opposite to the nav bar position in landscape
+            return dockSide == DOCKED_LEFT && navBarPosition == NAV_BAR_RIGHT
+                    || dockSide == DOCKED_RIGHT && navBarPosition == NAV_BAR_LEFT;
+        }
+
+        // Side is the same as original side
+        if (dockSide == originalDockSide) {
+            return true;
+        }
+
+        // Only if original docked side was top in portrait will allow left for landscape
+        if (dockSide == DOCKED_LEFT && originalDockSide == DOCKED_TOP) {
+            return true;
+        }
+        return false;
     }
 
     void sendCloseSystemWindows() {
@@ -8463,11 +8474,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private int configureNavBarOpacity(int visibility, boolean dockedStackVisible,
             boolean freeformStackVisible, boolean isDockedDividerResizing) {
-        if (mScreenMagnificationActive) {
-            // When the screen is magnified, the nav bar should be opaque since its background
-            // can vary as the user pans and zooms
-            visibility = setNavBarOpaqueFlag(visibility);
-        } else if (mNavBarOpacityMode == NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED) {
+        if (mNavBarOpacityMode == NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED) {
             if (dockedStackVisible || freeformStackVisible || isDockedDividerResizing) {
                 visibility = setNavBarOpaqueFlag(visibility);
             }
@@ -8619,14 +8626,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return true;
         }
         return false;
-    }
-
-    @Override
-    public void onScreenMagnificationStateChanged(boolean active) {
-        synchronized (mWindowManagerFuncs.getWindowManagerLock()) {
-            mScreenMagnificationActive = active;
-            updateSystemUiVisibilityLw();
-        }
     }
 
     @Override

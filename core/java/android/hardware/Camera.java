@@ -18,19 +18,23 @@ package android.hardware;
 
 import static android.system.OsConstants.*;
 
+import android.annotation.Nullable;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.app.ActivityThread;
+import android.app.AppOpsManager;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
+import android.media.AudioAttributes;
 import android.media.IAudioService;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemProperties;
@@ -44,6 +48,10 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.os.SystemProperties;
+
+import com.android.internal.annotations.GuardedBy;
+import com.android.internal.app.IAppOpsCallback;
+import com.android.internal.app.IAppOpsService;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -179,6 +187,15 @@ public class Camera {
     private boolean mWithBuffer;
     private boolean mFaceDetectionRunning = false;
     private final Object mAutoFocusCallbackLock = new Object();
+
+    private final Object mShutterSoundLock = new Object();
+    // for AppOps
+    private @Nullable IAppOpsService mAppOps;
+    private IAppOpsCallback mAppOpsCallback;
+    @GuardedBy("mShutterSoundLock")
+    private boolean mHasAppOpsPlayAudio = true;
+    @GuardedBy("mShutterSoundLock")
+    private boolean mShutterSoundEnabledFromApp = true;
 
     private static final int NO_ERROR = 0;
     private static final int EACCESS = -13;
@@ -605,6 +622,7 @@ public class Camera {
             // Should never hit this.
             throw new RuntimeException("Unknown camera error");
         }
+        initAppOps();
     }
 
 
@@ -626,6 +644,33 @@ public class Camera {
      * An empty Camera for testing purpose.
      */
     Camera() {
+        initAppOps();
+    }
+
+    private void initAppOps() {
+        IBinder b = ServiceManager.getService(Context.APP_OPS_SERVICE);
+        mAppOps = IAppOpsService.Stub.asInterface(b);
+        // initialize mHasAppOpsPlayAudio
+        updateAppOpsPlayAudio();
+        // register a callback to monitor whether the OP_PLAY_AUDIO is still allowed
+        mAppOpsCallback = new IAppOpsCallbackWrapper(this);
+        try {
+            mAppOps.startWatchingMode(AppOpsManager.OP_PLAY_AUDIO,
+                    ActivityThread.currentPackageName(), mAppOpsCallback);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error registering appOps callback", e);
+            mHasAppOpsPlayAudio = false;
+        }
+    }
+
+    private void releaseAppOps() {
+        try {
+            if (mAppOps != null) {
+                mAppOps.stopWatchingMode(mAppOpsCallback);
+            }
+        } catch (Exception e) {
+            // nothing to do here, the object is supposed to be released anyway
+        }
     }
 
     @Override
@@ -647,6 +692,7 @@ public class Camera {
     public final void release() {
         native_release();
         mFaceDetectionRunning = false;
+        releaseAppOps();
     }
 
     /**
@@ -1714,16 +1760,32 @@ public class Camera {
      * @see ShutterCallback
      */
     public final boolean enableShutterSound(boolean enabled) {
-        if (!enabled) {
-            IBinder b = ServiceManager.getService(Context.AUDIO_SERVICE);
-            IAudioService audioService = IAudioService.Stub.asInterface(b);
-            try {
-                if (audioService.isCameraSoundForced()) return false;
-            } catch (RemoteException e) {
-                Log.e(TAG, "Audio service is unavailable for queries");
+        boolean canDisableShutterSound = true;
+        IBinder b = ServiceManager.getService(Context.AUDIO_SERVICE);
+        IAudioService audioService = IAudioService.Stub.asInterface(b);
+        try {
+            if (audioService.isCameraSoundForced()) {
+                canDisableShutterSound = false;
             }
+        } catch (RemoteException e) {
+            Log.e(TAG, "Audio service is unavailable for queries");
         }
-        return _enableShutterSound(enabled);
+        if (!enabled && !canDisableShutterSound) {
+            return false;
+        }
+        synchronized (mShutterSoundLock) {
+            mShutterSoundEnabledFromApp = enabled;
+            // Return the result of _enableShutterSound(enabled) in all cases.
+            // If the shutter sound can be disabled, disable it when the device is in DnD mode.
+            boolean ret = _enableShutterSound(enabled);
+            if (enabled && !mHasAppOpsPlayAudio) {
+                Log.i(TAG, "Shutter sound is not allowed by AppOpsManager");
+                if (canDisableShutterSound) {
+                    _enableShutterSound(false);
+                }
+            }
+            return ret;
+        }
     }
 
     /**
@@ -1747,6 +1809,58 @@ public class Camera {
     }
 
     private native final boolean _enableShutterSound(boolean enabled);
+
+    private static class IAppOpsCallbackWrapper extends IAppOpsCallback.Stub {
+        private final WeakReference<Camera> mWeakCamera;
+
+        IAppOpsCallbackWrapper(Camera camera) {
+            mWeakCamera = new WeakReference<Camera>(camera);
+        }
+
+        @Override
+        public void opChanged(int op, int uid, String packageName) {
+            if (op == AppOpsManager.OP_PLAY_AUDIO) {
+                final Camera camera = mWeakCamera.get();
+                if (camera != null) {
+                    camera.updateAppOpsPlayAudio();
+                }
+            }
+        }
+    }
+
+    private void updateAppOpsPlayAudio() {
+        synchronized (mShutterSoundLock) {
+            boolean oldHasAppOpsPlayAudio = mHasAppOpsPlayAudio;
+            try {
+                int mode = AppOpsManager.MODE_IGNORED;
+                if (mAppOps != null) {
+                    mode = mAppOps.checkAudioOperation(AppOpsManager.OP_PLAY_AUDIO,
+                            AudioAttributes.USAGE_ASSISTANCE_SONIFICATION,
+                            Process.myUid(), ActivityThread.currentPackageName());
+                }
+                mHasAppOpsPlayAudio = mode == AppOpsManager.MODE_ALLOWED;
+            } catch (RemoteException e) {
+                Log.e(TAG, "AppOpsService check audio operation failed");
+                mHasAppOpsPlayAudio = false;
+            }
+            if (oldHasAppOpsPlayAudio != mHasAppOpsPlayAudio) {
+                if (!mHasAppOpsPlayAudio) {
+                    IBinder b = ServiceManager.getService(Context.AUDIO_SERVICE);
+                    IAudioService audioService = IAudioService.Stub.asInterface(b);
+                    try {
+                        if (audioService.isCameraSoundForced()) {
+                            return;
+                        }
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "Audio service is unavailable for queries");
+                    }
+                    _enableShutterSound(false);
+                } else {
+                    enableShutterSound(mShutterSoundEnabledFromApp);
+                }
+            }
+        }
+    }
 
     /**
      * Callback interface for zoom changes during a smooth zoom operation.

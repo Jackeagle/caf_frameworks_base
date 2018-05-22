@@ -54,6 +54,7 @@ import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.R;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.IState;
 import com.android.internal.util.Preconditions;
@@ -74,6 +75,7 @@ import java.util.Objects;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -100,6 +102,36 @@ public class IpClient extends StateMachine {
     private static final Class[] sMessageClasses = { IpClient.class, DhcpClient.class };
     private static final SparseArray<String> sWhatToString =
             MessageUtils.findMessageNames(sMessageClasses);
+    // Two static concurrent hashmaps of interface name to logging classes.
+    // One holds StateMachine logs and the other connectivity packet logs.
+    private static final ConcurrentHashMap<String, SharedLog> sSmLogs = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, LocalLog> sPktLogs = new ConcurrentHashMap<>();
+
+    // If |args| is non-empty, assume it's a list of interface names for which
+    // we should print IpClient logs (filter out all others).
+    public static void dumpAllLogs(PrintWriter writer, String[] args) {
+        for (String ifname : sSmLogs.keySet()) {
+            if (!ArrayUtils.isEmpty(args) && !ArrayUtils.contains(args, ifname)) continue;
+
+            writer.println(String.format("--- BEGIN %s ---", ifname));
+
+            final SharedLog smLog = sSmLogs.get(ifname);
+            if (smLog != null) {
+                writer.println("State machine log:");
+                smLog.dump(null, writer, null);
+            }
+
+            writer.println("");
+
+            final LocalLog pktLog = sPktLogs.get(ifname);
+            if (pktLog != null) {
+                writer.println("Connectivity packet log:");
+                pktLog.readOnlyLocalLog().dump(null, writer, null);
+            }
+
+            writer.println(String.format("--- END %s ---", ifname));
+        }
+    }
 
     /**
      * Callbacks for handling IpClient events.
@@ -624,7 +656,14 @@ public class IpClient extends StateMachine {
     private ApfFilter mApfFilter;
     private boolean mMulticastFiltering;
     private long mStartTimeMillis;
-    private byte[] mApfDataSnapshot;
+
+    /**
+     * Reading the snapshot is an asynchronous operation initiated by invoking
+     * Callback.startReadPacketFilter() and completed when the WiFi Service responds with an
+     * EVENT_READ_PACKET_FILTER_COMPLETE message. The mApfDataSnapshotComplete condition variable
+     * signals when a new snapshot is ready.
+     */
+    private final ConditionVariable mApfDataSnapshotComplete = new ConditionVariable();
 
     public static class Dependencies {
         public INetworkManagementService getNMS() {
@@ -673,8 +712,10 @@ public class IpClient extends StateMachine {
         mShutdownLatch = new CountDownLatch(1);
         mNwService = deps.getNMS();
 
-        mLog = new SharedLog(MAX_LOG_RECORDS, mTag);
-        mConnectivityPacketLog = new LocalLog(MAX_PACKET_RECORDS);
+        sSmLogs.putIfAbsent(mInterfaceName, new SharedLog(MAX_LOG_RECORDS, mTag));
+        mLog = sSmLogs.get(mInterfaceName);
+        sPktLogs.putIfAbsent(mInterfaceName, new LocalLog(MAX_PACKET_RECORDS));
+        mConnectivityPacketLog = sPktLogs.get(mInterfaceName);
         mMsgStateLogger = new MessageHandlingLogger();
 
         // TODO: Consider creating, constructing, and passing in some kind of
@@ -881,13 +922,21 @@ public class IpClient extends StateMachine {
         final ProvisioningConfiguration provisioningConfig = mConfiguration;
         final ApfCapabilities apfCapabilities = (provisioningConfig != null)
                 ? provisioningConfig.mApfCapabilities : null;
-        final byte[] apfDataSnapshot = mApfDataSnapshot;
 
         IndentingPrintWriter pw = new IndentingPrintWriter(writer, "  ");
         pw.println(mTag + " APF dump:");
         pw.increaseIndent();
         if (apfFilter != null) {
+            if (apfCapabilities.hasDataAccess()) {
+                // Request a new snapshot, then wait for it.
+                mApfDataSnapshotComplete.close();
+                mCallback.startReadPacketFilter();
+                if (!mApfDataSnapshotComplete.block(1000)) {
+                    pw.print("TIMEOUT: DUMPING STALE APF SNAPSHOT");
+                }
+            }
             apfFilter.dump(pw);
+
         } else {
             pw.print("No active ApfFilter; ");
             if (provisioningConfig == null) {
@@ -899,15 +948,6 @@ public class IpClient extends StateMachine {
             }
         }
         pw.decreaseIndent();
-        pw.println(mTag + " latest APF data snapshot: ");
-        pw.increaseIndent();
-        if (apfDataSnapshot != null) {
-            pw.println(HexDump.dumpHexString(apfDataSnapshot));
-        } else {
-            pw.println("No last snapshot.");
-        }
-        pw.decreaseIndent();
-
         pw.println();
         pw.println(mTag + " current ProvisioningConfiguration:");
         pw.increaseIndent();
@@ -1704,7 +1744,10 @@ public class IpClient extends StateMachine {
                 }
 
                 case EVENT_READ_PACKET_FILTER_COMPLETE: {
-                    mApfDataSnapshot = (byte[]) msg.obj;
+                    if (mApfFilter != null) {
+                        mApfFilter.setDataSnapshot((byte[]) msg.obj);
+                    }
+                    mApfDataSnapshotComplete.open();
                     break;
                 }
 

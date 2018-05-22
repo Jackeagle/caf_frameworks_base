@@ -2722,7 +2722,40 @@ public class Notification implements Parcelable
      * @hide
      */
     public static boolean areRemoteViewsChanged(Builder first, Builder second) {
-        return !first.usesStandardHeader() || !second.usesStandardHeader();
+        if (!Objects.equals(first.usesStandardHeader(), second.usesStandardHeader())) {
+            return true;
+        }
+
+        if (areRemoteViewsChanged(first.mN.contentView, second.mN.contentView)) {
+            return true;
+        }
+        if (areRemoteViewsChanged(first.mN.bigContentView, second.mN.bigContentView)) {
+            return true;
+        }
+        if (areRemoteViewsChanged(first.mN.headsUpContentView, second.mN.headsUpContentView)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static boolean areRemoteViewsChanged(RemoteViews first, RemoteViews second) {
+        if (first == null && second == null) {
+            return false;
+        }
+        if (first == null && second != null || first != null && second == null) {
+            return true;
+        }
+
+        if (!Objects.equals(first.getLayoutId(), second.getLayoutId())) {
+            return true;
+        }
+
+        if (!Objects.equals(first.getSequenceNumber(), second.getSequenceNumber())) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -5102,6 +5135,10 @@ public class Notification implements Parcelable
                     savedBundle.getBoolean(EXTRA_SHOW_CHRONOMETER));
             publicExtras.putBoolean(EXTRA_CHRONOMETER_COUNT_DOWN,
                     savedBundle.getBoolean(EXTRA_CHRONOMETER_COUNT_DOWN));
+            String appName = savedBundle.getString(EXTRA_SUBSTITUTE_APP_NAME);
+            if (appName != null) {
+                publicExtras.putString(EXTRA_SUBSTITUTE_APP_NAME, appName);
+            }
             mN.extras = publicExtras;
             RemoteViews view;
             if (ambient) {
@@ -5553,7 +5590,8 @@ public class Notification implements Parcelable
          *
          * @hide
          */
-        public static Notification maybeCloneStrippedForDelivery(Notification n, boolean isLowRam) {
+        public static Notification maybeCloneStrippedForDelivery(Notification n, boolean isLowRam,
+                Context context) {
             String templateClass = n.extras.getString(EXTRA_TEMPLATE);
 
             // Only strip views for known Styles because we won't know how to
@@ -5595,9 +5633,13 @@ public class Notification implements Parcelable
                 clone.extras.remove(EXTRA_REBUILD_HEADS_UP_CONTENT_VIEW_ACTION_COUNT);
             }
             if (isLowRam) {
-                clone.extras.remove(Notification.TvExtender.EXTRA_TV_EXTENDER);
-                clone.extras.remove(WearableExtender.EXTRA_WEARABLE_EXTENSIONS);
-                clone.extras.remove(CarExtender.EXTRA_CAR_EXTENDER);
+                String[] allowedServices = context.getResources().getStringArray(
+                        R.array.config_allowedManagedServicesOnLowRamDevices);
+                if (allowedServices.length == 0) {
+                    clone.extras.remove(Notification.TvExtender.EXTRA_TV_EXTENDER);
+                    clone.extras.remove(WearableExtender.EXTRA_WEARABLE_EXTENSIONS);
+                    clone.extras.remove(CarExtender.EXTRA_CAR_EXTENDER);
+                }
             }
             return clone;
         }

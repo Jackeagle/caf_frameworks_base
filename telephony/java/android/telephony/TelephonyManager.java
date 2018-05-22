@@ -334,10 +334,12 @@ public class TelephonyManager {
      *
      * <p>
      * The {@link #EXTRA_STATE} extra indicates the new call state.
-     * If the new state is RINGING, a second extra
-     * {@link #EXTRA_INCOMING_NUMBER} provides the incoming phone number as
-     * a String.
-     *
+     * If a receiving app has {@link android.Manifest.permission#READ_CALL_LOG} permission, a second
+     * extra {@link #EXTRA_INCOMING_NUMBER} provides the phone number for incoming and outoing calls
+     * as a String.  Note: If the receiving app has
+     * {@link android.Manifest.permission#READ_CALL_LOG} and
+     * {@link android.Manifest.permission#READ_PHONE_STATE} permission, it will receive the
+     * broadcast twice; one with the phone number and another without it.
      * <p class="note">
      * This was a {@link android.content.Context#sendStickyBroadcast sticky}
      * broadcast in version 1.0, but it is no longer sticky.
@@ -2786,6 +2788,22 @@ public class TelephonyManager {
             return telephony.getUiccSlotsInfo();
         } catch (RemoteException e) {
             return null;
+        }
+    }
+
+    /**
+     * Test method to reload the UICC profile.
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
+    public void refreshUiccProfile() {
+        try {
+            ITelephony telephony = getITelephony();
+            telephony.refreshUiccProfile(mSubId);
+        } catch (RemoteException ex) {
+            Rlog.w(TAG, "RemoteException", ex);
         }
     }
 
@@ -6483,6 +6501,29 @@ public class TelephonyManager {
         } catch (NullPointerException e) {
         }
         return retVal;
+    }
+
+    /**
+     * Returns the result and response from RIL for oem request
+     *
+     * @param oemReq the data is sent to ril.
+     * @param oemResp the respose data from RIL.
+     * @return negative value request was not handled or get error
+     *         0 request was handled succesfully, but no response data
+     *         positive value success, data length of response
+     * @hide
+     * @deprecated OEM needs a vendor-extension hal and their apps should use that instead
+     */
+    @Deprecated
+    public int invokeOemRilRequestRaw(byte[] oemReq, byte[] oemResp) {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null)
+                return telephony.invokeOemRilRequestRaw(oemReq, oemResp);
+        } catch (RemoteException ex) {
+        } catch (NullPointerException ex) {
+        }
+        return -1;
     }
 
     /** @hide */

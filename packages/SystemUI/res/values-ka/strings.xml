@@ -32,7 +32,7 @@
     <string name="status_bar_no_notifications_title" msgid="4755261167193833213">"შეტყობინებები არ არის."</string>
     <string name="status_bar_ongoing_events_title" msgid="1682504513316879202">"მიმდინარე"</string>
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"შეტყობინებები"</string>
-    <string name="battery_low_title" msgid="6456385927409742437">"ბატარეა იწურება"</string>
+    <string name="battery_low_title" msgid="9187898087363540349">"ბატარეა შესაძლოა მალე ამოიწუროს"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"დარჩენილია <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"დარჩენილია <xliff:g id="PERCENTAGE">%s</xliff:g>, რაც დაახლოებით <xliff:g id="TIME">%s</xliff:g> არის, მოხმარების გათვალისწინებით"</string>
     <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"დარჩენილია <xliff:g id="PERCENTAGE">%s</xliff:g>, რაც დაახლოებით <xliff:g id="TIME">%s</xliff:g> არის"</string>
@@ -46,7 +46,7 @@
     <string name="battery_saver_start_action" msgid="8187820911065797519">"ბატარეის დამზოგის ჩართვა"</string>
     <string name="status_bar_settings_settings_button" msgid="3023889916699270224">"პარამეტრები"</string>
     <string name="status_bar_settings_wifi_button" msgid="1733928151698311923">"Wi-Fi"</string>
-    <string name="status_bar_settings_auto_rotation" msgid="3790482541357798421">"ავტოროტაციის ეკრანი"</string>
+    <string name="status_bar_settings_auto_rotation" msgid="3790482541357798421">"ეკრანის ავტოროტაცია"</string>
     <string name="status_bar_settings_mute_label" msgid="554682549917429396">"დადუმება"</string>
     <string name="status_bar_settings_auto_brightness_label" msgid="511453614962324674">"ავტო."</string>
     <string name="status_bar_settings_notifications" msgid="397146176280905137">"შეტყობინებები"</string>
@@ -95,8 +95,8 @@
     <string name="accessibility_unlock_button" msgid="128158454631118828">"განბლოკვა"</string>
     <string name="accessibility_waiting_for_fingerprint" msgid="4808860050517462885">"თითის ანაბეჭდის მოლოდინში"</string>
     <string name="accessibility_unlock_without_fingerprint" msgid="7541705575183694446">"თქვენი თითის ანაბეჭდის გარეშე განბლოკვა"</string>
-    <!-- no translation found for accessibility_send_smart_reply (7766727839703044493) -->
-    <skip />
+    <string name="accessibility_scanning_face" msgid="769545173211758586">"მიმდინარეობს სახის სკანირება"</string>
+    <string name="accessibility_send_smart_reply" msgid="7766727839703044493">"გაგზავნა"</string>
     <string name="unlock_label" msgid="8779712358041029439">"განბლოკვა"</string>
     <string name="phone_label" msgid="2320074140205331708">"ტელეფონის გახსნა"</string>
     <string name="voice_assist_label" msgid="3956854378310019854">"ხმოვანი დახმარების გახსნა"</string>
@@ -208,10 +208,8 @@
     <string name="accessibility_quick_settings_airplane_on" msgid="6406141469157599296">"თვითმფრინავის რეჟიმი ჩართულია."</string>
     <string name="accessibility_quick_settings_airplane_changed_off" msgid="66846307818850664">"თვითმფრინავის რეჟიმი გამოირთო."</string>
     <string name="accessibility_quick_settings_airplane_changed_on" msgid="8983005603505087728">"თვითმფრინავის რეჟიმი ჩაირთო."</string>
-    <!-- no translation found for accessibility_quick_settings_dnd_none_on (2960643943620637020) -->
-    <skip />
-    <!-- no translation found for accessibility_quick_settings_dnd_alarms_on (3357131899365865386) -->
-    <skip />
+    <string name="accessibility_quick_settings_dnd_none_on" msgid="2960643943620637020">"სრული სიჩუმე"</string>
+    <string name="accessibility_quick_settings_dnd_alarms_on" msgid="3357131899365865386">"მხოლოდ მაღვიძარები"</string>
     <string name="accessibility_quick_settings_dnd" msgid="6607873236717185815">"არ შემაწუხოთ."</string>
     <string name="accessibility_quick_settings_dnd_changed_off" msgid="898107593453022935">"„არ შემაწუხოთ\" რეჟიმი გამორთულია."</string>
     <string name="accessibility_quick_settings_dnd_changed_on" msgid="4483780856613561039">"„არ შემაწუხოთ\" რეჟიმი ჩართულია."</string>
@@ -370,6 +368,8 @@
     <string name="recents_accessibility_split_screen_top" msgid="9056056469282256287">"ეკრანის გაყოფა ზემოთ"</string>
     <string name="recents_accessibility_split_screen_left" msgid="8987144699630620019">"ეკრანის გაყოფა მარცხნივ"</string>
     <string name="recents_accessibility_split_screen_right" msgid="275069779299592867">"ეკრანის გაყოფა მარჯვნივ"</string>
+    <!-- no translation found for quick_step_accessibility_toggle_overview (7171470775439860480) -->
+    <skip />
     <string name="expanded_header_battery_charged" msgid="5945855970267657951">"დატენილია"</string>
     <string name="expanded_header_battery_charging" msgid="205623198487189724">"მიმდინარეობს დატენვა"</string>
     <string name="expanded_header_battery_charging_with_time" msgid="457559884275395376">"<xliff:g id="CHARGING_TIME">%s</xliff:g> სრულად დატენვამდე"</string>
@@ -543,6 +543,12 @@
     <string name="volume_stream_content_description_mute" msgid="3625049841390467354">"%1$s. შეეხეთ დასადუმებლად. შეიძლება დადუმდეს მარტივი წვდომის სერვისებიც."</string>
     <string name="volume_stream_content_description_vibrate_a11y" msgid="6427727603978431301">"%1$s. შეეხეთ ვიბრაციაზე დასაყენებლად."</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="8995013018414535494">"%1$s. შეეხეთ დასადუმებლად."</string>
+    <!-- no translation found for volume_ringer_hint_mute (9199811307292269601) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_unmute (6602880133293060368) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_vibrate (4036802135666515202) -->
+    <skip />
     <string name="volume_dialog_title" msgid="7272969888820035876">"%s-ის ხმის მართვის საშუალებები"</string>
     <string name="volume_dialog_ringer_guidance_ring" msgid="3360373718388509040">"ზარებისა და შეტყობინებების მიღებისას დაირეკება (<xliff:g id="VOLUME_LEVEL">%1$s</xliff:g>)"</string>
     <string name="output_title" msgid="5355078100792942802">"მედია გამომავალი"</string>
@@ -608,20 +614,22 @@
     <string name="inline_minimize_button" msgid="966233327974702195">"ჩაკეცვა"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"გაგრძელდეს შეტყობინებათა ჩვენება ამ აპიდან?"</string>
     <string name="notification_unblockable_desc" msgid="1037434112919403708">"ამ შეტყობინებათა გამორთვა ვერ მოხერხდება"</string>
-    <string name="notification_appops_camera_active" msgid="730959943016785931">"კამერა"</string>
-    <string name="notification_appops_microphone_active" msgid="1546319728924580686">"მიკროფონი"</string>
-    <string name="notification_appops_overlay_active" msgid="633813008357934729">"სხვა აპების გადაფარვით ჩანს თქვენს ეკრანზე"</string>
-    <plurals name="notification_appops" formatted="false" msgid="1258122060887196817">
-      <item quantity="other">ეს აპი ასრულებს <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g>-ს და <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>-ს.</item>
-      <item quantity="one">ეს აპი ასრულებს <xliff:g id="PERFORMING_ACTIVITY_0">%1$s</xliff:g>-ს.</item>
-    </plurals>
-    <plurals name="notification_using" formatted="false" msgid="2211008461429037973">
-      <item quantity="other"><xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g>-ისა და <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>-ის გამოყენებით</item>
-      <item quantity="one"><xliff:g id="PERFORMING_ACTIVITY_0">%1$s</xliff:g>-ის გამოყენებით</item>
-    </plurals>
-    <string name="notification_appops_settings" msgid="1028328314935908050">"პარამეტრები"</string>
-    <!-- no translation found for notification_appops_ok (1156966426011011434) -->
+    <!-- no translation found for appops_camera (8100147441602585776) -->
     <skip />
+    <!-- no translation found for appops_microphone (741508267659494555) -->
+    <skip />
+    <!-- no translation found for appops_overlay (6165912637560323464) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic (1576901651150187433) -->
+    <skip />
+    <!-- no translation found for appops_camera_overlay (8869400080809298814) -->
+    <skip />
+    <!-- no translation found for appops_mic_overlay (4835157962857919804) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic_overlay (6718768197048030993) -->
+    <skip />
+    <string name="notification_appops_settings" msgid="1028328314935908050">"პარამეტრები"</string>
+    <string name="notification_appops_ok" msgid="1156966426011011434">"კარგი"</string>
     <string name="notification_channel_controls_opened_accessibility" msgid="6553950422055908113">"შეტყობინებების მართვა „<xliff:g id="APP_NAME">%1$s</xliff:g>“-ისთვის გახსნილია"</string>
     <string name="notification_channel_controls_closed_accessibility" msgid="7521619812603693144">"შეტყობინებების მართვა „<xliff:g id="APP_NAME">%1$s</xliff:g>“-ისთვის დახურულია"</string>
     <string name="notification_channel_switch_accessibility" msgid="3420796005601900717">"ამ არხიდან შეტყობინებების დაშვება"</string>
@@ -855,4 +863,5 @@
     <string name="auto_saver_enabled_text" msgid="874711029884777579">"ბატარეის დამზოგი ავტომატურად ჩაირთვება, როცა ბატარეა ჩამოსცდება <xliff:g id="PERCENTAGE">%d</xliff:g>%%-ს."</string>
     <string name="open_saver_setting_action" msgid="8314624730997322529">"პარამეტრები"</string>
     <string name="auto_saver_okay_action" msgid="2701221740227683650">"გასაგებია"</string>
+    <string name="heap_dump_tile_name" msgid="9141031328971226374">"SysUI გროვის გამოტანა"</string>
 </resources>

@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"SIM-kortið er PUK-læst."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"Tekur SIM-kort úr lás…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"PIN-svæði"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"PIN-svæði SIM-korts"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"PUK-svæði SIM-korts"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"Næsti vekjari stilltur á <xliff:g id="ALARM">%1$s</xliff:g>"</string>
@@ -140,7 +142,10 @@
       <item quantity="other">Tækið hefur ekki verið tekið úr lás í <xliff:g id="NUMBER_1">%d</xliff:g> klukkustundir. Staðfestu aðgangsorðið.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"Þekktist ekki"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="one">Sláðu inn PIN-númer SIM-korts. Þú átt <xliff:g id="NUMBER_1">%d</xliff:g> tilraun eftir.</item>
+      <item quantity="other">Sláðu inn PIN-númer SIM-korts. Þú átt <xliff:g id="NUMBER_1">%d</xliff:g> tilraunir eftir.</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="one">SIM-kortið er nú óvirkt. Sláðu inn PUK-númer til að halda áfram. Það er <xliff:g id="_NUMBER_1">%d</xliff:g> tilraun eftir þar til SIM-kortið verður ónothæft til frambúðar. Hafðu samband við símafyrirtækið til að fá upplýsingar.</item>
       <item quantity="other">SIM-kortið er nú óvirkt. Sláðu inn PUK-númer til að halda áfram. Það eru <xliff:g id="_NUMBER_1">%d</xliff:g> tilraunir eftir þar til SIM-kortið verður ónothæft til frambúðar. Hafðu samband við símafyrirtækið til að fá upplýsingar.</item>

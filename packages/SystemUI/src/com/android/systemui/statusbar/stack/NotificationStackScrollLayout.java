@@ -69,6 +69,7 @@ import android.widget.ScrollView;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.keyguard.KeyguardSliceView;
 import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.ExpandHelper;
@@ -168,6 +169,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     private int mCollapsedSize;
     private int mPaddingBetweenElements;
     private int mIncreasedPaddingBetweenElements;
+    private int mMaxTopPadding;
     private int mRegularTopPadding;
     private int mDarkTopPadding;
     // Current padding, will be either mRegularTopPadding or mDarkTopPadding
@@ -176,6 +178,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     private int mDarkSeparatorPadding;
     private int mBottomMargin;
     private int mBottomInset = 0;
+    private float mQsExpansionFraction;
 
     /**
      * The algorithm which calculates the properties for our children
@@ -229,6 +232,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     private boolean mPanelTracking;
     private boolean mExpandingNotification;
     private boolean mExpandedInThisMotion;
+    private boolean mShouldShowShelfOnly;
     protected boolean mScrollingEnabled;
     protected FooterView mFooterView;
     protected EmptyShadeView mEmptyShadeView;
@@ -370,6 +374,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     private boolean mGroupExpandedForMeasure;
     private boolean mScrollable;
     private View mForcedScroll;
+    private View mNeedingPulseAnimation;
     private float mDarkAmount = 0f;
     private static final Property<NotificationStackScrollLayout, Float> DARK_AMOUNT =
             new FloatProperty<NotificationStackScrollLayout>("darkAmount") {
@@ -406,7 +411,6 @@ public class NotificationStackScrollLayout extends ViewGroup
     private final int mSeparatorWidth;
     private final int mSeparatorThickness;
     private final Rect mBackgroundAnimationRect = new Rect();
-    private int mClockBottom;
     private int mAntiBurnInOffsetX;
     private ArrayList<BiConsumer<Float, Float>> mExpandedHeightListeners = new ArrayList<>();
     private int mHeadsUpInset;
@@ -717,11 +721,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     }
 
     private void updateAlgorithmHeightAndPadding() {
-        if (mPulsing) {
-            mTopPadding = mClockBottom;
-        } else {
-            mTopPadding = (int) MathUtils.lerp(mRegularTopPadding, mDarkTopPadding, mDarkAmount);
-        }
+        mTopPadding = (int) MathUtils.lerp(mRegularTopPadding, mDarkTopPadding, mDarkAmount);
         mAmbientState.setLayoutHeight(getLayoutHeight());
         updateAlgorithmLayoutMinHeight();
         mAmbientState.setTopPadding(mTopPadding);
@@ -886,7 +886,20 @@ public class NotificationStackScrollLayout extends ViewGroup
         float appearFraction = 1.0f;
         if (height >= appearEndPosition) {
             translationY = 0;
-            stackHeight = (int) height;
+            if (mShouldShowShelfOnly) {
+                stackHeight = mTopPadding + mShelf.getIntrinsicHeight();
+            } else if (mQsExpanded) {
+                int stackStartPosition = mContentHeight - mTopPadding + mIntrinsicPadding;
+                int stackEndPosition = mMaxTopPadding + mShelf.getIntrinsicHeight();
+                if (stackStartPosition <= stackEndPosition) {
+                    stackHeight = stackEndPosition;
+                } else {
+                    stackHeight = (int) NotificationUtils.interpolate(stackStartPosition,
+                            stackEndPosition, mQsExpansionFraction);
+                }
+            } else {
+                stackHeight = (int) height;
+            }
         } else {
             appearFraction = getAppearFraction(height);
             if (appearFraction >= 0) {
@@ -2402,16 +2415,10 @@ public class NotificationStackScrollLayout extends ViewGroup
      * Update the background bounds to the new desired bounds
      */
     private void updateBackgroundBounds() {
-        if (mAmbientState.isPanelFullWidth()) {
-            mBackgroundBounds.left = 0;
-            mBackgroundBounds.right = getWidth();
-        } else {
-            getLocationInWindow(mTempInt2);
-            mBackgroundBounds.left = mTempInt2[0];
-            mBackgroundBounds.right = mTempInt2[0] + getWidth();
-        }
-        mBackgroundBounds.left += mSidePaddings;
-        mBackgroundBounds.right -= mSidePaddings;
+        getLocationInWindow(mTempInt2);
+        mBackgroundBounds.left = mTempInt2[0] + mSidePaddings;
+        mBackgroundBounds.right = mTempInt2[0] + getWidth() - mSidePaddings;
+
         if (!mIsExpanded) {
             mBackgroundBounds.top = 0;
             mBackgroundBounds.bottom = 0;
@@ -2582,6 +2589,10 @@ public class NotificationStackScrollLayout extends ViewGroup
         setTopPadding(ignoreIntrinsicPadding ? topPadding : clampPadding(topPadding),
                 animate);
         setExpandedHeight(mExpandedHeight);
+    }
+
+    public void setMaxTopPadding(int maxTopPadding) {
+        mMaxTopPadding = maxTopPadding;
     }
 
     public int getLayoutMinHeight() {
@@ -3174,6 +3185,7 @@ public class NotificationStackScrollLayout extends ViewGroup
         generateViewResizeEvent();
         generateGroupExpansionEvent();
         generateAnimateEverythingEvent();
+        generatePulsingAnimationEvent();
         mNeedsAnimation = false;
     }
 
@@ -3319,8 +3331,16 @@ public class NotificationStackScrollLayout extends ViewGroup
 
     private void generateTopPaddingEvent() {
         if (mTopPaddingNeedsAnimation) {
-            mAnimationEvents.add(
-                    new AnimationEvent(null, AnimationEvent.ANIMATION_TYPE_TOP_PADDING_CHANGED));
+            AnimationEvent event;
+            if (mAmbientState.isDark()) {
+                event = new AnimationEvent(null /* view */,
+                        AnimationEvent.ANIMATION_TYPE_TOP_PADDING_CHANGED,
+                        KeyguardSliceView.DEFAULT_ANIM_DURATION);
+            } else {
+                event = new AnimationEvent(null /* view */,
+                        AnimationEvent.ANIMATION_TYPE_TOP_PADDING_CHANGED);
+            }
+            mAnimationEvents.add(event);
         }
         mTopPaddingNeedsAnimation = false;
     }
@@ -4428,18 +4448,28 @@ public class NotificationStackScrollLayout extends ViewGroup
         return mIsExpanded;
     }
 
-    public void setPulsing(boolean pulsing, int clockBottom) {
+    public void setPulsing(boolean pulsing, boolean animated) {
         if (!mPulsing && !pulsing) {
             return;
         }
         mPulsing = pulsing;
-        mClockBottom = clockBottom;
+        mNeedingPulseAnimation = animated ? getFirstChildNotGone() : null;
         mAmbientState.setPulsing(pulsing);
         updateNotificationAnimationStates();
         updateAlgorithmHeightAndPadding();
         updateContentHeight();
-        notifyHeightChangeListener(mShelf);
         requestChildrenUpdate();
+        notifyHeightChangeListener(null, animated);
+        mNeedsAnimation |= animated;
+    }
+
+    private void generatePulsingAnimationEvent() {
+        if (mNeedingPulseAnimation != null) {
+            int type = mPulsing ? AnimationEvent.ANIMATION_TYPE_PULSE_APPEAR
+                    : AnimationEvent.ANIMATION_TYPE_PULSE_DISAPPEAR;
+            mAnimationEvents.add(new AnimationEvent(mNeedingPulseAnimation, type));
+            mNeedingPulseAnimation = null;
+        }
     }
 
     public void setFadingOut(boolean fadingOut) {
@@ -4476,6 +4506,10 @@ public class NotificationStackScrollLayout extends ViewGroup
         updateAlgorithmLayoutMinHeight();
     }
 
+    public void setQsExpansionFraction(float qsExpansionFraction) {
+        mQsExpansionFraction = qsExpansionFraction;
+    }
+
     public void setOwnScrollY(int ownScrollY) {
         if (ownScrollY != mOwnScrollY) {
             // We still want to call the normal scrolled changed for accessibility reasons
@@ -4509,6 +4543,11 @@ public class NotificationStackScrollLayout extends ViewGroup
             updateContentHeight();
             notifyHeightChangeListener(mShelf);
         }
+    }
+
+    public void setShouldShowShelfOnly(boolean shouldShowShelfOnly) {
+        mShouldShowShelfOnly =  shouldShowShelfOnly;
+        updateAlgorithmLayoutMinHeight();
     }
 
     public int getMinExpansionHeight() {
@@ -4566,7 +4605,8 @@ public class NotificationStackScrollLayout extends ViewGroup
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println(String.format("[%s: pulsing=%s qsCustomizerShowing=%s visibility=%s"
-                        + " alpha:%f scrollY:%d]",
+                        + " alpha:%f scrollY:%d maxTopPadding:%d showShelfOnly=%s"
+                        + " qsExpandFraction=%f]",
                 this.getClass().getSimpleName(),
                 mPulsing ? "T":"f",
                 mAmbientState.isQsCustomizerShowing() ? "T":"f",
@@ -4574,7 +4614,10 @@ public class NotificationStackScrollLayout extends ViewGroup
                         : getVisibility() == View.GONE ? "gone"
                                 : "invisible",
                 getAlpha(),
-                mAmbientState.getScrollY()));
+                mAmbientState.getScrollY(),
+                mMaxTopPadding,
+                mShouldShowShelfOnly ? "T":"f",
+                mQsExpansionFraction));
     }
 
     public boolean isFullyDark() {
@@ -5007,6 +5050,16 @@ public class NotificationStackScrollLayout extends ViewGroup
                         .animateTopInset()
                         .animateY()
                         .animateZ(),
+
+                // ANIMATION_TYPE_PULSE_APPEAR
+                new AnimationFilter()
+                        .animateAlpha()
+                        .animateY(),
+
+                // ANIMATION_TYPE_PULSE_DISAPPEAR
+                new AnimationFilter()
+                        .animateAlpha()
+                        .animateY(),
         };
 
         static int[] LENGTHS = new int[] {
@@ -5067,6 +5120,12 @@ public class NotificationStackScrollLayout extends ViewGroup
 
                 // ANIMATION_TYPE_EVERYTHING
                 StackStateAnimator.ANIMATION_DURATION_STANDARD,
+
+                // ANIMATION_TYPE_PULSE_APPEAR
+                KeyguardSliceView.DEFAULT_ANIM_DURATION,
+
+                // ANIMATION_TYPE_PULSE_DISAPPEAR
+                KeyguardSliceView.DEFAULT_ANIM_DURATION / 2,
         };
 
         static final int ANIMATION_TYPE_ADD = 0;
@@ -5088,6 +5147,8 @@ public class NotificationStackScrollLayout extends ViewGroup
         static final int ANIMATION_TYPE_HEADS_UP_DISAPPEAR_CLICK = 16;
         static final int ANIMATION_TYPE_HEADS_UP_OTHER = 17;
         static final int ANIMATION_TYPE_EVERYTHING = 18;
+        static final int ANIMATION_TYPE_PULSE_APPEAR = 19;
+        static final int ANIMATION_TYPE_PULSE_DISAPPEAR = 20;
 
         static final int DARK_ANIMATION_ORIGIN_INDEX_ABOVE = -1;
         static final int DARK_ANIMATION_ORIGIN_INDEX_BELOW = -2;
