@@ -113,6 +113,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private static final int MESSAGE_DISABLE = 2;
     private static final int MESSAGE_REGISTER_ADAPTER = 20;
     private static final int MESSAGE_UNREGISTER_ADAPTER = 21;
+    private static final int MESSAGE_INFORM_ADAPTER_SERVICE_UP = 22;
     private static final int MESSAGE_REGISTER_STATE_CHANGE_CALLBACK = 30;
     private static final int MESSAGE_UNREGISTER_STATE_CHANGE_CALLBACK = 31;
     private static final int MESSAGE_BLUETOOTH_SERVICE_CONNECTED = 40;
@@ -1569,14 +1570,22 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
 
                 case MESSAGE_REGISTER_ADAPTER:
                 {
+                    if (DBG) Slog.d(TAG,"MESSAGE_REGISTER_ADAPTER");
                     IBluetoothManagerCallback callback = (IBluetoothManagerCallback) msg.obj;
                     mCallbacks.register(callback);
                     break;
                 }
                 case MESSAGE_UNREGISTER_ADAPTER:
                 {
+                    if (DBG) Slog.d(TAG,"MESSAGE_UNREGISTER_ADAPTER");
                     IBluetoothManagerCallback callback = (IBluetoothManagerCallback) msg.obj;
                     mCallbacks.unregister(callback);
+                    break;
+                }
+                case MESSAGE_INFORM_ADAPTER_SERVICE_UP:
+                {
+                    if (DBG) Slog.d(TAG,"MESSAGE_INFORM_ADAPTER_SERVICE_UP");
+                    sendBluetoothServiceUpCallback();
                     break;
                 }
                 case MESSAGE_REGISTER_STATE_CHANGE_CALLBACK:
@@ -1648,7 +1657,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                             Slog.e(TAG, "Unable to register BluetoothCallback",re);
                         }
                         //Inform BluetoothAdapter instances that service is up
-                        sendBluetoothServiceUpCallback();
+                        Message informMsg = mHandler.obtainMessage(MESSAGE_INFORM_ADAPTER_SERVICE_UP);
+                        mHandler.sendMessage(informMsg);
 
                         //Do enable request
                         try {
