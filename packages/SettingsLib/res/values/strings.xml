@@ -32,6 +32,12 @@
     <string name="wifi_security_short_psk_generic">@string/wifi_security_short_wpa_wpa2</string>
     <!-- Do not translate.  Concise terminology for wifi with 802.1x EAP security -->
     <string name="wifi_security_short_eap">802.1x</string>
+    <!-- Do not translate.  Concise terminology for wifi with DPP security -->
+    <string name="wifi_security_short_dpp">DPP</string>
+    <!-- Do not translate.  Concise terminology for wifi with SAE security -->
+    <string name="wifi_security_short_sae">SAE</string>
+    <!-- Do not translate.  Concise terminology for wifi with OWE security -->
+    <string name="wifi_security_short_owe">OWE</string>
 
     <!-- Used in Wi-Fi settings dialogs when Wi-Fi does not have any security. -->
     <string name="wifi_security_none">None</string>
@@ -50,6 +56,12 @@
     <string name="wifi_security_eap">802.1x EAP</string>
     <!-- Do not translate.  Concise terminology for Passpoint network -->
     <string name="wifi_security_passpoint">Passpoint</string>
+    <!-- Do not translate.  Concise terminology for DPP network -->
+    <string name="wifi_security_dpp">DPP</string>
+    <!-- Do not translate.  Concise terminology for SAE network -->
+    <string name="wifi_security_sae">SAE</string>
+    <!-- Do not translate.  Concise terminology for OWE network -->
+    <string name="wifi_security_owe">OWE</string>
 
     <!-- Summary for the remembered network. -->
     <string name="wifi_remembered">Saved</string>
@@ -572,7 +584,7 @@
     <!-- UI debug setting: Trigger Bluetooth Audio LDAC Playback Quality Selection -->
     <string name="bluetooth_select_a2dp_codec_ldac_playback_quality">Bluetooth Audio LDAC Codec: Playback Quality</string>
     <!-- UI debug setting: Select Bluetooth Audio LDAC Codec: LDAC Playback Quality -->
-    <string name="bluetooth_select_a2dp_codec_ldac_playback_quality_dialog_title">Trigger Bluetooth Audio LDAC Codec\u000ASelection: Playback Quality</string>
+    <string name="bluetooth_select_a2dp_codec_ldac_playback_quality_dialog_title">Trigger Bluetooth Audio LDAC\u000ACodec Selection: Playback Quality</string>
 
     <!-- [CHAR LIMIT=NONE] Label for displaying Bluetooth Audio Codec Parameters while streaming -->
     <string name="bluetooth_select_a2dp_codec_streaming_label">Streaming: <xliff:g id="streaming_parameter">%1$s</xliff:g></string>
@@ -908,16 +920,18 @@
     <!-- Summary shown for color space correction preference when its value is overridden by another preference [CHAR LIMIT=35] -->
     <string name="daltonizer_type_overridden">Overridden by <xliff:g id="title" example="Simulate color space">%1$s</xliff:g></string>
 
+    <!-- [CHAR_LIMIT=NONE] Label for battery on main page of settings -->
+    <string name="power_remaining_settings_home_page"><xliff:g id="percentage" example="10%">%1$s</xliff:g> - <xliff:g id="time_string" example="1 hour left based on your usage">%2$s</xliff:g></string>
     <!-- [CHAR_LIMIT=40] Label for estimated remaining duration of battery discharging -->
-    <string name="power_remaining_duration_only">About <xliff:g id="time">%1$s</xliff:g> left</string>
+    <string name="power_remaining_duration_only">About <xliff:g id="time_remaining">%1$s</xliff:g> left</string>
     <!-- [CHAR_LIMIT=40] Label for battery level chart when discharging with duration -->
-    <string name="power_discharging_duration">About <xliff:g id="time">%1$s</xliff:g> left (<xliff:g id="level">%2$s</xliff:g>)</string>
+    <string name="power_discharging_duration">About <xliff:g id="time_remaining">%1$s</xliff:g> left (<xliff:g id="level">%2$s</xliff:g>)</string>
     <!-- [CHAR_LIMIT=60] Label for estimated remaining duration of battery discharging -->
-    <string name="power_remaining_duration_only_enhanced">About <xliff:g id="time">%1$s</xliff:g> left based on your usage</string>
+    <string name="power_remaining_duration_only_enhanced">About <xliff:g id="time_remaining">%1$s</xliff:g> left based on your usage</string>
     <!-- [CHAR_LIMIT=60] Label for battery level chart when discharging with duration and using enhanced estimate -->
-    <string name="power_discharging_duration_enhanced">About <xliff:g id="time">%1$s</xliff:g> left based on your usage (<xliff:g id="level">%2$s</xliff:g>)</string>
+    <string name="power_discharging_duration_enhanced">About <xliff:g id="time_remaining">%1$s</xliff:g> left based on your usage (<xliff:g id="level">%2$s</xliff:g>)</string>
     <!-- [CHAR_LIMIT=40] Short label for estimated remaining duration of battery charging/discharging -->
-    <string name="power_remaining_duration_only_short"><xliff:g id="time">%1$s</xliff:g> left</string>
+    <string name="power_remaining_duration_only_short"><xliff:g id="time_remaining">%1$s</xliff:g> left</string>
 
     <!-- [CHAR_LIMIT=100] Label for enhanced estimated time that phone will run out of battery -->
     <string name="power_discharge_by_enhanced">Should last until about <xliff:g id="time">%1$s</xliff:g> based on your usage (<xliff:g id="level">%2$s</xliff:g>)</string>

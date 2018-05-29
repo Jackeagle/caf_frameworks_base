@@ -68,10 +68,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-
 import java.util.Collections;
+import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
@@ -115,6 +116,8 @@ public class BrightnessTracker {
     private static final int MSG_STOP_SENSOR_LISTENER = 2;
     private static final int MSG_START_SENSOR_LISTENER = 3;
 
+    private static final SimpleDateFormat FORMAT = new SimpleDateFormat("MM-dd HH:mm:ss.SSS");
+
     // Lock held while accessing mEvents, is held while writing events to flash.
     private final Object mEventsLock = new Object();
     @GuardedBy("mEventsLock")
@@ -127,10 +130,10 @@ public class BrightnessTracker {
 
     private AmbientBrightnessStatsTracker mAmbientBrightnessStatsTracker;
 
-    private UserManager mUserManager;
+    private final UserManager mUserManager;
     private final Context mContext;
     private final ContentResolver mContentResolver;
-    private Handler mBgHandler;
+    private final Handler mBgHandler;
 
     // mBroadcastReceiver,  mSensorListener, mSettingsObserver and mSensorRegistered
     // should only be used on the mBgHandler thread.
@@ -164,6 +167,8 @@ public class BrightnessTracker {
         } else {
             mInjector = new Injector();
         }
+        mBgHandler = new TrackerHandler(mInjector.getBackgroundHandler().getLooper());
+        mUserManager = mContext.getSystemService(UserManager.class);
     }
 
     /**
@@ -175,8 +180,6 @@ public class BrightnessTracker {
         if (DEBUG) {
             Slog.d(TAG, "Start");
         }
-        mBgHandler = new TrackerHandler(mInjector.getBackgroundHandler().getLooper());
-        mUserManager = mContext.getSystemService(UserManager.class);
         mCurrentUserId = ActivityManager.getCurrentUser();
         mBgHandler.obtainMessage(MSG_BACKGROUND_START, (Float) initialBrightness).sendToTarget();
     }
@@ -282,13 +285,14 @@ public class BrightnessTracker {
         }
         Message m = mBgHandler.obtainMessage(MSG_BRIGHTNESS_CHANGED,
                 userInitiated ? 1 : 0, 0 /*unused*/, new BrightnessChangeValues(brightness,
-                        powerBrightnessFactor, isUserSetBrightness, isDefaultBrightnessConfig));
+                        powerBrightnessFactor, isUserSetBrightness, isDefaultBrightnessConfig,
+                        mInjector.currentTimeMillis()));
         m.sendToTarget();
     }
 
     private void handleBrightnessChanged(float brightness, boolean userInitiated,
             float powerBrightnessFactor, boolean isUserSetBrightness,
-            boolean isDefaultBrightnessConfig) {
+            boolean isDefaultBrightnessConfig, long timestamp) {
         BrightnessChangeEvent.Builder builder;
 
         synchronized (mDataCollectionLock) {
@@ -309,7 +313,7 @@ public class BrightnessTracker {
 
             builder = new BrightnessChangeEvent.Builder();
             builder.setBrightness(brightness);
-            builder.setTimeStamp(mInjector.currentTimeMillis());
+            builder.setTimeStamp(timestamp);
             builder.setPowerBrightnessFactor(powerBrightnessFactor);
             builder.setUserBrightnessPoint(isUserSetBrightness);
             builder.setIsDefaultBrightnessConfig(isDefaultBrightnessConfig);
@@ -648,10 +652,12 @@ public class BrightnessTracker {
         }
     }
 
-    public void dump(PrintWriter pw) {
+    public void dump(final PrintWriter pw) {
         pw.println("BrightnessTracker state:");
         synchronized (mDataCollectionLock) {
             pw.println("  mStarted=" + mStarted);
+            pw.println("  mLastBatteryLevel=" + mLastBatteryLevel);
+            pw.println("  mLastBrightness=" + mLastBrightness);
             pw.println("  mLastSensorReadings.size=" + mLastSensorReadings.size());
             if (!mLastSensorReadings.isEmpty()) {
                 pw.println("  mLastSensorReadings time span "
@@ -664,7 +670,8 @@ public class BrightnessTracker {
             pw.println("  mEvents.size=" + mEvents.size());
             BrightnessChangeEvent[] events = mEvents.toArray();
             for (int i = 0; i < events.length; ++i) {
-                pw.print("    " + events[i].timeStamp + ", " + events[i].userId);
+                pw.print("    " + FORMAT.format(new Date(events[i].timeStamp)));
+                pw.print(", userId=" + events[i].userId);
                 pw.print(", " + events[i].lastBrightness + "->" + events[i].brightness);
                 pw.print(", isUserSetBrightness=" + events[i].isUserSetBrightness);
                 pw.print(", powerBrightnessFactor=" + events[i].powerBrightnessFactor);
@@ -679,17 +686,23 @@ public class BrightnessTracker {
                 pw.println("}");
             }
         }
+        pw.println("  mWriteBrightnessTrackerStateScheduled="
+                + mWriteBrightnessTrackerStateScheduled);
+        mBgHandler.runWithScissors(() -> dumpLocal(pw), 1000);
         if (mAmbientBrightnessStatsTracker != null) {
             pw.println();
             mAmbientBrightnessStatsTracker.dump(pw);
         }
     }
 
+    private void dumpLocal(PrintWriter pw) {
+        pw.println("  mSensorRegistered=" + mSensorRegistered);
+    }
+
     public ParceledListSlice<AmbientBrightnessDayStats> getAmbientBrightnessStats(int userId) {
         if (mAmbientBrightnessStatsTracker != null) {
             ArrayList<AmbientBrightnessDayStats> stats =
-                    mAmbientBrightnessStatsTracker.getUserStats(
-                            userId);
+                    mAmbientBrightnessStatsTracker.getUserStats(userId);
             if (stats != null) {
                 return new ParceledListSlice<>(stats);
             }
@@ -813,7 +826,7 @@ public class BrightnessTracker {
                     boolean userInitiatedChange = (msg.arg1 == 1);
                     handleBrightnessChanged(values.brightness, userInitiatedChange,
                             values.powerBrightnessFactor, values.isUserSetBrightness,
-                            values.isDefaultBrightnessConfig);
+                            values.isDefaultBrightnessConfig, values.timestamp);
                     break;
                 case MSG_START_SENSOR_LISTENER:
                     startSensorListener();
@@ -830,13 +843,16 @@ public class BrightnessTracker {
         final float powerBrightnessFactor;
         final boolean isUserSetBrightness;
         final boolean isDefaultBrightnessConfig;
+        final long timestamp;
 
         BrightnessChangeValues(float brightness, float powerBrightnessFactor,
-                boolean isUserSetBrightness, boolean isDefaultBrightnessConfig) {
+                boolean isUserSetBrightness, boolean isDefaultBrightnessConfig,
+                long timestamp) {
             this.brightness = brightness;
             this.powerBrightnessFactor = powerBrightnessFactor;
             this.isUserSetBrightness = isUserSetBrightness;
             this.isDefaultBrightnessConfig = isDefaultBrightnessConfig;
+            this.timestamp = timestamp;
         }
     }
 

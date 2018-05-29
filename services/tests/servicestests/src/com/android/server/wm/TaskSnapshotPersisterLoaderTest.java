@@ -16,6 +16,8 @@
 
 package com.android.server.wm;
 
+import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
+import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -32,6 +34,7 @@ import android.support.test.filters.MediumTest;
 import android.support.test.runner.AndroidJUnit4;
 import android.util.ArraySet;
 
+import android.view.View;
 import com.android.server.wm.TaskSnapshotPersister.RemoveObsoleteFilesQueueItem;
 
 import org.junit.Test;
@@ -164,8 +167,12 @@ public class TaskSnapshotPersisterLoaderTest extends TaskSnapshotPersisterTestBa
 
     @Test
     public void testIsRealSnapshotPersistAndLoadSnapshot() {
-        TaskSnapshot a = createSnapshot(1f /* scale */, true /* isRealSnapshot */);
-        TaskSnapshot b = createSnapshot(1f /* scale */, false /* isRealSnapshot */);
+        TaskSnapshot a = new TaskSnapshotBuilder()
+                .setIsRealSnapshot(true)
+                .build();
+        TaskSnapshot b = new TaskSnapshotBuilder()
+                .setIsRealSnapshot(false)
+                .build();
         assertTrue(a.isRealSnapshot());
         assertFalse(b.isRealSnapshot());
         mPersister.persistSnapshot(1, mTestUserId, a);
@@ -177,6 +184,71 @@ public class TaskSnapshotPersisterLoaderTest extends TaskSnapshotPersisterTestBa
         assertNotNull(snapshotB);
         assertTrue(snapshotA.isRealSnapshot());
         assertFalse(snapshotB.isRealSnapshot());
+    }
+
+    @Test
+    public void testWindowingModePersistAndLoadSnapshot() {
+        TaskSnapshot a = new TaskSnapshotBuilder()
+                .setWindowingMode(WINDOWING_MODE_FULLSCREEN)
+                .build();
+        TaskSnapshot b = new TaskSnapshotBuilder()
+                .setWindowingMode(WINDOWING_MODE_PINNED)
+                .build();
+        assertTrue(a.getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
+        assertTrue(b.getWindowingMode() == WINDOWING_MODE_PINNED);
+        mPersister.persistSnapshot(1, mTestUserId, a);
+        mPersister.persistSnapshot(2, mTestUserId, b);
+        mPersister.waitForQueueEmpty();
+        final TaskSnapshot snapshotA = mLoader.loadTask(1, mTestUserId, false /* reduced */);
+        final TaskSnapshot snapshotB = mLoader.loadTask(2, mTestUserId, false /* reduced */);
+        assertNotNull(snapshotA);
+        assertNotNull(snapshotB);
+        assertTrue(snapshotA.getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
+        assertTrue(snapshotB.getWindowingMode() == WINDOWING_MODE_PINNED);
+    }
+
+    @Test
+    public void testIsTranslucentPersistAndLoadSnapshot() {
+        TaskSnapshot a = new TaskSnapshotBuilder()
+                .setIsTranslucent(true)
+                .build();
+        TaskSnapshot b = new TaskSnapshotBuilder()
+                .setIsTranslucent(false)
+                .build();
+        assertTrue(a.isTranslucent());
+        assertFalse(b.isTranslucent());
+        mPersister.persistSnapshot(1, mTestUserId, a);
+        mPersister.persistSnapshot(2, mTestUserId, b);
+        mPersister.waitForQueueEmpty();
+        final TaskSnapshot snapshotA = mLoader.loadTask(1, mTestUserId, false /* reduced */);
+        final TaskSnapshot snapshotB = mLoader.loadTask(2, mTestUserId, false /* reduced */);
+        assertNotNull(snapshotA);
+        assertNotNull(snapshotB);
+        assertTrue(snapshotA.isTranslucent());
+        assertFalse(snapshotB.isTranslucent());
+    }
+
+    @Test
+    public void testSystemUiVisibilityPersistAndLoadSnapshot() {
+        final int lightBarFlags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        TaskSnapshot a = new TaskSnapshotBuilder()
+                .setSystemUiVisibility(0)
+                .build();
+        TaskSnapshot b = new TaskSnapshotBuilder()
+                .setSystemUiVisibility(lightBarFlags)
+                .build();
+        assertTrue(a.getSystemUiVisibility() == 0);
+        assertTrue(b.getSystemUiVisibility() == lightBarFlags);
+        mPersister.persistSnapshot(1, mTestUserId, a);
+        mPersister.persistSnapshot(2, mTestUserId, b);
+        mPersister.waitForQueueEmpty();
+        final TaskSnapshot snapshotA = mLoader.loadTask(1, mTestUserId, false /* reduced */);
+        final TaskSnapshot snapshotB = mLoader.loadTask(2, mTestUserId, false /* reduced */);
+        assertNotNull(snapshotA);
+        assertNotNull(snapshotB);
+        assertTrue(snapshotA.getSystemUiVisibility() == 0);
+        assertTrue(snapshotB.getSystemUiVisibility() == lightBarFlags);
     }
 
     @Test

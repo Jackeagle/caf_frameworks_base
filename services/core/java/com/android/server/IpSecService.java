@@ -107,7 +107,6 @@ public class IpSecService extends IIpSecService.Stub {
 
     static final int FREE_PORT_MIN = 1024; // ports 1-1023 are reserved
     static final int PORT_MAX = 0xFFFF; // ports are an unsigned 16-bit integer
-    static final String TUNNEL_INTERFACE_PREFIX = "ipsec";
 
     /* Binder context for this service */
     private final Context mContext;
@@ -1101,9 +1100,11 @@ public class IpSecService extends IIpSecService.Stub {
                     new RefcountedResource<SpiRecord>(
                             new SpiRecord(resourceId, "", destinationAddress, spi), binder));
         } catch (ServiceSpecificException e) {
-            // TODO: Add appropriate checks when other ServiceSpecificException types are supported
-            return new IpSecSpiResponse(
-                    IpSecManager.Status.SPI_UNAVAILABLE, INVALID_RESOURCE_ID, spi);
+            if (e.errorCode == OsConstants.ENOENT) {
+                return new IpSecSpiResponse(
+                        IpSecManager.Status.SPI_UNAVAILABLE, INVALID_RESOURCE_ID, spi);
+            }
+            throw e;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1115,7 +1116,6 @@ public class IpSecService extends IIpSecService.Stub {
      */
     private void releaseResource(RefcountedResourceArray resArray, int resourceId)
             throws RemoteException {
-
         resArray.getRefcountedResourceOrThrow(resourceId).userRelease();
     }
 
@@ -1269,7 +1269,7 @@ public class IpSecService extends IIpSecService.Stub {
         final int resourceId = mNextResourceId++;
         final int ikey = reserveNetId();
         final int okey = reserveNetId();
-        String intfName = String.format("%s%d", TUNNEL_INTERFACE_PREFIX, resourceId);
+        String intfName = String.format("%s%d", INetd.IPSEC_INTERFACE_PREFIX, resourceId);
 
         try {
             // Calls to netd:
@@ -1315,15 +1315,12 @@ public class IpSecService extends IIpSecService.Stub {
             releaseNetId(ikey);
             releaseNetId(okey);
             throw e.rethrowFromSystemServer();
-        } catch (ServiceSpecificException e) {
-            // FIXME: get the error code and throw is at an IOException from Errno Exception
+        } catch (Throwable t) {
+            // Release keys if we got an error.
+            releaseNetId(ikey);
+            releaseNetId(okey);
+            throw t;
         }
-
-        // If we make it to here, then something has gone wrong and we couldn't create a VTI.
-        // Release the keys that we reserved, and return an error status.
-        releaseNetId(ikey);
-        releaseNetId(okey);
-        return new IpSecTunnelInterfaceResponse(IpSecManager.Status.RESOURCE_UNAVAILABLE);
     }
 
     /**
@@ -1352,9 +1349,6 @@ public class IpSecService extends IIpSecService.Stub {
                             localAddr.getPrefixLength());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
-        } catch (ServiceSpecificException e) {
-            // If we get here, one of the arguments provided was invalid. Wrap the SSE, and throw.
-            throw new IllegalArgumentException(e);
         }
     }
 
@@ -1384,9 +1378,6 @@ public class IpSecService extends IIpSecService.Stub {
                             localAddr.getPrefixLength());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
-        } catch (ServiceSpecificException e) {
-            // If we get here, one of the arguments provided was invalid. Wrap the SSE, and throw.
-            throw new IllegalArgumentException(e);
         }
     }
 
@@ -1590,12 +1581,7 @@ public class IpSecService extends IIpSecService.Stub {
         dependencies.add(refcountedSpiRecord);
         SpiRecord spiRecord = refcountedSpiRecord.getResource();
 
-        try {
-            createOrUpdateTransform(c, resourceId, spiRecord, socketRecord);
-        } catch (ServiceSpecificException e) {
-            // FIXME: get the error code and throw is at an IOException from Errno Exception
-            return new IpSecTransformResponse(IpSecManager.Status.RESOURCE_UNAVAILABLE);
-        }
+        createOrUpdateTransform(c, resourceId, spiRecord, socketRecord);
 
         // SA was created successfully, time to construct a record and lock it away
         userRecord.mTransformRecords.put(
@@ -1642,23 +1628,15 @@ public class IpSecService extends IIpSecService.Stub {
                 c.getMode() == IpSecTransform.MODE_TRANSPORT,
                 "Transform mode was not Transport mode; cannot be applied to a socket");
 
-        try {
-            mSrvConfig
-                    .getNetdInstance()
-                    .ipSecApplyTransportModeTransform(
-                            socket.getFileDescriptor(),
-                            resourceId,
-                            direction,
-                            c.getSourceAddress(),
-                            c.getDestinationAddress(),
-                            info.getSpiRecord().getSpi());
-        } catch (ServiceSpecificException e) {
-            if (e.errorCode == EINVAL) {
-                throw new IllegalArgumentException(e.toString());
-            } else {
-                throw e;
-            }
-        }
+        mSrvConfig
+                .getNetdInstance()
+                .ipSecApplyTransportModeTransform(
+                        socket.getFileDescriptor(),
+                        resourceId,
+                        direction,
+                        c.getSourceAddress(),
+                        c.getDestinationAddress(),
+                        info.getSpiRecord().getSpi());
     }
 
     /**
@@ -1670,13 +1648,9 @@ public class IpSecService extends IIpSecService.Stub {
     @Override
     public synchronized void removeTransportModeTransforms(ParcelFileDescriptor socket)
             throws RemoteException {
-        try {
-            mSrvConfig
-                    .getNetdInstance()
-                    .ipSecRemoveTransportModeTransform(socket.getFileDescriptor());
-        } catch (ServiceSpecificException e) {
-            // FIXME: get the error code and throw is at an IOException from Errno Exception
-        }
+        mSrvConfig
+                .getNetdInstance()
+                .ipSecRemoveTransportModeTransform(socket.getFileDescriptor());
     }
 
     /**

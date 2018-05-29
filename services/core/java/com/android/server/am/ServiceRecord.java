@@ -56,7 +56,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NA
 /**
  * A running application service.
  */
-final class ServiceRecord extends Binder {
+final class ServiceRecord extends Binder implements ComponentName.WithComponentName {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ServiceRecord" : TAG_AM;
 
     // Maximum number of delivery attempts before giving up.
@@ -73,7 +73,7 @@ final class ServiceRecord extends Binder {
                             // original intent used to find service.
     final ServiceInfo serviceInfo;
                             // all information about the service.
-    final ApplicationInfo appInfo;
+    ApplicationInfo appInfo;
                             // information about service's app.
     final int userId;       // user that this service is running as
     final String packageName; // the package implementing intent's component
@@ -550,11 +550,11 @@ final class ServiceRecord extends Binder {
         restartTime = 0;
     }
 
-    public StartItem findDeliveredStart(int id, boolean remove) {
+    public StartItem findDeliveredStart(int id, boolean taskRemoved, boolean remove) {
         final int N = deliveredStarts.size();
         for (int i=0; i<N; i++) {
             StartItem si = deliveredStarts.get(i);
-            if (si.id == id) {
+            if (si.id == id && si.taskRemoved == taskRemoved) {
                 if (remove) deliveredStarts.remove(i);
                 return si;
             }
@@ -756,5 +756,9 @@ final class ServiceRecord extends Binder {
             .append(" u").append(userId)
             .append(' ').append(shortName).append('}');
         return stringName = sb.toString();
+    }
+
+    public ComponentName getComponentName() {
+        return name;
     }
 }

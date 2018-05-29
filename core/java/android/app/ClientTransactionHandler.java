@@ -18,6 +18,7 @@ package android.app;
 import android.app.servertransaction.ClientTransaction;
 import android.app.servertransaction.PendingTransactionActions;
 import android.app.servertransaction.TransactionExecutor;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
@@ -27,7 +28,6 @@ import android.util.MergedConfiguration;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.content.ReferrerIntent;
 
-import java.io.PrintWriter;
 import java.util.List;
 
 /**
@@ -122,7 +122,7 @@ public abstract class ClientTransactionHandler {
             Configuration overrideConfig, int displayId);
 
     /** Deliver result from another activity. */
-    public abstract void handleSendResult(IBinder token, List<ResultInfo> results);
+    public abstract void handleSendResult(IBinder token, List<ResultInfo> results, String reason);
 
     /** Deliver multi-window mode change notification. */
     public abstract void handleMultiWindowModeChanged(IBinder token, boolean isInMultiWindowMode,
@@ -141,7 +141,7 @@ public abstract class ClientTransactionHandler {
 
     /** Perform activity launch. */
     public abstract Activity handleLaunchActivity(ActivityThread.ActivityClientRecord r,
-            PendingTransactionActions pendingActions);
+            PendingTransactionActions pendingActions, Intent customIntent);
 
     /** Perform activity start. */
     public abstract void handleStartActivity(ActivityThread.ActivityClientRecord r,
@@ -192,11 +192,4 @@ public abstract class ClientTransactionHandler {
      *                       Used to check if we should report relaunch to WM.
      * */
     public abstract void reportRelaunch(IBinder token, PendingTransactionActions pendingActions);
-
-    /**
-     * Debugging output.
-     * @param pw {@link PrintWriter} to write logs to.
-     * @param prefix Prefix to prepend to output.
-     */
-    public abstract void dump(PrintWriter pw, String prefix);
 }

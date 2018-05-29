@@ -390,8 +390,15 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      */
     int mLayoutSeq = 0;
 
+    /**
+     * Specifies the count to determine whether to defer updating the IME target until ready.
+     */
+    private int mDeferUpdateImeTargetCount;
+
     /** Temporary float array to retrieve 3x3 matrix values. */
     private final float[] mTmpFloats = new float[9];
+
+    private MagnificationSpec mMagnificationSpec;
 
     private final Consumer<WindowState> mUpdateWindowsForAnimator = w -> {
         WindowStateAnimator winAnimator = w.mWinAnimator;
@@ -1508,6 +1515,10 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         return (stack != null && stack.isVisible()) ? stack : null;
     }
 
+    boolean hasSplitScreenPrimaryStack() {
+        return getSplitScreenPrimaryStack() != null;
+    }
+
     /**
      * Like {@link #getSplitScreenPrimaryStack}, but also returns the stack if it's currently
      * not visible.
@@ -1611,6 +1622,18 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         mService.mWindowsChanged = true;
     }
 
+    /**
+     * In split-screen mode we process the IME containers above the docked divider
+     * rather than directly above their target.
+     */
+    private boolean skipTraverseChild(WindowContainer child) {
+        if (child == mImeWindowsContainers && mService.mInputMethodTarget != null
+                && !hasSplitScreenPrimaryStack()) {
+            return true;
+        }
+        return false;
+    }
+
     @Override
     boolean forAllWindows(ToBooleanFunction<WindowState> callback, boolean traverseTopToBottom) {
         // Special handling so we can process IME windows with #forAllImeWindows above their IME
@@ -1618,11 +1641,10 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         if (traverseTopToBottom) {
             for (int i = mChildren.size() - 1; i >= 0; --i) {
                 final DisplayChildWindowContainer child = mChildren.get(i);
-                if (child == mImeWindowsContainers && mService.mInputMethodTarget != null) {
-                    // In this case the Ime windows will be processed above their target so we skip
-                    // here.
+                if (skipTraverseChild(child)) {
                     continue;
                 }
+
                 if (child.forAllWindows(callback, traverseTopToBottom)) {
                     return true;
                 }
@@ -1631,11 +1653,10 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             final int count = mChildren.size();
             for (int i = 0; i < count; i++) {
                 final DisplayChildWindowContainer child = mChildren.get(i);
-                if (child == mImeWindowsContainers && mService.mInputMethodTarget != null) {
-                    // In this case the Ime windows will be processed above their target so we skip
-                    // here.
+                if (skipTraverseChild(child)) {
                     continue;
                 }
+
                 if (child.forAllWindows(callback, traverseTopToBottom)) {
                     return true;
                 }
@@ -2438,6 +2459,12 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             return null;
         }
 
+        final WindowState curTarget = mService.mInputMethodTarget;
+        if (!canUpdateImeTarget()) {
+            if (DEBUG_INPUT_METHOD) Slog.w(TAG_WM, "Defer updating IME target");
+            return curTarget;
+        }
+
         // TODO(multidisplay): Needs some serious rethought when the target and IME are not on the
         // same display. Or even when the current IME/target are not on the same screen as the next
         // IME/target. For now only look for input windows on the main screen.
@@ -2461,16 +2488,13 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         if (DEBUG_INPUT_METHOD && updateImeTarget) Slog.v(TAG_WM,
                 "Proposed new IME target: " + target);
 
-        // Now, a special case -- if the last target's window is in the process of exiting, and is
-        // above the new target, keep on the last target to avoid flicker. Consider for example a
-        // Dialog with the IME shown: when the Dialog is dismissed, we want to keep the IME above it
-        // until it is completely gone so it doesn't drop behind the dialog or its full-screen
-        // scrim.
-        final WindowState curTarget = mService.mInputMethodTarget;
+        // Now, a special case -- if the last target's window is in the process of exiting, and the
+        // new target is home, keep on the last target to avoid flicker. Home is a special case
+        // since its above other stacks in the ordering list, but layed out below the others.
         if (curTarget != null && curTarget.isDisplayedLw() && curTarget.isClosing()
-                && (target == null
-                    || curTarget.mWinAnimator.mAnimLayer > target.mWinAnimator.mAnimLayer)) {
-            if (DEBUG_INPUT_METHOD) Slog.v(TAG_WM, "Current target higher, not changing");
+                && (target == null || target.isActivityTypeHome())) {
+            if (DEBUG_INPUT_METHOD) Slog.v(TAG_WM, "New target is home while current target is"
+                    + "closing, not changing");
             return curTarget;
         }
 
@@ -3190,6 +3214,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
          */
         SurfaceControl mAppAnimationLayer = null;
         SurfaceControl mBoostedAppAnimationLayer = null;
+        SurfaceControl mHomeAppAnimationLayer = null;
 
         /**
          * Given that the split-screen divider does not have an AppWindowToken, it
@@ -3552,6 +3577,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             int layer = 0;
             int layerForAnimationLayer = 0;
             int layerForBoostedAnimationLayer = 0;
+            int layerForHomeAnimationLayer = 0;
 
             for (int state = 0; state <= ALWAYS_ON_TOP_STATE; state++) {
                 for (int i = 0; i < mChildren.size(); i++) {
@@ -3578,6 +3604,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                         layerForBoostedAnimationLayer = layer++;
                     }
                 }
+                if (state == HOME_STACK_STATE) {
+                    layerForHomeAnimationLayer = layer++;
+                }
             }
             if (mAppAnimationLayer != null) {
                 t.setLayer(mAppAnimationLayer, layerForAnimationLayer);
@@ -3585,11 +3614,22 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             if (mBoostedAppAnimationLayer != null) {
                 t.setLayer(mBoostedAppAnimationLayer, layerForBoostedAnimationLayer);
             }
+            if (mHomeAppAnimationLayer != null) {
+                t.setLayer(mHomeAppAnimationLayer, layerForHomeAnimationLayer);
+            }
         }
 
         @Override
-        SurfaceControl getAppAnimationLayer(boolean boosted) {
-            return boosted ? mBoostedAppAnimationLayer : mAppAnimationLayer;
+        SurfaceControl getAppAnimationLayer(@AnimationLayer int animationLayer) {
+            switch (animationLayer) {
+                case ANIMATION_LAYER_BOOSTED:
+                    return mBoostedAppAnimationLayer;
+                case ANIMATION_LAYER_HOME:
+                    return mHomeAppAnimationLayer;
+                case ANIMATION_LAYER_STANDARD:
+                default:
+                    return mAppAnimationLayer;
+            }
         }
 
         SurfaceControl getSplitScreenDividerAnchor() {
@@ -3606,12 +3646,16 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 mBoostedAppAnimationLayer = makeChildSurface(null)
                         .setName("boostedAnimationLayer")
                         .build();
+                mHomeAppAnimationLayer = makeChildSurface(null)
+                        .setName("homeAnimationLayer")
+                        .build();
                 mSplitScreenDividerAnchor = makeChildSurface(null)
                         .setName("splitScreenDividerAnchor")
                         .build();
                 getPendingTransaction()
                         .show(mAppAnimationLayer)
                         .show(mBoostedAppAnimationLayer)
+                        .show(mHomeAppAnimationLayer)
                         .show(mSplitScreenDividerAnchor);
                 scheduleAnimation();
             } else {
@@ -3619,6 +3663,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 mAppAnimationLayer = null;
                 mBoostedAppAnimationLayer.destroy();
                 mBoostedAppAnimationLayer = null;
+                mHomeAppAnimationLayer.destroy();
+                mHomeAppAnimationLayer = null;
                 mSplitScreenDividerAnchor.destroy();
                 mSplitScreenDividerAnchor = null;
             }
@@ -3815,8 +3861,20 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
     }
 
     void applyMagnificationSpec(MagnificationSpec spec) {
+        if (spec.scale != 1.0) {
+            mMagnificationSpec = spec;
+        } else {
+            mMagnificationSpec = null;
+        }
+
         applyMagnificationSpec(getPendingTransaction(), spec);
         getPendingTransaction().apply();
+    }
+
+    void reapplyMagnificationSpec() {
+        if (mMagnificationSpec != null) {
+            applyMagnificationSpec(getPendingTransaction(), mMagnificationSpec);
+        }
     }
 
     @Override
@@ -3884,7 +3942,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
      * with {@link #WindowState#assignLayer}
      */
     void assignRelativeLayerForImeTargetChild(SurfaceControl.Transaction t, WindowContainer child) {
-        t.setRelativeLayer(child.getSurfaceControl(), mImeWindowsContainers.getSurfaceControl(), 1);
+        child.assignRelativeLayer(t, mImeWindowsContainers.getSurfaceControl(), 1);
     }
 
     @Override
@@ -3907,5 +3965,34 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
     void assignStackOrdering() {
         mTaskStackContainers.assignStackOrdering(getPendingTransaction());
+    }
+
+    /**
+     * Increment the deferral count to determine whether to update the IME target.
+     */
+    void deferUpdateImeTarget() {
+        mDeferUpdateImeTargetCount++;
+    }
+
+    /**
+     * Decrement the deferral count to determine whether to update the IME target. If the count
+     * reaches 0, a new ime target will get computed.
+     */
+    void continueUpdateImeTarget() {
+        if (mDeferUpdateImeTargetCount == 0) {
+            return;
+        }
+
+        mDeferUpdateImeTargetCount--;
+        if (mDeferUpdateImeTargetCount == 0) {
+            computeImeTarget(true /* updateImeTarget */);
+        }
+    }
+
+    /**
+     * @return Whether a new IME target should be computed.
+     */
+    private boolean canUpdateImeTarget() {
+        return mDeferUpdateImeTargetCount == 0;
     }
 }

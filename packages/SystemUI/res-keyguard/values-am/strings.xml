@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"ሲም ካርድ በፒዩኬ ተቆልፏል።"</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"ሲም ካርድን በመክፈት ላይ..."</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"የፒን አካባቢ"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"የሲም ፒን አካባቢ"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"የሲም ፒዩኬ አካባቢ"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"ቀጣዩ ማንቂያ ለ<xliff:g id="ALARM">%1$s</xliff:g> ተዘጋጅቷል"</string>
@@ -140,9 +142,9 @@
       <item quantity="other">መሣሪያው ለ<xliff:g id="NUMBER_1">%d</xliff:g> ሰዓቶች አልተከፈተም ነበር። የይለፍ ቃል ያረጋግጡ።</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"አልታወቀም"</string>
-    <plurals name="kg_password_default_pin_message" formatted="false" msgid="6203676909479972943">
-      <item quantity="one">የሲም ፒን ያስገቡ፣ <xliff:g id="NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል።</item>
-      <item quantity="other">የሲም ፒን ያስገቡ፣ <xliff:g id="NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል።</item>
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="one">የሲም ፒን ያስገቡ። <xliff:g id="NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል።</item>
+      <item quantity="other">የሲም ፒን ያስገቡ። <xliff:g id="NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል።</item>
     </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="one">ሲም አሁን ተሰናክሏል። ለመቀጠል የPUK ኮድ ያስገቡ። ሲም እስከመጨረሻው መጠቀም የማይቻል ከመሆኑ በፊት <xliff:g id="_NUMBER_1">%d</xliff:g> ሙከራዎች ይቀረዎታል። ዝርዝሮችን ለማግኘት የአገልግሎት አቅራቢን ያነጋግሩ።</item>

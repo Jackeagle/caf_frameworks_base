@@ -165,6 +165,9 @@ public final class ViewRootImpl implements ViewParent,
     public static final String PROPERTY_EMULATOR_WIN_OUTSET_BOTTOM_PX =
             "ro.emu.win_outset_bottom_px";
 
+    private static final boolean SCROLL_BOOST_SS_ENABLE =
+                    SystemProperties.getBoolean("vendor.perf.gestureflingboost.enable", false);
+
     /**
      * Maximum time we allow the user to roll the trackball enough to generate
      * a key event, before resetting the counters.
@@ -246,7 +249,7 @@ public final class ViewRootImpl implements ViewParent,
 
     final WindowLeaked mLocation;
 
-    final WindowManager.LayoutParams mWindowAttributes = new WindowManager.LayoutParams();
+    public final WindowManager.LayoutParams mWindowAttributes = new WindowManager.LayoutParams();
 
     final W mWindow;
 
@@ -1343,6 +1346,10 @@ public final class ViewRootImpl implements ViewParent,
 
             for (int i = 0; i < mWindowStoppedCallbacks.size(); i++) {
                 mWindowStoppedCallbacks.get(i).windowStopped(stopped);
+            }
+
+            if (mStopped) {
+                mSurface.release();
             }
         }
     }
@@ -3149,7 +3156,7 @@ public final class ViewRootImpl implements ViewParent,
         scrollToRectOrFocus(null, false);
 
         if (mAttachInfo.mViewScrollChanged) {
-            if (mHaveMoveEvent && !mIsPerfLockAcquired) {
+            if (!SCROLL_BOOST_SS_ENABLE && mHaveMoveEvent && !mIsPerfLockAcquired) {
                 mIsPerfLockAcquired = true;
                 if (mPerf != null) {
                     String currentPackage = mContext.getPackageName();
@@ -3280,7 +3287,8 @@ public final class ViewRootImpl implements ViewParent,
                 // eglTerminate() for instance.
                 if (mAttachInfo.mThreadedRenderer != null &&
                         !mAttachInfo.mThreadedRenderer.isEnabled() &&
-                        mAttachInfo.mThreadedRenderer.isRequested()) {
+                        mAttachInfo.mThreadedRenderer.isRequested() &&
+                        mSurface.isValid()) {
 
                     try {
                         mAttachInfo.mThreadedRenderer.initializeIfNeeded(
@@ -5063,11 +5071,13 @@ public final class ViewRootImpl implements ViewParent,
             mAttachInfo.mHandlingPointerEvent = true;
             boolean handled = mView.dispatchPointerEvent(event);
             int action = event.getActionMasked();
-            if (action == MotionEvent.ACTION_MOVE) {
-                mHaveMoveEvent = true;
-            } else if (action == MotionEvent.ACTION_UP) {
-                mHaveMoveEvent = false;
-                mIsPerfLockAcquired = false;
+            if (!SCROLL_BOOST_SS_ENABLE) {
+                if (action == MotionEvent.ACTION_MOVE) {
+                    mHaveMoveEvent = true;
+                } else if (action == MotionEvent.ACTION_UP) {
+                    mHaveMoveEvent = false;
+                    mIsPerfLockAcquired = false;
+                }
             }
             maybeUpdatePointerIcon(event);
             maybeUpdateTooltip(event);

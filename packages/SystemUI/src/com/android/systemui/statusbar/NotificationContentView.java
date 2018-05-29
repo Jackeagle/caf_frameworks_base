@@ -80,7 +80,8 @@ public class NotificationContentView extends FrameLayout {
     private RemoteInputView mHeadsUpRemoteInput;
 
     private SmartReplyConstants mSmartReplyConstants;
-    private SmartReplyLogger mSmartReplyLogger;
+    private SmartReplyView mExpandedSmartReplyView;
+    private SmartReplyController mSmartReplyController;
 
     private NotificationViewWrapper mContractedWrapper;
     private NotificationViewWrapper mExpandedWrapper;
@@ -153,7 +154,7 @@ public class NotificationContentView extends FrameLayout {
         super(context, attrs);
         mHybridGroupManager = new HybridGroupManager(getContext(), this);
         mSmartReplyConstants = Dependency.get(SmartReplyConstants.class);
-        mSmartReplyLogger = Dependency.get(SmartReplyLogger.class);
+        mSmartReplyController = Dependency.get(SmartReplyController.class);
         initView();
     }
 
@@ -177,24 +178,26 @@ public class NotificationContentView extends FrameLayout {
         int heightMode = MeasureSpec.getMode(heightMeasureSpec);
         boolean hasFixedHeight = heightMode == MeasureSpec.EXACTLY;
         boolean isHeightLimited = heightMode == MeasureSpec.AT_MOST;
-        int maxSize = Integer.MAX_VALUE;
+        int maxSize = Integer.MAX_VALUE / 2;
         int width = MeasureSpec.getSize(widthMeasureSpec);
         if (hasFixedHeight || isHeightLimited) {
             maxSize = MeasureSpec.getSize(heightMeasureSpec);
         }
         int maxChildHeight = 0;
         if (mExpandedChild != null) {
-            int size = Math.min(maxSize, mNotificationMaxHeight);
+            int notificationMaxHeight = mNotificationMaxHeight;
+            if (mExpandedSmartReplyView != null) {
+                notificationMaxHeight += mExpandedSmartReplyView.getHeightUpperLimit();
+            }
+            int size = notificationMaxHeight;
             ViewGroup.LayoutParams layoutParams = mExpandedChild.getLayoutParams();
             boolean useExactly = false;
             if (layoutParams.height >= 0) {
                 // An actual height is set
-                size = Math.min(maxSize, layoutParams.height);
+                size = Math.min(size, layoutParams.height);
                 useExactly = true;
             }
-            int spec = size == Integer.MAX_VALUE
-                    ? MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-                    : MeasureSpec.makeMeasureSpec(size, useExactly
+            int spec = MeasureSpec.makeMeasureSpec(size, useExactly
                             ? MeasureSpec.EXACTLY
                             : MeasureSpec.AT_MOST);
             measureChildWithMargins(mExpandedChild, widthMeasureSpec, 0, spec, 0);
@@ -202,7 +205,7 @@ public class NotificationContentView extends FrameLayout {
         }
         if (mContractedChild != null) {
             int heightSpec;
-            int size = Math.min(maxSize, mSmallHeight);
+            int size = mSmallHeight;
             ViewGroup.LayoutParams layoutParams = mContractedChild.getLayoutParams();
             boolean useExactly = false;
             if (layoutParams.height >= 0) {
@@ -234,7 +237,9 @@ public class NotificationContentView extends FrameLayout {
             }
         }
         if (mHeadsUpChild != null) {
-            int size = Math.min(maxSize, mHeadsUpHeight);
+            int maxHeight = mHeadsUpHeight;
+            maxHeight += mHeadsUpWrapper.getExtraMeasureHeight();
+            int size = maxHeight;
             ViewGroup.LayoutParams layoutParams = mHeadsUpChild.getLayoutParams();
             boolean useExactly = false;
             if (layoutParams.height >= 0) {
@@ -256,11 +261,11 @@ public class NotificationContentView extends FrameLayout {
                         MeasureSpec.EXACTLY);
             }
             mSingleLineView.measure(singleLineWidthSpec,
-                    MeasureSpec.makeMeasureSpec(maxSize, MeasureSpec.AT_MOST));
+                    MeasureSpec.makeMeasureSpec(mNotificationMaxHeight, MeasureSpec.AT_MOST));
             maxChildHeight = Math.max(maxChildHeight, mSingleLineView.getMeasuredHeight());
         }
         if (mAmbientChild != null) {
-            int size = Math.min(maxSize, mNotificationAmbientHeight);
+            int size = mNotificationAmbientHeight;
             ViewGroup.LayoutParams layoutParams = mAmbientChild.getLayoutParams();
             boolean useExactly = false;
             if (layoutParams.height >= 0) {
@@ -274,7 +279,7 @@ public class NotificationContentView extends FrameLayout {
             maxChildHeight = Math.max(maxChildHeight, mAmbientChild.getMeasuredHeight());
         }
         if (mAmbientSingleLineChild != null) {
-            int size = Math.min(maxSize, mNotificationAmbientHeight);
+            int size = mNotificationAmbientHeight;
             ViewGroup.LayoutParams layoutParams = mAmbientSingleLineChild.getLayoutParams();
             boolean useExactly = false;
             if (layoutParams.height >= 0) {
@@ -308,8 +313,7 @@ public class NotificationContentView extends FrameLayout {
      * @return The extra height needed.
      */
     private int getExtraRemoteInputHeight(RemoteInputView remoteInput) {
-        if (remoteInput != null && remoteInput.getVisibility() == VISIBLE
-                && remoteInput.isActive()) {
+        if (remoteInput != null && (remoteInput.isActive() || remoteInput.isSending())) {
             return getResources().getDimensionPixelSize(
                     com.android.internal.R.dimen.notification_content_margin);
         }
@@ -418,7 +422,6 @@ public class NotificationContentView extends FrameLayout {
         mContractedChild = child;
         mContractedWrapper = NotificationViewWrapper.wrap(getContext(), child,
                 mContainingNotification);
-        mContractedWrapper.setDark(mDark, false /* animate */, 0 /* delay */);
     }
 
     private NotificationViewWrapper getWrapperForView(View child) {
@@ -881,6 +884,12 @@ public class NotificationContentView extends FrameLayout {
         mContainingNotification.setContentBackground(customBackgroundColor, animate, this);
     }
 
+    public void setBackgroundTintColor(int color) {
+        if (mExpandedSmartReplyView != null) {
+            mExpandedSmartReplyView.setBackgroundTintColor(color);
+        }
+    }
+
     public int getVisibleType() {
         return mVisibleType;
     }
@@ -1096,18 +1105,6 @@ public class NotificationContentView extends FrameLayout {
             return;
         }
         mDark = dark;
-        if (mVisibleType == VISIBLE_TYPE_CONTRACTED || !dark) {
-            mContractedWrapper.setDark(dark, fade, delay);
-        }
-        if (mVisibleType == VISIBLE_TYPE_EXPANDED || (mExpandedChild != null && !dark)) {
-            mExpandedWrapper.setDark(dark, fade, delay);
-        }
-        if (mVisibleType == VISIBLE_TYPE_HEADSUP || (mHeadsUpChild != null && !dark)) {
-            mHeadsUpWrapper.setDark(dark, fade, delay);
-        }
-        if (mSingleLineView != null && (mVisibleType == VISIBLE_TYPE_SINGLELINE || !dark)) {
-            mSingleLineView.setDark(dark, fade, delay);
-        }
         selectLayout(!dark && fade /* animate */, false /* force */);
     }
 
@@ -1189,8 +1186,13 @@ public class NotificationContentView extends FrameLayout {
     }
     private void updateSingleLineView() {
         if (mIsChildInGroup) {
+            boolean isNewView = mSingleLineView == null;
             mSingleLineView = mHybridGroupManager.bindFromNotification(
                     mSingleLineView, mStatusBarNotification.getNotification());
+            if (isNewView) {
+                updateViewVisibility(mVisibleType, VISIBLE_TYPE_SINGLELINE,
+                        mSingleLineView, mSingleLineView);
+            }
         } else if (mSingleLineView != null) {
             removeView(mSingleLineView);
             mSingleLineView = null;
@@ -1199,8 +1201,13 @@ public class NotificationContentView extends FrameLayout {
 
     private void updateAmbientSingleLineView() {
         if (mIsChildInGroup) {
+            boolean isNewView = mAmbientSingleLineChild == null;
             mAmbientSingleLineChild = mHybridGroupManager.bindAmbientFromNotification(
                     mAmbientSingleLineChild, mStatusBarNotification.getNotification());
+            if (isNewView) {
+                updateViewVisibility(mVisibleType, VISIBLE_TYPE_AMBIENT_SINGLELINE,
+                        mAmbientSingleLineChild, mAmbientSingleLineChild);
+            }
         } else if (mAmbientSingleLineChild != null) {
             removeView(mAmbientSingleLineChild);
             mAmbientSingleLineChild = null;
@@ -1348,11 +1355,11 @@ public class NotificationContentView extends FrameLayout {
     private void applySmartReplyView(RemoteInput remoteInput, PendingIntent pendingIntent,
             NotificationData.Entry entry) {
         if (mExpandedChild != null) {
-            SmartReplyView view =
+            mExpandedSmartReplyView =
                     applySmartReplyView(mExpandedChild, remoteInput, pendingIntent, entry);
-            if (view != null && remoteInput != null && remoteInput.getChoices() != null
-                    && remoteInput.getChoices().length > 0) {
-                mSmartReplyLogger.smartRepliesAdded(entry, remoteInput.getChoices().length);
+            if (mExpandedSmartReplyView != null && remoteInput != null
+                    && remoteInput.getChoices() != null && remoteInput.getChoices().length > 0) {
+                mSmartReplyController.smartRepliesAdded(entry, remoteInput.getChoices().length);
             }
         }
     }
@@ -1370,6 +1377,13 @@ public class NotificationContentView extends FrameLayout {
             smartReplyContainer.setVisibility(View.GONE);
             return null;
         }
+        // If we are showing the spinner we don't want to add the buttons.
+        boolean showingSpinner = entry.notification.getNotification()
+                .extras.getBoolean(Notification.EXTRA_SHOW_REMOTE_INPUT_SPINNER, false);
+        if (showingSpinner) {
+            smartReplyContainer.setVisibility(View.GONE);
+            return null;
+        }
         SmartReplyView smartReplyView = null;
         if (smartReplyContainer.getChildCount() == 0) {
             smartReplyView = SmartReplyView.inflate(mContext, smartReplyContainer);
@@ -1382,7 +1396,7 @@ public class NotificationContentView extends FrameLayout {
         }
         if (smartReplyView != null) {
             smartReplyView.setRepliesFromRemoteInput(remoteInput, pendingIntent,
-                    mSmartReplyLogger, entry);
+                    mSmartReplyController, entry, smartReplyContainer);
             smartReplyContainer.setVisibility(View.VISIBLE);
         }
         return smartReplyView;
@@ -1691,7 +1705,10 @@ public class NotificationContentView extends FrameLayout {
         if (mHeadsUpChild == null) {
             viewType = VISIBLE_TYPE_CONTRACTED;
         }
-        return getViewHeight(viewType) + getExtraRemoteInputHeight(mHeadsUpRemoteInput);
+        // The headsUp remote input quickly switches to the expanded one, so lets also include that
+        // one
+        return getViewHeight(viewType) + getExtraRemoteInputHeight(mHeadsUpRemoteInput)
+                + getExtraRemoteInputHeight(mExpandedRemoteInput);
     }
 
     public void setRemoteInputVisible(boolean remoteInputVisible) {

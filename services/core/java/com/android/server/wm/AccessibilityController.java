@@ -87,8 +87,6 @@ final class AccessibilityController {
 
     private WindowsForAccessibilityObserver mWindowsForAccessibilityObserver;
 
-    private boolean mScreenMagnificationActive;
-
     public void setMagnificationCallbacksLocked(MagnificationCallbacks callbacks) {
         if (callbacks != null) {
             if (mDisplayMagnifier != null) {
@@ -137,11 +135,6 @@ final class AccessibilityController {
         }
         if (mWindowsForAccessibilityObserver != null) {
             mWindowsForAccessibilityObserver.scheduleComputeChangedWindowsLocked();
-        }
-        boolean nowActive = !spec.isNop();
-        if (nowActive != mScreenMagnificationActive) {
-            mScreenMagnificationActive = nowActive;
-            mService.mPolicy.onScreenMagnificationStateChanged(nowActive);
         }
     }
 
@@ -811,36 +804,35 @@ final class AccessibilityController {
                             return;
                         }
                         mInvalidated = false;
-                        Canvas canvas = null;
-                        try {
-                            // Empty dirty rectangle means unspecified.
-                            if (mDirtyRect.isEmpty()) {
-                                mBounds.getBounds(mDirtyRect);
-                            }
-                            mDirtyRect.inset(- mHalfBorderWidth, - mHalfBorderWidth);
-                            canvas = mSurface.lockCanvas(mDirtyRect);
-                            if (DEBUG_VIEWPORT_WINDOW) {
-                                Slog.i(LOG_TAG, "Dirty rect: " + mDirtyRect);
-                            }
-                        } catch (IllegalArgumentException iae) {
-                            /* ignore */
-                        } catch (Surface.OutOfResourcesException oore) {
-                            /* ignore */
-                        }
-                        if (canvas == null) {
-                            return;
-                        }
-                        if (DEBUG_VIEWPORT_WINDOW) {
-                            Slog.i(LOG_TAG, "Bounds: " + mBounds);
-                        }
-                        canvas.drawColor(Color.TRANSPARENT, Mode.CLEAR);
-                        mPaint.setAlpha(mAlpha);
-                        Path path = mBounds.getBoundaryPath();
-                        canvas.drawPath(path, mPaint);
-
-                        mSurface.unlockCanvasAndPost(canvas);
-
                         if (mAlpha > 0) {
+                            Canvas canvas = null;
+                            try {
+                                // Empty dirty rectangle means unspecified.
+                                if (mDirtyRect.isEmpty()) {
+                                    mBounds.getBounds(mDirtyRect);
+                                }
+                                mDirtyRect.inset(-mHalfBorderWidth, -mHalfBorderWidth);
+                                canvas = mSurface.lockCanvas(mDirtyRect);
+                                if (DEBUG_VIEWPORT_WINDOW) {
+                                    Slog.i(LOG_TAG, "Dirty rect: " + mDirtyRect);
+                                }
+                            } catch (IllegalArgumentException iae) {
+                                /* ignore */
+                            } catch (Surface.OutOfResourcesException oore) {
+                                /* ignore */
+                            }
+                            if (canvas == null) {
+                                return;
+                            }
+                            if (DEBUG_VIEWPORT_WINDOW) {
+                                Slog.i(LOG_TAG, "Bounds: " + mBounds);
+                            }
+                            canvas.drawColor(Color.TRANSPARENT, Mode.CLEAR);
+                            mPaint.setAlpha(mAlpha);
+                            Path path = mBounds.getBoundaryPath();
+                            canvas.drawPath(path, mPaint);
+
+                            mSurface.unlockCanvasAndPost(canvas);
                             mSurfaceControl.show();
                         } else {
                             mSurfaceControl.hide();

@@ -248,6 +248,7 @@ public class JobSchedulerService extends com.android.server.SystemService
     static final int WORKING_INDEX = 1;
     static final int FREQUENT_INDEX = 2;
     static final int RARE_INDEX = 3;
+    static final int NEVER_INDEX = 4;
 
     /**
      * Bookkeeping about when jobs last run.  We keep our own record in heartbeat time,
@@ -2432,11 +2433,11 @@ public class JobSchedulerService extends com.android.server.SystemService
 
     public static int standbyBucketToBucketIndex(int bucket) {
         // Normalize AppStandby constants to indices into our bookkeeping
-        if (bucket == UsageStatsManager.STANDBY_BUCKET_NEVER) return 4;
-        else if (bucket >= UsageStatsManager.STANDBY_BUCKET_RARE) return 3;
-        else if (bucket >= UsageStatsManager.STANDBY_BUCKET_FREQUENT) return 2;
-        else if (bucket >= UsageStatsManager.STANDBY_BUCKET_WORKING_SET) return 1;
-        else return 0;
+        if (bucket == UsageStatsManager.STANDBY_BUCKET_NEVER) return NEVER_INDEX;
+        else if (bucket > UsageStatsManager.STANDBY_BUCKET_FREQUENT) return RARE_INDEX;
+        else if (bucket > UsageStatsManager.STANDBY_BUCKET_WORKING_SET) return FREQUENT_INDEX;
+        else if (bucket > UsageStatsManager.STANDBY_BUCKET_ACTIVE) return WORKING_INDEX;
+        else return ACTIVE_INDEX;
     }
 
     // Static to support external callers
@@ -2960,6 +2961,18 @@ public class JobSchedulerService extends com.android.server.SystemService
         return 0;
     }
 
+    void triggerDockState(boolean idleState) {
+        final Intent dockIntent;
+        if (idleState) {
+            dockIntent = new Intent(Intent.ACTION_DOCK_IDLE);
+        } else {
+            dockIntent = new Intent(Intent.ACTION_DOCK_ACTIVE);
+        }
+        dockIntent.setPackage("android");
+        dockIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY | Intent.FLAG_RECEIVER_FOREGROUND);
+        getContext().sendBroadcastAsUser(dockIntent, UserHandle.ALL);
+    }
+
     private String printContextIdToJobMap(JobStatus[] map, String initial) {
         StringBuilder s = new StringBuilder(initial + ": ");
         for (int i=0; i<map.length; i++) {
@@ -3034,6 +3047,9 @@ public class JobSchedulerService extends com.android.server.SystemService
             pw.print("    Next heartbeat: ");
             TimeUtils.formatDuration(mLastHeartbeatTime + mConstants.STANDBY_HEARTBEAT_TIME,
                     nowElapsed, pw);
+            pw.println();
+            pw.print("    In parole?: ");
+            pw.print(mInParole);
             pw.println();
             pw.println();
 
@@ -3209,6 +3225,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                     mLastHeartbeatTime - nowUptime);
             proto.write(JobSchedulerServiceDumpProto.NEXT_HEARTBEAT_TIME_MILLIS,
                     mLastHeartbeatTime + mConstants.STANDBY_HEARTBEAT_TIME - nowUptime);
+            proto.write(JobSchedulerServiceDumpProto.IN_PAROLE, mInParole);
 
             for (int u : mStartedUsers) {
                 proto.write(JobSchedulerServiceDumpProto.STARTED_USERS, u);

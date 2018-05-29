@@ -32,12 +32,23 @@ namespace android {
 namespace os {
 namespace statsd {
 
+// Keep this in sync with DumpReportReason enum in stats_log.proto
+enum DumpReportReason {
+    DEVICE_SHUTDOWN = 1,
+    CONFIG_UPDATED = 2,
+    CONFIG_REMOVED = 3,
+    GET_DATA_CALLED = 4,
+    ADB_DUMP = 5,
+    CONFIG_RESET = 6,
+    STATSCOMPANION_DIED = 7
+};
+
 class StatsLogProcessor : public ConfigListener {
 public:
     StatsLogProcessor(const sp<UidMap>& uidMap, const sp<AlarmMonitor>& anomalyAlarmMonitor,
                       const sp<AlarmMonitor>& subscriberTriggerAlarmMonitor,
                       const int64_t timeBaseNs,
-                      const std::function<void(const ConfigKey&)>& sendBroadcast);
+                      const std::function<bool(const ConfigKey&)>& sendBroadcast);
     virtual ~StatsLogProcessor();
 
     void OnLogEvent(LogEvent* event, bool reconnectionStarts);
@@ -52,7 +63,8 @@ public:
     size_t GetMetricsSize(const ConfigKey& key) const;
 
     void onDumpReport(const ConfigKey& key, const int64_t dumpTimeNs,
-                      const bool include_current_partial_bucket, vector<uint8_t>* outData);
+                      const bool include_current_partial_bucket,
+                      const DumpReportReason dumpReportReason, vector<uint8_t>* outData);
 
     /* Tells MetricsManager that the alarms in alarmSet have fired. Modifies anomaly alarmSet. */
     void onAnomalyAlarmFired(
@@ -65,7 +77,10 @@ public:
             unordered_set<sp<const InternalAlarm>, SpHash<InternalAlarm>> alarmSet);
 
     /* Flushes data to disk. Data on memory will be gone after written to disk. */
-    void WriteDataToDisk();
+    void WriteDataToDisk(const DumpReportReason dumpReportReason);
+
+    // Reset all configs.
+    void resetConfigs();
 
     inline sp<UidMap> getUidMap() {
         return mUidMap;
@@ -74,6 +89,18 @@ public:
     void dumpStates(FILE* out, bool verbose);
 
     void informPullAlarmFired(const int64_t timestampNs);
+
+    int64_t getLastReportTimeNs(const ConfigKey& key);
+
+    inline void setPrintLogs(bool enabled) {
+#ifdef VERY_VERBOSE_PRINTING
+        std::lock_guard<std::mutex> lock(mMetricsMutex);
+        mPrintAllLogs = enabled;
+#endif
+    }
+
+    // Add a specific config key to the possible configs to dump ASAP.
+    void noteOnDiskData(const ConfigKey& key);
 
 private:
     // For testing only.
@@ -94,6 +121,9 @@ private:
     // Tracks when we last checked the bytes consumed for each config key.
     std::unordered_map<ConfigKey, long> mLastByteSizeTimes;
 
+    // Tracks which config keys has metric reports on disk
+    std::set<ConfigKey> mOnDiskDataConfigs;
+
     sp<UidMap> mUidMap;  // Reference to the UidMap to lookup app name and version for each uid.
 
     StatsPullerManager mStatsPullerManager;
@@ -107,11 +137,13 @@ private:
     void OnConfigUpdatedLocked(
         const int64_t currentTimestampNs, const ConfigKey& key, const StatsdConfig& config);
 
-    void WriteDataToDiskLocked();
-    void WriteDataToDiskLocked(const ConfigKey& key);
+    void WriteDataToDiskLocked(const DumpReportReason dumpReportReason);
+    void WriteDataToDiskLocked(const ConfigKey& key, const int64_t timestampNs,
+                               const DumpReportReason dumpReportReason);
 
     void onConfigMetricsReportLocked(const ConfigKey& key, const int64_t dumpTimeStampNs,
                                      const bool include_current_partial_bucket,
+                                     const DumpReportReason dumpReportReason,
                                      util::ProtoOutputStream* proto);
 
     /* Check if we should send a broadcast if approaching memory limits and if we're over, we
@@ -125,11 +157,14 @@ private:
     // Handler over the isolated uid change event.
     void onIsolatedUidChangedEventLocked(const LogEvent& event);
 
+    // Reset all configs.
+    void resetConfigsLocked(const int64_t timestampNs);
+    // Reset the specified configs.
     void resetConfigsLocked(const int64_t timestampNs, const std::vector<ConfigKey>& configs);
 
     // Function used to send a broadcast so that receiver for the config key can call getData
     // to retrieve the stored data.
-    std::function<void(const ConfigKey& key)> mSendBroadcast;
+    std::function<bool(const ConfigKey& key)> mSendBroadcast;
 
     const int64_t mTimeBaseNs;
 
@@ -147,6 +182,10 @@ private:
     int mLogLossCount = 0;
 
     long mLastPullerCacheClearTimeSec = 0;
+
+#ifdef VERY_VERBOSE_PRINTING
+    bool mPrintAllLogs = false;
+#endif
 
     FRIEND_TEST(StatsLogProcessorTest, TestOutOfOrderLogs);
     FRIEND_TEST(StatsLogProcessorTest, TestRateLimitByteSize);

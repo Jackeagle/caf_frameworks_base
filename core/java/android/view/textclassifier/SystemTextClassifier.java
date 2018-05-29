@@ -55,7 +55,8 @@ public final class SystemTextClassifier implements TextClassifier {
         mManagerService = ITextClassifierService.Stub.asInterface(
                 ServiceManager.getServiceOrThrow(Context.TEXT_CLASSIFICATION_SERVICE));
         mSettings = Preconditions.checkNotNull(settings);
-        mFallback = new TextClassifierImpl(context, settings);
+        mFallback = context.getSystemService(TextClassificationManager.class)
+                .getTextClassifier(TextClassifier.LOCAL);
         mPackageName = Preconditions.checkNotNull(context.getPackageName());
     }
 
@@ -126,6 +127,18 @@ public final class SystemTextClassifier implements TextClassifier {
             Log.e(LOG_TAG, "Error generating links. Using fallback.", e);
         }
         return mFallback.generateLinks(request);
+    }
+
+    @Override
+    public void onSelectionEvent(SelectionEvent event) {
+        Preconditions.checkNotNull(event);
+        Utils.checkMainThread();
+
+        try {
+            mManagerService.onSelectionEvent(mSessionId, event);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "Error reporting selection event.", e);
+        }
     }
 
     /**

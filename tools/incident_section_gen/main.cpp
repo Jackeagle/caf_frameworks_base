@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-
 #include <frameworks/base/core/proto/android/os/incident.pb.h>
 
 #include <map>
 #include <set>
-#include <string>
 #include <sstream>
+#include <string>
 
 using namespace android;
 using namespace android::os;
@@ -413,7 +412,8 @@ static bool generateSectionListCpp(Descriptor const* descriptor) {
             case SECTION_NONE:
                 continue;
             case SECTION_FILE:
-                printf("    new FileSection(%d, \"%s\"),\n", field->number(), s.args().c_str());
+                printf("    new FileSection(%d, \"%s\", %s),\n", field->number(), s.args().c_str(),
+                       s.device_specific() ? "true" : "false");
                 break;
             case SECTION_COMMAND:
                 printf("    new CommandSection(%d,", field->number());
@@ -421,7 +421,8 @@ static bool generateSectionListCpp(Descriptor const* descriptor) {
                 printf(" NULL),\n");
                 break;
             case SECTION_DUMPSYS:
-                printf("    new DumpsysSection(%d,", field->number());
+                printf("    new DumpsysSection(%d, %s,", field->number(),
+                       s.userdebug_and_eng_only() ? "true" : "false");
                 splitAndPrint(s.args());
                 printf(" NULL),\n");
                 break;

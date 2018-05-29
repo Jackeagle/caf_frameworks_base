@@ -51,6 +51,8 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
+import android.os.ShellCallback;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -164,7 +166,7 @@ public final class ContentService extends IContentService.Stub {
     private SyncManager getSyncManager() {
         synchronized(mSyncManagerLock) {
             try {
-                // Try to create the SyncManager, return null if it fails (e.g. the disk is full).
+                // Try to create the SyncManager, return null if it fails (which it shouldn't).
                 if (mSyncManager == null) mSyncManager = new SyncManager(mContext, mFactoryTest);
             } catch (SQLiteException e) {
                 Log.e(TAG, "Can't create SyncManager", e);
@@ -197,7 +199,7 @@ public final class ContentService extends IContentService.Stub {
         final long identityToken = clearCallingIdentity();
         try {
             if (mSyncManager == null) {
-                pw.println("No SyncManager created!  (Disk full?)");
+                pw.println("SyncManager not available yet");
             } else {
                 mSyncManager.dump(fd, pw, dumpAll);
             }
@@ -1277,7 +1279,9 @@ public final class ContentService extends IContentService.Stub {
                 case Process.SYSTEM_UID:
                     break; // Okay
                 default:
-                    throw new SecurityException("Invalid extras specified.");
+                    final String msg = "Invalid extras specified.";
+                    Log.w(TAG, msg + " requestsync -f/-F needs to run on 'adb shell'");
+                    throw new SecurityException(msg);
             }
         }
     }
@@ -1576,5 +1580,33 @@ public final class ContentService extends IContentService.Stub {
                 }
             }
         }
+    }
+
+    private void enforceShell(String method) {
+        final int callingUid = Binder.getCallingUid();
+        if (callingUid != Process.SHELL_UID && callingUid != Process.ROOT_UID) {
+            throw new SecurityException("Non-shell user attempted to call " + method);
+        }
+    }
+
+    @Override
+    public void resetTodayStats() {
+        enforceShell("resetTodayStats");
+
+        if (mSyncManager != null) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                mSyncManager.resetTodayStats();
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+    }
+
+    @Override
+    public void onShellCommand(FileDescriptor in, FileDescriptor out,
+            FileDescriptor err, String[] args, ShellCallback callback,
+            ResultReceiver resultReceiver) {
+        (new ContentShellCommand(this)).exec(this, in, out, err, args, callback, resultReceiver);
     }
 }

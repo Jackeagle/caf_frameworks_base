@@ -166,6 +166,7 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.os.storage.StorageManager;
 import android.service.voice.IVoiceInteractionSession;
+import android.util.BoostFramework;
 import android.util.EventLog;
 import android.util.Log;
 import android.util.MergedConfiguration;
@@ -193,6 +194,7 @@ import com.android.server.wm.TaskWindowContainerController;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
+import android.util.BoostFramework;
 
 import java.io.File;
 import java.io.IOException;
@@ -203,6 +205,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import android.util.BoostFramework;
+
+import android.os.AsyncTask;
 import android.util.BoostFramework;
 
 /**
@@ -229,8 +234,6 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     private static final String ATTR_RESOLVEDTYPE = "resolved_type";
     private static final String ATTR_COMPONENTSPECIFIED = "component_specified";
     static final String ACTIVITY_ICON_SUFFIX = "_activity_icon_";
-
-    private static final int MAX_STORED_STATE_TRANSITIONS = 5;
 
     final ActivityManagerService service; // owner
     final IApplicationToken.Stub appToken; // window manager token
@@ -264,6 +267,7 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     private int theme;              // resource identifier of activity's theme.
     private int realTheme;          // actual theme resource we will use, never 0.
     private int windowFlags;        // custom window flags for preview window.
+    int perfActivityBoostHandler = -1; //perflock handler when activity is created.
     private TaskRecord task;        // the task this is in.
     private long createTime = System.currentTimeMillis();
     long displayStartTime;  // when we started launching this activity
@@ -354,6 +358,10 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     boolean pendingVoiceInteractionStart;   // Waiting for activity-invoked voice session
     IVoiceInteractionSession voiceSession;  // Voice interaction session for this activity
 
+    private BoostFramework mPerf = null;
+    public BoostFramework mUxPerf = new BoostFramework();
+    public BoostFramework mPerf_iop = null;
+
     // A hint to override the window specified rotation animation, or -1
     // to use the window specified value. We use this so that
     // we can select the right animation in the cases of starting
@@ -371,28 +379,6 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     private final Configuration mTmpConfig = new Configuration();
     private final Rect mTmpBounds = new Rect();
 
-    private final ArrayList<StateTransition> mRecentTransitions = new ArrayList<>();
-
-    // TODO(b/71506345): Remove once issue has been resolved.
-    private static class StateTransition {
-        final long time;
-        final ActivityState prev;
-        final ActivityState state;
-        final String reason;
-
-        StateTransition(ActivityState prev, ActivityState state, String reason) {
-            time = System.currentTimeMillis();
-            this.prev = prev;
-            this.state = state;
-            this.reason = reason;
-        }
-
-        @Override
-        public String toString() {
-            return "[" + prev + "->" + state + ":" + reason + "@" + time + "]";
-        }
-    }
-
     private static String startingWindowStateToString(int state) {
         switch (state) {
             case STARTING_WINDOW_NOT_SHOWN:
@@ -404,21 +390,6 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             default:
                 return "unknown state=" + state;
         }
-    }
-
-    String getLifecycleDescription(String reason) {
-        StringBuilder transitionBuilder = new StringBuilder();
-
-        for (int i = 0, size = mRecentTransitions.size(); i < size; ++i) {
-            transitionBuilder.append(mRecentTransitions.get(i));
-            if (i + 1 < size) {
-                transitionBuilder.append(",");
-            }
-        }
-
-        return "name= " + this + ", component=" + intent.getComponent().flattenToShortString()
-                + ", package=" + packageName + ", state=" + mState + ", reason=" + reason
-                + ", time=" + System.currentTimeMillis() + " transitions=" + transitionBuilder;
     }
 
     void dump(PrintWriter pw, String prefix) {
@@ -818,6 +789,29 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
         }
     }
 
+    private class PreferredAppsTask extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... params) {
+            String res = null;
+            if (mUxPerf != null) {
+                res = mUxPerf.perfUXEngine_trigger(BoostFramework.UXE_TRIGGER);
+                if (res == null)
+                    return null;
+                String[] p_apps = res.split("/");
+                if (p_apps.length != 0) {
+                    ArrayList<String> apps_l = new ArrayList(Arrays.asList(p_apps));
+                    Bundle bParams = new Bundle();
+                    if (bParams == null)
+                        return null;
+                    bParams.putStringArrayList("start_empty_apps", apps_l);
+                    service.startActivityAsUserEmpty(null, null, intent, null,
+                                  null, null, 0, 0, null, bParams, 0);
+                }
+            }
+            return null;
+        }
+    }
+
     static class Token extends IApplicationToken.Stub {
         private final WeakReference<ActivityRecord> weakActivity;
         private final String name;
@@ -1004,6 +998,9 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
                 lockTaskLaunchMode = LOCK_TASK_LAUNCH_MODE_IF_WHITELISTED;
             }
         }
+
+        if (mPerf == null)
+            mPerf = new BoostFramework();
     }
 
     void setProcess(ProcessRecord proc) {
@@ -1661,19 +1658,16 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             return;
         }
 
-        final ActivityState prev = mState;
         mState = state;
-
-        if (mRecentTransitions.size() == MAX_STORED_STATE_TRANSITIONS) {
-            mRecentTransitions.remove(0);
-        }
-
-        mRecentTransitions.add(new StateTransition(prev, state, reason));
 
         final TaskRecord parent = getTask();
 
         if (parent != null) {
             parent.onActivityStateChanged(this, state, reason);
+        }
+
+        if (state == STOPPING) {
+            mWindowContainerController.notifyAppStopping();
         }
     }
 
@@ -1773,15 +1767,13 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             if (isState(STOPPED, STOPPING) && stack.mTranslucentActivityWaiting == null
                     && mStackSupervisor.getResumedActivityLocked() != this) {
                 // Capture reason before state change
-                final String reason = getLifecycleDescription("makeVisibleIfNeeded");
 
                 // An activity must be in the {@link PAUSING} state for the system to validate
                 // the move to {@link PAUSED}.
                 setState(PAUSING, "makeVisibleIfNeeded");
                 service.getLifecycleManager().scheduleTransaction(app.thread, appToken,
                         PauseActivityItem.obtain(finishing, false /* userLeaving */,
-                                configChangeFlags, false /* dontReport */)
-                                .setDescription(reason));
+                                configChangeFlags, false /* dontReport */));
             }
         } catch (Exception e) {
             // Just skip on any failure; we'll make it visible when it next restarts.
@@ -1832,8 +1824,12 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             if (app != null && app != service.mHomeProcess) {
                 service.mHomeProcess = app;
             }
+            try {
+                new PreferredAppsTask().execute();
+            } catch (Exception e) {
+                Log.v (TAG, "Exception: " + e);
+            }
         }
-
         if (nowVisible) {
             // We won't get a call to reportActivityVisibleLocked() so dismiss lockscreen now.
             mStackSupervisor.reportActivityVisibleLocked(this);
@@ -1974,11 +1970,12 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
         if (displayStartTime != 0) {
             reportLaunchTimeLocked(curTime);
         }
-        final ActivityStack stack = getStack();
-        if (fullyDrawnStartTime != 0 && stack != null) {
+        final LaunchTimeTracker.Entry entry = mStackSupervisor.getLaunchTimeTracker().getEntry(
+                getWindowingMode());
+        if (fullyDrawnStartTime != 0 && entry != null) {
             final long thisTime = curTime - fullyDrawnStartTime;
-            final long totalTime = stack.mFullyDrawnStartTime != 0
-                    ? (curTime - stack.mFullyDrawnStartTime) : thisTime;
+            final long totalTime = entry.mFullyDrawnStartTime != 0
+                    ? (curTime - entry.mFullyDrawnStartTime) : thisTime;
             if (SHOW_ACTIVITY_START_TIME) {
                 Trace.asyncTraceEnd(TRACE_TAG_ACTIVITY_MANAGER, "drawing", 0);
                 EventLog.writeEvent(AM_ACTIVITY_FULLY_DRAWN_TIME,
@@ -2000,7 +1997,7 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             if (totalTime > 0) {
                 //service.mUsageStatsService.noteFullyDrawnTime(realActivity, (int) totalTime);
             }
-            stack.mFullyDrawnStartTime = 0;
+            entry.mFullyDrawnStartTime = 0;
         }
         mStackSupervisor.getActivityMetricsLogger().logAppTransitionReportedDrawn(this,
                 restoredFromBundle);
@@ -2008,13 +2005,14 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     }
 
     private void reportLaunchTimeLocked(final long curTime) {
-        final ActivityStack stack = getStack();
-        if (stack == null) {
+        final LaunchTimeTracker.Entry entry = mStackSupervisor.getLaunchTimeTracker().getEntry(
+                getWindowingMode());
+        if (entry == null) {
             return;
         }
         final long thisTime = curTime - displayStartTime;
-        final long totalTime = stack.mLaunchStartTime != 0
-                ? (curTime - stack.mLaunchStartTime) : thisTime;
+        final long totalTime = entry.mLaunchStartTime != 0
+                ? (curTime - entry.mLaunchStartTime) : thisTime;
         if (SHOW_ACTIVITY_START_TIME) {
             Trace.asyncTraceEnd(TRACE_TAG_ACTIVITY_MANAGER, "launching: " + packageName, 0);
             EventLog.writeEvent(AM_ACTIVITY_LAUNCH_TIME,
@@ -2030,8 +2028,24 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
                 sb.append(" (total ");
                 TimeUtils.formatDuration(totalTime, sb);
                 sb.append(")");
+                if (mUxPerf != null) {
+                    mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_DISPLAYED_ACT, 0, packageName, (int)totalTime);
+                }
+            } else {
+                if (mUxPerf != null) {
+                    mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_DISPLAYED_ACT, 0, packageName, (int)thisTime);
+                }
             }
             Log.i(TAG, sb.toString());
+        }
+        if (mPerf_iop == null) {
+            mPerf_iop = new BoostFramework();
+        }
+        if (mPerf_iop != null) {
+            if (app != null) {
+                String codePath = appInfo.sourceDir.substring(0, appInfo.sourceDir.lastIndexOf('/'));
+                mPerf_iop.perfIOPrefetchStart(app.pid, packageName, codePath);
+            }
         }
         mStackSupervisor.reportActivityLaunchedLocked(false, this, thisTime, totalTime);
         if (mPerfFirstDraw == null) {
@@ -2044,7 +2058,11 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             //service.mUsageStatsService.noteLaunchTime(realActivity, (int)totalTime);
         }
         displayStartTime = 0;
-        stack.mLaunchStartTime = 0;
+        entry.mLaunchStartTime = 0;
+        if (mPerf != null && perfActivityBoostHandler > 0) {
+            mPerf.perfLockReleaseHandler(perfActivityBoostHandler);
+            perfActivityBoostHandler = -1;
+        }
     }
 
     @Override
@@ -2748,8 +2766,7 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
             if (andResume) {
                 lifecycleItem = ResumeActivityItem.obtain(service.isNextTransitionForward());
             } else {
-                lifecycleItem = PauseActivityItem.obtain()
-                        .setDescription(getLifecycleDescription("relaunchActivityLocked"));
+                lifecycleItem = PauseActivityItem.obtain();
             }
             final ClientTransaction transaction = ClientTransaction.obtain(app.thread, appToken);
             transaction.addCallback(callbackItem);

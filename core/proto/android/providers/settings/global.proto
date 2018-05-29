@@ -452,6 +452,7 @@ message GlobalSettingsProto {
         // Secure#LOCATION_MODE_OFF} temporarily for all users.
         optional SettingProto global_kill_switch = 5 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto gnss_satellite_blacklist = 6 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        optional SettingProto gnss_hal_location_request_duration_millis = 7 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional Location location = 69;
 
@@ -599,16 +600,14 @@ message GlobalSettingsProto {
     }
     optional Ntp ntp = 84;
 
-    // Details about the Off Body, Radios Off feature.
-    message OffBodyRadiosOff {
+    // Details about the User Absent, Radios Off feature.
+    message UserAbsentRadiosOff {
         option (android.msg_privacy).dest = DEST_EXPLICIT;
 
-        // Whether or not to enable the Off Body, Radios Off feature on small battery devices.
+        // Whether or not to enable the User Absent, Radios Off feature on small battery devices.
         optional SettingProto enabled_for_small_battery = 1 [ (android.privacy).dest = DEST_AUTOMATIC ];
-        // How long after the device goes off body to disable radios, in milliseconds.
-        optional SettingProto delay_ms = 2 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
-    optional OffBodyRadiosOff off_body_radios_off = 85;
+    optional UserAbsentRadiosOff user_absent_radios_off = 85;
 
     // Whether to disable the automatic scheduling of system updates.
     optional SettingProto ota_disable_automatic_update = 86 [ (android.privacy).dest = DEST_AUTOMATIC ];

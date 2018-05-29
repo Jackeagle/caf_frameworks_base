@@ -23,6 +23,7 @@ import android.annotation.Nullable;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemService;
+import android.annotation.WorkerThread;
 import android.content.ContentProviderClient;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -66,7 +67,7 @@ public class SliceManager {
      * @hide
      */
     public static final String ACTION_REQUEST_SLICE_PERMISSION =
-            "android.intent.action.REQUEST_SLICE_PERMISSION";
+            "com.android.intent.action.REQUEST_SLICE_PERMISSION";
 
     /**
      * Category used to resolve intents that can be rendered as slices.
@@ -139,6 +140,7 @@ public class SliceManager {
 
     /**
      * @deprecated TO BE REMOVED
+     * @removed
      */
     @Deprecated
     public void pinSlice(@NonNull Uri uri, @NonNull List<SliceSpec> specs) {
@@ -216,6 +218,7 @@ public class SliceManager {
      * @return All slices within the space.
      * @see SliceProvider#onGetSliceDescendants(Uri)
      */
+    @WorkerThread
     public @NonNull Collection<Uri> getSliceDescendants(@NonNull Uri uri) {
         ContentResolver resolver = mContext.getContentResolver();
         try (ContentProviderClient provider = resolver.acquireContentProviderClient(uri)) {
@@ -263,6 +266,7 @@ public class SliceManager {
 
     /**
      * @deprecated TO BE REMOVED
+     * @removed
      */
     @Deprecated
     public @Nullable Slice bindSlice(@NonNull Uri uri, @NonNull List<SliceSpec> supportedSpecs) {
@@ -354,7 +358,7 @@ public class SliceManager {
 
     /**
      * Turns a slice intent into slice content. Is a shortcut to perform the action
-     * of both {@link #mapIntentToUri(Intent)} and {@link #bindSlice(Uri, List)} at once.
+     * of both {@link #mapIntentToUri(Intent)} and {@link #bindSlice(Uri, Set)} at once.
      *
      * @param intent The intent associated with a slice.
      * @param supportedSpecs List of supported specs.
@@ -397,6 +401,7 @@ public class SliceManager {
 
     /**
      * @deprecated TO BE REMOVED.
+     * @removed
      */
     @Deprecated
     @Nullable

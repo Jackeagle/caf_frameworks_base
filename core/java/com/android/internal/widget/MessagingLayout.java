@@ -50,6 +50,7 @@ import com.android.internal.util.NotificationColorUtil;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * A custom-built layout for the Notification.MessagingStyle allows dynamic addition and removal
@@ -59,6 +60,8 @@ import java.util.function.Consumer;
 public class MessagingLayout extends FrameLayout {
 
     private static final float COLOR_SHIFT_AMOUNT = 60;
+    private static final Pattern SPECIAL_CHAR_PATTERN
+            = Pattern.compile ("[!@#$%&*()_+=|<>?{}\\[\\]~-]");
     private static final Consumer<MessagingMessage> REMOVE_MESSAGE
             = MessagingMessage::removeMessage;
     public static final Interpolator LINEAR_OUT_SLOW_IN = new PathInterpolator(0f, 0f, 0.2f, 1f);
@@ -73,6 +76,8 @@ public class MessagingLayout extends FrameLayout {
     private ArrayList<MessagingGroup> mGroups = new ArrayList<>();
     private TextView mTitleView;
     private int mLayoutColor;
+    private int mSenderTextColor;
+    private int mMessageTextColor;
     private int mAvatarSize;
     private Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint mTextPaint = new Paint();
@@ -110,7 +115,8 @@ public class MessagingLayout extends FrameLayout {
         // We still want to clip, but only on the top, since views can temporarily out of bounds
         // during transitions.
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        Rect rect = new Rect(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels);
+        int size = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
+        Rect rect = new Rect(0, 0, size, size);
         mMessagingLinearLayout.setClipBounds(rect);
         mTitleView = findViewById(R.id.title);
         mAvatarSize = getResources().getDimensionPixelSize(R.dimen.messaging_avatar_size);
@@ -149,7 +155,9 @@ public class MessagingLayout extends FrameLayout {
         }
         addRemoteInputHistoryToMessages(newMessages,
                 extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY));
-        bind(newMessages, newHistoricMessages);
+        boolean showSpinner =
+                extras.getBoolean(Notification.EXTRA_SHOW_REMOTE_INPUT_SPINNER, false);
+        bind(newMessages, newHistoricMessages, showSpinner);
     }
 
     private void addRemoteInputHistoryToMessages(
@@ -161,17 +169,18 @@ public class MessagingLayout extends FrameLayout {
         for (int i = remoteInputHistory.length - 1; i >= 0; i--) {
             CharSequence message = remoteInputHistory[i];
             newMessages.add(new Notification.MessagingStyle.Message(
-                    message, 0, (Person) null));
+                    message, 0, (Person) null, true /* remoteHistory */));
         }
     }
 
     private void bind(List<Notification.MessagingStyle.Message> newMessages,
-            List<Notification.MessagingStyle.Message> newHistoricMessages) {
+            List<Notification.MessagingStyle.Message> newHistoricMessages,
+            boolean showSpinner) {
 
         List<MessagingMessage> historicMessages = createMessages(newHistoricMessages,
                 true /* isHistoric */);
         List<MessagingMessage> messages = createMessages(newMessages, false /* isHistoric */);
-        addMessagesToGroups(historicMessages, messages);
+        addMessagesToGroups(historicMessages, messages, showSpinner);
 
         // Let's remove the remaining messages
         mMessages.forEach(REMOVE_MESSAGE);
@@ -253,18 +262,26 @@ public class MessagingLayout extends FrameLayout {
     }
 
     public Icon createAvatarSymbol(CharSequence senderName, String symbol, int layoutColor) {
-        Bitmap bitmap = Bitmap.createBitmap(mAvatarSize, mAvatarSize, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        float radius = mAvatarSize / 2.0f;
-        int color = findColor(senderName, layoutColor);
-        mPaint.setColor(color);
-        canvas.drawCircle(radius, radius, radius, mPaint);
-        boolean needDarkText  = ColorUtils.calculateLuminance(color) > 0.5f;
-        mTextPaint.setColor(needDarkText ? Color.BLACK : Color.WHITE);
-        mTextPaint.setTextSize(symbol.length() == 1 ? mAvatarSize * 0.5f : mAvatarSize * 0.3f);
-        int yPos = (int) (radius - ((mTextPaint.descent() + mTextPaint.ascent()) / 2)) ;
-        canvas.drawText(symbol, radius, yPos, mTextPaint);
-        return Icon.createWithBitmap(bitmap);
+        if (symbol.isEmpty() || TextUtils.isDigitsOnly(symbol) ||
+                SPECIAL_CHAR_PATTERN.matcher(symbol).find()) {
+            Icon avatarIcon = Icon.createWithResource(getContext(),
+                    com.android.internal.R.drawable.messaging_user);
+            avatarIcon.setTint(findColor(senderName, layoutColor));
+            return avatarIcon;
+        } else {
+            Bitmap bitmap = Bitmap.createBitmap(mAvatarSize, mAvatarSize, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            float radius = mAvatarSize / 2.0f;
+            int color = findColor(senderName, layoutColor);
+            mPaint.setColor(color);
+            canvas.drawCircle(radius, radius, radius, mPaint);
+            boolean needDarkText = ColorUtils.calculateLuminance(color) > 0.5f;
+            mTextPaint.setColor(needDarkText ? Color.BLACK : Color.WHITE);
+            mTextPaint.setTextSize(symbol.length() == 1 ? mAvatarSize * 0.5f : mAvatarSize * 0.3f);
+            int yPos = (int) (radius - ((mTextPaint.descent() + mTextPaint.ascent()) / 2));
+            canvas.drawText(symbol, radius, yPos, mTextPaint);
+            return Icon.createWithBitmap(bitmap);
+        }
     }
 
     private int findColor(CharSequence senderName, int layoutColor) {
@@ -297,6 +314,16 @@ public class MessagingLayout extends FrameLayout {
         mIsOneToOne = oneToOne;
     }
 
+    @RemotableViewMethod
+    public void setSenderTextColor(int color) {
+        mSenderTextColor = color;
+    }
+
+    @RemotableViewMethod
+    public void setMessageTextColor(int color) {
+        mMessageTextColor = color;
+    }
+
     public void setUser(Person user) {
         mUser = user;
         if (mUser.getIcon() == null) {
@@ -308,7 +335,7 @@ public class MessagingLayout extends FrameLayout {
     }
 
     private void addMessagesToGroups(List<MessagingMessage> historicMessages,
-            List<MessagingMessage> messages) {
+            List<MessagingMessage> messages, boolean showSpinner) {
         // Let's first find our groups!
         List<List<MessagingMessage>> groups = new ArrayList<>();
         List<Person> senders = new ArrayList<>();
@@ -317,11 +344,11 @@ public class MessagingLayout extends FrameLayout {
         findGroups(historicMessages, messages, groups, senders);
 
         // Let's now create the views and reorder them accordingly
-        createGroupViews(groups, senders);
+        createGroupViews(groups, senders, showSpinner);
     }
 
     private void createGroupViews(List<List<MessagingMessage>> groups,
-            List<Person> senders) {
+            List<Person> senders, boolean showSpinner) {
         mGroups.clear();
         for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
             List<MessagingMessage> group = groups.get(groupIndex);
@@ -340,12 +367,14 @@ public class MessagingLayout extends FrameLayout {
             }
             newGroup.setDisplayImagesAtEnd(mDisplayImagesAtEnd);
             newGroup.setLayoutColor(mLayoutColor);
+            newGroup.setTextColors(mSenderTextColor, mMessageTextColor);
             Person sender = senders.get(groupIndex);
             CharSequence nameOverride = null;
             if (sender != mUser && mNameReplacement != null) {
                 nameOverride = mNameReplacement;
             }
             newGroup.setSender(sender, nameOverride);
+            newGroup.setSending(groupIndex == (groups.size() - 1) && showSpinner);
             mGroups.add(newGroup);
 
             if (mMessagingLinearLayout.indexOfChild(newGroup) != groupIndex) {
@@ -431,9 +460,28 @@ public class MessagingLayout extends FrameLayout {
     }
 
     private void updateHistoricMessageVisibility() {
-        for (int i = 0; i < mHistoricMessages.size(); i++) {
+        int numHistoric = mHistoricMessages.size();
+        for (int i = 0; i < numHistoric; i++) {
             MessagingMessage existing = mHistoricMessages.get(i);
             existing.setVisibility(mShowHistoricMessages ? VISIBLE : GONE);
+        }
+        int numGroups = mGroups.size();
+        for (int i = 0; i < numGroups; i++) {
+            MessagingGroup group = mGroups.get(i);
+            int visibleChildren = 0;
+            List<MessagingMessage> messages = group.getMessages();
+            int numGroupMessages = messages.size();
+            for (int j = 0; j < numGroupMessages; j++) {
+                MessagingMessage message = messages.get(j);
+                if (message.getVisibility() != GONE) {
+                    visibleChildren++;
+                }
+            }
+            if (visibleChildren > 0 && group.getVisibility() == GONE) {
+                group.setVisibility(VISIBLE);
+            } else if (visibleChildren == 0 && group.getVisibility() != GONE)   {
+                group.setVisibility(GONE);
+            }
         }
     }
 

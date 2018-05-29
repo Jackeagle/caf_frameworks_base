@@ -174,6 +174,7 @@ import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.BoostFramework;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
@@ -374,6 +375,8 @@ public class WindowManagerService extends IWindowManager.Stub
     private static final int ANIMATION_DURATION_SCALE = 2;
 
     final WindowTracing mWindowTracing;
+
+    private BoostFramework mPerf = null;
 
     final private KeyguardDisableHandler mKeyguardDisableHandler;
     boolean mKeyguardGoingAway;
@@ -871,10 +874,19 @@ public class WindowManagerService extends IWindowManager.Stub
             } else {
                 atoken.updateReportedVisibilityLocked();
                 if (atoken.mEnteringAnimation) {
-                    atoken.mEnteringAnimation = false;
-                    try {
-                        mActivityManager.notifyEnterAnimationComplete(atoken.token);
-                    } catch (RemoteException e) {
+                    if (getRecentsAnimationController() != null
+                            && getRecentsAnimationController().isTargetApp(atoken)) {
+                        // Currently running a recents animation, this will get called early because
+                        // we show the recents animation target activity immediately when the
+                        // animation starts. In this case, we should defer sending the finished
+                        // callback until the animation successfully finishes
+                        return;
+                    } else {
+                        atoken.mEnteringAnimation = false;
+                        try {
+                            mActivityManager.notifyEnterAnimationComplete(atoken.token);
+                        } catch (RemoteException e) {
+                        }
                     }
                 }
             }
@@ -1797,6 +1809,12 @@ public class WindowManagerService extends IWindowManager.Stub
                     }
                     w.setDisplayLayoutNeeded();
                     mWindowPlacerLocked.performSurfacePlacement();
+
+                    // We need to report touchable region changes to accessibility.
+                    if (mAccessibilityController != null
+                            && w.getDisplayContent().getDisplayId() == DEFAULT_DISPLAY) {
+                        mAccessibilityController.onSomeWindowResizedOrMovedLocked();
+                    }
                 }
             }
         } finally {
@@ -2204,7 +2222,7 @@ public class WindowManagerService extends IWindowManager.Stub
             if (mInputMethodWindow == win) {
                 setInputMethodWindowLocked(null);
             }
-            boolean stopped = win.mAppToken != null ? win.mAppToken.mAppStopped : false;
+            boolean stopped = win.mAppToken != null ? win.mAppToken.mAppStopped : true;
             // We set mDestroying=true so AppWindowToken#notifyAppStopped in-to destroy surfaces
             // will later actually destroy the surface if we do not do so here. Normally we leave
             // this to the exit animation.
@@ -2677,15 +2695,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @Override
     public void endProlongedAnimations() {
-        synchronized (mWindowMap) {
-            for (final WindowState win : mWindowMap.values()) {
-                final AppWindowToken appToken = win.mAppToken;
-                if (appToken != null) {
-                    appToken.endDelayingAnimationStart();
-                }
-            }
-            mAppTransition.notifyProlongedAnimationsEnded();
-        }
+        // TODO: Remove once clients are updated.
     }
 
     @Override
@@ -2699,12 +2709,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     + " Callers=" + Debug.getCallers(5));
             if (mAppTransition.isTransitionSet()) {
                 mAppTransition.setReady();
-                final long origId = Binder.clearCallingIdentity();
-                try {
-                    mWindowPlacerLocked.performSurfacePlacement();
-                } finally {
-                    Binder.restoreCallingIdentity(origId);
-                }
+                mWindowPlacerLocked.requestTraversal();
             }
         }
     }
@@ -2740,17 +2745,15 @@ public class WindowManagerService extends IWindowManager.Stub
 
     /**
      * Cancels any running recents animation. The caller should NOT hold the WM lock while calling
-     * this method, as it can call back into AM, and locking will be done in the animation
-     * controller itself.
+     * this method, as it will call back into AM and may cause a deadlock. Any locking will be done
+     * in the animation controller itself.
      */
-    public void cancelRecentsAnimation(@RecentsAnimationController.ReorderMode int reorderMode,
-            String reason) {
-        // Note: Do not hold the WM lock, this will lock appropriately in the call which also
-        // calls through to AM/RecentsAnimation.onAnimationFinished()
+    public void cancelRecentsAnimationSynchronously(
+            @RecentsAnimationController.ReorderMode int reorderMode, String reason) {
         if (mRecentsAnimationController != null) {
             // This call will call through to cleanupAnimation() below after the animation is
             // canceled
-            mRecentsAnimationController.cancelAnimation(reorderMode, reason);
+            mRecentsAnimationController.cancelAnimationSynchronously(reorderMode, reason);
         }
     }
 
@@ -5792,6 +5795,12 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         mLatencyTracker.onActionStart(ACTION_ROTATE_SCREEN);
+        if (mPerf == null) {
+            mPerf = new BoostFramework();
+        }
+        if (mPerf != null) {
+            mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_LATENCY_BOOST, null);
+        }
         // TODO(multidisplay): rotation on non-default displays
         if (CUSTOM_SCREEN_ROTATION && displayContent.isDefaultDisplay) {
             mExitAnimId = exitAnim;
@@ -5842,6 +5851,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final int displayId = mFrozenDisplayId;
         mFrozenDisplayId = INVALID_DISPLAY;
         mDisplayFrozen = false;
+        mInputMonitor.thawInputDispatchingLw();
         mLastDisplayFreezeDuration = (int)(SystemClock.elapsedRealtime() - mDisplayFreezeTime);
         StringBuilder sb = new StringBuilder(128);
         sb.append("Screen frozen for ");
@@ -5888,8 +5898,6 @@ public class WindowManagerService extends IWindowManager.Stub
             updateRotation = true;
         }
 
-        mInputMonitor.thawInputDispatchingLw();
-
         boolean configChanged;
 
         // While the display is frozen we don't re-compute the orientation
@@ -5917,6 +5925,9 @@ public class WindowManagerService extends IWindowManager.Stub
             mH.obtainMessage(H.SEND_NEW_CONFIGURATION, displayId).sendToTarget();
         }
         mLatencyTracker.onActionEnd(ACTION_ROTATE_SCREEN);
+        if (mPerf != null) {
+            mPerf.perfLockRelease();
+        }
     }
 
     static int getPropertyInt(String[] tokens, int index, int defUnits, int defDps,
@@ -5978,12 +5989,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @Override
     public void setRecentsVisibility(boolean visible) {
-        if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.STATUS_BAR)
-                != PackageManager.PERMISSION_GRANTED) {
-            throw new SecurityException("Caller does not hold permission "
-                    + android.Manifest.permission.STATUS_BAR);
-        }
-
+        mAmInternal.enforceCallerIsRecentsOrHasPermission(android.Manifest.permission.STATUS_BAR,
+                "setRecentsVisibility()");
         synchronized (mWindowMap) {
             mPolicy.setRecentsVisibilityLw(visible);
         }
@@ -6890,7 +6897,6 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    @Override
     public void setDockedStackResizing(boolean resizing) {
         synchronized (mWindowMap) {
             getDefaultDisplayContentLocked().getDockedDividerController().setResizing(resizing);
@@ -7531,7 +7537,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     boolean hasWideColorGamutSupport() {
         return mHasWideColorGamutSupport &&
-                !SystemProperties.getBoolean("persist.sys.sf.native_mode", false);
+                SystemProperties.getInt("persist.sys.sf.native_mode", 0) != 1;
     }
 
     void updateNonSystemOverlayWindowsVisibilityIfNeeded(WindowState win, boolean surfaceShown) {

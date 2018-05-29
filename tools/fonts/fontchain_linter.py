@@ -471,18 +471,23 @@ def parse_ucd(ucd_path):
     _emoji_zwj_sequences.update(parse_unicode_datafile(
         path.join(ucd_path, 'additions', 'emoji-zwj-sequences.txt')))
 
+    exclusions = parse_unicode_datafile(path.join(ucd_path, 'additions', 'emoji-exclusions.txt'))
+    _emoji_sequences = remove_emoji_exclude(_emoji_sequences, exclusions)
+    _emoji_zwj_sequences = remove_emoji_exclude(_emoji_zwj_sequences, exclusions)
+    _emoji_variation_sequences = remove_emoji_variation_exclude(_emoji_variation_sequences, exclusions)
+
+def remove_emoji_variation_exclude(source, items):
+    return source.difference(items.keys())
+
+def remove_emoji_exclude(source, items):
+    return {k: v for k, v in source.items() if k not in items}
 
 def flag_sequence(territory_code):
     return tuple(0x1F1E6 + ord(ch) - ord('A') for ch in territory_code)
 
-
 UNSUPPORTED_FLAGS = frozenset({
-    flag_sequence('BL'), flag_sequence('BQ'), flag_sequence('DG'),
-    flag_sequence('EA'), flag_sequence('EH'), flag_sequence('FK'),
-    flag_sequence('GF'), flag_sequence('GP'), flag_sequence('GS'),
-    flag_sequence('MF'), flag_sequence('MQ'), flag_sequence('NC'),
-    flag_sequence('PM'), flag_sequence('RE'), flag_sequence('TF'),
-    flag_sequence('WF'), flag_sequence('XK'), flag_sequence('YT'),
+    flag_sequence('BL'), flag_sequence('BQ'), flag_sequence('MQ'),
+    flag_sequence('RE'), flag_sequence('TF'),
 })
 
 EQUIVALENT_FLAGS = {
@@ -522,11 +527,16 @@ LEGACY_ANDROID_EMOJI = {
 ZWJ_IDENTICALS = {
     # KISS
     (0x1F469, 0x200D, 0x2764, 0x200D, 0x1F48B, 0x200D, 0x1F468): 0x1F48F,
-    # COUPLE WITH HEART
-    (0x1F469, 0x200D, 0x2764, 0x200D, 0x1F468): 0x1F491,
-    # FAMILY
-    (0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F466): 0x1F46A,
 }
+
+SAME_FLAG_MAPPINGS = [
+    # Diego Garcia and British Indian Ocean Territory
+    ((0x1F1EE, 0x1F1F4), (0x1F1E9, 0x1F1EC)),
+    # St. Martin and France
+    ((0x1F1F2, 0x1F1EB), (0x1F1EB, 0x1F1F7)),
+    # Spain and Ceuta & Melilla
+    ((0x1F1EA, 0x1F1F8), (0x1F1EA, 0x1F1E6)),
+]
 
 ZWJ = 0x200D
 FEMALE_SIGN = 0x2640
@@ -576,6 +586,8 @@ GENDER_DEFAULTS = [
     (0x1F9DD, FEMALE_SIGN), # ELF
     (0x1F9DE, FEMALE_SIGN), # GENIE
     (0x1F9DF, FEMALE_SIGN), # ZOMBIE
+    (0X1F9B8, FEMALE_SIGN), # SUPERVILLAIN
+    (0x1F9B9, FEMALE_SIGN), # SUPERHERO
 ]
 
 def is_fitzpatrick_modifier(cp):
@@ -626,6 +638,9 @@ def compute_expected_emoji():
         reversed_seq = reverse_emoji(sequence)
         all_sequences.add(reversed_seq)
         equivalent_emoji[reversed_seq] = sequence
+
+    for first, second in SAME_FLAG_MAPPINGS:
+        equivalent_emoji[first] = second
 
     # Remove unsupported flags
     all_sequences.difference_update(UNSUPPORTED_FLAGS)

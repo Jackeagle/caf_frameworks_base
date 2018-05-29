@@ -107,5 +107,5 @@ cc_library_shared {
         "liblog",
         "libutils",
     ],
+    static_libs: ["libstatssocket"],
 }
-

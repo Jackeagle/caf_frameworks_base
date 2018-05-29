@@ -28,6 +28,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 import com.android.internal.util.ArrayUtils;
+import com.android.internal.util.Preconditions;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -197,6 +198,7 @@ public final class Slice implements Parcelable {
     /**
      * Key to retrieve an extra added to an intent when the value of a slider is changed.
      * @deprecated remove once support lib is update to use EXTRA_RANGE_VALUE instead
+     * @removed
      */
     @Deprecated
     public static final String EXTRA_SLIDER_VALUE = "android.app.slice.extra.SLIDER_VALUE";
@@ -224,6 +226,7 @@ public final class Slice implements Parcelable {
     /**
      * Subtype to tag an item as representing a slider.
      * @deprecated remove once support lib is update to use SUBTYPE_RANGE instead
+     * @removed
      */
     @Deprecated
     public static final String SUBTYPE_SLIDER = "slider";
@@ -360,6 +363,7 @@ public final class Slice implements Parcelable {
 
         /**
          * @deprecated TO BE REMOVED
+         * @removed
          */
         @Deprecated
         public Builder(@NonNull Uri uri) {
@@ -388,7 +392,7 @@ public final class Slice implements Parcelable {
 
         /**
          * Tells the system whether for this slice the return value of
-         * {@link SliceProvider#onBindSlice(Uri, List)} may be different depending on
+         * {@link SliceProvider#onBindSlice(Uri, java.util.Set)} may be different depending on
          * {@link SliceProvider#getCallingPackage()} and should not be cached for multiple
          * apps.
          */
@@ -411,6 +415,7 @@ public final class Slice implements Parcelable {
 
         /**
          * @deprecated TO BE REMOVED
+         * @removed
          */
         public Builder setSpec(SliceSpec spec) {
             mSpec = spec;
@@ -423,6 +428,7 @@ public final class Slice implements Parcelable {
          * @see {@link SliceItem#getSubType()}
          */
         public Builder addSubSlice(@NonNull Slice slice, @Nullable @SliceSubtype String subType) {
+            Preconditions.checkNotNull(slice);
             mItems.add(new SliceItem(slice, SliceItem.FORMAT_SLICE, subType,
                     slice.getHints().toArray(new String[slice.getHints().size()])));
             return this;
@@ -435,6 +441,8 @@ public final class Slice implements Parcelable {
          */
         public Slice.Builder addAction(@NonNull PendingIntent action, @NonNull Slice s,
                 @Nullable @SliceSubtype String subType) {
+            Preconditions.checkNotNull(action);
+            Preconditions.checkNotNull(s);
             List<String> hints = s.getHints();
             s.mSpec = null;
             mItems.add(new SliceItem(action, s, SliceItem.FORMAT_ACTION, subType, hints.toArray(
@@ -460,6 +468,7 @@ public final class Slice implements Parcelable {
          */
         public Builder addIcon(Icon icon, @Nullable @SliceSubtype String subType,
                 @SliceHint List<String> hints) {
+            Preconditions.checkNotNull(icon);
             mItems.add(new SliceItem(icon, SliceItem.FORMAT_IMAGE, subType, hints));
             return this;
         }
@@ -472,6 +481,7 @@ public final class Slice implements Parcelable {
         public Slice.Builder addRemoteInput(RemoteInput remoteInput,
                 @Nullable @SliceSubtype String subType,
                 @SliceHint List<String> hints) {
+            Preconditions.checkNotNull(remoteInput);
             mItems.add(new SliceItem(remoteInput, SliceItem.FORMAT_REMOTE_INPUT,
                     subType, hints));
             return this;
@@ -490,6 +500,7 @@ public final class Slice implements Parcelable {
 
         /**
          * @deprecated TO BE REMOVED.
+         * @removed
          */
         @Deprecated
         public Slice.Builder addTimestamp(long time, @Nullable @SliceSubtype String subType,
@@ -518,6 +529,7 @@ public final class Slice implements Parcelable {
          */
         public Slice.Builder addBundle(Bundle bundle, @Nullable @SliceSubtype String subType,
                 @SliceHint List<String> hints) {
+            Preconditions.checkNotNull(bundle);
             mItems.add(new SliceItem(bundle, SliceItem.FORMAT_BUNDLE, subType,
                     hints));
             return this;

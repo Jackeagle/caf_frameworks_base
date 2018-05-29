@@ -21,6 +21,9 @@ import com.android.systemui.statusbar.policy.DarkIconDispatcher.DarkReceiver;
 public interface StatusIconDisplayable extends DarkReceiver {
     String getSlot();
     void setStaticDrawableColor(int color);
+    void setDecorColor(int color);
+    void setVisibleState(int state);
+    int getVisibleState();
     boolean isIconVisible();
     default boolean isIconBlocked() {
         return false;

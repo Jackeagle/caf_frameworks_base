@@ -42,6 +42,7 @@ import android.text.Html;
 import android.util.ArraySet;
 import android.util.Pair;
 import android.util.Slog;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -59,6 +60,7 @@ import com.android.internal.R;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.server.UiThread;
+import com.android.server.autofill.Helper;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -69,6 +71,9 @@ import java.util.ArrayList;
 final class SaveUi {
 
     private static final String TAG = "AutofillSaveUi";
+
+    private static final int THEME_ID =
+            com.android.internal.R.style.Theme_DeviceDefault_Autofill_Save;
 
     public interface OnSaveListener {
         void onSave();
@@ -130,6 +135,7 @@ final class SaveUi {
     private final PendingUi mPendingUi;
     private final String mServicePackageName;
     private final String mPackageName;
+    private final boolean mCompatMode;
 
     private boolean mDestroyed;
 
@@ -137,13 +143,16 @@ final class SaveUi {
            @NonNull CharSequence serviceLabel, @NonNull Drawable serviceIcon,
            @Nullable String servicePackageName, @NonNull String packageName,
            @NonNull SaveInfo info, @NonNull ValueFinder valueFinder,
-           @NonNull OverlayControl overlayControl, @NonNull OnSaveListener listener) {
+           @NonNull OverlayControl overlayControl, @NonNull OnSaveListener listener,
+           boolean compatMode) {
         mPendingUi= pendingUi;
         mListener = new OneTimeListener(listener);
         mOverlayControl = overlayControl;
         mServicePackageName = servicePackageName;
         mPackageName = packageName;
+        mCompatMode = compatMode;
 
+        context = new ContextThemeWrapper(context, THEME_ID);
         final LayoutInflater inflater = LayoutInflater.from(context);
         final View view = inflater.inflate(R.layout.autofill_save, null);
 
@@ -222,7 +231,7 @@ final class SaveUi {
         final View yesButton = view.findViewById(R.id.autofill_save_yes);
         yesButton.setOnClickListener((v) -> mListener.onSave());
 
-        mDialog = new Dialog(context, R.style.Theme_DeviceDefault_Light_Panel);
+        mDialog = new Dialog(context, THEME_ID);
         mDialog.setContentView(view);
 
         // Dialog can be dismissed when touched outside, but the negative listener should not be
@@ -309,6 +318,7 @@ final class SaveUi {
 
         try {
             // Create the remote view peer.
+            template.setApplyTheme(THEME_ID);
             final View customSubtitleView = template.apply(context, null, handler);
 
             // And apply batch updates (if any).
@@ -403,14 +413,12 @@ final class SaveUi {
     }
 
     private LogMaker newLogMaker(int category, int saveType) {
-        return newLogMaker(category)
+        return Helper.newLogMaker(category, mPackageName, mServicePackageName, mCompatMode)
                 .addTaggedData(MetricsEvent.FIELD_AUTOFILL_SAVE_TYPE, saveType);
     }
 
     private LogMaker newLogMaker(int category) {
-        return new LogMaker(category)
-                .setPackageName(mPackageName)
-                .addTaggedData(MetricsEvent.FIELD_AUTOFILL_SERVICE, mServicePackageName);
+        return Helper.newLogMaker(category, mPackageName, mServicePackageName, mCompatMode);
     }
 
     private void writeLog(int category, int saveType) {
@@ -499,6 +507,7 @@ final class SaveUi {
         pw.print(prefix); pw.print("pendingUi: "); pw.println(mPendingUi);
         pw.print(prefix); pw.print("service: "); pw.println(mServicePackageName);
         pw.print(prefix); pw.print("app: "); pw.println(mPackageName);
+        pw.print(prefix); pw.print("compat mode: "); pw.println(mCompatMode);
 
         final View view = mDialog.getWindow().getDecorView();
         final int[] loc = view.getLocationOnScreen();

@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"SIM 카드가 PUK로 잠겨 있습니다."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"SIM 카드 잠금 해제 중..."</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"PIN 영역"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"SIM PIN 영역"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"SIM PUK 영역"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"<xliff:g id="ALARM">%1$s</xliff:g>에 다음 알람이 설정됨"</string>
@@ -140,9 +142,9 @@
       <item quantity="one">기기가 <xliff:g id="NUMBER_0">%d</xliff:g>시간 동안 잠금 해제되지 않았습니다. 비밀번호를 입력하세요.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"인식할 수 없음"</string>
-    <plurals name="kg_password_default_pin_message" formatted="false" msgid="6203676909479972943">
-      <item quantity="other">SIM PIN을 입력하세요. <xliff:g id="NUMBER_1">%d</xliff:g>번 더 시도할 수 있습니다.</item>
-      <item quantity="one">SIM PIN을 입력하세요. <xliff:g id="NUMBER_0">%d</xliff:g>번 더 실패하면 이동통신사에 문의하여 기기를 잠금 해제해야 합니다.</item>
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="other">SIM PIN을 입력하세요. 입력은 <xliff:g id="NUMBER_1">%d</xliff:g>번 더 시도할 수 있습니다.</item>
+      <item quantity="one">SIM PIN을 입력하세요. 입력에 <xliff:g id="NUMBER_0">%d</xliff:g>번 더 실패하면 이동통신사에 문의하여 기기를 잠금 해제해야 합니다.</item>
     </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="other">SIM이 사용 중지되었습니다. 계속하려면 PUK 코드를 입력하세요. <xliff:g id="_NUMBER_1">%d</xliff:g>번 더 실패하면 SIM을 완전히 사용할 수 없게 됩니다. 자세한 내용은 이동통신사에 문의하세요.</item>

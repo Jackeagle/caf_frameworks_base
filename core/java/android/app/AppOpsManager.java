@@ -109,6 +109,82 @@ public class AppOpsManager {
      */
     public static final int MODE_DEFAULT = 3;
 
+    /**
+     * Special mode that means "allow only when app is in foreground."  This is <b>not</b>
+     * returned from {@link #checkOp}, {@link #noteOp}, {@link #startOp}; rather, when this
+     * mode is set, these functions will return {@link #MODE_ALLOWED} when the app being
+     * checked is currently in the foreground, otherwise {@link #MODE_IGNORED}.
+     * @hide
+     */
+    public static final int MODE_FOREGROUND = 4;
+
+    /**
+     * Flag for {@link #startWatchingMode(String, String, int, OnOpChangedListener)}:
+     * Also get reports if the foreground state of an op's uid changes.  This only works
+     * when watching a particular op, not when watching a package.
+     * @hide
+     */
+    public static final int WATCH_FOREGROUND_CHANGES = 1 << 0;
+
+    /**
+     * @hide
+     */
+    public static final String[] MODE_NAMES = new String[] {
+            "allow",        // MODE_ALLOWED
+            "ignore",       // MODE_IGNORED
+            "deny",         // MODE_ERRORED
+            "default",      // MODE_DEFAULT
+            "foreground",   // MODE_FOREGROUND
+    };
+
+    /**
+     * Metrics about an op when its uid is persistent.
+     * @hide
+     */
+    public static final int UID_STATE_PERSISTENT = 0;
+
+    /**
+     * Metrics about an op when its uid is at the top.
+     * @hide
+     */
+    public static final int UID_STATE_TOP = 1;
+
+    /**
+     * Metrics about an op when its uid is running a foreground service.
+     * @hide
+     */
+    public static final int UID_STATE_FOREGROUND_SERVICE = 2;
+
+    /**
+     * Last UID state in which we don't restrict what an op can do.
+     * @hide
+     */
+    public static final int UID_STATE_LAST_NON_RESTRICTED = UID_STATE_FOREGROUND_SERVICE;
+
+    /**
+     * Metrics about an op when its uid is in the foreground for any other reasons.
+     * @hide
+     */
+    public static final int UID_STATE_FOREGROUND = 3;
+
+    /**
+     * Metrics about an op when its uid is in the background for any reason.
+     * @hide
+     */
+    public static final int UID_STATE_BACKGROUND = 4;
+
+    /**
+     * Metrics about an op when its uid is cached.
+     * @hide
+     */
+    public static final int UID_STATE_CACHED = 5;
+
+    /**
+     * Number of uid states we track.
+     * @hide
+     */
+    public static final int _NUM_UID_STATE = 6;
+
     // when adding one of these:
     //  - increment _NUM_OP
     //  - define an OPSTR_* constant (marked as @SystemApi)
@@ -275,7 +351,9 @@ public class AppOpsManager {
     /** @hide Any app start foreground service. */
     public static final int OP_START_FOREGROUND = 76;
     /** @hide */
-    public static final int _NUM_OP = 77;
+    public static final int OP_BLUETOOTH_SCAN = 77;
+    /** @hide */
+    public static final int _NUM_OP = 78;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -517,6 +595,8 @@ public class AppOpsManager {
     /** @hide */
     @SystemApi @TestApi
     public static final String OPSTR_START_FOREGROUND = "android:start_foreground";
+    /** @hide */
+    public static final String OPSTR_BLUETOOTH_SCAN = "android:bluetooth_scan";
 
     // Warning: If an permission is added here it also has to be added to
     // com.android.packageinstaller.permission.utils.EventLogger
@@ -577,83 +657,84 @@ public class AppOpsManager {
      * make them all controlled by the same single operation.
      */
     private static int[] sOpToSwitch = new int[] {
-            OP_COARSE_LOCATION,
-            OP_COARSE_LOCATION,
-            OP_COARSE_LOCATION,
-            OP_VIBRATE,
-            OP_READ_CONTACTS,
-            OP_WRITE_CONTACTS,
-            OP_READ_CALL_LOG,
-            OP_WRITE_CALL_LOG,
-            OP_READ_CALENDAR,
-            OP_WRITE_CALENDAR,
-            OP_COARSE_LOCATION,
-            OP_POST_NOTIFICATION,
-            OP_COARSE_LOCATION,
-            OP_CALL_PHONE,
-            OP_READ_SMS,
-            OP_WRITE_SMS,
-            OP_RECEIVE_SMS,
-            OP_RECEIVE_SMS,
-            OP_RECEIVE_MMS,
-            OP_RECEIVE_WAP_PUSH,
-            OP_SEND_SMS,
-            OP_READ_SMS,
-            OP_WRITE_SMS,
-            OP_WRITE_SETTINGS,
-            OP_SYSTEM_ALERT_WINDOW,
-            OP_ACCESS_NOTIFICATIONS,
-            OP_CAMERA,
-            OP_RECORD_AUDIO,
-            OP_PLAY_AUDIO,
-            OP_READ_CLIPBOARD,
-            OP_WRITE_CLIPBOARD,
-            OP_TAKE_MEDIA_BUTTONS,
-            OP_TAKE_AUDIO_FOCUS,
-            OP_AUDIO_MASTER_VOLUME,
-            OP_AUDIO_VOICE_VOLUME,
-            OP_AUDIO_RING_VOLUME,
-            OP_AUDIO_MEDIA_VOLUME,
-            OP_AUDIO_ALARM_VOLUME,
-            OP_AUDIO_NOTIFICATION_VOLUME,
-            OP_AUDIO_BLUETOOTH_VOLUME,
-            OP_WAKE_LOCK,
-            OP_COARSE_LOCATION,
-            OP_COARSE_LOCATION,
-            OP_GET_USAGE_STATS,
-            OP_MUTE_MICROPHONE,
-            OP_TOAST_WINDOW,
-            OP_PROJECT_MEDIA,
-            OP_ACTIVATE_VPN,
-            OP_WRITE_WALLPAPER,
-            OP_ASSIST_STRUCTURE,
-            OP_ASSIST_SCREENSHOT,
-            OP_READ_PHONE_STATE,
-            OP_ADD_VOICEMAIL,
-            OP_USE_SIP,
-            OP_PROCESS_OUTGOING_CALLS,
-            OP_USE_FINGERPRINT,
-            OP_BODY_SENSORS,
-            OP_READ_CELL_BROADCASTS,
-            OP_MOCK_LOCATION,
-            OP_READ_EXTERNAL_STORAGE,
-            OP_WRITE_EXTERNAL_STORAGE,
-            OP_TURN_SCREEN_ON,
-            OP_GET_ACCOUNTS,
-            OP_RUN_IN_BACKGROUND,
-            OP_AUDIO_ACCESSIBILITY_VOLUME,
-            OP_READ_PHONE_NUMBERS,
-            OP_REQUEST_INSTALL_PACKAGES,
-            OP_PICTURE_IN_PICTURE,
-            OP_INSTANT_APP_START_FOREGROUND,
-            OP_ANSWER_PHONE_CALLS,
-            OP_RUN_ANY_IN_BACKGROUND,
-            OP_CHANGE_WIFI_STATE,
-            OP_REQUEST_DELETE_PACKAGES,
-            OP_BIND_ACCESSIBILITY_SERVICE,
-            OP_ACCEPT_HANDOVER,
-            OP_MANAGE_IPSEC_TUNNELS,
-            OP_START_FOREGROUND,
+            OP_COARSE_LOCATION,                 // COARSE_LOCATION
+            OP_COARSE_LOCATION,                 // FINE_LOCATION
+            OP_COARSE_LOCATION,                 // GPS
+            OP_VIBRATE,                         // VIBRATE
+            OP_READ_CONTACTS,                   // READ_CONTACTS
+            OP_WRITE_CONTACTS,                  // WRITE_CONTACTS
+            OP_READ_CALL_LOG,                   // READ_CALL_LOG
+            OP_WRITE_CALL_LOG,                  // WRITE_CALL_LOG
+            OP_READ_CALENDAR,                   // READ_CALENDAR
+            OP_WRITE_CALENDAR,                  // WRITE_CALENDAR
+            OP_COARSE_LOCATION,                 // WIFI_SCAN
+            OP_POST_NOTIFICATION,               // POST_NOTIFICATION
+            OP_COARSE_LOCATION,                 // NEIGHBORING_CELLS
+            OP_CALL_PHONE,                      // CALL_PHONE
+            OP_READ_SMS,                        // READ_SMS
+            OP_WRITE_SMS,                       // WRITE_SMS
+            OP_RECEIVE_SMS,                     // RECEIVE_SMS
+            OP_RECEIVE_SMS,                     // RECEIVE_EMERGECY_SMS
+            OP_RECEIVE_MMS,                     // RECEIVE_MMS
+            OP_RECEIVE_WAP_PUSH,                // RECEIVE_WAP_PUSH
+            OP_SEND_SMS,                        // SEND_SMS
+            OP_READ_SMS,                        // READ_ICC_SMS
+            OP_WRITE_SMS,                       // WRITE_ICC_SMS
+            OP_WRITE_SETTINGS,                  // WRITE_SETTINGS
+            OP_SYSTEM_ALERT_WINDOW,             // SYSTEM_ALERT_WINDOW
+            OP_ACCESS_NOTIFICATIONS,            // ACCESS_NOTIFICATIONS
+            OP_CAMERA,                          // CAMERA
+            OP_RECORD_AUDIO,                    // RECORD_AUDIO
+            OP_PLAY_AUDIO,                      // PLAY_AUDIO
+            OP_READ_CLIPBOARD,                  // READ_CLIPBOARD
+            OP_WRITE_CLIPBOARD,                 // WRITE_CLIPBOARD
+            OP_TAKE_MEDIA_BUTTONS,              // TAKE_MEDIA_BUTTONS
+            OP_TAKE_AUDIO_FOCUS,                // TAKE_AUDIO_FOCUS
+            OP_AUDIO_MASTER_VOLUME,             // AUDIO_MASTER_VOLUME
+            OP_AUDIO_VOICE_VOLUME,              // AUDIO_VOICE_VOLUME
+            OP_AUDIO_RING_VOLUME,               // AUDIO_RING_VOLUME
+            OP_AUDIO_MEDIA_VOLUME,              // AUDIO_MEDIA_VOLUME
+            OP_AUDIO_ALARM_VOLUME,              // AUDIO_ALARM_VOLUME
+            OP_AUDIO_NOTIFICATION_VOLUME,       // AUDIO_NOTIFICATION_VOLUME
+            OP_AUDIO_BLUETOOTH_VOLUME,          // AUDIO_BLUETOOTH_VOLUME
+            OP_WAKE_LOCK,                       // WAKE_LOCK
+            OP_COARSE_LOCATION,                 // MONITOR_LOCATION
+            OP_COARSE_LOCATION,                 // MONITOR_HIGH_POWER_LOCATION
+            OP_GET_USAGE_STATS,                 // GET_USAGE_STATS
+            OP_MUTE_MICROPHONE,                 // MUTE_MICROPHONE
+            OP_TOAST_WINDOW,                    // TOAST_WINDOW
+            OP_PROJECT_MEDIA,                   // PROJECT_MEDIA
+            OP_ACTIVATE_VPN,                    // ACTIVATE_VPN
+            OP_WRITE_WALLPAPER,                 // WRITE_WALLPAPER
+            OP_ASSIST_STRUCTURE,                // ASSIST_STRUCTURE
+            OP_ASSIST_SCREENSHOT,               // ASSIST_SCREENSHOT
+            OP_READ_PHONE_STATE,                // READ_PHONE_STATE
+            OP_ADD_VOICEMAIL,                   // ADD_VOICEMAIL
+            OP_USE_SIP,                         // USE_SIP
+            OP_PROCESS_OUTGOING_CALLS,          // PROCESS_OUTGOING_CALLS
+            OP_USE_FINGERPRINT,                 // USE_FINGERPRINT
+            OP_BODY_SENSORS,                    // BODY_SENSORS
+            OP_READ_CELL_BROADCASTS,            // READ_CELL_BROADCASTS
+            OP_MOCK_LOCATION,                   // MOCK_LOCATION
+            OP_READ_EXTERNAL_STORAGE,           // READ_EXTERNAL_STORAGE
+            OP_WRITE_EXTERNAL_STORAGE,          // WRITE_EXTERNAL_STORAGE
+            OP_TURN_SCREEN_ON,                  // TURN_SCREEN_ON
+            OP_GET_ACCOUNTS,                    // GET_ACCOUNTS
+            OP_RUN_IN_BACKGROUND,               // RUN_IN_BACKGROUND
+            OP_AUDIO_ACCESSIBILITY_VOLUME,      // AUDIO_ACCESSIBILITY_VOLUME
+            OP_READ_PHONE_NUMBERS,              // READ_PHONE_NUMBERS
+            OP_REQUEST_INSTALL_PACKAGES,        // REQUEST_INSTALL_PACKAGES
+            OP_PICTURE_IN_PICTURE,              // ENTER_PICTURE_IN_PICTURE_ON_HIDE
+            OP_INSTANT_APP_START_FOREGROUND,    // INSTANT_APP_START_FOREGROUND
+            OP_ANSWER_PHONE_CALLS,              // ANSWER_PHONE_CALLS
+            OP_RUN_ANY_IN_BACKGROUND,           // OP_RUN_ANY_IN_BACKGROUND
+            OP_CHANGE_WIFI_STATE,               // OP_CHANGE_WIFI_STATE
+            OP_REQUEST_DELETE_PACKAGES,         // OP_REQUEST_DELETE_PACKAGES
+            OP_BIND_ACCESSIBILITY_SERVICE,      // OP_BIND_ACCESSIBILITY_SERVICE
+            OP_ACCEPT_HANDOVER,                 // ACCEPT_HANDOVER
+            OP_MANAGE_IPSEC_TUNNELS,            // MANAGE_IPSEC_HANDOVERS
+            OP_START_FOREGROUND,                // START_FOREGROUND
+            OP_COARSE_LOCATION,                 // BLUETOOTH_SCAN
     };
 
     /**
@@ -737,6 +818,7 @@ public class AppOpsManager {
             OPSTR_ACCEPT_HANDOVER,
             OPSTR_MANAGE_IPSEC_TUNNELS,
             OPSTR_START_FOREGROUND,
+            OPSTR_BLUETOOTH_SCAN,
     };
 
     /**
@@ -821,6 +903,7 @@ public class AppOpsManager {
             "ACCEPT_HANDOVER",
             "MANAGE_IPSEC_TUNNELS",
             "START_FOREGROUND",
+            "BLUETOOTH_SCAN",
     };
 
     /**
@@ -905,6 +988,7 @@ public class AppOpsManager {
             Manifest.permission.ACCEPT_HANDOVER,
             null, // no permission for OP_MANAGE_IPSEC_TUNNELS
             Manifest.permission.FOREGROUND_SERVICE,
+            null, // no permission for OP_BLUETOOTH_SCAN
     };
 
     /**
@@ -990,6 +1074,7 @@ public class AppOpsManager {
             null, // ACCEPT_HANDOVER
             null, // MANAGE_IPSEC_TUNNELS
             null, // START_FOREGROUND
+            null, // maybe should be UserManager.DISALLOW_SHARE_LOCATION, //BLUETOOTH_SCAN
     };
 
     /**
@@ -1074,6 +1159,7 @@ public class AppOpsManager {
             false, // ACCEPT_HANDOVER
             false, // MANAGE_IPSEC_HANDOVERS
             false, // START_FOREGROUND
+            true, // BLUETOOTH_SCAN
     };
 
     /**
@@ -1157,6 +1243,7 @@ public class AppOpsManager {
             AppOpsManager.MODE_ALLOWED,  // ACCEPT_HANDOVER
             AppOpsManager.MODE_ERRORED,  // MANAGE_IPSEC_TUNNELS
             AppOpsManager.MODE_ALLOWED,  // OP_START_FOREGROUND
+            AppOpsManager.MODE_ALLOWED,  // OP_BLUETOOTH_SCAN
     };
 
     /**
@@ -1244,6 +1331,7 @@ public class AppOpsManager {
             false, // ACCEPT_HANDOVER
             false, // MANAGE_IPSEC_TUNNELS
             false, // START_FOREGROUND
+            false, // BLUETOOTH_SCAN
     };
 
     /**
@@ -1378,19 +1466,11 @@ public class AppOpsManager {
      * Retrieve the human readable mode.
      * @hide
      */
-    public static String modeToString(int mode) {
-        switch (mode) {
-            case MODE_ALLOWED:
-                return "allow";
-            case MODE_IGNORED:
-                return "ignore";
-            case MODE_ERRORED:
-                return "deny";
-            case MODE_DEFAULT:
-                return "default";
-            default:
-                return "mode=" + mode;
+    public static String modeToName(int mode) {
+        if (mode >= 0 && mode < MODE_NAMES.length) {
+            return MODE_NAMES[mode];
         }
+        return "mode=" + mode;
     }
 
     /**
@@ -1471,8 +1551,8 @@ public class AppOpsManager {
     public static class OpEntry implements Parcelable {
         private final int mOp;
         private final int mMode;
-        private final long mTime;
-        private final long mRejectTime;
+        private final long[] mTimes;
+        private final long[] mRejectTimes;
         private final int mDuration;
         private final int mProxyUid;
         private final String mProxyPackageName;
@@ -1481,8 +1561,23 @@ public class AppOpsManager {
                 int proxyUid, String proxyPackage) {
             mOp = op;
             mMode = mode;
-            mTime = time;
-            mRejectTime = rejectTime;
+            mTimes = new long[_NUM_UID_STATE];
+            mRejectTimes = new long[_NUM_UID_STATE];
+            mTimes[0] = time;
+            mRejectTimes[0] = rejectTime;
+            mDuration = duration;
+            mProxyUid = proxyUid;
+            mProxyPackageName = proxyPackage;
+        }
+
+        public OpEntry(int op, int mode, long[] times, long[] rejectTimes, int duration,
+                int proxyUid, String proxyPackage) {
+            mOp = op;
+            mMode = mode;
+            mTimes = new long[_NUM_UID_STATE];
+            mRejectTimes = new long[_NUM_UID_STATE];
+            System.arraycopy(times, 0, mTimes, 0, _NUM_UID_STATE);
+            System.arraycopy(rejectTimes, 0, mRejectTimes, 0, _NUM_UID_STATE);
             mDuration = duration;
             mProxyUid = proxyUid;
             mProxyPackageName = proxyPackage;
@@ -1497,11 +1592,43 @@ public class AppOpsManager {
         }
 
         public long getTime() {
-            return mTime;
+            return maxTime(mTimes, 0, _NUM_UID_STATE);
+        }
+
+        public long getLastAccessTime() {
+            return maxTime(mTimes, 0, _NUM_UID_STATE);
+        }
+
+        public long getLastAccessForegroundTime() {
+            return maxTime(mTimes, UID_STATE_PERSISTENT, UID_STATE_LAST_NON_RESTRICTED + 1);
+        }
+
+        public long getLastAccessBackgroundTime() {
+            return maxTime(mTimes, UID_STATE_LAST_NON_RESTRICTED + 1, _NUM_UID_STATE);
+        }
+
+        public long getLastTimeFor(int uidState) {
+            return mTimes[uidState];
         }
 
         public long getRejectTime() {
-            return mRejectTime;
+            return maxTime(mRejectTimes, 0, _NUM_UID_STATE);
+        }
+
+        public long getLastRejectTime() {
+            return maxTime(mRejectTimes, 0, _NUM_UID_STATE);
+        }
+
+        public long getLastRejectForegroundTime() {
+            return maxTime(mRejectTimes, UID_STATE_PERSISTENT, UID_STATE_LAST_NON_RESTRICTED + 1);
+        }
+
+        public long getLastRejectBackgroundTime() {
+            return maxTime(mRejectTimes, UID_STATE_LAST_NON_RESTRICTED + 1, _NUM_UID_STATE);
+        }
+
+        public long getLastRejectTimeFor(int uidState) {
+            return mRejectTimes[uidState];
         }
 
         public boolean isRunning() {
@@ -1509,7 +1636,7 @@ public class AppOpsManager {
         }
 
         public int getDuration() {
-            return mDuration == -1 ? (int)(System.currentTimeMillis()-mTime) : mDuration;
+            return mDuration;
         }
 
         public int getProxyUid() {
@@ -1529,8 +1656,8 @@ public class AppOpsManager {
         public void writeToParcel(Parcel dest, int flags) {
             dest.writeInt(mOp);
             dest.writeInt(mMode);
-            dest.writeLong(mTime);
-            dest.writeLong(mRejectTime);
+            dest.writeLongArray(mTimes);
+            dest.writeLongArray(mRejectTimes);
             dest.writeInt(mDuration);
             dest.writeInt(mProxyUid);
             dest.writeString(mProxyPackageName);
@@ -1539,8 +1666,8 @@ public class AppOpsManager {
         OpEntry(Parcel source) {
             mOp = source.readInt();
             mMode = source.readInt();
-            mTime = source.readLong();
-            mRejectTime = source.readLong();
+            mTimes = source.createLongArray();
+            mRejectTimes = source.createLongArray();
             mDuration = source.readInt();
             mProxyUid = source.readInt();
             mProxyPackageName = source.readString();
@@ -1603,6 +1730,7 @@ public class AppOpsManager {
      * @param ops The set of operations you are interested in, or null if you want all of them.
      * @hide
      */
+    @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
     public List<AppOpsManager.PackageOps> getPackagesForOps(int[] ops) {
         try {
             return mService.getPackagesForOps(ops);
@@ -1619,6 +1747,7 @@ public class AppOpsManager {
      * @param ops The set of operations you are interested in, or null if you want all of them.
      * @hide
      */
+    @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
     public List<AppOpsManager.PackageOps> getOpsForPackage(int uid, String packageName, int[] ops) {
         try {
             return mService.getOpsForPackage(uid, packageName, ops);
@@ -1784,6 +1913,21 @@ public class AppOpsManager {
 
     /**
      * Monitor for changes to the operating mode for the given op in the given app package.
+     * You can watch op changes only for your UID.
+     *
+     * @param op The operation to monitor, one of OPSTR_*.
+     * @param packageName The name of the application to monitor.
+     * @param flags Option flags: any combination of {@link #WATCH_FOREGROUND_CHANGES} or 0.
+     * @param callback Where to report changes.
+     * @hide
+     */
+    public void startWatchingMode(String op, String packageName, int flags,
+            final OnOpChangedListener callback) {
+        startWatchingMode(strOpToOp(op), packageName, flags, callback);
+    }
+
+    /**
+     * Monitor for changes to the operating mode for the given op in the given app package.
      *
      * <p> If you don't hold the {@link android.Manifest.permission#WATCH_APPOPS} permission
      * you can watch changes only for your UID.
@@ -1795,6 +1939,24 @@ public class AppOpsManager {
      */
     @RequiresPermission(value=android.Manifest.permission.WATCH_APPOPS, conditional=true)
     public void startWatchingMode(int op, String packageName, final OnOpChangedListener callback) {
+        startWatchingMode(op, packageName, 0, callback);
+    }
+
+    /**
+     * Monitor for changes to the operating mode for the given op in the given app package.
+     *
+     * <p> If you don't hold the {@link android.Manifest.permission#WATCH_APPOPS} permission
+     * you can watch changes only for your UID.
+     *
+     * @param op The operation to monitor, one of OP_*.
+     * @param packageName The name of the application to monitor.
+     * @param flags Option flags: any combination of {@link #WATCH_FOREGROUND_CHANGES} or 0.
+     * @param callback Where to report changes.
+     * @hide
+     */
+    @RequiresPermission(value=android.Manifest.permission.WATCH_APPOPS, conditional=true)
+    public void startWatchingMode(int op, String packageName, int flags,
+            final OnOpChangedListener callback) {
         synchronized (mModeWatchers) {
             IAppOpsCallback cb = mModeWatchers.get(callback);
             if (cb == null) {
@@ -1811,7 +1973,7 @@ public class AppOpsManager {
                 mModeWatchers.put(callback, cb);
             }
             try {
-                mService.startWatchingMode(op, packageName, cb);
+                mService.startWatchingModeWithFlags(op, packageName, flags, cb);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -1932,6 +2094,17 @@ public class AppOpsManager {
      * used for a quick check to see if an operation has been disabled for the application,
      * as an early reject of some work.  This does not modify the time stamp or other data
      * about the operation.
+     *
+     * <p>Important things this will not do (which you need to ultimate use
+     * {@link #noteOp(String, int, String)} or {@link #startOp(String, int, String)} to cover):</p>
+     * <ul>
+     *     <li>Verifying the uid and package are consistent, so callers can't spoof
+     *     their identity.</li>
+     *     <li>Taking into account the current foreground/background state of the
+     *     app; apps whose mode varies by this state will always be reported
+     *     as {@link #MODE_ALLOWED}.</li>
+     * </ul>
+     *
      * @param op The operation to check.  One of the OPSTR_* constants.
      * @param uid The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
@@ -1950,6 +2123,19 @@ public class AppOpsManager {
      */
     public int checkOpNoThrow(String op, int uid, String packageName) {
         return checkOpNoThrow(strOpToOp(op), uid, packageName);
+    }
+
+    /**
+     * Like {@link #checkOp} but returns the <em>raw</em> mode associated with the op.
+     * Does not throw a security exception, does not translate {@link #MODE_FOREGROUND}.
+     * @hide
+     */
+    public int unsafeCheckOpRaw(String op, int uid, String packageName) {
+        try {
+            return mService.checkOperation(strOpToOp(op), uid, packageName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     /**
@@ -2051,6 +2237,17 @@ public class AppOpsManager {
      * used for a quick check to see if an operation has been disabled for the application,
      * as an early reject of some work.  This does not modify the time stamp or other data
      * about the operation.
+     *
+     * <p>Important things this will not do (which you need to ultimate use
+     * {@link #noteOp(int, int, String)} or {@link #startOp(int, int, String)} to cover):</p>
+     * <ul>
+     *     <li>Verifying the uid and package are consistent, so callers can't spoof
+     *     their identity.</li>
+     *     <li>Taking into account the current foreground/background state of the
+     *     app; apps whose mode varies by this state will always be reported
+     *     as {@link #MODE_ALLOWED}.</li>
+     * </ul>
+     *
      * @param op The operation to check.  One of the OP_* constants.
      * @param uid The user id of the application attempting to perform the operation.
      * @param packageName The name of the application attempting to perform the operation.
@@ -2079,7 +2276,8 @@ public class AppOpsManager {
      */
     public int checkOpNoThrow(int op, int uid, String packageName) {
         try {
-            return mService.checkOperation(op, uid, packageName);
+            int mode = mService.checkOperation(op, uid, packageName);
+            return mode == AppOpsManager.MODE_FOREGROUND ? AppOpsManager.MODE_ALLOWED : mode;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -2367,5 +2565,18 @@ public class AppOpsManager {
     @TestApi
     public static String[] getOpStrs() {
         return Arrays.copyOf(sOpToString, sOpToString.length);
+    }
+
+    /**
+     * @hide
+     */
+    public static long maxTime(long[] times, int start, int end) {
+        long time = 0;
+        for (int i = start; i < end; i++) {
+            if (times[i] > time) {
+                time = times[i];
+            }
+        }
+        return time;
     }
 }

@@ -16,6 +16,7 @@
 
 package android.net.ip;
 
+import com.android.internal.util.HexDump;
 import com.android.internal.util.MessageUtils;
 import com.android.internal.util.WakeupMessage;
 
@@ -53,6 +54,7 @@ import android.util.SparseArray;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.R;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.IState;
 import com.android.internal.util.Preconditions;
@@ -73,9 +75,11 @@ import java.util.Objects;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.nio.ByteBuffer;
 
 
 /**
@@ -99,6 +103,36 @@ public class IpClient extends StateMachine {
     private static final Class[] sMessageClasses = { IpClient.class, DhcpClient.class };
     private static final SparseArray<String> sWhatToString =
             MessageUtils.findMessageNames(sMessageClasses);
+    // Two static concurrent hashmaps of interface name to logging classes.
+    // One holds StateMachine logs and the other connectivity packet logs.
+    private static final ConcurrentHashMap<String, SharedLog> sSmLogs = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, LocalLog> sPktLogs = new ConcurrentHashMap<>();
+
+    // If |args| is non-empty, assume it's a list of interface names for which
+    // we should print IpClient logs (filter out all others).
+    public static void dumpAllLogs(PrintWriter writer, String[] args) {
+        for (String ifname : sSmLogs.keySet()) {
+            if (!ArrayUtils.isEmpty(args) && !ArrayUtils.contains(args, ifname)) continue;
+
+            writer.println(String.format("--- BEGIN %s ---", ifname));
+
+            final SharedLog smLog = sSmLogs.get(ifname);
+            if (smLog != null) {
+                writer.println("State machine log:");
+                smLog.dump(null, writer, null);
+            }
+
+            writer.println("");
+
+            final LocalLog pktLog = sPktLogs.get(ifname);
+            if (pktLog != null) {
+                writer.println("Connectivity packet log:");
+                pktLog.readOnlyLocalLog().dump(null, writer, null);
+            }
+
+            writer.println(String.format("--- END %s ---", ifname));
+        }
+    }
 
     /**
      * Callbacks for handling IpClient events.
@@ -141,6 +175,12 @@ public class IpClient extends StateMachine {
 
         // Install an APF program to filter incoming packets.
         public void installPacketFilter(byte[] filter) {}
+
+        // Asynchronously read back the APF program & data buffer from the wifi driver.
+        // Due to Wifi HAL limitations, the current implementation only supports dumping the entire
+        // buffer. In response to this request, the driver returns the data buffer asynchronously
+        // by sending an IpClient#EVENT_READ_PACKET_FILTER_COMPLETE message.
+        public void startReadPacketFilter() {}
 
         // If multicast filtering cannot be accomplished with APF, this function will be called to
         // actuate multicast filtering using another means.
@@ -246,6 +286,11 @@ public class IpClient extends StateMachine {
         public void installPacketFilter(byte[] filter) {
             mCallback.installPacketFilter(filter);
             log("installPacketFilter(byte[" + filter.length + "])");
+        }
+        @Override
+        public void startReadPacketFilter() {
+            mCallback.startReadPacketFilter();
+            log("startReadPacketFilter()");
         }
         @Override
         public void setFallbackMulticastFilter(boolean enabled) {
@@ -379,6 +424,8 @@ public class IpClient extends StateMachine {
         /* package */ ApfCapabilities mApfCapabilities;
         /* package */ int mProvisioningTimeoutMs = DEFAULT_TIMEOUT_MS;
         /* package */ int mIPv6AddrGenMode = INetd.IPV6_ADDR_GEN_MODE_STABLE_PRIVACY;
+        /* package */ public boolean mRapidCommit;
+        /* package */ public boolean mDiscoverSent;
         /* package */ Network mNetwork = null;
         /* package */ String mDisplayName = null;
 
@@ -393,6 +440,8 @@ public class IpClient extends StateMachine {
             mStaticIpConfig = other.mStaticIpConfig;
             mApfCapabilities = other.mApfCapabilities;
             mProvisioningTimeoutMs = other.mProvisioningTimeoutMs;
+            mRapidCommit = other.mRapidCommit;
+            mDiscoverSent = other.mDiscoverSent;
             mIPv6AddrGenMode = other.mIPv6AddrGenMode;
             mNetwork = other.mNetwork;
             mDisplayName = other.mDisplayName;
@@ -559,6 +608,7 @@ public class IpClient extends StateMachine {
     private static final int CMD_SET_MULTICAST_FILTER             = 9;
     private static final int EVENT_PROVISIONING_TIMEOUT           = 10;
     private static final int EVENT_DHCPACTION_TIMEOUT             = 11;
+    private static final int EVENT_READ_PACKET_FILTER_COMPLETE    = 12;
 
     private static final int MAX_LOG_RECORDS = 500;
     private static final int MAX_PACKET_RECORDS = 100;
@@ -612,6 +662,14 @@ public class IpClient extends StateMachine {
     private boolean mMulticastFiltering;
     private long mStartTimeMillis;
 
+    /**
+     * Reading the snapshot is an asynchronous operation initiated by invoking
+     * Callback.startReadPacketFilter() and completed when the WiFi Service responds with an
+     * EVENT_READ_PACKET_FILTER_COMPLETE message. The mApfDataSnapshotComplete condition variable
+     * signals when a new snapshot is ready.
+     */
+    private final ConditionVariable mApfDataSnapshotComplete = new ConditionVariable();
+
     public static class Dependencies {
         public INetworkManagementService getNMS() {
             return INetworkManagementService.Stub.asInterface(
@@ -659,8 +717,10 @@ public class IpClient extends StateMachine {
         mShutdownLatch = new CountDownLatch(1);
         mNwService = deps.getNMS();
 
-        mLog = new SharedLog(MAX_LOG_RECORDS, mTag);
-        mConnectivityPacketLog = new LocalLog(MAX_PACKET_RECORDS);
+        sSmLogs.putIfAbsent(mInterfaceName, new SharedLog(MAX_LOG_RECORDS, mTag));
+        mLog = sSmLogs.get(mInterfaceName);
+        sPktLogs.putIfAbsent(mInterfaceName, new LocalLog(MAX_PACKET_RECORDS));
+        mConnectivityPacketLog = sPktLogs.get(mInterfaceName);
         mMsgStateLogger = new MessageHandlingLogger();
 
         // TODO: Consider creating, constructing, and passing in some kind of
@@ -823,6 +883,10 @@ public class IpClient extends StateMachine {
         sendMessage(EVENT_PRE_DHCP_ACTION_COMPLETE);
     }
 
+    public void readPacketFilterComplete(byte[] data) {
+        sendMessage(EVENT_READ_PACKET_FILTER_COMPLETE, data);
+    }
+
     /**
      * Set the TCP buffer sizes to use.
      *
@@ -868,7 +932,16 @@ public class IpClient extends StateMachine {
         pw.println(mTag + " APF dump:");
         pw.increaseIndent();
         if (apfFilter != null) {
+            if (apfCapabilities.hasDataAccess()) {
+                // Request a new snapshot, then wait for it.
+                mApfDataSnapshotComplete.close();
+                mCallback.startReadPacketFilter();
+                if (!mApfDataSnapshotComplete.block(1000)) {
+                    pw.print("TIMEOUT: DUMPING STALE APF SNAPSHOT");
+                }
+            }
             apfFilter.dump(pw);
+
         } else {
             pw.print("No active ApfFilter; ");
             if (provisioningConfig == null) {
@@ -880,7 +953,6 @@ public class IpClient extends StateMachine {
             }
         }
         pw.decreaseIndent();
-
         pw.println();
         pw.println(mTag + " current ProvisioningConfiguration:");
         pw.increaseIndent();
@@ -1287,7 +1359,12 @@ public class IpClient extends StateMachine {
             // Start DHCPv4.
             mDhcpClient = DhcpClient.makeDhcpClient(mContext, IpClient.this, mInterfaceParams);
             mDhcpClient.registerForPreDhcpNotification();
-            mDhcpClient.sendMessage(DhcpClient.CMD_START_DHCP);
+            if (mConfiguration.mRapidCommit || mConfiguration.mDiscoverSent)
+                mDhcpClient.sendMessage(DhcpClient.CMD_START_DHCP_RAPID_COMMIT,
+                    (mConfiguration.mRapidCommit ? 1: 0),
+                    (mConfiguration.mDiscoverSent ? 1: 0));
+            else
+                mDhcpClient.sendMessage(DhcpClient.CMD_START_DHCP);
         }
 
         return true;
@@ -1332,6 +1409,11 @@ public class IpClient extends StateMachine {
         }
 
         return (mIpReachabilityMonitor != null);
+    }
+
+
+    public ByteBuffer buildDiscoverWithRapidCommitPacket() {
+        return mDhcpClient.buildDiscoverWithRapidCommitPacket();
     }
 
     private void stopAllIP() {
@@ -1673,6 +1755,14 @@ public class IpClient extends StateMachine {
                     } else {
                         mCallback.setFallbackMulticastFilter(mMulticastFiltering);
                     }
+                    break;
+                }
+
+                case EVENT_READ_PACKET_FILTER_COMPLETE: {
+                    if (mApfFilter != null) {
+                        mApfFilter.setDataSnapshot((byte[]) msg.obj);
+                    }
+                    mApfDataSnapshotComplete.open();
                     break;
                 }
 

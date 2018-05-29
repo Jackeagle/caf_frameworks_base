@@ -73,6 +73,9 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker
 import static com.android.server.devicepolicy.TransferOwnershipMetadataManager.ADMIN_TYPE_DEVICE_OWNER;
 import static com.android.server.devicepolicy.TransferOwnershipMetadataManager.ADMIN_TYPE_PROFILE_OWNER;
 
+
+import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
+
 import static org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
 import static org.xmlpull.v1.XmlPullParser.END_TAG;
 import static org.xmlpull.v1.XmlPullParser.TEXT;
@@ -3348,6 +3351,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             case SystemService.PHASE_LOCK_SETTINGS_READY:
                 onLockSettingsReady();
                 loadAdminDataAsync();
+                mOwners.systemReady();
                 break;
             case SystemService.PHASE_BOOT_COMPLETED:
                 ensureDeviceOwnerUserStarted(); // TODO Consider better place to do this.
@@ -3941,6 +3945,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.quality != quality) {
                 metrics.quality = quality;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -3958,8 +3963,6 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         DevicePolicyData policy = getUserData(credentialOwner);
         PasswordMetrics metrics = getUserPasswordMetricsLocked(credentialOwner);
         if (metrics == null) {
-            Slog.wtf(LOG_TAG, "Should have had a valid password metrics for updating checkpoint " +
-                    "validity.");
             metrics = new PasswordMetrics();
         }
         policy.mPasswordValidAtLastCheckpoint =
@@ -4054,6 +4057,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.length != length) {
                 metrics.length = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4078,6 +4082,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (ap.passwordHistoryLength != length) {
                 ap.passwordHistoryLength = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
         }
         if (SecurityLog.isLoggingEnabled()) {
@@ -4279,6 +4284,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.upperCase != length) {
                 metrics.upperCase = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4301,6 +4307,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.lowerCase != length) {
                 metrics.lowerCase = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4326,6 +4333,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.letters != length) {
                 metrics.letters = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4351,6 +4359,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.numeric != length) {
                 metrics.numeric = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4376,6 +4385,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.symbols != length) {
                 ap.minimumPasswordMetrics.symbols = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4401,6 +4411,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             if (metrics.nonLetter != length) {
                 ap.minimumPasswordMetrics.nonLetter = length;
                 updatePasswordValidityCheckpointLocked(userId, parent);
+                saveSettingsLocked(userId);
             }
             maybeLogPasswordComplexitySet(who, userId, parent, metrics);
         }
@@ -4508,7 +4519,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         }
 
         if (metrics == null) {
-            Slog.wtf(LOG_TAG, "FBE device, should have been unlocked and had valid metrics.");
+            // This could happen if the user never had a password set, for example, so
+            // setActivePasswordState has never been called for it.
             metrics = new PasswordMetrics();
         }
         return isPasswordSufficientForUserWithoutCheckpointLocked(metrics, userHandle, parent);
@@ -5514,9 +5526,11 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
         // If there is a profile owner, redirect to that; otherwise query the device owner.
         ComponentName aliasChooser = getProfileOwner(caller.getIdentifier());
         if (aliasChooser == null && caller.isSystem()) {
-            ActiveAdmin deviceOwnerAdmin = getDeviceOwnerAdminLocked();
-            if (deviceOwnerAdmin != null) {
-                aliasChooser = deviceOwnerAdmin.info.getComponent();
+            synchronized (getLockObject()) {
+                final ActiveAdmin deviceOwnerAdmin = getDeviceOwnerAdminLocked();
+                if (deviceOwnerAdmin != null) {
+                    aliasChooser = deviceOwnerAdmin.info.getComponent();
+                }
             }
         }
         if (aliasChooser == null) {
@@ -5895,35 +5909,41 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
 
     private void forceWipeDeviceNoLock(boolean wipeExtRequested, String reason, boolean wipeEuicc) {
         wtfIfInLock();
-
-        if (wipeExtRequested) {
-            StorageManager sm = (StorageManager) mContext.getSystemService(
-                    Context.STORAGE_SERVICE);
-            sm.wipeAdoptableDisks();
-        }
+        boolean success = false;
         try {
+            if (wipeExtRequested) {
+                StorageManager sm = (StorageManager) mContext.getSystemService(
+                    Context.STORAGE_SERVICE);
+                sm.wipeAdoptableDisks();
+            }
             mInjector.recoverySystemRebootWipeUserData(
-                    /*shutdown=*/ false, reason, /*force=*/ true, /*wipeEuicc=*/ wipeEuicc);
+                /*shutdown=*/ false, reason, /*force=*/ true, /*wipeEuicc=*/ wipeEuicc);
+            success = true;
         } catch (IOException | SecurityException e) {
             Slog.w(LOG_TAG, "Failed requesting data wipe", e);
+        } finally {
+            if (!success) SecurityLog.writeEvent(SecurityLog.TAG_WIPE_FAILURE);
         }
     }
 
     private void forceWipeUser(int userId, String wipeReasonForUser) {
+        boolean success = false;
         try {
             IActivityManager am = mInjector.getIActivityManager();
             if (am.getCurrentUser().id == userId) {
                 am.switchUser(UserHandle.USER_SYSTEM);
             }
 
-            boolean userRemoved = mUserManagerInternal.removeUserEvenWhenDisallowed(userId);
-            if (!userRemoved) {
+            success = mUserManagerInternal.removeUserEvenWhenDisallowed(userId);
+            if (!success) {
                 Slog.w(LOG_TAG, "Couldn't remove user " + userId);
             } else if (isManagedProfile(userId)) {
                 sendWipeProfileNotification(wipeReasonForUser);
             }
         } catch (RemoteException re) {
             // Shouldn't happen
+        } finally {
+            if (!success) SecurityLog.writeEvent(SecurityLog.TAG_WIPE_FAILURE);
         }
     }
 
@@ -6085,6 +6105,7 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
             synchronized (getLockObject()) {
                 policy.mFailedPasswordAttempts = 0;
                 updatePasswordValidityCheckpointLocked(userId, /* parent */ false);
+                saveSettingsLocked(userId);
                 updatePasswordExpirationsLocked(userId);
                 setExpirationAlarmCheckLocked(mContext, userId, /* parent */ false);
 
@@ -9193,8 +9214,8 @@ public class DevicePolicyManagerService extends BaseIDevicePolicyManager {
 
             long id = mInjector.binderClearCallingIdentity();
             try {
-                return mIPackageManager.setPackagesSuspendedAsUser(
-                        packageNames, suspended, null, null, null, "android", callingUserId);
+                return mIPackageManager.setPackagesSuspendedAsUser(packageNames, suspended,
+                        null, null, null, PLATFORM_PACKAGE_NAME, callingUserId);
             } catch (RemoteException re) {
                 // Shouldn't happen.
                 Slog.e(LOG_TAG, "Failed talking to the package manager", re);

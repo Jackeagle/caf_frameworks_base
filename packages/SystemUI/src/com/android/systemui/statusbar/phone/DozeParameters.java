@@ -30,6 +30,7 @@ import com.android.internal.hardware.AmbientDisplayConfiguration;
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
 import com.android.systemui.doze.AlwaysOnDisplayPolicy;
+import com.android.systemui.doze.DozeScreenState;
 import com.android.systemui.tuner.TunerService;
 
 import java.io.PrintWriter;
@@ -37,6 +38,8 @@ import java.io.PrintWriter;
 public class DozeParameters implements TunerService.Tunable {
     private static final int MAX_DURATION = 60 * 1000;
     public static final String DOZE_SENSORS_WAKE_UP_FULLY = "doze_sensors_wake_up_fully";
+    public static final boolean FORCE_NO_BLANKING =
+            SystemProperties.getBoolean("debug.force_no_blanking", false);
 
     private static IntInOutMatcher sPickupSubtypePerformsProxMatcher;
     private static DozeParameters sInstance;
@@ -59,9 +62,9 @@ public class DozeParameters implements TunerService.Tunable {
 
     @VisibleForTesting
     protected DozeParameters(Context context) {
-        mContext = context;
+        mContext = context.getApplicationContext();
         mAmbientDisplayConfiguration = new AmbientDisplayConfiguration(mContext);
-        mAlwaysOnPolicy = new AlwaysOnDisplayPolicy(context);
+        mAlwaysOnPolicy = new AlwaysOnDisplayPolicy(mContext);
 
         mControlScreenOffAnimation = !getDisplayNeedsBlanking();
         mPowerManager = mContext.getSystemService(PowerManager.class);
@@ -153,7 +156,8 @@ public class DozeParameters implements TunerService.Tunable {
      * @return duration in millis.
      */
     public long getWallpaperAodDuration() {
-        return mAlwaysOnPolicy.wallpaperVisibilityDuration;
+        return shouldControlScreenOff() ? DozeScreenState.ENTER_DOZE_HIDE_WALLPAPER_DELAY
+                : mAlwaysOnPolicy.wallpaperVisibilityDuration;
     }
 
     /**
@@ -179,7 +183,7 @@ public class DozeParameters implements TunerService.Tunable {
      * @return {@code true} if screen needs to be completely black before a power transition.
      */
     public boolean getDisplayNeedsBlanking() {
-        return mContext.getResources().getBoolean(
+        return !FORCE_NO_BLANKING && mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_displayBlanksAfterDoze);
     }
 
@@ -241,6 +245,10 @@ public class DozeParameters implements TunerService.Tunable {
     @Override
     public void onTuningChanged(String key, String newValue) {
         mDozeAlwaysOn = mAmbientDisplayConfiguration.alwaysOnEnabled(UserHandle.USER_CURRENT);
+    }
+
+    public AlwaysOnDisplayPolicy getPolicy() {
+        return mAlwaysOnPolicy;
     }
 
     /**

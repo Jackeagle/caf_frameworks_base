@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.stack;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -28,12 +29,10 @@ import static org.mockito.Mockito.when;
 import android.support.test.annotation.UiThreadTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
-import android.view.View;
 
 import com.android.systemui.ExpandHelper;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
-import com.android.systemui.TestableDependency;
 import com.android.systemui.statusbar.EmptyShadeView;
 import com.android.systemui.statusbar.FooterView;
 import com.android.systemui.statusbar.NotificationBlockingHelperManager;
@@ -141,6 +140,19 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
+    public void updateEmptyView_noNotificationsToDndSuppressing() {
+        mStackScroller.setEmptyShadeView(mEmptyShadeView);
+        when(mEmptyShadeView.willBeGone()).thenReturn(true);
+        when(mBar.areNotificationsHidden()).thenReturn(false);
+        mStackScroller.updateEmptyShadeView(true);
+        verify(mEmptyShadeView).setText(R.string.empty_shade_text);
+
+        when(mBar.areNotificationsHidden()).thenReturn(true);
+        mStackScroller.updateEmptyShadeView(true);
+        verify(mEmptyShadeView).setText(R.string.dnd_suppressing_shade_text);
+    }
+
+    @Test
     @UiThreadTest
     public void testSetExpandedHeight_blockingHelperManagerReceivedCallbacks() {
         mStackScroller.setExpandedHeight(0f);
@@ -156,12 +168,11 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         FooterView view = mock(FooterView.class);
         mStackScroller.setFooterView(view);
         when(view.willBeGone()).thenReturn(true);
-        when(view.isSecondaryVisible()).thenReturn(true);
 
         mStackScroller.updateFooterView(true, false);
 
-        verify(view).setVisibility(View.VISIBLE);
-        verify(view).performSecondaryVisibilityAnimation(false);
+        verify(view).setVisible(eq(true), anyBoolean());
+        verify(view).setSecondaryVisible(eq(false), anyBoolean());
     }
 
     @Test
@@ -169,11 +180,10 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         FooterView view = mock(FooterView.class);
         mStackScroller.setFooterView(view);
         when(view.willBeGone()).thenReturn(true);
-        when(view.isSecondaryVisible()).thenReturn(false);
 
         mStackScroller.updateFooterView(true, true);
 
-        verify(view).setVisibility(View.VISIBLE);
-        verify(view).performSecondaryVisibilityAnimation(true);
+        verify(view).setVisible(eq(true), anyBoolean());
+        verify(view).setSecondaryVisible(eq(true), anyBoolean());
     }
 }

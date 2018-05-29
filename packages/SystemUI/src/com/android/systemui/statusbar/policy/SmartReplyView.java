@@ -1,12 +1,17 @@
 package com.android.systemui.statusbar.policy;
 
+import android.annotation.ColorInt;
 import android.app.PendingIntent;
 import android.app.RemoteInput;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.Layout;
@@ -17,14 +22,18 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import android.widget.Button;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.NotificationColorUtil;
 import com.android.keyguard.KeyguardHostView.OnDismissAction;
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.NotificationData;
-import com.android.systemui.statusbar.SmartReplyLogger;
+import com.android.systemui.statusbar.SmartReplyController;
+import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.phone.KeyguardDismissUtil;
 
 import java.text.BreakIterator;
@@ -48,6 +57,12 @@ public class SmartReplyView extends ViewGroup {
     private final SmartReplyConstants mConstants;
     private final KeyguardDismissUtil mKeyguardDismissUtil;
 
+    /**
+     * The upper bound for the height of this view in pixels. Notifications are automatically
+     * recreated on density or font size changes so caching this should be fine.
+     */
+    private final int mHeightUpperLimit;
+
     /** Spacing to be applied between views. */
     private final int mSpacing;
 
@@ -64,14 +79,48 @@ public class SmartReplyView extends ViewGroup {
 
     private PriorityQueue<Button> mCandidateButtonQueueForSqueezing;
 
+    private View mSmartReplyContainer;
+
+    @ColorInt
+    private int mCurrentBackgroundColor;
+    @ColorInt
+    private final int mDefaultBackgroundColor;
+    @ColorInt
+    private final int mDefaultStrokeColor;
+    @ColorInt
+    private final int mDefaultTextColor;
+    @ColorInt
+    private final int mDefaultTextColorDarkBg;
+    @ColorInt
+    private final int mRippleColorDarkBg;
+    @ColorInt
+    private final int mRippleColor;
+    private final int mStrokeWidth;
+    private final double mMinStrokeContrast;
+
     public SmartReplyView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mConstants = Dependency.get(SmartReplyConstants.class);
         mKeyguardDismissUtil = Dependency.get(KeyguardDismissUtil.class);
 
+        mHeightUpperLimit = NotificationUtils.getFontScaledHeight(mContext,
+            R.dimen.smart_reply_button_max_height);
+
+        mCurrentBackgroundColor = context.getColor(R.color.smart_reply_button_background);
+        mDefaultBackgroundColor = mCurrentBackgroundColor;
+        mDefaultTextColor = mContext.getColor(R.color.smart_reply_button_text);
+        mDefaultTextColorDarkBg = mContext.getColor(R.color.smart_reply_button_text_dark_bg);
+        mDefaultStrokeColor = mContext.getColor(R.color.smart_reply_button_stroke);
+        mRippleColor = mContext.getColor(R.color.notification_ripple_untinted_color);
+        mRippleColorDarkBg = Color.argb(Color.alpha(mRippleColor),
+                255 /* red */, 255 /* green */, 255 /* blue */);
+        mMinStrokeContrast = NotificationColorUtil.calculateContrast(mDefaultStrokeColor,
+                mDefaultBackgroundColor);
+
         int spacing = 0;
         int singleLineButtonPaddingHorizontal = 0;
         int doubleLineButtonPaddingHorizontal = 0;
+        int strokeWidth = 0;
 
         final TypedArray arr = context.obtainStyledAttributes(attrs, R.styleable.SmartReplyView,
                 0, 0);
@@ -88,18 +137,31 @@ public class SmartReplyView extends ViewGroup {
                 case R.styleable.SmartReplyView_doubleLineButtonPaddingHorizontal:
                     doubleLineButtonPaddingHorizontal = arr.getDimensionPixelSize(i, 0);
                     break;
+                case R.styleable.SmartReplyView_buttonStrokeWidth:
+                    strokeWidth = arr.getDimensionPixelSize(i, 0);
+                    break;
             }
         }
         arr.recycle();
 
+        mStrokeWidth = strokeWidth;
         mSpacing = spacing;
         mSingleLineButtonPaddingHorizontal = singleLineButtonPaddingHorizontal;
         mDoubleLineButtonPaddingHorizontal = doubleLineButtonPaddingHorizontal;
         mSingleToDoubleLineButtonWidthIncrease =
                 2 * (doubleLineButtonPaddingHorizontal - singleLineButtonPaddingHorizontal);
 
+
         mBreakIterator = BreakIterator.getLineInstance();
         reallocateCandidateButtonQueueForSqueezing();
+    }
+
+    /**
+     * Returns an upper bound for the height of this view in pixels. This method is intended to be
+     * invoked before onMeasure, so it doesn't do any analysis on the contents of the buttons.
+     */
+    public int getHeightUpperLimit() {
+       return mHeightUpperLimit;
     }
 
     private void reallocateCandidateButtonQueueForSqueezing() {
@@ -112,15 +174,18 @@ public class SmartReplyView extends ViewGroup {
     }
 
     public void setRepliesFromRemoteInput(RemoteInput remoteInput, PendingIntent pendingIntent,
-            SmartReplyLogger smartReplyLogger, NotificationData.Entry entry) {
+            SmartReplyController smartReplyController, NotificationData.Entry entry,
+            View smartReplyContainer) {
+        mSmartReplyContainer = smartReplyContainer;
         removeAllViews();
+        mCurrentBackgroundColor = mDefaultBackgroundColor;
         if (remoteInput != null && pendingIntent != null) {
             CharSequence[] choices = remoteInput.getChoices();
             if (choices != null) {
                 for (int i = 0; i < choices.length; ++i) {
                     Button replyButton = inflateReplyButton(
                             getContext(), this, i, choices[i], remoteInput, pendingIntent,
-                            smartReplyLogger, entry);
+                            smartReplyController, entry);
                     addView(replyButton);
                 }
             }
@@ -136,7 +201,7 @@ public class SmartReplyView extends ViewGroup {
     @VisibleForTesting
     Button inflateReplyButton(Context context, ViewGroup root, int replyIndex,
             CharSequence choice, RemoteInput remoteInput, PendingIntent pendingIntent,
-            SmartReplyLogger smartReplyLogger, NotificationData.Entry entry) {
+            SmartReplyController smartReplyController, NotificationData.Entry entry) {
         Button b = (Button) LayoutInflater.from(context).inflate(
                 R.layout.smart_reply_button, root, false);
         b.setText(choice);
@@ -152,14 +217,24 @@ public class SmartReplyView extends ViewGroup {
             } catch (PendingIntent.CanceledException e) {
                 Log.w(TAG, "Unable to send smart reply", e);
             }
-            smartReplyLogger.smartReplySent(entry, replyIndex);
+            smartReplyController.smartReplySent(entry, replyIndex, b.getText());
+            mSmartReplyContainer.setVisibility(View.GONE);
             return false; // do not defer
         };
 
         b.setOnClickListener(view -> {
-            mKeyguardDismissUtil.dismissKeyguardThenExecute(
-                    action, null /* cancelAction */, false /* afterKeyguardGone */);
+            mKeyguardDismissUtil.executeWhenUnlocked(action);
         });
+
+        b.setAccessibilityDelegate(new AccessibilityDelegate() {
+            public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                String label = getResources().getString(R.string.accessibility_send_smart_reply);
+                info.addAction(new AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, label));
+            }
+        });
+
+        setColors(b, mCurrentBackgroundColor, mDefaultStrokeColor, mDefaultTextColor, mRippleColor);
         return b;
     }
 
@@ -280,8 +355,8 @@ public class SmartReplyView extends ViewGroup {
         // We're done squeezing buttons, so we can clear the priority queue.
         mCandidateButtonQueueForSqueezing.clear();
 
-        // Finally, we need to update corner radius and re-measure some buttons.
-        updateCornerRadiusAndRemeasureButtonsIfNecessary(buttonPaddingHorizontal, maxChildHeight);
+        // Finally, we need to re-measure some buttons.
+        remeasureButtonsIfNecessary(buttonPaddingHorizontal, maxChildHeight);
 
         setMeasuredDimension(
                 resolveSize(Math.max(getSuggestedMinimumWidth(), measuredWidth), widthMeasureSpec),
@@ -393,9 +468,8 @@ public class SmartReplyView extends ViewGroup {
         }
     }
 
-    private void updateCornerRadiusAndRemeasureButtonsIfNecessary(
+    private void remeasureButtonsIfNecessary(
             int buttonPaddingHorizontal, int maxChildHeight) {
-        final float cornerRadius = ((float) maxChildHeight) / 2;
         final int maxChildHeightMeasure =
                 MeasureSpec.makeMeasureSpec(maxChildHeight, MeasureSpec.EXACTLY);
 
@@ -406,11 +480,6 @@ public class SmartReplyView extends ViewGroup {
             if (!lp.show) {
                 continue;
             }
-
-            // Update corner radius.
-            GradientDrawable backgroundDrawable =
-                    (GradientDrawable) ((RippleDrawable) child.getBackground()).getDrawable(0);
-            backgroundDrawable.setCornerRadius(cornerRadius);
 
             boolean requiresNewMeasure = false;
             int newWidth = child.getMeasuredWidth();
@@ -426,12 +495,14 @@ public class SmartReplyView extends ViewGroup {
             // measured with the wrong number of lines).
             if (child.getPaddingLeft() != buttonPaddingHorizontal) {
                 requiresNewMeasure = true;
-                if (buttonPaddingHorizontal == mSingleLineButtonPaddingHorizontal) {
-                    // Decrease padding (2->1 line).
-                    newWidth -= mSingleToDoubleLineButtonWidthIncrease;
-                } else {
-                    // Increase padding (1->2 lines).
-                    newWidth += mSingleToDoubleLineButtonWidthIncrease;
+                if (newWidth != Integer.MAX_VALUE) {
+                    if (buttonPaddingHorizontal == mSingleLineButtonPaddingHorizontal) {
+                        // Change padding (2->1 line).
+                        newWidth -= mSingleToDoubleLineButtonWidthIncrease;
+                    } else {
+                        // Change padding (1->2 lines).
+                        newWidth += mSingleToDoubleLineButtonWidthIncrease;
+                    }
                 }
                 child.setPadding(buttonPaddingHorizontal, child.getPaddingTop(),
                         buttonPaddingHorizontal, child.getPaddingBottom());
@@ -493,6 +564,51 @@ public class SmartReplyView extends ViewGroup {
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
         final LayoutParams lp = (LayoutParams) child.getLayoutParams();
         return lp.show && super.drawChild(canvas, child, drawingTime);
+    }
+
+    public void setBackgroundTintColor(int backgroundColor) {
+        if (backgroundColor == mCurrentBackgroundColor) {
+            // Same color ignoring.
+           return;
+        }
+        mCurrentBackgroundColor = backgroundColor;
+
+        final boolean dark = !NotificationColorUtil.isColorLight(backgroundColor);
+
+        int textColor = NotificationColorUtil.ensureTextContrast(
+                dark ? mDefaultTextColorDarkBg : mDefaultTextColor,
+                backgroundColor | 0xff000000, dark);
+        int strokeColor = NotificationColorUtil.ensureContrast(
+                mDefaultStrokeColor, backgroundColor | 0xff000000, dark, mMinStrokeContrast);
+        int rippleColor = dark ? mRippleColorDarkBg : mRippleColor;
+
+        int childCount = getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            final Button child = (Button) getChildAt(i);
+            setColors(child, backgroundColor, strokeColor, textColor, rippleColor);
+        }
+    }
+
+    private void setColors(Button button, int backgroundColor, int strokeColor, int textColor,
+            int rippleColor) {
+        Drawable drawable = button.getBackground();
+        if (drawable instanceof RippleDrawable) {
+            // Mutate in case other notifications are using this drawable.
+            drawable = drawable.mutate();
+            RippleDrawable ripple = (RippleDrawable) drawable;
+            ripple.setColor(ColorStateList.valueOf(rippleColor));
+            Drawable inset = ripple.getDrawable(0);
+            if (inset instanceof InsetDrawable) {
+                Drawable background = ((InsetDrawable) inset).getDrawable();
+                if (background instanceof GradientDrawable) {
+                    GradientDrawable gradientDrawable = (GradientDrawable) background;
+                    gradientDrawable.setColor(backgroundColor);
+                    gradientDrawable.setStroke(mStrokeWidth, strokeColor);
+                }
+            }
+            button.setBackground(drawable);
+        }
+        button.setTextColor(textColor);
     }
 
     @VisibleForTesting

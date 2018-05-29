@@ -15,8 +15,6 @@
  */
 package com.android.server.autofill;
 
-import static android.view.autofill.AutofillManager.FC_SERVICE_TIMEOUT;
-
 import static com.android.server.autofill.Helper.sDebug;
 import static com.android.server.autofill.Helper.sVerbose;
 import static android.service.autofill.AutofillFieldClassificationService.SERVICE_META_DATA_KEY_AVAILABLE_ALGORITHMS;
@@ -52,8 +50,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Strategy used to bridge the field classification algorithms provided by a service in an external
@@ -83,7 +79,7 @@ final class FieldClassificationStrategy {
     }
 
     @Nullable
-    private ServiceInfo getServiceInfo() {
+    ServiceInfo getServiceInfo() {
         final String packageName =
                 mContext.getPackageManager().getServicesSystemSharedLibraryPackageName();
         if (packageName == null) {
@@ -117,6 +113,18 @@ final class FieldClassificationStrategy {
 
         if (sVerbose) Slog.v(TAG, "getServiceComponentName(): " + name);
         return name;
+    }
+
+    void reset() {
+        synchronized (mLock) {
+            if (mServiceConnection != null) {
+                if (sDebug) Slog.d(TAG, "reset(): unbinding service.");
+                mContext.unbindService(mServiceConnection);
+                mServiceConnection = null;
+            } else {
+                if (sDebug) Slog.d(TAG, "reset(): service is not bound. Do nothing.");
+            }
+        }
     }
 
     /**

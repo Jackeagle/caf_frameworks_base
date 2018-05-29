@@ -25,7 +25,6 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
-import android.util.Log;
 import android.view.Display;
 import android.view.DisplayInfo;
 
@@ -105,6 +104,12 @@ public class DividerSnapAlgorithm {
             boolean isHorizontalDivision, Rect insets) {
         this(res, displayWidth, displayHeight, dividerSize, isHorizontalDivision, insets,
                 DOCKED_INVALID, false);
+    }
+
+    public DividerSnapAlgorithm(Resources res, int displayWidth, int displayHeight, int dividerSize,
+        boolean isHorizontalDivision, Rect insets, int dockSide) {
+        this(res, displayWidth, displayHeight, dividerSize, isHorizontalDivision, insets,
+            dockSide, false);
     }
 
     public DividerSnapAlgorithm(Resources res, int displayWidth, int displayHeight, int dividerSize,
@@ -265,7 +270,11 @@ public class DividerSnapAlgorithm {
                 ? mDisplayHeight
                 : mDisplayWidth;
         int navBarSize = isHorizontalDivision ? mInsets.bottom : mInsets.right;
-        mTargets.add(new SnapTarget(-mDividerSize, -mDividerSize, SnapTarget.FLAG_DISMISS_START,
+        int startPos = -mDividerSize;
+        if (dockedSide == DOCKED_RIGHT) {
+            startPos += mInsets.left;
+        }
+        mTargets.add(new SnapTarget(startPos, startPos, SnapTarget.FLAG_DISMISS_START,
                 0.35f));
         switch (mSnapMode) {
             case SNAP_MODE_16_9:
@@ -344,7 +353,7 @@ public class DividerSnapAlgorithm {
             if (dockedSide == DOCKED_LEFT) {
                 position += mInsets.left;
             } else if (dockedSide == DOCKED_RIGHT) {
-                position = mDisplayWidth - position - mInsets.right;
+                position = mDisplayWidth - position - mInsets.right - mDividerSize;
             }
         }
         mTargets.add(new SnapTarget(position, position, SnapTarget.FLAG_NONE));
@@ -368,6 +377,14 @@ public class DividerSnapAlgorithm {
             return mTargets.get(index - 1);
         }
         return snapTarget;
+    }
+
+    /**
+     * @return whether or not there are more than 1 split targets that do not include the two
+     * dismiss targets, used in deciding to display the middle target for accessibility
+     */
+    public boolean showMiddleSplitTargetForAccessibility() {
+        return (mTargets.size() - 2) > 1;
     }
 
     public boolean isFirstSplitTargetAvailable() {

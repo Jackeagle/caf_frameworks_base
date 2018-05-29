@@ -751,8 +751,9 @@ public class TaskStack extends WindowContainer<Task> implements
      * Used to make room for shadows in the pinned windowing mode.
      */
     int getStackOutset() {
-        if (inPinnedWindowingMode()) {
-            final DisplayMetrics displayMetrics = getDisplayContent().getDisplayMetrics();
+        DisplayContent displayContent = getDisplayContent();
+        if (inPinnedWindowingMode() && displayContent != null) {
+            final DisplayMetrics displayMetrics = displayContent.getDisplayMetrics();
 
             // We multiply by two to match the client logic for converting view elevation
             // to insets, as in {@link WindowManager.LayoutParams#setSurfaceInsets}
@@ -799,34 +800,7 @@ public class TaskStack extends WindowContainer<Task> implements
     }
 
     private void updateBoundsForWindowModeChange() {
-        Rect bounds = null;
-        final boolean inSplitScreenPrimary = inSplitScreenPrimaryWindowingMode();
-        final TaskStack splitScreenStack =
-                mDisplayContent.getSplitScreenPrimaryStackIgnoringVisibility();
-        if (inSplitScreenPrimary || (splitScreenStack != null
-                && inSplitScreenSecondaryWindowingMode() && !splitScreenStack.fillsParent())) {
-            // The existence of a docked stack affects the size of other static stack created since
-            // the docked stack occupies a dedicated region on screen, but only if the dock stack is
-            // not fullscreen. If it's fullscreen, it means that we are in the transition of
-            // dismissing it, so we must not resize this stack.
-            bounds = new Rect();
-            mDisplayContent.getBounds(mTmpRect);
-            mTmpRect2.setEmpty();
-            if (splitScreenStack != null) {
-                splitScreenStack.getRawBounds(mTmpRect2);
-            }
-            final boolean dockedOnTopOrLeft = mService.mDockedStackCreateMode
-                    == SPLIT_SCREEN_CREATE_MODE_TOP_OR_LEFT;
-            getStackDockedModeBounds(mTmpRect, bounds, mTmpRect2,
-                    mDisplayContent.mDividerControllerLocked.getContentWidth(), dockedOnTopOrLeft);
-        } else if (inPinnedWindowingMode()) {
-            // Update the bounds based on any changes to the display info
-            getAnimationOrCurrentBounds(mTmpRect2);
-            if (mDisplayContent.mPinnedStackControllerLocked.onTaskStackBoundsChanged(
-                    mTmpRect2, mTmpRect3)) {
-                bounds = new Rect(mTmpRect3);
-            }
-        }
+        final Rect bounds = calculateBoundsForWindowModeChange();
 
         if (inSplitScreenSecondaryWindowingMode()) {
             // When the stack is resized due to entering split screen secondary, offset the
@@ -838,6 +812,49 @@ public class TaskStack extends WindowContainer<Task> implements
 
         updateDisplayInfo(bounds);
         updateSurfaceBounds();
+    }
+
+    private Rect calculateBoundsForWindowModeChange() {
+        final boolean inSplitScreenPrimary = inSplitScreenPrimaryWindowingMode();
+        final TaskStack splitScreenStack =
+                mDisplayContent.getSplitScreenPrimaryStackIgnoringVisibility();
+        if (inSplitScreenPrimary || (splitScreenStack != null
+                && inSplitScreenSecondaryWindowingMode() && !splitScreenStack.fillsParent())) {
+            // The existence of a docked stack affects the size of other static stack created since
+            // the docked stack occupies a dedicated region on screen, but only if the dock stack is
+            // not fullscreen. If it's fullscreen, it means that we are in the transition of
+            // dismissing it, so we must not resize this stack.
+            final Rect bounds = new Rect();
+            mDisplayContent.getBounds(mTmpRect);
+            mTmpRect2.setEmpty();
+            if (splitScreenStack != null) {
+                if (inSplitScreenSecondaryWindowingMode()
+                        && mDisplayContent.mDividerControllerLocked.isMinimizedDock()
+                        && splitScreenStack.getTopChild() != null) {
+                    // If the primary split screen stack is currently minimized, then don't use the
+                    // stack bounds of the minimized stack, instead, use the temporary task bounds
+                    // to calculate the appropriate uniminized size of any secondary split stack
+                    // TODO: Find a cleaner way for computing new stack bounds while minimized that
+                    //       doesn't assume the primary stack's task bounds as the temp task bounds
+                    splitScreenStack.getTopChild().getBounds(mTmpRect2);
+                } else {
+                    splitScreenStack.getRawBounds(mTmpRect2);
+                }
+            }
+            final boolean dockedOnTopOrLeft = mService.mDockedStackCreateMode
+                    == SPLIT_SCREEN_CREATE_MODE_TOP_OR_LEFT;
+            getStackDockedModeBounds(mTmpRect, bounds, mTmpRect2,
+                    mDisplayContent.mDividerControllerLocked.getContentWidth(), dockedOnTopOrLeft);
+            return bounds;
+        } else if (inPinnedWindowingMode()) {
+            // Update the bounds based on any changes to the display info
+            getAnimationOrCurrentBounds(mTmpRect2);
+            if (mDisplayContent.mPinnedStackControllerLocked.onTaskStackBoundsChanged(
+                    mTmpRect2, mTmpRect3)) {
+                return new Rect(mTmpRect3);
+            }
+        }
+        return null;
     }
 
     /**
@@ -1461,27 +1478,7 @@ public class TaskStack extends WindowContainer<Task> implements
         }
         dc.getBounds(mTmpRect);
         final int orientation = dc.getConfiguration().orientation;
-        return getDockSideUnchecked(bounds, mTmpRect, orientation);
-    }
-
-    static int getDockSideUnchecked(Rect bounds, Rect displayRect, int orientation) {
-        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-            // Portrait mode, docked either at the top or the bottom.
-            if (bounds.top - displayRect.top <= displayRect.bottom - bounds.bottom) {
-                return DOCKED_TOP;
-            } else {
-                return DOCKED_BOTTOM;
-            }
-        } else if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            // Landscape mode, docked either on the left or on the right.
-            if (bounds.left - displayRect.left <= displayRect.right - bounds.right) {
-                return DOCKED_LEFT;
-            } else {
-                return DOCKED_RIGHT;
-            }
-        } else {
-            return DOCKED_INVALID;
-        }
+        return dc.getDockedDividerController().getDockSide(bounds, mTmpRect, orientation);
     }
 
     boolean hasTaskForUser(int userId) {
@@ -1721,6 +1718,9 @@ public class TaskStack extends WindowContainer<Task> implements
             return true;
         }
         final Task homeTask = homeStack.getTopChild();
+        if (homeTask == null) {
+            return true;
+        }
         final AppWindowToken homeApp = homeTask.getTopVisibleAppToken();
         if (!homeTask.isVisible() || homeApp == null) {
             return true;

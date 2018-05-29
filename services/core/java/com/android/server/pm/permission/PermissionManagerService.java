@@ -51,6 +51,7 @@ import android.os.storage.StorageManagerInternal;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.EventLog;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -391,6 +392,83 @@ public class PermissionManagerService {
         return protectionLevel;
     }
 
+    /**
+     * We might auto-grant permissions if any permission of the group is already granted. Hence if
+     * the group of a granted permission changes we need to revoke it to avoid having permissions of
+     * the new group auto-granted.
+     *
+     * @param newPackage The new package that was installed
+     * @param oldPackage The old package that was updated
+     * @param allPackageNames All package names
+     * @param permissionCallback Callback for permission changed
+     */
+    private void revokeRuntimePermissionsIfGroupChanged(
+            @NonNull PackageParser.Package newPackage,
+            @NonNull PackageParser.Package oldPackage,
+            @NonNull ArrayList<String> allPackageNames,
+            @NonNull PermissionCallback permissionCallback) {
+        final int numOldPackagePermissions = oldPackage.permissions.size();
+        final ArrayMap<String, String> oldPermissionNameToGroupName
+                = new ArrayMap<>(numOldPackagePermissions);
+
+        for (int i = 0; i < numOldPackagePermissions; i++) {
+            final PackageParser.Permission permission = oldPackage.permissions.get(i);
+
+            if (permission.group != null) {
+                oldPermissionNameToGroupName.put(permission.info.name,
+                        permission.group.info.name);
+            }
+        }
+
+        final int numNewPackagePermissions = newPackage.permissions.size();
+        for (int newPermissionNum = 0; newPermissionNum < numNewPackagePermissions;
+                newPermissionNum++) {
+            final PackageParser.Permission newPermission =
+                    newPackage.permissions.get(newPermissionNum);
+            final int newProtection = newPermission.info.getProtection();
+
+            if ((newProtection & PermissionInfo.PROTECTION_DANGEROUS) != 0) {
+                final String permissionName = newPermission.info.name;
+                final String newPermissionGroupName =
+                        newPermission.group == null ? null : newPermission.group.info.name;
+                final String oldPermissionGroupName = oldPermissionNameToGroupName.get(
+                        permissionName);
+
+                if (newPermissionGroupName != null
+                        && !newPermissionGroupName.equals(oldPermissionGroupName)) {
+                    final int[] userIds = mUserManagerInt.getUserIds();
+                    final int numUserIds = userIds.length;
+                    for (int userIdNum = 0; userIdNum < numUserIds; userIdNum++) {
+                        final int userId = userIds[userIdNum];
+
+                        final int numPackages = allPackageNames.size();
+                        for (int packageNum = 0; packageNum < numPackages; packageNum++) {
+                            final String packageName = allPackageNames.get(packageNum);
+
+                            if (checkPermission(permissionName, packageName, UserHandle.USER_SYSTEM,
+                                    userId) == PackageManager.PERMISSION_GRANTED) {
+                                EventLog.writeEvent(0x534e4554, "72710897",
+                                        newPackage.applicationInfo.uid,
+                                        "Revoking permission " + permissionName +
+                                        " from package " + packageName +
+                                        " as the group changed from " + oldPermissionGroupName +
+                                        " to " + newPermissionGroupName);
+
+                                try {
+                                    revokeRuntimePermission(permissionName, packageName, false,
+                                            Process.SYSTEM_UID, userId, permissionCallback);
+                                } catch (IllegalArgumentException e) {
+                                    Slog.e(TAG, "Could not revoke " + permissionName + " from "
+                                            + packageName, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void addAllPermissions(PackageParser.Package pkg, boolean chatty) {
         final int N = pkg.permissions.size();
         for (int i=0; i<N; i++) {
@@ -543,9 +621,8 @@ public class PermissionManagerService {
                 enforcePermissionCapLocked(info, tree);
                 bp = new BasePermission(info.name, tree.getSourcePackageName(),
                         BasePermission.TYPE_DYNAMIC);
-            } else if (bp.isDynamic()) {
-                // TODO: switch this back to SecurityException
-                Slog.wtf(TAG, "Not allowed to modify non-dynamic permission "
+            } else if (!bp.isDynamic()) {
+                throw new SecurityException("Not allowed to modify non-dynamic permission "
                         + info.name);
             }
             changed = bp.addToTree(fixedLevel, info, tree);
@@ -1876,7 +1953,7 @@ public class PermissionManagerService {
                     UserManager.DISALLOW_DEBUGGING_FEATURES, callingUid, userId);
         }
         if (userId == UserHandle.getUserId(callingUid)) return;
-        if (callingUid != Process.SYSTEM_UID && callingUid != 0) {
+        if (callingUid != Process.SYSTEM_UID && callingUid != Process.ROOT_UID) {
             if (requireFullPermission) {
                 mContext.enforceCallingOrSelfPermission(
                         android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, message);
@@ -1966,6 +2043,15 @@ public class PermissionManagerService {
         @Override
         public boolean isPermissionsReviewRequired(Package pkg, int userId) {
             return PermissionManagerService.this.isPermissionsReviewRequired(pkg, userId);
+        }
+        @Override
+        public void revokeRuntimePermissionsIfGroupChanged(
+                @NonNull PackageParser.Package newPackage,
+                @NonNull PackageParser.Package oldPackage,
+                @NonNull ArrayList<String> allPackageNames,
+                @NonNull PermissionCallback permissionCallback) {
+            PermissionManagerService.this.revokeRuntimePermissionsIfGroupChanged(newPackage,
+                    oldPackage, allPackageNames, permissionCallback);
         }
         @Override
         public void addAllPermissions(Package pkg, boolean chatty) {

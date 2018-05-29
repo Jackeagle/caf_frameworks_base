@@ -392,7 +392,7 @@ public final class OverlayManagerService extends SystemService {
                         mPackageManager.cachePackageInfo(packageName, userId, pi);
                         if (pi.isOverlayPackage()) {
                             mImpl.onOverlayPackageChanged(packageName, userId);
-                        } else {
+                        }  else {
                             mImpl.onTargetPackageChanged(packageName, userId);
                         }
                     }
@@ -675,7 +675,7 @@ public final class OverlayManagerService extends SystemService {
          * @throws SecurityException if the permission check fails
          */
         private void enforceChangeOverlayPackagesPermission(@NonNull final String message) {
-            getContext().enforceCallingOrSelfPermission(
+            getContext().enforceCallingPermission(
                     android.Manifest.permission.CHANGE_OVERLAY_PACKAGES, message);
         }
 
@@ -686,8 +686,7 @@ public final class OverlayManagerService extends SystemService {
          * @throws SecurityException if the permission check fails
          */
         private void enforceDumpPermission(@NonNull final String message) {
-            getContext().enforceCallingOrSelfPermission(android.Manifest.permission.DUMP,
-                    message);
+            getContext().enforceCallingPermission(android.Manifest.permission.DUMP, message);
         }
     };
 

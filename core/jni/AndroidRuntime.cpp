@@ -109,6 +109,7 @@ extern int register_android_media_JetPlayer(JNIEnv *env);
 extern int register_android_media_ToneGenerator(JNIEnv *env);
 
 namespace android {
+extern int register_android_util_SeempLog(JNIEnv* env);
 
 /*
  * JNI-based registration functions.  Note these are properly contained in
@@ -748,6 +749,12 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote)
                        jittransitionweightOptBuf,
                        "-Xjittransitionweight:");
 
+    property_get("dalvik.vm.profilebootimage", propBuf, "");
+    if (strcmp(propBuf, "true") == 0) {
+        addOption("-Xps-profile-boot-class-path");
+        addOption("-Xps-profile-aot-code");
+    }
+
     /*
      * Madvise related options.
      */
@@ -1337,6 +1344,7 @@ static int register_jni_procs(const RegJNIRec array[], size_t count, JNIEnv* env
 }
 
 static const RegJNIRec gRegJNI[] = {
+    REG_JNI(register_android_util_SeempLog),
     REG_JNI(register_com_android_internal_os_RuntimeInit),
     REG_JNI(register_com_android_internal_os_ZygoteInit_nativeZygoteInit),
     REG_JNI(register_android_os_SystemClock),

@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"SIM картица је закључана PUK кодом."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"SIM картица се откључава…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"Област за PIN"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"Област за PIN за SIM"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"Област за PUK за SIM"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"Следећи аларм је подешен за <xliff:g id="ALARM">%1$s</xliff:g>"</string>
@@ -146,7 +148,7 @@
       <item quantity="other">Нисте откључали уређај <xliff:g id="NUMBER_1">%d</xliff:g> сати. Потврдите лозинку.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"Није препознат"</string>
-    <plurals name="kg_password_default_pin_message" formatted="false" msgid="6203676909479972943">
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
       <item quantity="one">Унесите PIN за SIM. Имате још <xliff:g id="NUMBER_1">%d</xliff:g> покушај.</item>
       <item quantity="few">Унесите PIN за SIM. Имате још <xliff:g id="NUMBER_1">%d</xliff:g> покушаја.</item>
       <item quantity="other">Унесите PIN за SIM. Имате још <xliff:g id="NUMBER_1">%d</xliff:g> покушаја.</item>

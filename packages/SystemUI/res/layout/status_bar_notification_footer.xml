@@ -19,9 +19,10 @@
         xmlns:android="http://schemas.android.com/apk/res/android"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingEnd="8dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
         android:visibility="gone">
-    <FrameLayout
+    <com.android.systemui.statusbar.AlphaOptimizedFrameLayout
         android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" >
@@ -45,5 +46,5 @@
             android:contentDescription="@string/accessibility_clear_all"
             android:text="@string/clear_all_notifications_text"
             android:textColor="?attr/wallpaperTextColor"/>
-    </FrameLayout>
+    </com.android.systemui.statusbar.AlphaOptimizedFrameLayout>
 </com.android.systemui.statusbar.FooterView>

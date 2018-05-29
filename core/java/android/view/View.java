@@ -12496,6 +12496,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         final int actionMasked = event.getActionMasked();
         if (actionMasked == MotionEvent.ACTION_DOWN) {
+            android.util.SeempLog.record(3);
             // Defensive cleanup for new gesture
             stopNestedScroll();
         }
@@ -13152,6 +13153,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event the KeyEvent object that defines the button action
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        android.util.SeempLog.record(4);
         if (KeyEvent.isConfirmKey(keyCode)) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -13204,6 +13206,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event   The KeyEvent object that defines the button action.
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        android.util.SeempLog.record(5);
         if (KeyEvent.isConfirmKey(keyCode)) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -13718,6 +13721,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return True if the event was handled, false otherwise.
      */
     public boolean onTouchEvent(MotionEvent event) {
+        android.util.SeempLog.record(3);
         final float x = event.getX();
         final float y = event.getY();
         final int viewFlags = mViewFlags;
@@ -15049,8 +15053,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void setAlpha(@FloatRange(from=0.0, to=1.0) float alpha) {
         ensureTransformationInfo();
         if (mTransformationInfo.mAlpha != alpha) {
-            float oldAlpha = mTransformationInfo.mAlpha;
-            mTransformationInfo.mAlpha = alpha;
+            setAlphaInternal(alpha);
             if (onSetAlpha((int) (alpha * 255))) {
                 mPrivateFlags |= PFLAG_ALPHA_SET;
                 // subclass is handling alpha - don't optimize rendering cache invalidation
@@ -15060,10 +15063,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 mPrivateFlags &= ~PFLAG_ALPHA_SET;
                 invalidateViewProperty(true, false);
                 mRenderNode.setAlpha(getFinalAlpha());
-            }
-            // Report visibility changes, which can affect children, to accessibility
-            if ((alpha == 0) ^ (oldAlpha == 0)) {
-                notifySubtreeAccessibilityStateChangedIfNeeded();
             }
         }
     }
@@ -15081,7 +15080,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     boolean setAlphaNoInvalidation(float alpha) {
         ensureTransformationInfo();
         if (mTransformationInfo.mAlpha != alpha) {
-            mTransformationInfo.mAlpha = alpha;
+            setAlphaInternal(alpha);
             boolean subclassHandlesAlpha = onSetAlpha((int) (alpha * 255));
             if (subclassHandlesAlpha) {
                 mPrivateFlags |= PFLAG_ALPHA_SET;
@@ -15092,6 +15091,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             }
         }
         return false;
+    }
+
+    private void setAlphaInternal(float alpha) {
+        float oldAlpha = mTransformationInfo.mAlpha;
+        mTransformationInfo.mAlpha = alpha;
+        // Report visibility changes, which can affect children, to accessibility
+        if ((alpha == 0) ^ (oldAlpha == 0)) {
+            notifySubtreeAccessibilityStateChangedIfNeeded();
+        }
     }
 
     /**
@@ -20700,7 +20708,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             if (canTakeFocus()) {
                 // We have a robust focus, so parents should no longer be wanting focus.
                 clearParentsWantFocus();
-            } else if (!getViewRootImpl().isInLayout()) {
+            } else if (getViewRootImpl() == null || !getViewRootImpl().isInLayout()) {
                 // This is a weird case. Most-likely the user, rather than ViewRootImpl, called
                 // layout. In this case, there's no guarantee that parent layouts will be evaluated
                 // and thus the safest action is to clear focus here.
@@ -20850,7 +20858,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         }
         // If this isn't laid out yet, focus assignment will be handled during the "deferment/
         // backtracking" of requestFocus during layout, so don't touch focus here.
-        if (!sCanFocusZeroSized && isLayoutValid()) {
+        if (!sCanFocusZeroSized && isLayoutValid()
+                // Don't touch focus if animating
+                && !(mParent instanceof ViewGroup && ((ViewGroup) mParent).isLayoutSuppressed())) {
             if (newWidth <= 0 || newHeight <= 0) {
                 if (hasFocus()) {
                     clearFocus();

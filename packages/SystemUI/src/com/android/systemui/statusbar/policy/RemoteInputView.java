@@ -285,12 +285,12 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
         if (mWrapper != null) {
             mWrapper.setRemoteInputVisible(true);
         }
-        mController.addRemoteInput(mEntry, mToken);
         mEditText.setInnerFocusable(true);
         mEditText.mShowImeOnInputConnection = true;
         mEditText.setText(mEntry.remoteInputText);
         mEditText.setSelection(mEditText.getText().length());
         mEditText.requestFocus();
+        mController.addRemoteInput(mEntry, mToken);
         updateSendButton();
     }
 
@@ -466,6 +466,10 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
         }
     }
 
+    public boolean isSending() {
+        return getVisibility() == VISIBLE && mController.isSpinning(mEntry.key, mToken);
+    }
+
     /**
      * An EditText that changes appearance based on whether it's focusable and becomes
      * un-focusable whenever the user navigates away from it or it becomes invisible.
@@ -561,6 +565,11 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
         @Override
         public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
             final InputConnection inputConnection = super.onCreateInputConnection(outAttrs);
+            //if pinned, set imeOption to keep the behavior like in portrait.
+            if (mRemoteInputView != null && mRemoteInputView.mEntry.row.isPinned()) {
+                outAttrs.imeOptions |= EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                        | EditorInfo.IME_FLAG_NO_FULLSCREEN;
+            }
 
             if (mShowImeOnInputConnection && inputConnection != null) {
                 final InputMethodManager imm = InputMethodManager.getInstance();

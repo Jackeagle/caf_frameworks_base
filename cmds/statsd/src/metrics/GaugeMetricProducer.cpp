@@ -45,18 +45,28 @@ namespace statsd {
 // for StatsLogReport
 const int FIELD_ID_ID = 1;
 const int FIELD_ID_GAUGE_METRICS = 8;
+const int FIELD_ID_TIME_BASE = 9;
+const int FIELD_ID_BUCKET_SIZE = 10;
+const int FIELD_ID_DIMENSION_PATH_IN_WHAT = 11;
+const int FIELD_ID_DIMENSION_PATH_IN_CONDITION = 12;
 // for GaugeMetricDataWrapper
 const int FIELD_ID_DATA = 1;
+const int FIELD_ID_SKIPPED = 2;
+const int FIELD_ID_SKIPPED_START_MILLIS = 3;
+const int FIELD_ID_SKIPPED_END_MILLIS = 4;
 // for GaugeMetricData
 const int FIELD_ID_DIMENSION_IN_WHAT = 1;
 const int FIELD_ID_DIMENSION_IN_CONDITION = 2;
 const int FIELD_ID_BUCKET_INFO = 3;
+const int FIELD_ID_DIMENSION_LEAF_IN_WHAT = 4;
+const int FIELD_ID_DIMENSION_LEAF_IN_CONDITION = 5;
 // for GaugeBucketInfo
-const int FIELD_ID_START_BUCKET_ELAPSED_NANOS = 1;
-const int FIELD_ID_END_BUCKET_ELAPSED_NANOS = 2;
 const int FIELD_ID_ATOM = 3;
 const int FIELD_ID_ELAPSED_ATOM_TIMESTAMP = 4;
 const int FIELD_ID_WALL_CLOCK_ATOM_TIMESTAMP = 5;
+const int FIELD_ID_BUCKET_NUM = 6;
+const int FIELD_ID_START_BUCKET_ELAPSED_MILLIS = 7;
+const int FIELD_ID_END_BUCKET_ELAPSED_MILLIS = 8;
 
 GaugeMetricProducer::GaugeMetricProducer(const ConfigKey& key, const GaugeMetric& metric,
                                          const int conditionIndex,
@@ -66,6 +76,7 @@ GaugeMetricProducer::GaugeMetricProducer(const ConfigKey& key, const GaugeMetric
     : MetricProducer(metric.id(), key, timeBaseNs, conditionIndex, wizard),
       mStatsPullerManager(statsPullerManager),
       mPullTagId(pullTagId),
+      mMinBucketSizeNs(metric.min_bucket_size_nanos()),
       mDimensionSoftLimit(StatsdStats::kAtomDimensionKeySizeLimitMap.find(pullTagId) !=
                                           StatsdStats::kAtomDimensionKeySizeLimitMap.end()
                                   ? StatsdStats::kAtomDimensionKeySizeLimitMap.at(pullTagId).first
@@ -73,7 +84,8 @@ GaugeMetricProducer::GaugeMetricProducer(const ConfigKey& key, const GaugeMetric
       mDimensionHardLimit(StatsdStats::kAtomDimensionKeySizeLimitMap.find(pullTagId) !=
                                           StatsdStats::kAtomDimensionKeySizeLimitMap.end()
                                   ? StatsdStats::kAtomDimensionKeySizeLimitMap.at(pullTagId).second
-                                  : StatsdStats::kDimensionKeySizeHardLimit) {
+                                  : StatsdStats::kDimensionKeySizeHardLimit),
+      mGaugeAtomsPerDimensionLimit(metric.max_num_gauge_atoms_per_bucket()) {
     mCurrentSlicedBucket = std::make_shared<DimToGaugeAtomsMap>();
     mCurrentSlicedBucketForAnomaly = std::make_shared<DimToValMap>();
     int64_t bucketSizeMills = 0;
@@ -109,6 +121,8 @@ GaugeMetricProducer::GaugeMetricProducer(const ConfigKey& key, const GaugeMetric
         }
     }
     mConditionSliced = (metric.links().size() > 0) || (mDimensionsInCondition.size() > 0);
+    mSliceByPositionALL = HasPositionALL(metric.dimensions_in_what()) ||
+            HasPositionALL(metric.dimensions_in_condition());
 
     flushIfNeededLocked(startTimeNs);
     // Kicks off the puller immediately.
@@ -156,8 +170,15 @@ void GaugeMetricProducer::dumpStatesLocked(FILE* out, bool verbose) const {
     }
 }
 
+void GaugeMetricProducer::clearPastBucketsLocked(const int64_t dumpTimeNs) {
+    flushIfNeededLocked(dumpTimeNs);
+    mPastBuckets.clear();
+    mSkippedBuckets.clear();
+}
+
 void GaugeMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
                                              const bool include_current_partial_bucket,
+                                             std::set<string> *str_set,
                                              ProtoOutputStream* protoOutput) {
     VLOG("Gauge metric %lld report now...", (long long)mMetricId);
     if (include_current_partial_bucket) {
@@ -166,13 +187,42 @@ void GaugeMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
         flushIfNeededLocked(dumpTimeNs);
     }
 
-    flushIfNeededLocked(dumpTimeNs);
     if (mPastBuckets.empty()) {
         return;
     }
 
     protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_ID, (long long)mMetricId);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_TIME_BASE, (long long)mTimeBaseNs);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_BUCKET_SIZE, (long long)mBucketSizeNs);
+
+    // Fills the dimension path if not slicing by ALL.
+    if (!mSliceByPositionALL) {
+        if (!mDimensionsInWhat.empty()) {
+            uint64_t dimenPathToken = protoOutput->start(
+                    FIELD_TYPE_MESSAGE | FIELD_ID_DIMENSION_PATH_IN_WHAT);
+            writeDimensionPathToProto(mDimensionsInWhat, protoOutput);
+            protoOutput->end(dimenPathToken);
+        }
+        if (!mDimensionsInCondition.empty()) {
+            uint64_t dimenPathToken = protoOutput->start(
+                    FIELD_TYPE_MESSAGE | FIELD_ID_DIMENSION_PATH_IN_CONDITION);
+            writeDimensionPathToProto(mDimensionsInCondition, protoOutput);
+            protoOutput->end(dimenPathToken);
+        }
+    }
+
     uint64_t protoToken = protoOutput->start(FIELD_TYPE_MESSAGE | FIELD_ID_GAUGE_METRICS);
+
+    for (const auto& pair : mSkippedBuckets) {
+        uint64_t wrapperToken =
+                protoOutput->start(FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED | FIELD_ID_SKIPPED);
+        protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_SKIPPED_START_MILLIS,
+                           (long long)(NanoToMillis(pair.first)));
+        protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_SKIPPED_END_MILLIS,
+                           (long long)(NanoToMillis(pair.second)));
+        protoOutput->end(wrapperToken);
+    }
+    mSkippedBuckets.clear();
 
     for (const auto& pair : mPastBuckets) {
         const MetricDimensionKey& dimensionKey = pair.first;
@@ -182,26 +232,43 @@ void GaugeMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
                 protoOutput->start(FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED | FIELD_ID_DATA);
 
         // First fill dimension.
-        uint64_t dimensionToken = protoOutput->start(
-                FIELD_TYPE_MESSAGE | FIELD_ID_DIMENSION_IN_WHAT);
-        writeDimensionToProto(dimensionKey.getDimensionKeyInWhat(), protoOutput);
-        protoOutput->end(dimensionToken);
+        if (mSliceByPositionALL) {
+            uint64_t dimensionToken = protoOutput->start(
+                    FIELD_TYPE_MESSAGE | FIELD_ID_DIMENSION_IN_WHAT);
+            writeDimensionToProto(dimensionKey.getDimensionKeyInWhat(), str_set, protoOutput);
+            protoOutput->end(dimensionToken);
 
-        if (dimensionKey.hasDimensionKeyInCondition()) {
-            uint64_t dimensionInConditionToken = protoOutput->start(
-                    FIELD_TYPE_MESSAGE | FIELD_ID_DIMENSION_IN_CONDITION);
-            writeDimensionToProto(dimensionKey.getDimensionKeyInCondition(), protoOutput);
-            protoOutput->end(dimensionInConditionToken);
+            if (dimensionKey.hasDimensionKeyInCondition()) {
+                uint64_t dimensionInConditionToken = protoOutput->start(
+                        FIELD_TYPE_MESSAGE | FIELD_ID_DIMENSION_IN_CONDITION);
+                writeDimensionToProto(dimensionKey.getDimensionKeyInCondition(),
+                                      str_set, protoOutput);
+                protoOutput->end(dimensionInConditionToken);
+            }
+        } else {
+            writeDimensionLeafNodesToProto(dimensionKey.getDimensionKeyInWhat(),
+                                           FIELD_ID_DIMENSION_LEAF_IN_WHAT, str_set, protoOutput);
+            if (dimensionKey.hasDimensionKeyInCondition()) {
+                writeDimensionLeafNodesToProto(dimensionKey.getDimensionKeyInCondition(),
+                                               FIELD_ID_DIMENSION_LEAF_IN_CONDITION,
+                                               str_set, protoOutput);
+            }
         }
 
         // Then fill bucket_info (GaugeBucketInfo).
         for (const auto& bucket : pair.second) {
             uint64_t bucketInfoToken = protoOutput->start(
                     FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED | FIELD_ID_BUCKET_INFO);
-            protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_START_BUCKET_ELAPSED_NANOS,
-                               (long long)bucket.mBucketStartNs);
-            protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_END_BUCKET_ELAPSED_NANOS,
-                               (long long)bucket.mBucketEndNs);
+
+            if (bucket.mBucketEndNs - bucket.mBucketStartNs != mBucketSizeNs) {
+                protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_START_BUCKET_ELAPSED_MILLIS,
+                                   (long long)NanoToMillis(bucket.mBucketStartNs));
+                protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_END_BUCKET_ELAPSED_MILLIS,
+                                   (long long)NanoToMillis(bucket.mBucketEndNs));
+            } else {
+                protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_BUCKET_NUM,
+                                   (long long)(getBucketNumFromEndTimeNs(bucket.mBucketEndNs)));
+            }
 
             if (!bucket.mGaugeAtoms.empty()) {
                 for (const auto& atom : bucket.mGaugeAtoms) {
@@ -257,6 +324,10 @@ void GaugeMetricProducer::pullLocked(const int64_t timestampNs) {
             triggerPuller = true;
             break;
         }
+        case GaugeMetric::CONDITION_CHANGE_TO_TRUE: {
+            triggerPuller = mCondition;
+            break;
+        }
         default:
             break;
     }
@@ -281,7 +352,7 @@ void GaugeMetricProducer::onConditionChangedLocked(const bool conditionMet,
     flushIfNeededLocked(eventTimeNs);
     mCondition = conditionMet;
 
-    if (mPullTagId != -1 && mCondition) {
+    if (mPullTagId != -1) {
         pullLocked(eventTimeNs);
     }  // else: Push mode. No need to proactively pull the gauge data.
 }
@@ -363,6 +434,9 @@ void GaugeMetricProducer::onMatchedLogEventInternalLocked(
     if (hitGuardRailLocked(eventKey)) {
         return;
     }
+    if ((*mCurrentSlicedBucket)[eventKey].size() >= mGaugeAtomsPerDimensionLimit) {
+        return;
+    }
     GaugeAtom gaugeAtom(getGaugeFields(event), eventTimeNs, getWallClockNs());
     (*mCurrentSlicedBucket)[eventKey].push_back(gaugeAtom);
     // Anomaly detection on gauge metric only works when there is one numeric
@@ -440,12 +514,16 @@ void GaugeMetricProducer::flushCurrentBucketLocked(const int64_t& eventTimeNs) {
         info.mBucketEndNs = fullBucketEndTimeNs;
     }
 
-    for (const auto& slice : *mCurrentSlicedBucket) {
-        info.mGaugeAtoms = slice.second;
-        auto& bucketList = mPastBuckets[slice.first];
-        bucketList.push_back(info);
-        VLOG("Gauge gauge metric %lld, dump key value: %s", (long long)mMetricId,
-             slice.first.toString().c_str());
+    if (info.mBucketEndNs - mCurrentBucketStartTimeNs >= mMinBucketSizeNs) {
+        for (const auto& slice : *mCurrentSlicedBucket) {
+            info.mGaugeAtoms = slice.second;
+            auto& bucketList = mPastBuckets[slice.first];
+            bucketList.push_back(info);
+            VLOG("Gauge gauge metric %lld, dump key value: %s", (long long)mMetricId,
+                 slice.first.toString().c_str());
+        }
+    } else {
+        mSkippedBuckets.emplace_back(info.mBucketStartNs, info.mBucketEndNs);
     }
 
     // If we have anomaly trackers, we need to update the partial bucket values.
@@ -467,7 +545,14 @@ void GaugeMetricProducer::flushCurrentBucketLocked(const int64_t& eventTimeNs) {
 size_t GaugeMetricProducer::byteSizeLocked() const {
     size_t totalSize = 0;
     for (const auto& pair : mPastBuckets) {
-        totalSize += pair.second.size() * kBucketSize;
+        for (const auto& bucket : pair.second) {
+            totalSize += bucket.mGaugeAtoms.size() * sizeof(GaugeAtom);
+            for (const auto& atom : bucket.mGaugeAtoms) {
+                if (atom.mFields != nullptr) {
+                    totalSize += atom.mFields->size() * sizeof(FieldValue);
+                }
+            }
+        }
     }
     return totalSize;
 }
