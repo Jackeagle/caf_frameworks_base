@@ -268,6 +268,7 @@ import com.android.internal.accessibility.AccessibilityShortcutController;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.nano.MetricsProto;
 import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.internal.policy.IShortcutService;
 import com.android.internal.policy.KeyguardDismissCallback;
@@ -461,11 +462,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private final Object mLock = new Object();
 
+    private static final boolean SCROLL_BOOST_SS_ENABLE =
+                    SystemProperties.getBoolean("vendor.perf.gestureflingboost.enable", false);
+
     /*
      * @hide
      */
-    BoostFramework mPerfBoost = null;
-
+    BoostFramework mPerfBoostDrag = null;
+    BoostFramework mPerfBoostFling = null;
+    BoostFramework mPerfBoostPrefling = null;
     Context mContext;
     IWindowManager mWindowManager;
     WindowManagerFuncs mWindowManagerFuncs;
@@ -490,6 +495,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private ScreenshotHelper mScreenshotHelper;
     private boolean mHasFeatureWatch;
     private boolean mHasFeatureLeanback;
+    private boolean mIsPerfBoostFlingAcquired;
 
     // Assigned on main thread, accessed on UI thread
     volatile VrManagerInternal mVrManagerInternal;
@@ -640,6 +646,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mUseTvRouting;
     int mVeryLongPressTimeout;
     boolean mAllowStartActivityForLongPressOnPowerDuringSetup;
+    MetricsLogger mLogger;
 
     private boolean mHandleVolumeKeysInWM;
 
@@ -821,9 +828,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mHavePendingMediaKeyRepeatWithWakeLock;
 
     private int mCurrentUserId;
-
-    /* Whether accessibility is magnifying the screen */
-    private boolean mScreenMagnificationActive;
 
     // Maps global key codes to the components that will handle them.
     private GlobalKeyManager mGlobalKeyManager;
@@ -1160,6 +1164,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         getAudioManagerInternal();
         mAudioManagerInternal.silenceRingerModeInternal("volume_hush");
+        mLogger.action(MetricsProto.MetricsEvent.ACTION_HUSH_GESTURE, mRingerToggleChord);
     }
 
     IStatusBarService getStatusBarService() {
@@ -2027,6 +2032,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mHasFeatureLeanback = mContext.getPackageManager().hasSystemFeature(FEATURE_LEANBACK);
         mAccessibilityShortcutController =
                 new AccessibilityShortcutController(mContext, new Handler(), mCurrentUserId);
+        mLogger = new MetricsLogger();
         // Init display burn-in protection
         boolean burnInProtectionEnabled = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_enableBurnInProtection);
@@ -2229,26 +2235,52 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     }
                     @Override
                     public void onFling(int duration) {
+                        String currentPackage = mContext.getPackageName();
                         if (mPowerManagerInternal != null) {
                             mPowerManagerInternal.powerHint(
                                     PowerHint.INTERACTION, duration);
                         }
+                        if (SCROLL_BOOST_SS_ENABLE) {
+                            if (mPerfBoostFling == null) {
+                                mPerfBoostFling = new BoostFramework();
+                                mIsPerfBoostFlingAcquired = false;
+                            }
+                            if (mPerfBoostFling == null) {
+                                Slog.e(TAG, "Error: boost object null");
+                                return;
+                            }
+
+                            mPerfBoostFling.perfHint(BoostFramework.VENDOR_HINT_SCROLL_BOOST,
+                                currentPackage, duration + 160, BoostFramework.Scroll.VERTICAL);
+                            mIsPerfBoostFlingAcquired = true;
+                        }
                     }
                     @Override
                     public void onScroll(boolean started) {
-                        if (mPerfBoost == null) {
-                            mPerfBoost = new BoostFramework();
+                        String currentPackage = mContext.getPackageName();
+                        if (mPerfBoostDrag == null) {
+                            mPerfBoostDrag = new BoostFramework();
                         }
-
-                        if (mPerfBoost == null) {
+                        if (mPerfBoostDrag == null) {
                             Slog.e(TAG, "Error: boost object null");
                             return;
                         }
+                        if (SCROLL_BOOST_SS_ENABLE) {
+                            if (mPerfBoostPrefling == null) {
+                                mPerfBoostPrefling = new BoostFramework();
+                            }
+                            if (mPerfBoostPrefling == null) {
+                                Slog.e(TAG, "Error: boost object null");
+                                return;
+                            }
+                            mPerfBoostPrefling.perfHint(BoostFramework.VENDOR_HINT_SCROLL_BOOST,
+                                    currentPackage, -1, BoostFramework.Scroll.PREFILING);
+                        }
                         if (started) {
-                            mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
-                                                "", -1, 1);
+                            mPerfBoostDrag.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
+                                            currentPackage, -1, 1);
                         } else {
-                            mPerfBoost.perfLockRelease();
+                            mPerfBoostDrag.perfLockRelease();
                         }
                     }
 
@@ -2259,6 +2291,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     @Override
                     public void onDown() {
                         mOrientationListener.onTouchStart();
+                        if(SCROLL_BOOST_SS_ENABLE && mPerfBoostFling!= null
+                                            && mIsPerfBoostFlingAcquired) {
+                            mPerfBoostFling.perfLockRelease();
+                            mIsPerfBoostFlingAcquired = false;
+                        }
                     }
                     @Override
                     public void onUpOrCancel() {
@@ -6136,14 +6173,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 && (!isNavBarVirtKey || mNavBarVirtualKeyHapticFeedbackEnabled)
                 && event.getRepeatCount() == 0;
 
-        // Cancel any pending remote recents animations before handling the button itself. In the
-        // case where we are going home and the recents animation has already started, just cancel
-        // the recents animation, leaving the home stack in place for the pending start activity
-        if (isNavBarVirtKey && !down && !canceled) {
-            boolean isHomeKey = keyCode == KeyEvent.KEYCODE_HOME;
-            mActivityManagerInternal.cancelRecentsAnimation(!isHomeKey);
-        }
-
         // Handle special keys.
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK: {
@@ -8485,11 +8514,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private int configureNavBarOpacity(int visibility, boolean dockedStackVisible,
             boolean freeformStackVisible, boolean isDockedDividerResizing) {
-        if (mScreenMagnificationActive) {
-            // When the screen is magnified, the nav bar should be opaque since its background
-            // can vary as the user pans and zooms
-            visibility = setNavBarOpaqueFlag(visibility);
-        } else if (mNavBarOpacityMode == NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED) {
+        if (mNavBarOpacityMode == NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED) {
             if (dockedStackVisible || freeformStackVisible || isDockedDividerResizing) {
                 visibility = setNavBarOpaqueFlag(visibility);
             }
@@ -8641,14 +8666,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return true;
         }
         return false;
-    }
-
-    @Override
-    public void onScreenMagnificationStateChanged(boolean active) {
-        synchronized (mWindowManagerFuncs.getWindowManagerLock()) {
-            mScreenMagnificationActive = active;
-            updateSystemUiVisibilityLw();
-        }
     }
 
     @Override

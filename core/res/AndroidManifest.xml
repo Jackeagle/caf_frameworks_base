@@ -387,6 +387,7 @@
     <protected-broadcast android:name="android.net.wifi.p2p.PEERS_CHANGED" />
     <protected-broadcast android:name="android.net.wifi.p2p.CONNECTION_STATE_CHANGE" />
     <protected-broadcast android:name="android.net.wifi.p2p.PERSISTENT_GROUPS_CHANGED" />
+    <protected-broadcast android:name="android.net.wifi.DPP_EVENT" />
     <protected-broadcast android:name="android.net.wifi.COUNTRY_CODE_CHANGED" />
     <protected-broadcast android:name="android.net.conn.TETHER_STATE_CHANGED" />
     <protected-broadcast android:name="android.net.conn.INET_CONDITION_ACTION" />
@@ -625,6 +626,10 @@
     <protected-broadcast android:name="android.app.action.AFFILIATED_PROFILE_TRANSFER_OWNERSHIP_COMPLETE" />
     <protected-broadcast android:name="android.app.action.DATA_SHARING_RESTRICTION_CHANGED" />
     <protected-broadcast android:name="android.app.action.STATSD_STARTED" />
+
+    <!-- For IdleController -->
+    <protected-broadcast android:name="android.intent.action.DOCK_IDLE" />
+    <protected-broadcast android:name="android.intent.action.DOCK_ACTIVE" />
 
     <!-- ====================================================================== -->
     <!--                          RUNTIME PERMISSIONS                           -->
@@ -4294,7 +4299,7 @@
         <receiver android:name="com.android.server.updates.CarrierIdInstallReceiver"
                   android:permission="android.permission.UPDATE_CONFIG">
             <intent-filter>
-                <action android:name="com.android.internal.intent.action.UPDATE_CARRIER_ID_DB" />
+                <action android:name="android.os.action.UPDATE_CARRIER_ID_DB" />
                 <data android:scheme="content" android:host="*" android:mimeType="*/*" />
             </intent-filter>
         </receiver>

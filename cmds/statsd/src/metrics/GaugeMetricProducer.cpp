@@ -84,7 +84,8 @@ GaugeMetricProducer::GaugeMetricProducer(const ConfigKey& key, const GaugeMetric
       mDimensionHardLimit(StatsdStats::kAtomDimensionKeySizeLimitMap.find(pullTagId) !=
                                           StatsdStats::kAtomDimensionKeySizeLimitMap.end()
                                   ? StatsdStats::kAtomDimensionKeySizeLimitMap.at(pullTagId).second
-                                  : StatsdStats::kDimensionKeySizeHardLimit) {
+                                  : StatsdStats::kDimensionKeySizeHardLimit),
+      mGaugeAtomsPerDimensionLimit(metric.max_num_gauge_atoms_per_bucket()) {
     mCurrentSlicedBucket = std::make_shared<DimToGaugeAtomsMap>();
     mCurrentSlicedBucketForAnomaly = std::make_shared<DimToValMap>();
     int64_t bucketSizeMills = 0;
@@ -186,7 +187,6 @@ void GaugeMetricProducer::onDumpReportLocked(const int64_t dumpTimeNs,
         flushIfNeededLocked(dumpTimeNs);
     }
 
-    flushIfNeededLocked(dumpTimeNs);
     if (mPastBuckets.empty()) {
         return;
     }
@@ -324,6 +324,10 @@ void GaugeMetricProducer::pullLocked(const int64_t timestampNs) {
             triggerPuller = true;
             break;
         }
+        case GaugeMetric::CONDITION_CHANGE_TO_TRUE: {
+            triggerPuller = mCondition;
+            break;
+        }
         default:
             break;
     }
@@ -348,7 +352,7 @@ void GaugeMetricProducer::onConditionChangedLocked(const bool conditionMet,
     flushIfNeededLocked(eventTimeNs);
     mCondition = conditionMet;
 
-    if (mPullTagId != -1 && mCondition) {
+    if (mPullTagId != -1) {
         pullLocked(eventTimeNs);
     }  // else: Push mode. No need to proactively pull the gauge data.
 }
@@ -428,6 +432,9 @@ void GaugeMetricProducer::onMatchedLogEventInternalLocked(
         return;
     }
     if (hitGuardRailLocked(eventKey)) {
+        return;
+    }
+    if ((*mCurrentSlicedBucket)[eventKey].size() >= mGaugeAtomsPerDimensionLimit) {
         return;
     }
     GaugeAtom gaugeAtom(getGaugeFields(event), eventTimeNs, getWallClockNs());
@@ -538,7 +545,14 @@ void GaugeMetricProducer::flushCurrentBucketLocked(const int64_t& eventTimeNs) {
 size_t GaugeMetricProducer::byteSizeLocked() const {
     size_t totalSize = 0;
     for (const auto& pair : mPastBuckets) {
-        totalSize += pair.second.size() * kBucketSize;
+        for (const auto& bucket : pair.second) {
+            totalSize += bucket.mGaugeAtoms.size() * sizeof(GaugeAtom);
+            for (const auto& atom : bucket.mGaugeAtoms) {
+                if (atom.mFields != nullptr) {
+                    totalSize += atom.mFields->size() * sizeof(FieldValue);
+                }
+            }
+        }
     }
     return totalSize;
 }

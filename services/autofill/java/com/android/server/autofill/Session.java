@@ -517,7 +517,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             @NonNull IBinder client, boolean hasCallback, @NonNull LocalLog uiLatencyHistory,
             @NonNull LocalLog wtfHistory,
             @NonNull ComponentName serviceComponentName, @NonNull ComponentName componentName,
-            boolean compatMode, int flags) {
+            boolean compatMode, boolean bindInstantServiceAllowed, int flags) {
         id = sessionId;
         mFlags = flags;
         this.uid = uid;
@@ -526,7 +526,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         mLock = lock;
         mUi = ui;
         mHandler = handler;
-        mRemoteFillService = new RemoteFillService(context, serviceComponentName, userId, this);
+        mRemoteFillService = new RemoteFillService(context, serviceComponentName, userId, this,
+                bindInstantServiceAllowed);
         mActivityToken = activityToken;
         mHasCallback = hasCallback;
         mUiLatencyHistory = uiLatencyHistory;
@@ -644,9 +645,10 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 Slog.d(TAG, message.toString());
             }
             if ((flags & FillResponse.FLAG_DISABLE_ACTIVITY_ONLY) != 0) {
-                mService.disableAutofillForActivity(mComponentName, disableDuration);
+                mService.disableAutofillForActivity(mComponentName, disableDuration, mCompatMode);
             } else {
-                mService.disableAutofillForApp(mComponentName.getPackageName(), disableDuration);
+                mService.disableAutofillForApp(mComponentName.getPackageName(), disableDuration,
+                        mCompatMode);
             }
             sessionFinishedState = AutofillManager.STATE_DISABLED_BY_SERVICE;
         }
@@ -1251,7 +1253,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             mService.logContextCommittedLocked(id, mClientState, mSelectedDatasetIds,
                     ignoredDatasets, changedFieldIds, changedDatasetIds,
                     manuallyFilledFieldIds, manuallyFilledDatasetIds,
-                    mComponentName.getPackageName());
+                    mComponentName.getPackageName(), mCompatMode);
         }
     }
 
@@ -1306,7 +1308,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 mService.logContextCommittedLocked(id, mClientState, mSelectedDatasetIds,
                         ignoredDatasets, changedFieldIds, changedDatasetIds,
                         manuallyFilledFieldIds, manuallyFilledDatasetIds,
-                        mComponentName.getPackageName());
+                        mComponentName.getPackageName(), mCompatMode);
                 return;
             }
             final Scores scores = result.getParcelable(EXTRA_SCORES);
@@ -1371,7 +1373,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             mService.logContextCommittedLocked(id, mClientState, mSelectedDatasetIds,
                     ignoredDatasets, changedFieldIds, changedDatasetIds, manuallyFilledFieldIds,
                     manuallyFilledDatasetIds, detectedFieldIds, detectedFieldClassifications,
-                    mComponentName.getPackageName());
+                    mComponentName.getPackageName(), mCompatMode);
         });
 
         fcStrategy.getScores(callback, algorithm, algorithmArgs, currentValues, userValues);
@@ -1602,7 +1604,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 getUiForShowing().showSaveUi(mService.getServiceLabel(), mService.getServiceIcon(),
                         mService.getServicePackageName(), saveInfo, this,
                         mComponentName.getPackageName(), this,
-                        mPendingSaveUi);
+                        mPendingSaveUi, mCompatMode);
                 if (client != null) {
                     try {
                         client.setSaveUiState(id, true);
@@ -2080,7 +2082,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
 
         getUiForShowing().showFillUi(filledId, response, filterText,
                 mService.getServicePackageName(), mComponentName.getPackageName(),
-                mService.getServiceLabel(), mService.getServiceIcon(), this);
+                mService.getServiceLabel(), mService.getServiceIcon(), this, mCompatMode);
 
         synchronized (mLock) {
             if (mUiShownTime == 0) {
@@ -2717,7 +2719,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     }
 
     private LogMaker newLogMaker(int category, String servicePackageName) {
-        return Helper.newLogMaker(category, mComponentName.getPackageName(), servicePackageName);
+        return Helper.newLogMaker(category, mComponentName.getPackageName(), servicePackageName,
+                mCompatMode);
     }
 
     private void writeLog(int category) {

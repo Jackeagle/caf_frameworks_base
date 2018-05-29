@@ -2961,6 +2961,18 @@ public class JobSchedulerService extends com.android.server.SystemService
         return 0;
     }
 
+    void triggerDockState(boolean idleState) {
+        final Intent dockIntent;
+        if (idleState) {
+            dockIntent = new Intent(Intent.ACTION_DOCK_IDLE);
+        } else {
+            dockIntent = new Intent(Intent.ACTION_DOCK_ACTIVE);
+        }
+        dockIntent.setPackage("android");
+        dockIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY | Intent.FLAG_RECEIVER_FOREGROUND);
+        getContext().sendBroadcastAsUser(dockIntent, UserHandle.ALL);
+    }
+
     private String printContextIdToJobMap(JobStatus[] map, String initial) {
         StringBuilder s = new StringBuilder(initial + ": ");
         for (int i=0; i<map.length; i++) {
@@ -3035,6 +3047,9 @@ public class JobSchedulerService extends com.android.server.SystemService
             pw.print("    Next heartbeat: ");
             TimeUtils.formatDuration(mLastHeartbeatTime + mConstants.STANDBY_HEARTBEAT_TIME,
                     nowElapsed, pw);
+            pw.println();
+            pw.print("    In parole?: ");
+            pw.print(mInParole);
             pw.println();
             pw.println();
 
@@ -3210,6 +3225,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                     mLastHeartbeatTime - nowUptime);
             proto.write(JobSchedulerServiceDumpProto.NEXT_HEARTBEAT_TIME_MILLIS,
                     mLastHeartbeatTime + mConstants.STANDBY_HEARTBEAT_TIME - nowUptime);
+            proto.write(JobSchedulerServiceDumpProto.IN_PAROLE, mInParole);
 
             for (int u : mStartedUsers) {
                 proto.write(JobSchedulerServiceDumpProto.STARTED_USERS, u);
