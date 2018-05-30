@@ -26,6 +26,7 @@ import static android.app.AppOpsManager.OP_TOAST_WINDOW;
 import static android.content.Context.CONTEXT_RESTRICTED;
 import static android.content.Context.DISPLAY_SERVICE;
 import static android.content.Context.WINDOW_SERVICE;
+import static android.content.Context.WIFI_SERVICE;
 import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE;
 import static android.content.pm.PackageManager.FEATURE_WATCH;
@@ -229,6 +230,12 @@ import android.view.animation.AnimationUtils;
 import android.view.autofill.AutofillManagerInternal;
 import android.view.inputmethod.InputMethodManagerInternal;
 
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiConfiguration.AuthAlgorithm;
+import android.net.wifi.WifiConfiguration.KeyMgmt;
+import static android.net.wifi.WifiManager.WIFI_AP_STATE_DISABLED;
+import android.net.wifi.IWifiManager;
+
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.logging.MetricsLogger;
@@ -417,6 +424,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      * where the window manager is calling in with its own lock held.)
      */
     private final Object mLock = new Object();
+
+    private static final int WIFI_BUTTON_SCAN_CODE = 528;
 
     Context mContext;
     IWindowManager mWindowManager;
@@ -849,6 +858,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_NAVIGATION = 1;
     private boolean mWifiDisplayConnected = false;
     private int mWifiDisplayCustomRotation = -1;
+
+    private String mHeadlessMode;
 
     private class PolicyHandler extends Handler {
         @Override
@@ -1901,6 +1912,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // Allow a system property to override this. Used by developer settings.
         boolean burnInProtectionDevMode =
                 SystemProperties.getBoolean("persist.debug.force_burn_in", false);
+
+        mHeadlessMode = SystemProperties.get("device.mode.headless","false");
+
         if (burnInProtectionEnabled || burnInProtectionDevMode) {
             final int minHorizontal;
             final int maxHorizontal;
@@ -5961,6 +5975,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         final boolean canceled = event.isCanceled();
         final int keyCode = event.getKeyCode();
+        final int scanCode = event.getScanCode();
 
         final boolean isInjected = (policyFlags & WindowManagerPolicy.FLAG_INJECTED) != 0;
 
@@ -5975,6 +5990,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         if (DEBUG_INPUT) {
             Log.d(TAG, "interceptKeyTq keycode=" + keyCode
+                    + " scanCode=" + scanCode
                     + " interactive=" + interactive + " keyguardActive=" + keyguardActive
                     + " policyFlags=" + Integer.toHexString(policyFlags));
         }
@@ -6304,6 +6320,31 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             showPictureInPictureMenu(event);
                         }
                         result &= ~ACTION_PASS_TO_USER;
+                    }
+                }
+                break;
+            }
+            case KeyEvent.KEYCODE_UNKNOWN: {
+                if ("true".equals(mHeadlessMode)) {
+                    if (DEBUG_INPUT) {
+                        Log.d(TAG, "scanCode=" + scanCode);
+                    }
+                    if (down && scanCode == WIFI_BUTTON_SCAN_CODE) {
+                        IWifiManager wifiManager = IWifiManager.Stub.asInterface(ServiceManager.getService(Context.WIFI_SERVICE));
+                        try {
+                            if (wifiManager.getWifiApEnabledState() == WIFI_AP_STATE_DISABLED) {
+                                WifiConfiguration mWifiConfig =  new WifiConfiguration();
+                                mWifiConfig.SSID = "QCS605_VRCAM";
+                                mWifiConfig.preSharedKey = "qualcomm";
+                                mWifiConfig.allowedKeyManagement.set(KeyMgmt.WPA_PSK);
+                                mWifiConfig.allowedAuthAlgorithms.set(AuthAlgorithm.OPEN);
+                                wifiManager.startSoftAp(mWifiConfig);
+                            } else {
+                                wifiManager.stopSoftAp();
+                            }
+                        } catch (RemoteException e) {
+                            Log.e(TAG,"wifiManager exception:" + e);
+                        }
                     }
                 }
                 break;
