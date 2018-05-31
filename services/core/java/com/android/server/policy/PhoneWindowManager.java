@@ -255,10 +255,7 @@ import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wm.AppTransition;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.List;
 
 /**
@@ -2187,6 +2184,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mWindowManagerFuncs.notifyKeyguardTrustedChanged();
                     }
                 });
+		// Turn off wifi led red
+		// TODO: This should be done by the system/driver
+		final String LED_PATH = "/sys/class/leds/WIFI_LED:red:114/brightness";
+		try {
+			BufferedWriter bw = new BufferedWriter ( new FileWriter (LED_PATH));
+			bw.write("0");
+			bw.close();
+		} catch (IOException e) {
+			Log.e(TAG,"wifi red led exception:" + e);
+		}
     }
 
     /**
@@ -6322,20 +6329,29 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Log.d(TAG, "scanCode=" + scanCode);
                 }
                 if (down && scanCode == 528) {
+                    final String LED_PATH = "/sys/class/leds/WIFI_LED:green:115/brightness";
                     IWifiManager wifiManager = IWifiManager.Stub.asInterface(ServiceManager.getService(Context.WIFI_SERVICE));
                     try {
-                        if (wifiManager.getWifiApEnabledState() == WIFI_AP_STATE_DISABLED) {
-                            WifiConfiguration mWifiConfig =  new WifiConfiguration();
-                            mWifiConfig.SSID = "QCS605_VRCAM";
-                            mWifiConfig.preSharedKey = "qualcomm";
-                            mWifiConfig.allowedKeyManagement.set(KeyMgmt.WPA_PSK);
-                            mWifiConfig.allowedAuthAlgorithms.set(AuthAlgorithm.OPEN);
-                            wifiManager.startSoftAp(mWifiConfig);
-                        } else {
-                            wifiManager.stopSoftAp();
+                        BufferedWriter bw = new BufferedWriter ( new FileWriter (LED_PATH));
+                        try {
+                            if (wifiManager.getWifiApEnabledState() == WIFI_AP_STATE_DISABLED) {
+                                WifiConfiguration mWifiConfig =  new WifiConfiguration();
+                                mWifiConfig.SSID = "QCS605_VRCAM";
+                                mWifiConfig.preSharedKey = "qualcomm";
+                                mWifiConfig.allowedKeyManagement.set(KeyMgmt.WPA_PSK);
+                                mWifiConfig.allowedAuthAlgorithms.set(AuthAlgorithm.OPEN);
+                                wifiManager.startSoftAp(mWifiConfig);
+                                bw.write("255");
+                            } else {
+                                wifiManager.stopSoftAp();
+                                bw.write("0");
+                            }
+                        } catch (RemoteException e) {
+                            Log.e(TAG,"wifiManager exception:" + e);
                         }
-                    } catch (RemoteException e) {
-                        Log.e(TAG,"wifiManager exception:" + e);
+                        bw.close();
+                    } catch (IOException e) {
+                        Log.e(TAG,"wifi green led exception:" + e);
                     }
                 }
                 break;
