@@ -711,6 +711,15 @@ message MetricsEvent {
     // OS: 6.0
     QS_BLUETOOTH = 113;
 
+    // OPEN: QS AudioProfile tile shown
+    // ACTION: QS AudioProfile tile tapped
+    //  SUBTYPE: 0 is off, 1 is on
+    // CATEGORY: QUICK_SETTINGS
+    // OS: 6.0
+    // GMS: 7.5.46
+    QS_AUDIOPROFILE = 1238;
+
+
     // OPEN: QS Cast tile shown
     // ACTION: QS Cast tile tapped
     // CATEGORY: QUICK_SETTINGS

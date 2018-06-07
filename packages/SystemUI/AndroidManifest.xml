@@ -203,6 +203,11 @@
     <!-- to change themes - light or dark -->
     <uses-permission android:name="android.permission.CHANGE_OVERLAY_PACKAGES" />
 
+    <permission android:name="com.android.audioprofile.qs.permission"
+        android:label="audio_profile_permission"
+        android:protectionLevel="normal" />
+    <!--<uses-permission android:name="com.android.audioprofile.qs.permission" />-->
+
     <!-- used for subsidy lock broadcasts. -->
     <permission android:name="com.codeaurora.permission.SUBSIDYLOCK"
         android:protectionLevel="signatureOrSystem"/>

@@ -222,6 +222,7 @@ import com.android.systemui.statusbar.notification.InflationException;
 import com.android.systemui.statusbar.notification.RowInflaterTask;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.phone.UnlockMethodCache.OnUnlockMethodChangedListener;
+import com.android.systemui.statusbar.policy.AudioProfileController;
 import com.android.systemui.statusbar.policy.BatteryController;
 import com.android.systemui.statusbar.policy.BatteryController.BatteryStateChangeCallback;
 import com.android.systemui.statusbar.policy.BrightnessMirrorController;
@@ -735,6 +736,7 @@ public class StatusBar extends SystemUI implements DemoMode,
     private KeyguardUserSwitcher mKeyguardUserSwitcher;
     private UserSwitcherController mUserSwitcherController;
     private NetworkController mNetworkController;
+    private AudioProfileController mAudioController;
     private KeyguardMonitorImpl mKeyguardMonitor
             = (KeyguardMonitorImpl) Dependency.get(KeyguardMonitor.class);
     private BatteryController mBatteryController;
@@ -802,6 +804,9 @@ public class StatusBar extends SystemUI implements DemoMode,
                 ServiceManager.getService(Context.OVERLAY_SERVICE));
 
         mColorExtractor = Dependency.get(SysuiColorExtractor.class);
+
+        mAudioController = Dependency.get(AudioProfileController.class);
+
         mColorExtractor.addOnColorsChangedListener(this);
 
         mWindowManager = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
