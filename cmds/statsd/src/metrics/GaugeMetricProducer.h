@@ -90,7 +90,9 @@ protected:
 private:
     void onDumpReportLocked(const int64_t dumpTimeNs,
                             const bool include_current_partial_bucket,
+                            std::set<string> *str_set,
                             android::util::ProtoOutputStream* protoOutput) override;
+    void clearPastBucketsLocked(const int64_t dumpTimeNs) override;
 
     // for testing
     GaugeMetricProducer(const ConfigKey& key, const GaugeMetric& gaugeMetric,
@@ -161,6 +163,8 @@ private:
     const size_t mDimensionSoftLimit;
 
     const size_t mDimensionHardLimit;
+
+    const size_t mGaugeAtomsPerDimensionLimit;
 
     FRIEND_TEST(GaugeMetricProducerTest, TestWithCondition);
     FRIEND_TEST(GaugeMetricProducerTest, TestWithSlicedCondition);

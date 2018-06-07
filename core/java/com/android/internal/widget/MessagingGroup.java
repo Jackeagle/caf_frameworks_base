@@ -118,7 +118,8 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
             ViewGroup parent = (ViewGroup) mSenderName.getParent();
             int top = getDistanceFromParent(mSenderName, parent) - getDistanceFromParent(
                     mMessageContainer, parent) + mSenderName.getHeight();
-            clipRect = new Rect(0, top, mDisplaySize.x, mDisplaySize.y);
+            int size = Math.max(mDisplaySize.x, mDisplaySize.y);
+            clipRect = new Rect(0, top, size, size);
         } else {
             clipRect = null;
         }
@@ -146,9 +147,7 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
             setAvatar(sender.getIcon());
         }
         mAvatarView.setVisibility(VISIBLE);
-        mSenderName.setVisibility(VISIBLE);
-        mTextColor = getNormalTextColor();
-        mSendingTextColor = calculateSendingTextColor();
+        mSenderName.setVisibility(TextUtils.isEmpty(nameOverride) ? GONE : VISIBLE);
     }
 
     public void setSending(boolean sending) {
@@ -157,10 +156,6 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
             mSendingSpinnerContainer.setVisibility(visibility);
             updateMessageColor();
         }
-    }
-
-    private int getNormalTextColor() {
-        return mContext.getColor(R.color.notification_secondary_text_color_light);
     }
 
     private int calculateSendingTextColor() {
@@ -275,9 +270,16 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
         boolean hasNormal = false;
         for (int i = mMessageContainer.getChildCount() - 1; i >= 0; i--) {
             View child = mMessageContainer.getChildAt(i);
+            if (child.getVisibility() == GONE) {
+                continue;
+            }
             if (child instanceof MessagingLinearLayout.MessagingChild) {
                 int type = ((MessagingLinearLayout.MessagingChild) child).getMeasuredType();
-                if (type == MEASURED_TOO_SMALL) {
+                boolean tooSmall = type == MEASURED_TOO_SMALL;
+                final MessagingLinearLayout.LayoutParams lp =
+                        (MessagingLinearLayout.LayoutParams) child.getLayoutParams();
+                tooSmall |= lp.hide;
+                if (tooSmall) {
                     if (hasNormal) {
                         return MEASURED_SHORTENED;
                     } else {
@@ -353,6 +355,13 @@ public class MessagingGroup extends LinearLayout implements MessagingLinearLayou
             setLayoutColor(layoutColor);
             mAvatarName = avatarName;
         }
+    }
+
+    public void setTextColors(int senderTextColor, int messageTextColor) {
+        mTextColor = messageTextColor;
+        mSendingTextColor = calculateSendingTextColor();
+        updateMessageColor();
+        mSenderName.setTextColor(senderTextColor);
     }
 
     public void setLayoutColor(int layoutColor) {

@@ -174,6 +174,7 @@ import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.BoostFramework;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
@@ -374,6 +375,8 @@ public class WindowManagerService extends IWindowManager.Stub
     private static final int ANIMATION_DURATION_SCALE = 2;
 
     final WindowTracing mWindowTracing;
+
+    private BoostFramework mPerf = null;
 
     final private KeyguardDisableHandler mKeyguardDisableHandler;
     boolean mKeyguardGoingAway;
@@ -1806,6 +1809,12 @@ public class WindowManagerService extends IWindowManager.Stub
                     }
                     w.setDisplayLayoutNeeded();
                     mWindowPlacerLocked.performSurfacePlacement();
+
+                    // We need to report touchable region changes to accessibility.
+                    if (mAccessibilityController != null
+                            && w.getDisplayContent().getDisplayId() == DEFAULT_DISPLAY) {
+                        mAccessibilityController.onSomeWindowResizedOrMovedLocked();
+                    }
                 }
             }
         } finally {
@@ -2700,12 +2709,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     + " Callers=" + Debug.getCallers(5));
             if (mAppTransition.isTransitionSet()) {
                 mAppTransition.setReady();
-                final long origId = Binder.clearCallingIdentity();
-                try {
-                    mWindowPlacerLocked.performSurfacePlacement();
-                } finally {
-                    Binder.restoreCallingIdentity(origId);
-                }
+                mWindowPlacerLocked.requestTraversal();
             }
         }
     }
@@ -5791,6 +5795,12 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         mLatencyTracker.onActionStart(ACTION_ROTATE_SCREEN);
+        if (mPerf == null) {
+            mPerf = new BoostFramework();
+        }
+        if (mPerf != null) {
+            mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_LATENCY_BOOST, null);
+        }
         // TODO(multidisplay): rotation on non-default displays
         if (CUSTOM_SCREEN_ROTATION && displayContent.isDefaultDisplay) {
             mExitAnimId = exitAnim;
@@ -5915,6 +5925,9 @@ public class WindowManagerService extends IWindowManager.Stub
             mH.obtainMessage(H.SEND_NEW_CONFIGURATION, displayId).sendToTarget();
         }
         mLatencyTracker.onActionEnd(ACTION_ROTATE_SCREEN);
+        if (mPerf != null) {
+            mPerf.perfLockRelease();
+        }
     }
 
     static int getPropertyInt(String[] tokens, int index, int defUnits, int defDps,
@@ -7524,7 +7537,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     boolean hasWideColorGamutSupport() {
         return mHasWideColorGamutSupport &&
-                !SystemProperties.getBoolean("persist.sys.sf.native_mode", false);
+                SystemProperties.getInt("persist.sys.sf.native_mode", 0) != 1;
     }
 
     void updateNonSystemOverlayWindowsVisibilityIfNeeded(WindowState win, boolean surfaceShown) {

@@ -2722,7 +2722,40 @@ public class Notification implements Parcelable
      * @hide
      */
     public static boolean areRemoteViewsChanged(Builder first, Builder second) {
-        return !first.usesStandardHeader() || !second.usesStandardHeader();
+        if (!Objects.equals(first.usesStandardHeader(), second.usesStandardHeader())) {
+            return true;
+        }
+
+        if (areRemoteViewsChanged(first.mN.contentView, second.mN.contentView)) {
+            return true;
+        }
+        if (areRemoteViewsChanged(first.mN.bigContentView, second.mN.bigContentView)) {
+            return true;
+        }
+        if (areRemoteViewsChanged(first.mN.headsUpContentView, second.mN.headsUpContentView)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static boolean areRemoteViewsChanged(RemoteViews first, RemoteViews second) {
+        if (first == null && second == null) {
+            return false;
+        }
+        if (first == null && second != null || first != null && second == null) {
+            return true;
+        }
+
+        if (!Objects.equals(first.getLayoutId(), second.getLayoutId())) {
+            return true;
+        }
+
+        if (!Objects.equals(first.getSequenceNumber(), second.getSequenceNumber())) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -5102,6 +5135,10 @@ public class Notification implements Parcelable
                     savedBundle.getBoolean(EXTRA_SHOW_CHRONOMETER));
             publicExtras.putBoolean(EXTRA_CHRONOMETER_COUNT_DOWN,
                     savedBundle.getBoolean(EXTRA_CHRONOMETER_COUNT_DOWN));
+            String appName = savedBundle.getString(EXTRA_SUBSTITUTE_APP_NAME);
+            if (appName != null) {
+                publicExtras.putString(EXTRA_SUBSTITUTE_APP_NAME, appName);
+            }
             mN.extras = publicExtras;
             RemoteViews view;
             if (ambient) {
@@ -5553,7 +5590,8 @@ public class Notification implements Parcelable
          *
          * @hide
          */
-        public static Notification maybeCloneStrippedForDelivery(Notification n, boolean isLowRam) {
+        public static Notification maybeCloneStrippedForDelivery(Notification n, boolean isLowRam,
+                Context context) {
             String templateClass = n.extras.getString(EXTRA_TEMPLATE);
 
             // Only strip views for known Styles because we won't know how to
@@ -5595,9 +5633,13 @@ public class Notification implements Parcelable
                 clone.extras.remove(EXTRA_REBUILD_HEADS_UP_CONTENT_VIEW_ACTION_COUNT);
             }
             if (isLowRam) {
-                clone.extras.remove(Notification.TvExtender.EXTRA_TV_EXTENDER);
-                clone.extras.remove(WearableExtender.EXTRA_WEARABLE_EXTENSIONS);
-                clone.extras.remove(CarExtender.EXTRA_CAR_EXTENDER);
+                String[] allowedServices = context.getResources().getStringArray(
+                        R.array.config_allowedManagedServicesOnLowRamDevices);
+                if (allowedServices.length == 0) {
+                    clone.extras.remove(Notification.TvExtender.EXTRA_TV_EXTENDER);
+                    clone.extras.remove(WearableExtender.EXTRA_WEARABLE_EXTENSIONS);
+                    clone.extras.remove(CarExtender.EXTRA_CAR_EXTENDER);
+                }
             }
             return clone;
         }
@@ -6332,6 +6374,8 @@ public class Notification implements Parcelable
 
         /**
          * @hide
+         * Note that we aren't actually comparing the contents of the bitmaps here, so this
+         * is only doing a cursory inspection. Bitmaps of equal size will appear the same.
          */
         @Override
         public boolean areNotificationsVisiblyDifferent(Style other) {
@@ -6339,7 +6383,20 @@ public class Notification implements Parcelable
                 return true;
             }
             BigPictureStyle otherS = (BigPictureStyle) other;
-            return !Objects.equals(getBigPicture(), otherS.getBigPicture());
+            return areBitmapsObviouslyDifferent(getBigPicture(), otherS.getBigPicture());
+        }
+
+        private static boolean areBitmapsObviouslyDifferent(Bitmap a, Bitmap b) {
+            if (a == b) {
+                return false;
+            }
+            if (a == null || b == null) {
+                return true;
+            }
+            return a.getWidth() != b.getWidth()
+                    || a.getHeight() != b.getHeight()
+                    || a.getConfig() != b.getConfig()
+                    || a.getGenerationId() != b.getGenerationId();
         }
     }
 
@@ -6484,6 +6541,7 @@ public class Notification implements Parcelable
 
         /**
          * @hide
+         * Spans are ignored when comparing text for visual difference.
          */
         @Override
         public boolean areNotificationsVisiblyDifferent(Style other) {
@@ -6491,7 +6549,7 @@ public class Notification implements Parcelable
                 return true;
             }
             BigTextStyle newS = (BigTextStyle) other;
-            return !Objects.equals(getBigText(), newS.getBigText());
+            return !Objects.equals(String.valueOf(getBigText()), String.valueOf(newS.getBigText()));
         }
 
         static void applyBigTextContentView(Builder builder,
@@ -6858,6 +6916,7 @@ public class Notification implements Parcelable
 
         /**
          * @hide
+         * Spans are ignored when comparing text for visual difference.
          */
         @Override
         public boolean areNotificationsVisiblyDifferent(Style other) {
@@ -6868,10 +6927,7 @@ public class Notification implements Parcelable
             List<MessagingStyle.Message> oldMs = getMessages();
             List<MessagingStyle.Message> newMs = newS.getMessages();
 
-            if (oldMs == null) {
-                oldMs = new ArrayList<>();
-            }
-            if (newMs == null) {
+            if (oldMs == null || newMs == null) {
                 newMs = new ArrayList<>();
             }
 
@@ -6882,16 +6938,20 @@ public class Notification implements Parcelable
             for (int i = 0; i < n; i++) {
                 MessagingStyle.Message oldM = oldMs.get(i);
                 MessagingStyle.Message newM = newMs.get(i);
-                if (!Objects.equals(oldM.getText(), newM.getText())) {
+                if (!Objects.equals(
+                        String.valueOf(oldM.getText()),
+                        String.valueOf(newM.getText()))) {
                     return true;
                 }
                 if (!Objects.equals(oldM.getDataUri(), newM.getDataUri())) {
                     return true;
                 }
-                CharSequence oldSender = oldM.getSenderPerson() == null ? oldM.getSender()
-                        : oldM.getSenderPerson().getName();
-                CharSequence newSender = newM.getSenderPerson() == null ? newM.getSender()
-                        : newM.getSenderPerson().getName();
+                String oldSender = String.valueOf(oldM.getSenderPerson() == null
+                        ? oldM.getSender()
+                        : oldM.getSenderPerson().getName());
+                String newSender = String.valueOf(newM.getSenderPerson() == null
+                        ? newM.getSender()
+                        : newM.getSenderPerson().getName());
                 if (!Objects.equals(oldSender, newSender)) {
                     return true;
                 }
@@ -6973,7 +7033,12 @@ public class Notification implements Parcelable
             contentView.setViewLayoutMarginEnd(R.id.notification_messaging,
                     bindResult.getIconMarginEnd());
             contentView.setInt(R.id.status_bar_latest_event_content, "setLayoutColor",
-                    mBuilder.resolveContrastColor());
+                    mBuilder.isColorized() ? mBuilder.getPrimaryTextColor()
+                            : mBuilder.resolveContrastColor());
+            contentView.setInt(R.id.status_bar_latest_event_content, "setSenderTextColor",
+                    mBuilder.getPrimaryTextColor());
+            contentView.setInt(R.id.status_bar_latest_event_content, "setMessageTextColor",
+                    mBuilder.getSecondaryTextColor());
             contentView.setBoolean(R.id.status_bar_latest_event_content, "setDisplayImagesAtEnd",
                     displayImagesAtEnd);
             contentView.setIcon(R.id.status_bar_latest_event_content, "setLargeIcon",
@@ -7486,7 +7551,22 @@ public class Notification implements Parcelable
                 return true;
             }
             InboxStyle newS = (InboxStyle) other;
-            return !Objects.equals(getLines(), newS.getLines());
+
+            final ArrayList<CharSequence> myLines = getLines();
+            final ArrayList<CharSequence> newLines = newS.getLines();
+            final int n = myLines.size();
+            if (n != newLines.size()) {
+                return true;
+            }
+
+            for (int i = 0; i < n; i++) {
+                if (!Objects.equals(
+                        String.valueOf(myLines.get(i)),
+                        String.valueOf(newLines.get(i)))) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void handleInboxImageMargin(RemoteViews contentView, int id, boolean first,

@@ -1420,6 +1420,9 @@ public class Intent implements Parcelable, Cloneable {
      * Activity Action: Start Voice Command.
      * <p>Input: Nothing.
      * <p>Output: Nothing.
+     * <p class="note">
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_VOICE_COMMAND = "android.intent.action.VOICE_COMMAND";
@@ -3671,6 +3674,10 @@ public class Intent implements Parcelable, Cloneable {
      * <p class="note">This is a protected intent that can only be sent by the system.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable} and the helper
+     * functions {@code ServiceStateTable.getUriForSubscriptionIdAndField} and
+     * {@code ServiceStateTable.getUriForSubscriptionId} to subscribe to changes to the ServiceState
+     * for a given subscription id and field with a ContentObserver or using JobScheduler.
      */
     @Deprecated
     @SystemApi
@@ -3686,6 +3693,7 @@ public class Intent implements Parcelable, Cloneable {
      * @see android.telephony.ServiceState#STATE_POWER_OFF
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#VOICE_REG_STATE}.
      */
     @Deprecated
     @SystemApi
@@ -3699,6 +3707,7 @@ public class Intent implements Parcelable, Cloneable {
      * @see android.telephony.ServiceState#STATE_POWER_OFF
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#DATA_REG_STATE}.
      */
     @Deprecated
     @SystemApi
@@ -3709,6 +3718,7 @@ public class Intent implements Parcelable, Cloneable {
      * type.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#VOICE_ROAMING_TYPE}.
      */
     @Deprecated
     @SystemApi
@@ -3719,6 +3729,7 @@ public class Intent implements Parcelable, Cloneable {
      * type.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#DATA_ROAMING_TYPE}.
      */
     @Deprecated
     @SystemApi
@@ -3730,6 +3741,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@code null} if the operator name is not known or unregistered.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#VOICE_OPERATOR_ALPHA_LONG}.
      */
     @Deprecated
     @SystemApi
@@ -3741,6 +3754,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@code null} if the operator name is not known or unregistered.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#VOICE_OPERATOR_ALPHA_SHORT}.
      */
     @Deprecated
     @SystemApi
@@ -3752,6 +3767,7 @@ public class Intent implements Parcelable, Cloneable {
      * network.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#VOICE_OPERATOR_NUMERIC}.
      */
     @Deprecated
     @SystemApi
@@ -3763,6 +3779,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@code null} if the operator name is not known or unregistered.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#DATA_OPERATOR_ALPHA_LONG}.
      */
     @Deprecated
     @SystemApi
@@ -3774,6 +3792,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@code null} if the operator name is not known or unregistered.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#DATA_OPERATOR_ALPHA_SHORT}.
      */
     @Deprecated
     @SystemApi
@@ -3785,6 +3805,7 @@ public class Intent implements Parcelable, Cloneable {
      * data operator.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#DATA_OPERATOR_NUMERIC}.
      */
     @Deprecated
     @SystemApi
@@ -3796,6 +3817,8 @@ public class Intent implements Parcelable, Cloneable {
      * Will be {@code true} if manual mode, {@code false} if automatic mode.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#IS_MANUAL_NETWORK_SELECTION}.
      */
     @Deprecated
     @SystemApi
@@ -3806,6 +3829,8 @@ public class Intent implements Parcelable, Cloneable {
      * radio technology.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#RIL_VOICE_RADIO_TECHNOLOGY}.
      */
     @Deprecated
     @SystemApi
@@ -3816,6 +3841,8 @@ public class Intent implements Parcelable, Cloneable {
      * radio technology.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#RIL_DATA_RADIO_TECHNOLOGY}.
      */
     @Deprecated
     @SystemApi
@@ -3827,6 +3854,7 @@ public class Intent implements Parcelable, Cloneable {
      * Will be {@code true} if support, {@code false} otherwise.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#CSS_INDICATOR}.
      */
     @Deprecated
     @SystemApi
@@ -3837,6 +3865,7 @@ public class Intent implements Parcelable, Cloneable {
      * id. {@code Integer.MAX_VALUE} if unknown.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#NETWORK_ID}.
      */
     @Deprecated
     @SystemApi
@@ -3847,6 +3876,7 @@ public class Intent implements Parcelable, Cloneable {
      * {@code Integer.MAX_VALUE} if unknown.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#SYSTEM_ID}.
      */
     @Deprecated
     @SystemApi
@@ -3857,6 +3887,7 @@ public class Intent implements Parcelable, Cloneable {
      * indicator if registered on a CDMA or EVDO system or {@code -1} if not.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#CDMA_ROAMING_INDICATOR}.
      */
     @Deprecated
     @SystemApi
@@ -3867,6 +3898,8 @@ public class Intent implements Parcelable, Cloneable {
      * indicator from the PRL if registered on a CDMA or EVDO system {@code -1} if not.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#CDMA_DEFAULT_ROAMING_INDICATOR}.
      */
     @Deprecated
     @SystemApi
@@ -3878,6 +3911,7 @@ public class Intent implements Parcelable, Cloneable {
      * {@code true} if in emergency only mode, {@code false} otherwise.
      * @hide
      * @removed
+     * @deprecated Use {@link android.provider.Telephony.ServiceStateTable#IS_EMERGENCY_ONLY}.
      */
     @Deprecated
     @SystemApi
@@ -3889,6 +3923,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@code true} if registration indicates roaming, {@code false} otherwise
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#IS_DATA_ROAMING_FROM_REGISTRATION}.
      */
     @Deprecated
     @SystemApi
@@ -3901,6 +3937,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@code true} if carrier aggregation is in use, {@code false} otherwise.
      * @hide
      * @removed
+     * @deprecated Use
+     * {@link android.provider.Telephony.ServiceStateTable#IS_USING_CARRIER_AGGREGATION}.
      */
     @Deprecated
     @SystemApi
@@ -3959,6 +3997,26 @@ public class Intent implements Parcelable, Cloneable {
      * {@hide}
      */
     public static final int EXTRA_THERMAL_STATE_EXCEEDED = 2;
+
+    /**
+     * Broadcast Action: Indicates the dock in idle state while device is docked.
+     *
+     * <p class="note">This is a protected intent that can only be sent
+     * by the system.
+     *
+     * @hide
+     */
+    public static final String ACTION_DOCK_IDLE = "android.intent.action.DOCK_IDLE";
+
+    /**
+     * Broadcast Action: Indicates the dock in active state while device is docked.
+     *
+     * <p class="note">This is a protected intent that can only be sent
+     * by the system.
+     *
+     * @hide
+     */
+    public static final String ACTION_DOCK_ACTIVE = "android.intent.action.DOCK_ACTIVE";
 
 
     // ---------------------------------------------------------------------
@@ -5660,9 +5718,24 @@ public class Intent implements Parcelable, Cloneable {
 
 
     /**
-     * If set, resolution of this intent may take place via an instant app not
-     * yet on the device if there does not yet exist an app on device to
-     * resolve it.
+     * If set in an Intent passed to {@link Context#startActivity Context.startActivity()},
+     * this flag will attempt to launch an instant app if no full app on the device can already
+     * handle the intent.
+     * <p>
+     * When attempting to resolve instant apps externally, the following {@link Intent} properties
+     * are supported:
+     * <ul>
+     *     <li>{@link Intent#setAction(String)}</li>
+     *     <li>{@link Intent#addCategory(String)}</li>
+     *     <li>{@link Intent#setData(Uri)}</li>
+     *     <li>{@link Intent#setType(String)}</li>
+     *     <li>{@link Intent#setPackage(String)}</li>
+     *     <li>{@link Intent#addFlags(int)}</li>
+     * </ul>
+     * <p>
+     * In the case that no instant app can be found, the installer will be launched to notify the
+     * user that the intent could not be resolved. On devices that do not support instant apps,
+     * the flag will be ignored.
      */
     public static final int FLAG_ACTIVITY_MATCH_EXTERNAL = 0x00000800;
 

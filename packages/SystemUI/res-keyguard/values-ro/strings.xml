@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"Cardul SIM este blocat cu codul PUK."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"Se deblochează cardul SIM…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"Zona codului PIN"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"Zona codului PIN pentru cardul SIM"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"Zona codului PUK pentru cardul SIM"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"Următoarea alarmă este setată pentru <xliff:g id="ALARM">%1$s</xliff:g>"</string>
@@ -146,7 +148,11 @@
       <item quantity="one">Dispozitivul nu a fost deblocat de <xliff:g id="NUMBER_0">%d</xliff:g> oră. Confirmați parola.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"Nu este recunoscută"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="few">Introduceți codul PIN pentru cardul SIM. V-au mai rămas <xliff:g id="NUMBER_1">%d</xliff:g> încercări.</item>
+      <item quantity="other">Introduceți codul PIN pentru cardul SIM. V-au mai rămas <xliff:g id="NUMBER_1">%d</xliff:g> de încercări.</item>
+      <item quantity="one">Introduceți codul PIN pentru cardul SIM. V-a mai rămas <xliff:g id="NUMBER_0">%d</xliff:g> încercare, după care va trebui să contactați operatorul pentru a vă debloca dispozitivul.</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="few">Cardul SIM este dezactivat acum. Introduceți codul PUK pentru a continua. V-au mai rămas <xliff:g id="_NUMBER_1">%d</xliff:g> încercări până când cardul SIM va deveni inutilizabil definitiv. Contactați operatorul pentru detalii.</item>
       <item quantity="other">Cardul SIM este dezactivat acum. Introduceți codul PUK pentru a continua. V-au mai rămas <xliff:g id="_NUMBER_1">%d</xliff:g> de încercări până când cardul SIM va deveni inutilizabil definitiv. Contactați operatorul pentru detalii.</item>

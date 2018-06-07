@@ -110,7 +110,6 @@
         <item name="android:paddingStart">@*android:dimen/notification_extra_margin_ambient</item>
         <item name="android:paddingEnd">@*android:dimen/notification_extra_margin_ambient</item>
         <item name="android:orientation">vertical</item>
-        <item name="android:paddingBottom">23.5dp</item>
     </style>
 
     <style name="hybrid_notification">
@@ -119,25 +118,32 @@
     </style>
 
     <style name="hybrid_notification_title_ambient">
+        <item name="android:layout_marginTop">@*android:dimen/notification_header_margin_top_ambient</item>
         <item name="android:paddingStart">@*android:dimen/notification_content_margin_start</item>
         <item name="android:paddingEnd">@*android:dimen/notification_content_margin_end</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textAppearance">@*android:style/Notification.Header.Ambient</item>
+        <item name="android:layout_gravity">top|center_horizontal</item>
+        <item name="android:textSize">@*android:dimen/notification_ambient_title_text_size</item>
         <item name="android:textColor">#ffffffff</item>
     </style>
 
     <style name="hybrid_notification_title">
         <item name="android:paddingEnd">4dp</item>
+        <item name="android:textAppearance">@*android:style/TextAppearance.Material.Notification.Title</item>
     </style>
 
     <style name="hybrid_notification_text_ambient">
         <item name="android:paddingStart">@*android:dimen/notification_content_margin_start</item>
         <item name="android:paddingEnd">@*android:dimen/notification_content_margin_end</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">@*android:dimen/notification_ambient_text_size</item>
         <item name="android:textColor">#eeffffff</item>
-        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:gravity">top|center_horizontal</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">3</item>
     </style>
 
-    <style name="hybrid_notification_text">
+    <style name="hybrid_notification_text"
+           parent="@*android:style/Widget.Material.Notification.Text">
         <item name="android:paddingEnd">4dp</item>
     </style>
 
@@ -319,7 +325,7 @@
         <item name="wallpaperTextColor">@*android:color/primary_text_material_light</item>
         <item name="wallpaperTextColorSecondary">@*android:color/secondary_text_material_light</item>
         <item name="android:colorError">@*android:color/error_color_material_light</item>
-        <item name="android:colorControlHighlight">@*android:color/primary_text_material_light</item>
+        <item name="android:colorControlHighlight">#40000000</item>
         <item name="passwordStyle">@style/PasswordTheme.Light</item>
     </style>
 
@@ -358,10 +364,6 @@
 
     <style name="TextAppearance.Material.Notification.HeaderTitle"
         parent="@*android:style/TextAppearance.Material.Notification.Info">
-    </style>
-
-    <style name="TextAppearance.Material.Notification.HybridNotificationDivider"
-        parent="@*android:style/TextAppearance.Material.Notification">
     </style>
 
     <style name="SearchPanelCircle">
@@ -486,8 +488,10 @@
         <item name="android:background">@drawable/btn_borderless_rect</item>
         <item name="android:gravity">center</item>
         <item name="android:focusable">true</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">@dimen/notification_guts_button_vertical_padding</item>
+        <item name="android:paddingBottom">@dimen/notification_guts_button_vertical_padding</item>
+        <item name="android:paddingLeft">@dimen/notification_guts_button_horizontal_padding</item>
+        <item name="android:paddingRight">@dimen/notification_guts_button_horizontal_padding</item>
     </style>
 
     <style name="TextAppearance.HeadsUpStatusBarText"

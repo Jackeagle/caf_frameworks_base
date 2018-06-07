@@ -34,7 +34,7 @@
     <string name="status_bar_no_notifications_title" msgid="4755261167193833213">"Нет уведомлений"</string>
     <string name="status_bar_ongoing_events_title" msgid="1682504513316879202">"Текущие"</string>
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"Уведомления"</string>
-    <string name="battery_low_title" msgid="6456385927409742437">"Батарея почти разряжена"</string>
+    <string name="battery_low_title" msgid="9187898087363540349">"Батарея скоро разрядится"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"Осталось: <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"Заряд батареи – <xliff:g id="PERCENTAGE">%s</xliff:g>, осталось примерно <xliff:g id="TIME">%s</xliff:g> при текущем уровне использования."</string>
     <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"Заряд батареи – <xliff:g id="PERCENTAGE">%s</xliff:g>, осталось примерно <xliff:g id="TIME">%s</xliff:g>."</string>
@@ -97,8 +97,8 @@
     <string name="accessibility_unlock_button" msgid="128158454631118828">"Разблокировать."</string>
     <string name="accessibility_waiting_for_fingerprint" msgid="4808860050517462885">"Отсканируйте отпечаток пальца"</string>
     <string name="accessibility_unlock_without_fingerprint" msgid="7541705575183694446">"Разблокировать без отпечатка пальца"</string>
-    <!-- no translation found for accessibility_send_smart_reply (7766727839703044493) -->
-    <skip />
+    <string name="accessibility_scanning_face" msgid="769545173211758586">"Сканирование лица"</string>
+    <string name="accessibility_send_smart_reply" msgid="7766727839703044493">"Отправить"</string>
     <string name="unlock_label" msgid="8779712358041029439">"Разблокировать."</string>
     <string name="phone_label" msgid="2320074140205331708">"Открыть телефон."</string>
     <string name="voice_assist_label" msgid="3956854378310019854">"включить аудиоподсказки"</string>
@@ -212,10 +212,8 @@
     <string name="accessibility_quick_settings_airplane_on" msgid="6406141469157599296">"Режим полета включен."</string>
     <string name="accessibility_quick_settings_airplane_changed_off" msgid="66846307818850664">"Режим полета отключен."</string>
     <string name="accessibility_quick_settings_airplane_changed_on" msgid="8983005603505087728">"Режим полета включен."</string>
-    <!-- no translation found for accessibility_quick_settings_dnd_none_on (2960643943620637020) -->
-    <skip />
-    <!-- no translation found for accessibility_quick_settings_dnd_alarms_on (3357131899365865386) -->
-    <skip />
+    <string name="accessibility_quick_settings_dnd_none_on" msgid="2960643943620637020">"полная тишина"</string>
+    <string name="accessibility_quick_settings_dnd_alarms_on" msgid="3357131899365865386">"только будильник"</string>
     <string name="accessibility_quick_settings_dnd" msgid="6607873236717185815">"Не беспокоить."</string>
     <string name="accessibility_quick_settings_dnd_changed_off" msgid="898107593453022935">"Режим \"Не беспокоить\" выключен."</string>
     <string name="accessibility_quick_settings_dnd_changed_on" msgid="4483780856613561039">"Режим \"Не беспокоить\" включен."</string>
@@ -378,6 +376,8 @@
     <string name="recents_accessibility_split_screen_top" msgid="9056056469282256287">"Разделить экран по верхнему краю"</string>
     <string name="recents_accessibility_split_screen_left" msgid="8987144699630620019">"Разделить экран по левому краю"</string>
     <string name="recents_accessibility_split_screen_right" msgid="275069779299592867">"Разделить экран по правому краю"</string>
+    <!-- no translation found for quick_step_accessibility_toggle_overview (7171470775439860480) -->
+    <skip />
     <string name="expanded_header_battery_charged" msgid="5945855970267657951">"Батарея заряжена"</string>
     <string name="expanded_header_battery_charging" msgid="205623198487189724">"Зарядка батареи"</string>
     <string name="expanded_header_battery_charging_with_time" msgid="457559884275395376">"<xliff:g id="CHARGING_TIME">%s</xliff:g> до полной зарядки"</string>
@@ -551,6 +551,12 @@
     <string name="volume_stream_content_description_mute" msgid="3625049841390467354">"%1$s. Нажмите, чтобы выключить звук. Специальные возможности могут прекратить работу."</string>
     <string name="volume_stream_content_description_vibrate_a11y" msgid="6427727603978431301">"%1$s. Нажмите, чтобы включить вибрацию."</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="8995013018414535494">"%1$s. Нажмите, чтобы выключить звук."</string>
+    <!-- no translation found for volume_ringer_hint_mute (9199811307292269601) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_unmute (6602880133293060368) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_vibrate (4036802135666515202) -->
+    <skip />
     <string name="volume_dialog_title" msgid="7272969888820035876">"%s: регулировка громкости"</string>
     <string name="volume_dialog_ringer_guidance_ring" msgid="3360373718388509040">"Для звонков и уведомлений включен звук (уровень громкости: <xliff:g id="VOLUME_LEVEL">%1$s</xliff:g>)"</string>
     <string name="output_title" msgid="5355078100792942802">"Выход мультимедиа"</string>
@@ -616,24 +622,22 @@
     <string name="inline_minimize_button" msgid="966233327974702195">"Свернуть"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"Показывать уведомления от этого приложения?"</string>
     <string name="notification_unblockable_desc" msgid="1037434112919403708">"Эти уведомления нельзя отключить."</string>
-    <string name="notification_appops_camera_active" msgid="730959943016785931">"камеру"</string>
-    <string name="notification_appops_microphone_active" msgid="1546319728924580686">"микрофон"</string>
-    <string name="notification_appops_overlay_active" msgid="633813008357934729">"показ поверх других окон"</string>
-    <plurals name="notification_appops" formatted="false" msgid="1258122060887196817">
-      <item quantity="one">Это приложение <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>.</item>
-      <item quantity="few">Это приложение <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>.</item>
-      <item quantity="many">Это приложение <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>.</item>
-      <item quantity="other">Это приложение <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>.</item>
-    </plurals>
-    <plurals name="notification_using" formatted="false" msgid="2211008461429037973">
-      <item quantity="one">использует <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g></item>
-      <item quantity="few">использует <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g></item>
-      <item quantity="many">использует <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g></item>
-      <item quantity="other">использует <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> и <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g></item>
-    </plurals>
-    <string name="notification_appops_settings" msgid="1028328314935908050">"Настройки"</string>
-    <!-- no translation found for notification_appops_ok (1156966426011011434) -->
+    <!-- no translation found for appops_camera (8100147441602585776) -->
     <skip />
+    <!-- no translation found for appops_microphone (741508267659494555) -->
+    <skip />
+    <!-- no translation found for appops_overlay (6165912637560323464) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic (1576901651150187433) -->
+    <skip />
+    <!-- no translation found for appops_camera_overlay (8869400080809298814) -->
+    <skip />
+    <!-- no translation found for appops_mic_overlay (4835157962857919804) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic_overlay (6718768197048030993) -->
+    <skip />
+    <string name="notification_appops_settings" msgid="1028328314935908050">"Настройки"</string>
+    <string name="notification_appops_ok" msgid="1156966426011011434">"ОК"</string>
     <string name="notification_channel_controls_opened_accessibility" msgid="6553950422055908113">"Настройки уведомлений для приложения <xliff:g id="APP_NAME">%1$s</xliff:g> открыты"</string>
     <string name="notification_channel_controls_closed_accessibility" msgid="7521619812603693144">"Настройки уведомлений для приложения <xliff:g id="APP_NAME">%1$s</xliff:g> закрыты"</string>
     <string name="notification_channel_switch_accessibility" msgid="3420796005601900717">"Показывать уведомления с этого канала"</string>
@@ -875,4 +879,5 @@
     <skip />
     <string name="open_saver_setting_action" msgid="8314624730997322529">"Открыть настройки"</string>
     <string name="auto_saver_okay_action" msgid="2701221740227683650">"ОК"</string>
+    <string name="heap_dump_tile_name" msgid="9141031328971226374">"Передача SysUI"</string>
 </resources>

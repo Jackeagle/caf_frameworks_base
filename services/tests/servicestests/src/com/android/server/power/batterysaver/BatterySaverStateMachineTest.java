@@ -17,6 +17,7 @@ package com.android.server.power.batterysaver;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -124,7 +125,7 @@ public class BatterySaverStateMachineTest {
      */
     private class TestableBatterySaverStateMachine extends BatterySaverStateMachine {
         public TestableBatterySaverStateMachine() {
-            super(mMockContext, mMockBatterySaverController);
+            super(new Object(), mMockContext, mMockBatterySaverController);
         }
 
         @Override
@@ -144,6 +145,11 @@ public class BatterySaverStateMachineTest {
         void runOnBgThread(Runnable r) {
             r.run();
         }
+
+        @Override
+        void runOnBgThreadLazy(Runnable r, int delayMillis) {
+            r.run();
+        }
     }
 
     @Before
@@ -153,7 +159,7 @@ public class BatterySaverStateMachineTest {
         mMockBatterySaverController = mock(BatterySaverController.class);
 
         doAnswer((inv) -> mDevice.batterySaverEnabled = inv.getArgument(0))
-                .when(mMockBatterySaverController).enableBatterySaver(anyBoolean());
+                .when(mMockBatterySaverController).enableBatterySaver(anyBoolean(), anyInt());
         when(mMockBatterySaverController.isEnabled())
                 .thenAnswer((inv) -> mDevice.batterySaverEnabled);
 

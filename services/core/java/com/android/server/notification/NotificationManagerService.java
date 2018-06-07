@@ -16,6 +16,7 @@
 
 package com.android.server.notification;
 
+import static android.app.Notification.FLAG_FOREGROUND_SERVICE;
 import static android.app.NotificationManager.ACTION_APP_BLOCK_STATE_CHANGED;
 import static android.app.NotificationManager.ACTION_NOTIFICATION_CHANNEL_BLOCK_STATE_CHANGED;
 import static android.app.NotificationManager.ACTION_NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED;
@@ -233,6 +234,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /** {@hide} */
 public class NotificationManagerService extends SystemService {
@@ -240,6 +242,9 @@ public class NotificationManagerService extends SystemService {
     static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
     public static final boolean ENABLE_CHILD_NOTIFICATIONS
             = SystemProperties.getBoolean("debug.child_notifs", true);
+
+    static final boolean DEBUG_INTERRUPTIVENESS = SystemProperties.getBoolean(
+            "debug.notification.interruptiveness", false);
 
     static final int MAX_PACKAGE_NOTIFICATIONS = 50;
     static final float DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE = 5f;
@@ -397,6 +402,7 @@ public class NotificationManagerService extends SystemService {
     private boolean mIsTelevision;
 
     private MetricsLogger mMetricsLogger;
+    private Predicate<String> mAllowedManagedServicePackages;
 
     private static class Archive {
         final int mBufferSize;
@@ -518,18 +524,15 @@ public class NotificationManagerService extends SystemService {
             } else if (RankingHelper.TAG_RANKING.equals(parser.getName())){
                 mRankingHelper.readXml(parser, forRestore);
             }
-            // No non-system managed services are allowed on low ram devices
-            if (canUseManagedServices()) {
-                if (mListeners.getConfig().xmlTag.equals(parser.getName())) {
-                    mListeners.readXml(parser);
-                    migratedManagedServices = true;
-                } else if (mAssistants.getConfig().xmlTag.equals(parser.getName())) {
-                    mAssistants.readXml(parser);
-                    migratedManagedServices = true;
-                } else if (mConditionProviders.getConfig().xmlTag.equals(parser.getName())) {
-                    mConditionProviders.readXml(parser);
-                    migratedManagedServices = true;
-                }
+            if (mListeners.getConfig().xmlTag.equals(parser.getName())) {
+                mListeners.readXml(parser, mAllowedManagedServicePackages);
+                migratedManagedServices = true;
+            } else if (mAssistants.getConfig().xmlTag.equals(parser.getName())) {
+                mAssistants.readXml(parser, mAllowedManagedServicePackages);
+                migratedManagedServices = true;
+            } else if (mConditionProviders.getConfig().xmlTag.equals(parser.getName())) {
+                mConditionProviders.readXml(parser, mAllowedManagedServicePackages);
+                migratedManagedServices = true;
             }
         }
 
@@ -711,7 +714,7 @@ public class NotificationManagerService extends SystemService {
                 StatusBarNotification sbn = r.sbn;
                 cancelNotification(callingUid, callingPid, sbn.getPackageName(), sbn.getTag(),
                         sbn.getId(), Notification.FLAG_AUTO_CANCEL,
-                        Notification.FLAG_FOREGROUND_SERVICE, false, r.getUserId(),
+                        FLAG_FOREGROUND_SERVICE, false, r.getUserId(),
                         REASON_CLICK, nv.rank, nv.count, null);
                 nv.recycle();
                 reportUserInteraction(r);
@@ -755,7 +758,7 @@ public class NotificationManagerService extends SystemService {
                 }
             }
             cancelNotification(callingUid, callingPid, pkg, tag, id, 0,
-                    Notification.FLAG_ONGOING_EVENT | Notification.FLAG_FOREGROUND_SERVICE,
+                    Notification.FLAG_ONGOING_EVENT | FLAG_FOREGROUND_SERVICE,
                     true, userId, REASON_CANCEL, nv.rank, nv.count,null);
             nv.recycle();
         }
@@ -986,7 +989,7 @@ public class NotificationManagerService extends SystemService {
                     cancelNotification(record.sbn.getUid(), record.sbn.getInitialPid(),
                             record.sbn.getPackageName(), record.sbn.getTag(),
                             record.sbn.getId(), 0,
-                            Notification.FLAG_FOREGROUND_SERVICE, true, record.getUserId(),
+                            FLAG_FOREGROUND_SERVICE, true, record.getUserId(),
                             REASON_TIMEOUT, null);
                 }
             }
@@ -1428,6 +1431,9 @@ public class NotificationManagerService extends SystemService {
 
         // This is a MangedServices object that keeps track of the assistant.
         mAssistants = notificationAssistants;
+
+        // Needs to be set before loadPolicyFile
+        mAllowedManagedServicePackages = this::canUseManagedServices;
 
         mPolicyFile = policyFile;
         loadPolicyFile();
@@ -2082,7 +2088,7 @@ public class NotificationManagerService extends SystemService {
             // Don't allow client applications to cancel foreground service notis or autobundled
             // summaries.
             final int mustNotHaveFlags = isCallingUidSystem() ? 0 :
-                    (Notification.FLAG_FOREGROUND_SERVICE | Notification.FLAG_AUTOGROUP_SUMMARY);
+                    (FLAG_FOREGROUND_SERVICE | Notification.FLAG_AUTOGROUP_SUMMARY);
             cancelNotification(Binder.getCallingUid(), Binder.getCallingPid(), pkg, tag, id, 0,
                     mustNotHaveFlags, false, userId, REASON_APP_CANCEL, null);
         }
@@ -2097,7 +2103,7 @@ public class NotificationManagerService extends SystemService {
             // Calling from user space, don't allow the canceling of actively
             // running foreground services.
             cancelAllNotificationsInt(Binder.getCallingUid(), Binder.getCallingPid(),
-                    pkg, null, 0, Notification.FLAG_FOREGROUND_SERVICE, true, userId,
+                    pkg, null, 0, FLAG_FOREGROUND_SERVICE, true, userId,
                     REASON_APP_CANCEL_ALL, null);
         }
 
@@ -2683,7 +2689,7 @@ public class NotificationManagerService extends SystemService {
         private void cancelNotificationFromListenerLocked(ManagedServiceInfo info,
                 int callingUid, int callingPid, String pkg, String tag, int id, int userId) {
             cancelNotification(callingUid, callingPid, pkg, tag, id, 0,
-                    Notification.FLAG_ONGOING_EVENT | Notification.FLAG_FOREGROUND_SERVICE,
+                    Notification.FLAG_ONGOING_EVENT | FLAG_FOREGROUND_SERVICE,
                     true,
                     userId, REASON_LISTENER_CANCEL, info);
         }
@@ -3218,7 +3224,7 @@ public class NotificationManagerService extends SystemService {
             checkCallerIsSystemOrShell();
             final long identity = Binder.clearCallingIdentity();
             try {
-                if (canUseManagedServices()) {
+                if (mAllowedManagedServicePackages.test(pkg)) {
                     mConditionProviders.setPackageOrComponentEnabled(
                             pkg, userId, true, granted);
 
@@ -3349,7 +3355,7 @@ public class NotificationManagerService extends SystemService {
             checkCallerIsSystemOrShell();
             final long identity = Binder.clearCallingIdentity();
             try {
-                if (canUseManagedServices()) {
+                if (mAllowedManagedServicePackages.test(listener.getPackageName())) {
                     mConditionProviders.setPackageOrComponentEnabled(listener.flattenToString(),
                             userId, false, granted);
                     mListeners.setPackageOrComponentEnabled(listener.flattenToString(),
@@ -3375,7 +3381,7 @@ public class NotificationManagerService extends SystemService {
             checkCallerIsSystemOrShell();
             final long identity = Binder.clearCallingIdentity();
             try {
-                if (canUseManagedServices()) {
+                if (mAllowedManagedServicePackages.test(assistant.getPackageName())) {
                     mConditionProviders.setPackageOrComponentEnabled(assistant.flattenToString(),
                             userId, false, granted);
                     mAssistants.setPackageOrComponentEnabled(assistant.flattenToString(),
@@ -3874,7 +3880,9 @@ public class NotificationManagerService extends SystemService {
                     for (int j = 0; j < listenerSize; j++) {
                         if (i > 0) pw.print(',');
                         final ManagedServiceInfo listener = listeners.valueAt(i);
-                        pw.print(listener.component);
+                        if (listener != null) {
+                            pw.print(listener.component);
+                        }
                     }
                 }
                 pw.println(')');
@@ -3960,7 +3968,7 @@ public class NotificationManagerService extends SystemService {
             // FLAG_FOREGROUND_SERVICE, we have to revert to the flags we received
             // initially *and* force remove FLAG_FOREGROUND_SERVICE.
             sbn.getNotification().flags =
-                    (r.mOriginalFlags & ~Notification.FLAG_FOREGROUND_SERVICE);
+                    (r.mOriginalFlags & ~FLAG_FOREGROUND_SERVICE);
             mRankingHelper.sort(mNotificationList);
             mListeners.notifyPostedLocked(r, r);
         }
@@ -4046,17 +4054,29 @@ public class NotificationManagerService extends SystemService {
         final NotificationRecord r = new NotificationRecord(getContext(), n, channel);
         r.setIsAppImportanceLocked(mRankingHelper.getIsAppImportanceLocked(pkg, callingUid));
 
-        if ((notification.flags & Notification.FLAG_FOREGROUND_SERVICE) != 0
-                && (channel.getUserLockedFields() & NotificationChannel.USER_LOCKED_IMPORTANCE) == 0
-                && (r.getImportance() == IMPORTANCE_MIN || r.getImportance() == IMPORTANCE_NONE)) {
-            // Increase the importance of foreground service notifications unless the user had an
-            // opinion otherwise
-            if (TextUtils.isEmpty(channelId)
-                    || NotificationChannel.DEFAULT_CHANNEL_ID.equals(channelId)) {
-                r.setImportance(IMPORTANCE_LOW, "Bumped for foreground service");
-            } else {
-                channel.setImportance(IMPORTANCE_LOW);
-                mRankingHelper.updateNotificationChannel(pkg, notificationUid, channel, false);
+        if ((notification.flags & Notification.FLAG_FOREGROUND_SERVICE) != 0) {
+            final boolean fgServiceShown = channel.isFgServiceShown();
+            if (((channel.getUserLockedFields() & NotificationChannel.USER_LOCKED_IMPORTANCE) == 0
+                        || !fgServiceShown)
+                    && (r.getImportance() == IMPORTANCE_MIN
+                            || r.getImportance() == IMPORTANCE_NONE)) {
+                // Increase the importance of foreground service notifications unless the user had
+                // an opinion otherwise (and the channel hasn't yet shown a fg service).
+                if (TextUtils.isEmpty(channelId)
+                        || NotificationChannel.DEFAULT_CHANNEL_ID.equals(channelId)) {
+                    r.setImportance(IMPORTANCE_LOW, "Bumped for foreground service");
+                } else {
+                    channel.setImportance(IMPORTANCE_LOW);
+                    if (!fgServiceShown) {
+                        channel.unlockFields(NotificationChannel.USER_LOCKED_IMPORTANCE);
+                        channel.setFgServiceShown(true);
+                    }
+                    mRankingHelper.updateNotificationChannel(pkg, notificationUid, channel, false);
+                    r.updateNotificationChannel(channel);
+                }
+            } else if (!fgServiceShown && !TextUtils.isEmpty(channelId)
+                    && !NotificationChannel.DEFAULT_CHANNEL_ID.equals(channelId)) {
+                channel.setFgServiceShown(true);
                 r.updateNotificationChannel(channel);
             }
         }
@@ -4420,14 +4440,14 @@ public class NotificationManagerService extends SystemService {
                     if (index < 0) {
                         mNotificationList.add(r);
                         mUsageStats.registerPostedByApp(r);
-                        r.setInterruptive(true);
+                        r.setInterruptive(isVisuallyInterruptive(null, r));
                     } else {
                         old = mNotificationList.get(index);
                         mNotificationList.set(index, r);
                         mUsageStats.registerUpdatedByApp(r, old);
                         // Make sure we don't lose the foreground service state.
                         notification.flags |=
-                                old.getNotification().flags & Notification.FLAG_FOREGROUND_SERVICE;
+                                old.getNotification().flags & FLAG_FOREGROUND_SERVICE;
                         r.isUpdate = true;
                         r.setInterruptive(isVisuallyInterruptive(old, r));
                     }
@@ -4436,7 +4456,7 @@ public class NotificationManagerService extends SystemService {
 
                     // Ensure if this is a foreground service that the proper additional
                     // flags are set.
-                    if ((notification.flags & Notification.FLAG_FOREGROUND_SERVICE) != 0) {
+                    if ((notification.flags & FLAG_FOREGROUND_SERVICE) != 0) {
                         notification.flags |= Notification.FLAG_ONGOING_EVENT
                                 | Notification.FLAG_NO_CLEAR;
                     }
@@ -4499,24 +4519,75 @@ public class NotificationManagerService extends SystemService {
     @GuardedBy("mNotificationLock")
     @VisibleForTesting
     protected boolean isVisuallyInterruptive(NotificationRecord old, NotificationRecord r) {
+        if (old == null) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                        +  r.getKey() + " is interruptive: new notification");
+            }
+            return true;
+        }
+
         Notification oldN = old.sbn.getNotification();
         Notification newN = r.sbn.getNotification();
+
         if (oldN.extras == null || newN.extras == null) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                        +  r.getKey() + " is not interruptive: no extras");
+            }
             return false;
         }
-        if (!Objects.equals(oldN.extras.get(Notification.EXTRA_TITLE),
-                newN.extras.get(Notification.EXTRA_TITLE))) {
+
+        // Ignore visual interruptions from foreground services because users
+        // consider them one 'session'. Count them for everything else.
+        if (r != null && (r.sbn.getNotification().flags & FLAG_FOREGROUND_SERVICE) != 0) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                        +  r.getKey() + " is not interruptive: foreground service");
+            }
+            return false;
+        }
+
+        final String oldTitle = String.valueOf(oldN.extras.get(Notification.EXTRA_TITLE));
+        final String newTitle = String.valueOf(newN.extras.get(Notification.EXTRA_TITLE));
+        if (!Objects.equals(oldTitle, newTitle)) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                        +  r.getKey() + " is interruptive: changed title");
+                Log.v(TAG, "INTERRUPTIVENESS: " + String.format("   old title: %s (%s@0x%08x)",
+                        oldTitle, oldTitle.getClass(), oldTitle.hashCode()));
+                Log.v(TAG, "INTERRUPTIVENESS: " + String.format("   new title: %s (%s@0x%08x)",
+                        newTitle, newTitle.getClass(), newTitle.hashCode()));
+            }
             return true;
         }
-        if (!Objects.equals(oldN.extras.get(Notification.EXTRA_TEXT),
-                newN.extras.get(Notification.EXTRA_TEXT))) {
+        // Do not compare Spannables (will always return false); compare unstyled Strings
+        final String oldText = String.valueOf(oldN.extras.get(Notification.EXTRA_TEXT));
+        final String newText = String.valueOf(newN.extras.get(Notification.EXTRA_TEXT));
+        if (!Objects.equals(oldText, newText)) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                        + r.getKey() + " is interruptive: changed text");
+                Log.v(TAG, "INTERRUPTIVENESS: " + String.format("   old text: %s (%s@0x%08x)",
+                        oldText, oldText.getClass(), oldText.hashCode()));
+                Log.v(TAG, "INTERRUPTIVENESS: " + String.format("   new text: %s (%s@0x%08x)",
+                        newText, newText.getClass(), newText.hashCode()));
+            }
             return true;
         }
-        if (oldN.extras.containsKey(Notification.EXTRA_PROGRESS) && newN.hasCompletedProgress()) {
+        if (oldN.hasCompletedProgress() != newN.hasCompletedProgress()) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                    +  r.getKey() + " is interruptive: completed progress");
+            }
             return true;
         }
         // Actions
         if (Notification.areActionsVisiblyDifferent(oldN, newN)) {
+            if (DEBUG_INTERRUPTIVENESS) {
+                Log.v(TAG, "INTERRUPTIVENESS: "
+                        +  r.getKey() + " is interruptive: changed actions");
+            }
             return true;
         }
 
@@ -4526,16 +4597,25 @@ public class NotificationManagerService extends SystemService {
 
             // Style based comparisons
             if (Notification.areStyledNotificationsVisiblyDifferent(oldB, newB)) {
+                if (DEBUG_INTERRUPTIVENESS) {
+                    Log.v(TAG, "INTERRUPTIVENESS: "
+                            +  r.getKey() + " is interruptive: styles differ");
+                }
                 return true;
             }
 
             // Remote views
             if (Notification.areRemoteViewsChanged(oldB, newB)) {
+                if (DEBUG_INTERRUPTIVENESS) {
+                    Log.v(TAG, "INTERRUPTIVENESS: "
+                            +  r.getKey() + " is interruptive: remoteviews differ");
+                }
                 return true;
             }
         } catch (Exception e) {
             Slog.w(TAG, "error recovering builder", e);
         }
+
         return false;
     }
 
@@ -5803,7 +5883,7 @@ public class NotificationManagerService extends SystemService {
             final StatusBarNotification childSbn = childR.sbn;
             if ((childSbn.isGroup() && !childSbn.getNotification().isGroupSummary()) &&
                     childR.getGroupKey().equals(parentNotification.getGroupKey())
-                    && (childR.getFlags() & Notification.FLAG_FOREGROUND_SERVICE) == 0
+                    && (childR.getFlags() & FLAG_FOREGROUND_SERVICE) == 0
                     && (flagChecker == null || flagChecker.apply(childR.getFlags()))) {
                 EventLogTags.writeNotificationCancel(callingUid, callingPid, pkg, childSbn.getId(),
                         childSbn.getTag(), userId, 0, 0, reason, listenerName);
@@ -6183,9 +6263,19 @@ public class NotificationManagerService extends SystemService {
         }
     }
 
-    private boolean canUseManagedServices() {
-        return !mActivityManager.isLowRamDevice()
+    @VisibleForTesting
+    boolean canUseManagedServices(String pkg) {
+        boolean canUseManagedServices = !mActivityManager.isLowRamDevice()
                 || mPackageManagerClient.hasSystemFeature(PackageManager.FEATURE_WATCH);
+
+        for (String whitelisted : getContext().getResources().getStringArray(
+                R.array.config_allowedManagedServicesOnLowRamDevices)) {
+            if (whitelisted.equals(pkg)) {
+                canUseManagedServices = true;
+            }
+        }
+
+        return canUseManagedServices;
     }
 
     private class TrimCache {

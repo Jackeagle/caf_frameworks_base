@@ -492,9 +492,19 @@ public class BluetoothEventManager {
     }
 
     private void dispatchAudioModeChanged() {
+        mDeviceManager.dispatchAudioModeChanged();
         synchronized (mCallbacks) {
             for (BluetoothCallback callback : mCallbacks) {
                 callback.onAudioModeChanged();
+            }
+        }
+    }
+
+    void dispatchProfileConnectionStateChanged(CachedBluetoothDevice device, int state,
+            int bluetoothProfile) {
+        synchronized (mCallbacks) {
+            for (BluetoothCallback callback : mCallbacks) {
+                callback.onProfileConnectionStateChanged(device, state, bluetoothProfile);
             }
         }
     }

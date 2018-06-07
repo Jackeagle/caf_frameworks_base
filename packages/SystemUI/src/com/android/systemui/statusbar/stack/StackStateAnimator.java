@@ -60,6 +60,7 @@ public class StackStateAnimator {
     public static final int ANIMATION_DELAY_HEADS_UP_CLICKED= 120;
 
     private final int mGoToFullShadeAppearingTranslation;
+    private final int mPulsingAppearingTranslation;
     private final ExpandableViewState mTmpState = new ExpandableViewState();
     private final AnimationProperties mAnimationProperties;
     public NotificationStackScrollLayout mHostLayout;
@@ -90,6 +91,9 @@ public class StackStateAnimator {
         mGoToFullShadeAppearingTranslation =
                 hostLayout.getContext().getResources().getDimensionPixelSize(
                         R.dimen.go_to_full_shade_appearing_translation);
+        mPulsingAppearingTranslation =
+                hostLayout.getContext().getResources().getDimensionPixelSize(
+                        R.dimen.pulsing_notification_appear_translation);
         mAnimationProperties = new AnimationProperties() {
             @Override
             public AnimationFilter getAnimationFilter() {
@@ -415,9 +419,6 @@ public class StackStateAnimator {
                 }, null);
             } else if (event.animationType ==
                 NotificationStackScrollLayout.AnimationEvent.ANIMATION_TYPE_REMOVE_SWIPED_OUT) {
-                // A race condition can trigger the view to be added to the overlay even though
-                // it was fully swiped out. So let's remove it
-                mHostLayout.getOverlay().remove(changingView);
                 if (Math.abs(changingView.getTranslation()) == changingView.getWidth()
                         && changingView.getTransientContainer() != null) {
                     changingView.getTransientContainer().removeTransientView(changingView);
@@ -426,6 +427,18 @@ public class StackStateAnimator {
                     .AnimationEvent.ANIMATION_TYPE_GROUP_EXPANSION_CHANGED) {
                 ExpandableNotificationRow row = (ExpandableNotificationRow) event.changingView;
                 row.prepareExpansionChanged(finalState);
+            } else if (event.animationType == NotificationStackScrollLayout
+                    .AnimationEvent.ANIMATION_TYPE_PULSE_APPEAR) {
+                ExpandableViewState viewState = finalState.getViewStateForView(changingView);
+                mTmpState.copyFrom(viewState);
+                mTmpState.yTranslation += mPulsingAppearingTranslation;
+                mTmpState.alpha = 0;
+                mTmpState.applyToView(changingView);
+            } else if (event.animationType == NotificationStackScrollLayout
+                    .AnimationEvent.ANIMATION_TYPE_PULSE_DISAPPEAR) {
+                ExpandableViewState viewState = finalState.getViewStateForView(changingView);
+                viewState.yTranslation += mPulsingAppearingTranslation;
+                viewState.alpha = 0;
             } else if (event.animationType == NotificationStackScrollLayout
                     .AnimationEvent.ANIMATION_TYPE_HEADS_UP_APPEAR) {
                 // This item is added, initialize it's properties.
@@ -453,8 +466,9 @@ public class StackStateAnimator {
                         ? ANIMATION_DELAY_HEADS_UP_CLICKED
                         : 0;
                 if (changingView.getParent() == null) {
-                    // This notification was actually removed, so we need to add it to the overlay
-                    mHostLayout.getOverlay().add(changingView);
+                    // This notification was actually removed, so we need to add it transiently
+                    mHostLayout.addTransientView(changingView, 0);
+                    changingView.setTransientContainer(mHostLayout);
                     mTmpState.initFrom(changingView);
                     mTmpState.yTranslation = 0;
                     // We temporarily enable Y animations, the real filter will be combined
@@ -463,10 +477,7 @@ public class StackStateAnimator {
                     mAnimationProperties.delay = extraDelay + ANIMATION_DELAY_HEADS_UP;
                     mAnimationProperties.duration = ANIMATION_DURATION_HEADS_UP_DISAPPEAR;
                     mTmpState.animateTo(changingView, mAnimationProperties);
-                    endRunnable = () -> {
-                        // remove the temporary overlay
-                        removeFromOverlay(changingView);
-                    };
+                    endRunnable = () -> removeTransientView(changingView);
                 }
                 float targetLocation = 0;
                 boolean needsAnimation = true;
@@ -501,16 +512,9 @@ public class StackStateAnimator {
         }
     }
 
-    private static void removeTransientView(ExpandableView viewToRemove) {
+    public static void removeTransientView(ExpandableView viewToRemove) {
         if (viewToRemove.getTransientContainer() != null) {
             viewToRemove.getTransientContainer().removeTransientView(viewToRemove);
-        }
-    }
-
-    public static void removeFromOverlay(View changingView) {
-        ViewGroup parent = (ViewGroup) changingView.getParent();
-        if (parent != null) {
-            parent.removeView(changingView);
         }
     }
 

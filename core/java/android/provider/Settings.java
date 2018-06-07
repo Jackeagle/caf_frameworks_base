@@ -58,6 +58,7 @@ import android.content.res.Resources;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.location.LocationManager;
+import android.media.AudioFormat;
 import android.net.ConnectivityManager;
 import android.net.NetworkScoreManager;
 import android.net.Uri;
@@ -86,6 +87,7 @@ import android.util.MemoryIntArray;
 import android.view.textservice.TextServicesManager;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.app.ColorDisplayController;
 import com.android.internal.widget.ILockSettings;
 
 import java.io.IOException;
@@ -122,6 +124,10 @@ public final class Settings {
      * Input: Nothing.
      * <p>
      * Output: Nothing.
+     *
+     * <p class="note">
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APN_SETTINGS = "android.settings.APN_SETTINGS";
@@ -881,6 +887,10 @@ public final class Settings {
      * Applications can also use {@link android.net.ConnectivityManager#getRestrictBackgroundStatus
      * ConnectivityManager#getRestrictBackgroundStatus()} to determine the
      * status of the background data restrictions for them.
+     *
+     * <p class="note">
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS =
@@ -1147,6 +1157,10 @@ public final class Settings {
      * Input: Nothing.
      * <p>
      * Output: Nothing.
+     *
+     * <p class="note">
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS
@@ -1784,6 +1798,12 @@ public final class Settings {
     public static final int USER_SETUP_PERSONALIZATION_STARTED = 1;
 
     /**
+     * User has snoozed personalization and will complete it later.
+     * @hide
+     */
+    public static final int USER_SETUP_PERSONALIZATION_PAUSED = 2;
+
+    /**
      * User has completed setup personalization.
      * @hide
      */
@@ -1794,6 +1814,7 @@ public final class Settings {
     @IntDef({
             USER_SETUP_PERSONALIZATION_NOT_STARTED,
             USER_SETUP_PERSONALIZATION_STARTED,
+            USER_SETUP_PERSONALIZATION_PAUSED,
             USER_SETUP_PERSONALIZATION_COMPLETE
     })
     public @interface UserSetupPersonalization {}
@@ -3149,7 +3170,9 @@ public final class Settings {
         public static final String DISPLAY_COLOR_MODE = "display_color_mode";
 
         private static final Validator DISPLAY_COLOR_MODE_VALIDATOR =
-                new SettingsValidators.InclusiveIntegerRangeValidator(0, 2);
+                new SettingsValidators.InclusiveIntegerRangeValidator(
+                        ColorDisplayController.COLOR_MODE_NATURAL,
+                        ColorDisplayController.COLOR_MODE_AUTOMATIC);
 
         /**
          * The amount of time in milliseconds before the device goes to sleep or begins
@@ -4166,6 +4189,7 @@ public final class Settings {
             PUBLIC_SETTINGS.add(DIM_SCREEN);
             PUBLIC_SETTINGS.add(SCREEN_OFF_TIMEOUT);
             PUBLIC_SETTINGS.add(SCREEN_BRIGHTNESS);
+            PUBLIC_SETTINGS.add(SCREEN_BRIGHTNESS_FOR_VR);
             PUBLIC_SETTINGS.add(SCREEN_BRIGHTNESS_MODE);
             PUBLIC_SETTINGS.add(MODE_RINGER_STREAMS_AFFECTED);
             PUBLIC_SETTINGS.add(MUTE_STREAMS_AFFECTED);
@@ -8894,6 +8918,14 @@ public final class Settings {
         public static final String PRIV_APP_OOB_ENABLED = "priv_app_oob_enabled";
 
         /**
+         * Comma separated list of privileged package names, which will be running out-of-box APK.
+         * Default: "ALL"
+         *
+         * @hide
+         */
+        public static final String PRIV_APP_OOB_LIST = "priv_app_oob_list";
+
+        /**
          * The interval in milliseconds at which location requests will be throttled when they are
          * coming from the background.
          *
@@ -9534,6 +9566,15 @@ public final class Settings {
         */
        public static final String WIFI_SCAN_ALWAYS_AVAILABLE =
                 "wifi_scan_always_enabled";
+
+        /**
+         * The interval in milliseconds at which wifi rtt ranging requests will be throttled when
+         * they are coming from the background.
+         *
+         * @hide
+         */
+        public static final String WIFI_RTT_BACKGROUND_EXEC_GAP_MS =
+                "wifi_rtt_background_exec_gap_ms";
 
         /**
          * Whether soft AP will shut down after a timeout period when no devices are connected.
@@ -10400,6 +10441,27 @@ public final class Settings {
         public static final String ACTIVITY_MANAGER_CONSTANTS = "activity_manager_constants";
 
         /**
+         * App ops specific settings.
+         * This is encoded as a key=value list, separated by commas. Ex:
+         *
+         * "state_settle_time=10000"
+         *
+         * The following keys are supported:
+         *
+         * <pre>
+         * top_state_settle_time                (long)
+         * fg_service_state_settle_time         (long)
+         * bg_state_settle_time                 (long)
+         * </pre>
+         *
+         * <p>
+         * Type: string
+         * @hide
+         * @see com.android.server.AppOpsService.Constants
+         */
+        public static final String APP_OPS_CONSTANTS = "app_ops_constants";
+
+        /**
          * Device Idle (Doze) specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          *
@@ -10603,18 +10665,30 @@ public final class Settings {
          * App standby (app idle) specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          * <p>
-         * "idle_duration=5000,parole_interval=4500"
+         * "idle_duration=5000,parole_interval=4500,screen_thresholds=0/0/60000/120000"
          * <p>
          * All durations are in millis.
+         * Array values are separated by forward slashes
          * The following keys are supported:
          *
          * <pre>
-         * idle_duration2       (long)
-         * wallclock_threshold  (long)
-         * parole_interval      (long)
-         * parole_duration      (long)
+         * parole_interval                  (long)
+         * parole_window                    (long)
+         * parole_duration                  (long)
+         * screen_thresholds                (long[4])
+         * elapsed_thresholds               (long[4])
+         * strong_usage_duration            (long)
+         * notification_seen_duration       (long)
+         * system_update_usage_duration     (long)
+         * prediction_timeout               (long)
+         * sync_adapter_duration            (long)
+         * exempted_sync_duration           (long)
+         * system_interaction_duration      (long)
+         * stable_charging_threshold        (long)
          *
          * idle_duration        (long) // This is deprecated and used to circumvent b/26355386.
+         * idle_duration2       (long) // deprecated
+         * wallclock_threshold  (long) // deprecated
          * </pre>
          *
          * <p>
@@ -10778,6 +10852,7 @@ public final class Settings {
          * read_binary_cpu_time          (boolean)
          * proc_state_cpu_times_read_delay_ms (long)
          * external_stats_collection_rate_limit_ms (long)
+         * battery_level_collection_delay_ms (long)
          * </pre>
          *
          * <p>
@@ -10852,21 +10927,13 @@ public final class Settings {
                 = "forced_app_standby_for_small_battery_enabled";
 
         /**
-         * Whether or not to enable the Off Body, Radios Off feature on small battery devices.
+         * Whether or not to enable the User Absent, Radios Off feature on small battery devices.
          * Type: int (0 for false, 1 for true)
          * Default: 0
          * @hide
          */
-        public static final String OFF_BODY_RADIOS_OFF_FOR_SMALL_BATTERY_ENABLED
-                = "off_body_radios_off_for_small_battery_enabled";
-
-        /**
-         * How long after the device goes off body to disable radios, in milliseconds.
-         * Type: long
-         * Default: 10 minutes
-         * @hide
-         */
-        public static final String OFF_BODY_RADIOS_OFF_DELAY_MS = "off_body_radios_off_delay_ms";
+        public static final String USER_ABSENT_RADIOS_OFF_FOR_SMALL_BATTERY_ENABLED
+                = "user_absent_radios_off_for_small_battery_enabled";
 
         /**
          * Whether or not to turn on Wifi when proxy is disconnected.
@@ -11239,15 +11306,66 @@ public final class Settings {
          public static final int ENCODED_SURROUND_OUTPUT_ALWAYS = 2;
 
         /**
+         * Surround sound formats are available according to the choice
+         * of user, even if they are not detected by the hardware. Those
+         * formats will be reported as part of the HDMI output capability.
+         * Applications are then free to use either PCM or encoded output.
+         *
+         * An example use case would be an AVR that doesn't report a surround
+         * format while the user knows the AVR does support it.
+         * @hide
+         */
+        public static final int ENCODED_SURROUND_OUTPUT_MANUAL = 3;
+
+        /**
          * Set to ENCODED_SURROUND_OUTPUT_AUTO,
-         * ENCODED_SURROUND_OUTPUT_NEVER or
-         * ENCODED_SURROUND_OUTPUT_ALWAYS
+         * ENCODED_SURROUND_OUTPUT_NEVER,
+         * ENCODED_SURROUND_OUTPUT_ALWAYS or
+         * ENCODED_SURROUND_OUTPUT_MANUAL
          * @hide
          */
         public static final String ENCODED_SURROUND_OUTPUT = "encoded_surround_output";
 
         private static final Validator ENCODED_SURROUND_OUTPUT_VALIDATOR =
-                new SettingsValidators.DiscreteValueValidator(new String[] {"0", "1", "2"});
+                new SettingsValidators.DiscreteValueValidator(new String[] {"0", "1", "2", "3"});
+
+        /**
+         * Surround sounds formats that are enabled when ENCODED_SURROUND_OUTPUT is set to
+         * ENCODED_SURROUND_OUTPUT_MANUAL. Encoded as comma separated list. Allowed values
+         * are the format constants defined in AudioFormat.java. Ex:
+         *
+         * "5,6"
+         *
+         * @hide
+         */
+        public static final String ENCODED_SURROUND_OUTPUT_ENABLED_FORMATS =
+                "encoded_surround_output_enabled_formats";
+
+        private static final Validator ENCODED_SURROUND_OUTPUT_ENABLED_FORMATS_VALIDATOR =
+                new Validator() {
+            @Override
+            public boolean validate(String value) {
+                try {
+                    String[] surroundFormats = TextUtils.split(value, ",");
+                    for (String format : surroundFormats) {
+                        int audioFormat = Integer.valueOf(format);
+                        boolean isSurroundFormat = false;
+                        for (int sf : AudioFormat.SURROUND_SOUND_ENCODING) {
+                            if (sf == audioFormat) {
+                                isSurroundFormat = true;
+                                break;
+                            }
+                        }
+                        if (!isSurroundFormat) {
+                            return false;
+                        }
+                    }
+                    return true;
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+        };
 
         /**
          * Persisted safe headphone volume management state by AudioService
@@ -11894,6 +12012,7 @@ public final class Settings {
             CALL_AUTO_RETRY,
             DOCK_AUDIO_MEDIA_ENABLED,
             ENCODED_SURROUND_OUTPUT,
+            ENCODED_SURROUND_OUTPUT_ENABLED_FORMATS,
             LOW_POWER_MODE_TRIGGER_LEVEL,
             BLUETOOTH_ON,
             PRIVATE_DNS_MODE,
@@ -11930,6 +12049,8 @@ public final class Settings {
             VALIDATORS.put(CALL_AUTO_RETRY, CALL_AUTO_RETRY_VALIDATOR);
             VALIDATORS.put(DOCK_AUDIO_MEDIA_ENABLED, DOCK_AUDIO_MEDIA_ENABLED_VALIDATOR);
             VALIDATORS.put(ENCODED_SURROUND_OUTPUT, ENCODED_SURROUND_OUTPUT_VALIDATOR);
+            VALIDATORS.put(ENCODED_SURROUND_OUTPUT_ENABLED_FORMATS,
+                    ENCODED_SURROUND_OUTPUT_ENABLED_FORMATS_VALIDATOR);
             VALIDATORS.put(LOW_POWER_MODE_TRIGGER_LEVEL, LOW_POWER_MODE_TRIGGER_LEVEL_VALIDATOR);
             VALIDATORS.put(LOW_POWER_MODE_TRIGGER_LEVEL_MAX,
                     LOW_POWER_MODE_TRIGGER_LEVEL_VALIDATOR);
@@ -12399,7 +12520,7 @@ public final class Settings {
           */
         public static final String MULTI_SIM_SMS_SUBSCRIPTION = "multi_sim_sms";
 
-       /**
+        /**
           * Used to provide option to user to select subscription during send SMS.
           * The value 1 - enable, 0 - disable
           * @hide
@@ -12541,6 +12662,28 @@ public final class Settings {
                 "notification_snooze_options";
 
         /**
+         * Settings key for the ratio of notification dismissals to notification views - one of the
+         * criteria for showing the notification blocking helper.
+         *
+         * <p>The value is a float ranging from 0.0 to 1.0 (the closer to 0.0, the more intrusive
+         * the blocking helper will be).
+         *
+         * @hide
+         */
+        public static final String BLOCKING_HELPER_DISMISS_TO_VIEW_RATIO_LIMIT =
+                "blocking_helper_dismiss_to_view_ratio";
+
+        /**
+         * Settings key for the longest streak of dismissals  - one of the criteria for showing the
+         * notification blocking helper.
+         *
+         * <p>The value is an integer greater than 0.
+         *
+         * @hide
+         */
+        public static final String BLOCKING_HELPER_STREAK_LIMIT = "blocking_helper_streak_limit";
+
+        /**
          * Configuration flags for SQLite Compatibility WAL. Encoded as a key-value list, separated
          * by commas. E.g.: compatibility_wal_supported=true, wal_syncmode=OFF
          *
@@ -12647,6 +12790,25 @@ public final class Settings {
          * @hide
          */
         public static final String SHOW_ZEN_UPGRADE_NOTIFICATION = "show_zen_upgrade_notification";
+
+        /**
+         * If nonzero, will show the zen update settings suggestion.
+         * @hide
+         */
+        public static final String SHOW_ZEN_SETTINGS_SUGGESTION = "show_zen_settings_suggestion";
+
+        /**
+         * If nonzero, zen has not been updated to reflect new changes.
+         * @hide
+         */
+        public static final String ZEN_SETTINGS_UPDATED = "zen_settings_updated";
+
+        /**
+         * If nonzero, zen setting suggestion has beem viewed by user
+         * @hide
+         */
+        public static final String ZEN_SETTINGS_SUGGESTION_VIEWED =
+                "zen_settings_suggestion_viewed";
 
         /**
          * Backup and restore agent timeout parameters.

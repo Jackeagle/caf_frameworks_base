@@ -68,6 +68,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
@@ -90,6 +91,7 @@ import android.util.Pair;
 import android.util.Slog;
 
 import com.android.internal.R;
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
@@ -213,6 +215,10 @@ public class SyncManager {
     /** Flags used when connecting to a sync adapter service */
     private static final int SYNC_ADAPTER_CONNECTION_FLAGS = Context.BIND_AUTO_CREATE
             | Context.BIND_NOT_FOREGROUND | Context.BIND_ALLOW_OOM_MANAGEMENT;
+
+    /** Singleton instance. */
+    @GuardedBy("SyncManager.class")
+    private static SyncManager sInstance;
 
     private Context mContext;
 
@@ -454,6 +460,7 @@ public class SyncManager {
         }
     };
 
+    private final HandlerThread mThread;
     private final SyncHandler mSyncHandler;
     private final SyncManagerConstants mConstants;
 
@@ -569,6 +576,14 @@ public class SyncManager {
     }
 
     public SyncManager(Context context, boolean factoryTest) {
+        synchronized (SyncManager.class) {
+            if (sInstance == null) {
+                sInstance = this;
+            } else {
+                Slog.wtf(TAG, "SyncManager instantiated multiple times");
+            }
+        }
+
         // Initialize the SyncStorageEngine first, before registering observers
         // and creating threads and so on; it may fail if the disk is full.
         mContext = context;
@@ -604,7 +619,9 @@ public class SyncManager {
 
         mSyncAdapters = new SyncAdaptersCache(mContext);
 
-        mSyncHandler = new SyncHandler(BackgroundThread.get().getLooper());
+        mThread = new HandlerThread("SyncManager", android.os.Process.THREAD_PRIORITY_BACKGROUND);
+        mThread.start();
+        mSyncHandler = new SyncHandler(mThread.getLooper());
 
         mSyncAdapters.setListener(new RegisteredServicesCacheListener<SyncAdapterType>() {
             @Override
@@ -2843,6 +2860,16 @@ public class SyncManager {
         ServiceConnectionData(ActiveSyncContext activeSyncContext, IBinder adapter) {
             this.activeSyncContext = activeSyncContext;
             this.adapter = adapter;
+        }
+    }
+
+    /**
+     * @return whether the device is ready to run sync jobs.
+     */
+    public static boolean readyToSync() {
+        synchronized (SyncManager.class) {
+            return sInstance != null && sInstance.mProvisioned && sInstance.mBootCompleted
+                    && sInstance.mJobServiceReady;
         }
     }
 

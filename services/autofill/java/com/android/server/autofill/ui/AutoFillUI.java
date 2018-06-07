@@ -163,17 +163,21 @@ public final class AutoFillUI {
      * @param filterText text of the view to be filled
      * @param servicePackageName package name of the autofill service filling the activity
      * @param packageName package name of the activity that is filled
+     * @param serviceLabel label of autofill service
+     * @param serviceIcon icon of autofill service
      * @param callback Identifier for the caller
      */
     public void showFillUi(@NonNull AutofillId focusedId, @NonNull FillResponse response,
             @Nullable String filterText, @Nullable String servicePackageName,
-            @NonNull String packageName, @NonNull AutoFillUiCallback callback) {
+            @NonNull String packageName, @NonNull CharSequence serviceLabel,
+            @NonNull Drawable serviceIcon, @NonNull AutoFillUiCallback callback, boolean compatMode) {
         if (sDebug) {
             final int size = filterText == null ? 0 : filterText.length();
             Slog.d(TAG, "showFillUi(): id=" + focusedId + ", filter=" + size + " chars");
         }
-        final LogMaker log =
-                Helper.newLogMaker(MetricsEvent.AUTOFILL_FILL_UI, packageName, servicePackageName)
+        final LogMaker log = Helper
+                .newLogMaker(MetricsEvent.AUTOFILL_FILL_UI, packageName, servicePackageName,
+                        compatMode)
                 .addTaggedData(MetricsEvent.FIELD_AUTOFILL_FILTERTEXT_LEN,
                         filterText == null ? 0 : filterText.length())
                 .addTaggedData(MetricsEvent.FIELD_AUTOFILL_NUM_DATASETS,
@@ -185,7 +189,7 @@ public final class AutoFillUI {
             }
             hideAllUiThread(callback);
             mFillUi = new FillUi(mContext, response, focusedId,
-                    filterText, mOverlayControl, new FillUi.Callback() {
+                    filterText, mOverlayControl, serviceLabel, serviceIcon, new FillUi.Callback() {
                 @Override
                 public void onResponsePicked(FillResponse response) {
                     log.setType(MetricsEvent.TYPE_DETAIL);
@@ -259,14 +263,16 @@ public final class AutoFillUI {
     public void showSaveUi(@NonNull CharSequence serviceLabel, @NonNull Drawable serviceIcon,
             @Nullable String servicePackageName, @NonNull SaveInfo info,
             @NonNull ValueFinder valueFinder, @NonNull String packageName,
-            @NonNull AutoFillUiCallback callback, @NonNull PendingUi pendingSaveUi) {
+            @NonNull AutoFillUiCallback callback, @NonNull PendingUi pendingSaveUi,
+            boolean compatMode) {
         if (sVerbose) Slog.v(TAG, "showSaveUi() for " + packageName + ": " + info);
         int numIds = 0;
         numIds += info.getRequiredIds() == null ? 0 : info.getRequiredIds().length;
         numIds += info.getOptionalIds() == null ? 0 : info.getOptionalIds().length;
 
-        final LogMaker log =
-                Helper.newLogMaker(MetricsEvent.AUTOFILL_SAVE_UI, packageName, servicePackageName)
+        final LogMaker log = Helper
+                .newLogMaker(MetricsEvent.AUTOFILL_SAVE_UI, packageName, servicePackageName,
+                        compatMode)
                 .addTaggedData(MetricsEvent.FIELD_AUTOFILL_NUM_IDS, numIds);
 
         mHandler.post(() -> {
@@ -316,7 +322,7 @@ public final class AutoFillUI {
                     }
                     mMetricsLogger.write(log);
                 }
-            });
+            }, compatMode);
         });
     }
 

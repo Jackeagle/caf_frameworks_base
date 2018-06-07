@@ -54,6 +54,7 @@ import android.view.ViewGroup;
 import android.view.ViewStub;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import android.widget.Chronometer;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -76,6 +77,7 @@ import com.android.systemui.statusbar.NotificationGuts.GutsContent;
 import com.android.systemui.statusbar.notification.AboveShelfChangedListener;
 import com.android.systemui.statusbar.notification.ActivityLaunchAnimator;
 import com.android.systemui.statusbar.notification.HybridNotificationView;
+import com.android.systemui.statusbar.notification.NotificationCounters;
 import com.android.systemui.statusbar.notification.NotificationInflater;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.NotificationViewWrapper;
@@ -468,6 +470,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         updateNotificationColor();
         if (mMenuRow != null) {
             mMenuRow.onNotificationUpdated(mStatusBarNotification);
+            mMenuRow.setAppName(mAppName);
         }
         if (mIsSummaryWithChildren) {
             mChildrenContainer.recreateNotificationHeader(mExpandClickListener);
@@ -1088,6 +1091,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
+    @Override
+    protected void setBackgroundTintColor(int color) {
+        super.setBackgroundTintColor(color);
+        NotificationContentView view = getShowingLayout();
+        if (view != null) {
+            view.setBackgroundTintColor(color);
+        }
+    }
+
     public void closeRemoteInput() {
         for (NotificationContentView l : mLayouts) {
             l.closeRemoteInput();
@@ -1251,6 +1263,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         NotificationBlockingHelperManager manager =
                 Dependency.get(NotificationBlockingHelperManager.class);
         boolean isBlockingHelperShown = manager.perhapsShowBlockingHelper(this, mMenuRow);
+
+        Dependency.get(MetricsLogger.class).count(NotificationCounters.NOTIFICATION_DISMISSED, 1);
 
         // Continue with dismiss since we don't want the blocking helper to be directly associated
         // with a certain notification.
@@ -1586,6 +1600,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     public void doLongClickCallback(int x, int y) {
         createMenu();
         MenuItem menuItem = getProvider().getLongpressMenuItem(mContext);
+        doLongClickCallback(x, y, menuItem);
+    }
+
+    private void doLongClickCallback(int x, int y, MenuItem menuItem) {
         if (mLongPressListener != null && menuItem != null) {
             mLongPressListener.onLongPress(this, x, y, menuItem);
         }
@@ -1632,9 +1650,49 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 mTranslateableViews.get(i).setTranslationX(0);
             }
             invalidateOutline();
+            getEntry().expandedIcon.setScrollX(0);
         }
 
         mMenuRow.resetMenu();
+    }
+
+    void onGutsOpened() {
+        resetTranslation();
+        updateContentAccessibilityImportanceForGuts(false /* isEnabled */);
+    }
+
+    void onGutsClosed() {
+        updateContentAccessibilityImportanceForGuts(true /* isEnabled */);
+    }
+
+    /**
+     * Updates whether all the non-guts content inside this row is important for accessibility.
+     *
+     * @param isEnabled whether the content views should be enabled for accessibility
+     */
+    private void updateContentAccessibilityImportanceForGuts(boolean isEnabled) {
+        if (mChildrenContainer != null) {
+            updateChildAccessibilityImportance(mChildrenContainer, isEnabled);
+        }
+        if (mLayouts != null) {
+            for (View view : mLayouts) {
+                updateChildAccessibilityImportance(view, isEnabled);
+            }
+        }
+
+        if (isEnabled) {
+            this.requestAccessibilityFocus();
+        }
+    }
+
+    /**
+     * Updates whether the given childView is important for accessibility based on
+     * {@code isEnabled}.
+     */
+    private void updateChildAccessibilityImportance(View childView, boolean isEnabled) {
+        childView.setImportantForAccessibility(isEnabled
+                ? View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                : View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
 
     public CharSequence getActiveRemoteInputText() {
@@ -2595,6 +2653,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     protected boolean disallowSingleClick(MotionEvent event) {
+        if (areGutsExposed()) {
+            return false;
+        }
         float x = event.getX();
         float y = event.getY();
         NotificationHeaderView header = getVisibleNotificationHeader();
@@ -2651,6 +2712,16 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND);
             }
         }
+        NotificationMenuRowPlugin provider = getProvider();
+        if (provider != null) {
+            MenuItem snoozeMenu = provider.getSnoozeMenuItem(getContext());
+            if (snoozeMenu != null) {
+                AccessibilityAction action = new AccessibilityAction(R.id.action_snooze,
+                    getContext().getResources()
+                        .getString(R.string.notification_menu_snooze_action));
+                info.addAction(action);
+            }
+        }
     }
 
     @Override
@@ -2669,6 +2740,16 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             case AccessibilityNodeInfo.ACTION_LONG_CLICK:
                 doLongClickCallback();
                 return true;
+            case R.id.action_snooze:
+                NotificationMenuRowPlugin provider = getProvider();
+                if (provider == null) {
+                    provider = createMenu();
+                }
+                MenuItem snoozeMenu = provider.getSnoozeMenuItem(getContext());
+                if (snoozeMenu != null) {
+                    doLongClickCallback(getWidth() / 2, getHeight() / 2, snoozeMenu);
+                }
+                return true;
         }
         return false;
     }
@@ -2684,6 +2765,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     @Override
     public ExpandableViewState createNewViewState(StackScrollState stackScrollState) {
         mNotificationViewState = new NotificationViewState(stackScrollState);
+        return mNotificationViewState;
+    }
+
+    public NotificationViewState getViewState() {
         return mNotificationViewState;
     }
 

@@ -2935,7 +2935,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 164;
+            private static final int SETTINGS_VERSION = 166;
 
             private final int mUserId;
 
@@ -3710,17 +3710,7 @@ public class SettingsProvider extends ContentProvider {
                 }
 
                 if (currentVersion == 162) {
-                    // Version 162: Add a gesture for silencing phones
-                    final SettingsState settings = getGlobalSettingsLocked();
-                    final Setting currentSetting = settings.getSettingLocked(
-                            Global.SHOW_ZEN_UPGRADE_NOTIFICATION);
-                    if (!currentSetting.isNull()
-                            && TextUtils.equals("0", currentSetting.getValue())) {
-                        settings.insertSettingLocked(
-                                Global.SHOW_ZEN_UPGRADE_NOTIFICATION, "1",
-                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
-                    }
-
+                    // Version 162: REMOVED: Add a gesture for silencing phones
                     currentVersion = 163;
                 }
 
@@ -3740,6 +3730,51 @@ public class SettingsProvider extends ContentProvider {
                     }
 
                     currentVersion = 164;
+                }
+
+                if (currentVersion == 164) {
+                    // Version 164: show zen upgrade notification
+                    final SettingsState settings = getGlobalSettingsLocked();
+                    final Setting currentSetting = settings.getSettingLocked(
+                            Global.SHOW_ZEN_UPGRADE_NOTIFICATION);
+                    if (!currentSetting.isNull()
+                            && TextUtils.equals("0", currentSetting.getValue())) {
+                        settings.insertSettingLocked(
+                                Global.SHOW_ZEN_UPGRADE_NOTIFICATION, "1",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 165;
+                }
+
+                if (currentVersion == 165) {
+                    // Version 165: Show zen settings suggestion and zen updated
+                    final SettingsState settings = getGlobalSettingsLocked();
+                    final Setting currentSetting = settings.getSettingLocked(
+                            Global.SHOW_ZEN_SETTINGS_SUGGESTION);
+                    if (currentSetting.isNull()) {
+                        settings.insertSettingLocked(
+                                Global.SHOW_ZEN_SETTINGS_SUGGESTION, "1",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    final Setting currentUpdatedSetting = settings.getSettingLocked(
+                            Global.ZEN_SETTINGS_UPDATED);
+                    if (currentUpdatedSetting.isNull()) {
+                        settings.insertSettingLocked(
+                                Global.ZEN_SETTINGS_UPDATED, "0",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    final Setting currentSettingSuggestionViewed = settings.getSettingLocked(
+                            Global.ZEN_SETTINGS_SUGGESTION_VIEWED);
+                    if (currentSettingSuggestionViewed.isNull()) {
+                        settings.insertSettingLocked(
+                                Global.ZEN_SETTINGS_SUGGESTION_VIEWED, "0",
+                                null, true, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 166;
                 }
 
                 // vXXX: Add new settings above this point.

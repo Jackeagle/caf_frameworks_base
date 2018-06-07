@@ -146,6 +146,9 @@ TEST(DimensionInConditionE2eTest, TestDurationMetric_NoLink_SimpleCondition) {
                                     ADB_DUMP, &buffer);
             EXPECT_TRUE(buffer.size() > 0);
             EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+            backfillDimensionPath(&reports);
+            backfillStringInReport(&reports);
+            backfillStartEndTimestamp(&reports);
 
             EXPECT_EQ(reports.reports_size(), 1);
             EXPECT_EQ(reports.reports(0).metrics_size(), 1);
@@ -438,6 +441,9 @@ TEST(DimensionInConditionE2eTest, TestDurationMetric_Link_SimpleCondition) {
                                     ADB_DUMP, &buffer);
             EXPECT_TRUE(buffer.size() > 0);
             EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+            backfillDimensionPath(&reports);
+            backfillStringInReport(&reports);
+            backfillStartEndTimestamp(&reports);
 
             EXPECT_EQ(reports.reports_size(), 1);
             EXPECT_EQ(reports.reports(0).metrics_size(), 1);
@@ -656,6 +662,9 @@ TEST(DimensionInConditionE2eTest, TestDurationMetric_PartialLink_SimpleCondition
                                 &buffer);
         EXPECT_TRUE(buffer.size() > 0);
         EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+        backfillDimensionPath(&reports);
+        backfillStringInReport(&reports);
+        backfillStartEndTimestamp(&reports);
 
         EXPECT_EQ(reports.reports_size(), 1);
         EXPECT_EQ(reports.reports(0).metrics_size(), 1);

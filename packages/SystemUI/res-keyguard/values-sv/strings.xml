@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"SIM-kortet är PUK-låst."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"Låser upp SIM-kort …"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"Pinkodsområde"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"Pinkodsområde för SIM-kort"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"PUK-kodsområde för SIM-kort"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"Nästa alarm är inställt på <xliff:g id="ALARM">%1$s</xliff:g>"</string>
@@ -140,7 +142,10 @@
       <item quantity="one">Enheten har inte låsts upp på <xliff:g id="NUMBER_0">%d</xliff:g> timme. Bekräfta lösenordet.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"Identifierades inte"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="other">Ange pinkod för SIM-kortet. <xliff:g id="NUMBER_1">%d</xliff:g> försök återstår.</item>
+      <item quantity="one">Ange pinkod för SIM-kortet. <xliff:g id="NUMBER_0">%d</xliff:g> försök återstår innan du måste kontakta operatören för att låsa upp enheten.</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="other">SIM-kortet är inaktiverat. Ange PUK-koden om du vill fortsätta. <xliff:g id="_NUMBER_1">%d</xliff:g> försök återstår innan SIM-kortet blir obrukbart. Kontakta operatören för mer information.</item>
       <item quantity="one">SIM-kortet är inaktiverat. Ange PUK-koden om du vill fortsätta. <xliff:g id="_NUMBER_0">%d</xliff:g> försök återstår innan SIM-kortet blir obrukbart. Kontakta operatören för mer information.</item>

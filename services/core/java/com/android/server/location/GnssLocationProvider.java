@@ -827,26 +827,6 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
 
         mGnssNavigationMessageProvider = new GnssNavigationMessageProvider(mHandler) {
             @Override
-            protected boolean isAvailableInPlatform() {
-                return native_is_navigation_message_supported();
-            }
-
-            @Override
-            protected int registerWithService() {
-                boolean result = native_start_navigation_message_collection();
-                if (result) {
-                    return RemoteListenerHelper.RESULT_SUCCESS;
-                } else {
-                    return RemoteListenerHelper.RESULT_INTERNAL_ERROR;
-                }
-            }
-
-            @Override
-            protected void unregisterFromService() {
-                native_stop_navigation_message_collection();
-            }
-
-            @Override
             protected boolean isGpsEnabled() {
                 return isEnabled();
             }
@@ -1907,9 +1887,26 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
                         GPS_CAPABILITY_MEASUREMENTS));
                 mGnssNavigationMessageProvider.onCapabilitiesUpdated(hasCapability(
                         GPS_CAPABILITY_NAV_MESSAGES));
+                restartRequests();
             }
         });
-   }
+    }
+
+    private void restartRequests() {
+        Log.i(TAG, "restartRequests");
+
+        restartLocationRequest();
+        mGnssMeasurementsProvider.resumeIfStarted();
+        mGnssNavigationMessageProvider.resumeIfStarted();
+        mGnssBatchingProvider.resumeIfStarted();
+        mGnssGeofenceProvider.resumeIfStarted();
+    }
+
+    private void restartLocationRequest() {
+        if (DEBUG) Log.d(TAG, "restartLocationRequest");
+        mStarted = false;
+        updateRequirements();
+    }
 
     /**
      * Called from native code to inform us the hardware year.
@@ -1927,6 +1924,23 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
         // mHardwareModelName is simply set here, to be read elsewhere, and volatile for safe sync
         if (DEBUG) Log.d(TAG, "setGnssModelName called with " + modelName);
         mHardwareModelName = modelName;
+    }
+
+    /**
+     * Called from native code to inform us GNSS HAL service died.
+     */
+    private void reportGnssServiceDied() {
+        if (DEBUG) Log.d(TAG, "reportGnssServiceDied");
+        mHandler.post(() -> {
+            class_init_native();
+            native_init_once();
+            if (isEnabled()) {
+                // re-calls native_init() and other setup.
+                handleEnable();
+                // resend configuration into the restarted HAL service.
+                reloadGpsProperties(mContext, mProperties);
+            }
+        });
     }
 
     public interface GnssSystemInfoProvider {
@@ -2759,13 +2773,6 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
 
     private native void native_update_network_state(boolean connected, int type,
             boolean roaming, boolean available, String extraInfo, String defaultAPN);
-
-    // Gps Navigation message support.
-    private static native boolean native_is_navigation_message_supported();
-
-    private native boolean native_start_navigation_message_collection();
-
-    private native boolean native_stop_navigation_message_collection();
 
     // GNSS Configuration
     private static native boolean native_set_supl_version(int version);

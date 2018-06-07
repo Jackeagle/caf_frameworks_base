@@ -21,6 +21,8 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_SPLIT_SCREEN_SECOND
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW;
 import static android.view.PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW;
+import static android.view.WindowManager.DOCKED_LEFT;
+import static android.view.WindowManager.DOCKED_RIGHT;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -124,8 +126,10 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     private SnapTarget mSnapTargetBeforeMinimized;
 
     private int mDividerInsets;
+    private final Display mDefaultDisplay;
     private int mDisplayWidth;
     private int mDisplayHeight;
+    private int mDisplayRotation;
     private int mDividerWindowWidth;
     private int mDividerSize;
     private int mTouchElevation;
@@ -138,7 +142,7 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     private final Rect mDockedInsetRect = new Rect();
     private final Rect mOtherInsetRect = new Rect();
     private final Rect mLastResizeRect = new Rect();
-    private final Rect mDisplayRect = new Rect();
+    private final Rect mTmpRect = new Rect();
     private final WindowManagerProxy mWindowManagerProxy = WindowManagerProxy.getInstance();
     private DividerWindowManager mWindowManager;
     private VelocityTracker mVelocityTracker;
@@ -178,16 +182,20 @@ public class DividerView extends FrameLayout implements OnTouchListener,
         @Override
         public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
             super.onInitializeAccessibilityNodeInfo(host, info);
+            final DividerSnapAlgorithm snapAlgorithm = getSnapAlgorithm();
             if (isHorizontalDivision()) {
                 info.addAction(new AccessibilityAction(R.id.action_move_tl_full,
                         mContext.getString(R.string.accessibility_action_divider_top_full)));
-                if (mSnapAlgorithm.isFirstSplitTargetAvailable()) {
+                if (snapAlgorithm.isFirstSplitTargetAvailable()) {
                     info.addAction(new AccessibilityAction(R.id.action_move_tl_70,
                             mContext.getString(R.string.accessibility_action_divider_top_70)));
                 }
-                info.addAction(new AccessibilityAction(R.id.action_move_tl_50,
+                if (snapAlgorithm.showMiddleSplitTargetForAccessibility()) {
+                    // Only show the middle target if there are more than 1 split target
+                    info.addAction(new AccessibilityAction(R.id.action_move_tl_50,
                         mContext.getString(R.string.accessibility_action_divider_top_50)));
-                if (mSnapAlgorithm.isLastSplitTargetAvailable()) {
+                }
+                if (snapAlgorithm.isLastSplitTargetAvailable()) {
                     info.addAction(new AccessibilityAction(R.id.action_move_tl_30,
                             mContext.getString(R.string.accessibility_action_divider_top_30)));
                 }
@@ -196,13 +204,16 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             } else {
                 info.addAction(new AccessibilityAction(R.id.action_move_tl_full,
                         mContext.getString(R.string.accessibility_action_divider_left_full)));
-                if (mSnapAlgorithm.isFirstSplitTargetAvailable()) {
+                if (snapAlgorithm.isFirstSplitTargetAvailable()) {
                     info.addAction(new AccessibilityAction(R.id.action_move_tl_70,
                             mContext.getString(R.string.accessibility_action_divider_left_70)));
                 }
-                info.addAction(new AccessibilityAction(R.id.action_move_tl_50,
+                if (snapAlgorithm.showMiddleSplitTargetForAccessibility()) {
+                    // Only show the middle target if there are more than 1 split target
+                    info.addAction(new AccessibilityAction(R.id.action_move_tl_50,
                         mContext.getString(R.string.accessibility_action_divider_left_50)));
-                if (mSnapAlgorithm.isLastSplitTargetAvailable()) {
+                }
+                if (snapAlgorithm.isLastSplitTargetAvailable()) {
                     info.addAction(new AccessibilityAction(R.id.action_move_tl_30,
                             mContext.getString(R.string.accessibility_action_divider_left_30)));
                 }
@@ -265,6 +276,9 @@ public class DividerView extends FrameLayout implements OnTouchListener,
         super(context, attrs, defStyleAttr, defStyleRes);
         mSfChoreographer = new SurfaceFlingerVsyncChoreographer(mHandler, context.getDisplay(),
                 Choreographer.getInstance());
+        final DisplayManager displayManager =
+                (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
+        mDefaultDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
     }
 
     @Override
@@ -364,14 +378,13 @@ public class DividerView extends FrameLayout implements OnTouchListener,
         if (mStableInsets.isEmpty()) {
             SystemServicesProxy.getInstance(mContext).getStableInsets(mStableInsets);
         }
-        int position = (int) (mState.mRatioPositionBeforeMinimized *
-                (isHorizontalDivision() ? mDisplayHeight : mDisplayWidth));
-        mSnapAlgorithm = null;
-        initializeSnapAlgorithm();
 
-        // Set the snap target before minimized but do not save until divider is attached and not
-        // minimized because it does not know its minimized state yet.
-        mSnapTargetBeforeMinimized = mSnapAlgorithm.calculateNonDismissingSnapTarget(position);
+        if (mState.mRatioPositionBeforeMinimized == 0) {
+            // Set the middle target as the initial state
+            mSnapTargetBeforeMinimized = mSnapAlgorithm.getMiddleTarget();
+        } else {
+            repositionSnapTargetBeforeMinimized();
+        }
     }
 
     public WindowManagerProxy getWindowManagerProxy() {
@@ -381,15 +394,15 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     public Rect getNonMinimizedSplitScreenSecondaryBounds() {
         calculateBoundsForPosition(mSnapTargetBeforeMinimized.position,
                 DockedDividerUtils.invertDockSide(mDockSide), mOtherTaskRect);
+        mOtherTaskRect.bottom -= mStableInsets.bottom;
         switch (mDockSide) {
             case WindowManager.DOCKED_LEFT:
+                mOtherTaskRect.top += mStableInsets.top;
                 mOtherTaskRect.right -= mStableInsets.right;
                 break;
             case WindowManager.DOCKED_RIGHT:
-                mOtherTaskRect.left -= mStableInsets.left;
-                break;
-            case WindowManager.DOCKED_TOP:
-                mOtherTaskRect.bottom -= mStableInsets.bottom;
+                mOtherTaskRect.top += mStableInsets.top;
+                mOtherTaskRect.left += mStableInsets.left;
                 break;
         }
         return mOtherTaskRect;
@@ -401,6 +414,11 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             mHandle.setTouching(true, animate);
         }
         mDockSide = mWindowManagerProxy.getDockSide();
+
+        // Update snap algorithm if rotation has occurred
+        if (mDisplayRotation != mDefaultDisplay.getRotation()) {
+            updateDisplayInfo();
+        }
         initializeSnapAlgorithm();
         mWindowManagerProxy.setResizing(true);
         if (touching) {
@@ -451,7 +469,7 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     private void initializeSnapAlgorithm() {
         if (mSnapAlgorithm == null) {
             mSnapAlgorithm = new DividerSnapAlgorithm(getContext().getResources(), mDisplayWidth,
-                    mDisplayHeight, mDividerSize, isHorizontalDivision(), mStableInsets);
+                    mDisplayHeight, mDividerSize, isHorizontalDivision(), mStableInsets, mDockSide);
         }
         if (mMinimizedSnapAlgorithm == null) {
             mMinimizedSnapAlgorithm = new DividerSnapAlgorithm(getContext().getResources(),
@@ -618,7 +636,10 @@ public class DividerView extends FrameLayout implements OnTouchListener,
                 } else {
                     saveTarget = snapTarget;
                 }
-                saveSnapTargetBeforeMinimized(saveTarget);
+                if (saveTarget.position != mSnapAlgorithm.getDismissEndTarget().position
+                        && saveTarget.position != mSnapAlgorithm.getDismissStartTarget().position) {
+                    saveSnapTargetBeforeMinimized(saveTarget);
+                }
             }
         };
         Runnable notCancelledEndAction = () -> {
@@ -762,6 +783,8 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             initializeSnapAlgorithm();
             if (mIsInMinimizeInteraction != minimized) {
                 if (minimized) {
+                    // Relayout to recalculate the divider shadow when minimizing
+                    requestLayout();
                     mIsInMinimizeInteraction = true;
                     resizeStack(mMinimizedSnapAlgorithm.getMiddleTarget());
                 } else {
@@ -878,17 +901,42 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     }
 
     public void notifyDockSideChanged(int newDockSide) {
+        int oldDockSide = mDockSide;
         mDockSide = newDockSide;
         mMinimizedShadow.setDockSide(mDockSide);
         requestLayout();
+
+        // Update the snap position to the new docked side with correct insets
+        SystemServicesProxy.getInstance(mContext).getStableInsets(mStableInsets);
+        mMinimizedSnapAlgorithm = null;
+        initializeSnapAlgorithm();
+
+        if (oldDockSide == DOCKED_LEFT && mDockSide == DOCKED_RIGHT
+                || oldDockSide == DOCKED_RIGHT && mDockSide == DOCKED_LEFT) {
+            repositionSnapTargetBeforeMinimized();
+        }
+
+        // Landscape to seascape rotation requires minimized to resize docked app correctly
+        if (mHomeStackResizable && mDockedStackMinimized) {
+            resizeStack(mMinimizedSnapAlgorithm.getMiddleTarget());
+        }
+    }
+
+    private void repositionSnapTargetBeforeMinimized() {
+        int position = (int) (mState.mRatioPositionBeforeMinimized *
+                (isHorizontalDivision() ? mDisplayHeight : mDisplayWidth));
+        mSnapAlgorithm = null;
+        initializeSnapAlgorithm();
+
+        // Set the snap target before minimized but do not save until divider is attached and not
+        // minimized because it does not know its minimized state yet.
+        mSnapTargetBeforeMinimized = mSnapAlgorithm.calculateNonDismissingSnapTarget(position);
     }
 
     private void updateDisplayInfo() {
-        final DisplayManager displayManager =
-                (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
-        Display display = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+        mDisplayRotation = mDefaultDisplay.getRotation();
         final DisplayInfo info = new DisplayInfo();
-        display.getDisplayInfo(info);
+        mDefaultDisplay.getDisplayInfo(info);
         mDisplayWidth = info.logicalWidth;
         mDisplayHeight = info.logicalHeight;
         mSnapAlgorithm = null;
@@ -964,30 +1012,45 @@ public class DividerView extends FrameLayout implements OnTouchListener,
                     mDockedTaskRect);
             calculateBoundsForPosition(mSnapTargetBeforeMinimized.position,
                     DockedDividerUtils.invertDockSide(mDockSide), mOtherTaskRect);
+
+            // Move a right-docked-app to line up with the divider while dragging it
+            if (mDockSide == DOCKED_RIGHT) {
+                mDockedTaskRect.offset(Math.max(position, mStableInsets.left - mDividerSize)
+                        - mDockedTaskRect.left + mDividerSize, 0);
+                mOtherTaskRect.offset(mStableInsets.left, 0);
+            }
             mWindowManagerProxy.resizeDockedStack(mDockedRect, mDockedTaskRect, mDockedTaskRect,
                     mOtherTaskRect, null);
             return;
         }
 
         if (mEntranceAnimationRunning && taskPosition != TASK_POSITION_SAME) {
-            if (mCurrentAnimator != null) {
-                calculateBoundsForPosition(taskPosition, mDockSide, mDockedTaskRect);
-            } else {
-                calculateBoundsForPosition(isHorizontalDivision() ? mDisplayHeight : mDisplayWidth,
-                        mDockSide, mDockedTaskRect);
+            calculateBoundsForPosition(taskPosition, mDockSide, mDockedTaskRect);
+
+            // Move a docked app if from the right in position with the divider up to insets
+            if (mDockSide == DOCKED_RIGHT) {
+                mDockedTaskRect.offset(Math.max(position, mStableInsets.left - mDividerSize)
+                        - mDockedTaskRect.left + mDividerSize, 0);
+                mOtherTaskRect.offset(mStableInsets.left, 0);
             }
             calculateBoundsForPosition(taskPosition, DockedDividerUtils.invertDockSide(mDockSide),
                     mOtherTaskRect);
             mWindowManagerProxy.resizeDockedStack(mDockedRect, mDockedTaskRect, null,
                     mOtherTaskRect, null);
         } else if (mExitAnimationRunning && taskPosition != TASK_POSITION_SAME) {
-            calculateBoundsForPosition(taskPosition,
-                    mDockSide, mDockedTaskRect);
+            calculateBoundsForPosition(taskPosition, mDockSide, mDockedTaskRect);
+            mDockedInsetRect.set(mDockedTaskRect);
             calculateBoundsForPosition(mExitStartPosition,
                     DockedDividerUtils.invertDockSide(mDockSide), mOtherTaskRect);
             mOtherInsetRect.set(mOtherTaskRect);
             applyExitAnimationParallax(mOtherTaskRect, position);
-            mWindowManagerProxy.resizeDockedStack(mDockedRect, mDockedTaskRect, null,
+
+            // Move a right-docked-app to line up with the divider while dragging it
+            if (mDockSide == DOCKED_RIGHT) {
+                mDockedTaskRect.offset(position - mStableInsets.left + mDividerSize, 0);
+                mOtherTaskRect.offset(mStableInsets.left, 0);
+            }
+            mWindowManagerProxy.resizeDockedStack(mDockedRect, mDockedTaskRect, mDockedInsetRect,
                     mOtherTaskRect, mOtherInsetRect);
         } else if (taskPosition != TASK_POSITION_SAME) {
             calculateBoundsForPosition(position, DockedDividerUtils.invertDockSide(mDockSide),
@@ -999,17 +1062,17 @@ public class DividerView extends FrameLayout implements OnTouchListener,
                     restrictDismissingTaskPosition(taskPosition, dockSideInverted, taskSnapTarget);
             calculateBoundsForPosition(taskPositionDocked, mDockSide, mDockedTaskRect);
             calculateBoundsForPosition(taskPositionOther, dockSideInverted, mOtherTaskRect);
-            mDisplayRect.set(0, 0, mDisplayWidth, mDisplayHeight);
+            mTmpRect.set(0, 0, mDisplayWidth, mDisplayHeight);
             alignTopLeft(mDockedRect, mDockedTaskRect);
             alignTopLeft(mOtherRect, mOtherTaskRect);
             mDockedInsetRect.set(mDockedTaskRect);
             mOtherInsetRect.set(mOtherTaskRect);
             if (dockSideTopLeft(mDockSide)) {
-                alignTopLeft(mDisplayRect, mDockedInsetRect);
-                alignBottomRight(mDisplayRect, mOtherInsetRect);
+                alignTopLeft(mTmpRect, mDockedInsetRect);
+                alignBottomRight(mTmpRect, mOtherInsetRect);
             } else {
-                alignBottomRight(mDisplayRect, mDockedInsetRect);
-                alignTopLeft(mDisplayRect, mOtherInsetRect);
+                alignBottomRight(mTmpRect, mDockedInsetRect);
+                alignTopLeft(mTmpRect, mOtherInsetRect);
             }
             applyDismissingParallax(mDockedTaskRect, mDockSide, taskSnapTarget, position,
                     taskPositionDocked);
@@ -1228,23 +1291,22 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             startDragging(false /* animate */, false /* touching */);
         }
         updateDockSide();
-        int position = DockedDividerUtils.calculatePositionForBounds(event.initialRect,
-                mDockSide, mDividerSize);
         mEntranceAnimationRunning = true;
 
-        resizeStack(position, mSnapAlgorithm.getMiddleTarget().position,
+        resizeStack(calculatePositionForInsetBounds(), mSnapAlgorithm.getMiddleTarget().position,
                 mSnapAlgorithm.getMiddleTarget());
     }
 
     public void onRecentsDrawn() {
+        updateDockSide();
+        final int position = calculatePositionForInsetBounds();
         if (mState.animateAfterRecentsDrawn) {
             mState.animateAfterRecentsDrawn = false;
-            updateDockSide();
 
             mHandler.post(() -> {
                 // Delay switching resizing mode because this might cause jank in recents animation
                 // that's longer than this animation.
-                stopDragging(getCurrentPosition(), mSnapAlgorithm.getMiddleTarget(),
+                stopDragging(position, getSnapAlgorithm().getMiddleTarget(),
                         mLongPressEntraceAnimDuration, Interpolators.FAST_OUT_SLOW_IN,
                         200 /* endDelay */);
             });
@@ -1253,7 +1315,7 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             mState.growAfterRecentsDrawn = false;
             updateDockSide();
             EventBus.getDefault().send(new RecentsGrowingEvent());
-            stopDragging(getCurrentPosition(), mSnapAlgorithm.getMiddleTarget(), 336,
+            stopDragging(position, getSnapAlgorithm().getMiddleTarget(), 336,
                     Interpolators.FAST_OUT_SLOW_IN);
         }
     }
@@ -1273,5 +1335,11 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             stopDragging(mExitStartPosition, target, 336 /* duration */, 100 /* startDelay */,
                     0 /* endDelay */, Interpolators.FAST_OUT_SLOW_IN);
         }
+    }
+
+    private int calculatePositionForInsetBounds() {
+        mTmpRect.set(0, 0, mDisplayWidth, mDisplayHeight);
+        mTmpRect.inset(mStableInsets);
+        return DockedDividerUtils.calculatePositionForBounds(mTmpRect, mDockSide, mDividerSize);
     }
 }

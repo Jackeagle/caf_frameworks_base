@@ -41,6 +41,7 @@ import android.util.Pair;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -178,9 +179,10 @@ public class QuickStatusBarHeader extends RelativeLayout implements
 
         mBatteryMeterView = findViewById(R.id.battery);
         mBatteryMeterView.setForceShowPercent(true);
+        mBatteryMeterView.setOnClickListener(this);
         mClockView = findViewById(R.id.clock);
+        mClockView.setOnClickListener(this);
         mDateView = findViewById(R.id.date);
-        mDateView.setOnClickListener(this);
     }
 
     private void updateStatusText() {
@@ -412,9 +414,12 @@ public class QuickStatusBarHeader extends RelativeLayout implements
 
     @Override
     public void onClick(View v) {
-        if(v == mDateView){
+        if (v == mClockView) {
             Dependency.get(ActivityStarter.class).postStartActivityDismissingKeyguard(new Intent(
                     AlarmClock.ACTION_SHOW_ALARMS),0);
+        } else if (v == mBatteryMeterView) {
+            Dependency.get(ActivityStarter.class).postStartActivityDismissingKeyguard(new Intent(
+                    Intent.ACTION_POWER_USAGE_SUMMARY),0);
         }
     }
 
@@ -590,5 +595,17 @@ public class QuickStatusBarHeader extends RelativeLayout implements
 
     public static float getColorIntensity(@ColorInt int color) {
         return color == Color.WHITE ? 0 : 1;
+    }
+
+    public void setMargins(int sideMargins) {
+        for (int i = 0; i < getChildCount(); i++) {
+            View v = getChildAt(i);
+            if (v == mSystemIconsView || v == mQuickQsStatusIcons || v == mHeaderQsPanel) {
+                continue;
+            }
+            RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) v.getLayoutParams();
+            lp.leftMargin = sideMargins;
+            lp.rightMargin = sideMargins;
+        }
     }
 }

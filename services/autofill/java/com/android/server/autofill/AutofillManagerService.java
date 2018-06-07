@@ -157,6 +157,9 @@ public final class AutofillManagerService extends SystemService {
         }
     };
 
+    @GuardedBy("mLock")
+    private boolean mAllowInstantService;
+
     public AutofillManagerService(Context context) {
         super(context);
         mContext = context;
@@ -219,6 +222,8 @@ public final class AutofillManagerService extends SystemService {
                     final String activePackageName = getActiveAutofillServicePackageName();
                     if (packageName.equals(activePackageName)) {
                         removeCachedServiceLocked(getChangingUserId());
+                    } else {
+                        handlePackageUpdateLocked(packageName);
                     }
                 }
             }
@@ -250,6 +255,8 @@ public final class AutofillManagerService extends SystemService {
                                 return true;
                             }
                             removeCachedServiceLocked(getChangingUserId());
+                        } else {
+                          handlePackageUpdateLocked(pkg);
                         }
                     }
                 }
@@ -273,6 +280,14 @@ public final class AutofillManagerService extends SystemService {
                     return null;
                 }
                 return serviceComponent.getPackageName();
+            }
+
+            @GuardedBy("mLock")
+            private void handlePackageUpdateLocked(String packageName) {
+                final int size = mServicesCache.size();
+                for (int i = 0; i < size; i++) {
+                    mServicesCache.valueAt(i).handlePackageUpdateLocked(packageName);
+                }
             }
         };
 
@@ -506,6 +521,23 @@ public final class AutofillManagerService extends SystemService {
         sFullScreenMode = mode;
     }
 
+    // Called by Shell command.
+    boolean getAllowInstantService() {
+        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+        synchronized (mLock) {
+            return mAllowInstantService;
+        }
+    }
+
+    // Called by Shell command.
+    void setAllowInstantService(boolean mode) {
+        mContext.enforceCallingPermission(MANAGE_AUTO_FILL, TAG);
+        Slog.i(TAG, "setAllowInstantService(): " + mode);
+        synchronized (mLock) {
+            mAllowInstantService = mode;
+        }
+    }
+
     private void setDebugLocked(boolean debug) {
         com.android.server.autofill.Helper.sDebug = debug;
         android.view.autofill.Helper.sDebug = debug;
@@ -556,7 +588,7 @@ public final class AutofillManagerService extends SystemService {
 
     private void addCompatibilityModeRequestsLocked(@NonNull AutofillManagerServiceImpl service
             , int userId) {
-        mAutofillCompatState.reset();
+        mAutofillCompatState.reset(userId);
         final ArrayMap<String, Long> compatPackages =
                 service.getCompatibilityPackagesLocked();
         if (compatPackages == null || compatPackages.isEmpty()) {
@@ -689,6 +721,9 @@ public final class AutofillManagerService extends SystemService {
     static final class AutofillCompatState {
         private final Object mLock = new Object();
 
+        /**
+         * Map of app->compat_state per user.
+         */
         @GuardedBy("mLock")
         private SparseArray<ArrayMap<String, PackageCompatState>> mUserSpecs;
 
@@ -755,11 +790,17 @@ public final class AutofillManagerService extends SystemService {
             }
         }
 
-        void reset() {
+        void reset(int userId) {
             synchronized (mLock) {
                 if (mUserSpecs != null) {
-                    mUserSpecs.clear();
-                    mUserSpecs = null;
+                    mUserSpecs.delete(userId);
+                    final int newSize = mUserSpecs.size();
+                    if (newSize == 0) {
+                        if (sVerbose) Slog.v(TAG, "reseting mUserSpecs");
+                        mUserSpecs = null;
+                    } else {
+                        if (sVerbose) Slog.v(TAG, "mUserSpecs down to " + newSize);
+                    }
                 }
             }
         }
@@ -774,7 +815,7 @@ public final class AutofillManagerService extends SystemService {
              for (int i = 0; i < mUserSpecs.size(); i++) {
                  final int user = mUserSpecs.keyAt(i);
                  pw.print(prefix); pw.print("User: "); pw.println(user);
-                 final ArrayMap<String,PackageCompatState> perUser = mUserSpecs.get(i);
+                 final ArrayMap<String, PackageCompatState> perUser = mUserSpecs.valueAt(i);
                  for (int j = 0; j < perUser.size(); j++) {
                      final String packageName = perUser.keyAt(j);
                      final PackageCompatState state = perUser.valueAt(j);
@@ -854,7 +895,8 @@ public final class AutofillManagerService extends SystemService {
             synchronized (mLock) {
                 final AutofillManagerServiceImpl service = getServiceForUserLocked(userId);
                 return service.startSessionLocked(activityToken, getCallingUid(), appCallback,
-                        autofillId, bounds, value, hasCallback, flags, componentName, compatMode);
+                        autofillId, bounds, value, hasCallback, componentName, compatMode,
+                        mAllowInstantService, flags);
             }
         }
 
@@ -1190,6 +1232,7 @@ public final class AutofillManagerService extends SystemService {
                     mAutofillCompatState.dump(prefix2, pw);
                     pw.print(prefix2); pw.print("from settings: ");
                     pw.println(getWhitelistedCompatModePackagesFromSettings());
+                    pw.print("Allow instant service: "); pw.println(mAllowInstantService);
                 }
                 if (showHistory) {
                     pw.println(); pw.println("Requests history:"); pw.println();

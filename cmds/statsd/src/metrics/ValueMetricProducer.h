@@ -51,7 +51,7 @@ public:
                           const int64_t version) override {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        if (mPullTagId != -1) {
+        if (mPullTagId != -1 && (mCondition == true || mConditionTrackerIndex < 0) ) {
             vector<shared_ptr<LogEvent>> allData;
             mStatsPullerManager->Pull(mPullTagId, eventTimeNs, &allData);
             if (allData.size() == 0) {
@@ -73,7 +73,9 @@ public:
                 data->setElapsedTimestampNs(eventTimeNs);
                 onMatchedLogEventLocked(0, *data);
             }
-        } else {  // For pushed value metric, we simply flush and reset the current bucket start.
+        } else {
+            // For pushed value metric or pulled metric where condition is not true,
+            // we simply flush and reset the current bucket start.
             flushCurrentBucketLocked(eventTimeNs);
             mCurrentBucketStartTimeNs = eventTimeNs;
         }
@@ -88,7 +90,9 @@ protected:
 private:
     void onDumpReportLocked(const int64_t dumpTimeNs,
                             const bool include_current_partial_bucket,
+                            std::set<string> *str_set,
                             android::util::ProtoOutputStream* protoOutput) override;
+    void clearPastBucketsLocked(const int64_t dumpTimeNs) override;
 
     // Internal interface to handle condition change.
     void onConditionChangedLocked(const bool conditionMet, const int64_t eventTime) override;
@@ -162,10 +166,13 @@ private:
 
     const size_t mDimensionHardLimit;
 
+    const bool mUseAbsoluteValueOnReset;
+
     FRIEND_TEST(ValueMetricProducerTest, TestNonDimensionalEvents);
     FRIEND_TEST(ValueMetricProducerTest, TestEventsWithNonSlicedCondition);
     FRIEND_TEST(ValueMetricProducerTest, TestPushedEventsWithUpgrade);
     FRIEND_TEST(ValueMetricProducerTest, TestPulledValueWithUpgrade);
+    FRIEND_TEST(ValueMetricProducerTest, TestPulledValueWithUpgradeWhileConditionFalse);
     FRIEND_TEST(ValueMetricProducerTest, TestPushedEventsWithoutCondition);
     FRIEND_TEST(ValueMetricProducerTest, TestAnomalyDetection);
     FRIEND_TEST(ValueMetricProducerTest, TestBucketBoundaryNoCondition);

@@ -32,7 +32,7 @@
     <string name="status_bar_no_notifications_title" msgid="4755261167193833213">"কোনো জাননী নাই"</string>
     <string name="status_bar_ongoing_events_title" msgid="1682504513316879202">"চলিত"</string>
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"জাননীসমূহ"</string>
-    <string name="battery_low_title" msgid="6456385927409742437">"বেটাৰি কম আছে"</string>
+    <string name="battery_low_title" msgid="9187898087363540349">"বেটাৰি অতি সোনকালে শেষ হ\'ব পাৰে"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"<xliff:g id="PERCENTAGE">%s</xliff:g> বাকী আছে"</string>
     <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"<xliff:g id="PERCENTAGE">%s</xliff:g> অৱশিষ্ট আছে, আপোনাৰ ব্যৱহাৰক ভিত্তি কৰি প্ৰায় <xliff:g id="TIME">%s</xliff:g> বাকী আছে"</string>
     <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"<xliff:g id="PERCENTAGE">%s</xliff:g> অৱশিষ্ট আছে, প্ৰায় <xliff:g id="TIME">%s</xliff:g> বাকী"</string>
@@ -95,8 +95,9 @@
     <string name="accessibility_unlock_button" msgid="128158454631118828">"আনলক কৰক"</string>
     <string name="accessibility_waiting_for_fingerprint" msgid="4808860050517462885">"ফিংগাৰপ্ৰিণ্টৰ বাবে ৰৈ থকা হৈছে"</string>
     <string name="accessibility_unlock_without_fingerprint" msgid="7541705575183694446">"ফিংগাৰপ্ৰিণ্ট ব্যৱহাৰ নকৰাকৈ আনলক কৰক"</string>
-    <!-- no translation found for accessibility_send_smart_reply (7766727839703044493) -->
+    <!-- no translation found for accessibility_scanning_face (769545173211758586) -->
     <skip />
+    <string name="accessibility_send_smart_reply" msgid="7766727839703044493">"পঠিয়াওক"</string>
     <string name="unlock_label" msgid="8779712358041029439">"আনলক কৰক"</string>
     <string name="phone_label" msgid="2320074140205331708">"ফ\'ন খোলক"</string>
     <string name="voice_assist_label" msgid="3956854378310019854">"কণ্ঠধ্বনিৰে সহায় খোলক"</string>
@@ -208,10 +209,8 @@
     <string name="accessibility_quick_settings_airplane_on" msgid="6406141469157599296">"এয়াৰপ্লেইন ম\'ড অন হৈ আছে৷"</string>
     <string name="accessibility_quick_settings_airplane_changed_off" msgid="66846307818850664">"এয়াৰপ্লেইন ম\'ড অফ কৰা হ\'ল।"</string>
     <string name="accessibility_quick_settings_airplane_changed_on" msgid="8983005603505087728">"এয়াৰপ্লেইন ম\'ড অন কৰা হ\'ল।"</string>
-    <!-- no translation found for accessibility_quick_settings_dnd_none_on (2960643943620637020) -->
-    <skip />
-    <!-- no translation found for accessibility_quick_settings_dnd_alarms_on (3357131899365865386) -->
-    <skip />
+    <string name="accessibility_quick_settings_dnd_none_on" msgid="2960643943620637020">"সম্পূৰ্ণ নিৰৱতা"</string>
+    <string name="accessibility_quick_settings_dnd_alarms_on" msgid="3357131899365865386">"কেৱল এলাৰ্মবোৰৰ বাবে"</string>
     <string name="accessibility_quick_settings_dnd" msgid="6607873236717185815">"অসুবিধা নিদিব।"</string>
     <string name="accessibility_quick_settings_dnd_changed_off" msgid="898107593453022935">"অসুবিধা নিদিব বন্ধ কৰা হ\'ল।"</string>
     <string name="accessibility_quick_settings_dnd_changed_on" msgid="4483780856613561039">"অসুবিধা নিদিব অন কৰা হৈছে।"</string>
@@ -370,6 +369,8 @@
     <string name="recents_accessibility_split_screen_top" msgid="9056056469282256287">"স্ক্ৰীণখনক ওপৰফাললৈ ভাগ কৰক"</string>
     <string name="recents_accessibility_split_screen_left" msgid="8987144699630620019">"স্ক্ৰীণখনক বাওঁফাললৈ ভাগ কৰক"</string>
     <string name="recents_accessibility_split_screen_right" msgid="275069779299592867">"স্ক্ৰীণখনক সোঁফাললৈ ভাগ কৰক"</string>
+    <!-- no translation found for quick_step_accessibility_toggle_overview (7171470775439860480) -->
+    <skip />
     <string name="expanded_header_battery_charged" msgid="5945855970267657951">"চ্চার্জ হ\'ল"</string>
     <string name="expanded_header_battery_charging" msgid="205623198487189724">"চ্চার্জ হৈ আছে"</string>
     <string name="expanded_header_battery_charging_with_time" msgid="457559884275395376">"বেটাৰিৰ চ্চাৰ্জ সম্পূর্ণ হ\'বলৈ <xliff:g id="CHARGING_TIME">%s</xliff:g> বাকী"</string>
@@ -543,6 +544,12 @@
     <string name="volume_stream_content_description_mute" msgid="3625049841390467354">"%1$s। মিউট কৰিবলৈ টিপক। দিব্য়াংগসকলৰ বাবে থকা সেৱা মিউট হৈ থাকিব পাৰে।"</string>
     <string name="volume_stream_content_description_vibrate_a11y" msgid="6427727603978431301">"%1$s। কম্পন অৱস্থাত ছেট কৰিবলৈ টিপক।"</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="8995013018414535494">"%1$s। মিউট কৰিবলৈ টিপক।"</string>
+    <!-- no translation found for volume_ringer_hint_mute (9199811307292269601) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_unmute (6602880133293060368) -->
+    <skip />
+    <!-- no translation found for volume_ringer_hint_vibrate (4036802135666515202) -->
+    <skip />
     <string name="volume_dialog_title" msgid="7272969888820035876">"%s ধ্বনি নিয়ন্ত্ৰণসমূহ"</string>
     <string name="volume_dialog_ringer_guidance_ring" msgid="3360373718388509040">"কল আৰু জাননীবোৰ ইমান ভলিউমত বাজিব (<xliff:g id="VOLUME_LEVEL">%1$s</xliff:g>)"</string>
     <string name="output_title" msgid="5355078100792942802">"মিডিয়া আউটপুট"</string>
@@ -608,20 +615,22 @@
     <string name="inline_minimize_button" msgid="966233327974702195">"সৰু কৰক"</string>
     <string name="inline_keep_showing_app" msgid="1723113469580031041">"এই এপটোৰ জাননী দেখুওৱাই থাকিব লাগিবনে?"</string>
     <string name="notification_unblockable_desc" msgid="1037434112919403708">"এই জাননীসমূহ বন্ধ কৰিব নোৱাৰি"</string>
-    <string name="notification_appops_camera_active" msgid="730959943016785931">"কেমেৰা"</string>
-    <string name="notification_appops_microphone_active" msgid="1546319728924580686">"মাইক্ৰ\'ফ\'ন"</string>
-    <string name="notification_appops_overlay_active" msgid="633813008357934729">"স্ক্ৰীণত অইন এপৰ ওপৰত দেখুৱাওক"</string>
-    <plurals name="notification_appops" formatted="false" msgid="1258122060887196817">
-      <item quantity="one">এই এপটোৱে <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> আৰু <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>।</item>
-      <item quantity="other">এই এপটোৱে <xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> আৰু <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g>।</item>
-    </plurals>
-    <plurals name="notification_using" formatted="false" msgid="2211008461429037973">
-      <item quantity="one"><xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> আৰু <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g> ব্যৱহাৰ কৰি আছে</item>
-      <item quantity="other"><xliff:g id="PERFORMING_ACTIVITY_1">%1$s</xliff:g> আৰু <xliff:g id="PERFORMING_ACTIVITY_2">%2$s</xliff:g> ব্যৱহাৰ কৰি আছে</item>
-    </plurals>
-    <string name="notification_appops_settings" msgid="1028328314935908050">"ছেটিংসমূহ"</string>
-    <!-- no translation found for notification_appops_ok (1156966426011011434) -->
+    <!-- no translation found for appops_camera (8100147441602585776) -->
     <skip />
+    <!-- no translation found for appops_microphone (741508267659494555) -->
+    <skip />
+    <!-- no translation found for appops_overlay (6165912637560323464) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic (1576901651150187433) -->
+    <skip />
+    <!-- no translation found for appops_camera_overlay (8869400080809298814) -->
+    <skip />
+    <!-- no translation found for appops_mic_overlay (4835157962857919804) -->
+    <skip />
+    <!-- no translation found for appops_camera_mic_overlay (6718768197048030993) -->
+    <skip />
+    <string name="notification_appops_settings" msgid="1028328314935908050">"ছেটিংসমূহ"</string>
+    <string name="notification_appops_ok" msgid="1156966426011011434">"ঠিক আছে"</string>
     <string name="notification_channel_controls_opened_accessibility" msgid="6553950422055908113">"<xliff:g id="APP_NAME">%1$s</xliff:g>ৰ জাননী নিয়ন্ত্ৰণসমূহ খোলা অৱস্থাত আছে"</string>
     <string name="notification_channel_controls_closed_accessibility" msgid="7521619812603693144">"<xliff:g id="APP_NAME">%1$s</xliff:g>ৰ জাননী নিয়ন্ত্ৰণসমূহ বন্ধ অৱস্থাত আছে"</string>
     <string name="notification_channel_switch_accessibility" msgid="3420796005601900717">"এই চ্চেনেলৰ পৰা জাননী দিবলৈ অনুমতি দিয়ক"</string>
@@ -674,7 +683,7 @@
     <string name="keyboard_key_num_lock" msgid="5052537581246772117">"সংখ্য়া লক"</string>
     <string name="keyboard_key_numpad_template" msgid="8729216555174634026">"নামপেড <xliff:g id="NAME">%1$s</xliff:g>"</string>
     <string name="keyboard_shortcut_group_system" msgid="6472647649616541064">"ছিষ্টেম"</string>
-    <string name="keyboard_shortcut_group_system_home" msgid="3054369431319891965">"হ\'ম স্ক্ৰীণ"</string>
+    <string name="keyboard_shortcut_group_system_home" msgid="3054369431319891965">"গৃহ স্ক্ৰীণ"</string>
     <string name="keyboard_shortcut_group_system_recents" msgid="3154851905021926744">"শেহতীয়াসমূহ"</string>
     <string name="keyboard_shortcut_group_system_back" msgid="2207004531216446378">"উভতি যাওক"</string>
     <string name="keyboard_shortcut_group_system_notifications" msgid="8366964080041773224">"জাননীসমূহ"</string>
@@ -855,4 +864,6 @@
     <string name="auto_saver_enabled_text" msgid="874711029884777579">"বেটাৰি চ্চাৰ্জৰ স্তৰ <xliff:g id="PERCENTAGE">%d</xliff:g>%%তকৈ কম হোৱাৰ লগে লগে বেটাৰি সঞ্চয়কাৰী স্বয়ংক্ৰিয়ভাৱে অন হ’ব।"</string>
     <string name="open_saver_setting_action" msgid="8314624730997322529">"ছেটিংবোৰ"</string>
     <string name="auto_saver_okay_action" msgid="2701221740227683650">"বুজি পালোঁ"</string>
+    <!-- no translation found for heap_dump_tile_name (9141031328971226374) -->
+    <skip />
 </resources>

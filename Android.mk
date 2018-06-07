@@ -448,6 +448,7 @@ LOCAL_DROIDDOC_OPTIONS:=\
 		-showAnnotation android.annotation.SystemApi \
 		-showAnnotation android.annotation.TestApi \
 		-privateDexApi $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE) \
+		-removedDexApi $(INTERNAL_PLATFORM_REMOVED_DEX_API_FILE) \
 		-nodocs
 
 LOCAL_DROIDDOC_CUSTOM_TEMPLATE_DIR:=external/doclava/res/assets/templates-sdk
@@ -456,7 +457,8 @@ LOCAL_UNINSTALLABLE_MODULE := true
 
 include $(BUILD_DROIDDOC)
 
-$(full_target): .KATI_IMPLICIT_OUTPUTS := $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE)
+$(full_target): .KATI_IMPLICIT_OUTPUTS := $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE) \
+                                          $(INTERNAL_PLATFORM_REMOVED_DEX_API_FILE)
 
 # ====  check javadoc comments but don't generate docs ========
 include $(CLEAR_VARS)
@@ -865,16 +867,67 @@ LOCAL_ERROR_PRONE_FLAGS := -XepDisableAllChecks
 include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # ==== hiddenapi lists =======================================
+include $(CLEAR_VARS)
 
-# Copy light and dark greylist over into the build folder.
-# This is for ART buildbots which need to mock these lists and have alternative
-# rules for building them. Other rules in the build system should depend on the
-# files in the build folder.
+# File names of final API lists
+LOCAL_LIGHT_GREYLIST := $(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST)
+LOCAL_DARK_GREYLIST := $(INTERNAL_PLATFORM_HIDDENAPI_DARK_GREYLIST)
+LOCAL_BLACKLIST := $(INTERNAL_PLATFORM_HIDDENAPI_BLACKLIST)
 
-# Automatically add all methods which match the following signatures.
-# These need to be greylisted in order to allow applications to write their
-# own serializers.
-$(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST): REGEX_SERIALIZATION := \
+# File names of source files we will use to generate the final API lists.
+LOCAL_SRC_GREYLIST := frameworks/base/config/hiddenapi-light-greylist.txt
+LOCAL_SRC_VENDOR_LIST := frameworks/base/config/hiddenapi-vendor-list.txt
+LOCAL_SRC_FORCE_BLACKLIST := frameworks/base/config/hiddenapi-force-blacklist.txt
+LOCAL_SRC_PRIVATE_API := $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE)
+LOCAL_SRC_REMOVED_API := $(INTERNAL_PLATFORM_REMOVED_DEX_API_FILE)
+
+LOCAL_SRC_ALL := \
+	$(LOCAL_SRC_GREYLIST) \
+	$(LOCAL_SRC_VENDOR_LIST) \
+	$(LOCAL_SRC_FORCE_BLACKLIST) \
+	$(LOCAL_SRC_PRIVATE_API) \
+	$(LOCAL_SRC_REMOVED_API)
+
+define assert-has-no-overlap
+if [ ! -z "`comm -12 <(sort $(1)) <(sort $(2))`" ]; then \
+	echo "$(1) and $(2) should not overlap" 1>&2; \
+	comm -12 <(sort $(1)) <(sort $(2)) 1>&2; \
+	exit 1; \
+fi
+endef
+
+define assert-is-subset
+if [ ! -z "`comm -23 <(sort $(1)) <(sort $(2))`" ]; then \
+	echo "$(1) must be a subset of $(2)" 1>&2; \
+	comm -23 <(sort $(1)) <(sort $(2)) 1>&2; \
+	exit 1; \
+fi
+endef
+
+define assert-has-no-duplicates
+if [ ! -z "`sort $(1) | uniq -D`" ]; then \
+	echo "$(1) has duplicate entries" 1>&2; \
+	sort $(1) | uniq -D 1>&2; \
+	exit 1; \
+fi
+endef
+
+# The following rules build API lists in the build folder.
+# By not using files from the source tree, ART buildbots can mock these lists
+# or have alternative rules for building them. Other rules in the build system
+# should depend on the files in the build folder.
+
+# Merge light greylist from multiple files:
+#  (1) manual greylist LOCAL_SRC_GREYLIST
+#  (2) list of usages from vendor apps LOCAL_SRC_VENDOR_LIST
+#  (3) list of removed APIs in LOCAL_SRC_REMOVED_API
+#      @removed does not imply private in Doclava. We must take the subset also
+#      in LOCAL_SRC_PRIVATE_API.
+#  (4) list of serialization APIs
+#      Automatically adds all methods which match the signatures in
+#      REGEX_SERIALIZATION. These are greylisted in order to allow applications
+#      to write their own serializers.
+$(LOCAL_LIGHT_GREYLIST): REGEX_SERIALIZATION := \
     "readObject\(Ljava/io/ObjectInputStream;\)V" \
     "readObjectNoData\(\)V" \
     "readResolve\(\)Ljava/lang/Object;" \
@@ -882,42 +935,48 @@ $(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST): REGEX_SERIALIZATION := \
     "serialPersistentFields:\[Ljava/io/ObjectStreamField;" \
     "writeObject\(Ljava/io/ObjectOutputStream;\)V" \
     "writeReplace\(\)Ljava/lang/Object;"
-$(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST): PRIVATE_API := $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE)
-# Temporarily merge light greylist from two files. Vendor list will become dark
-# grey once we remove the UI toast.
-$(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST): frameworks/base/config/hiddenapi-light-greylist.txt \
-                                               frameworks/base/config/hiddenapi-vendor-list.txt \
-                                               $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE)
-	sort frameworks/base/config/hiddenapi-light-greylist.txt \
-	     frameworks/base/config/hiddenapi-vendor-list.txt \
-	     <(grep -E "\->("$(subst $(space),"|",$(REGEX_SERIALIZATION))")$$" $(PRIVATE_API)) \
-	> $@
+$(LOCAL_LIGHT_GREYLIST): $(LOCAL_SRC_ALL)
+	sort $(LOCAL_SRC_GREYLIST) $(LOCAL_SRC_VENDOR_LIST) \
+	     <(grep -E "\->("$(subst $(space),"|",$(REGEX_SERIALIZATION))")$$" \
+	               $(LOCAL_SRC_PRIVATE_API)) \
+	     <(comm -12 <(sort $(LOCAL_SRC_REMOVED_API)) <(sort $(LOCAL_SRC_PRIVATE_API))) \
+	     > $@
+	$(call assert-has-no-duplicates,$@)
+	$(call assert-is-subset,$@,$(LOCAL_SRC_PRIVATE_API))
+	$(call assert-has-no-overlap,$@,$(LOCAL_SRC_FORCE_BLACKLIST))
 
-$(eval $(call copy-one-file,frameworks/base/config/hiddenapi-dark-greylist.txt,\
-                            $(INTERNAL_PLATFORM_HIDDENAPI_DARK_GREYLIST)))
+# Generate dark greylist as remaining classes and class members in the same
+# package as classes listed in the light greylist.
+# The algorithm is as follows:
+#   (1) extract the class descriptor from each entry in LOCAL_LIGHT_GREYLIST
+#   (2) strip everything after the last forward-slash,
+#       e.g. 'Lpackage/subpackage/class$inner;' turns into 'Lpackage/subpackage/'
+#   (3) insert all entries from LOCAL_SRC_PRIVATE_API which begin with the package
+#       name but do not contain another forward-slash in the class name, e.g.
+#       matching '^Lpackage/subpackage/[^/;]*;'
+#   (4) subtract entries shared with LOCAL_LIGHT_GREYLIST
+$(LOCAL_DARK_GREYLIST): $(LOCAL_SRC_ALL) $(LOCAL_LIGHT_GREYLIST)
+	comm -13 <(sort $(LOCAL_LIGHT_GREYLIST) $(LOCAL_SRC_FORCE_BLACKLIST)) \
+	         <(sed 's/\->.*//' $(LOCAL_LIGHT_GREYLIST) | sed 's/\(.*\/\).*/\1/' | sort | uniq | \
+	               while read PKG_NAME; do \
+	                   grep -E "^$${PKG_NAME}[^/;]*;" $(LOCAL_SRC_PRIVATE_API); \
+	               done | sort | uniq) \
+	         > $@
+	$(call assert-is-subset,$@,$(LOCAL_SRC_PRIVATE_API))
+	$(call assert-has-no-duplicates,$@)
+	$(call assert-has-no-overlap,$@,$(LOCAL_LIGHT_GREYLIST))
+	$(call assert-has-no-overlap,$@,$(LOCAL_SRC_FORCE_BLACKLIST))
 
-# Generate dark greylist as private API minus (blacklist plus light greylist).
-
-$(INTERNAL_PLATFORM_HIDDENAPI_BLACKLIST): PRIVATE_API := $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE)
-$(INTERNAL_PLATFORM_HIDDENAPI_BLACKLIST): LIGHT_GREYLIST := $(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST)
-$(INTERNAL_PLATFORM_HIDDENAPI_BLACKLIST): DARK_GREYLIST := $(INTERNAL_PLATFORM_HIDDENAPI_DARK_GREYLIST)
-$(INTERNAL_PLATFORM_HIDDENAPI_BLACKLIST): $(INTERNAL_PLATFORM_PRIVATE_DEX_API_FILE) \
-                                          $(INTERNAL_PLATFORM_HIDDENAPI_LIGHT_GREYLIST) \
-                                          $(INTERNAL_PLATFORM_HIDDENAPI_DARK_GREYLIST)
-	if [ ! -z "`comm -12 <(sort $(LIGHT_GREYLIST)) <(sort $(DARK_GREYLIST))`" ]; then \
-		echo "There should be no overlap between $(LIGHT_GREYLIST) and $(DARK_GREYLIST)" 1>&2; \
-		comm -12 <(sort $(LIGHT_GREYLIST)) <(sort $(DARK_GREYLIST)) 1>&2; \
-		exit 1; \
-	elif [ ! -z "`comm -13 <(sort $(PRIVATE_API)) <(sort $(LIGHT_GREYLIST))`" ]; then \
-		echo "$(LIGHT_GREYLIST) must be a subset of $(PRIVATE_API)" 1>&2; \
-		comm -13 <(sort $(PRIVATE_API)) <(sort $(LIGHT_GREYLIST)) 1>&2; \
-		exit 2; \
-	elif [ ! -z "`comm -13 <(sort $(PRIVATE_API)) <(sort $(DARK_GREYLIST))`" ]; then \
-		echo "$(DARK_GREYLIST) must be a subset of $(PRIVATE_API)" 1>&2; \
-		comm -13 <(sort $(PRIVATE_API)) <(sort $(DARK_GREYLIST)) 1>&2; \
-		exit 3; \
-	fi
-	comm -23 <(sort $(PRIVATE_API)) <(sort $(LIGHT_GREYLIST) $(DARK_GREYLIST)) > $@
+# Generate blacklist as private API minus (light greylist plus dark greylist).
+$(LOCAL_BLACKLIST): $(LOCAL_SRC_ALL) $(LOCAL_LIGHT_GREYLIST) $(LOCAL_DARK_GREYLIST)
+	comm -13 <(sort $(LOCAL_LIGHT_GREYLIST) $(LOCAL_DARK_GREYLIST)) \
+	         <(sort $(LOCAL_SRC_PRIVATE_API)) \
+	         > $@
+	$(call assert-is-subset,$@,$(LOCAL_SRC_PRIVATE_API))
+	$(call assert-has-no-duplicates,$@)
+	$(call assert-has-no-overlap,$@,$(LOCAL_LIGHT_GREYLIST))
+	$(call assert-has-no-overlap,$@,$(LOCAL_DARK_GREYLIST))
+	$(call assert-is-subset,$(LOCAL_SRC_FORCE_BLACKLIST),$@)
 
 # Include subdirectory makefiles
 # ============================================================
@@ -929,4 +988,3 @@ include $(call first-makefiles-under,$(LOCAL_PATH))
 endif
 
 endif # ANDROID_BUILD_EMBEDDED
-

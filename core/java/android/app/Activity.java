@@ -979,7 +979,9 @@ public class Activity extends ContextThemeWrapper
     @Override
     protected void attachBaseContext(Context newBase) {
         super.attachBaseContext(newBase);
-        newBase.setAutofillClient(this);
+        if (newBase != null) {
+            newBase.setAutofillClient(this);
+        }
     }
 
     /** @hide */
@@ -5578,7 +5580,10 @@ public class Activity extends ContextThemeWrapper
         if (mParent != null) {
             throw new IllegalStateException("Can only be called on top-level activity");
         }
-        mMainThread.handleRelaunchActivityLocally(mToken);
+        if (Looper.myLooper() != mMainThread.getLooper()) {
+            throw new IllegalStateException("Must be called from main thread");
+        }
+        mMainThread.scheduleRelaunchActivity(mToken);
     }
 
     /**

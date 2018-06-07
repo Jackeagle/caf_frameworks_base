@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#define DEBUG true  // STOPSHIP if true
+#define DEBUG false  // STOPSHIP if true
 #include "Log.h"
 #include "MetricsManager.h"
 #include "statslog.h"
@@ -36,6 +36,7 @@ using android::util::FIELD_COUNT_REPEATED;
 using android::util::FIELD_TYPE_INT32;
 using android::util::FIELD_TYPE_INT64;
 using android::util::FIELD_TYPE_MESSAGE;
+using android::util::FIELD_TYPE_STRING;
 using android::util::ProtoOutputStream;
 
 using std::make_unique;
@@ -61,7 +62,7 @@ MetricsManager::MetricsManager(const ConfigKey& key, const StatsdConfig& config,
     : mConfigKey(key), mUidMap(uidMap),
       mTtlNs(config.has_ttl_in_seconds() ? config.ttl_in_seconds() * NS_PER_SEC : -1),
       mTtlEndNs(-1),
-      mLastReportTimeNs(timeBaseNs),
+      mLastReportTimeNs(currentTimeNs),
       mLastReportWallClockNs(getWallClockNs()) {
     // Init the ttl end timestamp.
     refreshTtl(timeBaseNs);
@@ -192,15 +193,19 @@ void MetricsManager::dropData(const int64_t dropTimeNs) {
 
 void MetricsManager::onDumpReport(const int64_t dumpTimeStampNs,
                                   const bool include_current_partial_bucket,
+                                  std::set<string> *str_set,
                                   ProtoOutputStream* protoOutput) {
     VLOG("=========================Metric Reports Start==========================");
     // one StatsLogReport per MetricProduer
     for (const auto& producer : mAllMetricProducers) {
         if (mNoReportMetricIds.find(producer->getMetricId()) == mNoReportMetricIds.end()) {
-            uint64_t token =
-                    protoOutput->start(FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED | FIELD_ID_METRICS);
-            producer->onDumpReport(dumpTimeStampNs, include_current_partial_bucket, protoOutput);
+            uint64_t token = protoOutput->start(
+                    FIELD_TYPE_MESSAGE | FIELD_COUNT_REPEATED | FIELD_ID_METRICS);
+            producer->onDumpReport(dumpTimeStampNs, include_current_partial_bucket, str_set,
+                                   protoOutput);
             protoOutput->end(token);
+        } else {
+            producer->clearPastBuckets(dumpTimeStampNs);
         }
     }
     for (const auto& annotation : mAnnotations) {
@@ -211,6 +216,7 @@ void MetricsManager::onDumpReport(const int64_t dumpTimeStampNs,
         protoOutput->write(FIELD_TYPE_INT32 | FIELD_ID_ANNOTATIONS_INT32, annotation.second);
         protoOutput->end(token);
     }
+
     mLastReportTimeNs = dumpTimeStampNs;
     mLastReportWallClockNs = getWallClockNs();
     VLOG("=========================Metric Reports End==========================");
@@ -238,16 +244,6 @@ void MetricsManager::onLogEvent(const LogEvent& event) {
         if (loggerUid != appHookUid && loggerUid != AID_STATSD) {
             VLOG("APP_BREADCRUMB_REPORTED has invalid uid: claimed %ld but caller is %d",
                  appHookUid, loggerUid);
-            return;
-        }
-
-        // Label is 2nd from last field and must be from [0, 15].
-        long appHookLabel = event.GetLong(event.size()-1, &err);
-        if (err != NO_ERROR ) {
-            VLOG("APP_BREADCRUMB_REPORTED had error when parsing the label field");
-            return;
-        } else if (appHookLabel < 0 || appHookLabel > 15) {
-            VLOG("APP_BREADCRUMB_REPORTED does not have valid label %ld", appHookLabel);
             return;
         }
 

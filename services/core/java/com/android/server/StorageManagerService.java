@@ -2541,11 +2541,6 @@ class StorageManagerService extends IStorageManager.Stub
         synchronized (mLock) {
             mLocalUnlockedUsers = ArrayUtils.appendInt(mLocalUnlockedUsers, userId);
         }
-        if (userId == UserHandle.USER_SYSTEM) {
-            String propertyName = "sys.user." + userId + ".ce_available";
-            Slog.d(TAG, "Setting property: " + propertyName + "=true");
-            SystemProperties.set(propertyName, "true");
-        }
     }
 
     @Override
@@ -2685,7 +2680,8 @@ class StorageManagerService extends IStorageManager.Stub
         }
 
         // Ignore requests to create directories if CE storage is not available
-        if (!SystemProperties.getBoolean(propertyName, false)) {
+        if ((userId == UserHandle.USER_SYSTEM)
+                && !SystemProperties.getBoolean(propertyName, false)) {
             throw new IllegalStateException("Failed to prepare " + appPath);
         }
 
@@ -2799,7 +2795,7 @@ class StorageManagerService extends IStorageManager.Stub
             final String uuid = null;
             final String state = Environment.MEDIA_REMOVED;
 
-            res.add(0, new StorageVolume(id, path,
+            res.add(0, new StorageVolume(id, path, path,
                     description, primary, removable, emulated,
                     allowMassStorage, maxFileSize, owner, uuid, state));
         }

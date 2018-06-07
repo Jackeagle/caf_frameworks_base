@@ -312,7 +312,7 @@ public class VolumeInfo implements Parcelable {
      * {@link android.Manifest.permission#WRITE_MEDIA_STORAGE}.
      */
     public File getInternalPathForUser(int userId) {
-        if (type == TYPE_PUBLIC && !isVisible()) {
+        if (type == TYPE_PUBLIC) {
             // TODO: plumb through cleaner path from vold
             return new File(path.replace("/storage/", "/mnt/media_rw/"));
         } else {
@@ -332,6 +332,10 @@ public class VolumeInfo implements Parcelable {
         File userPath = getPathForUser(userId);
         if (userPath == null) {
             userPath = new File("/dev/null");
+        }
+        File internalPath = getInternalPathForUser(userId);
+        if (internalPath == null) {
+            internalPath = new File("/dev/null");
         }
 
         String description = null;
@@ -371,7 +375,7 @@ public class VolumeInfo implements Parcelable {
             description = context.getString(android.R.string.unknownName);
         }
 
-        return new StorageVolume(id, userPath, description, isPrimary(), removable,
+        return new StorageVolume(id, userPath, internalPath, description, isPrimary(), removable,
                 emulated, allowMassStorage, maxFileSize, new UserHandle(userId),
                 derivedFsUuid, envState);
     }

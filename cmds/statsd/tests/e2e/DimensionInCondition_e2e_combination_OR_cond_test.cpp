@@ -134,6 +134,9 @@ TEST(DimensionInConditionE2eTest, TestCreateCountMetric_NoLink_OR_CombinationCon
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
 
     EXPECT_EQ(reports.reports_size(), 1);
     EXPECT_EQ(reports.reports(0).metrics_size(), 1);
@@ -347,6 +350,9 @@ TEST(DimensionInConditionE2eTest, TestCreateCountMetric_Link_OR_CombinationCondi
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
 
     EXPECT_EQ(reports.reports_size(), 1);
     EXPECT_EQ(reports.reports(0).metrics_size(), 1);
@@ -528,6 +534,9 @@ TEST(DimensionInConditionE2eTest, TestDurationMetric_NoLink_OR_CombinationCondit
                                 &buffer);
         EXPECT_TRUE(buffer.size() > 0);
         EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+        backfillDimensionPath(&reports);
+        backfillStringInReport(&reports);
+        backfillStartEndTimestamp(&reports);
 
         EXPECT_EQ(reports.reports_size(), 1);
         EXPECT_EQ(reports.reports(0).metrics_size(), 1);
@@ -727,6 +736,9 @@ TEST(DimensionInConditionE2eTest, TestDurationMetric_Link_OR_CombinationConditio
                                 &buffer);
         EXPECT_TRUE(buffer.size() > 0);
         EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+        backfillDimensionPath(&reports);
+        backfillStringInReport(&reports);
+        backfillStartEndTimestamp(&reports);
 
         EXPECT_EQ(reports.reports_size(), 1);
         EXPECT_EQ(reports.reports(0).metrics_size(), 1);

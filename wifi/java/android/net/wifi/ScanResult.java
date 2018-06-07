@@ -134,7 +134,39 @@ public class ScanResult implements Parcelable {
      * Used for Hotspot 2.0.
      */
     public static final int KEY_MGMT_OSEN = 7;
+    /**
+     * @hide
+     * Security key management scheme: FILS_SHA256.
+     */
+    public static final int KEY_MGMT_FILS_SHA256 = 8;
+    /**
+     * @hide
+     * Security key management scheme: FILS_SHA384.
+     */
+    public static final int KEY_MGMT_FILS_SHA384 = 9;
 
+    /**
+     * @hide
+     * Security key management scheme: DPP.
+     */
+    public static final int KEY_MGMT_DPP = 10;
+
+     /**
+     * @hide
+     * Security key management scheme: SAE.
+     */
+    public static final int KEY_MGMT_SAE = 11;
+
+    /**
+     * @hide
+     * Security key management scheme: OWE.
+     */
+    public static final int KEY_MGMT_OWE = 12;
+    /**
+     * @hide
+     * Security key management scheme: SUITE_B_192.
+     */
+    public static final int KEY_MGMT_EAP_SUITE_B_192 = 13;
     /**
      * @hide
      * No cipher suite.
@@ -155,6 +187,11 @@ public class ScanResult implements Parcelable {
      * Cipher suite: CCMP
      */
     public static final int CIPHER_CCMP = 3;
+    /**
+     * @hide
+     * Cipher suite: GCMP
+     */
+    public static final int CIPHER_GCMP = 4;
 
     /**
      * The detected signal level in dBm, also known as the RSSI.
@@ -402,12 +439,14 @@ public class ScanResult implements Parcelable {
         public static final int EID_TIM = 5;
         public static final int EID_BSS_LOAD = 11;
         public static final int EID_ERP = 42;
+        public static final int EID_HT_CAPABILITIES = 45;
         public static final int EID_RSN = 48;
         public static final int EID_EXTENDED_SUPPORTED_RATES = 50;
         public static final int EID_HT_OPERATION = 61;
         public static final int EID_INTERWORKING = 107;
         public static final int EID_ROAMING_CONSORTIUM = 111;
         public static final int EID_EXTENDED_CAPS = 127;
+        public static final int EID_VHT_CAPABILITIES = 191;
         public static final int EID_VHT_OPERATION = 192;
         public static final int EID_VSA = 221;
 

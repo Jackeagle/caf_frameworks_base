@@ -36,6 +36,7 @@ import android.app.usage.UsageStatsManagerInternal;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.ContentProvider;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -49,6 +50,8 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
+import android.os.ShellCallback;
 import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.Slog;
@@ -69,6 +72,7 @@ import org.xmlpull.v1.XmlSerializer;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -155,11 +159,10 @@ public class SliceManagerService extends ISliceManager.Stub {
         enforceAccess(pkg, uri);
         int user = Binder.getCallingUserHandle().getIdentifier();
         uri = maybeAddUserId(uri, user);
-        getOrCreatePinnedSlice(uri, pkg).pin(pkg, specs, token);
+        String slicePkg = getProviderPkg(uri, user);
+        getOrCreatePinnedSlice(uri, slicePkg).pin(pkg, specs, token);
 
-        Uri finalUri = uri;
         mHandler.post(() -> {
-            String slicePkg = getProviderPkg(finalUri, user);
             if (slicePkg != null && !Objects.equals(pkg, slicePkg)) {
                 mAppUsageStats.reportEvent(slicePkg, user,
                         isAssistant(pkg, user) || isDefaultHomeApp(pkg, user)
@@ -319,6 +322,12 @@ public class SliceManagerService extends ISliceManager.Stub {
         } catch (NumberFormatException | XmlPullParserException | IOException e) {
             Slog.w(TAG, "applyRestore: error reading payload", e);
         }
+    }
+
+    @Override
+    public void onShellCommand(FileDescriptor in, FileDescriptor out, FileDescriptor err,
+            String[] args, ShellCallback callback, ResultReceiver resultReceiver) {
+        new SliceShellCommand(this).exec(this, in, out, err, args, callback, resultReceiver);
     }
 
     ///  ----- internal code -----
@@ -541,6 +550,14 @@ public class SliceManagerService extends ISliceManager.Stub {
             }
         }
     };
+
+    public String[] getAllPackagesGranted(String authority) {
+        String pkg = getProviderPkg(new Uri.Builder()
+                .scheme(ContentResolver.SCHEME_CONTENT)
+                .authority(authority)
+                .build(), 0);
+        return mPermissions.getAllPackagesGranted(pkg);
+    }
 
     public static class Lifecycle extends SystemService {
         private SliceManagerService mService;

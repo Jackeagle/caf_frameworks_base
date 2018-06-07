@@ -16,6 +16,7 @@
 
 package com.android.server.notification;
 
+import static android.app.Notification.FLAG_FOREGROUND_SERVICE;
 import static android.app.NotificationManager.EXTRA_BLOCKED_STATE;
 import static android.app.NotificationManager.IMPORTANCE_HIGH;
 import static android.app.NotificationManager.IMPORTANCE_LOW;
@@ -80,6 +81,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
@@ -102,9 +104,11 @@ import android.testing.AndroidTestingRunner;
 import android.testing.TestableContext;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
+import android.text.Html;
 import android.util.ArrayMap;
 import android.util.AtomicFile;
 
+import com.android.internal.R;
 import com.android.internal.statusbar.NotificationVisibility;
 import com.android.server.UiServiceTestCase;
 import com.android.server.lights.Light;
@@ -160,6 +164,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Mock
     ActivityManager mActivityManager;
     NotificationManagerService.WorkerHandler mHandler;
+    @Mock
+    Resources mResources;
 
     private NotificationChannel mTestNotificationChannel = new NotificationChannel(
             TEST_CHANNEL_ID, TEST_CHANNEL_ID, NotificationManager.IMPORTANCE_DEFAULT);
@@ -391,7 +397,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testCreateNotificationChannels_NullChannelThrowsException() throws Exception {
         try {
             mBinderService.createNotificationChannels(PKG,
-                    new ParceledListSlice(Arrays.asList(null)));
+                    new ParceledListSlice(Arrays.asList((Object[])null)));
             fail("Exception should be thrown immediately.");
         } catch (NullPointerException e) {
             // pass
@@ -524,7 +530,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 PKG, new ParceledListSlice(Arrays.asList(channel)));
 
         final StatusBarNotification sbn = generateNotificationRecord(channel).sbn;
-        sbn.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         waitForIdle();
@@ -552,11 +558,34 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertEquals(IMPORTANCE_NONE,
                 mBinderService.getNotificationChannel(PKG, channel.getId()).getImportance());
 
-        final StatusBarNotification sbn = generateNotificationRecord(channel).sbn;
-        sbn.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        StatusBarNotification sbn = generateNotificationRecord(channel).sbn;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         waitForIdle();
+        // The first time a foreground service notification is shown, we allow the channel
+        // to be updated to allow it to be seen.
+        assertEquals(1, mBinderService.getActiveNotifications(sbn.getPackageName()).length);
+        assertEquals(IMPORTANCE_LOW,
+                mService.getNotificationRecord(sbn.getKey()).getImportance());
+        assertEquals(IMPORTANCE_LOW,
+                mBinderService.getNotificationChannel(PKG, channel.getId()).getImportance());
+        mBinderService.cancelNotificationWithTag(PKG, "tag", sbn.getId(), sbn.getUserId());
+        waitForIdle();
+
+        update = new NotificationChannel("blockedbyuser", "name", IMPORTANCE_NONE);
+        update.setFgServiceShown(true);
+        mBinderService.updateNotificationChannelForPackage(PKG, mUid, update);
+        waitForIdle();
+        assertEquals(IMPORTANCE_NONE,
+                mBinderService.getNotificationChannel(PKG, channel.getId()).getImportance());
+
+        sbn = generateNotificationRecord(channel).sbn;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
+        mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
+                sbn.getId(), sbn.getNotification(), sbn.getUserId());
+        waitForIdle();
+        // The second time it is shown, we keep the user's preference.
         assertEquals(0, mBinderService.getActiveNotifications(sbn.getPackageName()).length);
         assertNull(mService.getNotificationRecord(sbn.getKey()));
         assertEquals(IMPORTANCE_NONE,
@@ -597,7 +626,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mBinderService.setNotificationsEnabledForPackage(PKG, mUid, false);
 
         final StatusBarNotification sbn = generateNotificationRecord(null).sbn;
-        sbn.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         waitForIdle();
@@ -755,7 +784,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testCancelAllNotifications_IgnoreForegroundService() throws Exception {
         final StatusBarNotification sbn = generateNotificationRecord(null).sbn;
-        sbn.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         mBinderService.cancelAllNotifications(PKG, sbn.getUserId());
@@ -769,7 +798,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testCancelAllNotifications_IgnoreOtherPackages() throws Exception {
         final StatusBarNotification sbn = generateNotificationRecord(null).sbn;
-        sbn.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         mBinderService.cancelAllNotifications("other_pkg_name", sbn.getUserId());
@@ -897,7 +926,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testRemoveForegroundServiceFlag_ImmediatelyAfterEnqueue() throws Exception {
         final StatusBarNotification sbn = generateNotificationRecord(null).sbn;
-        sbn.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        sbn.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", null,
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         mInternalService.removeForegroundServiceFlagFromNotification(PKG, sbn.getId(),
@@ -905,14 +934,14 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         waitForIdle();
         StatusBarNotification[] notifs =
                 mBinderService.getActiveNotifications(sbn.getPackageName());
-        assertEquals(0, notifs[0].getNotification().flags & Notification.FLAG_FOREGROUND_SERVICE);
+        assertEquals(0, notifs[0].getNotification().flags & FLAG_FOREGROUND_SERVICE);
     }
 
     @Test
     public void testCancelAfterSecondEnqueueDoesNotSpecifyForegroundFlag() throws Exception {
         final StatusBarNotification sbn = generateNotificationRecord(null).sbn;
         sbn.getNotification().flags =
-                Notification.FLAG_ONGOING_EVENT | Notification.FLAG_FOREGROUND_SERVICE;
+                Notification.FLAG_ONGOING_EVENT | FLAG_FOREGROUND_SERVICE;
         mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
                 sbn.getId(), sbn.getNotification(), sbn.getUserId());
         sbn.getNotification().flags = Notification.FLAG_ONGOING_EVENT;
@@ -933,7 +962,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mTestNotificationChannel, 2, "group", false);
         final NotificationRecord child2 = generateNotificationRecord(
                 mTestNotificationChannel, 3, "group", false);
-        child2.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        child2.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         final NotificationRecord newGroup = generateNotificationRecord(
                 mTestNotificationChannel, 4, "group2", false);
         mService.addNotification(parent);
@@ -956,7 +985,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mTestNotificationChannel, 2, "group", false);
         final NotificationRecord child2 = generateNotificationRecord(
                 mTestNotificationChannel, 3, "group", false);
-        child2.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        child2.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         final NotificationRecord newGroup = generateNotificationRecord(
                 mTestNotificationChannel, 4, "group2", false);
         mService.addNotification(parent);
@@ -980,7 +1009,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mTestNotificationChannel, 2, "group", false);
         final NotificationRecord child2 = generateNotificationRecord(
                 mTestNotificationChannel, 3, "group", false);
-        child2.getNotification().flags |= Notification.FLAG_FOREGROUND_SERVICE;
+        child2.getNotification().flags |= FLAG_FOREGROUND_SERVICE;
         final NotificationRecord newGroup = generateNotificationRecord(
                 mTestNotificationChannel, 4, "group2", false);
         mService.addNotification(parent);
@@ -2183,7 +2212,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testReadPolicyXml_readApprovedServicesFromXml() throws Exception {
         final String upgradeXml = "<notification-policy version=\"1\">"
-                + "<zen></zen>"
                 + "<ranking></ranking>"
                 + "<enabled_listeners>"
                 + "<service_listing approved=\"test\" user=\"0\" primary=\"true\" />"
@@ -2197,9 +2225,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 + "</notification-policy>";
         mService.readPolicyXml(
                 new BufferedInputStream(new ByteArrayInputStream(upgradeXml.getBytes())), false);
-        verify(mListeners, times(1)).readXml(any());
-        verify(mConditionProviders, times(1)).readXml(any());
-        verify(mAssistants, times(1)).readXml(any());
+        verify(mListeners, times(1)).readXml(any(), any());
+        verify(mConditionProviders, times(1)).readXml(any(), any());
+        verify(mAssistants, times(1)).readXml(any(), any());
 
         // numbers are inflated for setup
         verify(mListeners, times(1)).migrateToXml();
@@ -2211,14 +2239,13 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testReadPolicyXml_readApprovedServicesFromSettings() throws Exception {
         final String preupgradeXml = "<notification-policy version=\"1\">"
-                + "<zen></zen>"
                 + "<ranking></ranking>"
                 + "</notification-policy>";
         mService.readPolicyXml(
                 new BufferedInputStream(new ByteArrayInputStream(preupgradeXml.getBytes())), false);
-        verify(mListeners, never()).readXml(any());
-        verify(mConditionProviders, never()).readXml(any());
-        verify(mAssistants, never()).readXml(any());
+        verify(mListeners, never()).readXml(any(), any());
+        verify(mConditionProviders, never()).readXml(any(), any());
+        verify(mAssistants, never()).readXml(any(), any());
 
         // numbers are inflated for setup
         verify(mListeners, times(2)).migrateToXml();
@@ -2253,7 +2280,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 NotificationChannel.DEFAULT_CHANNEL_ID)
                 .setContentTitle("foo")
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
-                .setFlag(Notification.FLAG_FOREGROUND_SERVICE, true)
+                .setFlag(FLAG_FOREGROUND_SERVICE, true)
                 .setPriority(Notification.PRIORITY_MIN);
 
         StatusBarNotification sbn = new StatusBarNotification(preOPkg, preOPkg, 9, "tag", preOUid,
@@ -2268,7 +2295,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         nb = new Notification.Builder(mContext)
                 .setContentTitle("foo")
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
-                .setFlag(Notification.FLAG_FOREGROUND_SERVICE, true)
+                .setFlag(FLAG_FOREGROUND_SERVICE, true)
                 .setPriority(Notification.PRIORITY_MIN);
 
         sbn = new StatusBarNotification(preOPkg, preOPkg, 9, "tag", preOUid,
@@ -2666,6 +2693,26 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    public void testVisualDifference_foreground() {
+        Notification.Builder nb1 = new Notification.Builder(mContext, "")
+                .setContentTitle("foo");
+        StatusBarNotification sbn1 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb1.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
+
+        Notification.Builder nb2 = new Notification.Builder(mContext, "")
+                .setFlag(FLAG_FOREGROUND_SERVICE, true)
+                .setContentTitle("bar");
+        StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb2.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
+
+        assertFalse(mService.isVisuallyInterruptive(r1, r2));
+    }
+
+    @Test
     public void testVisualDifference_diffTitle() {
         Notification.Builder nb1 = new Notification.Builder(mContext, "")
                 .setContentTitle("foo");
@@ -2685,6 +2732,56 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    public void testVisualDifference_inboxStyle() {
+        Notification.Builder nb1 = new Notification.Builder(mContext, "")
+                .setStyle(new Notification.InboxStyle()
+                    .addLine("line1").addLine("line2"));
+        StatusBarNotification sbn1 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb1.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
+
+        Notification.Builder nb2 = new Notification.Builder(mContext, "")
+                .setStyle(new Notification.InboxStyle()
+                        .addLine("line1").addLine("line2_changed"));
+        StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb2.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
+
+        assertTrue(mService.isVisuallyInterruptive(r1, r2)); // line 2 changed unnoticed
+
+        Notification.Builder nb3 = new Notification.Builder(mContext, "")
+                .setStyle(new Notification.InboxStyle()
+                        .addLine("line1"));
+        StatusBarNotification sbn3 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb3.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r3 =
+                new NotificationRecord(mContext, sbn3, mock(NotificationChannel.class));
+
+        assertTrue(mService.isVisuallyInterruptive(r1, r3)); // line 2 removed unnoticed
+
+        Notification.Builder nb4 = new Notification.Builder(mContext, "")
+                .setStyle(new Notification.InboxStyle()
+                        .addLine("line1").addLine("line2").addLine("line3"));
+        StatusBarNotification sbn4 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb4.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r4 =
+                new NotificationRecord(mContext, sbn4, mock(NotificationChannel.class));
+
+        assertTrue(mService.isVisuallyInterruptive(r1, r4)); // line 3 added unnoticed
+
+        Notification.Builder nb5 = new Notification.Builder(mContext, "")
+            .setContentText("not an inbox");
+        StatusBarNotification sbn5 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb5.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r5 =
+                new NotificationRecord(mContext, sbn5, mock(NotificationChannel.class));
+
+        assertTrue(mService.isVisuallyInterruptive(r1, r5)); // changed Styles, went unnoticed
+    }
+
+    @Test
     public void testVisualDifference_diffText() {
         Notification.Builder nb1 = new Notification.Builder(mContext, "")
                 .setContentText("foo");
@@ -2695,6 +2792,63 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setContentText("bar");
+        StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb2.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
+
+        assertTrue(mService.isVisuallyInterruptive(r1, r2));
+    }
+
+    @Test
+    public void testVisualDifference_sameText() {
+        Notification.Builder nb1 = new Notification.Builder(mContext, "")
+                .setContentText("foo");
+        StatusBarNotification sbn1 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb1.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
+
+        Notification.Builder nb2 = new Notification.Builder(mContext, "")
+                .setContentText("foo");
+        StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb2.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
+
+        assertFalse(mService.isVisuallyInterruptive(r1, r2));
+    }
+
+    @Test
+    public void testVisualDifference_sameTextButStyled() {
+        Notification.Builder nb1 = new Notification.Builder(mContext, "")
+                .setContentText(Html.fromHtml("<b>foo</b>"));
+        StatusBarNotification sbn1 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb1.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
+
+        Notification.Builder nb2 = new Notification.Builder(mContext, "")
+                .setContentText(Html.fromHtml("<b>foo</b>"));
+        StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb2.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
+
+        assertFalse(mService.isVisuallyInterruptive(r1, r2));
+    }
+
+    @Test
+    public void testVisualDifference_diffTextButStyled() {
+        Notification.Builder nb1 = new Notification.Builder(mContext, "")
+                .setContentText(Html.fromHtml("<b>foo</b>"));
+        StatusBarNotification sbn1 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb1.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
+
+        Notification.Builder nb2 = new Notification.Builder(mContext, "")
+                .setContentText(Html.fromHtml("<b>bar</b>"));
         StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
                 nb2.build(), new UserHandle(mUid), null, 0);
         NotificationRecord r2 =
@@ -2742,6 +2896,25 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    public void testVisualDifference_sameProgressStillDone() {
+        Notification.Builder nb1 = new Notification.Builder(mContext, "")
+                .setProgress(100, 100, false);
+        StatusBarNotification sbn1 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb1.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
+
+        Notification.Builder nb2 = new Notification.Builder(mContext, "")
+                .setProgress(100, 100, false);
+        StatusBarNotification sbn2 = new StatusBarNotification(PKG, PKG, 0, "tag", mUid, 0,
+                nb2.build(), new UserHandle(mUid), null, 0);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
+
+        assertFalse(mService.isVisuallyInterruptive(r1, r2));
+    }
+
+    @Test
     public void testHideAndUnhideNotificationsOnSuspendedPackageBroadcast() {
         // post 2 notification from this package
         final NotificationRecord notif1 = generateNotificationRecord(
@@ -2779,5 +2952,71 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
         verify(mListeners, times(1)).notifyHiddenLocked(captor.capture());
         assertEquals(0, captor.getValue().size());
+    }
+
+    @Test
+    public void testCanUseManagedServicesLowRamNoWatchNullPkg() {
+        when(mPackageManagerClient.hasSystemFeature(FEATURE_WATCH)).thenReturn(false);
+        when(mActivityManager.isLowRamDevice()).thenReturn(true);
+        when(mResources.getStringArray(R.array.config_allowedManagedServicesOnLowRamDevices))
+                .thenReturn(new String[] {"a", "b", "c"});
+        when(mContext.getResources()).thenReturn(mResources);
+
+        assertEquals(false, mService.canUseManagedServices(null));
+    }
+
+    @Test
+    public void testCanUseManagedServicesLowRamNoWatchValidPkg() {
+        when(mPackageManagerClient.hasSystemFeature(FEATURE_WATCH)).thenReturn(false);
+        when(mActivityManager.isLowRamDevice()).thenReturn(true);
+        when(mResources.getStringArray(R.array.config_allowedManagedServicesOnLowRamDevices))
+                .thenReturn(new String[] {"a", "b", "c"});
+        when(mContext.getResources()).thenReturn(mResources);
+
+        assertEquals(true, mService.canUseManagedServices("b"));
+    }
+
+    @Test
+    public void testCanUseManagedServicesLowRamNoWatchNoValidPkg() {
+        when(mPackageManagerClient.hasSystemFeature(FEATURE_WATCH)).thenReturn(false);
+        when(mActivityManager.isLowRamDevice()).thenReturn(true);
+        when(mResources.getStringArray(R.array.config_allowedManagedServicesOnLowRamDevices))
+                .thenReturn(new String[] {"a", "b", "c"});
+        when(mContext.getResources()).thenReturn(mResources);
+
+        assertEquals(false, mService.canUseManagedServices("d"));
+    }
+
+    @Test
+    public void testCanUseManagedServicesLowRamWatchNoValidPkg() {
+        when(mPackageManagerClient.hasSystemFeature(FEATURE_WATCH)).thenReturn(true);
+        when(mActivityManager.isLowRamDevice()).thenReturn(true);
+        when(mResources.getStringArray(R.array.config_allowedManagedServicesOnLowRamDevices))
+                .thenReturn(new String[] {"a", "b", "c"});
+        when(mContext.getResources()).thenReturn(mResources);
+
+        assertEquals(true, mService.canUseManagedServices("d"));
+    }
+
+    @Test
+    public void testCanUseManagedServicesNoLowRamNoWatchValidPkg() {
+        when(mPackageManagerClient.hasSystemFeature(FEATURE_WATCH)).thenReturn(false);
+        when(mActivityManager.isLowRamDevice()).thenReturn(false);
+        when(mResources.getStringArray(R.array.config_allowedManagedServicesOnLowRamDevices))
+                .thenReturn(new String[] {"a", "b", "c"});
+        when(mContext.getResources()).thenReturn(mResources);
+
+        assertEquals(true, mService.canUseManagedServices("d"));
+    }
+
+    @Test
+    public void testCanUseManagedServicesNoLowRamWatchValidPkg() {
+        when(mPackageManagerClient.hasSystemFeature(FEATURE_WATCH)).thenReturn(true);
+        when(mActivityManager.isLowRamDevice()).thenReturn(false);
+        when(mResources.getStringArray(R.array.config_allowedManagedServicesOnLowRamDevices))
+                .thenReturn(new String[] {"a", "b", "c"});
+        when(mContext.getResources()).thenReturn(mResources);
+
+        assertEquals(true, mService.canUseManagedServices("d"));
     }
 }

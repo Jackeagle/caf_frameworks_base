@@ -506,11 +506,11 @@
     <!-- String containing the apn value for tethering.  May be overriden by secure settings
          TETHER_DUN_APN.  Value is a comma separated series of strings:
          "name,apn,proxy,port,username,password,server,mmsc,mmsproxy,mmsport,mcc,mnc,auth,type",
-         Or string format of ApnSettingV3.
+         Or string format of ApnSettingV3 or higher.
          note that empty fields can be ommitted: "name,apn,,,,,,,,,310,260,,DUN"
          Multiple entries are separated by using string-array:
          "<item>[ApnSettingV3]Name,apn,,,,,,,,,123,45,,mms|*,IPV6,IP,true,14,,,,,,,spn,testspn</item>
-          <item>[ApnSettingV3]Name1,apn2,,,,,,,,,123,46,,mms|*,IPV6,IP,true,12,,,,,,,,</item>" -->
+          <item>[ApnSettingV5]Name1,apn2,,,,,,,,,123,46,,mms|*,IPV6,IP,true,12,,,,,,,,,,</item>" -->
     <string-array translatable="false" name="config_tether_apndata">
     </string-array>
 
@@ -665,10 +665,13 @@
 
     <!-- Wifi driver supports IEEE80211AC for softap -->
     <bool translatable="false" name="config_wifi_softap_ieee80211ac_supported">false</bool>
-    
-    <!-- Flag indicating whether the we should enable the automatic brightness in Settings.
+
+    <!-- Flag indicating whether we should enable the automatic brightness.
          Software implementation will be used if config_hardware_auto_brightness_available is not set -->
     <bool name="config_automatic_brightness_available">false</bool>
+
+    <!-- Flag indicating whether we should enable smart battery. -->
+    <bool name="config_smart_battery_available">false</bool>
 
     <!-- Fast brightness animation ramp rate in brightness units per second-->
     <integer translatable="false" name="config_brightness_ramp_rate_fast">180</integer>
@@ -947,6 +950,16 @@
         <!-- B b-coefficient --> <item>0.000302412211</item>
         <!-- B y-intercept --> <item>-0.198650895</item>
     </string-array>
+
+
+    <!-- Indicate available ColorDisplayController.COLOR_MODE_xxx. -->
+    <integer-array name="config_availableColorModes">
+        <!-- Example:
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        -->
+    </integer-array>
 
     <!-- Indicate whether to allow the device to suspend when the screen is off
          due to the proximity sensor.  This resource should only be set to true
@@ -1274,9 +1287,6 @@
          brightening or dimming debounce thresholds.  As a result, it may take somewhat longer to
          adapt to the environment.  This mode may be better suited for watches. -->
     <bool name="config_autoBrightnessResetAmbientLuxAfterWarmUp">true</bool>
-
-    <!-- Period of time in which to consider light samples in milliseconds. -->
-    <integer name="config_autoBrightnessAmbientLightHorizon">10000</integer>
 
     <!-- Screen brightness used to dim the screen when the user activity
          timeout expires.  May be less than the minimum allowed brightness setting
@@ -1829,12 +1839,16 @@
     <string name="db_default_sync_mode" translatable="false">FULL</string>
 
     <!-- The database synchronization mode when using Write-Ahead Logging.
-         FULL is safest and preserves durability at the cost of extra fsyncs.
-         NORMAL sacrifices durability in WAL mode because syncs are only performed before
-         and after checkpoint operations.  If checkpoints are infrequent and power loss
-         occurs, then committed transactions could be lost and applications might break.
+         From https://www.sqlite.org/pragma.html#pragma_synchronous:
+         WAL mode is safe from corruption with synchronous=NORMAL, and probably DELETE mode is safe
+         too on modern filesystems. WAL mode is always consistent with synchronous=NORMAL, but WAL
+         mode does lose durability. A transaction committed in WAL mode with
+         synchronous=NORMAL might roll back following a power loss or system crash.
+         Transactions are durable across application crashes regardless of the synchronous setting
+         or journal mode. The synchronous=NORMAL setting is a good choice for most applications
+         running in WAL mode.
          Choices are: FULL, NORMAL, OFF. -->
-    <string name="db_wal_sync_mode" translatable="false">FULL</string>
+    <string name="db_wal_sync_mode" translatable="false">NORMAL</string>
 
     <!-- The Write-Ahead Log auto-checkpoint interval in database pages (typically 1 to 4KB).
          The log is checkpointed automatically whenever it exceeds this many pages.
@@ -3187,6 +3201,9 @@
     <!-- An array of packages for which notifications cannot be blocked. -->
     <string-array translatable="false" name="config_nonBlockableNotificationPackages" />
 
+    <!-- An array of packages which can listen for notifications on low ram devices. -->
+    <string-array translatable="false" name="config_allowedManagedServicesOnLowRamDevices" />
+
     <!-- The default value for transition animation scale found in developer settings.
          1.0 corresponds to 1x animator scale, 0 means that there will be no transition
          animations. Note that this is only a default and will be overridden by a
@@ -3405,8 +3422,6 @@
          empty string is passed in -->
     <string name="config_wlan_network_service_package" translatable="false"></string>
 
-    <!-- whether to show dual bar -->
-    <bool name="config_dual_bar">false</bool>
     <!-- Wear devices: Controls the radios affected by Activity Mode. -->
     <string-array name="config_wearActivityModeRadios">
         <item>"wifi"</item>
@@ -3420,4 +3435,14 @@
 
     <!-- Enable sms authorization framework-->
     <bool name="config_sms_authorization_enabled">false</bool>
+
+    <!-- whether to enable primarycard -->
+    <bool name="config_primarycard">false</bool>
+
+    <!-- Whether or not swipe up gesture is enabled by default -->
+    <bool name="config_swipe_up_gesture_default">false</bool>
+
+    <!-- Whether or not swipe up gesture's opt-in setting is available on this device -->
+    <bool name="config_swipe_up_gesture_setting_available">false</bool>
+
 </resources>

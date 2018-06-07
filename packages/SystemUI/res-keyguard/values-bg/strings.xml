@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"SIM картата е заключена с PUK."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"SIM картата се отключва..."</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"Област за ПИН кода"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"Област за ПИН кода на SIM картата"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"Област за PUK кода на SIM картата"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"Следващият будилник е зададен за <xliff:g id="ALARM">%1$s</xliff:g>"</string>
@@ -140,7 +142,10 @@
       <item quantity="one">Устройството не е отключвано от <xliff:g id="NUMBER_0">%d</xliff:g> час. Потвърдете паролата.</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"Не е разпознато"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="other">Въведете ПИН кода за SIM картата – остават ви <xliff:g id="NUMBER_1">%d</xliff:g> опита.</item>
+      <item quantity="one">Въведете ПИН кода за SIM картата – остава ви <xliff:g id="NUMBER_0">%d</xliff:g> опит, преди да се наложи да се свържете с оператора си, за да отключите устройството.</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="other">SIM картата вече е деактивирана. Въведете PUK кода, за да продължите. Остават ви <xliff:g id="_NUMBER_1">%d</xliff:g> опита, преди SIM картата да стане неизползваема завинаги. Свържете се с оператора за подробности.</item>
       <item quantity="one">SIM картата вече е деактивирана. Въведете PUK кода, за да продължите. Остава ви <xliff:g id="_NUMBER_0">%d</xliff:g> опит, преди SIM картата да стане неизползваема завинаги. Свържете се с оператора за подробности.</item>

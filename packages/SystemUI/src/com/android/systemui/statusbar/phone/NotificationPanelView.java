@@ -32,6 +32,8 @@ import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.os.PowerManager;
 import android.util.AttributeSet;
@@ -250,6 +252,33 @@ public class NotificationPanelView extends PanelView implements
     private ArrayList<Runnable> mVerticalTranslationListener = new ArrayList<>();
     private HeadsUpAppearanceController mHeadsUpAppearanceController;
 
+    private int mPanelAlpha;
+    private int mCurrentPanelAlpha;
+    private final Paint mAlphaPaint = new Paint();
+    private Runnable mPanelAlphaEndAction;
+    private AnimatorListenerAdapter mAnimatorListenerAdapter = new AnimatorListenerAdapter() {
+        @Override
+        public void onAnimationEnd(Animator animation) {
+            if (mPanelAlphaEndAction != null) {
+                mPanelAlphaEndAction.run();
+            }
+        }
+    };
+    private final AnimatableProperty PANEL_ALPHA = AnimatableProperty.from(
+            "panelAlpha",
+            NotificationPanelView::setPanelAlphaInternal,
+            NotificationPanelView::getCurrentPanelAlpha,
+            R.id.panel_alpha_animator_tag,
+            R.id.panel_alpha_animator_start_tag,
+            R.id.panel_alpha_animator_end_tag);
+    private final AnimationProperties PANEL_ALPHA_OUT_PROPERTIES = new AnimationProperties()
+            .setDuration(150)
+            .setCustomInterpolator(PANEL_ALPHA.getProperty(), Interpolators.ALPHA_OUT);
+    private final AnimationProperties PANEL_ALPHA_IN_PROPERTIES = new AnimationProperties()
+            .setDuration(200)
+            .setAnimationFinishListener(mAnimatorListenerAdapter)
+            .setCustomInterpolator(PANEL_ALPHA.getProperty(), Interpolators.ALPHA_IN);
+
     public NotificationPanelView(Context context, AttributeSet attrs) {
         super(context, attrs);
         setWillNotDraw(!DEBUG);
@@ -257,6 +286,8 @@ public class NotificationPanelView extends PanelView implements
         mPowerManager = context.getSystemService(PowerManager.class);
         mAccessibilityManager = context.getSystemService(AccessibilityManager.class);
         setAccessibilityPaneTitle(determineAccessibilityPaneTitle());
+        mAlphaPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.MULTIPLY));
+        setPanelAlpha(255, false /* animate */);
     }
 
     public void setStatusBar(StatusBar bar) {
@@ -392,6 +423,8 @@ public class NotificationPanelView extends PanelView implements
         if (mQs != null) {
             mQsMinExpansionHeight = mKeyguardShowing ? 0 : mQs.getQsMinExpansionHeight();
             mQsMaxExpansionHeight = mQs.getDesiredHeight();
+            mNotificationStackScroller.setMaxTopPadding(
+                    mQsMaxExpansionHeight + mQsNotificationTopPadding);
         }
         positionClockAndNotifications();
         if (mQsExpanded && mQsFullyExpanded) {
@@ -588,6 +621,19 @@ public class NotificationPanelView extends PanelView implements
         mNotificationStackScroller.resetScrollPosition();
     }
 
+    @Override
+    public void collapse(boolean delayed, float speedUpFactor) {
+        if (!canPanelBeCollapsed()) {
+            return;
+        }
+
+        if (mQsExpanded) {
+            mQsExpandImmediate = true;
+            mNotificationStackScroller.setShouldShowShelfOnly(true);
+        }
+        super.collapse(delayed, speedUpFactor);
+    }
+
     public void closeQs() {
         cancelQsAnimation();
         setQsExpansion(mQsMinExpansionHeight);
@@ -615,6 +661,7 @@ public class NotificationPanelView extends PanelView implements
     public void expandWithQs() {
         if (mQsExpansionEnabled) {
             mQsExpandImmediate = true;
+            mNotificationStackScroller.setShouldShowShelfOnly(true);
         }
         expand(true /* animate */);
     }
@@ -878,6 +925,7 @@ public class NotificationPanelView extends PanelView implements
                 && event.getY(event.getActionIndex()) < mStatusBarMinHeight) {
             MetricsLogger.count(mContext, COUNTER_PANEL_OPEN_QS, 1);
             mQsExpandImmediate = true;
+            mNotificationStackScroller.setShouldShowShelfOnly(true);
             requestPanelHeightUpdate();
 
             // Normally, we start listening when the panel is expanded, but here we need to start
@@ -1321,7 +1369,9 @@ public class NotificationPanelView extends PanelView implements
 
     protected void updateQsExpansion() {
         if (mQs == null) return;
-        mQs.setQsExpansion(getQsExpansionFraction(), getHeaderTranslation());
+        float qsExpansionFraction = getQsExpansionFraction();
+        mQs.setQsExpansion(qsExpansionFraction, getHeaderTranslation());
+        mNotificationStackScroller.setQsExpansionFraction(qsExpansionFraction);
     }
 
     private String determineAccessibilityPaneTitle() {
@@ -1357,7 +1407,6 @@ public class NotificationPanelView extends PanelView implements
         } else if (mQsSizeChangeAnimator != null) {
             return (int) mQsSizeChangeAnimator.getAnimatedValue();
         } else if (mKeyguardShowing) {
-
             // We can only do the smoother transition on Keyguard when we also are not collapsing
             // from a scrolled quick settings.
             return interpolate(getQsExpansionFraction(),
@@ -1527,7 +1576,6 @@ public class NotificationPanelView extends PanelView implements
                 // On Keyguard, interpolate the QS expansion linearly to the panel expansion
                 t = expandedHeight / (getMaxPanelHeight());
             } else {
-
                 // In Shade, interpolate linearly such that QS is closed whenever panel height is
                 // minimum QS expansion + minStackHeight
                 float panelHeightQsCollapsed = mNotificationStackScroller.getIntrinsicPadding()
@@ -1776,6 +1824,7 @@ public class NotificationPanelView extends PanelView implements
             setListening(true);
         }
         mQsExpandImmediate = false;
+        mNotificationStackScroller.setShouldShowShelfOnly(false);
         mTwoFingerQsExpandPossible = false;
         mIsExpansionFromHeadsUp = false;
         notifyListenersTrackingHeadsUp(null);
@@ -1827,6 +1876,7 @@ public class NotificationPanelView extends PanelView implements
         super.onTrackingStarted();
         if (mQsFullyExpanded) {
             mQsExpandImmediate = true;
+            mNotificationStackScroller.setShouldShowShelfOnly(true);
         }
         if (mStatusBar.getBarState() == StatusBarState.KEYGUARD
                 || mStatusBar.getBarState() == StatusBarState.SHADE_LOCKED) {
@@ -1866,7 +1916,7 @@ public class NotificationPanelView extends PanelView implements
         if (view == null && mQsExpanded) {
             return;
         }
-        if (needsAnimation) {
+        if (needsAnimation && mDarkAmount == 0) {
             mAnimateNextPositionUpdate = true;
         }
         ExpandableView firstChildNotGone = mNotificationStackScroller.getFirstChildNotGone();
@@ -1894,6 +1944,8 @@ public class NotificationPanelView extends PanelView implements
         if (mAccessibilityManager.isEnabled()) {
             setAccessibilityPaneTitle(determineAccessibilityPaneTitle());
         }
+        mNotificationStackScroller.setMaxTopPadding(
+                mQsMaxExpansionHeight + mQsNotificationTopPadding);
     }
 
     @Override
@@ -2246,7 +2298,7 @@ public class NotificationPanelView extends PanelView implements
     }
 
     public void onScreenTurningOn() {
-        mKeyguardStatusView.refreshTime();
+        mKeyguardStatusView.dozeTimeTick();
     }
 
     @Override
@@ -2279,6 +2331,38 @@ public class NotificationPanelView extends PanelView implements
             default:
                 return true;
         }
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        super.dispatchDraw(canvas);
+        if (mCurrentPanelAlpha != 255) {
+            canvas.drawRect(0, 0, canvas.getWidth(), canvas.getHeight(), mAlphaPaint);
+        }
+    }
+
+    public float getCurrentPanelAlpha() {
+        return mCurrentPanelAlpha;
+    }
+
+    public boolean setPanelAlpha(int alpha, boolean animate) {
+        if (mPanelAlpha != alpha) {
+            mPanelAlpha = alpha;
+            PropertyAnimator.setProperty(this, PANEL_ALPHA, alpha,
+                    alpha == 255 ? PANEL_ALPHA_IN_PROPERTIES : PANEL_ALPHA_OUT_PROPERTIES, animate);
+            return true;
+        }
+        return false;
+    }
+
+    public void setPanelAlphaInternal(float alpha) {
+        mCurrentPanelAlpha = (int) alpha;
+        mAlphaPaint.setARGB(mCurrentPanelAlpha, 255, 255, 255);
+        invalidate();
+    }
+
+    public void setPanelAlphaEndAction(Runnable r) {
+        mPanelAlphaEndAction = r;
     }
 
     @Override
@@ -2652,10 +2736,13 @@ public class NotificationPanelView extends PanelView implements
 
     public void setPulsing(boolean pulsing) {
         mPulsing = pulsing;
-        mKeyguardStatusView.setPulsing(pulsing);
-        positionClockAndNotifications();
-        mNotificationStackScroller.setPulsing(pulsing, mKeyguardStatusView.getLocationOnScreen()[1]
-                + mKeyguardStatusView.getClockBottom());
+        final boolean canAnimatePulse =
+                !DozeParameters.getInstance(mContext).getDisplayNeedsBlanking();
+        if (canAnimatePulse) {
+            mAnimateNextPositionUpdate = true;
+        }
+        mNotificationStackScroller.setPulsing(pulsing, canAnimatePulse);
+        mKeyguardStatusView.setPulsing(pulsing, canAnimatePulse);
     }
 
     public void setAmbientIndicationBottomPadding(int ambientIndicationBottomPadding) {
@@ -2666,7 +2753,7 @@ public class NotificationPanelView extends PanelView implements
     }
 
     public void dozeTimeTick() {
-        mKeyguardStatusView.refreshTime();
+        mKeyguardStatusView.dozeTimeTick();
         mKeyguardBottomArea.dozeTimeTick();
         if (mDarkAmount > 0) {
             positionClockAndNotifications();

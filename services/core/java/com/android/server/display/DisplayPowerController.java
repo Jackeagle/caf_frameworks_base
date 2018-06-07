@@ -295,6 +295,10 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private boolean mAppliedAutoBrightness;
     private boolean mAppliedDimming;
     private boolean mAppliedLowPower;
+    private boolean mAppliedScreenBrightnessOverride;
+    private boolean mAppliedTemporaryBrightness;
+    private boolean mAppliedTemporaryAutoBrightnessAdjustment;
+    private boolean mAppliedBrightnessBoost;
 
     // Brightness animation ramp rates in brightness units per second
     private final int mBrightnessRampRateFast;
@@ -424,7 +428,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     com.android.internal.R.array.config_dynamicHysteresisDarkLevels);
             int[] luxHysteresisLevels = resources.getIntArray(
                     com.android.internal.R.array.config_dynamicHysteresisLuxLevels);
-            HysteresisLevels dynamicHysteresis = new HysteresisLevels(
+            HysteresisLevels hysteresisLevels = new HysteresisLevels(
                     brightLevels, darkLevels, luxHysteresisLevels);
 
             long brighteningLightDebounce = resources.getInteger(
@@ -433,8 +437,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     com.android.internal.R.integer.config_autoBrightnessDarkeningLightDebounce);
             boolean autoBrightnessResetAmbientLuxAfterWarmUp = resources.getBoolean(
                     com.android.internal.R.bool.config_autoBrightnessResetAmbientLuxAfterWarmUp);
-            int ambientLightHorizon = resources.getInteger(
-                    com.android.internal.R.integer.config_autoBrightnessAmbientLightHorizon);
 
             int lightSensorWarmUpTimeConfig = resources.getInteger(
                     com.android.internal.R.integer.config_lightSensorWarmupTime);
@@ -457,8 +459,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                         lightSensorWarmUpTimeConfig, mScreenBrightnessRangeMinimum,
                         mScreenBrightnessRangeMaximum, dozeScaleFactor, lightSensorRate,
                         initialLightSensorRate, brighteningLightDebounce, darkeningLightDebounce,
-                        autoBrightnessResetAmbientLuxAfterWarmUp, ambientLightHorizon,
-                        dynamicHysteresis);
+                        autoBrightnessResetAmbientLuxAfterWarmUp, hysteresisLevels);
             } else {
                 mUseSoftwareAutoBrightnessConfig = false;
             }
@@ -774,14 +775,11 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             brightness = mScreenBrightnessForVr;
         }
 
-        boolean setBrightnessToOverride = false;
         if (brightness < 0 && mPowerRequest.screenBrightnessOverride > 0) {
             brightness = mPowerRequest.screenBrightnessOverride;
-            // If there's a screen brightness override, we want to reset the brightness to it
-            // whenever the user changes it, to communicate that these changes aren't taking
-            // effect. However, for a nicer user experience, we don't do it here, but rather after
-            // the temporary brightness has been taken into account.
-            setBrightnessToOverride = true;
+            mAppliedScreenBrightnessOverride = true;
+        } else {
+            mAppliedScreenBrightnessOverride = false;
         }
 
         final boolean autoBrightnessEnabledInDoze =
@@ -790,7 +788,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     && (state == Display.STATE_ON || autoBrightnessEnabledInDoze)
                     && brightness < 0
                     && mAutomaticBrightnessController != null;
-        boolean brightnessIsTemporary = false;
 
         final boolean userSetBrightnessChanged = updateUserSetScreenBrightness();
         if (userSetBrightnessChanged) {
@@ -801,13 +798,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         // WindowManager or based on the display state.
         if (mTemporaryScreenBrightness > 0) {
             brightness = mTemporaryScreenBrightness;
-            brightnessIsTemporary = true;
-        }
-
-        // Reset the brightness to the screen brightness override to communicate to the user that
-        // her changes aren't taking effect.
-        if (setBrightnessToOverride && !brightnessIsTemporary) {
-            putScreenBrightnessSetting(brightness);
+            mAppliedTemporaryBrightness = true;
+        } else {
+            mAppliedTemporaryBrightness = false;
         }
 
         final boolean autoBrightnessAdjustmentChanged = updateAutoBrightnessAdjustment();
@@ -819,9 +812,10 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         final float autoBrightnessAdjustment;
         if (!Float.isNaN(mTemporaryAutoBrightnessAdjustment)) {
             autoBrightnessAdjustment = mTemporaryAutoBrightnessAdjustment;
-            brightnessIsTemporary = true;
+            mAppliedTemporaryAutoBrightnessAdjustment = true;
         } else {
             autoBrightnessAdjustment = mAutoBrightnessAdjustment;
+            mAppliedTemporaryAutoBrightnessAdjustment = true;
         }
 
         // Apply brightness boost.
@@ -831,6 +825,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (mPowerRequest.boostScreenBrightness
                 && brightness != PowerManager.BRIGHTNESS_OFF) {
             brightness = PowerManager.BRIGHTNESS_ON;
+            mAppliedBrightnessBoost = true;
+        } else {
+            mAppliedBrightnessBoost = false;
         }
 
         // If the brightness is already set then it's been overridden by something other than the
@@ -960,6 +957,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             // level without it being a noticeable jump since any actual content isn't yet visible.
             final boolean isDisplayContentVisible =
                     mColorFadeEnabled && mPowerState.getColorFadeLevel() == 1.0f;
+            final boolean brightnessIsTemporary =
+                    mAppliedTemporaryBrightness || mAppliedTemporaryAutoBrightnessAdjustment;
             if (initialRampSkip || hasBrightnessBuckets
                     || wasOrWillBeInVr || !isDisplayContentVisible || brightnessIsTemporary) {
                 animateScreenBrightness(brightness, 0);
@@ -1452,6 +1451,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (userSwitch) {
             // Don't treat user switches as user initiated change.
             mCurrentScreenBrightnessSetting = mPendingScreenBrightnessSetting;
+            if (mAutomaticBrightnessController != null) {
+                mAutomaticBrightnessController.resetShortTermModel();
+            }
         }
         mPendingAutoBrightnessAdjustment = getAutoBrightnessAdjustmentSetting();
         // We don't bother with a pending variable for VR screen brightness since we just
@@ -1595,10 +1597,20 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         pw.println("  mScreenBrightnessDimConfig=" + mScreenBrightnessDimConfig);
         pw.println("  mScreenBrightnessRangeMinimum=" + mScreenBrightnessRangeMinimum);
         pw.println("  mScreenBrightnessRangeMaximum=" + mScreenBrightnessRangeMaximum);
+        pw.println("  mScreenBrightnessDefault=" + mScreenBrightnessDefault);
+        pw.println("  mScreenBrightnessForVrRangeMinimum=" + mScreenBrightnessForVrRangeMinimum);
+        pw.println("  mScreenBrightnessForVrRangeMaximum=" + mScreenBrightnessForVrRangeMaximum);
+        pw.println("  mScreenBrightnessForVrDefault=" + mScreenBrightnessForVrDefault);
         pw.println("  mUseSoftwareAutoBrightnessConfig=" + mUseSoftwareAutoBrightnessConfig);
         pw.println("  mAllowAutoBrightnessWhileDozingConfig=" +
                 mAllowAutoBrightnessWhileDozingConfig);
+        pw.println("  mBrightnessRampRateFast=" + mBrightnessRampRateFast);
+        pw.println("  mBrightnessRampRateSlow=" + mBrightnessRampRateSlow);
+        pw.println("  mSkipScreenOnBrightnessRamp=" + mSkipScreenOnBrightnessRamp);
         pw.println("  mColorFadeFadesConfig=" + mColorFadeFadesConfig);
+        pw.println("  mColorFadeEnabled=" + mColorFadeEnabled);
+        pw.println("  mDisplayBlanksAfterDozeConfig=" + mDisplayBlanksAfterDozeConfig);
+        pw.println("  mBrightnessBucketsInDozeConfig=" + mBrightnessBucketsInDozeConfig);
 
         mHandler.runWithScissors(new Runnable() {
             @Override
@@ -1612,6 +1624,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         pw.println();
         pw.println("Display Power Controller Thread State:");
         pw.println("  mPowerRequest=" + mPowerRequest);
+        pw.println("  mUnfinishedBusiness=" + mUnfinishedBusiness);
         pw.println("  mWaitingForNegativeProximity=" + mWaitingForNegativeProximity);
         pw.println("  mProximitySensor=" + mProximitySensor);
         pw.println("  mProximitySensorEnabled=" + mProximitySensorEnabled);
@@ -1624,12 +1637,23 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         pw.println("  mLastUserSetScreenBrightness=" + mLastUserSetScreenBrightness);
         pw.println("  mCurrentScreenBrightnessSetting=" + mCurrentScreenBrightnessSetting);
         pw.println("  mPendingScreenBrightnessSetting=" + mPendingScreenBrightnessSetting);
+        pw.println("  mTemporaryScreenBrightness=" + mTemporaryScreenBrightness);
         pw.println("  mAutoBrightnessAdjustment=" + mAutoBrightnessAdjustment);
+        pw.println("  mTemporaryAutoBrightnessAdjustment=" + mTemporaryAutoBrightnessAdjustment);
         pw.println("  mPendingAutoBrightnessAdjustment=" + mPendingAutoBrightnessAdjustment);
+        pw.println("  mScreenBrightnessForVr=" + mScreenBrightnessForVr);
         pw.println("  mAppliedAutoBrightness=" + mAppliedAutoBrightness);
         pw.println("  mAppliedDimming=" + mAppliedDimming);
         pw.println("  mAppliedLowPower=" + mAppliedLowPower);
+        pw.println("  mAppliedScreenBrightnessOverride=" + mAppliedScreenBrightnessOverride);
+        pw.println("  mAppliedTemporaryBrightness=" + mAppliedTemporaryBrightness);
+        pw.println("  mDozing=" + mDozing);
+        pw.println("  mSkipRampState=" + skipRampStateToString(mSkipRampState));
+        pw.println("  mInitialAutoBrightness=" + mInitialAutoBrightness);
+        pw.println("  mScreenOnBlockStartRealTime=" + mScreenOnBlockStartRealTime);
+        pw.println("  mScreenOffBlockStartRealTime=" + mScreenOffBlockStartRealTime);
         pw.println("  mPendingScreenOnUnblocker=" + mPendingScreenOnUnblocker);
+        pw.println("  mPendingScreenOffUnblocker=" + mPendingScreenOffUnblocker);
         pw.println("  mPendingScreenOff=" + mPendingScreenOff);
         pw.println("  mReportedToPolicy=" +
                 reportedToPolicyToString(mReportedScreenStateToPolicy));
@@ -1681,6 +1705,19 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 return "REPORTED_TO_POLICY_SCREEN_TURNING_ON";
             case REPORTED_TO_POLICY_SCREEN_ON:
                 return "REPORTED_TO_POLICY_SCREEN_ON";
+            default:
+                return Integer.toString(state);
+        }
+    }
+
+    private static String skipRampStateToString(int state) {
+        switch (state) {
+            case RAMP_STATE_SKIP_NONE:
+                return "RAMP_STATE_SKIP_NONE";
+            case RAMP_STATE_SKIP_INITIAL:
+                return "RAMP_STATE_SKIP_INITIAL";
+            case RAMP_STATE_SKIP_AUTOBRIGHT:
+                return "RAMP_STATE_SKIP_AUTOBRIGHT";
             default:
                 return Integer.toString(state);
         }

@@ -32,6 +32,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.Process;
 import android.os.UserHandle;
 import android.util.Slog;
 import android.view.RemoteAnimationAdapter;
@@ -121,18 +122,26 @@ class SafeActivityOptions {
         if (mOriginalOptions != null) {
             checkPermissions(intent, aInfo, callerApp, supervisor, mOriginalOptions,
                     mOriginalCallingPid, mOriginalCallingUid);
-            if (mOriginalOptions.getRemoteAnimationAdapter() != null) {
-                mOriginalOptions.getRemoteAnimationAdapter().setCallingPid(mOriginalCallingPid);
-            }
+            setCallingPidForRemoteAnimationAdapter(mOriginalOptions, mOriginalCallingPid);
         }
         if (mCallerOptions != null) {
             checkPermissions(intent, aInfo, callerApp, supervisor, mCallerOptions,
                     mRealCallingPid, mRealCallingUid);
-            if (mCallerOptions.getRemoteAnimationAdapter() != null) {
-                mCallerOptions.getRemoteAnimationAdapter().setCallingPid(mRealCallingPid);
-            }
+            setCallingPidForRemoteAnimationAdapter(mCallerOptions, mRealCallingPid);
         }
         return mergeActivityOptions(mOriginalOptions, mCallerOptions);
+    }
+
+    private void setCallingPidForRemoteAnimationAdapter(ActivityOptions options, int callingPid) {
+        final RemoteAnimationAdapter adapter = options.getRemoteAnimationAdapter();
+        if (adapter == null) {
+            return;
+        }
+        if (callingPid == Process.myPid()) {
+            Slog.wtf(TAG, "Safe activity options constructed after clearing calling id");
+            return;
+        }
+        adapter.setCallingPid(callingPid);
     }
 
     /**

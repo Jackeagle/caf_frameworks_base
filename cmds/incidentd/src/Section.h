@@ -40,9 +40,12 @@ class Section {
 public:
     const int id;
     const int64_t timeoutMs;  // each section must have a timeout
+    const bool userdebugAndEngOnly;
+    const bool deviceSpecific;
     String8 name;
 
-    Section(int id, const int64_t timeoutMs = REMOTE_CALL_TIMEOUT_MS);
+    Section(int id, int64_t timeoutMs = REMOTE_CALL_TIMEOUT_MS, bool userdebugAndEngOnly = false,
+            bool deviceSpecific = false);
     virtual ~Section();
 
     virtual status_t Execute(ReportRequestSet* requests) const = 0;
@@ -75,7 +78,8 @@ public:
  */
 class FileSection : public Section {
 public:
-    FileSection(int id, const char* filename, const int64_t timeoutMs = 5000 /* 5 seconds */);
+    FileSection(int id, const char* filename, bool deviceSpecific = false,
+                int64_t timeoutMs = 5000 /* 5 seconds */);
     virtual ~FileSection();
 
     virtual status_t Execute(ReportRequestSet* requests) const;
@@ -105,7 +109,8 @@ private:
  */
 class WorkerThreadSection : public Section {
 public:
-    WorkerThreadSection(int id, const int64_t timeoutMs = REMOTE_CALL_TIMEOUT_MS);
+    WorkerThreadSection(int id, int64_t timeoutMs = REMOTE_CALL_TIMEOUT_MS,
+                        bool userdebugAndEngOnly = false);
     virtual ~WorkerThreadSection();
 
     virtual status_t Execute(ReportRequestSet* requests) const;
@@ -118,7 +123,7 @@ public:
  */
 class CommandSection : public Section {
 public:
-    CommandSection(int id, const int64_t timeoutMs, const char* command, ...);
+    CommandSection(int id, int64_t timeoutMs, const char* command, ...);
 
     CommandSection(int id, const char* command, ...);
 
@@ -135,7 +140,7 @@ private:
  */
 class DumpsysSection : public WorkerThreadSection {
 public:
-    DumpsysSection(int id, const char* service, ...);
+    DumpsysSection(int id, bool userdebugAndEngOnly, const char* service, ...);
     virtual ~DumpsysSection();
 
     virtual status_t BlockingCall(int pipeWriteFd) const;
@@ -168,7 +173,7 @@ private:
  */
 class TombstoneSection : public WorkerThreadSection {
 public:
-    TombstoneSection(int id, const char* type, const int64_t timeoutMs = 30000 /* 30 seconds */);
+    TombstoneSection(int id, const char* type, int64_t timeoutMs = 30000 /* 30 seconds */);
     virtual ~TombstoneSection();
 
     virtual status_t BlockingCall(int pipeWriteFd) const;

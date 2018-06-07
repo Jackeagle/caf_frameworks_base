@@ -28,6 +28,8 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.UserHandle;
+import android.support.v4.graphics.drawable.RoundedBitmapDrawable;
+import android.support.v4.graphics.drawable.RoundedBitmapDrawableFactory;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -193,7 +195,10 @@ public class UserGridRecyclerView extends PagedListView implements
         @Override
         public void onBindViewHolder(UserAdapterViewHolder holder, int position) {
             UserRecord userRecord = mUsers.get(position);
-            holder.mUserAvatarImageView.setImageBitmap(getUserRecordIcon(userRecord));
+            RoundedBitmapDrawable circleIcon = RoundedBitmapDrawableFactory.create(mRes,
+                getUserRecordIcon(userRecord));
+            circleIcon.setCircular(true);
+            holder.mUserAvatarImageView.setImageDrawable(circleIcon);
             holder.mUserNameTextView.setText(userRecord.mInfo.name);
             holder.mView.setOnClickListener(v -> {
                 if (userRecord == null) {
@@ -207,7 +212,7 @@ public class UserGridRecyclerView extends PagedListView implements
 
                 // If the user selects Guest, start the guest session.
                 if (userRecord.mIsStartGuestSession) {
-                    mUserManagerHelper.switchToGuest(mGuestName);
+                    mUserManagerHelper.startNewGuestSession(mGuestName);
                     return;
                 }
 
@@ -241,8 +246,7 @@ public class UserGridRecyclerView extends PagedListView implements
 
         private Bitmap getUserRecordIcon(UserRecord userRecord) {
             if (userRecord.mIsStartGuestSession) {
-                return UserIcons.convertToBitmap(UserIcons.getDefaultUserIcon(
-                    mContext.getResources(), UserHandle.USER_NULL, false));
+                return mUserManagerHelper.getGuestDefaultIcon();
             }
 
             if (userRecord.mIsAddUser) {

@@ -221,7 +221,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     public static boolean mPerfSendTapHint = false;
     public BoostFramework mPerfBoost = null;
     public BoostFramework mPerfPack = null;
-
+    public BoostFramework mPerfIop = null;
+    public BoostFramework mUxPerf = null;
     static final int HANDLE_DISPLAY_ADDED = FIRST_SUPERVISOR_STACK_MSG + 5;
     static final int HANDLE_DISPLAY_CHANGED = FIRST_SUPERVISOR_STACK_MSG + 6;
     static final int HANDLE_DISPLAY_REMOVED = FIRST_SUPERVISOR_STACK_MSG + 7;
@@ -451,6 +452,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     private boolean mTaskLayersChanged = true;
 
     private ActivityMetricsLogger mActivityMetricsLogger;
+    private LaunchTimeTracker mLaunchTimeTracker = new LaunchTimeTracker();
 
     private final ArrayList<ActivityRecord> mTmpActivityList = new ArrayList<>();
 
@@ -633,6 +635,10 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
     public ActivityMetricsLogger getActivityMetricsLogger() {
         return mActivityMetricsLogger;
+    }
+
+    LaunchTimeTracker getLaunchTimeTracker() {
+        return mLaunchTimeTracker;
     }
 
     public KeyguardController getKeyguardController() {
@@ -1230,7 +1236,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
     ActivityRecord topRunningActivityLocked(boolean considerKeyguardState) {
         final ActivityStack focusedStack = mFocusedStack;
         ActivityRecord r = focusedStack.topRunningActivityLocked();
-        if (r != null) {
+        if (r != null && isValidTopRunningActivity(r, considerKeyguardState)) {
             return r;
         }
 
@@ -1263,17 +1269,35 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 continue;
             }
 
-            final boolean keyguardLocked = getKeyguardController().isKeyguardLocked();
 
             // This activity can be considered the top running activity if we are not
             // considering the locked state, the keyguard isn't locked, or we can show when
             // locked.
-            if (!considerKeyguardState || !keyguardLocked || topActivity.canShowWhenLocked()) {
+            if (isValidTopRunningActivity(topActivity, considerKeyguardState)) {
                 return topActivity;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Verifies an {@link ActivityRecord} can be the top activity based on keyguard state and
+     * whether we are considering it.
+     */
+    private boolean isValidTopRunningActivity(ActivityRecord record,
+            boolean considerKeyguardState) {
+        if (!considerKeyguardState) {
+            return true;
+        }
+
+        final boolean keyguardLocked = getKeyguardController().isKeyguardLocked();
+
+        if (!keyguardLocked) {
+            return true;
+        }
+
+        return record.canShowWhenLocked();
     }
 
     @VisibleForTesting
@@ -1321,10 +1345,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         return aInfo;
     }
 
-    ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId) {
-        return resolveIntent(intent, resolvedType, userId, 0, Binder.getCallingUid());
-    }
-
     ResolveInfo resolveIntent(Intent intent, String resolvedType, int userId, int flags,
             int filterCallingUid) {
         synchronized (mService) {
@@ -1336,9 +1356,19 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                             || (intent.getFlags() & Intent.FLAG_ACTIVITY_MATCH_EXTERNAL) != 0) {
                     modifiedFlags |= PackageManager.MATCH_INSTANT;
                 }
-                return mService.getPackageManagerInternalLocked().resolveIntent(
-                        intent, resolvedType, modifiedFlags, userId, true, filterCallingUid);
 
+                // In order to allow cross-profile lookup, we clear the calling identity here.
+                // Note the binder identity won't affect the result, but filterCallingUid will.
+
+                // Cross-user/profile call check are done at the entry points
+                // (e.g. AMS.startActivityAsUser).
+                final long token = Binder.clearCallingIdentity();
+                try {
+                    return mService.getPackageManagerInternalLocked().resolveIntent(
+                            intent, resolvedType, modifiedFlags, userId, true, filterCallingUid);
+                } finally {
+                    Binder.restoreCallingIdentity(token);
+                }
             } finally {
                 Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
             }
@@ -1526,7 +1556,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 mService.getLifecycleManager().scheduleTransaction(clientTransaction);
 
 
-                if ((app.info.privateFlags & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0) {
+                if ((app.info.privateFlags & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0
+                        && mService.mHasHeavyWeightFeature) {
                     // This may be a heavy-weight process!  Note that the package
                     // manager will ensure that only activity can run in the main
                     // process of the .apk, which is the only thing that will be
@@ -1627,7 +1658,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         ProcessRecord app = mService.getProcessRecordLocked(r.processName,
                 r.info.applicationInfo.uid, true);
 
-        r.getStack().setLaunchTime(r);
+        getLaunchTimeTracker().setLaunchTime(r);
 
         if (app != null && app.thread != null) {
             try {
@@ -1683,11 +1714,16 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
     boolean checkStartAnyActivityPermission(Intent intent, ActivityInfo aInfo,
             String resultWho, int requestCode, int callingPid, int callingUid,
-            String callingPackage, boolean ignoreTargetSecurity, ProcessRecord callerApp,
-            ActivityRecord resultRecord, ActivityStack resultStack) {
+            String callingPackage, boolean ignoreTargetSecurity, boolean launchingInTask,
+            ProcessRecord callerApp, ActivityRecord resultRecord, ActivityStack resultStack) {
+        final boolean isCallerRecents = mService.getRecentTasks() != null &&
+                mService.getRecentTasks().isCallerRecents(callingUid);
         final int startAnyPerm = mService.checkPermission(START_ANY_ACTIVITY, callingPid,
                 callingUid);
-        if (startAnyPerm == PERMISSION_GRANTED) {
+        if (startAnyPerm == PERMISSION_GRANTED || (isCallerRecents && launchingInTask)) {
+            // If the caller has START_ANY_ACTIVITY, ignore all checks below. In addition, if the
+            // caller is the recents component and we are specifically starting an activity in an
+            // existing task, then also allow the activity to be fully relaunched.
             return true;
         }
         final int componentRestriction = getComponentRestrictionForCallingPackage(
@@ -2425,6 +2461,16 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 if (stack.isCompatible(windowingMode, activityType)) {
                     return stack;
                 }
+                if (windowingMode == WINDOWING_MODE_FULLSCREEN_OR_SPLIT_SCREEN_SECONDARY
+                        && display.getSplitScreenPrimaryStack() == stack
+                        && candidateTask == stack.topTask()) {
+                    // This is a special case when we try to launch an activity that is currently on
+                    // top of split-screen primary stack, but is targeting split-screen secondary.
+                    // In this case we don't want to move it to another stack.
+                    // TODO(b/78788972): Remove after differentiating between preferred and required
+                    // launch options.
+                    return stack;
+                }
             }
         }
 
@@ -2906,10 +2952,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         try {
             ActivityRecord r = stack.topRunningActivityLocked();
             Rect insetBounds = null;
-            if (tempPinnedTaskBounds != null) {
-                // We always use 0,0 as the position for the inset rect because
-                // if we are getting insets at all in the pinned stack it must mean
-                // we are headed for fullscreen.
+            if (tempPinnedTaskBounds != null && stack.isAnimatingBoundsToFullscreen()) {
+                // Use 0,0 as the position for the inset rect because we are headed for fullscreen.
                 insetBounds = tempRect;
                 insetBounds.top = 0;
                 insetBounds.left = 0;
@@ -3348,13 +3392,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
     void acquireAppLaunchPerfLock(String packageName) {
        /* Acquire perf lock during new app launch */
-       if (mPerfPack == null) {
-           mPerfPack = new BoostFramework();
-       }
-       if (mPerfPack != null) {
-           mPerfPack.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, packageName, -1, BoostFramework.Launch.BOOST_V2);
-       }
-
        if (mPerfBoost == null) {
            mPerfBoost = new BoostFramework();
        }
@@ -3362,6 +3399,26 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
            mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, packageName, -1, BoostFramework.Launch.BOOST_V1);
            mPerfSendTapHint = true;
        }
+       if (mPerfPack == null) {
+           mPerfPack = new BoostFramework();
+       }
+       if (mPerfPack != null) {
+           mPerfPack.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, packageName, -1, BoostFramework.Launch.BOOST_V2);
+       }
+       // Start IOP
+       if (mPerfIop == null) {
+           mPerfIop = new BoostFramework();
+       }
+       if (mPerfIop != null) {
+           mPerfIop.perfIOPrefetchStart(-1,packageName,"");
+       }
+    }
+
+    void acquireUxPerfLock(int opcode, String packageName) {
+        mUxPerf = new BoostFramework();
+        if (mUxPerf != null) {
+            mUxPerf.perfUXEngine_events(opcode, 0, packageName, 0);
+        }
     }
 
     ActivityRecord findTaskLocked(ActivityRecord r, int displayId) {
@@ -3389,6 +3446,10 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                         if(mTmpFindTaskResult.r.getState() == ActivityState.DESTROYED ) {
                             /*It's a new app launch */
                             acquireAppLaunchPerfLock(r.packageName);
+                        }
+                        if(mTmpFindTaskResult.r.getState() == ActivityState.STOPPED) {
+                            /*Warm launch */
+                            acquireUxPerfLock(BoostFramework.UXE_EVENT_SUB_LAUNCH, r.packageName);
                         }
                         return mTmpFindTaskResult.r;
                     } else if (mTmpFindTaskResult.r.getDisplayId() == displayId) {

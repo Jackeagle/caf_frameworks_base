@@ -204,6 +204,9 @@ TEST(MetricConditionLinkE2eTest, TestMultiplePredicatesAndLinks1) {
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
     EXPECT_EQ(reports.reports_size(), 1);
     EXPECT_EQ(reports.reports(0).metrics_size(), 1);
     EXPECT_EQ(reports.reports(0).metrics(0).count_metrics().data_size(), 1);
@@ -320,6 +323,9 @@ TEST(MetricConditionLinkE2eTest, TestMultiplePredicatesAndLinks2) {
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
     EXPECT_EQ(reports.reports_size(), 1);
     EXPECT_EQ(reports.reports(0).metrics_size(), 1);
     EXPECT_EQ(reports.reports(0).metrics(0).count_metrics().data_size(), 1);

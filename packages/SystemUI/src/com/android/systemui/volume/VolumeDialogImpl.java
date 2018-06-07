@@ -53,7 +53,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
-import android.os.Vibrator;
 import android.provider.Settings;
 import android.provider.Settings.Global;
 import android.text.InputFilter;
@@ -72,9 +71,10 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager.AccessibilityServicesStateChangeListener;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -122,7 +122,7 @@ public class VolumeDialogImpl implements VolumeDialog {
     private ImageButton mRingerIcon;
     private View mSettingsView;
     private ImageButton mSettingsIcon;
-    private ImageView mZenIcon;
+    private FrameLayout mZenIcon;
     private final List<VolumeRow> mRows = new ArrayList<>();
     private ConfigurableTexts mConfigurableTexts;
     private final SparseBooleanArray mDynamic = new SparseBooleanArray();
@@ -132,7 +132,6 @@ public class VolumeDialogImpl implements VolumeDialog {
     private final Accessibility mAccessibility = new Accessibility();
     private final ColorStateList mActiveTint;
     private final ColorStateList mInactiveTint;
-    private final Vibrator mVibrator;
 
     private boolean mShowing;
     private boolean mShowA11yStream;
@@ -153,7 +152,6 @@ public class VolumeDialogImpl implements VolumeDialog {
         mActiveTint = ColorStateList.valueOf(Utils.getColorAccent(mContext));
         mInactiveTint = loadColorStateList(R.color.volume_slider_inactive);
         mDeviceProvisionedController = Dependency.get(DeviceProvisionedController.class);
-        mVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
     }
 
     public void init(int windowType, Callback callback) {
@@ -630,35 +628,32 @@ public class VolumeDialogImpl implements VolumeDialog {
             switch (mState.ringerModeInternal) {
                 case AudioManager.RINGER_MODE_VIBRATE:
                     mRingerIcon.setImageResource(R.drawable.ic_volume_ringer_vibrate);
+                    addAccessibilityDescription(mRingerIcon, RINGER_MODE_VIBRATE,
+                            mContext.getString(R.string.volume_ringer_hint_mute));
                     mRingerIcon.setTag(Events.ICON_STATE_VIBRATE);
                     break;
                 case AudioManager.RINGER_MODE_SILENT:
                     mRingerIcon.setImageResource(R.drawable.ic_volume_ringer_mute);
-                    mRingerIcon.setContentDescription(mContext.getString(
-                            R.string.volume_stream_content_description_unmute,
-                            getStreamLabelH(ss)));
                     mRingerIcon.setTag(Events.ICON_STATE_MUTE);
+                    addAccessibilityDescription(mRingerIcon, RINGER_MODE_SILENT,
+                            mContext.getString(R.string.volume_ringer_hint_unmute));
                     break;
                 case AudioManager.RINGER_MODE_NORMAL:
                 default:
                     boolean muted = (mAutomute && ss.level == 0) || ss.muted;
                     if (!isZenMuted && muted) {
                         mRingerIcon.setImageResource(R.drawable.ic_volume_ringer_mute);
-                        mRingerIcon.setContentDescription(mContext.getString(
-                                R.string.volume_stream_content_description_unmute,
-                                getStreamLabelH(ss)));
+                        addAccessibilityDescription(mRingerIcon, RINGER_MODE_NORMAL,
+                                mContext.getString(R.string.volume_ringer_hint_unmute));
                         mRingerIcon.setTag(Events.ICON_STATE_MUTE);
                     } else {
                         mRingerIcon.setImageResource(R.drawable.ic_volume_ringer);
                         if (mController.hasVibrator()) {
-                            mRingerIcon.setContentDescription(mContext.getString(
-                                    mShowA11yStream
-                                            ? R.string.volume_stream_content_description_vibrate_a11y
-                                            : R.string.volume_stream_content_description_vibrate,
-                                    getStreamLabelH(ss)));
-
+                            addAccessibilityDescription(mRingerIcon, RINGER_MODE_NORMAL,
+                                    mContext.getString(R.string.volume_ringer_hint_vibrate));
                         } else {
-                            mRingerIcon.setContentDescription(getStreamLabelH(ss));
+                            addAccessibilityDescription(mRingerIcon, RINGER_MODE_NORMAL,
+                                    mContext.getString(R.string.volume_ringer_hint_mute));
                         }
                         mRingerIcon.setTag(Events.ICON_STATE_UNMUTE);
                     }
@@ -667,13 +662,39 @@ public class VolumeDialogImpl implements VolumeDialog {
         }
     }
 
+    private void addAccessibilityDescription(View view, int currState, String hintLabel) {
+        int currStateResId;
+        switch (currState) {
+            case RINGER_MODE_SILENT:
+                currStateResId = R.string.volume_ringer_status_silent;
+                break;
+            case RINGER_MODE_VIBRATE:
+                currStateResId = R.string.volume_ringer_status_vibrate;
+                break;
+            case RINGER_MODE_NORMAL:
+            default:
+                currStateResId = R.string.volume_ringer_status_normal;
+        }
+
+        view.setContentDescription(mContext.getString(currStateResId));
+
+        view.setAccessibilityDelegate(new AccessibilityDelegate() {
+            public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
+                                AccessibilityNodeInfo.ACTION_CLICK, hintLabel));
+            }
+        });
+    }
+
     /**
      * Toggles enable state of views in a VolumeRow (not including seekbar or icon)
      * Hides/shows zen icon
      * @param enable whether to enable volume row views and hide dnd icon
      */
     private void enableVolumeRowViewsH(VolumeRow row, boolean enable) {
-        row.dndIcon.setVisibility(enable ? GONE : VISIBLE);
+        boolean showDndIcon = !enable;
+        row.dndIcon.setVisibility(showDndIcon ? VISIBLE : GONE);
     }
 
     /**
@@ -724,8 +745,11 @@ public class VolumeDialogImpl implements VolumeDialog {
             updateVolumeRowH(row);
         }
         updateRingerH();
-        mWindow.setTitle(mContext.getString(R.string.volume_dialog_title,
-                getStreamLabelH(getActiveRow().ss)));
+        mWindow.setTitle(composeWindowTitle());
+    }
+
+    CharSequence composeWindowTitle() {
+        return mContext.getString(R.string.volume_dialog_title, getStreamLabelH(getActiveRow().ss));
     }
 
     private void updateVolumeRowH(VolumeRow row) {
@@ -1196,6 +1220,13 @@ public class VolumeDialogImpl implements VolumeDialog {
         }
 
         @Override
+        public boolean dispatchPopulateAccessibilityEvent(View host, AccessibilityEvent event) {
+            // Activities populate their title here. Follow that example.
+            event.getText().add(composeWindowTitle());
+            return true;
+        }
+
+        @Override
         public boolean onRequestSendAccessibilityEvent(ViewGroup host, View child,
                 AccessibilityEvent event) {
             rescheduleTimeoutH();
@@ -1241,6 +1272,6 @@ public class VolumeDialogImpl implements VolumeDialog {
         private ObjectAnimator anim;  // slider progress animation for non-touch-related updates
         private int animTargetProgress;
         private int lastAudibleLevel = 1;
-        private ImageView dndIcon;
+        private FrameLayout dndIcon;
     }
 }

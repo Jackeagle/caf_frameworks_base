@@ -51,6 +51,8 @@
     <string name="keyguard_sim_puk_locked_message" msgid="1772789643694942073">"‏SIM کارڈ PUK مقفل ہے۔"</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="3586601150825821675">"‏SIM کارڈ غیر مقفل ہو رہا ہے…"</string>
     <string name="keyguard_accessibility_pin_area" msgid="703175752097279029">"‏PIN کا علاقہ"</string>
+    <!-- no translation found for keyguard_accessibility_password (7695303207740941101) -->
+    <skip />
     <string name="keyguard_accessibility_sim_pin_area" msgid="912702510825058921">"‏SIM PIN کا علاقہ"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="136979425761438705">"‏SIM PUK کا علاقہ"</string>
     <string name="keyguard_accessibility_next_alarm" msgid="5835196989158584991">"اگلا الارم <xliff:g id="ALARM">%1$s</xliff:g> کیلئے سیٹ ہے"</string>
@@ -140,7 +142,10 @@
       <item quantity="one">آلہ <xliff:g id="NUMBER_0">%d</xliff:g> گھنٹہ سے غیر مقفل نہیں کیا گیا۔ پاسورڈ کی توثیق کریں۔</item>
     </plurals>
     <string name="fingerprint_not_recognized" msgid="348813995267914625">"تسلیم شدہ نہیں ہے"</string>
-    <!-- no translation found for kg_password_default_pin_message (3739658416797652781) -->
+    <plurals name="kg_password_default_pin_message" formatted="false" msgid="3739658416797652781">
+      <item quantity="other">‏SIM کا PIN درج کریں، آپ کے پاس <xliff:g id="NUMBER_1">%d</xliff:g> کوششیں بچی ہیں۔</item>
+      <item quantity="one">‏SIM کا PIN درج کریں، آپ کے پاس <xliff:g id="NUMBER_0">%d</xliff:g> کوشش بچی ہے، اس کے بعد آپ کو اپنا آلہ غیر مقفل کرنے کے لیے اپنے کیریئر سے رابطہ کرنا ہوگا۔</item>
+    </plurals>
     <plurals name="kg_password_default_puk_message" formatted="false" msgid="8744416410184198352">
       <item quantity="other">‏SIM اب غیر فعال ہے۔ جاری رکھنے کیلئے PUK کوڈ درج کریں۔ SIM کے مستقل طور پر ناقابل استعمال ہونے سے پہلے آپ کے پاس <xliff:g id="_NUMBER_1">%d</xliff:g> کوششیں بچی ہیں۔ تفصیلات کیلئے کیریئر سے رابطہ کریں۔</item>
       <item quantity="one">‏SIM اب غیر فعال ہے۔ جاری رکھنے کیلئے PUK کوڈ درج کریں۔ SIM کے مستقل طور پر ناقابل استعمال ہونے سے پہلے آپ کے پاس <xliff:g id="_NUMBER_0">%d</xliff:g> کوشش بچی ہے۔ تفصیلات کیلئے کیریئر سے رابطہ کریں۔</item>

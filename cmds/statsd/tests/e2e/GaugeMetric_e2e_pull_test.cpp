@@ -66,6 +66,7 @@ TEST(GaugeMetricE2eTest, TestRandomSamplePulledEvents) {
         baseTimeNs, configAddedTimeNs, config, cfgKey);
     EXPECT_EQ(processor->mMetricsManagers.size(), 1u);
     EXPECT_TRUE(processor->mMetricsManagers.begin()->second->isConfigValid());
+    processor->mStatsPullerManager.ForceClearPullerCache();
 
     int startBucketNum = processor->mMetricsManagers.begin()->second->
             mAllMetricProducers[0]->getCurrentBucketNum();
@@ -126,6 +127,9 @@ TEST(GaugeMetricE2eTest, TestRandomSamplePulledEvents) {
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
     EXPECT_EQ(1, reports.reports_size());
     EXPECT_EQ(1, reports.reports(0).metrics_size());
     StatsLogReport::GaugeMetricDataWrapper gaugeMetrics;
@@ -208,6 +212,7 @@ TEST(GaugeMetricE2eTest, TestAllConditionChangesSamplePulledEvents) {
         baseTimeNs, configAddedTimeNs, config, cfgKey);
     EXPECT_EQ(processor->mMetricsManagers.size(), 1u);
     EXPECT_TRUE(processor->mMetricsManagers.begin()->second->isConfigValid());
+    processor->mStatsPullerManager.ForceClearPullerCache();
 
     int startBucketNum = processor->mMetricsManagers.begin()->second->
             mAllMetricProducers[0]->getCurrentBucketNum();
@@ -245,6 +250,9 @@ TEST(GaugeMetricE2eTest, TestAllConditionChangesSamplePulledEvents) {
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
     EXPECT_EQ(1, reports.reports_size());
     EXPECT_EQ(1, reports.reports(0).metrics_size());
     StatsLogReport::GaugeMetricDataWrapper gaugeMetrics;
@@ -305,6 +313,7 @@ TEST(GaugeMetricE2eTest, TestRandomSamplePulledEvent_LateAlarm) {
         baseTimeNs, configAddedTimeNs, config, cfgKey);
     EXPECT_EQ(processor->mMetricsManagers.size(), 1u);
     EXPECT_TRUE(processor->mMetricsManagers.begin()->second->isConfigValid());
+    processor->mStatsPullerManager.ForceClearPullerCache();
 
     int startBucketNum = processor->mMetricsManagers.begin()->second->
             mAllMetricProducers[0]->getCurrentBucketNum();
@@ -346,6 +355,9 @@ TEST(GaugeMetricE2eTest, TestRandomSamplePulledEvent_LateAlarm) {
                             &buffer);
     EXPECT_TRUE(buffer.size() > 0);
     EXPECT_TRUE(reports.ParseFromArray(&buffer[0], buffer.size()));
+    backfillDimensionPath(&reports);
+    backfillStringInReport(&reports);
+    backfillStartEndTimestamp(&reports);
     EXPECT_EQ(1, reports.reports_size());
     EXPECT_EQ(1, reports.reports(0).metrics_size());
     StatsLogReport::GaugeMetricDataWrapper gaugeMetrics;
