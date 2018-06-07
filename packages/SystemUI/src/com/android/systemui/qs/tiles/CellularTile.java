@@ -162,20 +162,25 @@ public class CellularTile extends QSTileImpl<SignalState> {
             cb = mSignalCallback.mInfo;
         }
 
+        DataUsageController.DataUsageInfo carrierLabelInfo = mDataController.getDataUsageInfo();
         final Resources r = mContext.getResources();
         state.activityIn = cb.enabled && cb.activityIn;
         state.activityOut = cb.enabled && cb.activityOut;
         state.isOverlayIconWide = cb.isDataTypeIconWide;
         state.overlayIconId = cb.dataTypeIconId;
 
-        state.label = r.getString(R.string.mobile_data);
-
         final String signalContentDesc = cb.enabled && (cb.mobileSignalIconId > 0)
                 ? cb.signalContentDescription
                 : r.getString(R.string.accessibility_no_signal);
         if (cb.noSim) {
+            state.label = r.getString(R.string.mobile_data);
             state.contentDescription = state.label;
         } else {
+            if (carrierLabelInfo != null) {
+                state.label = carrierLabelInfo.carrier;
+            } else {
+                state.label = r.getString(R.string.mobile_data);
+            }
             state.contentDescription = signalContentDesc + ", " + state.label;
         }
 
