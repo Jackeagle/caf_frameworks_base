@@ -522,4 +522,8 @@
     <!-- List of Carrier one signal strength threshold values-->
     <integer-array name="carrier_one_strength_threshold_values">
     </integer-array>
+
+    <!-- When true,show the AutoBrightness checkbox -->
+    <bool name="config_show_auto_brightness">false</bool>
+
 </resources>
