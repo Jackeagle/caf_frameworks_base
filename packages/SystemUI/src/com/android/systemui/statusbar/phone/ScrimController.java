@@ -71,6 +71,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
     protected static final float SCRIM_BEHIND_ALPHA_UNLOCKING = 0.2f;
     private static final float SCRIM_IN_FRONT_ALPHA = GRADIENT_SCRIM_ALPHA_BUSY;
     private static final float SCRIM_IN_FRONT_ALPHA_LOCKED = GRADIENT_SCRIM_ALPHA_BUSY;
+    private static final float SUBSIDY_SCRIM_BEHIND_ALPHA = 0.4f;
     private static final int TAG_KEY_ANIM = R.id.scrim;
     private static final int TAG_KEY_ANIM_TARGET = R.id.scrim_target;
     private static final int TAG_START_ALPHA = R.id.scrim_alpha_start;
@@ -133,6 +134,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
     private boolean mWakingUpFromAodAnimationRunning;
     private boolean mScrimsVisble;
     private final Consumer<Boolean> mScrimVisibleListener;
+    private boolean mIsSubsidyLocked;
 
     public ScrimController(LightBarController lightBarController, ScrimView scrimBehind,
             ScrimView scrimInFront, View headsUpScrim,
@@ -421,8 +423,10 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
             setScrimInFrontAlpha(getScrimInFrontAlpha());
             updateScrimNormal();
         } else if (mBouncerShowing) {
+            // Adjusted alpha of back scrim to make status bar visible
+            // when anyone of the subsidy lock view is in foreground.
             setScrimInFrontAlpha(0f);
-            setScrimBehindAlpha(mScrimBehindAlpha);
+            setScrimBehindAlpha(mIsSubsidyLocked ? SUBSIDY_SCRIM_BEHIND_ALPHA : mScrimBehindAlpha);
         } else {
             float fraction = Math.max(0, Math.min(mFraction, 1));
             if (mWakingUpFromAodStarting) {
@@ -786,5 +790,12 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener,
         pw.print("   mBouncerShowing="); pw.println(mBouncerShowing);
         pw.print("   mTracking="); pw.println(mTracking);
         pw.print("   mForceHideScrims="); pw.println(mForceHideScrims);
+    }
+
+    /*
+     * Set current state of security mode is subsidy or not
+     */
+    public void setSubsidyLockEnabled(boolean isSubsidyLocked) {
+        mIsSubsidyLocked = isSubsidyLocked;
     }
 }
