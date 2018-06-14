@@ -255,10 +255,7 @@ import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wm.AppTransition;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.List;
 
 /**
@@ -2194,6 +2191,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mWindowManagerFuncs.notifyKeyguardTrustedChanged();
                     }
                 });
+
+        // Turn off wifi led red
+        // TODO: This should be done by the system/driver
+        if ("true".equals(mHeadlessMode)) {
+            final String LED_PATH = "/sys/class/leds/WIFI_LED:red:114/brightness";
+            updateWiFiLED(LED_PATH, "0");
+        }
     }
 
     /**
@@ -5694,6 +5698,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mLastWindowSleepTokenNeeded = mWindowSleepTokenNeeded;
     }
 
+    private void updateWiFiLED(String led_path, String value) {
+        try {
+            BufferedWriter bw = new BufferedWriter ( new FileWriter (led_path));
+            bw.write(value);
+            bw.close();
+        } catch (IOException e) {
+            Log.e(TAG, led_path + " exception:" + e);
+        }
+    }
     /**
      * @return Whether the top app should hide the statusbar based on the top fullscreen opaque
      *         window.
@@ -6330,6 +6343,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         Log.d(TAG, "scanCode=" + scanCode);
                     }
                     if (down && scanCode == WIFI_BUTTON_SCAN_CODE) {
+                        final String LED_PATH = "/sys/class/leds/WIFI_LED:green:115/brightness";
                         IWifiManager wifiManager = IWifiManager.Stub.asInterface(ServiceManager.getService(Context.WIFI_SERVICE));
                         try {
                             if (wifiManager.getWifiApEnabledState() == WIFI_AP_STATE_DISABLED) {
@@ -6339,8 +6353,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 mWifiConfig.allowedKeyManagement.set(KeyMgmt.WPA_PSK);
                                 mWifiConfig.allowedAuthAlgorithms.set(AuthAlgorithm.OPEN);
                                 wifiManager.startSoftAp(mWifiConfig);
+                                updateWiFiLED(LED_PATH, "255");
                             } else {
                                 wifiManager.stopSoftAp();
+                                updateWiFiLED(LED_PATH, "0");
                             }
                         } catch (RemoteException e) {
                             Log.e(TAG,"wifiManager exception:" + e);
