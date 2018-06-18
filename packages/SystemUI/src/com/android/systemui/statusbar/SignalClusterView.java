@@ -854,10 +854,12 @@ public class SignalClusterView extends LinearLayout implements
             setTint(mMobileType, DarkIconDispatcher.getTint(tintArea, mMobileType, tint));
             setTint(mMobileRoaming, DarkIconDispatcher.getTint(tintArea, mMobileRoaming,
                     tint));
-            setTint(mMobileActivityIn,
+            /*Commented tinting because the color is specified in xml to avoid anomalies
+              in case of a full signal where arrow and signal fill are same color */
+            /*setTint(mMobileActivityIn,
                     DarkIconDispatcher.getTint(tintArea, mMobileActivityIn, tint));
             setTint(mMobileActivityOut,
-                    DarkIconDispatcher.getTint(tintArea, mMobileActivityOut, tint));
+                    DarkIconDispatcher.getTint(tintArea, mMobileActivityOut, tint));*/
         }
     }
 }
