@@ -3122,4 +3122,7 @@
   <java-symbol type="integer" name="power_key_hits_emergency" />
   <java-symbol type="bool" name="config_emergencyCallOnPowerkeyTapGestureEnabled" />
 
+  <!-- Use LTE/GSM network mode instead of LTE/WCDMA/GSM network mode in network settings. -->
+  <java-symbol type="bool" name="config_useLteGsmModeInsteadOfLteWcdmaGsmMode" />
+
 </resources>
