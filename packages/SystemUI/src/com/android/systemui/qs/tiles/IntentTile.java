@@ -111,7 +111,9 @@ public class IntentTile extends QSTileImpl<State> {
                 if (pi.isActivity()) {
                     Dependency.get(ActivityStarter.class).postStartActivityDismissingKeyguard(pi);
                 } else {
-                    pi.send();
+                    Intent intent = new Intent();
+                    intent.setFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+                    pi.send(mContext, 1, intent);
                 }
             } else if (uri != null) {
                 final Intent intent = Intent.parseUri(uri, Intent.URI_INTENT_SCHEME);
