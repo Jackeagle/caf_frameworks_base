@@ -1323,6 +1323,7 @@ public class ServiceState implements Parcelable {
 
         // voice overrides
         newSs.mVoiceRegState = voiceSs.mVoiceRegState;
+        newSs.mRilVoiceRadioTechnology = voiceSs.mRilVoiceRadioTechnology;
         newSs.mIsEmergencyOnly = false; // only get here if voice is IN_SERVICE
 
         return newSs;
