@@ -26,6 +26,7 @@ import android.content.IntentFilter;
 import android.content.res.TypedArray;
 import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
+import android.os.SystemProperties;
 import android.telephony.ServiceState;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -56,6 +57,10 @@ public class CarrierText extends TextView {
 
     private boolean[] mSimErrorState = new boolean[TelephonyManager.getDefault().getPhoneCount()];
 
+    private boolean[] mSimMissingState = new boolean[TelephonyManager.getDefault().getPhoneCount()];
+
+    private final boolean mDisplayNoSim;
+
     private KeyguardUpdateMonitorCallback mCallback = new KeyguardUpdateMonitorCallback() {
         @Override
         public void onRefreshCarrierInfo() {
@@ -77,6 +82,12 @@ public class CarrierText extends TextView {
             }
 
             Log.d(TAG,"onSimStateChanged: " + getStatusForIccState(simState));
+
+            if (getStatusForIccState(simState) == StatusMode.SimMissing) {
+                mSimMissingState[slotId] = true;
+            } else {
+                mSimMissingState[slotId] = false;
+            }
             if (getStatusForIccState(simState) == StatusMode.SimIoError) {
                 mSimErrorState[slotId] = true;
                 updateCarrierText();
@@ -110,6 +121,7 @@ public class CarrierText extends TextView {
         super(context, attrs);
         mIsEmergencyCallCapable = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_voice_capable);
+        mDisplayNoSim = context.getResources().getBoolean(R.bool.config_carrier_display_no_sim);
         boolean useAllCaps;
         TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs, R.styleable.CarrierText, 0, 0);
@@ -152,6 +164,33 @@ public class CarrierText extends TextView {
         return text;
     }
 
+    /**
+     * Checks if there are abscent cards. Adds the text depending on the slot of the card
+     * @param text: current carrier text based on the sim state
+     * @param noSims: whether all sim missing
+     * @return text
+    */
+    private CharSequence updateCarrierTextWithSimMissing(CharSequence text, boolean noSims) {
+        CharSequence simMissingText = getContext().getText(
+            R.string.keyguard_missing_sim_message_RJIL);
+        // when all sim are missing, don't overwrite the current carrier text
+        if (noSims) {
+            return text;
+        }
+        for (int index = 0; index < mSimMissingState.length; index++) {
+            if (mSimMissingState[index]) {
+                if (index == 0) {
+                    // prepend "No Sim" when sim card is abscent in slot 0
+                    text = concatenate(simMissingText, text);
+                } else {
+                    // append "No Sim" when sim card is abscent in slot 1
+                    text = concatenate(text, simMissingText);
+                }
+            }
+        }
+        return text;
+    }
+
     protected void updateCarrierText() {
         boolean allSimsMissing = true;
         boolean anySimReadyAndInService = false;
@@ -160,10 +199,32 @@ public class CarrierText extends TextView {
         boolean showRat = getContext().getResources().getBoolean(
                 com.android.systemui.R.bool.config_display_rat);
         CharSequence displayText = null;
+        String carrier = "405854";
 
         List<SubscriptionInfo> subs = mKeyguardUpdateMonitor.getSubscriptionInfo(false);
         final int N = subs.size();
         if (DEBUG) Log.d(TAG, "updateCarrierText(): " + N);
+        /*
+         * If the Subscription Infos are not available and if any of the sims are not
+         * in SIM_STATE_ABSENT,set displayText as "NO SERVICE".
+         * displayText will be overrided after the Subscription infos are available and
+         * displayText is set according to the SIM Status.
+        */
+        String property = SystemProperties.get("persist.radio.atel.carrier");
+        if (N == 0 && carrier.equals(property)) {
+            boolean isSimAbsent = false;
+            for (int i = 0; i < TelephonyManager.getDefault().getSimCount(); i++) {
+                if (TelephonyManager.getDefault().getSimState(i)
+                        == TelephonyManager.SIM_STATE_ABSENT) {
+                    isSimAbsent = true;
+                    break;
+                }
+            }
+            if (!isSimAbsent) {
+                allSimsMissing = false;
+                displayText = getContext().getString(R.string.keyguard_carrier_default);
+            }
+        }
         for (int i = 0; i < N; i++) {
             CharSequence networkClass = "";
             int subId = subs.get(i).getSubscriptionId();
@@ -276,6 +337,9 @@ public class CarrierText extends TextView {
         }
 
         displayText = updateCarrierTextWithSimIoError(displayText, allSimsMissing);
+        if (mDisplayNoSim) {
+            displayText = updateCarrierTextWithSimMissing(displayText, allSimsMissing);
+        }
         // APM (airplane mode) != no carrier state. There are carrier services
         // (e.g. WFC = Wi-Fi calling) which may operate in APM.
         if (!anySimReadyAndInService && WirelessUtils.isAirplaneModeOn(mContext)) {

@@ -29,6 +29,7 @@ import android.service.quicksettings.Tile;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
@@ -117,7 +118,8 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
 
         mBrightnessController = new BrightnessController(getContext(),
                 findViewById(R.id.brightness_icon),
-                findViewById(R.id.brightness_slider));
+                findViewById(R.id.brightness_slider),
+                findViewById(R.id.brightness_auto));
     }
 
     protected void addDivider() {
@@ -140,6 +142,10 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
                 R.layout.qs_paged_tile_layout, this, false);
         mTileLayout.setListening(mListening);
         addView((View) mTileLayout);
+        //TODO Few things removed in this method on OREO.....
+        if (getResources().getBoolean(R.bool.config_show_auto_brightness)) {
+            findViewById(R.id.brightness_auto).setVisibility(View.VISIBLE);
+        }
     }
 
     public boolean isShowingCustomize() {

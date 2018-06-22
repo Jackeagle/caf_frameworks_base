@@ -54,7 +54,8 @@ import java.util.List;
 import java.util.Objects;
 
 // Intimately tied to the design of res/layout/signal_cluster_view.xml
-public class SignalClusterView extends LinearLayout implements NetworkControllerImpl.SignalCallback,
+public class SignalClusterView extends LinearLayout implements 
+        NetworkControllerImpl.SignalCallbackExtended,
         SecurityController.SecurityControllerCallback, Tunable,
         DarkReceiver {
 
@@ -325,6 +326,22 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         state.mStackedVoiceId = stackedVoiceId;
 
         apply();
+    }
+
+    @Override
+    public void setMobileDataIndicators(IconState statusIcon, IconState qsIcon, int statusType,
+            int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
+            int stackedDataId, int stackedVoiceId, String typeContentDescription,
+            String description, boolean isWide, int subId, boolean roaming,
+            int embmsIconId) {
+        PhoneState state = getState(subId);
+        if (state == null) {
+            return;
+        }
+        state.mMobileEmbmsId = embmsIconId;
+        this.setMobileDataIndicators(statusIcon, qsIcon, statusType, qsType, activityIn,
+                activityOut, dataActivityId, stackedDataId,
+                stackedVoiceId, typeContentDescription, description, isWide, subId, roaming);
     }
 
     @Override
@@ -684,14 +701,16 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         private String mMobileDescription, mMobileTypeDescription;
 
         private ViewGroup mMobileGroup;
-        private ImageView mMobile, mMobileDark, mMobileType, mMobileRoaming;
+        private ImageView mMobile, mMobileDark, mMobileType, mMobileRoaming,
+                mMobileEmbms;
         public boolean mRoaming;
         private ImageView mMobileActivityIn;
         private ImageView mMobileActivityOut;
         public boolean mActivityIn;
         public boolean mActivityOut;
 
-        private int mDataActivityId = 0;
+        private int mDataActivityId = 0, mMobileEmbmsId = 0;
+
         private int mStackedDataId = 0, mStackedVoiceId = 0;
         private ImageView mDataActivity, mStackedData, mStackedVoice;
         private ViewGroup mMobileSingleGroup, mMobileStackedGroup;
@@ -716,6 +735,8 @@ public class SignalClusterView extends LinearLayout implements NetworkController
             SignalDrawable drawable = new SignalDrawable(mMobileDark.getContext());
             drawable.setDarkIntensity(1);
             mMobileDark.setImageDrawable(drawable);
+
+            mMobileEmbms    = (ImageView) root.findViewById(R.id.embms);
             mDataActivity   = (ImageView) root.findViewById(R.id.data_inout);
             mStackedData    = (ImageView) root.findViewById(R.id.mobile_signal_data);
             mStackedVoice   = (ImageView) root.findViewById(R.id.mobile_signal_voice);
@@ -742,6 +763,8 @@ public class SignalClusterView extends LinearLayout implements NetworkController
                 }
 
                 mDataActivity.setImageResource(mDataActivityId);
+
+                mMobileEmbms.setImageResource(mMobileEmbmsId);
 
                 if (mStackedDataId != 0 && mStackedVoiceId != 0) {
                     mStackedData.setImageResource(mStackedDataId);
@@ -780,7 +803,7 @@ public class SignalClusterView extends LinearLayout implements NetworkController
             mMobileActivityIn.setVisibility(mActivityIn ? View.VISIBLE : View.GONE);
             mMobileActivityOut.setVisibility(mActivityOut ? View.VISIBLE : View.GONE);
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);
-
+            mMobileEmbms.setVisibility(mMobileEmbmsId != 0 ? View.VISIBLE : View.GONE);
             return mMobileVisible;
         }
 
