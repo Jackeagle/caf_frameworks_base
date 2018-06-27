@@ -17,25 +17,55 @@
 <animated-vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt">
     <aapt:attr name="android:drawable">
         <vector android:name="root"
-                android:width="24dp"
-                android:height="24dp"
-                android:viewportWidth="24.0"
-                android:viewportHeight="24.0">
-            <group android:name="icon" android:pivotX="12" android:pivotY="12">
+                android:width="28dp"
+                android:height="28dp"
+                android:viewportWidth="28.0"
+                android:viewportHeight="28.0">
+            <!-- Use scaleX to flip icon so arrows always point in the direction of motion -->
+            <group android:name="icon" android:pivotX="14" android:pivotY="14"
+                   android:scaleX="?attr/rotateButtonScaleX">
                 <!-- Tint color to be set directly -->
                 <path android:fillColor="#FFFFFFFF"
-                    android:pathData="M17,1.01L7,1C5.9,1 5,1.9 5,3v18c0,1.1 0.9,2 2,2h10c1.1,0 2,-0.9 2,-2V3C19,1.9 18.1,1.01 17,1.01zM17,21H7l0,-1h10V21zM17,18H7V6h10V18zM7,4V3h10v1H7z"/>
+                      android:pathData="M12.02,10.83L9.25,8.06l2.77,-2.77l1.12,1.12l-0.85,0.86h5.16c0.72,0 1.31,0.56 1.31,1.26v9.16l-1.58,-1.58V8.85h-4.89l0.86,0.86L12.02,10.83zM15.98,17.17l-1.12,1.12l0.85,0.86h-4.88v-7.26L9.25,10.3v9.17c0,0.7 0.59,1.26 1.31,1.26h5.16v0.01l-0.85,0.85l1.12,1.12l2.77,-2.77L15.98,17.17z"/>
             </group>
         </vector>
     </aapt:attr>
 
-    <!-- Repeat all animations 3 times but don't fade out at the end -->
+    <!-- Repeat all animations 5 times but don't fade out at the end -->
     <target android:name="root">
         <aapt:attr name="android:animation">
             <set android:ordering="sequentially">
                 <!-- Linear fade in-->
                 <objectAnimator android:propertyName="alpha"
                                 android:duration="100"
+                                android:valueFrom="0"
+                                android:valueTo="1"
+                                android:interpolator="@android:anim/linear_interpolator" />
+                <!-- Linear fade out -->
+                <objectAnimator android:propertyName="alpha"
+                                android:duration="100"
+                                android:startOffset="1700"
+                                android:valueFrom="1"
+                                android:valueTo="0"
+                                android:interpolator="@android:anim/linear_interpolator"/>
+                <!-- Linear fade in-->
+                <objectAnimator android:propertyName="alpha"
+                                android:duration="100"
+                                android:startOffset="100"
+                                android:valueFrom="0"
+                                android:valueTo="1"
+                                android:interpolator="@android:anim/linear_interpolator" />
+                <!-- Linear fade out -->
+                <objectAnimator android:propertyName="alpha"
+                                android:duration="100"
+                                android:startOffset="1700"
+                                android:valueFrom="1"
+                                android:valueTo="0"
+                                android:interpolator="@android:anim/linear_interpolator"/>
+                <!-- Linear fade in-->
+                <objectAnimator android:propertyName="alpha"
+                                android:duration="100"
+                                android:startOffset="100"
                                 android:valueFrom="0"
                                 android:valueTo="1"
                                 android:interpolator="@android:anim/linear_interpolator" />
@@ -76,6 +106,40 @@
                 <!-- Icon rotation with start timing offset after fade in -->
                 <objectAnimator android:propertyName="rotation"
                                 android:startOffset="100"
+                                android:duration="600"
+                                android:valueFrom="?attr/rotateButtonStartAngle"
+                                android:valueTo="?attr/rotateButtonEndAngle">
+                    <aapt:attr name="android:interpolator">
+                        <pathInterpolator android:pathData="M 0.0,0.0 c0.408,1.181 0.674,1.08 1.0,1.0"/>
+                    </aapt:attr>
+                </objectAnimator>
+
+                <!-- Reset rotation position for fade in -->
+                <objectAnimator android:propertyName="rotation"
+                                android:startOffset="1300"
+                                android:duration="100"
+                                android:valueFrom="?attr/rotateButtonStartAngle"
+                                android:valueTo="?attr/rotateButtonStartAngle"/>
+
+                <!-- Icon rotation with start timing offset after fade in -->
+                <objectAnimator android:propertyName="rotation"
+                                android:duration="600"
+                                android:valueFrom="?attr/rotateButtonStartAngle"
+                                android:valueTo="?attr/rotateButtonEndAngle">
+                    <aapt:attr name="android:interpolator">
+                        <pathInterpolator android:pathData="M 0.0,0.0 c0.408,1.181 0.674,1.08 1.0,1.0"/>
+                    </aapt:attr>
+                </objectAnimator>
+
+                <!-- Reset rotation position for fade in -->
+                <objectAnimator android:propertyName="rotation"
+                                android:startOffset="1300"
+                                android:duration="100"
+                                android:valueFrom="?attr/rotateButtonStartAngle"
+                                android:valueTo="?attr/rotateButtonStartAngle"/>
+
+                <!-- Icon rotation with start timing offset after fade in -->
+                <objectAnimator android:propertyName="rotation"
                                 android:duration="600"
                                 android:valueFrom="?attr/rotateButtonStartAngle"
                                 android:valueTo="?attr/rotateButtonEndAngle">
