@@ -41,6 +41,7 @@ public class SignalTileView extends QSIconViewImpl {
     private ImageView mOut;
 
     private int mWideOverlayIconStartPadding;
+	private int mIconLayoutHeight;
 
     public SignalTileView(Context context) {
         super(context);
@@ -66,7 +67,9 @@ public class SignalTileView extends QSIconViewImpl {
         mSignal = createSlashImageView(mContext);
         mIconFrame.addView(mSignal);
         mOverlay = new ImageView(mContext);
-        mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+		mIconLayoutHeight = getContext().getResources().getDimensionPixelSize(
+                R.dimen.wide_type_icon_height_qs);
+        mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, mIconLayoutHeight);
         return mIconFrame;
     }
 
