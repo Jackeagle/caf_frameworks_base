@@ -858,4 +858,7 @@
     <!-- Home button padding for sizing -->
     <dimen name="home_padding">15dp</dimen>
 
+	<!-- Height for wide data type icon when the data type icon is wide for the tile in quick
+         settings. -->
+    <dimen name="wide_type_icon_height_qs">20dp</dimen>
 </resources>
