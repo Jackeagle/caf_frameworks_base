@@ -927,6 +927,13 @@ class WindowStateAnimator {
                 mTmpSourceBounds.inset(mWin.mLastRelayoutContentInsets);
                 allowStretching = true;
             }
+
+            // Make sure that what we're animating to and from is actually the right size in case
+            // the window cannot take up the full screen.
+            mTmpStackBounds.intersectUnchecked(w.mParentFrame);
+            mTmpSourceBounds.intersectUnchecked(w.mParentFrame);
+            mTmpAnimatingBounds.intersectUnchecked(w.mParentFrame);
+
             if (!mTmpSourceBounds.isEmpty()) {
                 // Get the final target stack bounds, if we are not animating, this is just the
                 // current stack bounds
@@ -1108,7 +1115,7 @@ class WindowStateAnimator {
 
         setSurfaceBoundariesLocked(recoveringMemory);
 
-        if (mIsWallpaper && !mWin.mWallpaperVisible) {
+        if (mIsWallpaper && !w.mWallpaperVisible) {
             // Wallpaper is no longer visible and there is no wp target => hide it.
             hide("prepareSurfaceLocked");
         } else if (w.isParentWindowHidden() || !w.isOnScreen()) {
@@ -1172,6 +1179,11 @@ class WindowStateAnimator {
                         // LogicalDisplay.
                         mAnimator.setPendingLayoutChanges(w.getDisplayId(),
                                 FINISH_LAYOUT_REDO_ANIM);
+                        if (DEBUG_LAYOUT_REPEATS) {
+                            mService.mWindowPlacerLocked.debugLayoutRepeats(
+                                    "showSurfaceRobustlyLocked " + w,
+                                    mAnimator.getPendingLayoutChanges(w.getDisplayId()));
+                        }
                     } else {
                         w.setOrientationChanging(false);
                     }
@@ -1291,6 +1303,7 @@ class WindowStateAnimator {
         // if we are transparent.
         if (mPendingDestroySurface != null && mDestroyPreservedSurfaceUponRedraw) {
             mPendingDestroySurface.mSurfaceControl.hide();
+            mPendingDestroySurface.reparentChildrenInTransaction(mSurfaceController);
         }
 
         return true;
