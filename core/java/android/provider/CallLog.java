@@ -218,6 +218,21 @@ public class CallLog {
          * @hide
          */
         public static final int MISSED_IMS_TYPE = 1002;
+        /**
+        * Call log type for incoming WiFi calls
+        * @hide
+        */
+        public static final int INCOMING_WIFI_TYPE = 1003;
+        /**
+         * Call log type for outgoing WiFi calls.
+         * @hide
+         */
+        public static final int OUTGOING_WIFI_TYPE = 1004;
+        /**
+         * Call log type for missed WiFi calls.
+         * @hide
+         */
+        public static final int MISSED_WIFI_TYPE = 1005;
 
         /**
          * Bit-mask describing features of the call (e.g. video).
