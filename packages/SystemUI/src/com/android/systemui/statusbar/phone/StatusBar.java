@@ -607,6 +607,12 @@ public class StatusBar extends SystemUI implements DemoMode,
                         maybeEscalateHeadsUp();
                     }
                 }
+
+                @Override
+                public void onStrongAuthStateChanged(int userId) {
+                    super.onStrongAuthStateChanged(userId);
+                    mEntryManager.updateNotifications();
+                }
             };
 
     private NavigationBarFragment mNavigationBar;
@@ -1599,7 +1605,9 @@ public class StatusBar extends SystemUI implements DemoMode,
             return; // called too early
         }
 
-        if (mLaunchTransitionFadingAway) {
+        boolean wakeAndUnlock = mFingerprintUnlockController != null
+            && mFingerprintUnlockController.isWakeAndUnlock();
+        if (mLaunchTransitionFadingAway || wakeAndUnlock) {
             mBackdrop.setVisibility(View.INVISIBLE);
             Trace.endSection();
             return;
@@ -4712,11 +4720,11 @@ public class StatusBar extends SystemUI implements DemoMode,
 
         // We don't want to end up in KEYGUARD state when we're unlocking with
         // fingerprint from doze. We should cross fade directly from black.
-        final boolean wakeAndUnlocking = mFingerprintUnlockController.getMode()
-                == FingerprintUnlockController.MODE_WAKE_AND_UNLOCK;
+        boolean wakeAndUnlocking = mFingerprintUnlockController.isWakeAndUnlock();
 
         // Do not animate the scrim expansion when triggered by the fingerprint sensor.
-        mScrimController.setExpansionAffectsAlpha(!mFingerprintUnlockController.isWakeAndUnlock());
+        mScrimController.setExpansionAffectsAlpha(
+                !mFingerprintUnlockController.isFingerprintUnlock());
 
         if (mBouncerShowing) {
             // Bouncer needs the front scrim when it's on top of an activity,

@@ -108,6 +108,8 @@ interface IWifiManager
 
     boolean isDualBandSupported();
 
+    boolean needs5GHzToAnyApBandConversion();
+
     DhcpInfo getDhcpInfo();
 
     boolean isScanAlwaysAvailable();
@@ -199,5 +201,11 @@ interface IWifiManager
     int  dppStartAuth(in WifiDppConfig config);
 
     String dppConfiguratorGetKey(int id);
+
+    boolean isExtendingWifi();
+
+    boolean isWifiCoverageExtendFeatureEnabled();
+
+    void enableWifiCoverageExtendFeature(boolean enable);
 }
 
