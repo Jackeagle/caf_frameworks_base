@@ -17,6 +17,7 @@
 package com.android.server.am;
 
 import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SPLIT_SCREEN;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
@@ -133,7 +134,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.os.SystemClock;
-import android.os.Trace;
 import android.os.UserHandle;
 import android.service.voice.IVoiceInteractionSession;
 import android.util.ArraySet;
@@ -382,6 +382,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     final Handler mHandler;
 
     static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
+
+    private static final ActivityPluginDelegate mActivityPluginDelegate =
+        new ActivityPluginDelegate();
 
     private class ActivityStackHandler extends Handler {
         ActivityStackHandler(Looper looper) {
@@ -1364,7 +1367,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     }
 
     void goToSleep() {
-        ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
+        // Ensure visibility without updating configuration, as activities are about to sleep.
+        ensureActivitiesVisibleLocked(null /* starting */, 0 /* configChanges */,
+                !PRESERVE_WINDOWS);
 
         // Make sure any paused or stopped but visible activities are now sleeping.
         // This ensures that the activity's onStop() is called.
@@ -1447,6 +1452,11 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
         if (mActivityTrigger != null) {
             mActivityTrigger.activityPauseTrigger(prev.intent, prev.info, prev.appInfo);
+        }
+
+        if (mActivityPluginDelegate != null) {
+            mActivityPluginDelegate.activitySuspendNotification
+                (prev.appInfo.packageName, prev.fullscreen, true);
         }
 
         mResumedActivity = null;
@@ -1565,6 +1575,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         if (DEBUG_PAUSE) Slog.v(TAG_PAUSE, "Complete pause: " + prev);
 
         if (prev != null) {
+            prev.setWillCloseOrEnterPip(false);
             final boolean wasStopping = prev.isState(STOPPING);
             prev.setState(PAUSED, "completePausedLocked");
             if (prev.finishing) {
@@ -1770,10 +1781,16 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 // In this case the home stack isn't resizeable even though we are in split-screen
                 // mode. We still want the primary splitscreen stack to be visible as there will be
                 // a slight hint of it in the status bar area above the non-resizeable home
-                // activity.
-                if (windowingMode == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY
-                        && other.getActivityType() == ACTIVITY_TYPE_HOME) {
-                    return true;
+                // activity. In addition, if the fullscreen assistant is over primary splitscreen
+                // stack, the stack should still be visible in the background as long as the recents
+                // animation is running.
+                final int activityType = other.getActivityType();
+                if (windowingMode == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY) {
+                    if (activityType == ACTIVITY_TYPE_HOME
+                            || (activityType == ACTIVITY_TYPE_ASSISTANT
+                                    && mWindowManager.getRecentsAnimationController() != null)) {
+                       return true;
+                    }
                 }
                 if (other.isStackTranslucent(starting)) {
                     // Can be visible behind a translucent fullscreen stack.
@@ -1833,12 +1850,23 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     }
 
     /**
-     * Make sure that all activities that need to be visible (that is, they
-     * currently can be seen by the user) actually are.
+     * Make sure that all activities that need to be visible in the stack (that is, they
+     * currently can be seen by the user) actually are and update their configuration.
+     */
+    final void ensureActivitiesVisibleLocked(ActivityRecord starting, int configChanges,
+            boolean preserveWindows) {
+        ensureActivitiesVisibleLocked(starting, configChanges, preserveWindows,
+                true /* notifyClients */);
+    }
+
+    /**
+     * Ensure visibility with an option to also update the configuration of visible activities.
+     * @see #ensureActivitiesVisibleLocked(ActivityRecord, int, boolean)
+     * @see ActivityStackSupervisor#ensureActivitiesVisibleLocked(ActivityRecord, int, boolean)
      */
     // TODO: Should be re-worked based on the fact that each task as a stack in most cases.
     final void ensureActivitiesVisibleLocked(ActivityRecord starting, int configChanges,
-            boolean preserveWindows) {
+            boolean preserveWindows, boolean notifyClients) {
         mTopActivityOccludesKeyguard = false;
         mTopDismissingKeyguardActivity = null;
         mStackSupervisor.getKeyguardController().beginActivityVisibilityUpdate();
@@ -1890,9 +1918,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                                 + " finishing=" + r.finishing + " state=" + r.getState());
                         // First: if this is not the current activity being started, make
                         // sure it matches the current configuration.
-                        if (r != starting) {
-                            // Ensure activity configuration ignoring stop state since we are
-                            // becoming visible.
+                        if (r != starting && notifyClients) {
                             r.ensureActivityConfiguration(0 /* globalChanges */, preserveWindows,
                                     true /* ignoreStopState */);
                         }
@@ -1912,11 +1938,15 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                             if (DEBUG_VISIBILITY) Slog.v(TAG_VISIBILITY,
                                     "Skipping: already visible at " + r);
 
+                            if (r.mClientVisibilityDeferred && notifyClients) {
+                                r.makeClientVisible();
+                            }
+
                             if (r.handleAlreadyVisible()) {
                                 resumeNextActivity = false;
                             }
                         } else {
-                            r.makeVisibleIfNeeded(starting);
+                            r.makeVisibleIfNeeded(starting, notifyClients);
                         }
                         // Aggregate current change flags.
                         configChanges |= r.configChangeFlags;
@@ -2399,6 +2429,10 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     next.fullscreen);
         }
 
+        if (mActivityPluginDelegate != null) {
+            mActivityPluginDelegate.activityInvokeNotification
+                (next.appInfo.packageName, next.fullscreen);
+        }
         // If we are currently pausing an activity, then don't do anything
         // until that is done.
         if (!mStackSupervisor.allPausedActivitiesComplete()) {
@@ -2411,11 +2445,12 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         mStackSupervisor.setLaunchSource(next.info.applicationInfo.uid);
 
         boolean lastResumedCanPip = false;
+        ActivityRecord lastResumed = null;
         final ActivityStack lastFocusedStack = mStackSupervisor.getLastStack();
         if (lastFocusedStack != null && lastFocusedStack != this) {
             // So, why aren't we using prev here??? See the param comment on the method. prev doesn't
             // represent the last resumed activity. However, the last focus stack does if it isn't null.
-            final ActivityRecord lastResumed = lastFocusedStack.mResumedActivity;
+            lastResumed = lastFocusedStack.mResumedActivity;
             if (userLeaving && inMultiWindowMode() && lastFocusedStack.shouldBeVisible(next)) {
                 // The user isn't leaving if this stack is the multi-window mode and the last
                 // focused stack should still be visible.
@@ -2450,6 +2485,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 mService.updateLruProcessLocked(next.app, true, null);
             }
             if (DEBUG_STACK) mStackSupervisor.validateTopActivitiesLocked();
+            if (lastResumed != null) {
+                lastResumed.setWillCloseOrEnterPip(true);
+            }
             return true;
         } else if (mResumedActivity == next && next.isState(RESUMED)
                 && mStackSupervisor.allResumedActivitiesComplete()) {
@@ -2628,25 +2666,16 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 boolean notUpdated = true;
 
                 if (mStackSupervisor.isFocusedStack(this)) {
-
-                    // We have special rotation behavior when Keyguard is locked. Make sure all
-                    // activity visibilities are set correctly as well as the transition is updated
-                    // if needed to get the correct rotation behavior.
+                    // We have special rotation behavior when here is some active activity that
+                    // requests specific orientation or Keyguard is locked. Make sure all activity
+                    // visibilities are set correctly as well as the transition is updated if needed
+                    // to get the correct rotation behavior. Otherwise the following call to update
+                    // the orientation may cause incorrect configurations delivered to client as a
+                    // result of invisible window resize.
                     // TODO: Remove this once visibilities are set correctly immediately when
                     // starting an activity.
-                    if (mStackSupervisor.getKeyguardController().isKeyguardLocked()) {
-                        mStackSupervisor.ensureActivitiesVisibleLocked(null /* starting */,
-                                0 /* configChanges */, false /* preserveWindows */);
-                    }
-                    final Configuration config = mWindowManager.updateOrientationFromAppTokens(
-                            mStackSupervisor.getDisplayOverrideConfiguration(mDisplayId),
-                            next.mayFreezeScreenLocked(next.app) ? next.appToken : null,
-                                    mDisplayId);
-                    if (config != null) {
-                        next.frozenBeforeDestroy = true;
-                    }
-                    notUpdated = !mService.updateDisplayOverrideConfigurationLocked(config, next,
-                            false /* deferResume */, mDisplayId);
+                    notUpdated = !mStackSupervisor.ensureVisibilityAndConfig(next, mDisplayId,
+                            true /* markFrozenIfConfigChanged */, false /* deferResume */);
                 }
 
                 if (notUpdated) {
@@ -2931,6 +2960,10 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
         if (mActivityTrigger != null) {
             mActivityTrigger.activityStartTrigger(r.intent, r.info, r.appInfo, r.fullscreen);
+        }
+        if (mActivityPluginDelegate != null) {
+            mActivityPluginDelegate.activityInvokeNotification
+                (r.appInfo.packageName, r.fullscreen);
         }
         if (!isActivityTypeHome() || numActivities() > 0) {
             // We want to show the starting preview window if we are
@@ -3497,6 +3530,11 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     mActivityTrigger.activityStopTrigger(r.intent, r.info, r.appInfo);
                 }
 
+                if (mActivityPluginDelegate != null) {
+                    mActivityPluginDelegate.activitySuspendNotification
+                        (r.appInfo.packageName, r.fullscreen, false);
+                }
+
                 if (!r.visible) {
                     r.setVisible(false);
                 }
@@ -3581,8 +3619,8 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         int taskNdx = mTaskHistory.indexOf(finishedTask);
         final TaskRecord task = finishedTask;
         int activityNdx = task.mActivities.indexOf(r);
-        mWindowManager.prepareAppTransition(TRANSIT_CRASHING_ACTIVITY_CLOSE, false /* TODO */,
-                0, true /* forceOverride */);
+        mWindowManager.prepareAppTransition(TRANSIT_CRASHING_ACTIVITY_CLOSE,
+                false /* alwaysKeepCurrent */);
         finishActivityLocked(r, Activity.RESULT_CANCELED, null, reason, false);
         finishedTask = task;
         // Also terminate any activities below it that aren't yet
@@ -3867,7 +3905,8 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
             if (finishingActivityInNonFocusedStack) {
                 // Finishing activity that was in paused state and it was in not currently focused
                 // stack, need to make something visible in its place.
-                mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
+                mStackSupervisor.ensureVisibilityAndConfig(next, mDisplayId,
+                        false /* markFrozenIfConfigChanged */, true /* deferResume */);
             }
             if (activityRemoved) {
                 mStackSupervisor.resumeFocusedStackTopActivityLocked();
@@ -4819,6 +4858,10 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         }
     }
 
+    void onPipAnimationEndResize() {
+        mWindowContainerController.onPipAnimationEndResize();
+    }
+
 
     /**
      * Adjust bounds to stay within stack bounds.
@@ -5028,7 +5071,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     // Force the destroy to skip right to removal.
                     r.app = null;
                     mWindowManager.prepareAppTransition(TRANSIT_CRASHING_ACTIVITY_CLOSE,
-                            false /* TODO */, 0, true /* forceOverride */);
+                            false /* alwaysKeepCurrent */);
                     finishCurrentActivityLocked(r, FINISH_IMMEDIATELY, false,
                             "handleAppCrashedLocked");
                 }

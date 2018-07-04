@@ -220,8 +220,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
     public static boolean mPerfSendTapHint = false;
     public BoostFramework mPerfBoost = null;
-    public BoostFramework mPerfPack = null;
-    public BoostFramework mPerfIop = null;
     public BoostFramework mUxPerf = null;
     static final int HANDLE_DISPLAY_ADDED = FIRST_SUPERVISOR_STACK_MSG + 5;
     static final int HANDLE_DISPLAY_CHANGED = FIRST_SUPERVISOR_STACK_MSG + 6;
@@ -1416,15 +1414,11 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             // manager with a new orientation.  We don't care about that, because the activity is
             // not currently running so we are just restarting it anyway.
             if (checkConfig) {
-                final int displayId = r.getDisplayId();
-                final Configuration config = mWindowManager.updateOrientationFromAppTokens(
-                        getDisplayOverrideConfiguration(displayId),
-                        r.mayFreezeScreenLocked(app) ? r.appToken : null, displayId);
                 // Deferring resume here because we're going to launch new activity shortly.
                 // We don't want to perform a redundant launch of the same record while ensuring
                 // configurations and trying to resume top activity of focused stack.
-                mService.updateDisplayOverrideConfigurationLocked(config, r, true /* deferResume */,
-                        displayId);
+                ensureVisibilityAndConfig(r, r.getDisplayId(),
+                        false /* markFrozenIfConfigChanged */, true /* deferResume */);
             }
 
             if (r.getStack().checkKeyguardVisibility(r, true /* shouldBeVisible */,
@@ -1635,6 +1629,47 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         }
 
         return true;
+    }
+
+    /**
+     * Ensure all activities visibility, update orientation and configuration.
+     *
+     * @param starting The currently starting activity or {@code null} if there is none.
+     * @param displayId The id of the display where operation is executed.
+     * @param markFrozenIfConfigChanged Whether to set {@link ActivityRecord#frozenBeforeDestroy} to
+     *                                  {@code true} if config changed.
+     * @param deferResume Whether to defer resume while updating config.
+     * @return 'true' if starting activity was kept or wasn't provided, 'false' if it was relaunched
+     *         because of configuration update.
+     */
+    boolean ensureVisibilityAndConfig(ActivityRecord starting, int displayId,
+            boolean markFrozenIfConfigChanged, boolean deferResume) {
+        // First ensure visibility without updating the config just yet. We need this to know what
+        // activities are affecting configuration now.
+        // Passing null here for 'starting' param value, so that visibility of actual starting
+        // activity will be properly updated.
+        ensureActivitiesVisibleLocked(null /* starting */, 0 /* configChanges */,
+                false /* preserveWindows */, false /* notifyClients */);
+
+        if (displayId == INVALID_DISPLAY) {
+            // The caller didn't provide a valid display id, skip updating config.
+            return true;
+        }
+
+        // Force-update the orientation from the WindowManager, since we need the true configuration
+        // to send to the client now.
+        final Configuration config = mWindowManager.updateOrientationFromAppTokens(
+                getDisplayOverrideConfiguration(displayId),
+                starting != null && starting.mayFreezeScreenLocked(starting.app)
+                        ? starting.appToken : null,
+                displayId, true /* forceUpdate */);
+        if (starting != null && markFrozenIfConfigChanged && config != null) {
+            starting.frozenBeforeDestroy = true;
+        }
+
+        // Update the configuration of the activities on the display.
+        return mService.updateDisplayOverrideConfigurationLocked(config, starting, deferResume,
+                displayId);
     }
 
     private void logIfTransactionTooLarge(Intent intent, Bundle icicle) {
@@ -2265,7 +2300,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         //top_activity = task.stack.topRunningActivityLocked();
         /* App is launching from recent apps and it's a new process */
         if(top_activity != null && top_activity.getState() == ActivityState.DESTROYED) {
-            acquireAppLaunchPerfLock(top_activity.packageName);
+            acquireAppLaunchPerfLock(top_activity);
         }
 
         if (currentStack == null) {
@@ -2571,6 +2606,10 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             final int displayId = mTmpOrderedDisplayIds.get(i);
             // If a display is registered in WM, it must also be available in AM.
             final ActivityDisplay display = getActivityDisplayOrCreateLocked(displayId);
+            if (display == null) {
+                // Looks like the display no longer exists in the system...
+                continue;
+            }
             for (int j = display.getChildCount() - 1; j >= 0; --j) {
                 final ActivityStack stack = display.getChildAt(j);
                 if (ignoreCurrent && stack == currentFocus) {
@@ -2959,6 +2998,12 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 insetBounds.left = 0;
                 insetBounds.right = tempPinnedTaskBounds.width();
                 insetBounds.bottom = tempPinnedTaskBounds.height();
+            }
+            if (pinnedBounds != null && tempPinnedTaskBounds == null) {
+                // We have finished the animation into PiP, and are resizing the tasks to match the
+                // stack bounds, while layouts are deferred, update any task state as a part of
+                // transitioning it from fullscreen into a floating state.
+                stack.onPipAnimationEndResize();
             }
             stack.resize(pinnedBounds, tempPinnedTaskBounds, insetBounds);
             stack.ensureVisibleActivitiesConfigurationLocked(r, false);
@@ -3390,27 +3435,18 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         return true;
     }
 
-    void acquireAppLaunchPerfLock(String packageName) {
+    void acquireAppLaunchPerfLock(ActivityRecord r) {
        /* Acquire perf lock during new app launch */
        if (mPerfBoost == null) {
            mPerfBoost = new BoostFramework();
        }
        if (mPerfBoost != null) {
-           mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, packageName, -1, BoostFramework.Launch.BOOST_V1);
+           mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName, -1, BoostFramework.Launch.BOOST_V1);
            mPerfSendTapHint = true;
-       }
-       if (mPerfPack == null) {
-           mPerfPack = new BoostFramework();
-       }
-       if (mPerfPack != null) {
-           mPerfPack.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, packageName, -1, BoostFramework.Launch.BOOST_V2);
-       }
-       // Start IOP
-       if (mPerfIop == null) {
-           mPerfIop = new BoostFramework();
-       }
-       if (mPerfIop != null) {
-           mPerfIop.perfIOPrefetchStart(-1,packageName,"");
+           mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName, -1, BoostFramework.Launch.BOOST_V2);
+           // Start IOP
+           mPerfBoost.perfIOPrefetchStart(-1,r.packageName,
+                   r.appInfo.sourceDir.substring(0, r.appInfo.sourceDir.lastIndexOf('/')));
        }
     }
 
@@ -3445,7 +3481,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                     if (!mTmpFindTaskResult.matchedByRootAffinity) {
                         if(mTmpFindTaskResult.r.getState() == ActivityState.DESTROYED ) {
                             /*It's a new app launch */
-                            acquireAppLaunchPerfLock(r.packageName);
+                            acquireAppLaunchPerfLock(r);
                         }
                         if(mTmpFindTaskResult.r.getState() == ActivityState.STOPPED) {
                             /*Warm launch */
@@ -3467,7 +3503,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
 
         /* Acquire perf lock *only* during new app launch */
         if (mTmpFindTaskResult.r == null || mTmpFindTaskResult.r.getState() == ActivityState.DESTROYED) {
-            acquireAppLaunchPerfLock(r.packageName);
+            acquireAppLaunchPerfLock(r);
         }
 
         if (DEBUG_TASKS && affinityMatch == null) Slog.d(TAG_TASKS, "No task found");
@@ -3704,8 +3740,21 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         mHandler.obtainMessage(LAUNCH_TASK_BEHIND_COMPLETE, token).sendToTarget();
     }
 
+    /**
+     * Make sure that all activities that need to be visible in the system actually are and update
+     * their configuration.
+     */
     void ensureActivitiesVisibleLocked(ActivityRecord starting, int configChanges,
             boolean preserveWindows) {
+        ensureActivitiesVisibleLocked(starting, configChanges, preserveWindows,
+                true /* notifyClients */);
+    }
+
+    /**
+     * @see #ensureActivitiesVisibleLocked(ActivityRecord, int, boolean)
+     */
+    void ensureActivitiesVisibleLocked(ActivityRecord starting, int configChanges,
+            boolean preserveWindows, boolean notifyClients) {
         getKeyguardController().beginActivityVisibilityUpdate();
         try {
             // First the front stacks. In case any are not fullscreen and are in front of home.
@@ -3713,7 +3762,8 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
                 final ActivityDisplay display = mActivityDisplays.valueAt(displayNdx);
                 for (int stackNdx = display.getChildCount() - 1; stackNdx >= 0; --stackNdx) {
                     final ActivityStack stack = display.getChildAt(stackNdx);
-                    stack.ensureActivitiesVisibleLocked(starting, configChanges, preserveWindows);
+                    stack.ensureActivitiesVisibleLocked(starting, configChanges, preserveWindows,
+                            notifyClients);
                 }
             }
         } finally {
