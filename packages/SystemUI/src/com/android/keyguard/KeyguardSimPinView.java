@@ -40,6 +40,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 
 /**
@@ -167,6 +168,29 @@ public class KeyguardSimPinView extends KeyguardPinBasedInputView {
             ((EmergencyCarrierArea) mEcaView).setCarrierTextVisible(true);
         }
         mSimImageView = findViewById(R.id.keyguard_sim);
+    }
+    @Override
+    public void onResume(int reason) {
+        super.onResume(reason);
+        View space = findViewById(R.id.blank_space);
+        int slotId = SubscriptionManager.getSlotIndex(mSubId);
+        if (SubsidyUtility.isSubsidyRestricted(getContext(), slotId)) {
+            if (space instanceof ImageButton) {
+                ((ImageButton) space).setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        doHapticKeyClick();
+                        KeyguardUpdateMonitor.getInstance(getContext())
+                                .reportSimUnlocked(mSubId);
+                        if (mCallback != null) {
+                            mCallback.dismiss(true, KeyguardUpdateMonitor.getCurrentUser());
+                        }
+                    }
+                });
+            }
+        } else {
+            space.setVisibility(View.INVISIBLE);
+        }
     }
 
     @Override

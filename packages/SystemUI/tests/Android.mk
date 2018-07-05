@@ -57,7 +57,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     testables \
     truth-prebuilt \
 
-LOCAL_JAVA_LIBRARIES := android.test.runner telephony-common android.car
+LOCAL_JAVA_LIBRARIES := android.test.runner telephony-common android.car telephony-ext
 
 LOCAL_AAPT_FLAGS := --extra-packages com.android.systemui:com.android.keyguard
 

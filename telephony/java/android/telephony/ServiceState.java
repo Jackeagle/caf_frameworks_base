@@ -230,6 +230,7 @@ public class ServiceState implements Parcelable {
 
     private int mRilVoiceRadioTechnology;
     private int mRilDataRadioTechnology;
+    private int mRilImsRadioTechnology = RIL_RADIO_TECHNOLOGY_UNKNOWN;
 
     private boolean mCssIndicator;
     private int mNetworkId;
@@ -327,6 +328,7 @@ public class ServiceState implements Parcelable {
         mIsDataRoamingFromRegistration = s.mIsDataRoamingFromRegistration;
         mIsUsingCarrierAggregation = s.mIsUsingCarrierAggregation;
         mLteEarfcnRsrpBoost = s.mLteEarfcnRsrpBoost;
+        mRilImsRadioTechnology = s.mRilImsRadioTechnology;
     }
 
     /**
@@ -357,6 +359,7 @@ public class ServiceState implements Parcelable {
         mIsDataRoamingFromRegistration = in.readInt() != 0;
         mIsUsingCarrierAggregation = in.readInt() != 0;
         mLteEarfcnRsrpBoost = in.readInt();
+        mRilImsRadioTechnology = in.readInt();
     }
 
     public void writeToParcel(Parcel out, int flags) {
@@ -384,6 +387,7 @@ public class ServiceState implements Parcelable {
         out.writeInt(mIsDataRoamingFromRegistration ? 1 : 0);
         out.writeInt(mIsUsingCarrierAggregation ? 1 : 0);
         out.writeInt(mLteEarfcnRsrpBoost);
+        out.writeInt(mRilImsRadioTechnology);
     }
 
     public int describeContents() {
@@ -712,7 +716,8 @@ public class ServiceState implements Parcelable {
                         s.mCdmaDefaultRoamingIndicator)
                 && mIsEmergencyOnly == s.mIsEmergencyOnly
                 && mIsDataRoamingFromRegistration == s.mIsDataRoamingFromRegistration
-                && mIsUsingCarrierAggregation == s.mIsUsingCarrierAggregation);
+                && mIsUsingCarrierAggregation == s.mIsUsingCarrierAggregation
+                && mRilImsRadioTechnology == s.mRilImsRadioTechnology);
     }
 
     /**
@@ -845,6 +850,7 @@ public class ServiceState implements Parcelable {
             .append(", mIsDataRoamingFromRegistration=").append(mIsDataRoamingFromRegistration)
             .append(", mIsUsingCarrierAggregation=").append(mIsUsingCarrierAggregation)
             .append(", mLteEarfcnRsrpBoost=").append(mLteEarfcnRsrpBoost)
+            .append(", mRilImsRadioTechnology=").append(mRilImsRadioTechnology)
             .append("}").toString();
     }
 
@@ -874,6 +880,7 @@ public class ServiceState implements Parcelable {
         mIsDataRoamingFromRegistration = false;
         mIsUsingCarrierAggregation = false;
         mLteEarfcnRsrpBoost = 0;
+        mRilImsRadioTechnology = RIL_RADIO_TECHNOLOGY_UNKNOWN;
     }
 
     public void setStateOutOfService() {
@@ -1080,6 +1087,7 @@ public class ServiceState implements Parcelable {
         m.putBoolean("isDataRoamingFromRegistration", mIsDataRoamingFromRegistration);
         m.putBoolean("isUsingCarrierAggregation", mIsUsingCarrierAggregation);
         m.putInt("LteEarfcnRsrpBoost", mLteEarfcnRsrpBoost);
+        m.putInt("imsRadioTechnology", mRilImsRadioTechnology);
     }
 
     /** @hide */
@@ -1323,8 +1331,19 @@ public class ServiceState implements Parcelable {
 
         // voice overrides
         newSs.mVoiceRegState = voiceSs.mVoiceRegState;
+        newSs.mRilVoiceRadioTechnology = voiceSs.mRilVoiceRadioTechnology;
         newSs.mIsEmergencyOnly = false; // only get here if voice is IN_SERVICE
 
         return newSs;
+    }
+
+    /** @hide */
+    public int getRilImsRadioTechnology() {
+        return mRilImsRadioTechnology;
+    }
+
+    /** @hide */
+    public void setRilImsRadioTechnology(int imsRadioTechnology) {
+        mRilImsRadioTechnology = imsRadioTechnology;
     }
 }

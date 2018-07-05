@@ -41,29 +41,18 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="2dp"
+        android:layout_gravity="start|bottom"
+        android:layout_marginEnd="2dp"
+        android:id="@+id/volte_vowifi"
+        android:visibility="gone"
+        />
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="2dp"
         android:id="@+id/data_inout"
         android:visibility="gone"
         />
-    <FrameLayout
-        android:layout_height="17dp"
-        android:layout_width="wrap_content">
-        <ImageView
-            android:id="@+id/mobile_in"
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:src="@drawable/ic_activity_down"
-            android:visibility="gone"
-            android:paddingEnd="2dp"
-            />
-        <ImageView
-            android:id="@+id/mobile_out"
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:src="@drawable/ic_activity_up"
-            android:paddingEnd="2dp"
-            android:visibility="gone"
-            />
-    </FrameLayout>
     <FrameLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -88,12 +77,26 @@
                 android:alpha="0.0"
                 systemui:hasOverlappingRendering="false"
                 />
-            <ImageView
+           <ImageView
+                android:id="@+id/mobile_in"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:src="@drawable/ic_activity_down"
+                android:visibility="gone"
+                />
+           <ImageView
+                android:id="@+id/mobile_out"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:src="@drawable/ic_activity_up"
+                android:visibility="gone"
+               />
+           <ImageView
                 android:id="@+id/mobile_type"
                 android:layout_height="wrap_content"
                 android:layout_width="wrap_content"
                 />
-            <ImageView
+           <ImageView
                 android:id="@+id/mobile_roaming"
                 android:layout_width="wrap_content"
                 android:layout_height="17dp"

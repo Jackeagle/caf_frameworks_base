@@ -2909,8 +2909,11 @@ public class StatusBar extends SystemUI implements DemoMode,
      * @param animate should the change of the icons be animated.
      */
     private void updateHideIconsForBouncer(boolean animate) {
+        // Statusbar should be shown on bouncer screen  when device is in subsidy lock mode.
+        boolean isSubsidyEnabled = mStatusBarKeyguardViewManager != null
+                && mStatusBarKeyguardViewManager.isSubsidyLockEnabled();
         boolean shouldHideIconsForBouncer = !mPanelExpanded && mTopHidesStatusBar && mIsOccluded
-                && (mBouncerShowing || mStatusBarWindowHidden);
+                && ((mBouncerShowing && !isSubsidyEnabled) || mStatusBarWindowHidden);
         if (mHideIconsForBouncer != shouldHideIconsForBouncer) {
             mHideIconsForBouncer = shouldHideIconsForBouncer;
             if (!shouldHideIconsForBouncer && mBouncerWasShowingWhenHidden) {
@@ -3013,7 +3016,10 @@ public class StatusBar extends SystemUI implements DemoMode,
     }
 
     boolean panelsEnabled() {
-        return (mDisabled1 & StatusBarManager.DISABLE_EXPAND) == 0 && !ONLY_CORE_APPS;
+        boolean isSubsidyEnabled = mStatusBarKeyguardViewManager != null
+                && mStatusBarKeyguardViewManager.isSubsidyLockEnabled();
+        return (mDisabled1 & StatusBarManager.DISABLE_EXPAND) == 0 && !ONLY_CORE_APPS
+                && !isSubsidyEnabled; // disallow status bar expand when subsidy locked
     }
 
     void makeExpandedVisible(boolean force) {

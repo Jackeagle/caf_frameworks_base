@@ -24,6 +24,8 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
 import android.util.ArraySet;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -85,6 +87,7 @@ public class SignalClusterView extends LinearLayout implements
     private boolean mWifiIn;
     private boolean mWifiOut;
     private int mLastWifiActivityId = -1;
+    private boolean mImsOverWifi = false;
     private boolean mIsAirplaneMode = false;
     private int mAirplaneIconId = 0;
     private int mLastAirplaneIconId = -1;
@@ -99,7 +102,8 @@ public class SignalClusterView extends LinearLayout implements
 
     ViewGroup mEthernetGroup, mWifiGroup;
     View mNoSimsCombo;
-    ImageView mVpn, mEthernet, mWifi, mAirplane, mNoSims, mEthernetDark, mWifiDark, mNoSimsDark;
+    ImageView mVpn, mEthernet, mWifi, mAirplane,
+                mNoSims, mEthernetDark, mWifiDark, mNoSimsDark, mImsOverWifiImageView;
     ImageView mWifiActivityIn;
     ImageView mWifiActivityOut;
     View mWifiAirplaneSpacer;
@@ -206,6 +210,7 @@ public class SignalClusterView extends LinearLayout implements
         mAirplane       = findViewById(R.id.airplane);
         mNoSims         = findViewById(R.id.no_sims);
         mNoSimsDark     = findViewById(R.id.no_sims_dark);
+        mImsOverWifiImageView = findViewById(R.id.ims_over_wifi);
         mNoSimsCombo    =             findViewById(R.id.no_sims_combo);
         mWifiAirplaneSpacer =         findViewById(R.id.wifi_airplane_spacer);
         mWifiSignalSpacer =           findViewById(R.id.wifi_signal_spacer);
@@ -257,6 +262,7 @@ public class SignalClusterView extends LinearLayout implements
 
     @Override
     protected void onDetachedFromWindow() {
+        mImsOverWifiImageView    = null;
         mMobileSignalGroup.removeAllViews();
         Dependency.get(TunerService.class).removeTunable(this);
         mSecurityController.removeCallback(this);
@@ -333,12 +339,14 @@ public class SignalClusterView extends LinearLayout implements
             int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
             int stackedDataId, int stackedVoiceId, String typeContentDescription,
             String description, boolean isWide, int subId, boolean roaming,
-            int embmsIconId) {
+            int embmsIconId, int imsIconId, boolean isImsOverWifi) {
         PhoneState state = getState(subId);
         if (state == null) {
             return;
         }
         state.mMobileEmbmsId = embmsIconId;
+        state.mMobileImsId = imsIconId;
+        mImsOverWifi = isImsOverWifi;
         this.setMobileDataIndicators(statusIcon, qsIcon, statusType, qsType, activityIn,
                 activityOut, dataActivityId, stackedDataId,
                 stackedVoiceId, typeContentDescription, description, isWide, subId, roaming);
@@ -351,6 +359,17 @@ public class SignalClusterView extends LinearLayout implements
         mEthernetDescription = state.contentDescription;
 
         apply();
+    }
+
+    private boolean getImsOverWifiStatus(int subId) {
+        TelephonyManager tm =
+                (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if (tm != null
+                && (tm.isVoWifiCallingAvailableForSubscriber(subId)
+                || tm.isVideoTelephonyWifiCallingAvailableForSubscriber(subId))) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -370,9 +389,12 @@ public class SignalClusterView extends LinearLayout implements
             mMobileSignalGroup.removeAllViews();
         }
         final int n = subs.size();
+        boolean imsOverWiFi = false;
         for (int i = 0; i < n; i++) {
             inflatePhoneState(subs.get(i).getSubscriptionId());
+            imsOverWiFi |= getImsOverWifiStatus(subs.get(i).getSubscriptionId());
         }
+        mImsOverWifi = imsOverWiFi;
         if (isAttachedToWindow()) {
             applyIconTint();
         }
@@ -582,6 +604,12 @@ public class SignalClusterView extends LinearLayout implements
             mAirplane.setVisibility(View.GONE);
         }
 
+        if (mImsOverWifi){
+            mImsOverWifiImageView.setVisibility(View.VISIBLE);
+        } else {
+            mImsOverWifiImageView.setVisibility(View.GONE);
+        }
+
         if (mIsAirplaneMode && mWifiVisible) {
             mWifiAirplaneSpacer.setVisibility(View.VISIBLE);
         } else {
@@ -702,14 +730,14 @@ public class SignalClusterView extends LinearLayout implements
 
         private ViewGroup mMobileGroup;
         private ImageView mMobile, mMobileDark, mMobileType, mMobileRoaming,
-                mMobileEmbms;
+                mMobileEmbms, mMobileIms;
         public boolean mRoaming;
         private ImageView mMobileActivityIn;
         private ImageView mMobileActivityOut;
         public boolean mActivityIn;
         public boolean mActivityOut;
 
-        private int mDataActivityId = 0, mMobileEmbmsId = 0;
+        private int mDataActivityId = 0, mMobileEmbmsId = 0, mMobileImsId = 0;
 
         private int mStackedDataId = 0, mStackedVoiceId = 0;
         private ImageView mDataActivity, mStackedData, mStackedVoice;
@@ -735,6 +763,7 @@ public class SignalClusterView extends LinearLayout implements
             SignalDrawable drawable = new SignalDrawable(mMobileDark.getContext());
             drawable.setDarkIntensity(1);
             mMobileDark.setImageDrawable(drawable);
+            mMobileIms      = (ImageView) root.findViewById(R.id.volte_vowifi);
 
             mMobileEmbms    = (ImageView) root.findViewById(R.id.embms);
             mDataActivity   = (ImageView) root.findViewById(R.id.data_inout);
@@ -765,6 +794,8 @@ public class SignalClusterView extends LinearLayout implements
                 mDataActivity.setImageResource(mDataActivityId);
 
                 mMobileEmbms.setImageResource(mMobileEmbmsId);
+
+                mMobileIms.setImageResource(mMobileImsId);
 
                 if (mStackedDataId != 0 && mStackedVoiceId != 0) {
                     mStackedData.setImageResource(mStackedDataId);
@@ -804,6 +835,8 @@ public class SignalClusterView extends LinearLayout implements
             mMobileActivityOut.setVisibility(mActivityOut ? View.VISIBLE : View.GONE);
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);
             mMobileEmbms.setVisibility(mMobileEmbmsId != 0 ? View.VISIBLE : View.GONE);
+            mMobileIms.setVisibility(mMobileImsId != 0 ? View.VISIBLE : View.GONE);
+
             return mMobileVisible;
         }
 
@@ -821,10 +854,12 @@ public class SignalClusterView extends LinearLayout implements
             setTint(mMobileType, DarkIconDispatcher.getTint(tintArea, mMobileType, tint));
             setTint(mMobileRoaming, DarkIconDispatcher.getTint(tintArea, mMobileRoaming,
                     tint));
-            setTint(mMobileActivityIn,
+            /*Commented tinting because the color is specified in xml to avoid anomalies
+              in case of a full signal where arrow and signal fill are same color */
+            /*setTint(mMobileActivityIn,
                     DarkIconDispatcher.getTint(tintArea, mMobileActivityIn, tint));
             setTint(mMobileActivityOut,
-                    DarkIconDispatcher.getTint(tintArea, mMobileActivityOut, tint));
+                    DarkIconDispatcher.getTint(tintArea, mMobileActivityOut, tint));*/
         }
     }
 }
