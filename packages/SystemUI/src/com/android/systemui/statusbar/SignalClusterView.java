@@ -835,7 +835,7 @@ public class SignalClusterView extends LinearLayout implements
             mMobileActivityOut.setVisibility(mActivityOut ? View.VISIBLE : View.GONE);
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);
             mMobileEmbms.setVisibility(mMobileEmbmsId != 0 ? View.VISIBLE : View.GONE);
-            mMobileIms.setVisibility(mMobileImsId != 0 ? View.VISIBLE : View.GONE);
+            mMobileIms.setVisibility((mMobileImsId != 0) && !mRoaming ? View.VISIBLE : View.GONE);
 
             return mMobileVisible;
         }
@@ -860,6 +860,8 @@ public class SignalClusterView extends LinearLayout implements
                     DarkIconDispatcher.getTint(tintArea, mMobileActivityIn, tint));
             setTint(mMobileActivityOut,
                     DarkIconDispatcher.getTint(tintArea, mMobileActivityOut, tint));*/
+            setTint(mMobileIms,
+                    DarkIconDispatcher.getTint(tintArea, mMobileIms, tint));
         }
     }
 }
