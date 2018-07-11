@@ -55,7 +55,7 @@ import android.telephony.TelephonyManager;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.PhoneAccount;
 import android.telecom.TelecomManager;
-
+import android.text.TextUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Iterator;
@@ -141,7 +141,9 @@ public class SimSwitchController implements View.OnClickListener, View.OnLongCli
                  int color = sir.getIconTint();
                  switch(sir.getSimSlotIndex()) {
                   case 0:
-                     mSlot1Name.setText(sir.getDisplayName().toString());
+                     if (!TextUtils.isEmpty(sir.getDisplayName())) {
+                         mSlot1Name.setText(sir.getDisplayName().toString());
+                     }
                      mSimSlot1Icon.setImageBitmap(sir.createIconBitmap(mContext));
                      GradientDrawable drawable = (GradientDrawable)mSlot1Layout.getBackground();
                      if (voiceSlotId == 0) {
@@ -152,7 +154,9 @@ public class SimSwitchController implements View.OnClickListener, View.OnLongCli
                      }
                   break;
                   case 1:
-                     mSlot2Name.setText(sir.getDisplayName().toString());
+                     if (!TextUtils.isEmpty(sir.getDisplayName())) {
+                         mSlot2Name.setText(sir.getDisplayName().toString());
+                     }
                      mSimSlot2Icon.setImageBitmap(sir.createIconBitmap(mContext));
                      GradientDrawable drawable1 = (GradientDrawable)mSlot2Layout.getBackground();
                      if (voiceSlotId == 1) {
