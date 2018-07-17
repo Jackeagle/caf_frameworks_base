@@ -422,6 +422,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private final Object mLock = new Object();
 
+    private static final int WIFI_BUTTON_SCAN_CODE = 528;
+
     Context mContext;
     IWindowManager mWindowManager;
     WindowManagerFuncs mWindowManagerFuncs;
@@ -853,6 +855,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_NAVIGATION = 1;
     private boolean mWifiDisplayConnected = false;
     private int mWifiDisplayCustomRotation = -1;
+
+    private String mHeadlessMode;
 
     private class PolicyHandler extends Handler {
         @Override
@@ -1905,6 +1909,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // Allow a system property to override this. Used by developer settings.
         boolean burnInProtectionDevMode =
                 SystemProperties.getBoolean("persist.debug.force_burn_in", false);
+
+        mHeadlessMode = SystemProperties.get("device.mode.headless","false");
+
         if (burnInProtectionEnabled || burnInProtectionDevMode) {
             final int minHorizontal;
             final int maxHorizontal;
@@ -2184,16 +2191,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mWindowManagerFuncs.notifyKeyguardTrustedChanged();
                     }
                 });
-		// Turn off wifi led red
-		// TODO: This should be done by the system/driver
-		final String LED_PATH = "/sys/class/leds/WIFI_LED:red:114/brightness";
-		try {
-			BufferedWriter bw = new BufferedWriter ( new FileWriter (LED_PATH));
-			bw.write("0");
-			bw.close();
-		} catch (IOException e) {
-			Log.e(TAG,"wifi red led exception:" + e);
-		}
+
+        // Turn off wifi led red
+        // TODO: This should be done by the system/driver
+        if ("true".equals(mHeadlessMode)) {
+            final String LED_PATH = "/sys/class/leds/WIFI_LED:red:114/brightness";
+            updateWiFiLED(LED_PATH, "0");
+        }
     }
 
     /**
@@ -5694,6 +5698,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mLastWindowSleepTokenNeeded = mWindowSleepTokenNeeded;
     }
 
+    private void updateWiFiLED(String led_path, String value) {
+        try {
+            BufferedWriter bw = new BufferedWriter ( new FileWriter (led_path));
+            bw.write(value);
+            bw.close();
+        } catch (IOException e) {
+            Log.e(TAG, led_path + " exception:" + e);
+        }
+    }
     /**
      * @return Whether the top app should hide the statusbar based on the top fullscreen opaque
      *         window.
@@ -6325,14 +6338,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             }
             case KeyEvent.KEYCODE_UNKNOWN: {
-                if (DEBUG_INPUT) {
-                    Log.d(TAG, "scanCode=" + scanCode);
-                }
-                if (down && scanCode == 528) {
-                    final String LED_PATH = "/sys/class/leds/WIFI_LED:green:115/brightness";
-                    IWifiManager wifiManager = IWifiManager.Stub.asInterface(ServiceManager.getService(Context.WIFI_SERVICE));
-                    try {
-                        BufferedWriter bw = new BufferedWriter ( new FileWriter (LED_PATH));
+                if ("true".equals(mHeadlessMode)) {
+                    if (DEBUG_INPUT) {
+                        Log.d(TAG, "scanCode=" + scanCode);
+                    }
+                    if (down && scanCode == WIFI_BUTTON_SCAN_CODE) {
+                        final String LED_PATH = "/sys/class/leds/WIFI_LED:green:115/brightness";
+                        IWifiManager wifiManager = IWifiManager.Stub.asInterface(ServiceManager.getService(Context.WIFI_SERVICE));
                         try {
                             if (wifiManager.getWifiApEnabledState() == WIFI_AP_STATE_DISABLED) {
                                 WifiConfiguration mWifiConfig =  new WifiConfiguration();
@@ -6341,17 +6353,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                 mWifiConfig.allowedKeyManagement.set(KeyMgmt.WPA_PSK);
                                 mWifiConfig.allowedAuthAlgorithms.set(AuthAlgorithm.OPEN);
                                 wifiManager.startSoftAp(mWifiConfig);
-                                bw.write("255");
+                                updateWiFiLED(LED_PATH, "255");
                             } else {
                                 wifiManager.stopSoftAp();
-                                bw.write("0");
+                                updateWiFiLED(LED_PATH, "0");
                             }
                         } catch (RemoteException e) {
                             Log.e(TAG,"wifiManager exception:" + e);
                         }
-                        bw.close();
-                    } catch (IOException e) {
-                        Log.e(TAG,"wifi green led exception:" + e);
                     }
                 }
                 break;
