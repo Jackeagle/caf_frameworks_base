@@ -52,8 +52,6 @@ import com.android.systemui.statusbar.phone.StatusBarIconControllerImpl;
 import com.android.systemui.statusbar.phone.StatusBarWindowManager;
 import com.android.systemui.statusbar.policy.AccessibilityController;
 import com.android.systemui.statusbar.policy.AccessibilityManagerWrapper;
-import com.android.systemui.statusbar.policy.AudioProfileController;
-import com.android.systemui.statusbar.policy.AudioProfileControllerImpl;
 import com.android.systemui.statusbar.policy.BatteryController;
 import com.android.systemui.statusbar.policy.BatteryControllerImpl;
 import com.android.systemui.statusbar.policy.BluetoothController;
@@ -309,9 +307,6 @@ public class Dependency extends SystemUI {
         mProviders.put(LightBarController.class, () -> new LightBarController(mContext));
 
         mProviders.put(IWindowManager.class, () -> WindowManagerGlobal.getWindowManagerService());
-
-        mProviders.put(AudioProfileController.class,
-                () -> new AudioProfileControllerImpl(mContext));
 
         // Put all dependencies above here so the factory can override them if it wants.
         SystemUIFactory.getInstance().injectDependencies(mProviders, mContext);
