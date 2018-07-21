@@ -39,6 +39,7 @@ import com.android.systemui.qs.external.CustomTile;
 import com.android.systemui.qs.external.TileLifecycleManager;
 import com.android.systemui.qs.external.TileServices;
 import com.android.systemui.qs.tileimpl.QSFactoryImpl;
+import com.android.systemui.qs.tiles.IntentTile;
 import com.android.systemui.statusbar.phone.AutoTileManager;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
@@ -307,10 +308,21 @@ public class QSTileHost implements QSHost, Tunable, PluginListener<QSFactory> {
     protected List<String> loadTileSpecs(Context context, String tileList) {
         final Resources res = context.getResources();
         final String defaultTileList = res.getString(R.string.quick_settings_tiles_default);
+        LinkedHashMap<String, Integer> qsIntentMap = new LinkedHashMap<>();
         if (tileList == null) {
             tileList = res.getString(R.string.quick_settings_tiles);
             if (DEBUG) Log.d(TAG, "Loaded tile specs from config: " + tileList);
         } else {
+            int index = 0;
+            for (String tile : res.getString(R.string.quick_settings_tiles).split(",")) {
+                tile = tile.trim();
+                if (tile.isEmpty()) continue;
+                if (tile.startsWith(IntentTile.PREFIX)) {
+                    qsIntentMap.put(tile, index);
+                    tileList = tileList.concat(",").concat(tile);
+                }
+                index++;
+            }
             if (DEBUG) Log.d(TAG, "Loaded tile specs from setting: " + tileList);
         }
         final ArrayList<String> tiles = new ArrayList<String>();
@@ -324,7 +336,14 @@ public class QSTileHost implements QSHost, Tunable, PluginListener<QSFactory> {
                     addedDefault = true;
                 }
             } else {
-                tiles.add(tile);
+                // Intent tiles need to be retained in the same position once edit operation
+                // is completed.
+                if (tile.startsWith(IntentTile.PREFIX) && qsIntentMap.containsKey(tile)
+                        && tiles.size() >= qsIntentMap.get(tile)) {
+                    tiles.add(qsIntentMap.get(tile), tile);
+                } else {
+                    tiles.add(tile);
+                }
             }
         }
         return tiles;

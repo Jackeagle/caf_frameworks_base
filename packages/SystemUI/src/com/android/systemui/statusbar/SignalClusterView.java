@@ -862,6 +862,8 @@ public class SignalClusterView extends LinearLayout implements
                     DarkIconDispatcher.getTint(tintArea, mMobileActivityOut, tint));*/
             setTint(mMobileIms,
                     DarkIconDispatcher.getTint(tintArea, mMobileIms, tint));
+            setTint(mImsOverWifiImageView,
+                    DarkIconDispatcher.getTint(tintArea, mImsOverWifiImageView, tint));
         }
     }
 }
