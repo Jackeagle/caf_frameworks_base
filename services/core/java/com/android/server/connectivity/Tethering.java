@@ -214,7 +214,7 @@ public class Tethering extends BaseNetworkObserver {
 
         v6OnlyTetherEnabled = (Settings.Global.getInt(mContext.
                                          getContentResolver(),
-                                         "enable_v6_only_tethering", 0) == 1);
+                                         "enable_v6_only_tethering", 1) == 1);
 
         mTetherMasterSM = new TetherMasterSM("TetherMaster", mLooper);
         mTetherMasterSM.start();
@@ -279,8 +279,7 @@ public class Tethering extends BaseNetworkObserver {
             if (up) {
                 maybeTrackNewInterfaceLocked(iface);
             } else {
-                if (ifaceNameToType(iface) == ConnectivityManager.TETHERING_BLUETOOTH ||
-                    ifaceNameToType(iface) == ConnectivityManager.TETHERING_WIGIG) {
+                if (ifaceNameToType(iface) == ConnectivityManager.TETHERING_WIGIG) {
                     stopTrackingInterfaceLocked(iface);
                 } else {
                     // Ignore usb0 down after enabling RNDIS.
