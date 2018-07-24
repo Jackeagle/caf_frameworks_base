@@ -563,6 +563,9 @@ public final class PowerManagerService extends SystemService
     // True if we are currently in VR Mode.
     private boolean mIsVrModeEnabled;
 
+    // True if headless device
+    private String mHeadlessMode;
+
     /**
      * All times are in milliseconds. These constants are kept synchronized with the system
      * global Settings. Any access to this class or its fields should be done while
@@ -649,12 +652,15 @@ public final class PowerManagerService extends SystemService
         mAmbientDisplayConfiguration = new AmbientDisplayConfiguration(mContext);
         mBatterySaverPolicy = new BatterySaverPolicy(mHandler);
 
+        mHeadlessMode = SystemProperties.get("device.mode.headless","false");
         qcNsrmPowExt = new QCNsrmPowerExtension(this);
         synchronized (mLock) {
             mWakeLockSuspendBlocker = createSuspendBlockerLocked("PowerManagerService.WakeLocks");
             mDisplaySuspendBlocker = createSuspendBlockerLocked("PowerManagerService.Display");
-            mDisplaySuspendBlocker.acquire();
-            mHoldingDisplaySuspendBlocker = true;
+            if ("false".equals(mHeadlessMode)) {
+                mDisplaySuspendBlocker.acquire();
+                mHoldingDisplaySuspendBlocker = true;
+            }
             mHalAutoSuspendModeEnabled = false;
             mHalInteractiveModeEnabled = true;
 
@@ -2534,12 +2540,16 @@ public final class PowerManagerService extends SystemService
 
         @Override
         public void acquireSuspendBlocker() {
-            mDisplaySuspendBlocker.acquire();
+            if ("false".equals(mHeadlessMode)) {
+                mDisplaySuspendBlocker.acquire();
+            }
         }
 
         @Override
         public void releaseSuspendBlocker() {
-            mDisplaySuspendBlocker.release();
+            if ("false".equals(mHeadlessMode)) {
+                mDisplaySuspendBlocker.release();
+            }
         }
 
         @Override
@@ -2619,6 +2629,9 @@ public final class PowerManagerService extends SystemService
      * We do so if the screen is on or is in transition between states.
      */
     private boolean needDisplaySuspendBlockerLocked() {
+        if ("true".equals(mHeadlessMode)) {
+            return false;
+        }
         if (!mDisplayReady) {
             return true;
         }
