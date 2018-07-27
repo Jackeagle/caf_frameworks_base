@@ -42,24 +42,6 @@ import com.android.systemui.volume.VolumeDialogControllerImpl;
 
 import java.util.function.Consumer;
 
-import com.android.systemui.statusbar.phone.StatusBarWindowManager;
-import com.android.systemui.statusbar.policy.BatteryController;
-import com.android.systemui.statusbar.policy.BluetoothController;
-import com.android.systemui.statusbar.policy.CastController;
-import com.android.systemui.statusbar.policy.FlashlightController;
-import com.android.systemui.statusbar.policy.HotspotController;
-import com.android.systemui.statusbar.policy.KeyguardMonitor;
-import com.android.systemui.statusbar.policy.LocationController;
-import com.android.systemui.statusbar.policy.NetworkController;
-import com.android.systemui.statusbar.policy.NextAlarmController;
-import com.android.systemui.statusbar.policy.RotationLockController;
-import com.android.systemui.statusbar.policy.SecurityController;
-import com.android.systemui.statusbar.policy.UserInfoController;
-import com.android.systemui.statusbar.policy.UserSwitcherController;
-import com.android.systemui.statusbar.policy.ZenModeController;
-import com.android.systemui.statusbar.policy.AudioProfileController;
-
-
 /**
  * Class factory to provide customizable SystemUI components.
  */
