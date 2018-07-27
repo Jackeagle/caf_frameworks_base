@@ -48,6 +48,7 @@ class TelephonyIcons {
     static final int QS_DATA_3G = R.drawable.ic_qs_signal_3g;
     static final int QS_DATA_E = R.drawable.ic_qs_signal_e;
     static final int QS_DATA_H = R.drawable.ic_qs_signal_h;
+    static final int QS_DATA_H_PLUS = R.drawable.ic_qs_signal_h_plus;
     static final int QS_DATA_1X = R.drawable.ic_qs_signal_1x;
     static final int QS_DATA_4G = R.drawable.ic_qs_signal_4g;
     static final int QS_DATA_4G_PLUS = R.drawable.ic_qs_signal_4g_plus;
@@ -61,6 +62,7 @@ class TelephonyIcons {
     static final int ICON_G = R.drawable.stat_sys_data_fully_connected_g;
     static final int ICON_E = R.drawable.stat_sys_data_fully_connected_e;
     static final int ICON_H = R.drawable.stat_sys_data_fully_connected_h;
+    static final int ICON_H_PLUS = R.drawable.stat_sys_data_fully_connected_h_plus;
     static final int ICON_3G = R.drawable.stat_sys_data_fully_connected_3g;
     static final int ICON_4G = R.drawable.stat_sys_data_fully_connected_4g;
     static final int ICON_4G_PLUS = R.drawable.stat_sys_data_fully_connected_4g_plus;
@@ -241,13 +243,21 @@ class TelephonyIcons {
             case TelephonyManager.NETWORK_TYPE_HSDPA:
             case TelephonyManager.NETWORK_TYPE_HSUPA:
             case TelephonyManager.NETWORK_TYPE_HSPA:
-                if (hspaDistinguishable) {
-                    mSelectedDataActivityIndex[slot] = DATA_TYPE_H;
-                    mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
-                            dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = ICON_H;
+                if (hspaDistinguishable || MobileSignalController.isCarrierOneSupported()) {
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
-                    mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_H;
+                    if (type == TelephonyManager.NETWORK_TYPE_HSPA &&
+                            MobileSignalController.isCarrierOneSupported()) {
+                        mSelectedDataActivityIndex[slot] = DATA_TYPE_HP;
+                        mSelectedDataTypeIcon[slot] = ICON_H_PLUS;
+                        mSelectedQSDataTypeIcon[slot] = QS_DATA_H_PLUS;
+                        mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_HP;
+                    } else {
+                        mSelectedDataActivityIndex[slot] = DATA_TYPE_H;
+                        mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
+                                dataTypeArray[type], null, NS);
+                        mSelectedQSDataTypeIcon[slot] = ICON_H;
+                        mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_H;
+                    }
                 } else {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
@@ -262,14 +272,14 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_HP;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = ICON_H;
+                    mSelectedQSDataTypeIcon[slot] = ICON_H_PLUS;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_HP;
                 } else {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             mDataTypeGenerationArray[0], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = ICON_3G;
+                    mSelectedQSDataTypeIcon[slot] = QS_DATA_3G;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[0];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_3G;
                 }
@@ -584,6 +594,21 @@ class TelephonyIcons {
             TelephonyIcons.ICON_H,
             false,
             TelephonyIcons.QS_DATA_H
+            );
+
+    static final MobileIconGroup H_PLUS = new MobileIconGroup(
+            "H+",
+            null,
+            null,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH,
+            0, 0,
+            0,
+            0,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
+            R.string.accessibility_data_connection_3_5g_plus,
+            TelephonyIcons.ICON_H_PLUS,
+            false,
+            TelephonyIcons.QS_DATA_H_PLUS
             );
 
     static final MobileIconGroup FOUR_G = new MobileIconGroup(
