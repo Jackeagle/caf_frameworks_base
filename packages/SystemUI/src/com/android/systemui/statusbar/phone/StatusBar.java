@@ -2642,9 +2642,13 @@ public class StatusBar extends SystemUI implements DemoMode,
             }
         }
 
-        if ((diff1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
+        // Disable notifcation alert when device is subsidy locked
+        boolean isSubsidyEnabled = mStatusBarKeyguardViewManager != null
+                && mStatusBarKeyguardViewManager.isSubsidyLockEnabled();
+        if ((diff1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0 || isSubsidyEnabled) {
             mDisableNotificationAlerts =
-                    (state1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0;
+                    (state1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0
+                    || isSubsidyEnabled;
             mHeadsUpObserver.onChange(true);
         }
 
