@@ -29,6 +29,8 @@
 
 package com.android.keyguard;
 
+import static android.net.ConnectivityManager.TETHERING_WIFI;
+
 import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -239,7 +241,7 @@ public class SubsidyController {
                     .getSystemService(Context.CONNECTIVITY_SERVICE);
             new Thread(new Runnable() {
                 public void run() {
-                    disableWifiTethering(context);
+                    disableWifiTethering(context, connectivityManager);
                     disableUsbTethering(context, connectivityManager);
                     disableBluetooth();
                 }
@@ -274,9 +276,8 @@ public class SubsidyController {
             return false;
         }
 
-        private void disableWifiTethering(Context context) {
-            NetworkController networkController = Dependency.get(NetworkController.class);
-            networkController.setWifiEnabled(false);
+        private void disableWifiTethering(Context context, ConnectivityManager cm) {
+            cm.stopTethering(TETHERING_WIFI);
         }
 
         private void disableUsbTethering(Context context,
