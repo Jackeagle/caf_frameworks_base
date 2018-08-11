@@ -216,7 +216,9 @@ public class KeyguardSubsidyPinView extends KeyguardPinBasedInputView {
 
     @Override
     protected void onUserInput() {
-        super.onUserInput();
+        if (getkeypadViewVisibility() == View.VISIBLE) {
+            super.onUserInput();
+        }
         setOkButtonEnabled(mPasswordEntry.getText().length() > 0);
     }
 
