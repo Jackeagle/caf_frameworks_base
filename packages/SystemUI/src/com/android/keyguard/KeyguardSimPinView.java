@@ -134,8 +134,8 @@ public class KeyguardSimPinView extends KeyguardPinBasedInputView {
                 displayMessage = getContext().getResources()
                         .getQuantityString(msgId, attemptsRemaining, attemptsRemaining);
             } else {
-                msgId = isDefault ? R.plurals.kg_password_default_pin_message :
-                        R.plurals.kg_password_wrong_pin_code;
+                msgId = isDefault ? R.plurals.kg_password_default_pin_message_multi_sim :
+                        R.plurals.kg_password_wrong_pin_code_multi_sim;
                 displayMessage = getContext().getResources()
                         .getQuantityString(msgId, attemptsRemaining, mSlotId, attemptsRemaining);
             }
