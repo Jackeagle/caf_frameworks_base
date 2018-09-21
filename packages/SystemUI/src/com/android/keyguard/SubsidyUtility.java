@@ -55,7 +55,7 @@ public class SubsidyUtility {
     public static final String SUBSIDY_SWITCH_SIM_SETTING = "subsidy_switch_sim";
 
     public static final String ACTION_SUBSIDY_LOCK_CLIENT =
-        "org.codeaurora.intent.action.ACTION_LOCKSCREEN";
+        "com.slc.action.ACTION_SUBSIDYLOCK_STATE";
 
     public static final String ACTION_SUBSIDY_LOCK_INTERNAL =
         "org.codeaurora.intent.action.ACTION_LOCKSCREEN_INTERNAL";
@@ -64,7 +64,7 @@ public class SubsidyUtility {
         "org.codeaurora.intent.action.ACTION_SET_PRIMARY_CARD_DONE";
 
     public static final String BROADCAST_PERMISSION =
-        "com.codeaurora.permission.SUBSIDYLOCK";
+        "com.slc.permission.SUBSIDYLOCK";
 
     // Intent and extras sent from Subsidy Lock Client to lockscreen
     // Show Lock Screen [TYPE: BOOLEAN]
@@ -88,7 +88,7 @@ public class SubsidyUtility {
 
     // Intent and extras sent from lockscreen to Subsidy lock client
     public static final String ACTION_USER_REQUEST =
-        "org.codeaurora.intent.action.ACTION_USER_REQUEST";
+        "com.slc.action.ACTION_USER_UNLOCK";
     // User clicked Unlock button [TYPE: BOOLEAN]
     public static final String EXTRA_INTENT_KEY_UNLOCK = "INTENT_KEY_UNLOCK";
     // PIN verified [TYPE: BOOLEAN]
