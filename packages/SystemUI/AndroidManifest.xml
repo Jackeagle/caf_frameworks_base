@@ -204,9 +204,9 @@
     <uses-permission android:name="android.permission.CHANGE_OVERLAY_PACKAGES" />
 
     <!-- used for subsidy lock broadcasts. -->
-    <permission android:name="com.codeaurora.permission.SUBSIDYLOCK"
+    <permission android:name="com.slc.permission.SUBSIDYLOCK"
         android:protectionLevel="signatureOrSystem"/>
-    <uses-permission android:name="com.codeaurora.permission.SUBSIDYLOCK" />
+    <uses-permission android:name="com.slc.permission.SUBSIDYLOCK" />
 
 
     <application
