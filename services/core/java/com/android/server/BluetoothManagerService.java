@@ -1414,6 +1414,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             Message msg = mHandler.obtainMessage(MESSAGE_BLUETOOTH_SERVICE_CONNECTED);
             if (name.equals("com.android.bluetooth.btservice.AdapterService")) {
                 msg.arg1 = SERVICE_IBLUETOOTH;
+                mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
             } else if (name.equals("com.android.bluetooth.gatt.GattService")) {
                 msg.arg1 = SERVICE_IBLUETOOTHGATT;
             } else {
@@ -1644,9 +1645,6 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                             onBluetoothGattServiceUp();
                             break;
                         } // else must be SERVICE_IBLUETOOTH
-
-                        //Remove timeout
-                        mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
 
                         mBinding = false;
                         mTryBindOnBindTimeout = false;
