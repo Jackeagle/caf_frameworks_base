@@ -83,6 +83,8 @@ public class SystemConfig {
     // partition uses these to opt-out of features from the system image.
     final ArraySet<String> mUnavailableFeatures = new ArraySet<>();
 
+    final ArraySet<String> unsupportFeatures = new ArraySet<>();
+
     public static final class PermissionEntry {
         public final String name;
         public int[] gids;
@@ -595,7 +597,42 @@ public class SystemConfig {
         } finally {
             IoUtils.closeQuietly(permReader);
         }
+        if ((SystemProperties.get("ro.baseband")).equals("apq")) {
+           //disable telephony features
+           unsupportFeatures.add("android.hardware.telephony");
+           unsupportFeatures.add("android.hardware.telephony.gsm");
+           unsupportFeatures.add("android.hardware.telephony.cdma");
+           //disable sensor features
+           unsupportFeatures.add("android.hardware.sensor.hifi_sensors");
+           unsupportFeatures.add("android.hardware.sensor.accelerometer");
+           unsupportFeatures.add("android.hardware.sensor.barometer");
+           unsupportFeatures.add("android.hardware.sensor.compass");
+           unsupportFeatures.add("android.hardware.sensor.gyroscope");
+           unsupportFeatures.add("android.hardware.sensor.light");
+           unsupportFeatures.add("android.hardware.sensor.proximity");
+           unsupportFeatures.add("android.hardware.sensor.stepcounter");
+           unsupportFeatures.add("android.hardware.sensor.stepdetector");
+           unsupportFeatures.add("android.hardware.sensor.ambient_temperature");
+           unsupportFeatures.add("android.hardware.sensor.relative_humidity");
+           //disable camera features
+           unsupportFeatures.add("android.hardware.camera");
+           unsupportFeatures.add("android.hardware.camera.autofocus");
+           unsupportFeatures.add("android.hardware.camera.flash");
+           unsupportFeatures.add("android.hardware.camera.front");
+           unsupportFeatures.add("android.hardware.camera.any");
+           unsupportFeatures.add("android.hardware.camera.level.full");
+           unsupportFeatures.add("android.hardware.camera.capability.manual_sensor");
+           unsupportFeatures.add("android.hardware.camera.capability.manual_post_processing");
+           unsupportFeatures.add("android.hardware.camera.capability.raw");
+           unsupportFeatures.add("android.hardware.camera.external");
+           Slog.i(TAG,"Removing unsupported features");
+        }
 
+        for (String fname : unsupportFeatures) {
+            if (mAvailableFeatures.remove(fname) != null) {
+                Slog.d(TAG, "Removed unsupport feature " + fname);
+            }
+        }
         // Some devices can be field-converted to FBE, so offer to splice in
         // those features if not already defined by the static config
         if (StorageManager.isFileEncryptedNativeOnly()) {
