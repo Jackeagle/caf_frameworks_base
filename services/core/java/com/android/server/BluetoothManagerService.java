@@ -1017,12 +1017,21 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     @Override
     public boolean bindBluetoothProfileService(int bluetoothProfile,
             IBluetoothProfileServiceConnection proxy) {
-        if (!mEnable) {
-            if (DBG) {
-                Slog.d(TAG, "Trying to bind to profile: " + bluetoothProfile +
-                        ", while Bluetooth was disabled");
+        try {
+            mBluetoothLock.writeLock().lock();
+            if (!mEnable ||
+                (mBluetooth != null && (mBluetooth.getState() != BluetoothAdapter.STATE_ON) &&
+                (mBluetooth.getState() != BluetoothAdapter.STATE_TURNING_ON))) {
+                if (DBG) {
+                   Slog.d(TAG, "Trying to bind to profile: " + bluetoothProfile +
+                           ", while Bluetooth was disabled");
+                }
+                return false;
             }
-            return false;
+        } catch (RemoteException e) {
+            Slog.e(TAG, "getState()", e);
+        } finally {
+            mBluetoothLock.writeLock().unlock();
         }
         synchronized (mProfileServices) {
             ProfileServiceConnections psc = mProfileServices.get(new Integer(bluetoothProfile));
@@ -1384,7 +1393,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             mContext.enforceCallingOrSelfPermission(
                    BLUETOOTH_PRIVILEGED_PERM, "Need BLUETOOTH PRIVILEGED permission");
         }
-
+        persistBluetoothSetting(BLUETOOTH_ON_BLUETOOTH);
         try {
             if (mBluetooth != null) {
                 // Clear registered LE apps to force shut-off
