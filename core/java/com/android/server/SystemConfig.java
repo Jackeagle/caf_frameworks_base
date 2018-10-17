@@ -258,13 +258,6 @@ public class SystemConfig {
             removeFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION);
             removeFeature(PackageManager.FEATURE_VULKAN_HARDWARE_COMPUTE);
         }
-        // Remove android extension pack for opengles version 3.0
-        int value = SystemProperties.getInt("ro.opengles.version", 0);
-        if (value > 0 && (value == 196608)) {
-           if (mAvailableFeatures.remove("android.hardware.opengles.aep") != null) {
-               Slog.d(TAG, "Removed android.hardware.opengles.aep feature for opengles 3.0");
-           }
-        }
     }
 
     void readPermissions(File libraryDir, int permissionFlag) {
