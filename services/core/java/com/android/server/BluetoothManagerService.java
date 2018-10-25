@@ -105,7 +105,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     //Maximum msec to wait for restart due to error
     private static final int ERROR_RESTART_TIME_MS = 3000;
     //Maximum msec to delay MESSAGE_USER_SWITCHED
-    private static final int USER_SWITCHED_TIME_MS = 200;
+    private static final int USER_SWITCHED_TIME_MS = 300;
     // Delay for the addProxy function in msec
     private static final int ADD_PROXY_DELAY_MS = 100;
 
@@ -1017,12 +1017,21 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     @Override
     public boolean bindBluetoothProfileService(int bluetoothProfile,
             IBluetoothProfileServiceConnection proxy) {
-        if (!mEnable) {
-            if (DBG) {
-                Slog.d(TAG, "Trying to bind to profile: " + bluetoothProfile +
-                        ", while Bluetooth was disabled");
+        try {
+            mBluetoothLock.writeLock().lock();
+            if (!mEnable ||
+                (mBluetooth != null && (mBluetooth.getState() != BluetoothAdapter.STATE_ON) &&
+                (mBluetooth.getState() != BluetoothAdapter.STATE_TURNING_ON))) {
+                if (DBG) {
+                   Slog.d(TAG, "Trying to bind to profile: " + bluetoothProfile +
+                           ", while Bluetooth was disabled");
+                }
+                return false;
             }
-            return false;
+        } catch (RemoteException e) {
+            Slog.e(TAG, "getState()", e);
+        } finally {
+            mBluetoothLock.writeLock().unlock();
         }
         synchronized (mProfileServices) {
             ProfileServiceConnections psc = mProfileServices.get(new Integer(bluetoothProfile));
@@ -1384,7 +1393,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             mContext.enforceCallingOrSelfPermission(
                    BLUETOOTH_PRIVILEGED_PERM, "Need BLUETOOTH PRIVILEGED permission");
         }
-
+        persistBluetoothSetting(BLUETOOTH_ON_BLUETOOTH);
         try {
             if (mBluetooth != null) {
                 // Clear registered LE apps to force shut-off
@@ -1909,11 +1918,18 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     } else if (mBinding || mBluetooth != null) {
                         Message userMsg = mHandler.obtainMessage(MESSAGE_USER_SWITCHED);
                         userMsg.arg2 = 1 + msg.arg2;
-                        // if user is switched when service is binding retry after a delay
-                        mHandler.sendMessageDelayed(userMsg, USER_SWITCHED_TIME_MS);
-                        if (DBG) {
-                            Slog.d(TAG, "Retry MESSAGE_USER_SWITCHED " + userMsg.arg2);
+                        if ( userMsg.arg2 > 10) {
+                            if (DBG) {
+                                Slog.d(TAG, "Tried MESSAGE_USER_SWITCHED for " + userMsg.arg2 + " and returning from loop");
+                            }
+                        } else {
+                            // if user is switched when service is binding retry after a delay
+                            mHandler.sendMessageDelayed(userMsg, USER_SWITCHED_TIME_MS);
+                            if (DBG) {
+                                Slog.d(TAG, "Retry MESSAGE_USER_SWITCHED " + userMsg.arg2);
+                            }
                         }
+
                     }
                     break;
                 }
