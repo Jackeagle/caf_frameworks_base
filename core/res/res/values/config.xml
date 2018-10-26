@@ -173,6 +173,9 @@
          off features. -->
     <bool name="config_avoidGfxAccel">false</bool>
 
+    <!-- Device configuration for Hypervisor Changes. -->
+    <bool name="config_enable_hypervisor">true</bool>
+
     <!-- Device configuration setting the minfree tunable in the lowmemorykiller in the kernel.
          A high value will cause the lowmemorykiller to fire earlier, keeping more memory
          in the file cache and preventing I/O thrashing, but allowing fewer processes to

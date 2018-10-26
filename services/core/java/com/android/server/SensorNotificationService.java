@@ -35,6 +35,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Slog;
+import com.android.internal.R;
 
 public class SensorNotificationService extends SystemService
         implements SensorEventListener, LocationListener {
@@ -88,11 +89,14 @@ public class SensorNotificationService extends SystemService
             if (mLocationManager == null) {
                 if (DBG) Slog.d(TAG, "Cannot obtain location service.");
             } else {
+                if (!mContext.getResources().getBoolean(
+                        com.android.internal.R.bool.config_enable_hypervisor)) {
                 mLocationManager.requestLocationUpdates(
                         LocationManager.PASSIVE_PROVIDER,
                         LOCATION_MIN_TIME,
                         LOCATION_MIN_DISTANCE,
                         this);
+                }
             }
         }
     }
