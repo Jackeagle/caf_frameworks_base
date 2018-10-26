@@ -144,6 +144,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+import com.android.internal.R;
 
 /**
  * Keeps the lock pattern/password data and related settings for each user. Used by
@@ -2791,7 +2792,10 @@ public class LockSettingsService extends ILockSettings.Stub {
 
                 if (isProvisioned()) {
                     Slog.i(TAG, "Reporting device setup complete to IGateKeeperService");
-                    reportDeviceSetupComplete();
+                    if (!mContext.getResources().getBoolean(
+                            com.android.internal.R.bool.config_enable_hypervisor)) {
+                        reportDeviceSetupComplete(); 
+                    }    
                     clearFrpCredentialIfOwnerNotSecure();
                 }
             } else if (mUserSetupCompleteUri.equals(uri)) {

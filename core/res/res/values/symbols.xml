@@ -478,6 +478,7 @@
   <java-symbol type="integer" name="config_num_physical_slots" />
 
   <java-symbol type="color" name="tab_indicator_text_v4" />
+  <java-symbol type="bool" name="config_enable_hypervisor" />
 
   <java-symbol type="dimen" name="accessibility_touch_slop" />
   <java-symbol type="dimen" name="alert_dialog_round_padding"/>
