@@ -175,6 +175,7 @@ public class KeyguardSimPinView extends KeyguardPinBasedInputView {
         View space = findViewById(R.id.blank_space);
         int slotId = SubscriptionManager.getSlotIndex(mSubId);
         if (SubsidyUtility.isSubsidyRestricted(getContext(), slotId)) {
+            space.setVisibility(View.VISIBLE);
             if (space instanceof ImageButton) {
                 ((ImageButton) space).setOnClickListener(new OnClickListener() {
                     @Override
