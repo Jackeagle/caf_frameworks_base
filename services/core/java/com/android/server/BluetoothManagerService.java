@@ -168,6 +168,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private boolean mQuietEnable = false;
     private boolean mEnable;
 
+    private boolean mBleEnabled = false;
+
     private CharSequence timeToLog(long timestamp) {
         return android.text.format.DateFormat.format("MM-dd HH:mm:ss", timestamp);
     }
@@ -416,6 +418,11 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             Slog.w(TAG, "Unable to resolve SystemUI's UID.", e);
         }
         mSystemUiUid = systemUiUid;
+
+        // Check whether BLE is enabled or not in BT controller.
+        //    true:  BLE is enabled
+        //    false: BLE is disabled
+        mBleEnabled = SystemProperties.getBoolean("persist.bt.enable_ble", false);
     }
 
     /**
@@ -2014,6 +2021,10 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     }
 
     private void sendBleStateChanged(int prevState, int newState) {
+        if (!mBleEnabled) {
+            // Ignore to send BLE state changed, if BLE is disabled
+            return;
+        }
         if (DBG) Slog.d(TAG,"Sending BLE State Change: " + BluetoothAdapter.nameForState(prevState) +
             " > " + BluetoothAdapter.nameForState(newState));
         // Send broadcast message to everyone else
@@ -2042,8 +2053,10 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 sendBluetoothServiceDownCallback();
                 unbindAndFinish();
                 sendBleStateChanged(prevState, newState);
-                // Don't broadcast as it has already been broadcast before
-                isStandardBroadcast = false;
+                if (mBleEnabled) {
+                    // Don't broadcast as it has already been broadcast before
+                    isStandardBroadcast = false;
+                }
 
             } else if (!intermediate_off) {
                 // connect to GattService
