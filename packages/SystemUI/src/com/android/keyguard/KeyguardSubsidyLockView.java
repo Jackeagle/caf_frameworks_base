@@ -127,6 +127,14 @@ public class KeyguardSubsidyLockView extends KeyguardSubsidyStateView {
                 .addAction(SubsidyUtility.ACTION_SET_PRIMARY_CARD_DONE);
         mContext.registerReceiver(primaryCardChangeReceiver,
                 primaryCardIntentFilter);
+        // Moved to onResume()
+        //setNoDataTextVisibility();
+        //setEnableDataButtonVisibility();
+        //setSubsidySetupContainerVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onResume(int reason) {
         setNoDataTextVisibility();
         setEnableDataButtonVisibility();
         setSubsidySetupContainerVisibility(View.VISIBLE);
@@ -163,7 +171,11 @@ public class KeyguardSubsidyLockView extends KeyguardSubsidyStateView {
                 }
                 setEnableDataButtonVisibility();
                 setNoDataTextVisibility();
-                setSubsidySetupContainerVisibility(View.VISIBLE);
+                if (isLocked) {
+                    setSubsidySetupContainerVisibility(View.VISIBLE);
+                } else {
+                    setSubsidySetupContainerVisibility(View.GONE);
+                }
             }
                 public void onSimStateChanged(int subId, int slotId,
                         IccCardConstants.State simState) {
