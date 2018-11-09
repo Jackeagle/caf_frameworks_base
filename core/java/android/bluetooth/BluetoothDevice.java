@@ -1062,6 +1062,39 @@ public final class BluetoothDevice implements Parcelable {
         return false;
     }
 
+    /**
+     * Start the bonding (pairing) process with the remote device using the
+     * specified linkkey and key details.
+     *
+     * <p>This is an asynchronous call, it will return immediately. Register
+     * for {@link #ACTION_BOND_STATE_CHANGED} intents to be notified when
+     * the bonding process completes, and its result.
+     *
+     * <p>Android system services will handle the necessary user interactions
+     * to confirm and complete the bonding process.
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
+     *
+     * @param linkKey - Linkkey to use
+     * @param linkKeyType - Linkkey type
+     * @param pinLen - pin length
+     * @return false on immediate error, true if bonding will begin
+     * @hide
+     */
+     public boolean addOutOfBandBondDevice(String linkKey, int linkKeyType, int pinLen) {
+        final IBluetooth service = sService;
+        if (service == null) {
+            Log.w(TAG, "BT not enabled, addOutOfBandBondDevice failed");
+            return false;
+        }
+        try {
+            return service.addOutOfBandBondDevice(this, linkKey, linkKeyType, pinLen);
+        } catch (RemoteException e) {
+            Log.e(TAG, "", e);
+        }
+        return false;
+    }
+
     /** @hide */
     public boolean isBondingInitiatedLocally() {
         final IBluetooth service = sService;
