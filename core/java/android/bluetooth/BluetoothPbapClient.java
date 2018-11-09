@@ -42,6 +42,67 @@ public final class BluetoothPbapClient implements BluetoothProfile {
     public static final String ACTION_CONNECTION_STATE_CHANGED =
             "android.bluetooth.pbapclient.profile.action.CONNECTION_STATE_CHANGED";
 
+    /**
+     * Intent used to broadcast the state change in downloading phonebook
+     *
+     * <p>This intent will have 2 extras:
+     * <ul>
+     *   <li> {@link EXTRA_PHONEBOOK_PATH} - Phonebook path. </li>
+     *   <li> {@link EXTRA_DOWNLOAD_STATE} - Download state. </li>
+     * </ul>
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
+    public static final String ACTION_PHONEBOOK_DOWNLOAD_STATE_CHANGED =
+            "android.bluetooth.pbapclient.profile.action.PHONEBOOK_DOWNLOAD_STATE_CHANGED";
+
+    /**
+     * Extra for phonebook path.
+     */
+    public static final String EXTRA_PHONEBOOK_PATH =
+            "android.bluetooth.pbapclient.profile.extra.PHONEBOOK_PATH";
+
+    public static final String PB_PATH = "telecom/pb.vcf";
+    public static final String MCH_PATH = "telecom/mch.vcf";
+    public static final String ICH_PATH = "telecom/ich.vcf";
+    public static final String OCH_PATH = "telecom/och.vcf";
+    public static final String CCH_PATH = "telecom/cch.vcf";
+    public static final String SIM1_PB_PATH = "SIM1/telecom/pb.vcf";
+    public static final String SIM1_MCH_PATH = "SIM1/telecom/mch.vcf";
+    public static final String SIM1_ICH_PATH = "SIM1/telecom/ich.vcf";
+    public static final String SIM1_OCH_PATH = "SIM1/telecom/och.vcf";
+    public static final String SIM1_CCH_PATH = "SIM1/telecom/cch.vcf";
+
+    /**
+     * Extra for phonebook download state
+     */
+    public static final String EXTRA_DOWNLOAD_STATE =
+            "android.bluetooth.pbapclient.profile.extra.DOWNLOAD_STATE";
+
+    /** Download state: in progress */
+    public static final int DOWNLOAD_IN_PROGRESS = 0;
+    /** Download state: completed */
+    public static final int DOWNLOAD_COMPLETED = 1;
+    /** Download state: failed */
+    public static final int DOWNLOAD_FAILED = 2;
+
+    /**
+     * Extra for phonebook download result
+     */
+    public static final String EXTRA_DOWNLOAD_RESULT =
+            "android.bluetooth.pbapclient.profile.extra.DOWNLOAD_RESULT";
+
+    /* PBAP vCard filter */
+    private static final long PBAP_FILTER_VERSION = 1 << 0;
+    private static final long PBAP_FILTER_FN = 1 << 1;
+    private static final long PBAP_FILTER_N = 1 << 2;
+    private static final long PBAP_FILTER_PHOTO = 1 << 3;
+    private static final long PBAP_FILTER_ADR = 1 << 5;
+    private static final long PBAP_FILTER_TEL = 1 << 7;
+    private static final long PBAP_FILTER_EMAIL = 1 << 8;
+    private static final long PBAP_FILTER_NICKNAME = 1 << 23;
+
     private volatile IBluetoothPbapClient mService;
     private final Context mContext;
     private ServiceListener mServiceListener;
@@ -54,6 +115,7 @@ public final class BluetoothPbapClient implements BluetoothProfile {
     public static final int RESULT_SUCCESS = 1;
     /** Connection canceled before completion. */
     public static final int RESULT_CANCELED = 2;
+    public static final int RESULT_INVALID_PARAMETER = 3;
 
     private final IBluetoothStateChangeCallback mBluetoothStateChangeCallback =
             new IBluetoothStateChangeCallback.Stub() {
@@ -391,5 +453,44 @@ public final class BluetoothPbapClient implements BluetoothProfile {
             Log.w(TAG, "Proxy not attached to service");
         }
         return PRIORITY_OFF;
+    }
+
+    /**
+     * Pull phonebook or call-history
+     *
+     * <p> The pbName can be phonebook or call-history
+     * {@link #PB_PATH}, {@link #MCH_PATH},
+     * {@link #ICH_PATH}, {@link #OCH_PATH}
+     * {@link #SIM1_PB_PATH}, {@link #SIM1_MCH_PATH},
+     * {@link #SIM1_ICH_PATH}, {@link #SIM1_OCH_PATH}
+     *
+     * @param device Paired bluetooth device
+     * @param pbName Phonebook name
+     * @param filter vCard filter
+     * @param listStartOffset start offset
+     * @param maxListCount max phonebook count
+     *
+     * @return <code>true</code> if command has been issued successfully; <code>false</code>
+     * otherwise;
+     */
+    public boolean pullPhonebook(BluetoothDevice device, String pbName, long filter,
+            int listStartOffset, int maxListCount) {
+        if (DBG) {
+            log("pullPhonebook, device: " + device + ", pbName: " + pbName);
+        }
+        final IBluetoothPbapClient service = mService;
+        if (service != null && isEnabled() && isValidDevice(device)) {
+            try {
+                return service.pullPhonebook(device, pbName, filter,
+                        listStartOffset, maxListCount);
+            } catch (RemoteException e) {
+                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                return false;
+            }
+        }
+        if (service == null) {
+            Log.w(TAG, "Proxy not attached to service");
+        }
+        return false;
     }
 }

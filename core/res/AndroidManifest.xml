@@ -229,6 +229,7 @@
         android:name="android.bluetooth.pan.profile.action.CONNECTION_STATE_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.pbap.profile.action.CONNECTION_STATE_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.pbapclient.profile.action.CONNECTION_STATE_CHANGED" />
+    <protected-broadcast android:name="android.bluetooth.pbapclient.profile.action.PHONEBOOK_DOWNLOAD_STATE_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.sap.profile.action.CONNECTION_STATE_CHANGED" />
     <protected-broadcast android:name="android.btopp.intent.action.INCOMING_FILE_NOTIFICATION" />
     <protected-broadcast android:name="android.btopp.intent.action.USER_CONFIRMATION_TIMEOUT" />
