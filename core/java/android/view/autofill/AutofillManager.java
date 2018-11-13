@@ -45,6 +45,7 @@ import android.service.autofill.UserData;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
+import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Choreographer;
 import android.view.KeyEvent;
@@ -300,6 +301,14 @@ public final class AutofillManager {
      */
     public static final int STATE_UNKNOWN_COMPAT_MODE = 5;
 
+    /**
+     * Same as {@link #STATE_UNKNOWN}, but used on
+     * {@link AutofillManagerClient#setSessionFinished(int)} when the session was finished because
+     * the service failed to fullfil a request.
+     *
+     * @hide
+     */
+    public static final int STATE_UNKNOWN_FAILED = 6;
 
     /**
      * Timeout in ms for calls to the field classification service.
@@ -559,6 +568,9 @@ public final class AutofillManager {
             // different bridge based on which activity is currently focused
             // in the current process. Since compat would be rarely used, just
             // create and register a new instance every time.
+            if (sDebug) {
+                Slog.d(TAG, "creating CompatibilityBridge for " + mContext);
+            }
             mCompatibilityBridge = new CompatibilityBridge();
         }
     }
@@ -791,10 +803,6 @@ public final class AutofillManager {
                 return true;
             }
         }
-        if (sVerbose) {
-            Log.v(TAG, "not ignoring notifyViewEntered(flags=" + flags + ", view=" + id
-                    + ", state " + getStateAsStringLocked() + ", enteredIds=" + mEnteredIds);
-        }
         return false;
     }
 
@@ -833,6 +841,9 @@ public final class AutofillManager {
         ensureServiceClientAddedIfNeededLocked();
 
         if (!mEnabled) {
+            if (sVerbose) {
+                Log.v(TAG, "ignoring notifyViewEntered(" + id + "): disabled");
+            }
             if (mCallback != null) {
                 callback = mCallback;
             }
@@ -983,6 +994,9 @@ public final class AutofillManager {
         ensureServiceClientAddedIfNeededLocked();
 
         if (!mEnabled) {
+            if (sVerbose) {
+                Log.v(TAG, "ignoring notifyViewEntered(" + id + "): disabled");
+            }
             if (mCallback != null) {
                 callback = mCallback;
             }
@@ -1413,7 +1427,7 @@ public final class AutofillManager {
         try {
             mService.getAvailableFieldClassificationAlgorithms(receiver);
             final String[] algorithms = receiver
-                    .getObjectResult(SyncResultReceiver.TYPE_STRING_ARRAY);
+                .getObjectResult(SyncResultReceiver.TYPE_STRING_ARRAY);
             return algorithms != null ? Arrays.asList(algorithms) : Collections.emptyList();
         } catch (RemoteException e) {
             e.rethrowFromSystemServer();
@@ -2019,8 +2033,10 @@ public final class AutofillManager {
      * @param newState {@link #STATE_FINISHED} (because the autofill service returned a {@code null}
      *  FillResponse), {@link #STATE_UNKNOWN} (because the session was removed),
      *  {@link #STATE_UNKNOWN_COMPAT_MODE} (beucase the session was finished when the URL bar
-     *  changed on compat mode), or {@link #STATE_DISABLED_BY_SERVICE} (because the autofill service
-     *  disabled further autofill requests for the activity).
+     *  changed on compat mode), {@link #STATE_UNKNOWN_FAILED} (because the session was finished
+     *  when the service failed to fullfil the request, or {@link #STATE_DISABLED_BY_SERVICE}
+     *  (because the autofill service or {@link #STATE_DISABLED_BY_SERVICE} (because the autofill
+     *  service disabled further autofill requests for the activity).
      */
     private void setSessionFinished(int newState) {
         synchronized (mLock) {
@@ -2028,7 +2044,7 @@ public final class AutofillManager {
                 Log.v(TAG, "setSessionFinished(): from " + getStateAsStringLocked() + " to "
                         + getStateAsString(newState));
             }
-            if (newState == STATE_UNKNOWN_COMPAT_MODE) {
+            if (newState == STATE_UNKNOWN_COMPAT_MODE || newState == STATE_UNKNOWN_FAILED) {
                 resetSessionLocked(/* resetEnteredIds= */ true);
                 mState = STATE_UNKNOWN;
             } else {
@@ -2225,6 +2241,8 @@ public final class AutofillManager {
                 return "DISABLED_BY_SERVICE";
             case STATE_UNKNOWN_COMPAT_MODE:
                 return "UNKNOWN_COMPAT_MODE";
+            case STATE_UNKNOWN_FAILED:
+                return "UNKNOWN_FAILED";
             default:
                 return "INVALID:" + state;
         }

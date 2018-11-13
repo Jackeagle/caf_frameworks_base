@@ -198,8 +198,7 @@ int main(int argc, char** argv)
 
     sp<GraphicBuffer> outBuffer;
     status_t result = ScreenshotClient::capture(display, Rect(), 0 /* reqWidth */,
-            0 /* reqHeight */, INT32_MIN, INT32_MAX, /* all layers */ false, captureOrientation,
-            &outBuffer);
+            0 /* reqHeight */, false, captureOrientation, &outBuffer);
     if (result != NO_ERROR) {
         close(fd);
         return 1;
@@ -207,7 +206,14 @@ int main(int argc, char** argv)
 
     result = outBuffer->lock(GraphicBuffer::USAGE_SW_READ_OFTEN, &base);
 
-    if (base == NULL) {
+    if (base == nullptr || result != NO_ERROR) {
+        String8 reason;
+        if (base == nullptr) {
+            reason = "Failed to write to buffer";
+        } else {
+            reason.appendFormat("Error Code: %d", result);
+        }
+        fprintf(stderr, "Failed to take screenshot (%s)\n", reason.c_str());
         close(fd);
         return 1;
     }

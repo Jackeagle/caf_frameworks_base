@@ -987,11 +987,6 @@
     <!-- Summary for settings preference disabled by administrator [CHAR LIMIT=50] -->
     <string name="disabled_by_admin_summary_text">Controlled by admin</string>
 
-    <!-- Summary for switch preference to denote it is switched on [CHAR LIMIT=50] -->
-    <string name="enabled_by_admin">Enabled by admin</string>
-    <!-- Summary for switch preference to denote it is switched off [CHAR LIMIT=50] -->
-    <string name="disabled_by_admin">Disabled by admin</string>
-
     <!-- [CHAR LIMIT=25] Manage applications, text telling using an application is disabled. -->
     <string name="disabled">Disabled</string>
     <!-- Summary of app trusted to install apps [CHAR LIMIT=45] -->
@@ -1050,8 +1045,6 @@
     <!-- Description for a custom screen zoom level. This shows the requested display
          density in raw pixels per inch rather than using a relative description. [CHAR LIMIT=24] -->
     <string name="screen_zoom_summary_custom">Custom (<xliff:g id="densityDpi" example="160">%d</xliff:g>)</string>
-    <!-- Label for Help and feedback menu item -->
-    <string name="help_feedback_label">Help &amp; feedback</string>
 
     <!-- Content description for drawer menu button [CHAR_LIMIT=30]-->
     <string name="content_description_menu_button">Menu</string>
@@ -1145,4 +1138,6 @@
     <!-- time label for event have that happened very recently [CHAR LIMIT=60] -->
     <string name="time_unit_just_now">Just now</string>
 
-  </resources>
+    <!-- The notice header of Third-party licenses. not translatable -->
+    <string name="notice_header" translatable="false"></string>
+</resources>

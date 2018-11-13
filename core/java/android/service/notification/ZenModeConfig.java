@@ -16,6 +16,7 @@
 
 package android.service.notification;
 
+import static android.app.NotificationManager.Policy.PRIORITY_CATEGORY_REMINDERS;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_LIGHTS;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK;
@@ -145,6 +146,7 @@ public class ZenModeConfig implements Parcelable {
     private static final String RULE_ATT_CONDITION_ID = "conditionId";
     private static final String RULE_ATT_CREATION_TIME = "creationTime";
     private static final String RULE_ATT_ENABLER = "enabler";
+    private static final String RULE_ATT_MODIFIED = "modified";
 
     @UnsupportedAppUsage
     public boolean allowAlarms = DEFAULT_ALLOW_ALARMS;
@@ -471,6 +473,15 @@ public class ZenModeConfig implements Parcelable {
         }
     }
 
+    private static Long tryParseLong(String value, Long defValue) {
+        if (TextUtils.isEmpty(value)) return defValue;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return defValue;
+        }
+    }
+
     public static ZenModeConfig readXml(XmlPullParser parser)
             throws XmlPullParserException, IOException {
         int type = parser.getEventType();
@@ -632,6 +643,7 @@ public class ZenModeConfig implements Parcelable {
             Slog.i(TAG, "Updating zenMode of automatic rule " + rt.name);
             rt.zenMode = Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS;
         }
+        rt.modified = safeBoolean(parser, RULE_ATT_MODIFIED, false);
         return rt;
     }
 
@@ -655,6 +667,7 @@ public class ZenModeConfig implements Parcelable {
         if (rule.condition != null) {
             writeConditionXml(rule.condition, out);
         }
+        out.attribute(null, RULE_ATT_MODIFIED, Boolean.toString(rule.modified));
     }
 
     public static Condition readConditionXml(XmlPullParser parser) {
@@ -762,6 +775,145 @@ public class ZenModeConfig implements Parcelable {
             return new ZenModeConfig[size];
         }
     };
+
+    /**
+     * @return notification policy based on manual and automatic rules
+     */
+    public Policy getConsolidatedNotificationPolicy() {
+        ZenPolicy policy = new ZenPolicy();
+
+        // assumption: manual rule always uses the default policy
+        for (ZenRule rule : automaticRules.values()) {
+            if (rule.isAutomaticActive()) {
+                if (rule.zenMode == Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS) {
+                    policy.apply(rule.zenPolicy);
+                }
+            }
+        }
+
+        return toNotificationPolicy(policy);
+    }
+
+    /**
+     * Converts a zenPolicy to a notificationPolicy using this ZenModeConfig's values as its
+     * defaults for all unset values in zenPolicy
+     */
+    public Policy toNotificationPolicy(ZenPolicy zenPolicy) {
+        NotificationManager.Policy defaultPolicy = toNotificationPolicy();
+        int priorityCategories = 0;
+        int suppressedVisualEffects = 0;
+        int callSenders = defaultPolicy.priorityCallSenders;
+        int messageSenders = defaultPolicy.priorityMessageSenders;
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_REMINDERS,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_REMINDERS, defaultPolicy))) {
+            priorityCategories |= PRIORITY_CATEGORY_REMINDERS;
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_EVENTS,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_EVENTS, defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_EVENTS;
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_MESSAGES,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_MESSAGES, defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_MESSAGES;
+            messageSenders = getNotificationPolicySenders(zenPolicy.getPriorityMessageSenders());
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_CALLS,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_CALLS, defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_CALLS;
+            messageSenders = getNotificationPolicySenders(zenPolicy.getPriorityCallSenders());
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_REPEAT_CALLERS,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_REPEAT_CALLERS,
+                        defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_REPEAT_CALLERS;
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_ALARMS,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_ALARMS, defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_ALARMS;
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_MEDIA,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_MEDIA, defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_MEDIA;
+        }
+
+        if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_SYSTEM,
+                isPriorityCategoryEnabled(Policy.PRIORITY_CATEGORY_SYSTEM, defaultPolicy))) {
+            priorityCategories |= Policy.PRIORITY_CATEGORY_SYSTEM;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_FULL_SCREEN_INTENT,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_LIGHTS,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_LIGHTS,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_LIGHTS;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_PEEK,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_PEEK,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_PEEK;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_STATUS_BAR,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_STATUS_BAR,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_STATUS_BAR;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_BADGE,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_BADGE,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_BADGE;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_AMBIENT,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_AMBIENT,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_AMBIENT;
+        }
+
+        if (!zenPolicy.isVisualEffectAllowed(ZenPolicy.VISUAL_EFFECT_NOTIFICATION_LIST,
+                isVisualEffectAllowed(Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST,
+                        defaultPolicy))) {
+            suppressedVisualEffects |= Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST;
+        }
+
+        return new NotificationManager.Policy(priorityCategories, callSenders,
+                messageSenders, suppressedVisualEffects);
+    }
+
+    private boolean isPriorityCategoryEnabled(int categoryType, Policy policy) {
+        return (policy.priorityCategories & categoryType) != 0;
+    }
+
+    private boolean isVisualEffectAllowed(int visualEffect, Policy policy) {
+        return (policy.suppressedVisualEffects & visualEffect) == 0;
+    }
+
+    private int getNotificationPolicySenders(@ZenPolicy.PeopleType int senders) {
+        switch (senders) {
+            case ZenPolicy.PEOPLE_TYPE_ANYONE:
+                return Policy.PRIORITY_SENDERS_ANY;
+            case ZenPolicy.PEOPLE_TYPE_CONTACTS:
+                return Policy.PRIORITY_SENDERS_CONTACTS;
+            case ZenPolicy.PEOPLE_TYPE_STARRED:
+            default:
+                return Policy.PRIORITY_SENDERS_STARRED;
+        }
+
+    }
 
     public Policy toNotificationPolicy() {
         int priorityCategories = 0;
@@ -1145,7 +1297,9 @@ public class ZenModeConfig implements Parcelable {
                 .authority(SYSTEM_AUTHORITY)
                 .appendPath(EVENT_PATH)
                 .appendQueryParameter("userId", Long.toString(event.userId))
-                .appendQueryParameter("calendar", event.calendar != null ? event.calendar : "")
+                .appendQueryParameter("calendar", event.calName != null ? event.calName : "")
+                .appendQueryParameter("calendarId", event.calendarId != null
+                        ? event.calendarId.toString() : "")
                 .appendQueryParameter("reply", Integer.toString(event.reply))
                 .build();
     }
@@ -1163,10 +1317,11 @@ public class ZenModeConfig implements Parcelable {
         if (!isEvent) return null;
         final EventInfo rt = new EventInfo();
         rt.userId = tryParseInt(conditionId.getQueryParameter("userId"), UserHandle.USER_NULL);
-        rt.calendar = conditionId.getQueryParameter("calendar");
-        if (TextUtils.isEmpty(rt.calendar) || tryParseLong(rt.calendar, -1L) != -1L) {
-            rt.calendar = null;
+        rt.calName = conditionId.getQueryParameter("calendar");
+        if (TextUtils.isEmpty(rt.calName)) {
+            rt.calName = null;
         }
+        rt.calendarId = tryParseLong(conditionId.getQueryParameter("calendarId"), null);
         rt.reply = tryParseInt(conditionId.getQueryParameter("reply"), 0);
         return rt;
     }
@@ -1181,12 +1336,13 @@ public class ZenModeConfig implements Parcelable {
         public static final int REPLY_YES = 2;
 
         public int userId = UserHandle.USER_NULL;  // USER_NULL = unspecified - use current user
-        public String calendar;  // CalendarContract.Calendars.OWNER_ACCOUNT, or null for any
+        public String calName;  // CalendarContract.Calendars.DISPLAY_NAME, or null for any
+        public Long calendarId; // Calendars._ID, or null if restored from < Q calendar
         public int reply;
 
         @Override
         public int hashCode() {
-            return 0;
+            return Objects.hash(userId, calName, calendarId, reply);
         }
 
         @Override
@@ -1194,15 +1350,17 @@ public class ZenModeConfig implements Parcelable {
             if (!(o instanceof EventInfo)) return false;
             final EventInfo other = (EventInfo) o;
             return userId == other.userId
-                    && Objects.equals(calendar, other.calendar)
-                    && reply == other.reply;
+                    && Objects.equals(calName, other.calName)
+                    && reply == other.reply
+                    && Objects.equals(calendarId, other.calendarId);
         }
 
         public EventInfo copy() {
             final EventInfo rt = new EventInfo();
             rt.userId = userId;
-            rt.calendar = calendar;
+            rt.calName = calName;
             rt.reply = reply;
+            rt.calendarId = calendarId;
             return rt;
         }
 
@@ -1315,6 +1473,8 @@ public class ZenModeConfig implements Parcelable {
         @UnsupportedAppUsage
         public long creationTime;        // required for automatic
         public String enabler;          // package name, only used for manual rules.
+        public ZenPolicy zenPolicy;
+        public boolean modified;    // rule has been modified from initial creation
 
         public ZenRule() { }
 
@@ -1335,6 +1495,8 @@ public class ZenModeConfig implements Parcelable {
             if (source.readInt() == 1) {
                 enabler = source.readString();
             }
+            zenPolicy = source.readParcelable(null);
+            modified = source.readInt() == 1;
         }
 
         @Override
@@ -1369,6 +1531,8 @@ public class ZenModeConfig implements Parcelable {
             } else {
                 dest.writeInt(0);
             }
+            dest.writeParcelable(zenPolicy, 0);
+            dest.writeInt(modified ? 1 : 0);
         }
 
         @Override
@@ -1384,6 +1548,8 @@ public class ZenModeConfig implements Parcelable {
                     .append(",component=").append(component)
                     .append(",creationTime=").append(creationTime)
                     .append(",enabler=").append(enabler)
+                    .append(",zenPolicy=").append(zenPolicy)
+                    .append(",modified=").append(modified)
                     .append(']').toString();
         }
 
@@ -1407,7 +1573,10 @@ public class ZenModeConfig implements Parcelable {
             if (component != null) {
                 component.writeToProto(proto, ZenRuleProto.COMPONENT);
             }
-
+            if (zenPolicy != null) {
+                zenPolicy.writeToProto(proto, ZenRuleProto.ZEN_POLICY);
+            }
+            proto.write(ZenRuleProto.MODIFIED, modified);
             proto.end(token);
         }
 
@@ -1454,8 +1623,14 @@ public class ZenModeConfig implements Parcelable {
             if (creationTime != to.creationTime) {
                 d.addLine(item, "creationTime", creationTime, to.creationTime);
             }
-            if (enabler != to.enabler) {
+            if (!Objects.equals(enabler, to.enabler)) {
                 d.addLine(item, "enabler", enabler, to.enabler);
+            }
+            if (!Objects.equals(zenPolicy, to.zenPolicy)) {
+                d.addLine(item, "zenPolicy", zenPolicy, to.zenPolicy);
+            }
+            if (modified != to.modified) {
+                d.addLine(item, "modified", modified, to.modified);
             }
         }
 
@@ -1472,13 +1647,15 @@ public class ZenModeConfig implements Parcelable {
                     && Objects.equals(other.condition, condition)
                     && Objects.equals(other.component, component)
                     && Objects.equals(other.id, id)
-                    && Objects.equals(other.enabler, enabler);
+                    && Objects.equals(other.enabler, enabler)
+                    && Objects.equals(other.zenPolicy, zenPolicy)
+                    && other.modified == modified;
         }
 
         @Override
         public int hashCode() {
             return Objects.hash(enabled, snoozing, name, zenMode, conditionId, condition,
-                    component, id, enabler);
+                    component, id, enabler, zenPolicy, modified);
         }
 
         public boolean isAutomaticActive() {

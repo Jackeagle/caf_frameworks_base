@@ -16,8 +16,6 @@
 
 package com.android.server.accessibility;
 
-import static android.provider.Settings.Secure.SHOW_MODE_AUTO;
-
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
@@ -133,7 +131,7 @@ class AccessibilityServiceConnection extends AbstractAccessibilityServiceConnect
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
-                mSystemSupport.onClientChange(false);
+                mSystemSupport.onClientChangeLocked(false);
             }
         }
     }
@@ -158,7 +156,7 @@ class AccessibilityServiceConnection extends AbstractAccessibilityServiceConnect
             UserState userState = mUserStateWeakReference.get();
             if (userState == null) return;
             userState.addServiceLocked(this);
-            mSystemSupport.onClientChange(false);
+            mSystemSupport.onClientChangeLocked(false);
             // Initialize the service on the main handler after we're done setting up for
             // the new configuration (for example, initializing the input filter).
             mMainHandler.sendMessage(obtainMessage(
@@ -253,13 +251,13 @@ class AccessibilityServiceConnection extends AbstractAccessibilityServiceConnect
                 return;
             }
             mWasConnectedAndDied = true;
-            mSystemSupport.getKeyEventDispatcher().flush(this);
             UserState userState = mUserStateWeakReference.get();
             if (userState != null) {
                 userState.serviceDisconnectedLocked(this);
             }
+            resetLocked();
             mSystemSupport.getMagnificationController().resetIfNeeded(mId);
-            mSystemSupport.onClientChange(false);
+            mSystemSupport.onClientChangeLocked(false);
         }
     }
 

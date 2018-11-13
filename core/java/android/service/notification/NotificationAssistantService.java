@@ -52,6 +52,9 @@ import java.util.List;
  * {@link #onNotificationEnqueued(StatusBarNotification)} will only be called for notifications
  * sent to the current user, and {@link Adjustment adjuments} will only be accepted for the
  * current user.
+ * <p>
+ *     All callbacks are called on the main thread.
+ * </p>
  *
  * @hide
  */
@@ -280,6 +283,9 @@ public abstract class NotificationAssistantService extends NotificationListenerS
                         } catch (android.os.RemoteException ex) {
                             Log.v(TAG, "Unable to contact notification manager", ex);
                             throw ex.rethrowFromSystemServer();
+                        } catch (SecurityException e) {
+                            // app cannot catch and recover from this, so do on their behalf
+                            Log.w(TAG, "Enqueue adjustment failed; no longer connected", e);
                         }
                     }
                     break;

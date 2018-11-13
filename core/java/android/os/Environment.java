@@ -16,6 +16,7 @@
 
 package android.os;
 
+import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
@@ -165,6 +166,7 @@ public class Environment {
      *
      * @hide
      */
+    @SystemApi
     public static File getOemDirectory() {
         return DIR_OEM_ROOT;
     }
@@ -175,6 +177,7 @@ public class Environment {
      *
      * @hide
      */
+    @SystemApi
     public static File getOdmDirectory() {
         return DIR_ODM_ROOT;
     }
@@ -184,6 +187,7 @@ public class Environment {
      * software that should persist across simple reflashing of the "system" partition.
      * @hide
      */
+    @SystemApi
     public static File getVendorDirectory() {
         return DIR_VENDOR_ROOT;
     }
@@ -194,6 +198,7 @@ public class Environment {
      *
      * @hide
      */
+    @SystemApi
     public static File getProductDirectory() {
         return DIR_PRODUCT_ROOT;
     }
@@ -204,6 +209,7 @@ public class Environment {
      *
      * @hide
      */
+    @SystemApi
     public static File getProductServicesDirectory() {
         return DIR_PRODUCT_SERVICES_ROOT;
     }
@@ -213,12 +219,11 @@ public class Environment {
      * services to store files relating to the user. This directory will be
      * automatically deleted when the user is removed.
      *
-     * @deprecated This directory is valid and still exists, but callers should
-     *             <em>strongly</em> consider switching to
-     *             {@link #getDataSystemCeDirectory(int)} which is protected
-     *             with user credentials or
-     *             {@link #getDataSystemDeDirectory(int)} which supports fast
-     *             user wipe.
+     * @deprecated This directory is valid and still exists, but but callers
+     *             should <em>strongly</em> consider switching to using either
+     *             {@link #getDataSystemCeDirectory(int)} or
+     *             {@link #getDataSystemDeDirectory(int)}, both of which support
+     *             fast user wipe.
      * @hide
      */
     @Deprecated
@@ -286,12 +291,42 @@ public class Environment {
         return buildPath(getDataDirectory(), "system_ce");
     }
 
-    /** {@hide} */
+    /**
+     * Return the "credential encrypted" system directory for a user. This is
+     * for use by system services to store files relating to the user. This
+     * directory supports fast user wipe, and will be automatically deleted when
+     * the user is removed.
+     * <p>
+     * Data stored under this path is "credential encrypted", which uses an
+     * encryption key that is entangled with user credentials, such as a PIN or
+     * password. The contents will only be available once the user has been
+     * unlocked, as reported by {@code SystemService.onUnlockUser()}.
+     * <p>
+     * New code should <em>strongly</em> prefer storing sensitive data in these
+     * credential encrypted areas.
+     *
+     * @hide
+     */
     public static File getDataSystemCeDirectory(int userId) {
         return buildPath(getDataDirectory(), "system_ce", String.valueOf(userId));
     }
 
-    /** {@hide} */
+    /**
+     * Return the "device encrypted" system directory for a user. This is for
+     * use by system services to store files relating to the user. This
+     * directory supports fast user wipe, and will be automatically deleted when
+     * the user is removed.
+     * <p>
+     * Data stored under this path is "device encrypted", which uses an
+     * encryption key that is tied to the physical device. The contents will
+     * only be available once the device has finished a {@code dm-verity}
+     * protected boot.
+     * <p>
+     * New code should <em>strongly</em> avoid storing sensitive data in these
+     * device encrypted areas.
+     *
+     * @hide
+     */
     public static File getDataSystemDeDirectory(int userId) {
         return buildPath(getDataDirectory(), "system_de", String.valueOf(userId));
     }
@@ -1063,7 +1098,6 @@ public class Environment {
         return cur;
     }
 
-
     /**
      * If the given path exists on emulated external storage, return the
      * translated backing path hosted on internal storage. This bypasses any
@@ -1074,8 +1108,10 @@ public class Environment {
      * must hold {@link android.Manifest.permission#WRITE_MEDIA_STORAGE}
      * permission.
      *
+     * @deprecated disabled now that FUSE has been replaced by sdcardfs
      * @hide
      */
+    @Deprecated
     public static File maybeTranslateEmulatedPathToInternal(File path) {
         return StorageManager.maybeTranslateEmulatedPathToInternal(path);
     }

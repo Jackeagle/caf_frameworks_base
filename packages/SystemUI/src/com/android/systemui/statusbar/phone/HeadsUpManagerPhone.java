@@ -22,6 +22,8 @@ import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import androidx.collection.ArraySet;
+
+import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.Region.Op;
 import android.util.Log;
@@ -80,6 +82,7 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
     private int mStatusBarState;
 
     private final StateListener mStateListener = this::setStatusBarState;
+    private AnimationStateHandler mAnimationStateHandler;
 
     private final Pools.Pool<HeadsUpEntryPhone> mEntryPool = new Pools.Pool<HeadsUpEntryPhone>() {
         private Stack<HeadsUpEntryPhone> mPoolObjects = new Stack<>();
@@ -124,6 +127,10 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
             }
         });
         Dependency.get(StatusBarStateController.class).addListener(mStateListener);
+    }
+
+    public void setAnimationStateHandler(AnimationStateHandler handler) {
+        mAnimationStateHandler = handler;
     }
 
     public void destroy() {
@@ -172,7 +179,7 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
             mReleaseOnExpandFinish = false;
         } else {
             for (NotificationData.Entry entry : mEntriesToRemoveAfterExpand) {
-                if (contains(entry.key)) {
+                if (isAlerting(entry.key)) {
                     // Maybe the heads-up was removed already
                     removeAlertEntry(entry.key);
                 }
@@ -253,18 +260,6 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
         return mTrackingHeadsUp;
     }
 
-    /**
-     * React to the removal of the notification in the heads up.
-     *
-     * @return true if the notification was removed and false if it still needs to be kept around
-     * for a bit since it wasn't shown long enough
-     */
-    @Override
-    public boolean removeNotification(@NonNull String key, boolean releaseImmediately) {
-        return super.removeNotification(key, canRemoveImmediately(key)
-                || releaseImmediately);
-    }
-
     @Override
     public void snooze() {
         super.snooze();
@@ -331,11 +326,10 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
 
         // Expand touchable region such that we also catch touches that just start below the notch
         // area.
-        Region bounds = ScreenDecorations.DisplayCutoutView.boundsFromDirection(
-                cutout, Gravity.TOP);
-        bounds.translate(0, mDisplayCutoutTouchableRegionSize);
+        Rect bounds = new Rect();
+        ScreenDecorations.DisplayCutoutView.boundsFromDirection(cutout, Gravity.TOP, bounds);
+        bounds.offset(0, mDisplayCutoutTouchableRegionSize);
         region.op(bounds, Op.UNION);
-        bounds.recycle();
     }
 
     @Override
@@ -350,15 +344,15 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
 
     @Override
     public void onReorderingAllowed() {
-        mBar.getNotificationScrollLayout().setHeadsUpGoingAwayAnimationsAllowed(false);
+        mAnimationStateHandler.setHeadsUpGoingAwayAnimationsAllowed(false);
         for (NotificationData.Entry entry : mEntriesToRemoveWhenReorderingAllowed) {
-            if (contains(entry.key)) {
+            if (isAlerting(entry.key)) {
                 // Maybe the heads-up was removed already
                 removeAlertEntry(entry.key);
             }
         }
         mEntriesToRemoveWhenReorderingAllowed.clear();
-        mBar.getNotificationScrollLayout().setHeadsUpGoingAwayAnimationsAllowed(true);
+        mAnimationStateHandler.setHeadsUpGoingAwayAnimationsAllowed(true);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,7 +394,8 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
         return (HeadsUpEntryPhone) getTopHeadsUpEntry();
     }
 
-    private boolean canRemoveImmediately(@NonNull String key) {
+    @Override
+    protected boolean canRemoveImmediately(@NonNull String key) {
         if (mSwipedOutKeys.contains(key)) {
             // We always instantly dismiss views being manually swiped out.
             mSwipedOutKeys.remove(key);
@@ -409,7 +404,8 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
 
         HeadsUpEntryPhone headsUpEntry = getHeadsUpEntryPhone(key);
         HeadsUpEntryPhone topEntry = getTopHeadsUpEntryPhone();
-        return headsUpEntry != topEntry || headsUpEntry.wasShownLongEnough();
+
+        return headsUpEntry == null || headsUpEntry != topEntry || super.canRemoveImmediately(key);
     }
 
     /**
@@ -493,5 +489,9 @@ public class HeadsUpManagerPhone extends HeadsUpManager implements Dumpable,
                 updateEntry(false /* updatePostTime */);
             }
         }
+    }
+
+    public interface AnimationStateHandler {
+        void setHeadsUpGoingAwayAnimationsAllowed(boolean allowed);
     }
 }

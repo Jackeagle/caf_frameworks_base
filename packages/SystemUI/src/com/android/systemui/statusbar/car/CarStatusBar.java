@@ -17,7 +17,6 @@
 package com.android.systemui.statusbar.car;
 
 import android.app.ActivityTaskManager;
-import android.car.user.CarUserManagerHelper;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
@@ -36,8 +35,8 @@ import com.android.systemui.classifier.FalsingLog;
 import com.android.systemui.classifier.FalsingManager;
 import com.android.systemui.fragments.FragmentHostManager;
 import com.android.systemui.recents.Recents;
-import com.android.systemui.recents.misc.SysUiTaskStackChangeListener;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.car.hvac.HvacController;
 import com.android.systemui.statusbar.car.hvac.TemperatureView;
@@ -91,7 +90,7 @@ public class CarStatusBar extends StatusBar implements
         mActivityManagerWrapper = ActivityManagerWrapper.getInstance();
         mActivityManagerWrapper.registerTaskStackListener(mTaskStackListener);
 
-        mStackScroller.setScrollingEnabled(true);
+        mNotificationPanel.setScrollingEnabled(true);
 
         createBatteryController();
         mCarBatteryController.startListening();
@@ -461,16 +460,11 @@ public class CarStatusBar extends StatusBar implements
         }
     }
 
-
-    public boolean hasDockedTask() {
-        return Recents.getSystemServices().hasDockedTask();
-    }
-
     /**
-     * An implementation of SysUiTaskStackChangeListener, that listens for changes in the system
+     * An implementation of TaskStackChangeListener, that listens for changes in the system
      * task stack and notifies the navigation bar.
      */
-    private class TaskStackListenerImpl extends SysUiTaskStackChangeListener {
+    private class TaskStackListenerImpl extends TaskStackChangeListener {
         @Override
         public void onTaskStackChanged() {
             try {
@@ -495,30 +489,35 @@ public class CarStatusBar extends StatusBar implements
     }
 
     @Override
-    public void onUserSwitched(int newUserId) {
-        super.onUserSwitched(newUserId);
-        if (mFullscreenUserSwitcher != null) {
-            mFullscreenUserSwitcher.onUserSwitched(newUserId);
-        }
-    }
-
-    @Override
     public void onStateChanged(int newState) {
         super.onStateChanged(newState);
-        CarUserManagerHelper helper = new CarUserManagerHelper(mContext);
-        if (!helper.isHeadlessSystemUser()) {
-            showUserSwitcher();
+        if (newState == StatusBarState.FULLSCREEN_USER_SWITCHER) {
+            if (!mFullscreenUserSwitcher.isVisible()) {
+                // Current execution path continues to set state after this, thus we deffer the
+                // dismissal to the next execution cycle.
+                postDismissKeyguard(); // Dismiss the keyguard if switcher is not visible.
+            }
+        } else {
+            mFullscreenUserSwitcher.hide();
         }
     }
 
     public void showUserSwitcher() {
-        if (mFullscreenUserSwitcher != null) {
-            if (mState == StatusBarState.FULLSCREEN_USER_SWITCHER) {
-                mFullscreenUserSwitcher.show();
-            } else {
-                mFullscreenUserSwitcher.hide();
-            }
+        if (mFullscreenUserSwitcher != null && mState == StatusBarState.FULLSCREEN_USER_SWITCHER) {
+            mFullscreenUserSwitcher.show(); // Makes the switcher visible.
         }
+    }
+
+    public void postDismissKeyguard() {
+        mHandler.post(this::dismissKeyguard);
+    }
+
+    /**
+     * Dismisses the keyguard and shows bouncer if authentication is necessary.
+     */
+    public void dismissKeyguard() {
+        executeRunnableDismissingKeyguard(null/* runnable */, null /* cancelAction */,
+            true /* dismissShade */, true /* afterKeyguardGone */, true /* deferred */);
     }
 
     @Override

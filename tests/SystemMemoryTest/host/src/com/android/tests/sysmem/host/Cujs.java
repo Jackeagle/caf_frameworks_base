@@ -11,33 +11,36 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License
+ * limitations under the License.
  */
 
 package com.android.tests.sysmem.host;
-
-import com.android.tradefed.device.DeviceNotAvailableException;
-import com.android.tradefed.device.ITestDevice;
 
 /**
  * Critical user journeys with which to exercise the system, driven from the
  * host.
  */
 public class Cujs {
-    private ITestDevice device;
+    private Device mDevice;
 
-    public Cujs(ITestDevice device) {
-        this.device = device;
+    public Cujs(Device device) {
+        this.mDevice = device;
     }
 
     /**
      * Runs the critical user journeys.
      */
-    public void run() throws DeviceNotAvailableException {
+    public void run() throws TestException {
+        // Do an explicit GC in the system server process as part of the test
+        // case to reduce GC-related sources of noise.
+        // SIGUSR1 = 10 is the magic signal to trigger the GC.
+        int pid = mDevice.getPidForProcess("system_server");
+        mDevice.executeShellCommand("kill -10 " + pid);
+
         // Invoke the Device Cujs instrumentation to run the cujs.
         // TODO: Consider exercising the system in other interesting ways as
         // well.
         String command = "am instrument -w com.android.tests.sysmem.device/.Cujs";
-        device.executeShellCommand(command);
+        mDevice.executeShellCommand(command);
     }
 }

@@ -48,13 +48,14 @@ import android.provider.Settings;
 import android.util.EventLog;
 import android.util.Slog;
 import android.util.StatsLog;
-import android.view.inputmethod.InputMethodManagerInternal;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.server.EventLogTags;
 import com.android.server.LocalServices;
+import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.statusbar.StatusBarManagerInternal;
 
@@ -75,7 +76,8 @@ import com.android.server.statusbar.StatusBarManagerInternal;
  * tell the system when we go to sleep so that it can lock the keyguard if needed.
  * </p>
  */
-final class Notifier {
+@VisibleForTesting
+public class Notifier {
     private static final String TAG = "PowerManagerNotifier";
 
     private static final boolean DEBUG = false;
@@ -188,6 +190,8 @@ final class Notifier {
         try {
             mBatteryStats.noteInteractive(true);
         } catch (RemoteException ex) { }
+        StatsLog.write(StatsLog.INTERACTIVE_STATE_CHANGED,
+                StatsLog.INTERACTIVE_STATE_CHANGED__STATE__ON);
     }
 
     /**
@@ -399,6 +403,9 @@ final class Notifier {
             try {
                 mBatteryStats.noteInteractive(interactive);
             } catch (RemoteException ex) { }
+            StatsLog.write(StatsLog.INTERACTIVE_STATE_CHANGED,
+                    interactive ? StatsLog.INTERACTIVE_STATE_CHANGED__STATE__ON :
+                            StatsLog.INTERACTIVE_STATE_CHANGED__STATE__OFF);
 
             // Handle early behaviors.
             mInteractive = interactive;

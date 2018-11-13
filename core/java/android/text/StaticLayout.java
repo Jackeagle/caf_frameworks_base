@@ -22,6 +22,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UnsupportedAppUsage;
 import android.graphics.Paint;
+import android.os.Build;
 import android.text.style.LeadingMarginSpan;
 import android.text.style.LeadingMarginSpan.LeadingMarginSpan2;
 import android.text.style.LineHeightSpan;
@@ -598,7 +599,14 @@ public class StaticLayout extends Layout {
         float ellipsizedWidth = b.mEllipsizedWidth;
         TextUtils.TruncateAt ellipsize = b.mEllipsize;
         final boolean addLastLineSpacing = b.mAddLastLineLineSpacing;
-        NativeLineBreaker.LineBreaks lineBreaks = new NativeLineBreaker.LineBreaks();
+
+        int lineBreakCapacity = 0;
+        int[] breaks = null;
+        float[] lineWidths = null;
+        float[] ascents = null;
+        float[] descents = null;
+        boolean[] hasTabs = null;
+        int[] hyphenEdits = null;
 
         mLineCount = 0;
         mEllipsized = false;
@@ -731,14 +739,27 @@ public class StaticLayout extends Layout {
             constraints.setIndent(firstWidth, firstWidthLineCount);
             constraints.setTabStops(variableTabStops, TAB_INCREMENT);
 
-            lineBreaker.computeLineBreaks(measuredPara.getNativeMeasuredParagraph(),
-                    constraints, mLineCount, lineBreaks);
-            int breakCount = lineBreaks.breakCount;
-            final int[] breaks = lineBreaks.breaks;
-            final float[] lineWidths = lineBreaks.widths;
-            final float[] ascents = lineBreaks.ascents;
-            final float[] descents = lineBreaks.descents;
-            final int[] flags = lineBreaks.flags;
+            NativeLineBreaker.Result res = lineBreaker.computeLineBreaks(
+                    measuredPara.getNativeMeasuredParagraph(), constraints, mLineCount);
+            int breakCount = res.getLineCount();
+            if (lineBreakCapacity < breakCount) {
+                lineBreakCapacity = breakCount;
+                breaks = new int[lineBreakCapacity];
+                lineWidths = new float[lineBreakCapacity];
+                ascents = new float[lineBreakCapacity];
+                descents = new float[lineBreakCapacity];
+                hasTabs = new boolean[lineBreakCapacity];
+                hyphenEdits = new int[lineBreakCapacity];
+            }
+
+            for (int i = 0; i < breakCount; ++i) {
+                breaks[i] = res.getLineBreakOffset(i);
+                lineWidths[i] = res.getLineWidth(i);
+                ascents[i] = res.getLineAscent(i);
+                descents[i] = res.getLineDescent(i);
+                hasTabs[i] = res.hasLineTab(i);
+                hyphenEdits[i] = res.getLineHyphenEdit(i);
+            }
 
             final int remainingLineCount = mMaximumVisibleLineCount - mLineCount;
             final boolean ellipsisMayBeApplied = ellipsize != null
@@ -749,7 +770,7 @@ public class StaticLayout extends Layout {
                     && ellipsisMayBeApplied) {
                 // Calculate width
                 float width = 0;
-                int flag = 0;  // XXX May need to also have starting hyphen edit
+                boolean hasTab = false;  // XXX May need to also have starting hyphen edit
                 for (int i = remainingLineCount - 1; i < breakCount; i++) {
                     if (i == breakCount - 1) {
                         width += lineWidths[i];
@@ -758,12 +779,12 @@ public class StaticLayout extends Layout {
                             width += measuredPara.getCharWidthAt(j - paraStart);
                         }
                     }
-                    flag |= flags[i] & TAB_MASK;
+                    hasTab |= hasTabs[i];
                 }
                 // Treat the last line and overflowed lines as a single line.
                 breaks[remainingLineCount - 1] = breaks[breakCount - 1];
                 lineWidths[remainingLineCount - 1] = width;
-                flags[remainingLineCount - 1] = flag;
+                hasTabs[remainingLineCount - 1] = hasTab;
 
                 breakCount = remainingLineCount;
             }
@@ -820,8 +841,8 @@ public class StaticLayout extends Layout {
                     v = out(source, here, endPos,
                             ascent, descent, fmTop, fmBottom,
                             v, spacingmult, spacingadd, chooseHt, chooseHtv, fm,
-                            flags[breakIndex], needMultiply, measuredPara, bufEnd,
-                            includepad, trackpad, addLastLineSpacing, chs,
+                            hasTabs[breakIndex], hyphenEdits[breakIndex], needMultiply,
+                            measuredPara, bufEnd, includepad, trackpad, addLastLineSpacing, chs,
                             paraStart, ellipsize, ellipsizedWidth, lineWidths[breakIndex],
                             paint, moreChars);
 
@@ -859,7 +880,7 @@ public class StaticLayout extends Layout {
                     fm.top, fm.bottom,
                     v,
                     spacingmult, spacingadd, null,
-                    null, fm, 0,
+                    null, fm, false, 0,
                     needMultiply, measuredPara, bufEnd,
                     includepad, trackpad, addLastLineSpacing, null,
                     bufStart, ellipsize,
@@ -870,7 +891,8 @@ public class StaticLayout extends Layout {
     private int out(final CharSequence text, final int start, final int end, int above, int below,
             int top, int bottom, int v, final float spacingmult, final float spacingadd,
             final LineHeightSpan[] chooseHt, final int[] chooseHtv, final Paint.FontMetricsInt fm,
-            final int flags, final boolean needMultiply, @NonNull final MeasuredParagraph measured,
+            final boolean hasTab, final int hyphenEdit, final boolean needMultiply,
+            @NonNull final MeasuredParagraph measured,
             final int bufEnd, final boolean includePad, final boolean trackPad,
             final boolean addLastLineLineSpacing, final char[] chs,
             final int widthStart, final TextUtils.TruncateAt ellipsize, final float ellipsisWidth,
@@ -1004,8 +1026,8 @@ public class StaticLayout extends Layout {
 
         // TODO: could move TAB to share same column as HYPHEN, simplifying this code and gaining
         // one bit for start field
-        lines[off + TAB] |= flags & TAB_MASK;
-        lines[off + HYPHEN] = flags;
+        lines[off + TAB] |= hasTab ? TAB_MASK : 0;
+        lines[off + HYPHEN] = hyphenEdit;
         lines[off + DIR] |= dir << DIR_SHIFT;
         mLineDirections[j] = measured.getDirections(start - widthStart, end - widthStart);
 
@@ -1216,11 +1238,19 @@ public class StaticLayout extends Layout {
     }
 
     /**
+     * Returns the packed hyphen edit value for this line.
+     *
+     * You can extract start hyphen edit and end hyphen edit by using
+     * {@link Hyphenator#unpackStartHyphenEdit(int)} and
+     * {@link Hyphenator#unpackEndHyphenEdit(int)}.
+     *
+     * @param lineNumber a line number
+     * @return A packed hyphen edit value.
      * @hide
      */
     @Override
-    public int getHyphen(int line) {
-        return mLines[mColumns * line + HYPHEN] & HYPHEN_MASK;
+    public int getHyphen(int lineNumber) {
+        return mLines[mColumns * lineNumber + HYPHEN] & HYPHEN_MASK;
     }
 
     /**
@@ -1285,7 +1315,7 @@ public class StaticLayout extends Layout {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public int getHeight(boolean cap) {
         if (cap && mLineCount > mMaximumVisibleLineCount && mMaxLineHeight == -1
                 && Log.isLoggable(TAG, Log.WARN)) {

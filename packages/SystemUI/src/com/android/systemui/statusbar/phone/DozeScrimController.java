@@ -45,7 +45,7 @@ public class DozeScrimController {
         public void onDisplayBlanked() {
             if (DEBUG) {
                 Log.d(TAG, "Pulse in, mDozing=" + mDozing + " mPulseReason="
-                        + DozeLog.pulseReasonToString(mPulseReason));
+                        + DozeLog.reasonToString(mPulseReason));
             }
             if (!mDozing) {
                 return;
@@ -63,9 +63,14 @@ public class DozeScrimController {
             if (!mDozing) {
                 return;
             }
-            mHandler.postDelayed(mPulseOut, mDozeParameters.getPulseVisibleDuration());
-            mHandler.postDelayed(mPulseOutExtended,
-                    mDozeParameters.getPulseVisibleDurationExtended());
+            // All pulses except notifications should time out on their own.  Pulses due to
+            // notifications should instead be managed externally based off the notification's
+            // lifetime.
+            if (mPulseReason != DozeLog.PULSE_REASON_NOTIFICATION) {
+                mHandler.postDelayed(mPulseOut, mDozeParameters.getPulseVisibleDuration());
+                mHandler.postDelayed(mPulseOutExtended,
+                        mDozeParameters.getPulseVisibleDurationExtended());
+            }
             mFullyPulsing = true;
         }
 

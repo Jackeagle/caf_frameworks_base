@@ -17,22 +17,34 @@ package android.hardware.face;
 
 import android.os.Bundle;
 import android.hardware.biometrics.IBiometricPromptReceiver;
+import android.hardware.biometrics.IBiometricServiceReceiver;
 import android.hardware.biometrics.IBiometricServiceLockoutResetCallback;
 import android.hardware.face.IFaceServiceReceiver;
 import android.hardware.face.Face;
 
 /**
- * Communication channel from client to the face service.
+ * Communication channel from client to the face service. These methods are all require the
+ * MANAGE_BIOMETRIC signature permission.
  * @hide
  */
 interface IFaceService {
     // Authenticate the given sessionId with a face
     void authenticate(IBinder token, long sessionId,
-            IFaceServiceReceiver receiver, int flags, String opPackageName,
-            in Bundle bundle, IBiometricPromptReceiver dialogReceiver);
+            IFaceServiceReceiver receiver, int flags, String opPackageName);
+
+    // This method invokes the BiometricDialog. The arguments are almost the same as above,
+    // but should only be called from (BiometricPromptService).
+    void authenticateFromService(boolean requireConfirmation, IBinder token, long sessionId,
+            int userId, IBiometricServiceReceiver receiver, int flags, String opPackageName,
+            in Bundle bundle, IBiometricPromptReceiver dialogReceiver,
+            int callingUid, int callingPid, int callingUserId);
 
     // Cancel authentication for the given sessionId
     void cancelAuthentication(IBinder token, String opPackageName);
+
+    // Same as above, with extra arguments.
+    void cancelAuthenticationFromService(IBinder token, String opPackageName,
+            int callingUid, int callingPid, int callingUserId);
 
     // Start face enrollment
     void enroll(IBinder token, in byte [] cryptoToken, int userId, IFaceServiceReceiver receiver,
@@ -54,10 +66,10 @@ interface IFaceService {
     boolean isHardwareDetected(long deviceId, String opPackageName);
 
     // Get a pre-enrollment authentication token
-    long preEnroll(IBinder token);
+    long generateChallenge(IBinder token);
 
     // Finish an enrollment sequence and invalidate the authentication token
-    int postEnroll(IBinder token);
+    int revokeChallenge(IBinder token);
 
     // Determine if a user has at least one enrolled face
     boolean hasEnrolledFaces(int userId, String opPackageName);
@@ -82,4 +94,8 @@ interface IFaceService {
 
     // Enumerate all faces
     void enumerate(IBinder token, int userId, IFaceServiceReceiver receiver);
+
+    int setRequireAttention(boolean requireAttention, in byte [] token);
+
+    boolean getRequireAttention(in byte [] token);
 }

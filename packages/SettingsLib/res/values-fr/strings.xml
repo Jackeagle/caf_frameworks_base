@@ -246,7 +246,7 @@
     <string name="select_logpersist_dialog_title" msgid="4003400579973269060">"Sélectionner les mémoires tampon journal à stocker en permanence sur l\'appareil"</string>
     <string name="select_usb_configuration_title" msgid="2649938511506971843">"Sélectionner une configuration USB"</string>
     <string name="select_usb_configuration_dialog_title" msgid="6385564442851599963">"Sélectionner une configuration USB"</string>
-    <string name="allow_mock_location" msgid="2787962564578664888">"Positions fictives"</string>
+    <string name="allow_mock_location" msgid="2787962564578664888">"Autoriser les positions fictives"</string>
     <string name="allow_mock_location_summary" msgid="317615105156345626">"Autoriser les positions fictives"</string>
     <string name="debug_view_attributes" msgid="6485448367803310384">"Activer inspect. attribut affich."</string>
     <string name="mobile_data_always_on_summary" msgid="8149773901431697910">"Maintenir les données mobiles à l\'état actif, même lorsque le Wi‑Fi est actif (pour changer rapidement de réseau)"</string>
@@ -395,8 +395,6 @@
     <string name="battery_info_status_not_charging" msgid="8523453668342598579">"Appareil branché, mais impossible de le charger pour le moment"</string>
     <string name="battery_info_status_full" msgid="2824614753861462808">"pleine"</string>
     <string name="disabled_by_admin_summary_text" msgid="6750513964908334617">"Contrôlé par l\'administrateur"</string>
-    <string name="enabled_by_admin" msgid="5302986023578399263">"Activé par l\'administrateur"</string>
-    <string name="disabled_by_admin" msgid="8505398946020816620">"Désactivé par l\'administrateur"</string>
     <string name="disabled" msgid="9206776641295849915">"Désactivée"</string>
     <string name="external_source_trusted" msgid="2707996266575928037">"Autorisé"</string>
     <string name="external_source_untrusted" msgid="2677442511837596726">"Non autorisé"</string>
@@ -415,7 +413,6 @@
     <string name="screen_zoom_summary_very_large" msgid="7108563375663670067">"Très grand"</string>
     <string name="screen_zoom_summary_extremely_large" msgid="7427320168263276227">"Extrêmement grand"</string>
     <string name="screen_zoom_summary_custom" msgid="5611979864124160447">"Personnalisé (<xliff:g id="DENSITYDPI">%d</xliff:g>)"</string>
-    <string name="help_feedback_label" msgid="6815040660801785649">"Aide et commentaires"</string>
     <string name="content_description_menu_button" msgid="8182594799812351266">"Menu"</string>
     <string name="retail_demo_reset_message" msgid="118771671364131297">"Saisir mot de passe pour rétablir conf. d\'usine en mode démo."</string>
     <string name="retail_demo_reset_next" msgid="8356731459226304963">"Suivant"</string>

@@ -27,12 +27,12 @@
 #include "android-base/errors.h"
 #include "android-base/file.h"
 #include "android-base/stringprintf.h"
+#include "androidfw/Locale.h"
 #include "androidfw/StringPiece.h"
 
 #include "AppInfo.h"
 #include "Debug.h"
 #include "LoadedApk.h"
-#include "Locale.h"
 #include "NameMangler.h"
 #include "ResourceUtils.h"
 #include "ResourceValues.h"
@@ -70,6 +70,7 @@
 #include "xml/XmlDom.h"
 
 using ::aapt::io::FileInputStream;
+using ::android::ConfigDescription;
 using ::android::StringPiece;
 using ::android::base::StringPrintf;
 
@@ -1260,7 +1261,7 @@ class Linker {
       return false;
     }
 
-    proguard::WriteKeepSet(keep_set, &fout);
+    proguard::WriteKeepSet(keep_set, &fout, options_.generate_minimal_proguard_rules);
     fout.Flush();
 
     if (fout.HadError()) {
@@ -1775,10 +1776,12 @@ class Linker {
 
     // Before we process anything, remove the resources whose default values don't exist.
     // We want to force any references to these to fail the build.
-    if (!NoDefaultResourceRemover{}.Consume(context_, &final_table_)) {
-      context_->GetDiagnostics()->Error(DiagMessage()
-                                        << "failed removing resources with no defaults");
-      return 1;
+    if (!options_.no_resource_removal) {
+      if (!NoDefaultResourceRemover{}.Consume(context_, &final_table_)) {
+        context_->GetDiagnostics()->Error(DiagMessage()
+                                          << "failed removing resources with no defaults");
+        return 1;
+      }
     }
 
     ReferenceLinker linker;
@@ -1842,9 +1845,15 @@ class Linker {
     } else {
       // Adjust the SplitConstraints so that their SDK version is stripped if it is less than or
       // equal to the minSdk.
+      const size_t origConstraintSize = options_.split_constraints.size();
       options_.split_constraints =
           AdjustSplitConstraintsForMinSdk(context_->GetMinSdkVersion(), options_.split_constraints);
 
+      if (origConstraintSize != options_.split_constraints.size()) {
+        context_->GetDiagnostics()->Warn(DiagMessage()
+                                         << "requested to split resources prior to min sdk of "
+                                         << context_->GetMinSdkVersion());
+      }
       TableSplitter table_splitter(options_.split_constraints, options_.table_splitter_options);
       if (!table_splitter.VerifySplitConstraints(context_)) {
         return 1;

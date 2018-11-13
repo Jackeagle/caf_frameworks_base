@@ -31,11 +31,11 @@
     </plurals>
     <string name="status_bar_no_notifications_title" msgid="4755261167193833213">"কোনো বিজ্ঞপ্তি নেই"</string>
     <string name="status_bar_ongoing_events_title" msgid="1682504513316879202">"চলতে-থাকা"</string>
-    <string name="status_bar_latest_events_title" msgid="6594767438577593172">"বিজ্ঞপ্তিগুলি"</string>
+    <string name="status_bar_latest_events_title" msgid="6594767438577593172">"বিজ্ঞপ্তি"</string>
     <string name="battery_low_title" msgid="9187898087363540349">"চার্জ শীঘ্রই শেষ হয়ে যেতে পারে"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"<xliff:g id="PERCENTAGE">%s</xliff:g> অবশিষ্ট আছে"</string>
-    <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"<xliff:g id="PERCENTAGE">%s</xliff:g> বাকি আছে, বর্তমান ব্যবহারের ভিত্তিতে আর <xliff:g id="TIME">%s</xliff:g> চলবে"</string>
-    <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"<xliff:g id="PERCENTAGE">%s</xliff:g> বাকি আছে, আর <xliff:g id="TIME">%s</xliff:g> চলবে"</string>
+    <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"<xliff:g id="PERCENTAGE">%1$s</xliff:g> বাকি আছে, বর্তমান ব্যবহারের ভিত্তিতে আর <xliff:g id="TIME">%2$s</xliff:g> চলবে"</string>
+    <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"<xliff:g id="PERCENTAGE">%1$s</xliff:g> বাকি আছে, আর <xliff:g id="TIME">%2$s</xliff:g> চলবে"</string>
     <string name="battery_low_percent_format_saver_started" msgid="7879389868952879166">"<xliff:g id="PERCENTAGE">%s</xliff:g> অবশিষ্ট আছে। ব্যাটারি সেভার চালু আছে।"</string>
     <string name="invalid_charger" msgid="2741987096648693172">"ইউএসবি দিয়ে চার্জ করা যাবে না। ডিভাইসের সাথে যে চার্জারটি পেয়েছেন, সেটি ব্যবহার করুন।"</string>
     <string name="invalid_charger_title" msgid="2836102177577255404">"ইউএসবি দিয়ে চার্জ করা যাবে না"</string>
@@ -49,7 +49,7 @@
     <string name="status_bar_settings_auto_rotation" msgid="3790482541357798421">"অটো-রোটেট স্ক্রিন"</string>
     <string name="status_bar_settings_mute_label" msgid="554682549917429396">"মিউট করুন"</string>
     <string name="status_bar_settings_auto_brightness_label" msgid="511453614962324674">"স্বতঃ"</string>
-    <string name="status_bar_settings_notifications" msgid="397146176280905137">"বিজ্ঞপ্তিগুলি"</string>
+    <string name="status_bar_settings_notifications" msgid="397146176280905137">"বিজ্ঞপ্তি"</string>
     <string name="bluetooth_tethered" msgid="7094101612161133267">"ব্লুটুথ টিথার করা হয়েছে"</string>
     <string name="status_bar_input_method_settings_configure_input_methods" msgid="3504292471512317827">"ইনপুট পদ্ধতিগুলি সেট আপ করুন"</string>
     <string name="status_bar_use_physical_keyboard" msgid="7551903084416057810">"ফিজিক্যাল কীবোর্ড"</string>
@@ -103,10 +103,12 @@
     <string name="camera_label" msgid="7261107956054836961">"ক্যামেরা খুলুন"</string>
     <string name="recents_caption_resize" msgid="3517056471774958200">"নতুন কার্য লেআউট বেছে নিন"</string>
     <string name="cancel" msgid="6442560571259935130">"বাতিল করুন"</string>
+    <string name="accessibility_biometric_dialog_help_area" msgid="8953787076940186847">"সহায়তার মেসেজ দেখানোর জায়গা"</string>
+    <string name="biometric_dialog_confirm" msgid="6468457350041712674">"কনফার্ম করুন"</string>
     <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"আঙ্গুলের ছাপের সেন্সর স্পর্শ করুন"</string>
     <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"আঙ্গুলের ছাপের আইকন"</string>
-    <string name="accessibility_fingerprint_dialog_app_icon" msgid="3228052542929174609">"অ্যাপ্লিকেশনের আইকন"</string>
-    <string name="accessibility_fingerprint_dialog_help_area" msgid="5730471601819225159">"সহায়তার মেসেজ দেখানোর জায়গা"</string>
+    <string name="face_dialog_looking_for_face" msgid="7049276266074494689">"আপনার জন্য খোঁজা হচ্ছে…"</string>
+    <string name="accessibility_face_dialog_face_icon" msgid="2658119009870383490">"ফেস আইকন"</string>
     <string name="accessibility_compatibility_zoom_button" msgid="8461115318742350699">"সামঞ্জস্যের জুম বোতাম৷"</string>
     <string name="accessibility_compatibility_zoom_example" msgid="4220687294564945780">"ছোট থেকে বৃহৎ স্ক্রীণে জুম করুন৷"</string>
     <string name="accessibility_bluetooth_connected" msgid="2707027633242983370">"ব্লুটুথ সংযুক্ত হয়েছে৷"</string>
@@ -174,7 +176,7 @@
     <string name="accessibility_battery_level" msgid="7451474187113371965">"<xliff:g id="NUMBER">%d</xliff:g> শতাংশ ব্যাটারি রয়েছে৷"</string>
     <string name="accessibility_battery_level_charging" msgid="1147587904439319646">"ব্যাটারি চার্জ হচ্ছে, <xliff:g id="BATTERY_PERCENTAGE">%d</xliff:g> শতাংশ৷"</string>
     <string name="accessibility_settings_button" msgid="799583911231893380">"সিস্টেম সেটিংস৷"</string>
-    <string name="accessibility_notifications_button" msgid="4498000369779421892">"বিজ্ঞপ্তিগুলি৷"</string>
+    <string name="accessibility_notifications_button" msgid="4498000369779421892">"বিজ্ঞপ্তি৷"</string>
     <string name="accessibility_overflow_action" msgid="5681882033274783311">"সমস্ত বিজ্ঞপ্তি দেখুন"</string>
     <string name="accessibility_remove_notification" msgid="3603099514902182350">"বিজ্ঞপ্তি সাফ করুন৷"</string>
     <string name="accessibility_gps_enabled" msgid="3511469499240123019">"GPS সক্ষম করা হয়েছে৷"</string>
@@ -257,7 +259,7 @@
     <string name="accessibility_location_active" msgid="2427290146138169014">"লোকেশন অনুরোধ সক্রিয় রয়েছে"</string>
     <string name="accessibility_clear_all" msgid="5235938559247164925">"সমস্ত বিজ্ঞপ্তি সাফ করুন৷"</string>
     <string name="notification_group_overflow_indicator" msgid="1863231301642314183">"+ <xliff:g id="NUMBER">%s</xliff:g>টি"</string>
-    <string name="notification_group_overflow_indicator_ambient" msgid="879560382990377886">"<xliff:g id="NOTIFICATION_TITLE">%s</xliff:g>, +<xliff:g id="OVERFLOW">%s</xliff:g>"</string>
+    <string name="notification_group_overflow_indicator_ambient" msgid="879560382990377886">"<xliff:g id="NOTIFICATION_TITLE">%1$s</xliff:g>, +<xliff:g id="OVERFLOW">%2$s</xliff:g>"</string>
     <plurals name="notification_group_overflow_description" formatted="false" msgid="4579313201268495404">
       <item quantity="one">ভিতরে আরও <xliff:g id="NUMBER_1">%s</xliff:g>টি বিজ্ঞপ্তি আছে।</item>
       <item quantity="other">ভিতরে আরও <xliff:g id="NUMBER_1">%s</xliff:g>টি বিজ্ঞপ্তি আছে।</item>
@@ -334,7 +336,7 @@
       <item quantity="one">%dটি ডিভাইস</item>
       <item quantity="other">%dটি ডিভাইস</item>
     </plurals>
-    <string name="quick_settings_notifications_label" msgid="4818156442169154523">"বিজ্ঞপ্তিগুলি"</string>
+    <string name="quick_settings_notifications_label" msgid="4818156442169154523">"বিজ্ঞপ্তি"</string>
     <string name="quick_settings_flashlight_label" msgid="2133093497691661546">"ফ্ল্যাশলাইট"</string>
     <string name="quick_settings_cellular_detail_title" msgid="3661194685666477347">"মোবাইল ডেটা"</string>
     <string name="quick_settings_cellular_detail_data_usage" msgid="1964260360259312002">"ডেটার ব্যবহার"</string>
@@ -399,9 +401,9 @@
     <string name="interruption_level_none_twoline" msgid="3957581548190765889">"একদম\nনিরব"</string>
     <string name="interruption_level_priority_twoline" msgid="1564715335217164124">"শুধুমাত্র\nঅগ্রাধিকার"</string>
     <string name="interruption_level_alarms_twoline" msgid="3266909566410106146">"শুধুমাত্র\nঅ্যালার্মগুলি"</string>
-    <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • চার্জ হচ্ছে (পুরো চার্জ হতে <xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> লাগবে)"</string>
-    <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • দ্রুত চার্জ হচ্ছে (পুরোটা হতে <xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> লাগবে)"</string>
-    <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • ধীরে চার্জ হচ্ছে (পুরোটা হতে <xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> লাগবে)"</string>
+    <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • চার্জ হচ্ছে (পুরো চার্জ হতে <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> লাগবে)"</string>
+    <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • দ্রুত চার্জ হচ্ছে (পুরোটা হতে <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> লাগবে)"</string>
+    <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • ধীরে চার্জ হচ্ছে (পুরোটা হতে <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> লাগবে)"</string>
     <string name="accessibility_multi_user_switch_switcher" msgid="7305948938141024937">"ব্যবহারকারী পাল্টে দিন"</string>
     <string name="accessibility_multi_user_switch_switcher_with_current" msgid="8434880595284601601">"ব্যবহারকারী পাল্টান, বর্তমান ব্যবহারকারী <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
     <string name="accessibility_multi_user_switch_inactive" msgid="1424081831468083402">"<xliff:g id="CURRENT_USER_NAME">%s</xliff:g> হল বর্তমান ব্যবহারকারী"</string>
@@ -426,6 +428,11 @@
     <string name="user_logout_notification_action" msgid="1195428991423425062">"ব্যবহারকারীকে লগ-আউট করুন"</string>
     <string name="user_add_user_title" msgid="4553596395824132638">"নতুন ব্যবহারকারীকে যোগ করবেন?"</string>
     <string name="user_add_user_message_short" msgid="2161624834066214559">"আপনি একজন নতুন ব্যবহারকারী যোগ করলে তাকে তার জায়গা সেট আপ করে নিতে হবে৷\n\nযেকোনো ব্যবহারকারী অন্য সব ব্যবহারকারীর জন্য অ্যাপ্লিকেশান আপডেট করতে পারবেন৷"</string>
+    <string name="user_limit_reached_title" msgid="7374910700117359177">"আর কোনও প্রোফাইল যোগ করা যাবে না"</string>
+    <plurals name="user_limit_reached_message" formatted="false" msgid="1855040563671964242">
+      <item quantity="one">আপনি <xliff:g id="COUNT">%d</xliff:g> জন পর্যন্ত ব্যবহারকারীর প্রোফাইল যোগ করতে পারেন।</item>
+      <item quantity="other">আপনি <xliff:g id="COUNT">%d</xliff:g> জন পর্যন্ত ব্যবহারকারীর প্রোফাইল যোগ করতে পারেন।</item>
+    </plurals>
     <string name="user_remove_user_title" msgid="4681256956076895559">"ব্যবহারকারী সরাবেন?"</string>
     <string name="user_remove_user_message" msgid="1453218013959498039">"এই ব্যবহারকারীর সমস্ত অ্যাপ্লিকেশান ও ডেটা মুছে ফেলা হবে।"</string>
     <string name="user_remove_user_remove" msgid="7479275741742178297">"সরান"</string>
@@ -435,7 +442,8 @@
     <string name="media_projection_dialog_text" msgid="3071431025448218928">"<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> আপনার স্ক্রীনে দেখানো সব কিছু ক্যাপচার করা শুরু করবে।"</string>
     <string name="media_projection_remember_text" msgid="3103510882172746752">"আর দেখাবেন না"</string>
     <string name="clear_all_notifications_text" msgid="814192889771462828">"সবকিছু সাফ করুন"</string>
-    <string name="manage_notifications_text" msgid="8035284146227267681">"বিজ্ঞপ্তি পরিচালনা করুন"</string>
+    <!-- no translation found for manage_notifications_text (2386728145475108753) -->
+    <skip />
     <string name="dnd_suppressing_shade_text" msgid="1904574852846769301">"\'বিরক্ত করবেন না\' দিয়ে বিজ্ঞপ্তি পজ করা হয়েছে"</string>
     <string name="media_projection_action_text" msgid="8470872969457985954">"এখন শুরু করুন"</string>
     <string name="empty_shade_text" msgid="708135716272867002">"কোনো বিজ্ঞপ্তি নেই"</string>
@@ -571,7 +579,7 @@
     <string name="broadcast_tile" msgid="3894036511763289383">"সম্প্রচার টাইল"</string>
     <string name="zen_alarm_warning_indef" msgid="3482966345578319605">"তার আগে আপনি এটিকে বন্ধ না করা পর্যন্ত আপনি পরবর্তী <xliff:g id="WHEN">%1$s</xliff:g> অ্যালার্ম শুনতে পাবেন না"</string>
     <string name="zen_alarm_warning" msgid="444533119582244293">"আপনি আপনার পরবর্তী <xliff:g id="WHEN">%1$s</xliff:g> অ্যালার্ম শুনতে পাবেন না"</string>
-    <string name="alarm_template" msgid="3980063409350522735">"<xliff:g id="WHEN">%1$s</xliff:g> -টায়"</string>
+    <string name="alarm_template" msgid="3980063409350522735">"<xliff:g id="WHEN">%1$s</xliff:g>"</string>
     <string name="alarm_template_far" msgid="4242179982586714810">"<xliff:g id="WHEN">%1$s</xliff:g> -তে"</string>
     <string name="accessibility_quick_settings_detail" msgid="2579369091672902101">"দ্রুত সেটিংস, <xliff:g id="TITLE">%s</xliff:g>৷"</string>
     <string name="accessibility_status_bar_hotspot" msgid="4099381329956402865">"হটস্পট"</string>
@@ -674,7 +682,7 @@
     <string name="keyboard_shortcut_group_system_home" msgid="3054369431319891965">"হোম"</string>
     <string name="keyboard_shortcut_group_system_recents" msgid="3154851905021926744">"সাম্প্রতিকগুলি"</string>
     <string name="keyboard_shortcut_group_system_back" msgid="2207004531216446378">"পিছনে"</string>
-    <string name="keyboard_shortcut_group_system_notifications" msgid="8366964080041773224">"বিজ্ঞপ্তিগুলি"</string>
+    <string name="keyboard_shortcut_group_system_notifications" msgid="8366964080041773224">"বিজ্ঞপ্তি"</string>
     <string name="keyboard_shortcut_group_system_shortcuts_helper" msgid="4892255911160332762">"কীবোর্ড শর্টকাট"</string>
     <string name="keyboard_shortcut_group_system_switch_input" msgid="8413348767825486492">"কীবোর্ড লে-আউট পাল্টান"</string>
     <string name="keyboard_shortcut_group_applications" msgid="9129465955073449206">"অ্যাপ্লিকেশানগুলি"</string>
@@ -729,6 +737,7 @@
     <string name="left_icon" msgid="3096287125959387541">"বাঁ দিকের আইকন"</string>
     <string name="right_icon" msgid="3952104823293824311">"ডানদিকের আইকন"</string>
     <string name="drag_to_add_tiles" msgid="230586591689084925">"টাইল যোগ করতে ট্যাপ করে টেনে আনুন"</string>
+    <string name="drag_to_rearrange_tiles" msgid="4566074720193667473">"টাইলগুলি আবার সাজানোর জন্য ধরে থেকে টেনে আনুন"</string>
     <string name="drag_to_remove_tiles" msgid="3361212377437088062">"সরানোর জন্য এখানে টেনে আনুন"</string>
     <string name="drag_to_remove_disabled" msgid="2390968976638993382">"অন্তত ৬টি টাইল রাখতে হবে"</string>
     <string name="qs_edit" msgid="2232596095725105230">"সম্পাদনা করুন"</string>
@@ -757,12 +766,10 @@
     <string name="accessibility_action_divider_bottom_full" msgid="301433196679548001">"নীচের অংশ নিয়ে পূর্ণ স্ক্রিন"</string>
     <string name="accessibility_qs_edit_tile_label" msgid="8374924053307764245">"<xliff:g id="POSITION">%1$d</xliff:g> লোকেশন, <xliff:g id="TILE_NAME">%2$s</xliff:g>৷ সম্পাদনা করতে দুবার আলতো চাপুন৷"</string>
     <string name="accessibility_qs_edit_add_tile_label" msgid="8133209638023882667">"<xliff:g id="TILE_NAME">%1$s</xliff:g>৷ যোগ করতে দুবার আলতো চাপুন৷"</string>
-    <string name="accessibility_qs_edit_position_label" msgid="5055306305919289819">"<xliff:g id="POSITION">%1$d</xliff:g> অবস্থান৷ নির্বাচন করতে দুবার আলতো চাপুন৷"</string>
     <string name="accessibility_qs_edit_move_tile" msgid="2461819993780159542">"<xliff:g id="TILE_NAME">%1$s</xliff:g> সরান"</string>
     <string name="accessibility_qs_edit_remove_tile" msgid="7484493384665907197">"<xliff:g id="TILE_NAME">%1$s</xliff:g> সরান"</string>
-    <string name="accessibility_qs_edit_tile_added" msgid="8050200862063548309">"<xliff:g id="POSITION">%2$d</xliff:g> অবস্থানে <xliff:g id="TILE_NAME">%1$s</xliff:g> যোগ করা হয়েছে"</string>
-    <string name="accessibility_qs_edit_tile_removed" msgid="8584304916627913440">"<xliff:g id="TILE_NAME">%1$s</xliff:g> মোছা হয়েছে"</string>
-    <string name="accessibility_qs_edit_tile_moved" msgid="4343693412689365038">"<xliff:g id="TILE_NAME">%1$s</xliff:g> <xliff:g id="POSITION">%2$d</xliff:g> এ সরানো হয়েছে"</string>
+    <string name="accessibility_qs_edit_tile_add" msgid="3520406665865985109">"<xliff:g id="TILE_NAME">%1$s</xliff:g> <xliff:g id="POSITION">%2$d</xliff:g>-এ যোগ করুন"</string>
+    <string name="accessibility_qs_edit_tile_move" msgid="3108103090006972938">"<xliff:g id="TILE_NAME">%1$s</xliff:g> <xliff:g id="POSITION">%2$d</xliff:g>-এ সরান"</string>
     <string name="accessibility_desc_quick_settings_edit" msgid="8073587401747016103">"দ্রুত সেটিংস সম্পাদক৷"</string>
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"<xliff:g id="ID_1">%1$s</xliff:g> বিজ্ঞপ্তি: <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"অ্যাপ্লিকেশানটি বিভক্ত স্ক্রীনে কাজ নাও করতে পারে৷"</string>
@@ -819,11 +826,13 @@
     <string name="notification_channel_storage" msgid="3077205683020695313">"স্টোরেজ"</string>
     <string name="notification_channel_hints" msgid="7323870212489152689">"হিন্ট"</string>
     <string name="instant_apps" msgid="6647570248119804907">"ঝটপট অ্যাপ"</string>
-    <string name="instant_apps_message" msgid="8116608994995104836">"ঝটপট অ্যাপ ইনস্টল করার প্রয়োজন হয় না।"</string>
+    <string name="instant_apps_title" msgid="8738419517367449783">"<xliff:g id="APP">%1$s</xliff:g> চলছে"</string>
+    <string name="instant_apps_message" msgid="1183313016396018086">"অ্যাপটি ইনস্টল না করে চালু করা হয়েছে।"</string>
+    <string name="instant_apps_message_with_help" msgid="6179830437630729747">"অ্যাপটি ইনস্টল না করে চালু করা হয়েছে। আরও জানতে ট্যাপ করুন।"</string>
     <string name="app_info" msgid="6856026610594615344">"অ্যাপের তথ্য"</string>
-    <string name="go_to_web" msgid="2650669128861626071">"ব্রাউজারে যান"</string>
+    <string name="go_to_web" msgid="1106022723459948514">"ওয়েবে যান"</string>
     <string name="mobile_data" msgid="7094582042819250762">"মোবাইল ডেটা"</string>
-    <string name="mobile_data_text_format" msgid="3526214522670876454">"<xliff:g id="ID_1">%s</xliff:g> — <xliff:g id="ID_2">%s</xliff:g>"</string>
+    <string name="mobile_data_text_format" msgid="3526214522670876454">"<xliff:g id="ID_1">%1$s</xliff:g> — <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="wifi_is_off" msgid="1838559392210456893">"ওয়াই ফাই বন্ধ আছে"</string>
     <string name="bt_is_off" msgid="2640685272289706392">"ব্লুটুথ বন্ধ আছে"</string>
     <string name="dnd_is_off" msgid="6167780215212497572">"বিরক্ত করবেন না বিকল্পটি বন্ধ আছে"</string>

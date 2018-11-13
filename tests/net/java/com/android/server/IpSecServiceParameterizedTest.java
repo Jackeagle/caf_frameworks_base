@@ -16,6 +16,8 @@
 
 package com.android.server;
 
+import static android.system.OsConstants.AF_INET;
+import static android.system.OsConstants.AF_INET6;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -34,16 +36,18 @@ import android.net.IpSecAlgorithm;
 import android.net.IpSecConfig;
 import android.net.IpSecManager;
 import android.net.IpSecSpiResponse;
+import android.net.IpSecTransform;
 import android.net.IpSecTransformResponse;
 import android.net.IpSecTunnelInterfaceResponse;
+import android.net.IpSecUdpEncapResponse;
 import android.net.LinkAddress;
 import android.net.Network;
 import android.net.NetworkUtils;
 import android.os.Binder;
 import android.os.ParcelFileDescriptor;
-import android.test.mock.MockContext;
 import android.support.test.filters.SmallTest;
 import android.system.Os;
+import android.test.mock.MockContext;
 
 import java.net.Socket;
 import java.util.Arrays;
@@ -62,16 +66,17 @@ public class IpSecServiceParameterizedTest {
 
     private static final int TEST_SPI = 0xD1201D;
 
-    private final String mDestinationAddr;
     private final String mSourceAddr;
+    private final String mDestinationAddr;
     private final LinkAddress mLocalInnerAddress;
+    private final int mFamily;
 
     @Parameterized.Parameters
     public static Collection ipSecConfigs() {
         return Arrays.asList(
                 new Object[][] {
-                {"1.2.3.4", "8.8.4.4", "10.0.1.1/24"},
-                {"2601::2", "2601::10", "2001:db8::1/64"}
+                {"1.2.3.4", "8.8.4.4", "10.0.1.1/24", AF_INET},
+                {"2601::2", "2601::10", "2001:db8::1/64", AF_INET6}
         });
     }
 
@@ -121,6 +126,7 @@ public class IpSecServiceParameterizedTest {
     IpSecService.IpSecServiceConfiguration mMockIpSecSrvConfig;
     IpSecService mIpSecService;
     Network fakeNetwork = new Network(0xAB);
+    int mUid = Os.getuid();
 
     private static final IpSecAlgorithm AUTH_ALGO =
             new IpSecAlgorithm(IpSecAlgorithm.AUTH_HMAC_SHA256, AUTH_KEY, AUTH_KEY.length * 4);
@@ -128,12 +134,14 @@ public class IpSecServiceParameterizedTest {
             new IpSecAlgorithm(IpSecAlgorithm.CRYPT_AES_CBC, CRYPT_KEY);
     private static final IpSecAlgorithm AEAD_ALGO =
             new IpSecAlgorithm(IpSecAlgorithm.AUTH_CRYPT_AES_GCM, AEAD_KEY, 128);
+    private static final int REMOTE_ENCAP_PORT = 4500;
 
     public IpSecServiceParameterizedTest(
-            String sourceAddr, String destAddr, String localInnerAddr) {
+            String sourceAddr, String destAddr, String localInnerAddr, int family) {
         mSourceAddr = sourceAddr;
         mDestinationAddr = destAddr;
         mLocalInnerAddress = new LinkAddress(localInnerAddr);
+        mFamily = family;
     }
 
     @Before
@@ -155,6 +163,8 @@ public class IpSecServiceParameterizedTest {
         when(mMockAppOps.noteOp(anyInt(), anyInt(), eq("badPackage")))
             .thenReturn(AppOpsManager.MODE_IGNORED);
     }
+
+    //TODO: Add a test to verify SPI.
 
     @Test
     public void testIpSecServiceReserveSpi() throws Exception {
@@ -181,7 +191,7 @@ public class IpSecServiceParameterizedTest {
 
         verify(mMockNetd)
                 .ipSecDeleteSecurityAssociation(
-                        eq(spiResp.resourceId),
+                        eq(mUid),
                         anyString(),
                         anyString(),
                         eq(TEST_SPI),
@@ -189,8 +199,7 @@ public class IpSecServiceParameterizedTest {
                         anyInt());
 
         // Verify quota and RefcountedResource objects cleaned up
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         assertEquals(0, userRecord.mSpiQuotaTracker.mCurrent);
         try {
             userRecord.mSpiRecords.getRefcountedResourceOrThrow(spiResp.resourceId);
@@ -209,8 +218,7 @@ public class IpSecServiceParameterizedTest {
                 mIpSecService.allocateSecurityParameterIndex(
                         mDestinationAddr, TEST_SPI, new Binder());
 
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         IpSecService.RefcountedResource refcountedRecord =
                 userRecord.mSpiRecords.getRefcountedResourceOrThrow(spiResp.resourceId);
 
@@ -218,7 +226,7 @@ public class IpSecServiceParameterizedTest {
 
         verify(mMockNetd)
                 .ipSecDeleteSecurityAssociation(
-                        eq(spiResp.resourceId),
+                        eq(mUid),
                         anyString(),
                         anyString(),
                         eq(TEST_SPI),
@@ -258,6 +266,47 @@ public class IpSecServiceParameterizedTest {
         config.setAuthentication(AUTH_ALGO);
     }
 
+    private void addEncapSocketToIpSecConfig(int resourceId, IpSecConfig config) throws Exception {
+        config.setEncapType(IpSecTransform.ENCAP_ESPINUDP);
+        config.setEncapSocketResourceId(resourceId);
+        config.setEncapRemotePort(REMOTE_ENCAP_PORT);
+    }
+
+    private void verifyTransformNetdCalledForCreatingSA(
+            IpSecConfig config, IpSecTransformResponse resp) throws Exception {
+        verifyTransformNetdCalledForCreatingSA(config, resp, 0);
+    }
+
+    private void verifyTransformNetdCalledForCreatingSA(
+            IpSecConfig config, IpSecTransformResponse resp, int encapSocketPort) throws Exception {
+        IpSecAlgorithm auth = config.getAuthentication();
+        IpSecAlgorithm crypt = config.getEncryption();
+        IpSecAlgorithm authCrypt = config.getAuthenticatedEncryption();
+
+        verify(mMockNetd, times(1))
+                .ipSecAddSecurityAssociation(
+                        eq(mUid),
+                        eq(config.getMode()),
+                        eq(config.getSourceAddress()),
+                        eq(config.getDestinationAddress()),
+                        eq((config.getNetwork() != null) ? config.getNetwork().netId : 0),
+                        eq(TEST_SPI),
+                        eq(0),
+                        eq(0),
+                        eq((auth != null) ? auth.getName() : ""),
+                        eq((auth != null) ? auth.getKey() : new byte[] {}),
+                        eq((auth != null) ? auth.getTruncationLengthBits() : 0),
+                        eq((crypt != null) ? crypt.getName() : ""),
+                        eq((crypt != null) ? crypt.getKey() : new byte[] {}),
+                        eq((crypt != null) ? crypt.getTruncationLengthBits() : 0),
+                        eq((authCrypt != null) ? authCrypt.getName() : ""),
+                        eq((authCrypt != null) ? authCrypt.getKey() : new byte[] {}),
+                        eq((authCrypt != null) ? authCrypt.getTruncationLengthBits() : 0),
+                        eq(config.getEncapType()),
+                        eq(encapSocketPort),
+                        eq(config.getEncapRemotePort()));
+    }
+
     @Test
     public void testCreateTransform() throws Exception {
         IpSecConfig ipSecConfig = new IpSecConfig();
@@ -268,28 +317,7 @@ public class IpSecServiceParameterizedTest {
                 mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
         assertEquals(IpSecManager.Status.OK, createTransformResp.status);
 
-        verify(mMockNetd)
-                .ipSecAddSecurityAssociation(
-                        eq(createTransformResp.resourceId),
-                        anyInt(),
-                        anyString(),
-                        anyString(),
-                        anyInt(),
-                        eq(TEST_SPI),
-                        anyInt(),
-                        anyInt(),
-                        eq(IpSecAlgorithm.AUTH_HMAC_SHA256),
-                        eq(AUTH_KEY),
-                        anyInt(),
-                        eq(IpSecAlgorithm.CRYPT_AES_CBC),
-                        eq(CRYPT_KEY),
-                        anyInt(),
-                        eq(""),
-                        eq(new byte[] {}),
-                        eq(0),
-                        anyInt(),
-                        anyInt(),
-                        anyInt());
+        verifyTransformNetdCalledForCreatingSA(ipSecConfig, createTransformResp);
     }
 
     @Test
@@ -303,28 +331,59 @@ public class IpSecServiceParameterizedTest {
                 mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
         assertEquals(IpSecManager.Status.OK, createTransformResp.status);
 
-        verify(mMockNetd)
-                .ipSecAddSecurityAssociation(
-                        eq(createTransformResp.resourceId),
-                        anyInt(),
-                        anyString(),
-                        anyString(),
-                        anyInt(),
-                        eq(TEST_SPI),
-                        anyInt(),
-                        anyInt(),
-                        eq(""),
-                        eq(new byte[] {}),
-                        eq(0),
-                        eq(""),
-                        eq(new byte[] {}),
-                        eq(0),
-                        eq(IpSecAlgorithm.AUTH_CRYPT_AES_GCM),
-                        eq(AEAD_KEY),
-                        anyInt(),
-                        anyInt(),
-                        anyInt(),
-                        anyInt());
+        verifyTransformNetdCalledForCreatingSA(ipSecConfig, createTransformResp);
+    }
+
+    @Test
+    public void testCreateTransportModeTransformWithEncap() throws Exception {
+        IpSecUdpEncapResponse udpSock = mIpSecService.openUdpEncapsulationSocket(0, new Binder());
+
+        IpSecConfig ipSecConfig = new IpSecConfig();
+        ipSecConfig.setMode(IpSecTransform.MODE_TRANSPORT);
+        addDefaultSpisAndRemoteAddrToIpSecConfig(ipSecConfig);
+        addAuthAndCryptToIpSecConfig(ipSecConfig);
+        addEncapSocketToIpSecConfig(udpSock.resourceId, ipSecConfig);
+
+        if (mFamily == AF_INET) {
+            IpSecTransformResponse createTransformResp =
+                    mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
+            assertEquals(IpSecManager.Status.OK, createTransformResp.status);
+
+            verifyTransformNetdCalledForCreatingSA(ipSecConfig, createTransformResp, udpSock.port);
+        } else {
+            try {
+                IpSecTransformResponse createTransformResp =
+                        mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
+                fail("Expected IllegalArgumentException on attempt to use UDP Encap in IPv6");
+            } catch (IllegalArgumentException expected) {
+            }
+        }
+    }
+
+    @Test
+    public void testCreateTunnelModeTransformWithEncap() throws Exception {
+        IpSecUdpEncapResponse udpSock = mIpSecService.openUdpEncapsulationSocket(0, new Binder());
+
+        IpSecConfig ipSecConfig = new IpSecConfig();
+        ipSecConfig.setMode(IpSecTransform.MODE_TUNNEL);
+        addDefaultSpisAndRemoteAddrToIpSecConfig(ipSecConfig);
+        addAuthAndCryptToIpSecConfig(ipSecConfig);
+        addEncapSocketToIpSecConfig(udpSock.resourceId, ipSecConfig);
+
+        if (mFamily == AF_INET) {
+            IpSecTransformResponse createTransformResp =
+                    mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
+            assertEquals(IpSecManager.Status.OK, createTransformResp.status);
+
+            verifyTransformNetdCalledForCreatingSA(ipSecConfig, createTransformResp, udpSock.port);
+        } else {
+            try {
+                IpSecTransformResponse createTransformResp =
+                        mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
+                fail("Expected IllegalArgumentException on attempt to use UDP Encap in IPv6");
+            } catch (IllegalArgumentException expected) {
+            }
+        }
     }
 
     @Test
@@ -361,13 +420,12 @@ public class IpSecServiceParameterizedTest {
 
         IpSecTransformResponse createTransformResp =
                 mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         assertEquals(1, userRecord.mSpiQuotaTracker.mCurrent);
         mIpSecService.releaseSecurityParameterIndex(ipSecConfig.getSpiResourceId());
         verify(mMockNetd, times(0))
                 .ipSecDeleteSecurityAssociation(
-                        eq(createTransformResp.resourceId),
+                        eq(mUid),
                         anyString(),
                         anyString(),
                         eq(TEST_SPI),
@@ -389,7 +447,7 @@ public class IpSecServiceParameterizedTest {
 
         verify(mMockNetd, times(1))
                 .ipSecDeleteSecurityAssociation(
-                        eq(createTransformResp.resourceId),
+                        eq(mUid),
                         anyString(),
                         anyString(),
                         eq(TEST_SPI),
@@ -397,8 +455,7 @@ public class IpSecServiceParameterizedTest {
                         anyInt());
 
         // Verify quota and RefcountedResource objects cleaned up
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         assertEquals(0, userRecord.mTransformQuotaTracker.mCurrent);
         assertEquals(1, userRecord.mSpiQuotaTracker.mCurrent);
 
@@ -433,8 +490,7 @@ public class IpSecServiceParameterizedTest {
         IpSecTransformResponse createTransformResp =
                 mIpSecService.createTransform(ipSecConfig, new Binder(), "blessedPackage");
 
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         IpSecService.RefcountedResource refcountedRecord =
                 userRecord.mTransformRecords.getRefcountedResourceOrThrow(
                         createTransformResp.resourceId);
@@ -443,7 +499,7 @@ public class IpSecServiceParameterizedTest {
 
         verify(mMockNetd)
                 .ipSecDeleteSecurityAssociation(
-                        eq(createTransformResp.resourceId),
+                        eq(mUid),
                         anyString(),
                         anyString(),
                         eq(TEST_SPI),
@@ -477,7 +533,7 @@ public class IpSecServiceParameterizedTest {
         verify(mMockNetd)
                 .ipSecApplyTransportModeTransform(
                         eq(pfd.getFileDescriptor()),
-                        eq(resourceId),
+                        eq(mUid),
                         eq(IpSecManager.DIRECTION_OUT),
                         anyString(),
                         anyString(),
@@ -509,8 +565,7 @@ public class IpSecServiceParameterizedTest {
                 createAndValidateTunnel(mSourceAddr, mDestinationAddr, "blessedPackage");
 
         // Check that we have stored the tracking object, and retrieve it
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         IpSecService.RefcountedResource refcountedRecord =
                 userRecord.mTunnelInterfaceRecords.getRefcountedResourceOrThrow(
                         createTunnelResp.resourceId);
@@ -530,8 +585,7 @@ public class IpSecServiceParameterizedTest {
         IpSecTunnelInterfaceResponse createTunnelResp =
                 createAndValidateTunnel(mSourceAddr, mDestinationAddr, "blessedPackage");
 
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
 
         mIpSecService.deleteTunnelInterface(createTunnelResp.resourceId, "blessedPackage");
 
@@ -551,8 +605,7 @@ public class IpSecServiceParameterizedTest {
         IpSecTunnelInterfaceResponse createTunnelResp =
                 createAndValidateTunnel(mSourceAddr, mDestinationAddr, "blessedPackage");
 
-        IpSecService.UserRecord userRecord =
-                mIpSecService.mUserResourceTracker.getUserRecord(Os.getuid());
+        IpSecService.UserRecord userRecord = mIpSecService.mUserResourceTracker.getUserRecord(mUid);
         IpSecService.RefcountedResource refcountedRecord =
                 userRecord.mTunnelInterfaceRecords.getRefcountedResourceOrThrow(
                         createTunnelResp.resourceId);

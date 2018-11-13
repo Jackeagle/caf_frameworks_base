@@ -57,6 +57,26 @@ bool transferFunctionCloseToSRGB(const SkColorSpace* colorSpace) {
     return false;
 }
 
+android::PixelFormat ColorTypeToPixelFormat(SkColorType colorType) {
+    switch (colorType) {
+        case kRGBA_8888_SkColorType:
+            return PIXEL_FORMAT_RGBA_8888;
+        case kRGBA_F16_SkColorType:
+            return PIXEL_FORMAT_RGBA_FP16;
+        case kRGB_565_SkColorType:
+            return PIXEL_FORMAT_RGB_565;
+        case kRGB_888x_SkColorType:
+            return PIXEL_FORMAT_RGBX_8888;
+        case kRGBA_1010102_SkColorType:
+            return PIXEL_FORMAT_RGBA_1010102;
+        case kARGB_4444_SkColorType:
+            return PIXEL_FORMAT_RGBA_4444;
+        default:
+            ALOGW("Unsupported colorType: %d, return RGBA_8888 by default", (int)colorType);
+            return PIXEL_FORMAT_RGBA_8888;
+    }
+}
+
 sk_sp<SkColorSpace> DataSpaceToColorSpace(android_dataspace dataspace) {
 
     SkColorSpace::Gamut gamut;

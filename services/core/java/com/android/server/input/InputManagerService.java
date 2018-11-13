@@ -17,25 +17,6 @@
 package com.android.server.input;
 
 import android.annotation.NonNull;
-import android.os.LocaleList;
-import android.os.ShellCallback;
-import android.util.Log;
-import android.view.Display;
-import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
-import com.android.internal.notification.SystemNotificationChannels;
-import com.android.internal.os.SomeArgs;
-import com.android.internal.R;
-import com.android.internal.util.DumpUtils;
-import com.android.internal.util.Preconditions;
-import com.android.internal.util.XmlUtils;
-import com.android.server.DisplayThread;
-import com.android.server.LocalServices;
-import com.android.server.Watchdog;
-import com.android.server.policy.WindowManagerPolicy;
-
-import org.xmlpull.v1.XmlPullParser;
-
-import android.Manifest;
 import android.app.IInputForwarder;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -50,8 +31,8 @@ import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.content.res.Resources.NotFoundException;
 import android.content.res.TypedArray;
@@ -61,10 +42,10 @@ import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayViewport;
 import android.hardware.input.IInputDevicesChangedListener;
 import android.hardware.input.IInputManager;
+import android.hardware.input.ITabletModeChangedListener;
 import android.hardware.input.InputDeviceIdentifier;
 import android.hardware.input.InputManager;
 import android.hardware.input.InputManagerInternal;
-import android.hardware.input.ITabletModeChangedListener;
 import android.hardware.input.KeyboardLayout;
 import android.hardware.input.TouchCalibration;
 import android.os.Binder;
@@ -72,6 +53,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.LocaleList;
 import android.os.Looper;
 import android.os.Message;
 import android.os.MessageQueue;
@@ -81,6 +63,7 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.Xml;
@@ -97,6 +80,23 @@ import android.view.Surface;
 import android.view.ViewConfiguration;
 import android.widget.Toast;
 
+import com.android.internal.R;
+import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
+import com.android.internal.notification.SystemNotificationChannels;
+import com.android.internal.os.SomeArgs;
+import com.android.internal.util.DumpUtils;
+import com.android.internal.util.Preconditions;
+import com.android.internal.util.XmlUtils;
+import com.android.server.DisplayThread;
+import com.android.server.LocalServices;
+import com.android.server.Watchdog;
+import com.android.server.policy.WindowManagerPolicy;
+
+import libcore.io.IoUtils;
+import libcore.io.Streams;
+
+import org.xmlpull.v1.XmlPullParser;
+
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
@@ -112,9 +112,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-
-import libcore.io.IoUtils;
-import libcore.io.Streams;
 
 /*
  * Wraps the C++ InputManager and provides its callbacks.
@@ -188,13 +185,8 @@ public class InputManagerService extends IInputManager.Stub
     private static native long nativeInit(InputManagerService service,
             Context context, MessageQueue messageQueue);
     private static native void nativeStart(long ptr);
-    private static native void nativeSetVirtualDisplayViewports(long ptr,
+    private static native void nativeSetDisplayViewports(long ptr,
             DisplayViewport[] viewports);
-    private static native void nativeSetDisplayViewport(long ptr, int viewportType,
-            int displayId, int rotation,
-            int logicalLeft, int logicalTop, int logicalRight, int logicalBottom,
-            int physicalLeft, int physicalTop, int physicalRight, int physicalBottom,
-            int deviceWidth, int deviceHeight, String uniqueId);
 
     private static native int nativeGetScanCodeState(long ptr,
             int deviceId, int sourceMask, int scanCode);
@@ -212,11 +204,13 @@ public class InputManagerService extends IInputManager.Stub
             int injectorPid, int injectorUid, int syncMode, int timeoutMillis,
             int policyFlags);
     private static native void nativeToggleCapsLock(long ptr, int deviceId);
-    private static native void nativeSetInputWindows(long ptr, InputWindowHandle[] windowHandles);
+    private static native void nativeSetInputWindows(long ptr, InputWindowHandle[] windowHandles,
+            int displayId);
     private static native void nativeSetInputDispatchMode(long ptr, boolean enabled, boolean frozen);
     private static native void nativeSetSystemUiVisibility(long ptr, int visibility);
     private static native void nativeSetFocusedApplication(long ptr,
-            InputApplicationHandle application);
+            int displayId, InputApplicationHandle application);
+    private static native void nativeSetFocusedDisplay(long ptr, int displayId);
     private static native boolean nativeTransferTouchFocus(long ptr,
             InputChannel fromChannel, InputChannel toChannel);
     private static native void nativeSetPointerSpeed(long ptr, int speed);
@@ -292,11 +286,6 @@ public class InputManagerService extends IInputManager.Stub
     /** Switch code: Camera lens cover. When set the lens is covered. */
     public static final int SW_CAMERA_LENS_COVER = 0x09;
 
-    // Viewport constants defined in InputReader.h.
-    public static final int VIEWPORT_DEFAULT = 1;
-    public static final int VIEWPORT_EXTERNAL = 2;
-    public static final int VIEWPORT_VIRTUAL = 3;
-
     public static final int SW_LID_BIT = 1 << SW_LID;
     public static final int SW_TABLET_MODE_BIT = 1 << SW_TABLET_MODE;
     public static final int SW_KEYPAD_SLIDE_BIT = 1 << SW_KEYPAD_SLIDE;
@@ -362,7 +351,7 @@ public class InputManagerService extends IInputManager.Stub
         updateAccessibilityLargePointerFromSettings();
     }
 
-    // TODO(BT) Pass in paramter for bluetooth system
+    // TODO(BT) Pass in parameter for bluetooth system
     public void systemRunning() {
         if (DEBUG) {
             Slog.d(TAG, "System ready.");
@@ -413,31 +402,8 @@ public class InputManagerService extends IInputManager.Stub
         nativeReloadDeviceAliases(mPtr);
     }
 
-    private void setDisplayViewportsInternal(DisplayViewport defaultViewport,
-            DisplayViewport externalTouchViewport,
-            List<DisplayViewport> virtualTouchViewports) {
-        if (defaultViewport.valid) {
-            setDisplayViewport(VIEWPORT_DEFAULT, defaultViewport);
-        }
-
-        if (externalTouchViewport.valid) {
-            setDisplayViewport(VIEWPORT_EXTERNAL, externalTouchViewport);
-        } else if (defaultViewport.valid) {
-            setDisplayViewport(VIEWPORT_EXTERNAL, defaultViewport);
-        }
-
-        nativeSetVirtualDisplayViewports(mPtr,
-                virtualTouchViewports.toArray(new DisplayViewport[0]));
-    }
-
-    private void setDisplayViewport(int viewportType, DisplayViewport viewport) {
-        nativeSetDisplayViewport(mPtr, viewportType,
-                viewport.displayId, viewport.orientation,
-                viewport.logicalFrame.left, viewport.logicalFrame.top,
-                viewport.logicalFrame.right, viewport.logicalFrame.bottom,
-                viewport.physicalFrame.left, viewport.physicalFrame.top,
-                viewport.physicalFrame.right, viewport.physicalFrame.bottom,
-                viewport.deviceWidth, viewport.deviceHeight, viewport.uniqueId);
+    private void setDisplayViewportsInternal(List<DisplayViewport> viewports) {
+        nativeSetDisplayViewports(mPtr, viewports.toArray(new DisplayViewport[0]));
     }
 
     /**
@@ -1466,21 +1432,27 @@ public class InputManagerService extends IInputManager.Stub
         }
     }
 
-    public void setInputWindows(InputWindowHandle[] windowHandles,
-            InputWindowHandle focusedWindowHandle) {
+    public void setInputWindows(InputWindowHandle[] windowHandles, int displayId) {
+        nativeSetInputWindows(mPtr, windowHandles, displayId);
+    }
+
+    public void setFocusedApplication(int displayId, InputApplicationHandle application) {
+        nativeSetFocusedApplication(mPtr, displayId, application);
+    }
+
+    public void setFocusedWindow(InputWindowHandle focusedWindowHandle) {
         final IWindow newFocusedWindow =
             focusedWindowHandle != null ? focusedWindowHandle.clientWindow : null;
         if (mFocusedWindow != newFocusedWindow) {
-            mFocusedWindow = newFocusedWindow;
             if (mFocusedWindowHasCapture) {
                 setPointerCapture(false);
             }
+            mFocusedWindow = newFocusedWindow;
         }
-        nativeSetInputWindows(mPtr, windowHandles);
     }
 
-    public void setFocusedApplication(InputApplicationHandle application) {
-        nativeSetFocusedApplication(mPtr, application);
+    public void setFocusedDisplay(int displayId) {
+        nativeSetFocusedDisplay(mPtr, displayId);
     }
 
     @Override
@@ -1495,16 +1467,18 @@ public class InputManagerService extends IInputManager.Stub
             return;
         }
         setPointerCapture(enabled);
-        try {
-            mFocusedWindow.dispatchPointerCaptureChanged(enabled);
-        } catch (RemoteException ex) {
-            /* ignore */
-        }
     }
 
     private void setPointerCapture(boolean enabled) {
-        mFocusedWindowHasCapture = enabled;
-        nativeSetPointerCapture(mPtr, enabled);
+        if (mFocusedWindowHasCapture != enabled) {
+            mFocusedWindowHasCapture = enabled;
+            try {
+                mFocusedWindow.dispatchPointerCaptureChanged(enabled);
+            } catch (RemoteException ex) {
+                /* ignore */
+            }
+            nativeSetPointerCapture(mPtr, enabled);
+        }
     }
 
     public void setInputDispatchMode(boolean enabled, boolean frozen) {
@@ -1879,30 +1853,36 @@ public class InputManagerService extends IInputManager.Stub
         // Read partner-provided list of excluded input devices
         XmlPullParser parser = null;
         // Environment.getRootDirectory() is a fancy way of saying ANDROID_ROOT or "/system".
-        File confFile = new File(Environment.getRootDirectory(), EXCLUDED_DEVICES_PATH);
-        FileReader confreader = null;
-        try {
-            confreader = new FileReader(confFile);
-            parser = Xml.newPullParser();
-            parser.setInput(confreader);
-            XmlUtils.beginDocument(parser, "devices");
+        final File[] baseDirs = {
+            Environment.getRootDirectory(),
+            Environment.getVendorDirectory()
+        };
+        for (File baseDir: baseDirs) {
+            File confFile = new File(baseDir, EXCLUDED_DEVICES_PATH);
+            FileReader confreader = null;
+            try {
+                confreader = new FileReader(confFile);
+                parser = Xml.newPullParser();
+                parser.setInput(confreader);
+                XmlUtils.beginDocument(parser, "devices");
 
-            while (true) {
-                XmlUtils.nextElement(parser);
-                if (!"device".equals(parser.getName())) {
-                    break;
+                while (true) {
+                    XmlUtils.nextElement(parser);
+                    if (!"device".equals(parser.getName())) {
+                        break;
+                    }
+                    String name = parser.getAttributeValue(null, "name");
+                    if (name != null) {
+                        names.add(name);
+                    }
                 }
-                String name = parser.getAttributeValue(null, "name");
-                if (name != null) {
-                    names.add(name);
-                }
+            } catch (FileNotFoundException e) {
+                // It's ok if the file does not exist.
+            } catch (Exception e) {
+                Slog.e(TAG, "Exception while parsing '" + confFile.getAbsolutePath() + "'", e);
+            } finally {
+                try { if (confreader != null) confreader.close(); } catch (IOException e) { }
             }
-        } catch (FileNotFoundException e) {
-            // It's ok if the file does not exist.
-        } catch (Exception e) {
-            Slog.e(TAG, "Exception while parsing '" + confFile.getAbsolutePath() + "'", e);
-        } finally {
-            try { if (confreader != null) confreader.close(); } catch (IOException e) { }
         }
 
         return names.toArray(new String[names.size()]);
@@ -2201,11 +2181,8 @@ public class InputManagerService extends IInputManager.Stub
 
     private final class LocalService extends InputManagerInternal {
         @Override
-        public void setDisplayViewports(DisplayViewport defaultViewport,
-                DisplayViewport externalTouchViewport,
-                List<DisplayViewport> virtualTouchViewports) {
-            setDisplayViewportsInternal(defaultViewport, externalTouchViewport,
-                    virtualTouchViewports);
+        public void setDisplayViewports(List<DisplayViewport> viewports) {
+            setDisplayViewportsInternal(viewports);
         }
 
         @Override

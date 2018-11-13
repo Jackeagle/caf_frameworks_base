@@ -79,13 +79,6 @@
     <!-- Show camera affordance on Keyguard -->
     <bool name="config_keyguardShowCameraAffordance">false</bool>
 
-    <!-- Whether we should use SRC drawing mode when drawing the scrim behind. If this flag is set,
-         we change the canvas opacity so libhwui doesn't call glClear on our surface, and then we
-         draw the scrim with SRC to overwrite the whole buffer, which saves us a layer of overdraw.
-         However, SRC performs poorly on some devices, where it is more efficient to
-         glClear + SRC_OVER, in which case this flag should be disabled. -->
-    <bool name="config_status_bar_scrim_behind_use_src">true</bool>
-
     <!-- The length of the vibration when the notification pops open. -->
     <integer name="one_finger_pop_duration_ms">10</integer>
 
@@ -114,7 +107,7 @@
     <integer name="quick_settings_num_columns">3</integer>
 
     <!-- The number of rows in the QuickSettings -->
-    <integer name="quick_settings_num_rows">1</integer>
+    <integer name="quick_settings_max_rows">3</integer>
 
     <!-- The number of columns that the top level tiles span in the QuickSettings -->
     <integer name="quick_settings_user_time_settings_tile_span">1</integer>
@@ -159,8 +152,8 @@
     <!-- Whether or not we always show type icon -->
     <bool name="config_alwaysShowTypeIcon">false</bool>
 
-    <!-- Whether or not we show G for CDMA/1xRTT -->
-    <bool name="config_showIconGforCDMA_1X">false</bool>
+    <!-- Whether or not we show 2G for CDMA/1xRTT -->
+    <bool name="config_show2GforCDMA_1X">false</bool>
 
     <!-- When true, hide no internet statue on signal strength icon -->
     <bool name="config_hideNoInternetState">false</bool>
@@ -171,18 +164,28 @@
     <!-- Should "LTE"/"4G" be shown instead of "LTE+"/"4G+" when on NETWORK_TYPE_LTE_CA? -->
     <bool name="config_hideLtePlus">false</bool>
 
-    <!-- milliseconds before the heads up notification auto-dismisses. -->
+    <!-- The number of milliseconds before the heads up notification auto-dismisses. -->
     <integer name="heads_up_notification_decay">5000</integer>
 
-    <!-- milliseconds after a heads up notification is pushed back
+    <!-- The number of milliseconds after a heads up notification is pushed back
      before the app can interrupt again. -->
     <integer name="heads_up_default_snooze_length_ms">60000</integer>
 
     <!-- Minimum display time for a heads up notification, in milliseconds. -->
     <integer name="heads_up_notification_minimum_time">2000</integer>
 
-    <!-- milliseconds before the heads up notification accepts touches. -->
+    <!-- The number of milliseconds before the heads up notification accepts touches. -->
     <integer name="touch_acceptance_delay">700</integer>
+
+    <!-- The number of milliseconds before the ambient notification auto-dismisses. This will
+         override the default pulse length. -->
+    <integer name="ambient_notification_decay">6000</integer>
+
+    <!-- Minimum display time for a heads up notification, in milliseconds. -->
+    <integer name="ambient_notification_minimum_time">2000</integer>
+
+    <!-- The number of milliseconds to extend ambient pulse by when prompted (e.g. on touch) -->
+    <integer name="ambient_notification_extension_time">6000</integer>
 
     <!-- The duration in seconds to wait before the dismiss buttons are shown. -->
     <integer name="recents_task_bar_dismiss_delay_seconds">1000</integer>
@@ -571,6 +574,12 @@
     <!-- On debuggable builds, alert the user if SystemUI PSS goes over this number (in kb) -->
     <integer name="watch_heap_limit">256000</integer>
 
+    <!-- Whether to show VoLTE icon in the status bar -->
+    <bool name="config_display_volte">false</bool>
+
     <!-- Allow dragging the PIP to a location to close it -->
     <bool name="config_pipEnableDismissDragToEdge">true</bool>
+
+    <!-- SystemUI Plugins that can be loaded on user builds. -->
+    <string-array name="config_pluginWhitelist" translatable="false" />
 </resources>

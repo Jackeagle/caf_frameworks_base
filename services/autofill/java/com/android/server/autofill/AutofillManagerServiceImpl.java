@@ -235,6 +235,13 @@ final class AutofillManagerServiceImpl {
         }
     }
 
+    int getTargedSdkLocked() {
+        if (mInfo == null) {
+            return 0;
+        }
+        return mInfo.getServiceInfo().applicationInfo.targetSdkVersion;
+    }
+
     private boolean isSetupCompletedLocked() {
         final String setupComplete = Settings.Secure.getStringForUser(
                 mContext.getContentResolver(), Settings.Secure.USER_SETUP_COMPLETE, mUserId);
@@ -617,7 +624,7 @@ final class AutofillManagerServiceImpl {
         ArrayList<Session> previousSessions = null;
         for (int i = 0; i < size; i++) {
             final Session previousSession = mSessions.valueAt(i);
-            // TODO(b/112051762): only return sessions asked to be kept alive / add CTS test
+            // TODO(b/113281366): only return sessions asked to be kept alive / add CTS test
             if (previousSession.taskId == session.taskId && previousSession.id != session.id) {
                 if (previousSessions == null) {
                     previousSessions = new ArrayList<>(size);
@@ -625,7 +632,7 @@ final class AutofillManagerServiceImpl {
                 previousSessions.add(previousSession);
             }
         }
-        // TODO(b/112051762): remove returned sessions / add CTS test
+        // TODO(b/113281366): remove returned sessions / add CTS test
         return previousSessions;
     }
 
@@ -953,6 +960,7 @@ final class AutofillManagerServiceImpl {
             pw.println();
             mInfo.dump(prefix2, pw);
             pw.print(prefix); pw.print("Service Label: "); pw.println(getServiceLabel());
+            pw.print(prefix); pw.print("Target SDK: "); pw.println(getTargedSdkLocked());
         }
         pw.print(prefix); pw.print("Component from settings: ");
             pw.println(getComponentNameFromSettings());

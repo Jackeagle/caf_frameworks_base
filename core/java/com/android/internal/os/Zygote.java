@@ -81,6 +81,8 @@ public final class Zygote {
     public static final int MOUNT_EXTERNAL_READ = IVold.REMOUNT_MODE_READ;
     /** Read-write external storage should be mounted. */
     public static final int MOUNT_EXTERNAL_WRITE = IVold.REMOUNT_MODE_WRITE;
+    /** Read-write external storage should be mounted instead of package sandbox */
+    public static final int MOUNT_EXTERNAL_FULL = IVold.REMOUNT_MODE_FULL;
 
     private static final ZygoteHooks VM_HOOKS = new ZygoteHooks();
 
@@ -131,15 +133,16 @@ public final class Zygote {
      * if this is the parent, or -1 on error.
      */
     public static int forkAndSpecialize(int uid, int gid, int[] gids, int runtimeFlags,
-          int[][] rlimits, int mountExternal, String seInfo, String niceName, int[] fdsToClose,
-          int[] fdsToIgnore, boolean startChildZygote, String instructionSet, String appDataDir,
-          String packageName) {
+            int[][] rlimits, int mountExternal, String seInfo, String niceName, int[] fdsToClose,
+            int[] fdsToIgnore, boolean startChildZygote, String instructionSet, String appDataDir,
+            String packageName, String[] packagesForUid, String[] visibleVolIds) {
         VM_HOOKS.preFork();
         // Resets nice priority for zygote process.
         resetNicePriority();
         int pid = nativeForkAndSpecialize(
                   uid, gid, gids, runtimeFlags, rlimits, mountExternal, seInfo, niceName, fdsToClose,
-                  fdsToIgnore, startChildZygote, instructionSet, appDataDir, packageName);
+                  fdsToIgnore, startChildZygote, instructionSet, appDataDir, packageName,
+                  packagesForUid, visibleVolIds);
         // Enable tracing as soon as possible for the child process.
         if (pid == 0) {
             Trace.setTracingEnabled(true, runtimeFlags);
@@ -152,9 +155,9 @@ public final class Zygote {
     }
 
     native private static int nativeForkAndSpecialize(int uid, int gid, int[] gids,int runtimeFlags,
-          int[][] rlimits, int mountExternal, String seInfo, String niceName, int[] fdsToClose,
-          int[] fdsToIgnore, boolean startChildZygote, String instructionSet, String appDataDir,
-          String packageName);
+            int[][] rlimits, int mountExternal, String seInfo, String niceName, int[] fdsToClose,
+            int[] fdsToIgnore, boolean startChildZygote, String instructionSet, String appDataDir,
+            String packageName, String[] packagesForUid, String[] visibleVolIds);
 
     /**
      * Called to do any initialization before starting an application.

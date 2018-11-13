@@ -305,7 +305,8 @@ class RemoteAnimationController implements DeathRecipient {
                     || mCapturedLeash == null) {
                 return null;
             }
-            final Rect insets = new Rect(mainWindow.mContentInsets);
+            final Rect insets = new Rect();
+            mainWindow.getContentInsets(insets);
             InsetUtils.addInsets(insets, mAppWindowToken.getLetterboxInsets());
             mTarget = new RemoteAnimationTarget(task.mTaskId, getMode(),
                     mCapturedLeash, !mAppWindowToken.fillsParent(),
@@ -321,11 +322,6 @@ class RemoteAnimationController implements DeathRecipient {
             } else {
                 return RemoteAnimationTarget.MODE_CLOSING;
             }
-        }
-
-        @Override
-        public boolean getDetachWallpaper() {
-            return false;
         }
 
         @Override

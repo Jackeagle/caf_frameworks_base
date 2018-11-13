@@ -50,7 +50,7 @@ const int FIELD_ID_ANOMALY_ALARM_STATS = 9;
 // const int FIELD_ID_PULLED_ATOM_STATS = 10; // The proto is written in stats_log_util.cpp
 const int FIELD_ID_LOGGER_ERROR_STATS = 11;
 const int FIELD_ID_PERIODIC_ALARM_STATS = 12;
-const int FIELD_ID_LOG_LOSS_STATS = 14;
+// const int FIELD_ID_LOG_LOSS_STATS = 14;
 const int FIELD_ID_SYSTEM_SERVER_RESTART = 15;
 
 const int FIELD_ID_ATOM_STATS_TAG = 1;
@@ -180,12 +180,12 @@ void StatsdStats::noteConfigReset(const ConfigKey& key) {
     noteConfigResetInternalLocked(key);
 }
 
-void StatsdStats::noteLogLost(int64_t timestampNs, int32_t count) {
+void StatsdStats::noteLogLost(int32_t wallClockTimeSec, int32_t count) {
     lock_guard<std::mutex> lock(mLock);
-    if (mLogLossTimestampNs.size() == kMaxLoggerErrors) {
-        mLogLossTimestampNs.pop_front();
+    if (mLogLossStats.size() == kMaxLoggerErrors) {
+        mLogLossStats.pop_front();
     }
-    mLogLossTimestampNs.push_back(std::make_pair(timestampNs, count));
+    mLogLossStats.push_back(std::make_pair(wallClockTimeSec, count));
 }
 
 void StatsdStats::noteBroadcastSent(const ConfigKey& key) {
@@ -365,15 +365,6 @@ void StatsdStats::noteSystemServerRestart(int32_t timeSec) {
     mSystemServerRestartSec.push_back(timeSec);
 }
 
-void StatsdStats::noteLoggerError(int error) {
-    lock_guard<std::mutex> lock(mLock);
-    // grows strictly one at a time. so it won't > kMaxLoggerErrors
-    if (mLoggerErrors.size() == kMaxLoggerErrors) {
-        mLoggerErrors.pop_front();
-    }
-    mLoggerErrors.push_back(std::make_pair(getWallClockSec(), error));
-}
-
 void StatsdStats::reset() {
     lock_guard<std::mutex> lock(mLock);
     resetInternalLocked();
@@ -386,9 +377,8 @@ void StatsdStats::resetInternalLocked() {
     std::fill(mPushedAtomStats.begin(), mPushedAtomStats.end(), 0);
     mAnomalyAlarmRegisteredStats = 0;
     mPeriodicAlarmRegisteredStats = 0;
-    mLoggerErrors.clear();
     mSystemServerRestartSec.clear();
-    mLogLossTimestampNs.clear();
+    mLogLossStats.clear();
     for (auto& config : mConfigStats) {
         config.second->broadcast_sent_time_sec.clear();
         config.second->data_drop_time_sec.clear();
@@ -410,36 +400,35 @@ string buildTimeString(int64_t timeSec) {
     return string(timeBuffer);
 }
 
-void StatsdStats::dumpStats(FILE* out) const {
+void StatsdStats::dumpStats(int out) const {
     lock_guard<std::mutex> lock(mLock);
     time_t t = mStartTimeSec;
     struct tm* tm = localtime(&t);
     char timeBuffer[80];
     strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %I:%M%p\n", tm);
-    fprintf(out, "Stats collection start second: %s\n", timeBuffer);
-    fprintf(out, "%lu Config in icebox: \n", (unsigned long)mIceBox.size());
+    dprintf(out, "Stats collection start second: %s\n", timeBuffer);
+    dprintf(out, "%lu Config in icebox: \n", (unsigned long)mIceBox.size());
     for (const auto& configStats : mIceBox) {
-        fprintf(out,
+        dprintf(out,
                 "Config {%d_%lld}: creation=%d, deletion=%d, reset=%d, #metric=%d, #condition=%d, "
                 "#matcher=%d, #alert=%d,  valid=%d\n",
                 configStats->uid, (long long)configStats->id, configStats->creation_time_sec,
                 configStats->deletion_time_sec, configStats->reset_time_sec,
-                configStats->metric_count,
-                configStats->condition_count, configStats->matcher_count, configStats->alert_count,
-                configStats->is_valid);
+                configStats->metric_count, configStats->condition_count, configStats->matcher_count,
+                configStats->alert_count, configStats->is_valid);
 
         for (const auto& broadcastTime : configStats->broadcast_sent_time_sec) {
-            fprintf(out, "\tbroadcast time: %d\n", broadcastTime);
+            dprintf(out, "\tbroadcast time: %d\n", broadcastTime);
         }
 
         for (const auto& dataDropTime : configStats->data_drop_time_sec) {
-            fprintf(out, "\tdata drop time: %d\n", dataDropTime);
+            dprintf(out, "\tdata drop time: %d\n", dataDropTime);
         }
     }
-    fprintf(out, "%lu Active Configs\n", (unsigned long)mConfigStats.size());
+    dprintf(out, "%lu Active Configs\n", (unsigned long)mConfigStats.size());
     for (auto& pair : mConfigStats) {
         auto& configStats = pair.second;
-        fprintf(out,
+        dprintf(out,
                 "Config {%d-%lld}: creation=%d, deletion=%d, #metric=%d, #condition=%d, "
                 "#matcher=%d, #alert=%d,  valid=%d\n",
                 configStats->uid, (long long)configStats->id, configStats->creation_time_sec,
@@ -447,89 +436,81 @@ void StatsdStats::dumpStats(FILE* out) const {
                 configStats->condition_count, configStats->matcher_count, configStats->alert_count,
                 configStats->is_valid);
         for (const auto& annotation : configStats->annotations) {
-            fprintf(out, "\tannotation: %lld, %d\n", (long long)annotation.first,
+            dprintf(out, "\tannotation: %lld, %d\n", (long long)annotation.first,
                     annotation.second);
         }
 
         for (const auto& broadcastTime : configStats->broadcast_sent_time_sec) {
-            fprintf(out, "\tbroadcast time: %s(%lld)\n",
-                    buildTimeString(broadcastTime).c_str(), (long long)broadcastTime);
+            dprintf(out, "\tbroadcast time: %s(%lld)\n", buildTimeString(broadcastTime).c_str(),
+                    (long long)broadcastTime);
         }
 
         for (const auto& dataDropTime : configStats->data_drop_time_sec) {
-            fprintf(out, "\tdata drop time: %s(%lld)\n",
-                    buildTimeString(dataDropTime).c_str(), (long long)dataDropTime);
+            dprintf(out, "\tdata drop time: %s(%lld)\n", buildTimeString(dataDropTime).c_str(),
+                    (long long)dataDropTime);
         }
 
         for (const auto& dump : configStats->dump_report_stats) {
-            fprintf(out, "\tdump report time: %s(%lld) bytes: %lld\n",
+            dprintf(out, "\tdump report time: %s(%lld) bytes: %lld\n",
                     buildTimeString(dump.first).c_str(), (long long)dump.first,
                     (long long)dump.second);
         }
 
         for (const auto& stats : pair.second->matcher_stats) {
-            fprintf(out, "matcher %lld matched %d times\n", (long long)stats.first, stats.second);
+            dprintf(out, "matcher %lld matched %d times\n", (long long)stats.first, stats.second);
         }
 
         for (const auto& stats : pair.second->condition_stats) {
-            fprintf(out, "condition %lld max output tuple size %d\n", (long long)stats.first,
+            dprintf(out, "condition %lld max output tuple size %d\n", (long long)stats.first,
                     stats.second);
         }
 
         for (const auto& stats : pair.second->condition_stats) {
-            fprintf(out, "metrics %lld max output tuple size %d\n", (long long)stats.first,
+            dprintf(out, "metrics %lld max output tuple size %d\n", (long long)stats.first,
                     stats.second);
         }
 
         for (const auto& stats : pair.second->alert_stats) {
-            fprintf(out, "alert %lld declared %d times\n", (long long)stats.first, stats.second);
+            dprintf(out, "alert %lld declared %d times\n", (long long)stats.first, stats.second);
         }
     }
-    fprintf(out, "********Disk Usage stats***********\n");
+    dprintf(out, "********Disk Usage stats***********\n");
     StorageManager::printStats(out);
-    fprintf(out, "********Pushed Atom stats***********\n");
+    dprintf(out, "********Pushed Atom stats***********\n");
     const size_t atomCounts = mPushedAtomStats.size();
     for (size_t i = 2; i < atomCounts; i++) {
         if (mPushedAtomStats[i] > 0) {
-            fprintf(out, "Atom %lu->%d\n", (unsigned long)i, mPushedAtomStats[i]);
+            dprintf(out, "Atom %lu->%d\n", (unsigned long)i, mPushedAtomStats[i]);
         }
     }
 
-    fprintf(out, "********Pulled Atom stats***********\n");
+    dprintf(out, "********Pulled Atom stats***********\n");
     for (const auto& pair : mPulledAtomStats) {
-        fprintf(out, "Atom %d->%ld, %ld, %ld\n", (int)pair.first, (long)pair.second.totalPull,
+        dprintf(out, "Atom %d->%ld, %ld, %ld\n", (int)pair.first, (long)pair.second.totalPull,
                 (long)pair.second.totalPullFromCache, (long)pair.second.minPullIntervalSec);
     }
 
     if (mAnomalyAlarmRegisteredStats > 0) {
-        fprintf(out, "********AnomalyAlarmStats stats***********\n");
-        fprintf(out, "Anomaly alarm registrations: %d\n", mAnomalyAlarmRegisteredStats);
+        dprintf(out, "********AnomalyAlarmStats stats***********\n");
+        dprintf(out, "Anomaly alarm registrations: %d\n", mAnomalyAlarmRegisteredStats);
     }
 
     if (mPeriodicAlarmRegisteredStats > 0) {
-        fprintf(out, "********SubscriberAlarmStats stats***********\n");
-        fprintf(out, "Subscriber alarm registrations: %d\n", mPeriodicAlarmRegisteredStats);
+        dprintf(out, "********SubscriberAlarmStats stats***********\n");
+        dprintf(out, "Subscriber alarm registrations: %d\n", mPeriodicAlarmRegisteredStats);
     }
 
-    fprintf(out, "UID map stats: bytes=%d, changes=%d, deleted=%d, changes lost=%d\n",
+    dprintf(out, "UID map stats: bytes=%d, changes=%d, deleted=%d, changes lost=%d\n",
             mUidMapStats.bytes_used, mUidMapStats.changes, mUidMapStats.deleted_apps,
             mUidMapStats.dropped_changes);
 
-    for (const auto& error : mLoggerErrors) {
-        time_t error_time = error.first;
-        struct tm* error_tm = localtime(&error_time);
-        char buffer[80];
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %I:%M%p\n", error_tm);
-        fprintf(out, "Logger error %d at %s\n", error.second, buffer);
-    }
-
     for (const auto& restart : mSystemServerRestartSec) {
-        fprintf(out, "System server restarts at %s(%lld)\n",
-            buildTimeString(restart).c_str(), (long long)restart);
+        dprintf(out, "System server restarts at %s(%lld)\n", buildTimeString(restart).c_str(),
+                (long long)restart);
     }
 
-    for (const auto& loss : mLogLossTimestampNs) {
-        fprintf(out, "Log loss: %lld (elapsedRealtimeNs) - %d (count)\n", (long long)loss.first,
+    for (const auto& loss : mLogLossStats) {
+        dprintf(out, "Log loss: %lld (wall clock sec) - %d (count)\n", (long long)loss.first,
                 loss.second);
     }
 }
@@ -678,17 +659,15 @@ void StatsdStats::dumpStats(std::vector<uint8_t>* output, bool reset) {
     proto.write(FIELD_TYPE_INT32 | FIELD_ID_UID_MAP_DELETED_APPS, mUidMapStats.deleted_apps);
     proto.end(uidMapToken);
 
-    for (const auto& error : mLoggerErrors) {
+    for (const auto& error : mLogLossStats) {
+        // The logger error stats are not used anymore since we move away from logd.
+        // Temporarily use this field to log the log loss timestamp and count
+        // TODO(b/80538532) Add a dedicated field in stats_log for this.
         uint64_t token = proto.start(FIELD_TYPE_MESSAGE | FIELD_ID_LOGGER_ERROR_STATS |
                                       FIELD_COUNT_REPEATED);
         proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOGGER_STATS_TIME, error.first);
         proto.write(FIELD_TYPE_INT32 | FIELD_ID_LOGGER_STATS_ERROR_CODE, error.second);
         proto.end(token);
-    }
-
-    for (const auto& loss : mLogLossTimestampNs) {
-        proto.write(FIELD_TYPE_INT64 | FIELD_ID_LOG_LOSS_STATS | FIELD_COUNT_REPEATED,
-                    (long long)loss.first);
     }
 
     for (const auto& restart : mSystemServerRestartSec) {

@@ -28,12 +28,15 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.database.ContentObserver;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.service.dreams.DreamService;
+import android.service.dreams.IDreamManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.NotificationStats;
 import android.service.notification.StatusBarNotification;
@@ -57,7 +60,9 @@ import com.android.systemui.EventLogTags;
 import com.android.systemui.ForegroundServiceController;
 import com.android.systemui.R;
 import com.android.systemui.UiOffloadThread;
-import com.android.systemui.recents.misc.SystemServicesProxy;
+import com.android.systemui.statusbar.NotificationLifetimeExtender;
+import com.android.systemui.statusbar.AlertingNotificationManager;
+import com.android.systemui.statusbar.AmbientPulseManager;
 import com.android.systemui.statusbar.NotificationListener;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationMediaManager;
@@ -65,7 +70,6 @@ import com.android.systemui.statusbar.NotificationPresenter;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.NotificationUiAdjustment;
 import com.android.systemui.statusbar.NotificationUpdateHandler;
-import com.android.systemui.statusbar.SmartReplyController;
 import com.android.systemui.statusbar.notification.row.NotificationInflater;
 import com.android.systemui.statusbar.notification.row.RowInflaterTask;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
@@ -92,7 +96,7 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         ExpandableNotificationRow.ExpansionLogger, NotificationUpdateHandler,
         VisualStabilityManager.Callback {
     private static final String TAG = "NotificationEntryMgr";
-    protected static final boolean DEBUG = false;
+    protected static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
     protected static final boolean ENABLE_HEADS_UP = true;
     protected static final String SETTING_HEADS_UP_TICKER = "ticker_gets_heads_up";
 
@@ -100,8 +104,6 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
     protected final Context mContext;
     protected final HashMap<String, NotificationData.Entry> mPendingNotifications = new HashMap<>();
     protected final NotificationClicker mNotificationClicker = new NotificationClicker();
-    protected final ArraySet<NotificationData.Entry> mHeadsUpEntriesToRemoveOnSwitch =
-            new ArraySet<>();
 
     // Dependencies:
     protected final NotificationLockscreenUserManager mLockscreenUserManager =
@@ -124,14 +126,13 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
             Dependency.get(ForegroundServiceController.class);
     protected final NotificationListener mNotificationListener =
             Dependency.get(NotificationListener.class);
-    private final SmartReplyController mSmartReplyController =
-            Dependency.get(SmartReplyController.class);
+    protected AmbientPulseManager mAmbientPulseManager = Dependency.get(AmbientPulseManager.class);
 
+    protected IDreamManager mDreamManager;
     protected IStatusBarService mBarService;
     protected NotificationPresenter mPresenter;
     protected Callback mCallback;
     protected PowerManager mPowerManager;
-    protected SystemServicesProxy mSystemServicesProxy;
     protected NotificationListenerService.RankingMap mLatestRankingMap;
     protected HeadsUpManager mHeadsUpManager;
     protected NotificationData mNotificationData;
@@ -139,13 +140,9 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
     protected boolean mUseHeadsUp = false;
     protected boolean mDisableNotificationAlerts;
     protected NotificationListContainer mListContainer;
+    protected final ArrayList<NotificationLifetimeExtender> mNotificationLifetimeExtenders
+            = new ArrayList<>();
     private ExpandableNotificationRow.OnAppOpsClickListener mOnAppOpsClickListener;
-    /**
-     * Notifications with keys in this set are not actually around anymore. We kept them around
-     * when they were canceled in response to a remote input interaction. This allows us to show
-     * what you replied and allows you to continue typing into it.
-     */
-    private final ArraySet<String> mKeysKeptForRemoteInput = new ArraySet<>();
 
 
     private final class NotificationClicker implements View.OnClickListener {
@@ -198,14 +195,6 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
                 }
             };
 
-    public NotificationListenerService.RankingMap getLatestRankingMap() {
-        return mLatestRankingMap;
-    }
-
-    public void setLatestRankingMap(NotificationListenerService.RankingMap latestRankingMap) {
-        mLatestRankingMap = latestRankingMap;
-    }
-
     public void setDisableNotificationAlerts(boolean disableNotificationAlerts) {
         mDisableNotificationAlerts = disableNotificationAlerts;
         mHeadsUpObserver.onChange(true);
@@ -213,18 +202,6 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
 
     public void destroy() {
         mDeviceProvisionedController.removeCallback(mDeviceProvisionedListener);
-    }
-
-    public void onHeadsUpStateChanged(NotificationData.Entry entry, boolean isHeadsUp) {
-        if (!isHeadsUp && mHeadsUpEntriesToRemoveOnSwitch.contains(entry)) {
-            removeNotification(entry.key, getLatestRankingMap());
-            mHeadsUpEntriesToRemoveOnSwitch.remove(entry);
-            if (mHeadsUpEntriesToRemoveOnSwitch.isEmpty()) {
-                setLatestRankingMap(null);
-            }
-        } else {
-            updateNotificationRanking(null);
-        }
     }
 
     @Override
@@ -240,8 +217,6 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         }
         pw.print("  mUseHeadsUp=");
         pw.println(mUseHeadsUp);
-        pw.print("  mKeysKeptForRemoteInput: ");
-        pw.println(mKeysKeptForRemoteInput);
     }
 
     public NotificationEntryManager(Context context) {
@@ -249,8 +224,9 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         mPowerManager = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
         mBarService = IStatusBarService.Stub.asInterface(
                 ServiceManager.getService(Context.STATUS_BAR_SERVICE));
+        mDreamManager = IDreamManager.Stub.asInterface(
+                ServiceManager.checkService(DreamService.DREAM_SERVICE));
         mMessagingUtil = new NotificationMessagingUtil(context);
-        mSystemServicesProxy = SystemServicesProxy.getInstance(mContext);
         mGroupManager.setPendingEntries(mPendingNotifications);
     }
 
@@ -292,6 +268,15 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
             mContext.getContentResolver().registerContentObserver(
                     Settings.Global.getUriFor(SETTING_HEADS_UP_TICKER), true,
                     mHeadsUpObserver);
+        }
+
+        mNotificationLifetimeExtenders.add(mHeadsUpManager);
+        mNotificationLifetimeExtenders.add(mAmbientPulseManager);
+        mNotificationLifetimeExtenders.add(mGutsManager);
+        mNotificationLifetimeExtenders.addAll(mRemoteInputManager.getLifetimeExtenders());
+
+        for (NotificationLifetimeExtender extender : mNotificationLifetimeExtenders) {
+            extender.setCallback(key -> removeNotification(key, mLatestRankingMap));
         }
 
         mDeviceProvisionedController.addCallback(mDeviceProvisionedListener);
@@ -397,11 +382,6 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
                 true);
         NotificationData.Entry entry = mNotificationData.get(n.getKey());
 
-        if (FORCE_REMOTE_INPUT_HISTORY
-                && mKeysKeptForRemoteInput.contains(n.getKey())) {
-            mKeysKeptForRemoteInput.remove(n.getKey());
-        }
-
         mRemoteInputManager.onPerformRemoveNotification(n, entry);
         final String pkg = n.getPackageName();
         final String tag = n.getTag();
@@ -409,7 +389,7 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         final int userId = n.getUserId();
         try {
             int dismissalSurface = NotificationStats.DISMISSAL_SHADE;
-            if (isHeadsUp(n.getKey())) {
+            if (mHeadsUpManager.isAlerting(n.getKey())) {
                 dismissalSurface = NotificationStats.DISMISSAL_PEEK;
             } else if (mListContainer.hasPulsingNotifications()) {
                 dismissalSurface = NotificationStats.DISMISSAL_AOD;
@@ -433,7 +413,7 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
      * WARNING: this will call back into us.  Don't hold any locks.
      */
     void handleNotificationError(StatusBarNotification n, String message) {
-        removeNotification(n.getKey(), null);
+        removeNotificationInternal(n.getKey(), null, true /* forceRemove */);
         try {
             mBarService.onNotificationError(n.getPackageName(), n.getTag(), n.getId(), n.getUid(),
                     n.getInitialPid(), message, n.getUserId());
@@ -460,11 +440,13 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
     }
 
     private void addEntry(NotificationData.Entry shadeEntry) {
-        boolean isHeadsUped = shouldPeek(shadeEntry);
-        if (isHeadsUped) {
+        if (shouldHeadsUp(shadeEntry)) {
             mHeadsUpManager.showNotification(shadeEntry);
             // Mark as seen immediately
             setNotificationShown(shadeEntry.notification);
+        }
+        if (shouldPulse(shadeEntry)) {
+            mAmbientPulseManager.showNotification(shadeEntry);
         }
         addNotificationViews(shadeEntry);
         mCallback.onNotificationAdded(shadeEntry);
@@ -487,9 +469,17 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
 
     @Override
     public void removeNotification(String key, NotificationListenerService.RankingMap ranking) {
-        boolean deferRemoval = false;
+        removeNotificationInternal(key, ranking, false /* forceRemove */);
+    }
+
+    private void removeNotificationInternal(String key,
+            @Nullable NotificationListenerService.RankingMap ranking, boolean forceRemove) {
         abortExistingInflation(key);
-        if (mHeadsUpManager.contains(key)) {
+
+        // Attempt to remove notifications from their alert managers (heads up, ambient pulse).
+        // Though the remove itself may fail, it lets the manager know to remove as soon as
+        // possible.
+        if (mHeadsUpManager.isAlerting(key)) {
             // A cancel() in response to a remote input shouldn't be delayed, as it makes the
             // sending look longer than it takes.
             // Also we should not defer the removal if reordering isn't allowed since otherwise
@@ -497,152 +487,52 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
             boolean ignoreEarliestRemovalTime = mRemoteInputManager.getController().isSpinning(key)
                     && !FORCE_REMOTE_INPUT_HISTORY
                     || !mVisualStabilityManager.isReorderingAllowed();
-            deferRemoval = !mHeadsUpManager.removeNotification(key,  ignoreEarliestRemovalTime);
+            mHeadsUpManager.removeNotification(key, ignoreEarliestRemovalTime);
         }
-        mMediaManager.onNotificationRemoved(key);
+        if (mAmbientPulseManager.isAlerting(key)) {
+            mAmbientPulseManager.removeNotification(key, false /* ignoreEarliestRemovalTime */);
+        }
 
         NotificationData.Entry entry = mNotificationData.get(key);
-        if (FORCE_REMOTE_INPUT_HISTORY
-                && shouldKeepForRemoteInput(entry)
-                && entry.row != null && !entry.row.isDismissed()) {
-            CharSequence remoteInputText = entry.remoteInputText;
-            if (TextUtils.isEmpty(remoteInputText)) {
-                remoteInputText = entry.remoteInputTextWhenReset;
-            }
-            StatusBarNotification newSbn = rebuildNotificationWithRemoteInput(entry,
-                    remoteInputText, false /* showSpinner */);
-            boolean updated = false;
-            entry.onRemoteInputInserted();
-            try {
-                updateNotificationInternal(newSbn, null);
-                updated = true;
-            } catch (InflationException e) {
-                deferRemoval = false;
-            }
-            if (updated) {
-                Log.w(TAG, "Keeping notification around after sending remote input "+ entry.key);
-                addKeyKeptForRemoteInput(entry.key);
-                return;
-            }
-        }
 
-        if (FORCE_REMOTE_INPUT_HISTORY
-                && shouldKeepForSmartReply(entry)
-                && entry.row != null && !entry.row.isDismissed()) {
-            // Turn off the spinner and hide buttons when an app cancels the notification.
-            StatusBarNotification newSbn = rebuildNotificationForCanceledSmartReplies(entry);
-            boolean updated = false;
-            try {
-                updateNotificationInternal(newSbn, null);
-                updated = true;
-            } catch (InflationException e) {
-                // Ignore just don't keep the notification around.
-            }
-            // Treat the reply as longer sending.
-            mSmartReplyController.stopSending(entry);
-            if (updated) {
-                Log.w(TAG, "Keeping notification around after sending smart reply " + entry.key);
-                addKeyKeptForRemoteInput(entry.key);
-                return;
-            }
-        }
-
-        // Actually removing notification so smart reply controller can forget about it.
-        mSmartReplyController.stopSending(entry);
-
-        if (deferRemoval) {
-            mLatestRankingMap = ranking;
-            mHeadsUpEntriesToRemoveOnSwitch.add(mHeadsUpManager.getEntry(key));
+        if (entry == null) {
+            mCallback.onNotificationRemoved(key, null /* old */);
             return;
         }
 
-        if (mRemoteInputManager.onRemoveNotification(entry)) {
-            mLatestRankingMap = ranking;
-            return;
+        // If a manager needs to keep the notification around for whatever reason, we return early
+        // and keep the notification
+        if (!forceRemove) {
+            for (NotificationLifetimeExtender extender : mNotificationLifetimeExtenders) {
+                if (extender.shouldExtendLifetime(entry)) {
+                    mLatestRankingMap = ranking;
+                    extender.setShouldManageLifetime(entry, true /* shouldManage */);
+                    return;
+                }
+            }
         }
 
-        if (entry != null && mGutsManager.getExposedGuts() != null
-                && mGutsManager.getExposedGuts() == entry.row.getGuts()
-                && entry.row.getGuts() != null && !entry.row.getGuts().isLeavebehind()) {
-            Log.w(TAG, "Keeping notification because it's showing guts. " + key);
-            mLatestRankingMap = ranking;
-            mGutsManager.setKeyToRemoveOnGutsClosed(key);
-            return;
+        // At this point, we are guaranteed the notification will be removed
+
+        // Ensure any managers keeping the lifetime extended stop managing the entry
+        for (NotificationLifetimeExtender extender: mNotificationLifetimeExtenders) {
+            extender.setShouldManageLifetime(entry, false /* shouldManage */);
         }
 
-        if (entry != null) {
-            mForegroundServiceController.removeNotification(entry.notification);
-        }
+        mMediaManager.onNotificationRemoved(key);
+        mForegroundServiceController.removeNotification(entry.notification);
 
-        if (entry != null && entry.row != null) {
+        if (entry.row != null) {
             entry.row.setRemoved();
             mListContainer.cleanUpViewState(entry.row);
         }
+
         // Let's remove the children if this was a summary
         handleGroupSummaryRemoved(key);
+
         StatusBarNotification old = removeNotificationViews(key, ranking);
 
         mCallback.onNotificationRemoved(key, old);
-    }
-
-    public StatusBarNotification rebuildNotificationWithRemoteInput(NotificationData.Entry entry,
-            CharSequence remoteInputText, boolean showSpinner) {
-        StatusBarNotification sbn = entry.notification;
-
-        Notification.Builder b = Notification.Builder
-                .recoverBuilder(mContext, sbn.getNotification().clone());
-        if (remoteInputText != null) {
-            CharSequence[] oldHistory = sbn.getNotification().extras
-                    .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY);
-            CharSequence[] newHistory;
-            if (oldHistory == null) {
-                newHistory = new CharSequence[1];
-            } else {
-                newHistory = new CharSequence[oldHistory.length + 1];
-                System.arraycopy(oldHistory, 0, newHistory, 1, oldHistory.length);
-            }
-            newHistory[0] = String.valueOf(remoteInputText);
-            b.setRemoteInputHistory(newHistory);
-        }
-        b.setShowRemoteInputSpinner(showSpinner);
-        b.setHideSmartReplies(true);
-
-        Notification newNotification = b.build();
-
-        // Undo any compatibility view inflation
-        newNotification.contentView = sbn.getNotification().contentView;
-        newNotification.bigContentView = sbn.getNotification().bigContentView;
-        newNotification.headsUpContentView = sbn.getNotification().headsUpContentView;
-
-        StatusBarNotification newSbn = new StatusBarNotification(sbn.getPackageName(),
-                sbn.getOpPkg(),
-                sbn.getId(), sbn.getTag(), sbn.getUid(), sbn.getInitialPid(),
-                newNotification, sbn.getUser(), sbn.getOverrideGroupKey(), sbn.getPostTime());
-        return newSbn;
-    }
-
-    @VisibleForTesting
-    StatusBarNotification rebuildNotificationForCanceledSmartReplies(
-            NotificationData.Entry entry) {
-        return rebuildNotificationWithRemoteInput(entry, null /* remoteInputTest */,
-                false /* showSpinner */);
-    }
-
-    private boolean shouldKeepForSmartReply(NotificationData.Entry entry) {
-        return entry != null && mSmartReplyController.isSendingSmartReply(entry.key);
-    }
-
-    private boolean shouldKeepForRemoteInput(NotificationData.Entry entry) {
-        if (entry == null) {
-            return false;
-        }
-        if (mRemoteInputManager.getController().isSpinning(entry.key)) {
-            return true;
-        }
-        if (entry.hasJustSentRemoteInput()) {
-            return true;
-        }
-        return false;
     }
 
     private StatusBarNotification removeNotificationViews(String key,
@@ -683,9 +573,9 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
                 NotificationData.Entry childEntry = row.getEntry();
                 boolean isForeground = (row.getStatusBarNotification().getNotification().flags
                         & Notification.FLAG_FOREGROUND_SERVICE) != 0;
-                boolean keepForReply = FORCE_REMOTE_INPUT_HISTORY
-                        && (shouldKeepForRemoteInput(childEntry)
-                                || shouldKeepForSmartReply(childEntry));
+                boolean keepForReply =
+                        mRemoteInputManager.shouldKeepForRemoteInputHistory(childEntry)
+                        || mRemoteInputManager.shouldKeepForSmartReplyHistory(childEntry);
                 if (isForeground || keepForReply) {
                     // the child is a foreground service notification which we can't remove or it's
                     // a child we're keeping around for reply!
@@ -776,13 +666,15 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
     private void addNotificationInternal(StatusBarNotification notification,
             NotificationListenerService.RankingMap rankingMap) throws InflationException {
         String key = notification.getKey();
-        if (DEBUG) Log.d(TAG, "addNotification key=" + key);
+        if (DEBUG) {
+            Log.d(TAG, "addNotification key=" + key);
+        }
 
         mNotificationData.updateRanking(rankingMap);
         NotificationListenerService.Ranking ranking = new NotificationListenerService.Ranking();
         rankingMap.getRanking(key, ranking);
         NotificationData.Entry shadeEntry = createNotificationViews(notification, ranking);
-        boolean isHeadsUped = shouldPeek(shadeEntry);
+        boolean isHeadsUped = shouldHeadsUp(shadeEntry);
         if (!isHeadsUped && notification.getNotification().fullScreenIntent != null) {
             if (shouldSuppressFullScreenIntent(shadeEntry)) {
                 if (DEBUG) {
@@ -797,7 +689,13 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
             } else {
                 // Stop screensaver if the notification has a fullscreen intent.
                 // (like an incoming phone call)
-                SystemServicesProxy.getInstance(mContext).awakenDreamsAsync();
+                Dependency.get(UiOffloadThread.class).submit(() -> {
+                    try {
+                        mDreamManager.awaken();
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                });
 
                 // not immersive & a fullscreen alert should be shown
                 if (DEBUG)
@@ -868,16 +766,13 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         if (entry == null) {
             return;
         }
-        mHeadsUpEntriesToRemoveOnSwitch.remove(entry);
-        mRemoteInputManager.onUpdateNotification(entry);
-        mSmartReplyController.stopSending(entry);
 
-        if (key.equals(mGutsManager.getKeyToRemoveOnGutsClosed())) {
-            mGutsManager.setKeyToRemoveOnGutsClosed(null);
-            Log.w(TAG, "Notification that was kept for guts was updated. " + key);
+        // Notification is updated so it is essentially re-added and thus alive again.  Don't need
+        // to keep its lifetime extended.
+        for (NotificationLifetimeExtender extender : mNotificationLifetimeExtenders) {
+            extender.setShouldManageLifetime(entry, false /* shouldManage */);
         }
 
-        Notification n = notification.getNotification();
         mNotificationData.updateRanking(ranking);
 
         final StatusBarNotification oldNotification = entry.notification;
@@ -890,10 +785,12 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         mForegroundServiceController.updateNotification(notification,
                 mNotificationData.getImportance(key));
 
-        boolean shouldPeek = shouldPeek(entry, notification);
-        boolean alertAgain = alertAgain(entry, n);
-
-        updateHeadsUp(key, entry, shouldPeek, alertAgain);
+        boolean alertAgain = alertAgain(entry, entry.notification.getNotification());
+        if (mPresenter.isDozing()) {
+            updateAlertState(entry, shouldPulse(entry), alertAgain, mAmbientPulseManager);
+        } else {
+            updateAlertState(entry, shouldHeadsUp(entry), alertAgain, mHeadsUpManager);
+        }
         updateNotifications();
 
         if (!notification.isClearable()) {
@@ -978,66 +875,163 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         }
     }
 
-    protected boolean shouldPeek(NotificationData.Entry entry) {
-        return shouldPeek(entry, entry.notification);
-    }
+    /**
+     * Whether the notification should peek in from the top and alert the user.
+     *
+     * @param entry the entry to check
+     * @return true if the entry should heads up, false otherwise
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PROTECTED)
+    public boolean shouldHeadsUp(NotificationData.Entry entry) {
+        StatusBarNotification sbn = entry.notification;
 
-    public boolean shouldPeek(NotificationData.Entry entry, StatusBarNotification sbn) {
-        if (!mUseHeadsUp || mPresenter.isDeviceInVrMode()) {
-            if (DEBUG) Log.d(TAG, "No peeking: no huns or vr mode");
-            return false;
-        }
-
-        if (mNotificationData.shouldFilterOut(entry)) {
-            if (DEBUG) Log.d(TAG, "No peeking: filtered notification: " + sbn.getKey());
-            return false;
-        }
-
-        boolean inUse = mPowerManager.isScreenOn() && !mSystemServicesProxy.isDreaming();
-
-        if (!inUse && !mPresenter.isDozing()) {
+        if (mPresenter.isDozing()) {
             if (DEBUG) {
-                Log.d(TAG, "No peeking: not in use: " + sbn.getKey());
+                Log.d(TAG, "No heads up: device is dozing: " + sbn.getKey());
             }
             return false;
         }
 
-        if (!mPresenter.isDozing() && mNotificationData.shouldSuppressPeek(entry)) {
-            if (DEBUG) Log.d(TAG, "No peeking: suppressed by DND: " + sbn.getKey());
+        if (!canAlertCommon(entry)) {
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: notification shouldn't alert: " + sbn.getKey());
+            }
             return false;
         }
 
-        // Peeking triggers an ambient display pulse, so disable peek is ambient is active
-        if (mPresenter.isDozing() && mNotificationData.shouldSuppressAmbient(entry)) {
-            if (DEBUG) Log.d(TAG, "No peeking: suppressed by DND: " + sbn.getKey());
+        if (!mUseHeadsUp || mPresenter.isDeviceInVrMode()) {
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: no huns or vr mode");
+            }
             return false;
         }
 
-        if (entry.hasJustLaunchedFullScreenIntent()) {
-            if (DEBUG) Log.d(TAG, "No peeking: recent fullscreen: " + sbn.getKey());
+        boolean isDreaming = false;
+        try {
+            isDreaming = mDreamManager.isDreaming();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to query dream manager.", e);
+        }
+        boolean inUse = mPowerManager.isScreenOn() && !isDreaming;
+
+        if (!inUse) {
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: not in use: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        if (mNotificationData.shouldSuppressPeek(entry)) {
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: suppressed by DND: " + sbn.getKey());
+            }
             return false;
         }
 
         if (isSnoozedPackage(sbn)) {
-            if (DEBUG) Log.d(TAG, "No peeking: snoozed package: " + sbn.getKey());
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: snoozed package: " + sbn.getKey());
+            }
             return false;
         }
 
-        // Allow peeking for DEFAULT notifications only if we're on Ambient Display.
-        int importanceLevel = mPresenter.isDozing() ? NotificationManager.IMPORTANCE_DEFAULT
-                : NotificationManager.IMPORTANCE_HIGH;
-        if (mNotificationData.getImportance(sbn.getKey()) < importanceLevel) {
-            if (DEBUG) Log.d(TAG, "No peeking: unimportant notification: " + sbn.getKey());
+        if (entry.hasJustLaunchedFullScreenIntent()) {
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: recent fullscreen: " + sbn.getKey());
+            }
             return false;
         }
 
-        // Don't peek notifications that are suppressed due to group alert behavior
+        if (mNotificationData.getImportance(sbn.getKey()) < NotificationManager.IMPORTANCE_HIGH) {
+            if (DEBUG) {
+                Log.d(TAG, "No heads up: unimportant notification: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        if (!mCallback.canHeadsUp(entry, sbn)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether or not the notification should "pulse" on the user's display when the phone is
+     * dozing.  This displays the ambient view of the notification.
+     *
+     * @param entry the entry to check
+     * @return true if the entry should ambient pulse, false otherwise
+     */
+    protected boolean shouldPulse(NotificationData.Entry entry) {
+        StatusBarNotification sbn = entry.notification;
+
+        if (!mPresenter.isDozing()) {
+            if (DEBUG) {
+                Log.d(TAG, "No pulsing: not dozing: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        if (!canAlertCommon(entry)) {
+            if (DEBUG) {
+                Log.d(TAG, "No pulsing: notification shouldn't alert: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        if (mNotificationData.shouldSuppressAmbient(entry)) {
+            if (DEBUG) {
+                Log.d(TAG, "No pulsing: ambient effect suppressed: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        if (mNotificationData.getImportance(sbn.getKey())
+                < NotificationManager.IMPORTANCE_DEFAULT) {
+            if (DEBUG) {
+                Log.d(TAG, "No pulsing: not important enough: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        Bundle extras = sbn.getNotification().extras;
+        CharSequence title = extras.getCharSequence(Notification.EXTRA_TITLE);
+        CharSequence text = extras.getCharSequence(Notification.EXTRA_TEXT);
+        if (TextUtils.isEmpty(title) && TextUtils.isEmpty(text)) {
+            if (DEBUG) {
+                Log.d(TAG, "No pulsing: title and text are empty: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Common checks between heads up alerting and ambient pulse alerting.  See
+     * {@link NotificationEntryManager#shouldHeadsUp(NotificationData.Entry)} and
+     * {@link NotificationEntryManager#shouldPulse(NotificationData.Entry)}.  Notifications that
+     * fail any of these checks should not alert at all.
+     *
+     * @param entry the entry to check
+     * @return true if these checks pass, false if the notification should not alert
+     */
+    protected boolean canAlertCommon(NotificationData.Entry entry) {
+        StatusBarNotification sbn = entry.notification;
+
+        if (mNotificationData.shouldFilterOut(entry)) {
+            if (DEBUG) {
+                Log.d(TAG, "No alerting: filtered notification: " + sbn.getKey());
+            }
+            return false;
+        }
+
+        // Don't alert notifications that are suppressed due to group alert behavior
         if (sbn.isGroup() && sbn.getNotification().suppressAlertingDueToGrouping()) {
-            if (DEBUG) Log.d(TAG, "No peeking: suppressed due to group alert behavior");
-            return false;
-        }
-
-        if (!mCallback.shouldPeek(entry, sbn)) {
+            if (DEBUG) {
+                Log.d(TAG, "No alerting: suppressed due to group alert behavior");
+            }
             return false;
         }
 
@@ -1060,37 +1054,28 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         return mHeadsUpManager.isSnoozed(sbn.getPackageName());
     }
 
-    protected void updateHeadsUp(String key, NotificationData.Entry entry, boolean shouldPeek,
-            boolean alertAgain) {
-        final boolean wasHeadsUp = isHeadsUp(key);
-        if (wasHeadsUp) {
-            if (!shouldPeek) {
+    /**
+     * Update the entry's alert state and call the appropriate {@link AlertingNotificationManager}
+     * method.
+     * @param entry entry to update
+     * @param shouldAlert whether or not it should be alerting
+     * @param alertAgain whether or not an alert should actually come in as if it were new
+     * @param alertManager the alerting notification manager that manages the alert state
+     */
+    private void updateAlertState(NotificationData.Entry entry, boolean shouldAlert,
+            boolean alertAgain, AlertingNotificationManager alertManager) {
+        final boolean wasAlerting = alertManager.isAlerting(entry.key);
+        if (wasAlerting) {
+            if (!shouldAlert) {
                 // We don't want this to be interrupting anymore, lets remove it
-                mHeadsUpManager.removeNotification(key, false /* ignoreEarliestRemovalTime */);
+                alertManager.removeNotification(entry.key,
+                        false /* ignoreEarliestRemovalTime */);
             } else {
-                mHeadsUpManager.updateNotification(entry.key, alertAgain);
+                alertManager.updateNotification(entry.key, alertAgain);
             }
-        } else if (shouldPeek && alertAgain) {
-            // This notification was updated to be a heads-up, show it!
-            mHeadsUpManager.showNotification(entry);
-        }
-    }
-
-    protected boolean isHeadsUp(String key) {
-        return mHeadsUpManager.contains(key);
-    }
-
-    public boolean isNotificationKeptForRemoteInput(String key) {
-        return mKeysKeptForRemoteInput.contains(key);
-    }
-
-    public void removeKeyKeptForRemoteInput(String key) {
-        mKeysKeptForRemoteInput.remove(key);
-    }
-
-    public void addKeyKeptForRemoteInput(String key) {
-        if (FORCE_REMOTE_INPUT_HISTORY) {
-            mKeysKeptForRemoteInput.add(key);
+        } else if (shouldAlert && alertAgain) {
+            // This notification was updated to be alerting, show it!
+            alertManager.showNotification(entry);
         }
     }
 
@@ -1149,12 +1134,12 @@ public class NotificationEntryManager implements Dumpable, NotificationInflater.
         void onPerformRemoveNotification(StatusBarNotification statusBarNotification);
 
         /**
-         * Returns true if NotificationEntryManager should peek this notification.
+         * Returns true if NotificationEntryManager can heads up this notification.
          *
-         * @param entry entry of the notification that might be peeked
-         * @param sbn notification that might be peeked
-         * @return true if the notification should be peeked
+         * @param entry entry of the notification that might be heads upped
+         * @param sbn notification that might be heads upped
+         * @return true if the notification can be heads upped
          */
-        boolean shouldPeek(NotificationData.Entry entry, StatusBarNotification sbn);
+        boolean canHeadsUp(NotificationData.Entry entry, StatusBarNotification sbn);
     }
 }

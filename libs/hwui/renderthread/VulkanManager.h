@@ -23,7 +23,10 @@
 #include <vulkan/vulkan.h>
 
 #include <SkSurface.h>
+#include <ui/Fence.h>
+#include <utils/StrongPointer.h>
 #include <vk/GrVkBackendContext.h>
+#include "IRenderPipeline.h"
 
 class GrVkExtensions;
 
@@ -35,7 +38,7 @@ class RenderThread;
 
 class VulkanSurface {
 public:
-    VulkanSurface() {}
+    VulkanSurface(ColorMode colorMode) : mColorMode(colorMode) {}
 
     sk_sp<SkSurface> getBackBufferSurface() { return mBackbuffer; }
 
@@ -71,6 +74,7 @@ private:
     VkImage* mImages = nullptr;
     ImageInfo* mImageInfos;
     uint16_t mCurrentTime = 0;
+    ColorMode mColorMode;
 };
 
 // This class contains the shared global Vulkan objects, such as VkInstance, VkDevice and VkQueue,
@@ -88,7 +92,7 @@ public:
 
     // Given a window this creates a new VkSurfaceKHR and VkSwapchain and stores them inside a new
     // VulkanSurface object which is returned.
-    VulkanSurface* createSurface(ANativeWindow* window);
+    VulkanSurface* createSurface(ANativeWindow* window, ColorMode colorMode);
 
     // Destroy the VulkanSurface and all associated vulkan objects.
     void destroySurface(VulkanSurface* surface);
@@ -110,6 +114,12 @@ public:
     // Presents the current VkImage.
     void swapBuffers(VulkanSurface* surface);
 
+    // Inserts a wait on fence command into the Vulkan command buffer.
+    status_t fenceWait(sp<Fence>& fence);
+
+    // Creates a fence that is signaled, when all the pending Vulkan commands are flushed.
+    status_t createReleaseFence(sp<Fence>& nativeFence);
+
 private:
     friend class RenderThread;
 
@@ -126,6 +136,8 @@ private:
     void createBuffers(VulkanSurface* surface, VkFormat format, VkExtent2D extent);
 
     VulkanSurface::BackbufferInfo* getAvailableBackbuffer(VulkanSurface* surface);
+
+    bool setupDummyCommandBuffer();
 
     // simple wrapper class that exists only to initialize a pointer to NULL
     template <typename FNPTR_TYPE>
@@ -164,6 +176,7 @@ private:
 
     VkPtr<PFN_vkDestroyInstance> mDestroyInstance;
     VkPtr<PFN_vkEnumeratePhysicalDevices> mEnumeratePhysicalDevices;
+    VkPtr<PFN_vkGetPhysicalDeviceProperties> mGetPhysicalDeviceProperties;
     VkPtr<PFN_vkGetPhysicalDeviceQueueFamilyProperties> mGetPhysicalDeviceQueueFamilyProperties;
     VkPtr<PFN_vkGetPhysicalDeviceFeatures2> mGetPhysicalDeviceFeatures2;
     VkPtr<PFN_vkCreateDevice> mCreateDevice;
@@ -187,6 +200,8 @@ private:
 
     VkPtr<PFN_vkCreateSemaphore> mCreateSemaphore;
     VkPtr<PFN_vkDestroySemaphore> mDestroySemaphore;
+    VkPtr<PFN_vkImportSemaphoreFdKHR> mImportSemaphoreFdKHR;
+    VkPtr<PFN_vkGetSemaphoreFdKHR> mGetSemaphoreFdKHR;
     VkPtr<PFN_vkCreateFence> mCreateFence;
     VkPtr<PFN_vkDestroyFence> mDestroyFence;
     VkPtr<PFN_vkWaitForFences> mWaitForFences;
@@ -203,6 +218,8 @@ private:
     uint32_t mPresentQueueIndex;
     VkQueue mPresentQueue = VK_NULL_HANDLE;
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
+
+    VkCommandBuffer mDummyCB = VK_NULL_HANDLE;
 
     enum class SwapBehavior {
         Discard,

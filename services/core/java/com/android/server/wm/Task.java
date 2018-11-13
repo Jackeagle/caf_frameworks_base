@@ -22,17 +22,20 @@ import static android.content.pm.ActivityInfo.RESIZE_MODE_FORCE_RESIZABLE_PORTRA
 import static android.content.pm.ActivityInfo.RESIZE_MODE_FORCE_RESIZABLE_PRESERVE_ORIENTATION;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
 import static android.content.res.Configuration.EMPTY;
+
 import static com.android.server.EventLogTags.WM_TASK_REMOVED;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STACK;
-import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
-import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.TaskProto.APP_WINDOW_TOKENS;
 import static com.android.server.wm.TaskProto.BOUNDS;
 import static com.android.server.wm.TaskProto.DEFER_REMOVAL;
 import static com.android.server.wm.TaskProto.FILLS_PARENT;
 import static com.android.server.wm.TaskProto.ID;
+import static com.android.server.wm.TaskProto.SURFACE_HEIGHT;
+import static com.android.server.wm.TaskProto.SURFACE_WIDTH;
 import static com.android.server.wm.TaskProto.TEMP_INSET_BOUNDS;
 import static com.android.server.wm.TaskProto.WINDOW_CONTAINER;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STACK;
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.CallSuper;
 import android.app.ActivityManager.TaskDescription;
@@ -43,8 +46,8 @@ import android.util.EventLog;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.Surface;
-
 import android.view.SurfaceControl;
+
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.io.PrintWriter;
@@ -296,6 +299,12 @@ class Task extends WindowContainer<AppWindowToken> {
         return boundsChange;
     }
 
+    @Override
+    void onDisplayChanged(DisplayContent dc) {
+        updateSurfaceSize(dc);
+        super.onDisplayChanged(dc);
+    }
+
     /**
      * Sets the bounds used to calculate the insets. See
      * {@link android.app.IActivityTaskManager#resizeDockedStack} why this is needed.
@@ -472,7 +481,8 @@ class Task extends WindowContainer<AppWindowToken> {
 
     void setDragResizing(boolean dragResizing, int dragResizeMode) {
         if (mDragResizing != dragResizing) {
-            if (!DragResizeMode.isModeAllowedForStack(mStack, dragResizeMode)) {
+            // No need to check if the mode is allowed if it's leaving dragResize
+            if (dragResizing && !DragResizeMode.isModeAllowedForStack(mStack, dragResizeMode)) {
                 throw new IllegalArgumentException("Drag resize mode not allow for stack stackId="
                         + mStack.mStackId + " dragResizeMode=" + dragResizeMode);
             }
@@ -551,9 +561,10 @@ class Task extends WindowContainer<AppWindowToken> {
 
     @Override
     public SurfaceControl getAnimationLeashParent() {
-        // Reparent to the animation layer so that we aren't clipped by the non-minimized
-        // stack bounds, currently we only animate the task for the recents animation
-        return getAppAnimationLayer(ANIMATION_LAYER_STANDARD);
+        // Currently, only the recents animation will create animation leashes for tasks. In this
+        // case, reparent the task to the home animation layer while it is being animated to allow
+        // the home activity to reorder the app windows relative to its own.
+        return getAppAnimationLayer(ANIMATION_LAYER_HOME);
     }
 
     boolean isTaskAnimating() {
@@ -701,6 +712,8 @@ class Task extends WindowContainer<AppWindowToken> {
         getBounds().writeToProto(proto, BOUNDS);
         mTempInsetBounds.writeToProto(proto, TEMP_INSET_BOUNDS);
         proto.write(DEFER_REMOVAL, mDeferRemoval);
+        proto.write(SURFACE_WIDTH, mSurfaceControl.getWidth());
+        proto.write(SURFACE_HEIGHT, mSurfaceControl.getHeight());
         proto.end(token);
     }
 

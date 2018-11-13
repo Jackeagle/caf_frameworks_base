@@ -44,6 +44,7 @@ import android.widget.ImageView;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.settingslib.RestrictedLockUtils;
+import com.android.settingslib.RestrictedLockUtilsInternal;
 import com.android.systemui.Dependency;
 
 import java.util.ArrayList;
@@ -399,7 +400,7 @@ public class BrightnessController implements ToggleSlider.Listener {
             @Override
             public void run() {
                 ((ToggleSliderView)mControl).setEnforcedAdmin(
-                        RestrictedLockUtils.checkIfRestrictionEnforced(mContext,
+                        RestrictedLockUtilsInternal.checkIfRestrictionEnforced(mContext,
                                 UserManager.DISALLOW_CONFIG_BRIGHTNESS,
                                 mUserTracker.getCurrentUserId()));
             }
@@ -459,7 +460,7 @@ public class BrightnessController implements ToggleSlider.Listener {
 
     private void animateSliderTo(int target) {
         if (!mControlValueInitialized) {
-            // Don't animate the first value since it's default state isn't meaningful to users.
+            // Don't animate the first value since its default state isn't meaningful to users.
             mControl.setValue(target);
             mControlValueInitialized = true;
         }
@@ -469,10 +470,12 @@ public class BrightnessController implements ToggleSlider.Listener {
         mSliderAnimator = ValueAnimator.ofInt(mControl.getValue(), target);
         mSliderAnimator.addUpdateListener((ValueAnimator animation) -> {
             mExternalChange = true;
-            mControl.setValue((int)animation.getAnimatedValue());
+            mControl.setValue((int) animation.getAnimatedValue());
             mExternalChange = false;
         });
-        mSliderAnimator.setDuration(SLIDER_ANIMATION_DURATION);
+        final long animationDuration = SLIDER_ANIMATION_DURATION * Math.abs(
+                mControl.getValue() - target) / GAMMA_SPACE_MAX;
+        mSliderAnimator.setDuration(animationDuration);
         mSliderAnimator.start();
     }
 

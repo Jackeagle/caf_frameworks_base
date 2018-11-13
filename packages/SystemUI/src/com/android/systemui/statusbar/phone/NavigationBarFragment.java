@@ -35,6 +35,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.annotation.IdRes;
 import android.annotation.Nullable;
+import android.app.ActivityManager;
 import android.app.ActivityTaskManager;
 import android.app.Fragment;
 import android.app.IActivityManager;
@@ -49,7 +50,6 @@ import android.content.res.Configuration;
 import android.database.ContentObserver;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
-import android.graphics.drawable.AnimatedVectorDrawable;
 import android.inputmethodservice.InputMethodService;
 import android.os.Binder;
 import android.os.Bundle;
@@ -89,8 +89,8 @@ import com.android.systemui.assist.AssistManager;
 import com.android.systemui.fragments.FragmentHostManager;
 import com.android.systemui.fragments.FragmentHostManager.FragmentListener;
 import com.android.systemui.recents.Recents;
-import com.android.systemui.recents.misc.SysUiTaskStackChangeListener;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
+import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.stackdivider.Divider;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.CommandQueue.Callbacks;
@@ -195,8 +195,14 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
         @Override
         public void onBackButtonAlphaChanged(float alpha, boolean animate) {
             final ButtonDispatcher backButton = mNavigationBarView.getBackButton();
-            backButton.setVisibility(alpha > 0 ? View.VISIBLE : View.INVISIBLE);
-            backButton.setAlpha(alpha, animate);
+            if (QuickStepController.shouldhideBackButton(getContext())) {
+                // If property was changed to hide/show back button, going home will trigger
+                // launcher to to change the back button alpha to reflect property change
+                backButton.setVisibility(View.GONE);
+            } else {
+                backButton.setVisibility(alpha > 0 ? View.VISIBLE : View.INVISIBLE);
+                backButton.setAlpha(alpha, animate);
+            }
         }
     };
 
@@ -279,7 +285,7 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
         mNavigationBarView = (NavigationBarView) view;
 
         mNavigationBarView.setDisabledFlags(mDisabledFlags1);
-        mNavigationBarView.setComponents(mRecents, mDivider, mStatusBar.getPanel());
+        mNavigationBarView.setComponents(mStatusBar.getPanel());
         mNavigationBarView.setOnVerticalChangedListener(this::onVerticalChanged);
         mNavigationBarView.setOnTouchListener(this::onNavigationTouch);
         if (savedInstanceState != null) {
@@ -302,7 +308,10 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        mNavigationBarView.getLightTransitionsController().destroy(getContext());
+        if (mNavigationBarView != null) {
+            mNavigationBarView.getBarTransitions().destroy();
+            mNavigationBarView.getLightTransitionsController().destroy(getContext());
+        }
         mOverviewProxyService.removeCallback(mOverviewProxyListener);
         getContext().unregisterReceiver(mBroadcastReceiver);
     }
@@ -455,7 +464,7 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
                 style = rotationCCW ? R.style.RotateButtonCCWStart0 :
                         R.style.RotateButtonCWStart0;
             }
-            mNavigationBarView.updateRotateSuggestionButtonStyle(style, true);
+            mNavigationBarView.updateRotateSuggestionButtonStyle(style);
         }
 
         if (mNavigationBarWindowState != WINDOW_STATE_SHOWING) {
@@ -526,12 +535,6 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
         KeyButtonDrawable kbd = rotBtn.getImageDrawable();
         if (kbd == null) return;
 
-        // The KBD and AVD is recreated every new valid suggestion because of style changes.
-        AnimatedVectorDrawable animIcon = null;
-        if (kbd.getDrawable(0) instanceof AnimatedVectorDrawable) {
-            animIcon = (AnimatedVectorDrawable) kbd.getDrawable(0);
-        }
-
         // Clear any pending suggestion flag as it has either been nullified or is being shown
         mPendingRotationSuggestion = false;
         if (getView() != null) getView().removeCallbacks(mCancelPendingRotationProposal);
@@ -548,9 +551,9 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
             view.setAlpha(1f);
 
             // Run the rotate icon's animation if it has one
-            if (animIcon != null) {
-                animIcon.reset();
-                animIcon.start();
+            if (kbd.canAnimate()) {
+                kbd.resetAnimation();
+                kbd.startAnimation();
             }
 
             if (!isRotateSuggestionIntroduced()) mViewRippler.start(view);
@@ -638,11 +641,11 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
     // Injected from StatusBar at creation.
     public void setCurrentSysuiVisibility(int systemUiVisibility) {
         mSystemUiVisibility = systemUiVisibility;
-        int nbMode = mStatusBar.computeBarMode(0, mSystemUiVisibility,
+        final int barMode = mStatusBar.computeBarMode(0, mSystemUiVisibility,
                 View.NAVIGATION_BAR_TRANSIENT, View.NAVIGATION_BAR_TRANSLUCENT,
                 View.NAVIGATION_BAR_TRANSPARENT);
-        if ( nbMode != -1 ) {
-            mNavigationBarMode = nbMode;
+        if (barMode != -1) {
+            mNavigationBarMode = barMode;
         }
         checkNavBarModes();
         mStatusBar.touchAutoHide();
@@ -947,7 +950,7 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
     private boolean onLongPressRecents() {
         if (mRecents == null || !ActivityTaskManager.supportsMultiWindow(getContext())
                 || !mDivider.getView().getSnapAlgorithm().isSplitScreenFeasible()
-                || Recents.getConfiguration().isLowRamDevice
+                || ActivityManager.isLowRamDeviceStatic()
                 // If we are connected to the overview service, then disable the recents button
                 || mOverviewProxyService.getProxy() != null) {
             return false;
@@ -1111,7 +1114,7 @@ public class NavigationBarFragment extends Fragment implements Callbacks {
         }
     };
 
-    class TaskStackListenerImpl extends SysUiTaskStackChangeListener {
+    class TaskStackListenerImpl extends TaskStackChangeListener {
         // Invalidate any rotation suggestion on task change or activity orientation change
         // Note: all callbacks happen on main thread
 

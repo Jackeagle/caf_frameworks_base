@@ -21,6 +21,7 @@ import static android.view.Display.INVALID_DISPLAY;
 import android.annotation.NonNull;
 import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.method.MetaKeyKeyListener;
@@ -895,8 +896,8 @@ public class KeyEvent extends InputEvent implements Parcelable {
      * @deprecated No longer used by the input system.
      * {@link #getAction} value: multiple duplicate key events have
      * occurred in a row, or a complex string is being delivered.  If the
-     * key code is not {#link {@link #KEYCODE_UNKNOWN} then the
-     * {#link {@link #getRepeatCount()} method returns the number of times
+     * key code is not {@link #KEYCODE_UNKNOWN} then the
+     * {@link #getRepeatCount()} method returns the number of times
      * the given key code should be executed.
      * Otherwise, if the key code is {@link #KEYCODE_UNKNOWN}, then
      * this is a sequence of characters as returned by {@link #getCharacters}.
@@ -1256,7 +1257,7 @@ public class KeyEvent extends InputEvent implements Parcelable {
 
     @UnsupportedAppUsage
     private int mDeviceId;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mSource;
     private int mDisplayId;
     @UnsupportedAppUsage
@@ -1658,7 +1659,7 @@ public class KeyEvent extends InputEvent implements Parcelable {
      * @hide
      */
     @Override
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public final void recycle() {
         super.recycle();
         mCharacters = null;

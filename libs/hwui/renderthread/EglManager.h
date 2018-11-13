@@ -17,10 +17,14 @@
 #define EGLMANAGER_H
 
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <SkImageInfo.h>
 #include <SkRect.h>
 #include <cutils/compiler.h>
+#include <ui/Fence.h>
 #include <ui/GraphicBuffer.h>
 #include <utils/StrongPointer.h>
+#include "IRenderPipeline.h"
 
 namespace android {
 namespace uirenderer {
@@ -43,7 +47,7 @@ public:
 
     bool hasEglContext();
 
-    EGLSurface createSurface(EGLNativeWindowType window, bool wideColorGamut);
+    EGLSurface createSurface(EGLNativeWindowType window, ColorMode colorMode);
     void destroySurface(EGLSurface surface);
 
     void destroy();
@@ -66,6 +70,14 @@ public:
 
     EGLDisplay eglDisplay() const { return mEglDisplay; }
 
+    // Inserts a wait on fence command into the OpenGL ES command stream. If EGL extension
+    // support is missing, block the CPU on the fence.
+    status_t fenceWait(sp<Fence>& fence);
+
+    // Creates a fence that is signaled, when all the pending GL commands are flushed.
+    // Depending on installed extensions, the result is either Android native fence or EGL fence.
+    status_t createReleaseFence(bool useFenceSync, EGLSyncKHR* eglFence, sp<Fence>& nativeFence);
+
 private:
 
     void initExtensions();
@@ -79,7 +91,6 @@ private:
     EGLConfig mEglConfigWideGamut;
     EGLContext mEglContext;
     EGLSurface mPBufferSurface;
-
     EGLSurface mCurrentSurface;
 
     enum class SwapBehavior {

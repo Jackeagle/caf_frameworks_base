@@ -44,11 +44,9 @@ import android.app.KeyguardManager;
 import android.app.admin.SecurityLog;
 import android.app.usage.StorageStatsManager;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageMoveObserver;
 import android.content.pm.PackageManager;
@@ -115,7 +113,6 @@ import android.util.Xml;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.app.IMediaContainerService;
 import com.android.internal.os.AppFuseMount;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.FuseUnavailableMountException;
@@ -333,6 +330,12 @@ class StorageManagerService extends IStorageManager.Stub
     @GuardedBy("mPackagesLock")
     private final SparseArray<String> mSandboxIds = new SparseArray<>();
 
+    /**
+     * List of volumes visible to any user.
+     * TODO: may be have a map of userId -> volumes?
+     */
+    private final CopyOnWriteArrayList<VolumeInfo> mVisibleVols = new CopyOnWriteArrayList<>();
+
     private volatile int mCurrentUserId = UserHandle.USER_SYSTEM;
 
     /** Holding lock for AppFuse business */
@@ -545,37 +548,7 @@ class StorageManagerService extends IStorageManager.Stub
 
     // OBB action handler messages
     private static final int OBB_RUN_ACTION = 1;
-    private static final int OBB_MCS_BOUND = 2;
-    private static final int OBB_MCS_UNBIND = 3;
-    private static final int OBB_MCS_RECONNECT = 4;
-    private static final int OBB_FLUSH_MOUNT_STATE = 5;
-
-    /*
-     * Default Container Service information
-     */
-    static final ComponentName DEFAULT_CONTAINER_COMPONENT = new ComponentName(
-            "com.android.defcontainer", "com.android.defcontainer.DefaultContainerService");
-
-    final private DefaultContainerConnection mDefContainerConn = new DefaultContainerConnection();
-
-    class DefaultContainerConnection implements ServiceConnection {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            if (DEBUG_OBB)
-                Slog.i(TAG, "onServiceConnected");
-            IMediaContainerService imcs = IMediaContainerService.Stub.asInterface(service);
-            mObbActionHandler.sendMessage(mObbActionHandler.obtainMessage(OBB_MCS_BOUND, imcs));
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            if (DEBUG_OBB)
-                Slog.i(TAG, "onServiceDisconnected");
-        }
-    }
-
-    // Used in the ObbActionHandler
-    private IMediaContainerService mContainerService = null;
+    private static final int OBB_FLUSH_MOUNT_STATE = 2;
 
     // Last fstrim operation tracking
     private static final String LAST_FSTRIM_FILE = "last-fstrim";
@@ -657,16 +630,12 @@ class StorageManagerService extends IStorageManager.Stub
                         Slog.i(TAG, "Ignoring mount " + vol.getId() + " due to policy");
                         break;
                     }
-                    try {
-                        mVold.mount(vol.id, vol.mountFlags, vol.mountUserId);
-                    } catch (Exception e) {
-                        Slog.wtf(TAG, e);
-                    }
+                    mount(vol);
                     break;
                 }
                 case H_VOLUME_UNMOUNT: {
                     final VolumeInfo vol = (VolumeInfo) msg.obj;
-                    unmount(vol.getId());
+                    unmount(vol);
                     break;
                 }
                 case H_VOLUME_BROADCAST: {
@@ -902,6 +871,8 @@ class StorageManagerService extends IStorageManager.Stub
 
                 addInternalVolumeLocked();
             }
+
+            mVisibleVols.clear();
 
             try {
                 mVold.reset();
@@ -1500,7 +1471,7 @@ class StorageManagerService extends IStorageManager.Stub
                     = mContext.getPackageManager().getInstalledApplicationsAsUser(
                             PackageManager.MATCH_UNINSTALLED_PACKAGES, userId);
             synchronized (mPackagesLock) {
-                final ArraySet<String> userPackages = getPackagesForUserPL(userId);
+                final ArraySet<String> userPackages = getAvailablePackagesForUserPL(userId);
                 for (int i = appInfos.size() - 1; i >= 0; --i) {
                     if (appInfos.get(i).isInstantApp()) {
                         continue;
@@ -1557,7 +1528,7 @@ class StorageManagerService extends IStorageManager.Stub
     }
 
     @GuardedBy("mPackagesLock")
-    private ArraySet<String> getPackagesForUserPL(int userId) {
+    private ArraySet<String> getAvailablePackagesForUserPL(int userId) {
         ArraySet<String> userPackages = mPackages.get(userId);
         if (userPackages == null) {
             userPackages = new ArraySet<>();
@@ -1569,8 +1540,24 @@ class StorageManagerService extends IStorageManager.Stub
     private String[] getPackagesArrayForUser(int userId) {
         if (!ENABLE_ISOLATED_STORAGE) return EmptyArray.STRING;
 
+        final ArraySet<String> userPackages;
         synchronized (mPackagesLock) {
-            return getPackagesForUserPL(userId).toArray(new String[0]);
+            userPackages = getAvailablePackagesForUserPL(userId);
+            if (!userPackages.isEmpty()) {
+                return userPackages.toArray(new String[0]);
+            }
+        }
+        final List<ApplicationInfo> appInfos =
+                mContext.getPackageManager().getInstalledApplicationsAsUser(
+                        PackageManager.MATCH_UNINSTALLED_PACKAGES, userId);
+        synchronized (mPackagesLock) {
+            for (int i = appInfos.size() - 1; i >= 0; --i) {
+                if (appInfos.get(i).isInstantApp()) {
+                    continue;
+                }
+                userPackages.add(appInfos.get(i).packageName);
+            }
+            return userPackages.toArray(new String[0]);
         }
     }
 
@@ -1781,8 +1768,15 @@ class StorageManagerService extends IStorageManager.Stub
         if (isMountDisallowed(vol)) {
             throw new SecurityException("Mounting " + volId + " restricted by policy");
         }
+        mount(vol);
+    }
+
+    private void mount(VolumeInfo vol) {
         try {
             mVold.mount(vol.id, vol.mountFlags, vol.mountUserId);
+            if ((vol.mountFlags & VolumeInfo.MOUNT_FLAG_VISIBLE) != 0) {
+                mVisibleVols.add(vol);
+            }
         } catch (Exception e) {
             Slog.wtf(TAG, e);
         }
@@ -1793,8 +1787,15 @@ class StorageManagerService extends IStorageManager.Stub
         enforcePermission(android.Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS);
 
         final VolumeInfo vol = findVolumeByIdOrThrow(volId);
+        unmount(vol);
+    }
+
+    private void unmount(VolumeInfo vol) {
         try {
             mVold.unmount(vol.id);
+            if ((vol.mountFlags & VolumeInfo.MOUNT_FLAG_VISIBLE) != 0) {
+                mVisibleVols.remove(vol);
+            }
         } catch (Exception e) {
             Slog.wtf(TAG, e);
         }
@@ -2306,16 +2307,17 @@ class StorageManagerService extends IStorageManager.Stub
     }
 
     @Override
-    public void mountObb(
-            String rawPath, String canonicalPath, String key, IObbActionListener token, int nonce) {
+    public void mountObb(String rawPath, String canonicalPath, String key,
+            IObbActionListener token, int nonce, ObbInfo obbInfo) {
         Preconditions.checkNotNull(rawPath, "rawPath cannot be null");
         Preconditions.checkNotNull(canonicalPath, "canonicalPath cannot be null");
         Preconditions.checkNotNull(token, "token cannot be null");
+        Preconditions.checkNotNull(obbInfo, "obbIfno cannot be null");
 
         final int callingUid = Binder.getCallingUid();
         final ObbState obbState = new ObbState(rawPath, canonicalPath,
                 callingUid, token, nonce, null);
-        final ObbAction action = new MountObbAction(obbState, key, callingUid);
+        final ObbAction action = new MountObbAction(obbState, key, callingUid, obbInfo);
         mObbActionHandler.sendMessage(mObbActionHandler.obtainMessage(OBB_RUN_ACTION, action));
 
         if (DEBUG_OBB)
@@ -2644,6 +2646,24 @@ class StorageManagerService extends IStorageManager.Stub
 
         try {
             mVold.addUserKeyAuth(userId, serialNumber, encodeBytes(token), encodeBytes(secret));
+        } catch (Exception e) {
+            Slog.wtf(TAG, e);
+        }
+    }
+
+    /*
+     * Clear disk encryption key bound to the associated token / secret pair. Removing the user
+     * binding of the Disk encryption key is done in two phases: first, this call will retrieve
+     * the disk encryption key using the provided token / secret pair and store it by
+     * encrypting it with a keymaster key not bound to the user, then fixateNewestUserKeyAuth
+     * is called to delete all other bindings of the disk encryption key.
+     */
+    @Override
+    public void clearUserKeyAuth(int userId, int serialNumber, byte[] token, byte[] secret) {
+        enforcePermission(android.Manifest.permission.STORAGE_INTERNAL);
+
+        try {
+            mVold.clearUserKeyAuth(userId, serialNumber, encodeBytes(token), encodeBytes(secret));
         } catch (Exception e) {
             Slog.wtf(TAG, e);
         }
@@ -3232,8 +3252,6 @@ class StorageManagerService extends IStorageManager.Stub
     }
 
     private class ObbActionHandler extends Handler {
-        private boolean mBound = false;
-        private final List<ObbAction> mActions = new LinkedList<ObbAction>();
 
         ObbActionHandler(Looper l) {
             super(l);
@@ -3248,83 +3266,7 @@ class StorageManagerService extends IStorageManager.Stub
                     if (DEBUG_OBB)
                         Slog.i(TAG, "OBB_RUN_ACTION: " + action.toString());
 
-                    // If a bind was already initiated we don't really
-                    // need to do anything. The pending install
-                    // will be processed later on.
-                    if (!mBound) {
-                        // If this is the only one pending we might
-                        // have to bind to the service again.
-                        if (!connectToService()) {
-                            action.notifyObbStateChange(new ObbException(ERROR_INTERNAL,
-                                    "Failed to bind to media container service"));
-                            return;
-                        }
-                    }
-
-                    mActions.add(action);
-                    break;
-                }
-                case OBB_MCS_BOUND: {
-                    if (DEBUG_OBB)
-                        Slog.i(TAG, "OBB_MCS_BOUND");
-                    if (msg.obj != null) {
-                        mContainerService = (IMediaContainerService) msg.obj;
-                    }
-                    if (mContainerService == null) {
-                        // Something seriously wrong. Bail out
-                        for (ObbAction action : mActions) {
-                            // Indicate service bind error
-                            action.notifyObbStateChange(new ObbException(ERROR_INTERNAL,
-                                    "Failed to bind to media container service"));
-                        }
-                        mActions.clear();
-                    } else if (mActions.size() > 0) {
-                        final ObbAction action = mActions.get(0);
-                        if (action != null) {
-                            action.execute(this);
-                        }
-                    } else {
-                        // Should never happen ideally.
-                        Slog.w(TAG, "Empty queue");
-                    }
-                    break;
-                }
-                case OBB_MCS_RECONNECT: {
-                    if (DEBUG_OBB)
-                        Slog.i(TAG, "OBB_MCS_RECONNECT");
-                    if (mActions.size() > 0) {
-                        if (mBound) {
-                            disconnectService();
-                        }
-                        if (!connectToService()) {
-                            for (ObbAction action : mActions) {
-                                // Indicate service bind error
-                                action.notifyObbStateChange(new ObbException(ERROR_INTERNAL,
-                                        "Failed to bind to media container service"));
-                            }
-                            mActions.clear();
-                        }
-                    }
-                    break;
-                }
-                case OBB_MCS_UNBIND: {
-                    if (DEBUG_OBB)
-                        Slog.i(TAG, "OBB_MCS_UNBIND");
-
-                    // Delete pending install
-                    if (mActions.size() > 0) {
-                        mActions.remove(0);
-                    }
-                    if (mActions.size() == 0) {
-                        if (mBound) {
-                            disconnectService();
-                        }
-                    } else {
-                        // There are more pending requests in queue.
-                        // Just post MCS_BOUND message to trigger processing
-                        // of next pending install.
-                        mObbActionHandler.sendEmptyMessage(OBB_MCS_BOUND);
-                    }
+                    action.execute(this);
                     break;
                 }
                 case OBB_FLUSH_MOUNT_STATE: {
@@ -3369,25 +3311,6 @@ class StorageManagerService extends IStorageManager.Stub
                 }
             }
         }
-
-        private boolean connectToService() {
-            if (DEBUG_OBB)
-                Slog.i(TAG, "Trying to bind to DefaultContainerService");
-
-            Intent service = new Intent().setComponent(DEFAULT_CONTAINER_COMPONENT);
-            if (mContext.bindServiceAsUser(service, mDefContainerConn, Context.BIND_AUTO_CREATE,
-                    UserHandle.SYSTEM)) {
-                mBound = true;
-                return true;
-            }
-            return false;
-        }
-
-        private void disconnectService() {
-            mContainerService = null;
-            mBound = false;
-            mContext.unbindService(mDefContainerConn);
-        }
     }
 
     private static class ObbException extends Exception {
@@ -3405,8 +3328,6 @@ class StorageManagerService extends IStorageManager.Stub
     }
 
     abstract class ObbAction {
-        private static final int MAX_RETRIES = 3;
-        private int mRetries;
 
         ObbState mObbState;
 
@@ -3418,39 +3339,13 @@ class StorageManagerService extends IStorageManager.Stub
             try {
                 if (DEBUG_OBB)
                     Slog.i(TAG, "Starting to execute action: " + toString());
-                mRetries++;
-                if (mRetries > MAX_RETRIES) {
-                    mObbActionHandler.sendEmptyMessage(OBB_MCS_UNBIND);
-                    notifyObbStateChange(new ObbException(ERROR_INTERNAL,
-                            "Failed to bind to media container service"));
-                } else {
-                    handleExecute();
-                    if (DEBUG_OBB)
-                        Slog.i(TAG, "Posting install MCS_UNBIND");
-                    mObbActionHandler.sendEmptyMessage(OBB_MCS_UNBIND);
-                }
+                handleExecute();
             } catch (ObbException e) {
                 notifyObbStateChange(e);
-                mObbActionHandler.sendEmptyMessage(OBB_MCS_UNBIND);
             }
         }
 
         abstract void handleExecute() throws ObbException;
-
-        protected ObbInfo getObbInfo() throws ObbException {
-            final ObbInfo obbInfo;
-            try {
-                obbInfo = mContainerService.getObbInfo(mObbState.canonicalPath);
-            } catch (Exception e) {
-                throw new ObbException(ERROR_PERMISSION_DENIED, e);
-            }
-            if (obbInfo != null) {
-                return obbInfo;
-            } else {
-                throw new ObbException(ERROR_INTERNAL,
-                        "Missing OBB info for: " + mObbState.canonicalPath);
-            }
-        }
 
         protected void notifyObbStateChange(ObbException e) {
             Slog.w(TAG, e);
@@ -3473,22 +3368,22 @@ class StorageManagerService extends IStorageManager.Stub
     class MountObbAction extends ObbAction {
         private final String mKey;
         private final int mCallingUid;
+        private ObbInfo mObbInfo;
 
-        MountObbAction(ObbState obbState, String key, int callingUid) {
+        MountObbAction(ObbState obbState, String key, int callingUid, ObbInfo obbInfo) {
             super(obbState);
             mKey = key;
             mCallingUid = callingUid;
+            mObbInfo = obbInfo;
         }
 
         @Override
         public void handleExecute() throws ObbException {
             warnOnNotMounted();
 
-            final ObbInfo obbInfo = getObbInfo();
-
-            if (!isUidOwnerOfPackageOrSystem(obbInfo.packageName, mCallingUid)) {
+            if (!isUidOwnerOfPackageOrSystem(mObbInfo.packageName, mCallingUid)) {
                 throw new ObbException(ERROR_PERMISSION_DENIED, "Denied attempt to mount OBB "
-                        + obbInfo.filename + " which is owned by " + obbInfo.packageName);
+                        + mObbInfo.filename + " which is owned by " + mObbInfo.packageName);
             }
 
             final boolean isMounted;
@@ -3497,7 +3392,7 @@ class StorageManagerService extends IStorageManager.Stub
             }
             if (isMounted) {
                 throw new ObbException(ERROR_ALREADY_MOUNTED,
-                        "Attempt to mount OBB which is already mounted: " + obbInfo.filename);
+                        "Attempt to mount OBB which is already mounted: " + mObbInfo.filename);
             }
 
             final String hashedKey;
@@ -3509,7 +3404,7 @@ class StorageManagerService extends IStorageManager.Stub
                 try {
                     SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
 
-                    KeySpec ks = new PBEKeySpec(mKey.toCharArray(), obbInfo.salt,
+                    KeySpec ks = new PBEKeySpec(mKey.toCharArray(), mObbInfo.salt,
                             PBKDF2_HASH_ROUNDS, CRYPTO_ALGORITHM_KEY_SIZE);
                     SecretKey key = factory.generateSecret(ks);
                     BigInteger bi = new BigInteger(key.getEncoded());
@@ -3768,6 +3663,14 @@ class StorageManagerService extends IStorageManager.Stub
             pw.decreaseIndent();
 
             pw.println();
+            pw.println("mVisibleVols:");
+            pw.increaseIndent();
+            for (int i = 0; i < mVisibleVols.size(); i++) {
+                mVisibleVols.get(i).dump(pw);
+            }
+            pw.decreaseIndent();
+
+            pw.println();
             pw.println("Primary storage UUID: " + mPrimaryStorageUuid);
             final Pair<String, Long> pair = StorageManager.getPrimaryStoragePathAndSize();
             if (pair == null) {
@@ -3881,6 +3784,88 @@ class StorageManagerService extends IStorageManager.Stub
                 }
             }
             return true;
+        }
+
+        @Override
+        public void prepareSandboxForApp(String packageName, int appId, String sharedUserId,
+                int userId) {
+            final String sandboxId;
+            synchronized (mPackagesLock) {
+                final ArraySet<String> userPackages = getAvailablePackagesForUserPL(userId);
+                // If userPackages is empty, it means the user is not started yet, so no need to
+                // do anything now.
+                if (userPackages.isEmpty() || userPackages.contains(packageName)) {
+                    return;
+                }
+                userPackages.add(packageName);
+                mAppIds.put(packageName, appId);
+                sandboxId = getSandboxId(packageName, sharedUserId);
+                mSandboxIds.put(appId, sandboxId);
+            }
+
+            try {
+                mVold.prepareSandboxForApp(packageName, appId, sandboxId, userId);
+            } catch (Exception e) {
+                Slog.wtf(TAG, e);
+            }
+        }
+
+        @Override
+        public void destroySandboxForApp(String packageName, int userId) {
+            if (!ENABLE_ISOLATED_STORAGE) {
+                return;
+            }
+            final int appId;
+            final String sandboxId;
+            synchronized (mPackagesLock) {
+                final ArraySet<String> userPackages = getAvailablePackagesForUserPL(userId);
+                userPackages.remove(packageName);
+                appId = mAppIds.get(packageName);
+                sandboxId = mSandboxIds.get(appId);
+
+                // If the package is not uninstalled in any other users, remove appId and sandboxId
+                // corresponding to it from the internal state.
+                boolean installedInAnyUser = false;
+                for (int i = mPackages.size() - 1; i >= 0; --i) {
+                    if (mPackages.valueAt(i).contains(packageName)) {
+                        installedInAnyUser = true;
+                        break;
+                    }
+                }
+                if (!installedInAnyUser) {
+                    mAppIds.remove(packageName);
+                    mSandboxIds.remove(appId);
+                }
+            }
+            try {
+                mVold.destroySandboxForApp(packageName, appId, sandboxId, userId);
+            } catch (Exception e) {
+                Slog.wtf(TAG, e);
+            }
+        }
+
+        @Override
+        public String[] getVisibleVolumesForUser(int userId) {
+            final ArrayList<String> visibleVolsForUser = new ArrayList<>();
+            for (int i = mVisibleVols.size() - 1; i >= 0; --i) {
+                final VolumeInfo vol = mVisibleVols.get(i);
+                if (vol.isVisibleForUser(userId)) {
+                    visibleVolsForUser.add(getVolumeLabel(vol));
+                }
+            }
+            return visibleVolsForUser.toArray(new String[visibleVolsForUser.size()]);
+        }
+
+        private String getVolumeLabel(VolumeInfo vol) {
+            // STOPSHIP: Label needs to part of VolumeInfo and need to be passed on from vold
+            switch (vol.getType()) {
+                case VolumeInfo.TYPE_EMULATED:
+                    return "emulated";
+                case VolumeInfo.TYPE_PUBLIC:
+                    return vol.fsUuid == null ? vol.id : vol.fsUuid;
+                default:
+                    return null;
+            }
         }
     }
 }

@@ -18,8 +18,10 @@ package android.os;
 
 import android.Manifest;
 import android.annotation.RequiresPermission;
+import android.annotation.SuppressAutoDoc;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
+import android.app.ActivityThread;
 import android.app.Application;
 import android.content.Context;
 import android.text.TextUtils;
@@ -30,6 +32,8 @@ import com.android.internal.telephony.TelephonyProperties;
 
 import dalvik.system.VMRuntime;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -125,14 +129,21 @@ public class Build {
      * <a href="/training/articles/security-key-attestation.html">key attestation</a> to obtain
      * proof of the device's original identifiers.
      *
+     * <p>Requires Permission: READ_PRIVILEGED_PHONE_STATE or for the calling package to be the
+     * device or profile owner. Profile owner access is deprecated and will be removed in a future
+     * release.
+     *
      * @return The serial number if specified.
      */
-    @RequiresPermission(Manifest.permission.READ_PHONE_STATE)
+    @SuppressAutoDoc // No support for device / profile owner.
+    @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public static String getSerial() {
         IDeviceIdentifiersPolicyService service = IDeviceIdentifiersPolicyService.Stub
                 .asInterface(ServiceManager.getService(Context.DEVICE_IDENTIFIERS_SERVICE));
         try {
-            return service.getSerial();
+            Application application = ActivityThread.currentApplication();
+            String callingPackage = application != null ? application.getPackageName() : null;
+            return service.getSerialForPackage(callingPackage);
         } catch (RemoteException e) {
             e.rethrowFromSystemServer();
         }
@@ -1083,7 +1094,67 @@ public class Build {
         return true;
     }
 
+    /** Build information for a particular device partition. */
+    public static class Partition {
+        /** The name identifying the system partition. */
+        public static final String PARTITION_NAME_SYSTEM = "system";
+
+        private String mName;
+        private String mFingerprint;
+        private long mTimeMs;
+
+        public Partition() {}
+
+        private Partition(String name, String fingerprint, long timeMs) {
+            mName = name;
+            mFingerprint = fingerprint;
+            mTimeMs = timeMs;
+        }
+
+        /** The name of this partition, e.g. "system", or "vendor" */
+        public String getName() {
+            return mName;
+        }
+
+        /** The build fingerprint of this partition, see {@link Build#FINGERPRINT}. */
+        public String getFingerprint() {
+            return mFingerprint;
+        }
+
+        /** The time (ms since epoch), at which this partition was built, see {@link Build#TIME}. */
+        public long getTimeMillis() {
+            return mTimeMs;
+        }
+    }
+
+    /**
+     * Get build information about partitions that have a separate fingerprint defined.
+     *
+     * The list includes partitions that are suitable candidates for over-the-air updates. This is
+     * not an exhaustive list of partitions on the device.
+     */
+    public static List<Partition> getPartitions() {
+        ArrayList<Partition> partitions = new ArrayList();
+
+        String[] names = new String[] {
+            "bootimage", "odm", "product", "product_services", Partition.PARTITION_NAME_SYSTEM,
+            "vendor"
+        };
+        for (String name : names) {
+            String fingerprint = SystemProperties.get("ro." + name + ".build.fingerprint");
+            if (TextUtils.isEmpty(fingerprint)) {
+                continue;
+            }
+            long time = getLong("ro." + name + ".build.date.utc") * 1000;
+            partitions.add(new Partition(name, fingerprint, time));
+        }
+
+        return partitions;
+    }
+
     // The following properties only make sense for internal engineering builds.
+
+    /** The time at which the build was produced, given in milliseconds since the UNIX epoch. */
     public static final long TIME = getLong("ro.build.date.utc") * 1000;
     public static final String USER = getString("ro.build.user");
     public static final String HOST = getString("ro.build.host");

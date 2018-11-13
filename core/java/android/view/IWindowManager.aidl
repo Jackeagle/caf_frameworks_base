@@ -17,8 +17,6 @@
 package android.view;
 
 import com.android.internal.os.IResultReceiver;
-import com.android.internal.view.IInputContext;
-import com.android.internal.view.IInputMethodClient;
 import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.internal.policy.IShortcutService;
 
@@ -71,9 +69,7 @@ interface IWindowManager
     boolean stopViewServer();            // Transaction #2
     boolean isViewServerRunning();       // Transaction #3
 
-    IWindowSession openSession(in IWindowSessionCallback callback, in IInputMethodClient client,
-            in IInputContext inputContext);
-    boolean inputMethodClientHasFocus(IInputMethodClient client);
+    IWindowSession openSession(in IWindowSessionCallback callback);
 
     void getInitialDisplaySize(int displayId, out Point size);
     void getBaseDisplaySize(int displayId, out Point size);
@@ -91,7 +87,6 @@ interface IWindowManager
     void setEventDispatching(boolean enabled);
     void addWindowToken(IBinder token, int type, int displayId);
     void removeWindowToken(IBinder token, int displayId);
-    void setFocusedApp(IBinder token, boolean moveFocusNow);
     void prepareAppTransition(int transit, boolean alwaysKeepCurrent);
     int getPendingAppTransition();
     void overridePendingAppTransition(String packageName, int enterAnim, int exitAnim,
@@ -392,15 +387,16 @@ interface IWindowManager
     void registerShortcutKey(in long shortcutCode, IShortcutService keySubscriber);
 
     /**
-     * Create an input consumer by name.
+     * Create an input consumer by name and display id.
      */
-    void createInputConsumer(IBinder token, String name, out InputChannel inputChannel);
+    void createInputConsumer(IBinder token, String name, int displayId,
+        out InputChannel inputChannel);
 
     /**
-     * Destroy an input consumer by name.  This method will also dispose the input channels
-     * associated with that InputConsumer.
+     * Destroy an input consumer by name and display id.
+     * This method will also dispose the input channels associated with that InputConsumer.
      */
-    boolean destroyInputConsumer(String name);
+    boolean destroyInputConsumer(String name, int displayId);
 
     /**
      * Return the touch region for the current IME window, or an empty region if there is none.

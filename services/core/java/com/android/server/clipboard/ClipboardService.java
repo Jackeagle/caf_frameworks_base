@@ -26,6 +26,7 @@ import android.app.KeyguardManager;
 import android.app.UriGrantsManager;
 import android.content.ClipData;
 import android.content.ClipDescription;
+import android.content.ComponentName;
 import android.content.ContentProvider;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -48,6 +49,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 
@@ -627,19 +629,35 @@ public class ClipboardService extends SystemService {
         if (mAppOps.noteOp(op, callingUid, callingPackage) != AppOpsManager.MODE_ALLOWED) {
             return false;
         }
+        // Shell can access the clipboard for testing purposes.
+        if (mPm.checkPermission(android.Manifest.permission.READ_CLIPBOARD_IN_BACKGROUND,
+                    callingPackage) == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
         // The default IME is always allowed to access the clipboard.
         String defaultIme = Settings.Secure.getStringForUser(getContext().getContentResolver(),
                 Settings.Secure.DEFAULT_INPUT_METHOD, UserHandle.getUserId(callingUid));
-        if (defaultIme != null && defaultIme.equals(callingPackage)) {
-            return true;
+        if (!TextUtils.isEmpty(defaultIme)) {
+            final String imePkg = ComponentName.unflattenFromString(defaultIme).getPackageName();
+            if (imePkg.equals(callingPackage)) {
+                return true;
+            }
         }
 
-        // Otherwise only focused applications can access the clipboard.
-        boolean uidFocused = mWm.isUidFocused(callingUid);
-        if (!uidFocused) {
-            Slog.e(TAG, "Denying clipboard access to " + callingPackage
-                    + ", application is not in focus.");
+        switch (op) {
+            case AppOpsManager.OP_READ_CLIPBOARD:
+                // Clipboard can only be read by applications with focus.
+                boolean uidFocused = mWm.isUidFocused(callingUid);
+                if (!uidFocused) {
+                    Slog.e(TAG, "Denying clipboard access to " + callingPackage
+                            + ", application is not in focus.");
+                }
+                return uidFocused;
+            case AppOpsManager.OP_WRITE_CLIPBOARD:
+                // Writing is allowed without focus.
+                return true;
+            default:
+                throw new IllegalArgumentException("Unknown clipboard appop " + op);
         }
-        return uidFocused;
     }
 }

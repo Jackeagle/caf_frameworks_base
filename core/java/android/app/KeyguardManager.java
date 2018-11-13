@@ -29,6 +29,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -415,7 +416,7 @@ public class KeyguardManager {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public boolean isDeviceLocked(int userId) {
         try {
             return mTrustManager.isDeviceLocked(userId);
@@ -560,7 +561,7 @@ public class KeyguardManager {
      * This will, if the keyguard is secure, bring up the unlock screen of
      * the keyguard.
      *
-     * @param callback Let's you know whether the operation was succesful and
+     * @param callback Lets you know whether the operation was successful and
      *   it is safe to launch anything that would normally be considered safe
      *   once the user has gotten past the keyguard.
      */

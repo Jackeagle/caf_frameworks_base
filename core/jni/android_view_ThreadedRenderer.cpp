@@ -1024,6 +1024,9 @@ static jobject android_view_ThreadedRenderer_createHardwareBitmapFromRenderNode(
         // Continue I guess?
     }
     sk_sp<Bitmap> bitmap = Bitmap::createFrom(buffer);
+    // Bitmap::createFrom currently can only attach to a GraphicBuffer with PIXEL_FORMAT_RGBA_8888
+    // format and SRGB color space.
+    // To support any color space, we could extract it from BufferItem and pass it to Bitmap.
     return bitmap::createBitmap(env, bitmap.release(),
             android::bitmap::kBitmapCreateFlag_Premultiplied);
 }
@@ -1059,6 +1062,12 @@ static void android_view_ThreadedRenderer_allocateBuffers(JNIEnv* env, jobject c
     RenderProxy* proxy = reinterpret_cast<RenderProxy*>(proxyPtr);
     sp<Surface> surface = android_view_Surface_getSurface(env, jsurface);
     proxy->allocateBuffers(surface);
+}
+
+static void android_view_ThreadedRenderer_setForceDark(JNIEnv* env, jobject clazz,
+        jlong proxyPtr, jboolean enable) {
+    RenderProxy* proxy = reinterpret_cast<RenderProxy*>(proxyPtr);
+    proxy->setForceDark(enable);
 }
 
 // ----------------------------------------------------------------------------
@@ -1174,6 +1183,7 @@ static const JNINativeMethod gMethods[] = {
     { "nSetIsolatedProcess", "(Z)V", (void*)android_view_ThreadedRenderer_setIsolatedProcess },
     { "nSetContextPriority", "(I)V", (void*)android_view_ThreadedRenderer_setContextPriority },
     { "nAllocateBuffers", "(JLandroid/view/Surface;)V", (void*)android_view_ThreadedRenderer_allocateBuffers },
+    { "nSetForceDark", "(JZ)V", (void*)android_view_ThreadedRenderer_setForceDark },
 };
 
 static JavaVM* mJvm = nullptr;

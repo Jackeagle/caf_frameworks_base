@@ -16,6 +16,8 @@
 
 package com.android.shell;
 
+import static android.content.pm.PackageManager.FEATURE_LEANBACK;
+import static android.content.pm.PackageManager.FEATURE_TELEVISION;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 
 import static com.android.shell.BugreportPrefs.STATE_HIDE;
@@ -42,6 +44,7 @@ import java.util.zip.ZipOutputStream;
 
 import libcore.io.Streams;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.ChooserActivity;
 import com.android.internal.logging.MetricsLogger;
@@ -232,9 +235,11 @@ public class BugreportProgressService extends Service {
      */
     private boolean mTakingScreenshot;
 
+    @GuardedBy("sNotificationBundle")
     private static final Bundle sNotificationBundle = new Bundle();
 
     private boolean mIsWatch;
+    private boolean mIsTv;
 
     private int mLastProgressPercent;
 
@@ -255,6 +260,9 @@ public class BugreportProgressService extends Service {
         final Configuration conf = mContext.getResources().getConfiguration();
         mIsWatch = (conf.uiMode & Configuration.UI_MODE_TYPE_MASK) ==
                 Configuration.UI_MODE_TYPE_WATCH;
+        PackageManager packageManager = getPackageManager();
+        mIsTv = packageManager.hasSystemFeature(FEATURE_LEANBACK)
+                || packageManager.hasSystemFeature(FEATURE_TELEVISION);
         NotificationManager nm = NotificationManager.from(mContext);
         nm.createNotificationChannel(
                 new NotificationChannel(NOTIFICATION_CHANNEL_ID,
@@ -500,8 +508,8 @@ public class BugreportProgressService extends Service {
                 .setProgress(info.max, info.progress, false)
                 .setOngoing(true);
 
-        // Wear bugreport doesn't need the bug info dialog, screenshot and cancel action.
-        if (!mIsWatch) {
+        // Wear and ATV bugreport doesn't need the bug info dialog, screenshot and cancel action.
+        if (!(mIsWatch || mIsTv)) {
             final Action cancelAction = new Action.Builder(null, mContext.getString(
                     com.android.internal.R.string.cancel), newCancelIntent(mContext, info)).build();
             final Intent infoIntent = new Intent(mContext, BugreportProgressService.class);
@@ -1053,10 +1061,12 @@ public class BugreportProgressService extends Service {
     }
 
     private static Notification.Builder newBaseNotification(Context context) {
-        if (sNotificationBundle.isEmpty()) {
-            // Rename notifcations from "Shell" to "Android System"
-            sNotificationBundle.putString(Notification.EXTRA_SUBSTITUTE_APP_NAME,
-                    context.getString(com.android.internal.R.string.android_system_label));
+        synchronized (sNotificationBundle) {
+            if (sNotificationBundle.isEmpty()) {
+                // Rename notifcations from "Shell" to "Android System"
+                sNotificationBundle.putString(Notification.EXTRA_SUBSTITUTE_APP_NAME,
+                        context.getString(com.android.internal.R.string.android_system_label));
+            }
         }
         return new Notification.Builder(context, NOTIFICATION_CHANNEL_ID)
                 .addExtras(sNotificationBundle)

@@ -30,6 +30,7 @@ import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
 import android.net.wifi.p2p.nsd.WifiP2pUpnpServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pUpnpServiceResponse;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -479,6 +480,13 @@ public class WifiP2pManager {
     /** @hide */
     public static final int REPORT_NFC_HANDOVER_FAILED              = BASE + 81;
 
+    /** @hide */
+    public static final int SET_WFDR2_INFO                          = BASE + 82;
+    /** @hide */
+    public static final int SET_WFDR2_INFO_FAILED                   = BASE + 83;
+    /** @hide */
+    public static final int SET_WFDR2_INFO_SUCCEEDED                = BASE + 84;
+
 
     /**
      * Create a new WifiP2pManager instance. Applications use
@@ -488,7 +496,7 @@ public class WifiP2pManager {
      * @hide - hide this because it takes in a parameter of type IWifiP2pManager, which
      * is a system private class.
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public WifiP2pManager(IWifiP2pManager service) {
         mService = service;
     }
@@ -770,6 +778,7 @@ public class WifiP2pManager {
                     case SET_DEVICE_NAME_FAILED:
                     case DELETE_PERSISTENT_GROUP_FAILED:
                     case SET_WFD_INFO_FAILED:
+                    case SET_WFDR2_INFO_FAILED:
                     case START_WPS_FAILED:
                     case START_LISTEN_FAILED:
                     case STOP_LISTEN_FAILED:
@@ -796,6 +805,7 @@ public class WifiP2pManager {
                     case SET_DEVICE_NAME_SUCCEEDED:
                     case DELETE_PERSISTENT_GROUP_SUCCEEDED:
                     case SET_WFD_INFO_SUCCEEDED:
+                    case SET_WFDR2_INFO_SUCCEEDED:
                     case START_WPS_SUCCEEDED:
                     case START_LISTEN_SUCCEEDED:
                     case STOP_LISTEN_SUCCEEDED:
@@ -1392,7 +1402,18 @@ public class WifiP2pManager {
         c.mAsyncChannel.sendMessage(SET_WFD_INFO, 0, c.putListener(listener), wfdInfo);
     }
 
-
+    /** @hide */
+    public void setWFDR2Info(
+            Channel c, WifiP2pWfdInfo wfdInfo,
+            ActionListener listener) {
+        checkChannel(c);
+        try {
+            mService.checkConfigureWifiDisplayPermission();
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+        c.mAsyncChannel.sendMessage(SET_WFDR2_INFO, 0, c.putListener(listener), wfdInfo);
+    }
     /**
      * Delete a stored persistent group from the system settings.
      *

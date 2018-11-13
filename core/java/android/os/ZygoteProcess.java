@@ -16,6 +16,8 @@
 
 package android.os;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.util.Log;
@@ -212,28 +214,33 @@ public class ZygoteProcess {
      * @param instructionSet null-ok the instruction set to use.
      * @param appDataDir null-ok the data directory of the app.
      * @param invokeWith null-ok the command to invoke with.
+     * @param packageName null-ok the name of the package this process belongs to.
+     * @param packagesForUid null-ok all the packages with the same uid as this process.
+     * @param visibleVols null-ok storage volumes that can be accessed by this process.
      * @param zygoteArgs Additional arguments to supply to the zygote process.
      *
      * @return An object that describes the result of the attempt to start the process.
      * @throws RuntimeException on fatal start failure
      */
-    public final Process.ProcessStartResult start(final String processClass,
+    public final Process.ProcessStartResult start(@NonNull final String processClass,
                                                   final String niceName,
-                                                  int uid, int gid, int[] gids,
+                                                  int uid, int gid, @Nullable int[] gids,
                                                   int runtimeFlags, int mountExternal,
                                                   int targetSdkVersion,
-                                                  String seInfo,
-                                                  String abi,
-                                                  String instructionSet,
-                                                  String appDataDir,
-                                                  String invokeWith,
-                                                  String packageName,
-                                                  String[] zygoteArgs) {
+                                                  @Nullable String seInfo,
+                                                  @NonNull String abi,
+                                                  @Nullable String instructionSet,
+                                                  @Nullable String appDataDir,
+                                                  @Nullable String invokeWith,
+                                                  @Nullable String packageName,
+                                                  @Nullable String[] packagesForUid,
+                                                  @Nullable String[] visibleVols,
+                                                  @Nullable String[] zygoteArgs) {
         try {
             return startViaZygote(processClass, niceName, uid, gid, gids,
                     runtimeFlags, mountExternal, targetSdkVersion, seInfo,
                     abi, instructionSet, appDataDir, invokeWith, false /* startChildZygote */,
-                    packageName, zygoteArgs);
+                    packageName, packagesForUid, visibleVols, zygoteArgs);
         } catch (ZygoteStartFailedEx ex) {
             Log.e(LOG_TAG,
                     "Starting VM process through Zygote failed");
@@ -351,24 +358,29 @@ public class ZygoteProcess {
      * @param appDataDir null-ok the data directory of the app.
      * @param startChildZygote Start a sub-zygote. This creates a new zygote process
      * that has its state cloned from this zygote process.
+     * @param packageName null-ok the name of the package this process belongs to.
+     * @param packagesForUid null-ok all the packages with the same uid as this process.
+     * @param visibleVols null-ok storage volumes that can be accessed by this process.
      * @param extraArgs Additional arguments to supply to the zygote process.
      * @return An object that describes the result of the attempt to start the process.
      * @throws ZygoteStartFailedEx if process start failed for any reason
      */
-    private Process.ProcessStartResult startViaZygote(final String processClass,
-                                                      final String niceName,
+    private Process.ProcessStartResult startViaZygote(@NonNull final String processClass,
+                                                      @Nullable final String niceName,
                                                       final int uid, final int gid,
-                                                      final int[] gids,
+                                                      @Nullable final int[] gids,
                                                       int runtimeFlags, int mountExternal,
                                                       int targetSdkVersion,
-                                                      String seInfo,
-                                                      String abi,
-                                                      String instructionSet,
-                                                      String appDataDir,
-                                                      String invokeWith,
+                                                      @Nullable String seInfo,
+                                                      @NonNull String abi,
+                                                      @Nullable String instructionSet,
+                                                      @Nullable String appDataDir,
+                                                      @Nullable String invokeWith,
                                                       boolean startChildZygote,
-                                                      String packageName,
-                                                      String[] extraArgs)
+                                                      @Nullable String packageName,
+                                                      @Nullable String[] packagesForUid,
+                                                      @Nullable String[] visibleVols,
+                                                      @Nullable String[] extraArgs)
                                                       throws ZygoteStartFailedEx {
         ArrayList<String> argsForZygote = new ArrayList<String>();
 
@@ -384,7 +396,10 @@ public class ZygoteProcess {
             argsForZygote.add("--mount-external-read");
         } else if (mountExternal == Zygote.MOUNT_EXTERNAL_WRITE) {
             argsForZygote.add("--mount-external-write");
+        } else if (mountExternal == Zygote.MOUNT_EXTERNAL_FULL) {
+            argsForZygote.add("--mount-external-full");
         }
+
         argsForZygote.add("--target-sdk-version=" + targetSdkVersion);
 
         // --setgroups is a comma-separated list
@@ -430,6 +445,32 @@ public class ZygoteProcess {
 
         if (packageName != null) {
             argsForZygote.add("--package-name=" + packageName);
+        }
+
+        if (packagesForUid != null && packagesForUid.length > 0) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("--packages-for-uid=");
+
+            for (int i = 0; i < packagesForUid.length; ++i) {
+                if (i != 0) {
+                    sb.append(',');
+                }
+                sb.append(packagesForUid[i]);
+            }
+            argsForZygote.add(sb.toString());
+        }
+
+        if (visibleVols != null && visibleVols.length > 0) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("--visible-vols=");
+
+            for (int i = 0; i < visibleVols.length; ++i) {
+                if (i != 0) {
+                    sb.append(',');
+                }
+                sb.append(visibleVols[i]);
+            }
+            argsForZygote.add(sb.toString());
         }
 
         argsForZygote.add(processClass);
@@ -739,7 +780,8 @@ public class ZygoteProcess {
             result = startViaZygote(processClass, niceName, uid, gid,
                     gids, runtimeFlags, 0 /* mountExternal */, 0 /* targetSdkVersion */, seInfo,
                     abi, instructionSet, null /* appDataDir */, null /* invokeWith */,
-                    true /* startChildZygote */, null /* packageName */, extraArgs);
+                    true /* startChildZygote */, null /* packageName */,
+                    null /* packagesForUid */, null /* visibleVolumes */, extraArgs);
         } catch (ZygoteStartFailedEx ex) {
             throw new RuntimeException("Starting child-zygote through Zygote failed", ex);
         }

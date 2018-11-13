@@ -70,15 +70,8 @@ public class SurfaceControl implements Parcelable {
     private static native void nativeDestroy(long nativeObject);
     private static native void nativeDisconnect(long nativeObject);
 
-    private static native Bitmap nativeScreenshot(IBinder displayToken,
-            Rect sourceCrop, int width, int height, int minLayer, int maxLayer,
-            boolean allLayers, boolean useIdentityTransform, int rotation);
-    private static native GraphicBuffer nativeScreenshotToBuffer(IBinder displayToken,
-            Rect sourceCrop, int width, int height, int minLayer, int maxLayer,
-            boolean allLayers, boolean useIdentityTransform, int rotation);
-    private static native void nativeScreenshot(IBinder displayToken, Surface consumer,
-            Rect sourceCrop, int width, int height, int minLayer, int maxLayer,
-            boolean allLayers, boolean useIdentityTransform);
+    private static native GraphicBuffer nativeScreenshot(IBinder displayToken,
+            Rect sourceCrop, int width, int height, boolean useIdentityTransform, int rotation);
     private static native GraphicBuffer nativeCaptureLayers(IBinder layerHandleToken,
             Rect sourceCrop, float frameScale);
 
@@ -104,12 +97,12 @@ public class SurfaceControl implements Parcelable {
     private static native void nativeSetMatrix(long transactionObj, long nativeObject,
             float dsdx, float dtdx,
             float dtdy, float dsdy);
+    private static native void nativeSetColorTransform(long transactionObj, long nativeObject,
+            float[] matrix, float[] translation);
     private static native void nativeSetColor(long transactionObj, long nativeObject, float[] color);
     private static native void nativeSetFlags(long transactionObj, long nativeObject,
             int flags, int mask);
     private static native void nativeSetWindowCrop(long transactionObj, long nativeObject,
-            int l, int t, int r, int b);
-    private static native void nativeSetFinalCrop(long transactionObj, long nativeObject,
             int l, int t, int r, int b);
     private static native void nativeSetLayerStack(long transactionObj, long nativeObject,
             int layerStack);
@@ -266,6 +259,13 @@ public class SurfaceControl implements Parcelable {
      *
      */
     public static final int FX_SURFACE_DIM = 0x00020000;
+
+    /**
+     * Surface creation flag: Creates a container surface.
+     * This surface will have no buffers and will only be used
+     * as a container for other surfaces, or for its InputInfo.
+     */
+    public static final int FX_SURFACE_CONTAINER = 0x00080000;
 
     /**
      * Mask used for FX values above.
@@ -535,6 +535,23 @@ public class SurfaceControl implements Parcelable {
                 mFlags |= FX_SURFACE_DIM;
             } else {
                 mFlags &= ~FX_SURFACE_DIM;
+            }
+            return this;
+        }
+
+        /**
+         * Indicates whether a 'ContainerLayer' is to be constructed.
+         *
+         * Container layers will not be rendered in any fashion and instead are used
+         * as a parent of renderable layers.
+         *
+         * @param isContainerLayer Whether to create a container layer.
+         */
+        public Builder setContainerLayer(boolean isContainerLayer) {
+            if (isContainerLayer) {
+                mFlags |= FX_SURFACE_CONTAINER;
+            } else {
+                mFlags &= ~FX_SURFACE_CONTAINER;
             }
             return this;
         }
@@ -939,17 +956,22 @@ public class SurfaceControl implements Parcelable {
         }
     }
 
+    /**
+     * Sets the color transform for the Surface.
+     * @param matrix A float array with 9 values represents a 3x3 transform matrix
+     * @param translation A float array with 3 values represents a translation vector
+     */
+    public void setColorTransform(@Size(9) float[] matrix, @Size(3) float[] translation) {
+        checkNotReleased();
+        synchronized (SurfaceControl.class) {
+            sGlobalTransaction.setColorTransform(this, matrix, translation);
+        }
+    }
+
     public void setWindowCrop(Rect crop) {
         checkNotReleased();
         synchronized (SurfaceControl.class) {
             sGlobalTransaction.setWindowCrop(this, crop);
-        }
-    }
-
-    public void setFinalCrop(Rect crop) {
-        checkNotReleased();
-        synchronized (SurfaceControl.class) {
-            sGlobalTransaction.setFinalCrop(this, crop);
         }
     }
 
@@ -1183,52 +1205,39 @@ public class SurfaceControl implements Parcelable {
     }
 
     /**
-     * Copy the current screen contents into the provided {@link Surface}
-     *
-     * @param display The display to take the screenshot of.
-     * @param consumer The {@link Surface} to take the screenshot into.
-     * @param width The desired width of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param height The desired height of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param minLayer The lowest (bottom-most Z order) surface layer to
-     * include in the screenshot.
-     * @param maxLayer The highest (top-most Z order) surface layer to
-     * include in the screenshot.
-     * @param useIdentityTransform Replace whatever transformation (rotation,
-     * scaling, translation) the surface layers are currently using with the
-     * identity transformation while taking the screenshot.
-     */
-    public static void screenshot(IBinder display, Surface consumer,
-            int width, int height, int minLayer, int maxLayer,
-            boolean useIdentityTransform) {
-        screenshot(display, consumer, new Rect(), width, height, minLayer, maxLayer,
-                false, useIdentityTransform);
-    }
-
-    /**
-     * Copy the current screen contents into the provided {@link Surface}
-     *
-     * @param display The display to take the screenshot of.
-     * @param consumer The {@link Surface} to take the screenshot into.
-     * @param width The desired width of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param height The desired height of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     */
-    public static void screenshot(IBinder display, Surface consumer,
-            int width, int height) {
-        screenshot(display, consumer, new Rect(), width, height, 0, 0, true, false);
-    }
-
-    /**
-     * Copy the current screen contents into the provided {@link Surface}
-     *
-     * @param display The display to take the screenshot of.
-     * @param consumer The {@link Surface} to take the screenshot into.
+     * @see SurfaceControl#screenshot(IBinder, Surface, Rect, int, int, boolean, int)
      */
     public static void screenshot(IBinder display, Surface consumer) {
-        screenshot(display, consumer, new Rect(), 0, 0, 0, 0, true, false);
+        screenshot(display, consumer, new Rect(), 0, 0, false, 0);
+    }
+
+    /**
+     * Copy the current screen contents into the provided {@link Surface}
+     *
+     * @param consumer The {@link Surface} to take the screenshot into.
+     * @see SurfaceControl#screenshotToBuffer(IBinder, Rect, int, int, boolean, int)
+     */
+    public static void screenshot(IBinder display, Surface consumer, Rect sourceCrop, int width,
+            int height, boolean useIdentityTransform, int rotation) {
+        if (consumer == null) {
+            throw new IllegalArgumentException("consumer must not be null");
+        }
+
+        final GraphicBuffer buffer = screenshotToBuffer(display, sourceCrop, width, height,
+                useIdentityTransform, rotation);
+        try {
+            consumer.attachAndQueueBuffer(buffer);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failed to take screenshot - " + e.getMessage());
+        }
+    }
+
+    /**
+     * @see SurfaceControl#screenshot(Rect, int, int, boolean, int)}
+     */
+    @UnsupportedAppUsage
+    public static Bitmap screenshot(Rect sourceCrop, int width, int height, int rotation) {
+        return screenshot(sourceCrop, width, height, false, rotation);
     }
 
     /**
@@ -1236,79 +1245,16 @@ public class SurfaceControl implements Parcelable {
      * Note: If you want to modify the Bitmap in software, you will need to copy the Bitmap into
      * a software Bitmap using {@link Bitmap#copy(Bitmap.Config, boolean)}
      *
-     * CAVEAT: Versions of screenshot that return a {@link Bitmap} can
-     * be extremely slow; avoid use unless absolutely necessary; prefer
-     * the versions that use a {@link Surface} instead, such as
-     * {@link SurfaceControl#screenshot(IBinder, Surface)}.
+     * CAVEAT: Versions of screenshot that return a {@link Bitmap} can be extremely slow; avoid use
+     * unless absolutely necessary; prefer the versions that use a {@link Surface} such as
+     * {@link SurfaceControl#screenshot(IBinder, Surface)} or {@link GraphicBuffer} such as
+     * {@link SurfaceControl#screenshotToBuffer(IBinder, Rect, int, int, boolean, int)}.
      *
-     * @param sourceCrop The portion of the screen to capture into the Bitmap;
-     * caller may pass in 'new Rect()' if no cropping is desired.
-     * @param width The desired width of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param height The desired height of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param minLayer The lowest (bottom-most Z order) surface layer to
-     * include in the screenshot.
-     * @param maxLayer The highest (top-most Z order) surface layer to
-     * include in the screenshot.
-     * @param useIdentityTransform Replace whatever transformation (rotation,
-     * scaling, translation) the surface layers are currently using with the
-     * identity transformation while taking the screenshot.
-     * @param rotation Apply a custom clockwise rotation to the screenshot, i.e.
-     * Surface.ROTATION_0,90,180,270. Surfaceflinger will always take
-     * screenshots in its native portrait orientation by default, so this is
-     * useful for returning screenshots that are independent of device
-     * orientation.
-     * @return Returns a hardware Bitmap containing the screen contents, or null
-     * if an error occurs. Make sure to call Bitmap.recycle() as soon as
-     * possible, once its content is not needed anymore.
+     * @see SurfaceControl#screenshotToBuffer(IBinder, Rect, int, int, boolean, int)}
      */
     @UnsupportedAppUsage
     public static Bitmap screenshot(Rect sourceCrop, int width, int height,
-            int minLayer, int maxLayer, boolean useIdentityTransform,
-            int rotation) {
-        // TODO: should take the display as a parameter
-        IBinder displayToken = SurfaceControl.getBuiltInDisplay(
-                SurfaceControl.BUILT_IN_DISPLAY_ID_MAIN);
-        return nativeScreenshot(displayToken, sourceCrop, width, height,
-                minLayer, maxLayer, false, useIdentityTransform, rotation);
-    }
-
-    /**
-     * Like {@link SurfaceControl#screenshot(Rect, int, int, int, int, boolean, int)}
-     * but returns a GraphicBuffer.
-     */
-    public static GraphicBuffer screenshotToBuffer(Rect sourceCrop, int width, int height,
-            int minLayer, int maxLayer, boolean useIdentityTransform,
-            int rotation) {
-        IBinder displayToken = SurfaceControl.getBuiltInDisplay(
-                SurfaceControl.BUILT_IN_DISPLAY_ID_MAIN);
-        return nativeScreenshotToBuffer(displayToken, sourceCrop, width, height,
-                minLayer, maxLayer, false, useIdentityTransform, rotation);
-    }
-
-    /**
-     * Like {@link SurfaceControl#screenshot(Rect, int, int, int, int, boolean, int)} but
-     * includes all Surfaces in the screenshot. This will also update the orientation so it
-     * sends the correct coordinates to SF based on the rotation value.
-     *
-     * @param sourceCrop The portion of the screen to capture into the Bitmap;
-     * caller may pass in 'new Rect()' if no cropping is desired.
-     * @param width The desired width of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param height The desired height of the returned bitmap; the raw
-     * screen will be scaled down to this size.
-     * @param rotation Apply a custom clockwise rotation to the screenshot, i.e.
-     * Surface.ROTATION_0,90,180,270. Surfaceflinger will always take
-     * screenshots in its native portrait orientation by default, so this is
-     * useful for returning screenshots that are independent of device
-     * orientation.
-     * @return Returns a Bitmap containing the screen contents, or null
-     * if an error occurs. Make sure to call Bitmap.recycle() as soon as
-     * possible, once its content is not needed anymore.
-     */
-    @UnsupportedAppUsage
-    public static Bitmap screenshot(Rect sourceCrop, int width, int height, int rotation) {
+            boolean useIdentityTransform, int rotation) {
         // TODO: should take the display as a parameter
         IBinder displayToken = SurfaceControl.getBuiltInDisplay(
                 SurfaceControl.BUILT_IN_DISPLAY_ID_MAIN);
@@ -1317,22 +1263,45 @@ public class SurfaceControl implements Parcelable {
         }
 
         SurfaceControl.rotateCropForSF(sourceCrop, rotation);
-        return nativeScreenshot(displayToken, sourceCrop, width, height, 0, 0, true,
-                false, rotation);
+        final GraphicBuffer buffer = screenshotToBuffer(displayToken, sourceCrop, width, height,
+                useIdentityTransform, rotation);
+
+        if (buffer == null) {
+            Log.w(TAG, "Failed to take screenshot");
+            return null;
+        }
+        return Bitmap.createHardwareBitmap(buffer);
     }
 
-    @UnsupportedAppUsage
-    private static void screenshot(IBinder display, Surface consumer, Rect sourceCrop,
-            int width, int height, int minLayer, int maxLayer, boolean allLayers,
-            boolean useIdentityTransform) {
+    /**
+     * Captures all the surfaces in a display and returns a {@link GraphicBuffer} with the content.
+     *
+     * @param display              The display to take the screenshot of.
+     * @param sourceCrop           The portion of the screen to capture into the Bitmap; caller may
+     *                             pass in 'new Rect()' if no cropping is desired.
+     * @param width                The desired width of the returned bitmap; the raw screen will be
+     *                             scaled down to this size; caller may pass in 0 if no scaling is
+     *                             desired.
+     * @param height               The desired height of the returned bitmap; the raw screen will
+     *                             be scaled down to this size; caller may pass in 0 if no scaling
+     *                             is desired.
+     * @param useIdentityTransform Replace whatever transformation (rotation, scaling, translation)
+     *                             the surface layers are currently using with the identity
+     *                             transformation while taking the screenshot.
+     * @param rotation             Apply a custom clockwise rotation to the screenshot, i.e.
+     *                             Surface.ROTATION_0,90,180,270. SurfaceFlinger will always take
+     *                             screenshots in its native portrait orientation by default, so
+     *                             this is useful for returning screenshots that are independent of
+     *                             device orientation.
+     * @return Returns a GraphicBuffer that contains the captured content.
+     */
+    public static GraphicBuffer screenshotToBuffer(IBinder display, Rect sourceCrop, int width,
+            int height, boolean useIdentityTransform, int rotation) {
         if (display == null) {
             throw new IllegalArgumentException("displayToken must not be null");
         }
-        if (consumer == null) {
-            throw new IllegalArgumentException("consumer must not be null");
-        }
-        nativeScreenshot(display, consumer, sourceCrop, width, height,
-                minLayer, maxLayer, allLayers, useIdentityTransform);
+
+        return nativeScreenshot(display, sourceCrop, width, height, useIdentityTransform, rotation);
     }
 
     private static void rotateCropForSF(Rect crop, int rot) {
@@ -1492,6 +1461,18 @@ public class SurfaceControl implements Parcelable {
             return this;
         }
 
+        /**
+         * Sets the color transform for the Surface.
+         * @param matrix A float array with 9 values represents a 3x3 transform matrix
+         * @param translation A float array with 3 values represents a translation vector
+         */
+        public Transaction setColorTransform(SurfaceControl sc, @Size(9) float[] matrix,
+                @Size(3) float[] translation) {
+            sc.checkNotReleased();
+            nativeSetColorTransform(mNativeObject, sc.mNativeObject, matrix, translation);
+            return this;
+        }
+
         @UnsupportedAppUsage
         public Transaction setWindowCrop(SurfaceControl sc, Rect crop) {
             sc.checkNotReleased();
@@ -1506,18 +1487,6 @@ public class SurfaceControl implements Parcelable {
         }
 
         @UnsupportedAppUsage
-        public Transaction setFinalCrop(SurfaceControl sc, Rect crop) {
-            sc.checkNotReleased();
-            if (crop != null) {
-                nativeSetFinalCrop(mNativeObject, sc.mNativeObject,
-                        crop.left, crop.top, crop.right, crop.bottom);
-            } else {
-                nativeSetFinalCrop(mNativeObject, sc.mNativeObject, 0, 0, 0, 0);
-            }
-
-            return this;
-        }
-
         public Transaction setLayerStack(SurfaceControl sc, int layerStack) {
             sc.checkNotReleased();
             nativeSetLayerStack(mNativeObject, sc.mNativeObject, layerStack);

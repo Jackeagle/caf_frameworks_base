@@ -23,6 +23,7 @@ import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -195,7 +196,10 @@ public final class WindowManagerGlobal {
         synchronized (WindowManagerGlobal.class) {
             if (sWindowSession == null) {
                 try {
-                    InputMethodManager imm = InputMethodManager.getInstance();
+                    // Emulate the legacy behavior.  The global instance of InputMethodManager
+                    // was instantiated here.
+                    // TODO(b/116157766): Remove this hack after cleaning up @UnsupportedAppUsage
+                    InputMethodManager.ensureDefaultInstanceForDefaultDisplayIfNecessary();
                     IWindowManager windowManager = getWindowManagerService();
                     sWindowSession = windowManager.openSession(
                             new IWindowSessionCallback.Stub() {
@@ -203,8 +207,7 @@ public final class WindowManagerGlobal {
                                 public void onAnimatorScaleChanged(float scale) {
                                     ValueAnimator.setDurationScale(scale);
                                 }
-                            },
-                            imm.getClient(), imm.getInputContext());
+                            });
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
                 }
@@ -213,7 +216,7 @@ public final class WindowManagerGlobal {
         }
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static IWindowSession peekWindowSession() {
         synchronized (WindowManagerGlobal.class) {
             return sWindowSession;
@@ -467,7 +470,7 @@ public final class WindowManagerGlobal {
         View view = root.getView();
 
         if (view != null) {
-            InputMethodManager imm = InputMethodManager.getInstance();
+            InputMethodManager imm = view.getContext().getSystemService(InputMethodManager.class);
             if (imm != null) {
                 imm.windowDismissed(mViews.get(index).getWindowToken());
             }

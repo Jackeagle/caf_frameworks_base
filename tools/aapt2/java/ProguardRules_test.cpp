@@ -21,15 +21,16 @@
 #include "test/Test.h"
 
 using ::aapt::io::StringOutputStream;
+using ::android::ConfigDescription;
 using ::testing::HasSubstr;
 using ::testing::Not;
 
 namespace aapt {
 
-std::string GetKeepSetString(const proguard::KeepSet& set) {
+std::string GetKeepSetString(const proguard::KeepSet& set, bool minimal_rules) {
   std::string out;
   StringOutputStream sout(&out);
-  proguard::WriteKeepSet(set, &sout);
+  proguard::WriteKeepSet(set, &sout, minimal_rules);
   sout.Flush();
   return out;
 }
@@ -53,8 +54,17 @@ TEST(ProguardRulesTest, ManifestRuleDefaultConstructorOnly) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRulesForManifest(manifest.get(), &set, false));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarAppComponentFactory { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarBackupAgent { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarApplication { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarActivity { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarService { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarReceiver { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarProvider { <init>(); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarInstrumentation { <init>(); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarAppComponentFactory { <init>(); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarBackupAgent { <init>(); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.BarApplication { <init>(); }"));
@@ -75,8 +85,10 @@ TEST(ProguardRulesTest, FragmentNameRuleIsEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(); }"));
 }
 
@@ -89,8 +101,10 @@ TEST(ProguardRulesTest, FragmentClassRuleIsEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(); }"));
 }
 
@@ -105,8 +119,11 @@ TEST(ProguardRulesTest, FragmentNameAndClassRulesAreEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Baz { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Baz { <init>(); }"));
 }
@@ -133,7 +150,12 @@ TEST(ProguardRulesTest, NavigationFragmentNameAndClassRulesAreEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), navigation.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.package.Foo { <init>(...); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.package.Bar { <init>(...); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.base.Nested { <init>(...); }"));
+
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr("-keep class com.package.Foo { <init>(...); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.package.Bar { <init>(...); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.base.Nested { <init>(...); }"));
@@ -150,8 +172,10 @@ TEST(ProguardRulesTest, CustomViewRulesAreEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr(
       "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
 }
@@ -188,11 +212,16 @@ TEST(ProguardRulesTest, IncludedLayoutRulesAreConditional) {
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), bar_layout.get(), &set));
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), foo_layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-if class **.R$layout"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
+  EXPECT_THAT(actual, HasSubstr("int foo"));
+  EXPECT_THAT(actual, HasSubstr("int bar"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr("-if class **.R$layout"));
   EXPECT_THAT(actual, HasSubstr(
-      "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
+    "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
   EXPECT_THAT(actual, HasSubstr("int foo"));
   EXPECT_THAT(actual, HasSubstr("int bar"));
 }
@@ -209,10 +238,16 @@ TEST(ProguardRulesTest, AliasedLayoutRulesAreConditional) {
   set.AddReference({test::ParseNameOrDie("layout/bar"), {}}, layout->file.name);
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
-
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
   EXPECT_THAT(actual, HasSubstr(
-      "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
+      "-keep class com.foo.Bar { <init>(...); }"));
+  EXPECT_THAT(actual, HasSubstr("-if class **.R$layout"));
+  EXPECT_THAT(actual, HasSubstr("int foo"));
+  EXPECT_THAT(actual, HasSubstr("int bar"));
+
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
+  EXPECT_THAT(actual, HasSubstr(
+    "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
   EXPECT_THAT(actual, HasSubstr("-if class **.R$layout"));
   EXPECT_THAT(actual, HasSubstr("int foo"));
   EXPECT_THAT(actual, HasSubstr("int bar"));
@@ -230,11 +265,14 @@ TEST(ProguardRulesTest, NonLayoutReferencesAreUnconditional) {
   set.AddReference({test::ParseNameOrDie("style/MyStyle"), {}}, layout->file.name);
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, Not(HasSubstr("-if")));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, Not(HasSubstr("-if")));
   EXPECT_THAT(actual, HasSubstr(
-      "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
+    "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
 }
 
 TEST(ProguardRulesTest, ViewOnClickRuleIsEmitted) {
@@ -247,10 +285,13 @@ TEST(ProguardRulesTest, ViewOnClickRuleIsEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), layout.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
-
+  std::string actual = GetKeepSetString(set,  /** minimal_rules */ false);
   EXPECT_THAT(actual, HasSubstr(
       "-keepclassmembers class * { *** bar_method(android.view.View); }"));
+
+  actual = GetKeepSetString(set,  /** minimal_rules */ true);
+  EXPECT_THAT(actual, HasSubstr(
+    "-keepclassmembers class * { *** bar_method(android.view.View); }"));
 }
 
 TEST(ProguardRulesTest, MenuRulesAreEmitted) {
@@ -267,10 +308,16 @@ TEST(ProguardRulesTest, MenuRulesAreEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), menu.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
-
+  std::string actual = GetKeepSetString(set,  /** minimal_rules */ false);
   EXPECT_THAT(actual, HasSubstr(
-      "-keepclassmembers class * { *** on_click(android.view.MenuItem); }"));
+    "-keepclassmembers class * { *** on_click(android.view.MenuItem); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Baz { <init>(...); }"));
+  EXPECT_THAT(actual, Not(HasSubstr("com.foo.Bat")));
+
+  actual = GetKeepSetString(set,  /** minimal_rules */ true);
+  EXPECT_THAT(actual, HasSubstr(
+    "-keepclassmembers class * { *** on_click(android.view.MenuItem); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(android.content.Context); }"));
   EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Baz { <init>(android.content.Context); }"));
   EXPECT_THAT(actual, Not(HasSubstr("com.foo.Bat")));
@@ -287,10 +334,12 @@ TEST(ProguardRulesTest, TransitionPathMotionRulesAreEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), transition.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr(
-      "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
+    "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
 }
 
 TEST(ProguardRulesTest, TransitionRulesAreEmitted) {
@@ -304,10 +353,12 @@ TEST(ProguardRulesTest, TransitionRulesAreEmitted) {
   proguard::KeepSet set;
   ASSERT_TRUE(proguard::CollectProguardRules(context.get(), transitionSet.get(), &set));
 
-  std::string actual = GetKeepSetString(set);
+  std::string actual = GetKeepSetString(set, /** minimal_rules */ false);
+  EXPECT_THAT(actual, HasSubstr("-keep class com.foo.Bar { <init>(...); }"));
 
+  actual = GetKeepSetString(set, /** minimal_rules */ true);
   EXPECT_THAT(actual, HasSubstr(
-      "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
+    "-keep class com.foo.Bar { <init>(android.content.Context, android.util.AttributeSet); }"));
 }
 
 }  // namespace aapt

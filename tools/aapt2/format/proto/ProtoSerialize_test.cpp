@@ -20,6 +20,7 @@
 #include "format/proto/ProtoDeserialize.h"
 #include "test/Test.h"
 
+using ::android::ConfigDescription;
 using ::android::StringPiece;
 using ::testing::Eq;
 using ::testing::IsEmpty;
@@ -33,6 +34,7 @@ class MockFileCollection : public io::IFileCollection {
  public:
   MOCK_METHOD1(FindFile, io::IFile*(const StringPiece& path));
   MOCK_METHOD0(Iterator, std::unique_ptr<io::IFileCollectionIterator>());
+  MOCK_METHOD0(GetDirSeparator, char());
 };
 
 TEST(ProtoSerializeTest, SerializeSinglePackage) {

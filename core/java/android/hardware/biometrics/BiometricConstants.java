@@ -16,6 +16,8 @@
 
 package android.hardware.biometrics;
 
+import android.annotation.UnsupportedAppUsage;
+
 
 /**
  * Interface containing all of the biometric modality agnostic constants.
@@ -30,6 +32,13 @@ public interface BiometricConstants {
     // Error messages from biometric hardware during initilization, enrollment, authentication or
     // removal.
     //
+
+    /**
+     * This was not added here since it would update BiometricPrompt API. But, is used in
+     * BiometricManager.
+     * @hide
+     */
+    int BIOMETRIC_ERROR_NONE = 0;
 
     /**
      * The hardware is unavailable. Try again later.
@@ -119,6 +128,7 @@ public interface BiometricConstants {
     /**
      * @hide
      */
+    @UnsupportedAppUsage
     int BIOMETRIC_ERROR_VENDOR_BASE = 1000;
 
     //
@@ -172,5 +182,5 @@ public interface BiometricConstants {
     /**
      * @hide
      */
-    int BIOMETRICT_ACQUIRED_VENDOR_BASE = 1000;
+    int BIOMETRIC_ACQUIRED_VENDOR_BASE = 1000;
 }

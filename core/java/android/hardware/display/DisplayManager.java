@@ -167,8 +167,7 @@ public final class DisplayManager {
      * reasonable measures, such as over-the-air encryption, to prevent the contents
      * of the display from being intercepted or recorded on a persistent medium.
      * </p><p>
-     * Creating a secure virtual display requires the
-     * {@link android.Manifest.permission#CAPTURE_SECURE_VIDEO_OUTPUT} permission.
+     * Creating a secure virtual display requires the CAPTURE_SECURE_VIDEO_OUTPUT permission.
      * This permission is reserved for use by system components and is not available to
      * third-party applications.
      * </p>
@@ -228,9 +227,8 @@ public final class DisplayManager {
      * </p>
      *
      * <p>
-     * Creating an auto-mirroing virtual display requires the
-     * {@link android.Manifest.permission#CAPTURE_VIDEO_OUTPUT}
-     * or {@link android.Manifest.permission#CAPTURE_SECURE_VIDEO_OUTPUT} permission.
+     * Creating an auto-mirroing virtual display requires the CAPTURE_VIDEO_OUTPUT
+     * or CAPTURE_SECURE_VIDEO_OUTPUT permission.
      * These permissions are reserved for use by system components and are not available to
      * third-party applications.
      *
@@ -298,6 +296,15 @@ public final class DisplayManager {
      * @hide
      */
     public static final int VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 << 8;
+
+    /**
+     * Virtual display flag: Indicates that the display should support system decorations. Virtual
+     * displays without this flag shouldn't show home, IME or any other system decorations.
+     *
+     * @see #createVirtualDisplay
+     * @hide
+     */
+    public static final int VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS = 1 << 9;
 
     /** @hide */
     public DisplayManager(Context context) {

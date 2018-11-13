@@ -44,6 +44,8 @@ public class GraphicsEnvironment {
     private static final boolean DEBUG = false;
     private static final String TAG = "GraphicsEnvironment";
     private static final String PROPERTY_GFX_DRIVER = "ro.gfx.driver.0";
+    private static final String ANGLE_PACKAGE_NAME = "com.android.angle";
+    private static final String GLES_MODE_METADATA_KEY = "com.android.angle.GLES_MODE";
 
     private ClassLoader mClassLoader;
     private String mLayerPath;
@@ -52,8 +54,9 @@ public class GraphicsEnvironment {
     /**
      * Set up GraphicsEnvironment
      */
-    public void setup(Context context) {
+    public void setup(Context context, Bundle coreSettings) {
         setupGpuLayers(context);
+        setupAngle(context, coreSettings);
         chooseDriver(context);
     }
 
@@ -121,13 +124,85 @@ public class GraphicsEnvironment {
                     }
                 }
             }
-
         }
 
         // Include the app's lib directory in all cases
         layerPaths += mLayerPath;
 
         setLayerPaths(mClassLoader, layerPaths);
+    }
+
+    /**
+     * Pass ANGLE details down to trigger enable logic
+     */
+    private static void setupAngle(Context context, Bundle coreSettings) {
+
+        String angleEnabledApp =
+                coreSettings.getString(Settings.Global.ANGLE_ENABLED_APP);
+
+        String packageName = context.getPackageName();
+
+        boolean devOptIn = false;
+        if ((angleEnabledApp != null && packageName != null)
+                && (!angleEnabledApp.isEmpty() && !packageName.isEmpty())
+                && angleEnabledApp.equals(packageName)) {
+
+            if (DEBUG) Log.v(TAG, packageName + " opted in for ANGLE via Developer Setting");
+
+            devOptIn = true;
+        }
+
+        ApplicationInfo appInfo;
+        try {
+            appInfo = context.getPackageManager().getApplicationInfo(packageName,
+                PackageManager.GET_META_DATA);
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Failed to get info about current application: " + packageName);
+            return;
+        }
+
+        String appPref = "dontcare";
+        final BaseBundle metadata = appInfo.metaData;
+        if (metadata != null) {
+            final String glesMode = metadata.getString(GLES_MODE_METADATA_KEY);
+            if (glesMode != null) {
+                if (glesMode.equals("angle")) {
+                    appPref = "angle";
+                    if (DEBUG) Log.v(TAG, packageName + " opted for ANGLE via AndroidManifest");
+                } else if (glesMode.equals("native")) {
+                    appPref = "native";
+                    if (DEBUG) Log.v(TAG, packageName + " opted for NATIVE via AndroidManifest");
+                } else {
+                    Log.w(TAG, "Unrecognized GLES_MODE (\"" + glesMode + "\") for " + packageName
+                               + ". Supported values are \"angle\" or \"native\"");
+                }
+            }
+        }
+
+        ApplicationInfo angleInfo;
+        try {
+            angleInfo = context.getPackageManager().getApplicationInfo(ANGLE_PACKAGE_NAME,
+                PackageManager.MATCH_SYSTEM_ONLY);
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "ANGLE package '" + ANGLE_PACKAGE_NAME + "' not installed");
+            return;
+        }
+
+        String abi = chooseAbi(angleInfo);
+
+        // Build a path that includes installed native libs and APK
+        StringBuilder sb = new StringBuilder();
+        sb.append(angleInfo.nativeLibraryDir)
+            .append(File.pathSeparator)
+            .append(angleInfo.sourceDir)
+            .append("!/lib/")
+            .append(abi);
+        String paths = sb.toString();
+
+        if (DEBUG) Log.v(TAG, "ANGLE package libs: " + paths);
+
+        // Further opt-in logic is handled in native, so pass relevant info down
+        setAngleInfo(paths, packageName, appPref, devOptIn);
     }
 
     /**
@@ -218,4 +293,6 @@ public class GraphicsEnvironment {
     private static native void setLayerPaths(ClassLoader classLoader, String layerPaths);
     private static native void setDebugLayers(String layers);
     private static native void setDriverPath(String path);
+    private static native void setAngleInfo(String path, String appPackage, String appPref,
+                                            boolean devOptIn);
 }

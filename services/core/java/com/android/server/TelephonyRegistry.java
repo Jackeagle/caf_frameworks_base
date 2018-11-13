@@ -50,6 +50,7 @@ import android.telephony.TelephonyManager;
 import android.telephony.VoLteServiceState;
 import android.util.LocalLog;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.telephony.IOnSubscriptionsChangedListener;
 import com.android.internal.telephony.IPhoneStateListener;
@@ -82,7 +83,8 @@ import java.util.NoSuchElementException;
  * Eventually we may want to remove the notion of dummy value but for now this
  * looks like the best approach.
  */
-class TelephonyRegistry extends ITelephonyRegistry.Stub {
+@VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
+public class TelephonyRegistry extends ITelephonyRegistry.Stub {
     private static final String TAG = "TelephonyRegistry";
     private static final boolean DBG = false; // STOPSHIP if true
     private static final boolean DBG_LOC = false; // STOPSHIP if true
@@ -99,6 +101,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
 
         IPhoneStateListener callback;
         IOnSubscriptionsChangedListener onSubscriptionsChangedListenerCallback;
+        IOnSubscriptionsChangedListener onOpportunisticSubscriptionsChangedListenerCallback;
 
         int callerUid;
         int callerPid;
@@ -117,6 +120,10 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             return (onSubscriptionsChangedListenerCallback != null);
         }
 
+        boolean matchOnOpportunisticSubscriptionsChangedListener() {
+            return (onOpportunisticSubscriptionsChangedListenerCallback != null);
+        }
+
         boolean canReadCallLog() {
             try {
                 return TelephonyPermissions.checkReadCallLog(
@@ -131,7 +138,9 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             return "{callingPackage=" + callingPackage + " binder=" + binder
                     + " callback=" + callback
                     + " onSubscriptionsChangedListenererCallback="
-                                            + onSubscriptionsChangedListenerCallback
+                    + onSubscriptionsChangedListenerCallback
+                    + " onOpportunisticSubscriptionsChangedListenererCallback="
+                    + onOpportunisticSubscriptionsChangedListenerCallback
                     + " callerUid=" + callerUid + " subId=" + subId + " phoneId=" + phoneId
                     + " events=" + Integer.toHexString(events) + "}";
         }
@@ -147,7 +156,9 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
 
     private final AppOpsManager mAppOps;
 
-    private boolean hasNotifySubscriptionInfoChangedOccurred = false;
+    private boolean mHasNotifySubscriptionInfoChangedOccurred = false;
+
+    private boolean mHasNotifyOpportunisticSubscriptionInfoChangedOccurred = false;
 
     private int mNumPhones;
 
@@ -201,6 +212,8 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
     private boolean mCarrierNetworkChangeState = false;
 
     private PhoneCapability mPhoneCapability = null;
+
+    private int mPreferredDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 
     private final LocalLog mLocalLog = new LocalLog(100);
 
@@ -315,7 +328,8 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
     // calls go through a oneway interface and local calls going through a
     // handler before they get to app code.
 
-    TelephonyRegistry(Context context) {
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
+    public TelephonyRegistry(Context context) {
         CellLocation  location = CellLocation.getEmpty();
 
         mContext = context;
@@ -407,7 +421,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
                 log("listen oscl:  Register r=" + r);
             }
             // Always notify when registration occurs if there has been a notification.
-            if (hasNotifySubscriptionInfoChangedOccurred) {
+            if (mHasNotifySubscriptionInfoChangedOccurred) {
                 try {
                     if (VDBG) log("listen oscl: send to r=" + r);
                     r.onSubscriptionsChangedListenerCallback.onSubscriptionsChanged();
@@ -417,7 +431,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
                     remove(r.binder);
                 }
             } else {
-                log("listen oscl: hasNotifySubscriptionInfoChangedOccurred==false no callback");
+                log("listen oscl: mHasNotifySubscriptionInfoChangedOccurred==false no callback");
             }
         }
     }
@@ -429,15 +443,61 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         remove(callback.asBinder());
     }
 
+
+    @Override
+    public void addOnOpportunisticSubscriptionsChangedListener(String callingPackage,
+            IOnSubscriptionsChangedListener callback) {
+        int callerUserId = UserHandle.getCallingUserId();
+        mAppOps.checkPackage(Binder.getCallingUid(), callingPackage);
+        if (VDBG) {
+            log("listen ooscl: E pkg=" + callingPackage + " myUserId=" + UserHandle.myUserId()
+                    + " callerUserId="  + callerUserId + " callback=" + callback
+                    + " callback.asBinder=" + callback.asBinder());
+        }
+
+        synchronized (mRecords) {
+            // register
+            IBinder b = callback.asBinder();
+            Record r = add(b);
+
+            if (r == null) {
+                return;
+            }
+
+            r.context = mContext;
+            r.onOpportunisticSubscriptionsChangedListenerCallback = callback;
+            r.callingPackage = callingPackage;
+            r.callerUid = Binder.getCallingUid();
+            r.callerPid = Binder.getCallingPid();
+            r.events = 0;
+            if (DBG) {
+                log("listen ooscl:  Register r=" + r);
+            }
+            // Always notify when registration occurs if there has been a notification.
+            if (mHasNotifyOpportunisticSubscriptionInfoChangedOccurred) {
+                try {
+                    if (VDBG) log("listen ooscl: send to r=" + r);
+                    r.onOpportunisticSubscriptionsChangedListenerCallback.onSubscriptionsChanged();
+                    if (VDBG) log("listen ooscl: sent to r=" + r);
+                } catch (RemoteException e) {
+                    if (VDBG) log("listen ooscl: remote exception sending to r=" + r + " e=" + e);
+                    remove(r.binder);
+                }
+            } else {
+                log("listen ooscl: hasNotifyOpptSubInfoChangedOccurred==false no callback");
+            }
+        }
+    }
+
     @Override
     public void notifySubscriptionInfoChanged() {
         if (VDBG) log("notifySubscriptionInfoChanged:");
         synchronized (mRecords) {
-            if (!hasNotifySubscriptionInfoChangedOccurred) {
+            if (!mHasNotifySubscriptionInfoChangedOccurred) {
                 log("notifySubscriptionInfoChanged: first invocation mRecords.size="
                         + mRecords.size());
             }
-            hasNotifySubscriptionInfoChangedOccurred = true;
+            mHasNotifySubscriptionInfoChangedOccurred = true;
             mRemoveList.clear();
             for (Record r : mRecords) {
                 if (r.matchOnSubscriptionsChangedListener()) {
@@ -447,6 +507,33 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
                         if (VDBG) log("notifySubscriptionInfoChanged: done osc to r=" + r);
                     } catch (RemoteException ex) {
                         if (VDBG) log("notifySubscriptionInfoChanged: RemoteException r=" + r);
+                        mRemoveList.add(r.binder);
+                    }
+                }
+            }
+            handleRemoveListLocked();
+        }
+    }
+
+    @Override
+    public void notifyOpportunisticSubscriptionInfoChanged() {
+        if (VDBG) log("notifyOpptSubscriptionInfoChanged:");
+        synchronized (mRecords) {
+            if (!mHasNotifyOpportunisticSubscriptionInfoChangedOccurred) {
+                log("notifyOpptSubscriptionInfoChanged: first invocation mRecords.size="
+                        + mRecords.size());
+            }
+            mHasNotifyOpportunisticSubscriptionInfoChangedOccurred = true;
+            mRemoveList.clear();
+            for (Record r : mRecords) {
+                if (r.matchOnOpportunisticSubscriptionsChangedListener()) {
+                    try {
+                        if (VDBG) log("notifyOpptSubChanged: call oosc to r=" + r);
+                        r.onOpportunisticSubscriptionsChangedListenerCallback
+                                .onSubscriptionsChanged();
+                        if (VDBG) log("notifyOpptSubChanged: done oosc to r=" + r);
+                    } catch (RemoteException ex) {
+                        if (VDBG) log("notifyOpptSubChanged: RemoteException r=" + r);
                         mRemoveList.add(r.binder);
                     }
                 }
@@ -663,6 +750,13 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
                     if ((events & PhoneStateListener.LISTEN_PHONE_CAPABILITY_CHANGE) != 0) {
                         try {
                             r.callback.onPhoneCapabilityChanged(mPhoneCapability);
+                        } catch (RemoteException ex) {
+                            remove(r.binder);
+                        }
+                    }
+                    if ((events & PhoneStateListener.LISTEN_PREFERRED_DATA_SUBID_CHANGE) != 0) {
+                        try {
+                            r.callback.onPreferredDataSubIdChanged(mPreferredDataSubId);
                         } catch (RemoteException ex) {
                             remove(r.binder);
                         }
@@ -1488,6 +1582,31 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         }
     }
 
+    public void notifyPreferredDataSubIdChanged(int preferredSubId) {
+        if (!checkNotifyPermission("notifyPreferredDataSubIdChanged()")) {
+            return;
+        }
+
+        if (VDBG) {
+            log("notifyPreferredDataSubIdChanged: preferredSubId=" + preferredSubId);
+        }
+
+        synchronized (mRecords) {
+            mPreferredDataSubId = preferredSubId;
+
+            for (Record r : mRecords) {
+                if (r.matchPhoneStateListenerEvent(
+                        PhoneStateListener.LISTEN_PREFERRED_DATA_SUBID_CHANGE)) {
+                    try {
+                        r.callback.onPreferredDataSubIdChanged(preferredSubId);
+                    } catch (RemoteException ex) {
+                        mRemoveList.add(r.binder);
+                    }
+                }
+            }
+            handleRemoveListLocked();
+        }
+    }
 
     @Override
     public void dump(FileDescriptor fd, PrintWriter writer, String[] args) {
@@ -1525,6 +1644,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
             pw.println("mBackgroundCallState=" + mBackgroundCallState);
             pw.println("mVoLteServiceState=" + mVoLteServiceState);
             pw.println("mPhoneCapability=" + mPhoneCapability);
+            pw.println("mPreferredDataSubId=" + mPreferredDataSubId);
 
             pw.decreaseIndent();
 
@@ -1562,6 +1682,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         intent.putExtras(data);
         // Pass the subscription along with the intent.
         intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, subId);
+        intent.putExtra(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX, subId);
         intent.putExtra(PhoneConstants.SLOT_KEY, phoneId);
         mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
     }
@@ -1616,6 +1737,7 @@ class TelephonyRegistry extends ITelephonyRegistry.Stub {
         if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
             intent.setAction(PhoneConstants.ACTION_SUBSCRIPTION_PHONE_STATE_CHANGED);
             intent.putExtra(PhoneConstants.SUBSCRIPTION_KEY, subId);
+            intent.putExtra(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX, subId);
         }
         // If the phoneId is invalid, the broadcast is for overall call state.
         if (phoneId != SubscriptionManager.INVALID_PHONE_INDEX) {

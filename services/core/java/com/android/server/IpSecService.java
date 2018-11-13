@@ -19,6 +19,8 @@ package com.android.server;
 import static android.Manifest.permission.DUMP;
 import static android.net.IpSecManager.INVALID_RESOURCE_ID;
 import static android.system.OsConstants.AF_INET;
+import static android.system.OsConstants.AF_INET6;
+import static android.system.OsConstants.AF_UNSPEC;
 import static android.system.OsConstants.EINVAL;
 import static android.system.OsConstants.IPPROTO_UDP;
 import static android.system.OsConstants.SOCK_DGRAM;
@@ -27,7 +29,6 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 import android.annotation.NonNull;
 import android.app.AppOpsManager;
 import android.content.Context;
-import android.net.ConnectivityManager;
 import android.net.IIpSecService;
 import android.net.INetd;
 import android.net.IpSecAlgorithm;
@@ -44,7 +45,6 @@ import android.net.NetworkUtils;
 import android.net.TrafficStats;
 import android.net.util.NetdService;
 import android.os.Binder;
-import android.os.DeadSystemException;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
@@ -65,6 +65,8 @@ import com.android.internal.util.Preconditions;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -89,9 +91,8 @@ public class IpSecService extends IIpSecService.Stub {
     private static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
 
     private static final String NETD_SERVICE_NAME = "netd";
-    private static final int[] DIRECTIONS =
-            new int[] {IpSecManager.DIRECTION_OUT, IpSecManager.DIRECTION_IN};
-    private static final String[] WILDCARD_ADDRESSES = new String[]{"0.0.0.0", "::"};
+    private static final int[] ADDRESS_FAMILIES =
+            new int[] {OsConstants.AF_INET, OsConstants.AF_INET6};
 
     private static final int NETD_FETCH_TIMEOUT_MS = 5000; // ms
     private static final int MAX_PORT_BIND_ATTEMPTS = 10;
@@ -615,7 +616,7 @@ public class IpSecService extends IIpSecService.Stub {
                 mSrvConfig
                         .getNetdInstance()
                         .ipSecDeleteSecurityAssociation(
-                                mResourceId,
+                                uid,
                                 mConfig.getSourceAddress(),
                                 mConfig.getDestinationAddress(),
                                 spi,
@@ -682,7 +683,7 @@ public class IpSecService extends IIpSecService.Stub {
                     mSrvConfig
                             .getNetdInstance()
                             .ipSecDeleteSecurityAssociation(
-                                    mResourceId, mSourceAddress, mDestinationAddress, mSpi, 0, 0);
+                                    uid, mSourceAddress, mDestinationAddress, mSpi, 0, 0);
                 }
             } catch (ServiceSpecificException | RemoteException e) {
                 Log.e(TAG, "Failed to delete SPI reservation with ID: " + mResourceId, e);
@@ -819,16 +820,22 @@ public class IpSecService extends IIpSecService.Stub {
             //       Teardown VTI
             //       Delete global policies
             try {
-                mSrvConfig.getNetdInstance().removeVirtualTunnelInterface(mInterfaceName);
+                final INetd netd = mSrvConfig.getNetdInstance();
+                netd.removeVirtualTunnelInterface(mInterfaceName);
 
-                for(String wildcardAddr : WILDCARD_ADDRESSES) {
-                    for (int direction : DIRECTIONS) {
-                        int mark = (direction == IpSecManager.DIRECTION_IN) ? mIkey : mOkey;
-                        mSrvConfig
-                                .getNetdInstance()
-                                .ipSecDeleteSecurityPolicy(
-                                        0, direction, wildcardAddr, wildcardAddr, mark, 0xffffffff);
-                    }
+                for (int selAddrFamily : ADDRESS_FAMILIES) {
+                    netd.ipSecDeleteSecurityPolicy(
+                            uid,
+                            selAddrFamily,
+                            IpSecManager.DIRECTION_OUT,
+                            mOkey,
+                            0xffffffff);
+                    netd.ipSecDeleteSecurityPolicy(
+                            uid,
+                            selAddrFamily,
+                            IpSecManager.DIRECTION_IN,
+                            mIkey,
+                            0xffffffff);
                 }
             } catch (ServiceSpecificException | RemoteException e) {
                 Log.e(
@@ -1080,7 +1087,8 @@ public class IpSecService extends IIpSecService.Stub {
         }
         checkNotNull(binder, "Null Binder passed to allocateSecurityParameterIndex");
 
-        UserRecord userRecord = mUserResourceTracker.getUserRecord(Binder.getCallingUid());
+        int callingUid = Binder.getCallingUid();
+        UserRecord userRecord = mUserResourceTracker.getUserRecord(callingUid);
         final int resourceId = mNextResourceId++;
 
         int spi = IpSecManager.INVALID_SECURITY_PARAMETER_INDEX;
@@ -1093,7 +1101,7 @@ public class IpSecService extends IIpSecService.Stub {
             spi =
                     mSrvConfig
                             .getNetdInstance()
-                            .ipSecAllocateSpi(resourceId, "", destinationAddress, requestedSpi);
+                            .ipSecAllocateSpi(callingUid, "", destinationAddress, requestedSpi);
             Log.d(TAG, "Allocated SPI " + spi);
             userRecord.mSpiRecords.put(
                     resourceId,
@@ -1261,7 +1269,8 @@ public class IpSecService extends IIpSecService.Stub {
         // TODO: Check that underlying network exists, and IP addresses not assigned to a different
         //       network (b/72316676).
 
-        UserRecord userRecord = mUserResourceTracker.getUserRecord(Binder.getCallingUid());
+        int callerUid = Binder.getCallingUid();
+        UserRecord userRecord = mUserResourceTracker.getUserRecord(callerUid);
         if (!userRecord.mTunnelQuotaTracker.isAvailable()) {
             return new IpSecTunnelInterfaceResponse(IpSecManager.Status.RESOURCE_UNAVAILABLE);
         }
@@ -1276,25 +1285,29 @@ public class IpSecService extends IIpSecService.Stub {
             //       Create VTI
             //       Add inbound/outbound global policies
             //              (use reqid = 0)
-            mSrvConfig
-                    .getNetdInstance()
-                    .addVirtualTunnelInterface(intfName, localAddr, remoteAddr, ikey, okey);
+            final INetd netd = mSrvConfig.getNetdInstance();
+            netd.addVirtualTunnelInterface(intfName, localAddr, remoteAddr, ikey, okey);
 
-            for(String wildcardAddr : WILDCARD_ADDRESSES) {
-                for (int direction : DIRECTIONS) {
-                    int mark = (direction == IpSecManager.DIRECTION_OUT) ? okey : ikey;
-
-                    mSrvConfig
-                            .getNetdInstance()
-                            .ipSecAddSecurityPolicy(
-                                0, // Use 0 for reqId
-                                direction,
-                                wildcardAddr,
-                                wildcardAddr,
-                                0,
-                                mark,
-                                0xffffffff);
-                }
+            for (int selAddrFamily : ADDRESS_FAMILIES) {
+                // Always send down correct local/remote addresses for template.
+                netd.ipSecAddSecurityPolicy(
+                        callerUid,
+                        selAddrFamily,
+                        IpSecManager.DIRECTION_OUT,
+                        localAddr,
+                        remoteAddr,
+                        0,
+                        okey,
+                        0xffffffff);
+                netd.ipSecAddSecurityPolicy(
+                        callerUid,
+                        selAddrFamily,
+                        IpSecManager.DIRECTION_IN,
+                        remoteAddr,
+                        localAddr,
+                        0,
+                        ikey,
+                        0xffffffff);
             }
 
             userRecord.mTunnelInterfaceRecords.put(
@@ -1417,6 +1430,17 @@ public class IpSecService extends IIpSecService.Stub {
                         + "or Encryption algorithms");
     }
 
+    private int getFamily(String inetAddress) {
+        int family = AF_UNSPEC;
+        InetAddress checkAddress = NetworkUtils.numericToInetAddress(inetAddress);
+        if (checkAddress instanceof Inet4Address) {
+            family = AF_INET;
+        } else if (checkAddress instanceof Inet6Address) {
+            family = AF_INET6;
+        }
+        return family;
+    }
+
     /**
      * Checks an IpSecConfig parcel to ensure that the contents are sane and throws an
      * IllegalArgumentException if they are not.
@@ -1470,6 +1494,26 @@ public class IpSecService extends IIpSecService.Stub {
         // Require a valid source address for all transforms.
         checkInetAddress(config.getSourceAddress());
 
+        // Check to ensure source and destination have the same address family.
+        String sourceAddress = config.getSourceAddress();
+        String destinationAddress = config.getDestinationAddress();
+        int sourceFamily = getFamily(sourceAddress);
+        int destinationFamily = getFamily(destinationAddress);
+        if (sourceFamily != destinationFamily) {
+            throw new IllegalArgumentException(
+                    "Source address ("
+                            + sourceAddress
+                            + ") and destination address ("
+                            + destinationAddress
+                            + ") have different address families.");
+        }
+
+        // Throw an error if UDP Encapsulation is not used in IPv4.
+        if (config.getEncapType() != IpSecTransform.ENCAP_NONE && sourceFamily != AF_INET) {
+            throw new IllegalArgumentException(
+                    "UDP Encapsulation is not supported for this address family");
+        }
+
         switch (config.getMode()) {
             case IpSecTransform.MODE_TRANSPORT:
                 break;
@@ -1481,23 +1525,19 @@ public class IpSecService extends IIpSecService.Stub {
         }
     }
 
-    private static final String TUNNEL_OP = "STOPSHIP"; // = AppOpsManager.OP_MANAGE_IPSEC_TUNNELS;
+    private static final String TUNNEL_OP = AppOpsManager.OPSTR_MANAGE_IPSEC_TUNNELS;
 
     private void enforceTunnelPermissions(String callingPackage) {
         checkNotNull(callingPackage, "Null calling package cannot create IpSec tunnels");
-        if (false) { // STOPSHIP if this line is present
-            switch (getAppOpsManager().noteOp(
-                        TUNNEL_OP,
-                        Binder.getCallingUid(), callingPackage)) {
-                case AppOpsManager.MODE_DEFAULT:
-                    mContext.enforceCallingOrSelfPermission(
-                            android.Manifest.permission.MANAGE_IPSEC_TUNNELS, "IpSecService");
-                    break;
-                case AppOpsManager.MODE_ALLOWED:
-                    return;
-                default:
-                    throw new SecurityException("Request to ignore AppOps for non-legacy API");
-            }
+        switch (getAppOpsManager().noteOp(TUNNEL_OP, Binder.getCallingUid(), callingPackage)) {
+            case AppOpsManager.MODE_DEFAULT:
+                mContext.enforceCallingOrSelfPermission(
+                        android.Manifest.permission.MANAGE_IPSEC_TUNNELS, "IpSecService");
+                break;
+            case AppOpsManager.MODE_ALLOWED:
+                return;
+            default:
+                throw new SecurityException("Request to ignore AppOps for non-legacy API");
         }
     }
 
@@ -1525,7 +1565,7 @@ public class IpSecService extends IIpSecService.Stub {
         mSrvConfig
                 .getNetdInstance()
                 .ipSecAddSecurityAssociation(
-                        resourceId,
+                        Binder.getCallingUid(),
                         c.getMode(),
                         c.getSourceAddress(),
                         c.getDestinationAddress(),
@@ -1616,13 +1656,14 @@ public class IpSecService extends IIpSecService.Stub {
     @Override
     public synchronized void applyTransportModeTransform(
             ParcelFileDescriptor socket, int direction, int resourceId) throws RemoteException {
-        UserRecord userRecord = mUserResourceTracker.getUserRecord(Binder.getCallingUid());
+        int callingUid = Binder.getCallingUid();
+        UserRecord userRecord = mUserResourceTracker.getUserRecord(callingUid);
         checkDirection(direction);
         // Get transform record; if no transform is found, will throw IllegalArgumentException
         TransformRecord info = userRecord.mTransformRecords.getResourceOrThrow(resourceId);
 
         // TODO: make this a function.
-        if (info.pid != getCallingPid() || info.uid != getCallingUid()) {
+        if (info.pid != getCallingPid() || info.uid != callingUid) {
             throw new SecurityException("Only the owner of an IpSec Transform may apply it!");
         }
 
@@ -1636,7 +1677,7 @@ public class IpSecService extends IIpSecService.Stub {
                 .getNetdInstance()
                 .ipSecApplyTransportModeTransform(
                         socket.getFileDescriptor(),
-                        resourceId,
+                        callingUid,
                         direction,
                         c.getSourceAddress(),
                         c.getDestinationAddress(),
@@ -1668,7 +1709,8 @@ public class IpSecService extends IIpSecService.Stub {
         enforceTunnelPermissions(callingPackage);
         checkDirection(direction);
 
-        UserRecord userRecord = mUserResourceTracker.getUserRecord(Binder.getCallingUid());
+        int callingUid = Binder.getCallingUid();
+        UserRecord userRecord = mUserResourceTracker.getUserRecord(callingUid);
 
         // Get transform record; if no transform is found, will throw IllegalArgumentException
         TransformRecord transformInfo =
@@ -1693,9 +1735,9 @@ public class IpSecService extends IIpSecService.Stub {
         SpiRecord spiRecord = userRecord.mSpiRecords.getResourceOrThrow(c.getSpiResourceId());
 
         int mark =
-                (direction == IpSecManager.DIRECTION_IN)
-                        ? tunnelInterfaceInfo.getIkey()
-                        : tunnelInterfaceInfo.getOkey();
+                (direction == IpSecManager.DIRECTION_OUT)
+                        ? tunnelInterfaceInfo.getOkey()
+                        : tunnelInterfaceInfo.getIkey();
 
         try {
             c.setMarkValue(mark);
@@ -1706,14 +1748,15 @@ public class IpSecService extends IIpSecService.Stub {
                 c.setNetwork(tunnelInterfaceInfo.getUnderlyingNetwork());
 
                 // If outbound, also add SPI to the policy.
-                for(String wildcardAddr : WILDCARD_ADDRESSES) {
+                for (int selAddrFamily : ADDRESS_FAMILIES) {
                     mSrvConfig
                             .getNetdInstance()
                             .ipSecUpdateSecurityPolicy(
-                                    0, // Use 0 for reqId
+                                    callingUid,
+                                    selAddrFamily,
                                     direction,
-                                    wildcardAddr,
-                                    wildcardAddr,
+                                    tunnelInterfaceInfo.getLocalAddress(),
+                                    tunnelInterfaceInfo.getRemoteAddress(),
                                     transformInfo.getSpiRecord().getSpi(),
                                     mark,
                                     0xffffffff);

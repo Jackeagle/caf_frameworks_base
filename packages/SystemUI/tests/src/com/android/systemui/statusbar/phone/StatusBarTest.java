@@ -50,6 +50,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.service.dreams.IDreamManager;
 import android.service.notification.StatusBarNotification;
 import android.support.test.filters.SmallTest;
 import android.support.test.metricshelper.MetricsAsserts;
@@ -77,8 +78,6 @@ import com.android.systemui.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.AppOpsListener;
 import com.android.systemui.statusbar.CommandQueue;
-import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
-import com.android.systemui.statusbar.notification.row.FooterView;
 import com.android.systemui.statusbar.KeyguardIndicationController;
 import com.android.systemui.statusbar.notification.NotificationData;
 import com.android.systemui.statusbar.notification.NotificationData.Entry;
@@ -105,7 +104,6 @@ import com.android.systemui.statusbar.notification.stack.NotificationStackScroll
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -122,9 +120,9 @@ public class StatusBarTest extends SysuiTestCase {
     @Mock private KeyguardIndicationController mKeyguardIndicationController;
     @Mock private NotificationStackScrollLayout mStackScroller;
     @Mock private HeadsUpManagerPhone mHeadsUpManager;
-    @Mock private SystemServicesProxy mSystemServicesProxy;
     @Mock private NotificationPanelView mNotificationPanelView;
     @Mock private IStatusBarService mBarService;
+    @Mock private IDreamManager mDreamManager;
     @Mock private ScrimController mScrimController;
     @Mock private ArrayList<Entry> mNotificationList;
     @Mock private BiometricUnlockController mBiometricUnlockController;
@@ -197,8 +195,7 @@ public class StatusBarTest extends SysuiTestCase {
             return null;
         }).when(mStatusBarKeyguardViewManager).addAfterKeyguardGoneRunnable(any());
 
-        mEntryManager = new TestableNotificationEntryManager(mSystemServicesProxy, mPowerManager,
-                mContext);
+        mEntryManager = new TestableNotificationEntryManager(mDreamManager, mPowerManager, mContext);
         when(mRemoteInputManager.getController()).thenReturn(mRemoteInputController);
         mStatusBar = new TestableStatusBar(mStatusBarKeyguardViewManager, mUnlockMethodCache,
                 mKeyguardIndicationController, mStackScroller, mHeadsUpManager,
@@ -361,12 +358,12 @@ public class StatusBarTest extends SysuiTestCase {
     }
 
     @Test
-    public void testShouldPeek_nonSuppressedGroupSummary() {
+    public void testShouldHeadsUp_nonSuppressedGroupSummary() throws Exception {
         when(mPowerManager.isScreenOn()).thenReturn(true);
         when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
         when(mNotificationData.shouldSuppressStatusBar(any())).thenReturn(false);
         when(mNotificationData.shouldFilterOut(any())).thenReturn(false);
-        when(mSystemServicesProxy.isDreaming()).thenReturn(false);
+        when(mDreamManager.isDreaming()).thenReturn(false);
         when(mNotificationData.getImportance(any())).thenReturn(IMPORTANCE_HIGH);
 
         Notification n = new Notification.Builder(getContext(), "a")
@@ -378,16 +375,16 @@ public class StatusBarTest extends SysuiTestCase {
                 UserHandle.of(0), null, 0);
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
 
-        assertTrue(mEntryManager.shouldPeek(entry, sbn));
+        assertTrue(mEntryManager.shouldHeadsUp(entry));
     }
 
     @Test
-    public void testShouldPeek_suppressedGroupSummary() {
+    public void testShouldHeadsUp_suppressedGroupSummary() throws Exception {
         when(mPowerManager.isScreenOn()).thenReturn(true);
         when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
         when(mNotificationData.shouldSuppressStatusBar(any())).thenReturn(false);
         when(mNotificationData.shouldFilterOut(any())).thenReturn(false);
-        when(mSystemServicesProxy.isDreaming()).thenReturn(false);
+        when(mDreamManager.isDreaming()).thenReturn(false);
         when(mNotificationData.getImportance(any())).thenReturn(IMPORTANCE_HIGH);
 
         Notification n = new Notification.Builder(getContext(), "a")
@@ -399,15 +396,15 @@ public class StatusBarTest extends SysuiTestCase {
                 UserHandle.of(0), null, 0);
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
 
-        assertFalse(mEntryManager.shouldPeek(entry, sbn));
+        assertFalse(mEntryManager.shouldHeadsUp(entry));
     }
 
     @Test
-    public void testShouldPeek_suppressedPeek() {
+    public void testShouldHeadsUp_suppressedHeadsUp() throws Exception {
         when(mPowerManager.isScreenOn()).thenReturn(true);
         when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
         when(mNotificationData.shouldFilterOut(any())).thenReturn(false);
-        when(mSystemServicesProxy.isDreaming()).thenReturn(false);
+        when(mDreamManager.isDreaming()).thenReturn(false);
         when(mNotificationData.getImportance(any())).thenReturn(IMPORTANCE_HIGH);
 
         when(mNotificationData.shouldSuppressPeek(any())).thenReturn(true);
@@ -417,15 +414,15 @@ public class StatusBarTest extends SysuiTestCase {
                 UserHandle.of(0), null, 0);
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
 
-        assertFalse(mEntryManager.shouldPeek(entry, sbn));
+        assertFalse(mEntryManager.shouldHeadsUp(entry));
     }
 
     @Test
-    public void testShouldPeek_noSuppressedPeek() {
+    public void testShouldHeadsUp_noSuppressedHeadsUp() throws Exception {
         when(mPowerManager.isScreenOn()).thenReturn(true);
         when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
         when(mNotificationData.shouldFilterOut(any())).thenReturn(false);
-        when(mSystemServicesProxy.isDreaming()).thenReturn(false);
+        when(mDreamManager.isDreaming()).thenReturn(false);
         when(mNotificationData.getImportance(any())).thenReturn(IMPORTANCE_HIGH);
 
         when(mNotificationData.shouldSuppressPeek(any())).thenReturn(false);
@@ -435,31 +432,31 @@ public class StatusBarTest extends SysuiTestCase {
                 UserHandle.of(0), null, 0);
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
 
-        assertTrue(mEntryManager.shouldPeek(entry, sbn));
+        assertTrue(mEntryManager.shouldHeadsUp(entry));
     }
 
     @Test
-    public void testPeek_disabledStatusBar() {
+    public void testHeadsUp_disabledStatusBar() {
         Notification n = new Notification.Builder(getContext(), "a").build();
         StatusBarNotification sbn = new StatusBarNotification("a", "a", 0, "a", 0, 0, n,
                 UserHandle.of(0), null, 0);
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
         mStatusBar.disable(StatusBarManager.DISABLE_EXPAND, 0, false /* animate */);
 
-        assertFalse("The panel shouldn't allow peek while disabled",
-                mStatusBar.shouldPeek(entry, sbn));
+        assertFalse("The panel shouldn't allow heads up while disabled",
+                mStatusBar.canHeadsUp(entry, sbn));
     }
 
     @Test
-    public void testPeek_disabledNotificationShade() {
+    public void testHeadsUp_disabledNotificationShade() {
         Notification n = new Notification.Builder(getContext(), "a").build();
         StatusBarNotification sbn = new StatusBarNotification("a", "a", 0, "a", 0, 0, n,
                 UserHandle.of(0), null, 0);
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
         mStatusBar.disable(0, StatusBarManager.DISABLE2_NOTIFICATION_SHADE, false /* animate */);
 
-        assertFalse("The panel shouldn't allow peek while notitifcation shade disabled",
-                mStatusBar.shouldPeek(entry, sbn));
+        assertFalse("The panel shouldn't allow heads up while notification shade disabled",
+                mStatusBar.canHeadsUp(entry, sbn));
     }
 
     @Test
@@ -475,7 +472,7 @@ public class StatusBarTest extends SysuiTestCase {
     }
 
     @Test
-    public void testPanelOpenForPeek() {
+    public void testPanelOpenForHeadsUp() {
         when(mHeadsUpManager.hasPinnedHeadsUp()).thenReturn(true);
         when(mNotificationData.getActiveNotifications()).thenReturn(mNotificationList);
         when(mNotificationList.size()).thenReturn(5);
@@ -593,85 +590,7 @@ public class StatusBarTest extends SysuiTestCase {
     }
 
     @Test
-    public void testInflateFooterView() {
-        mStatusBar.inflateFooterView();
-        ArgumentCaptor<FooterView> captor = ArgumentCaptor.forClass(FooterView.class);
-        verify(mStackScroller).setFooterView(captor.capture());
 
-        assertNotNull(captor.getValue().findViewById(R.id.manage_text).hasOnClickListeners());
-        assertNotNull(captor.getValue().findViewById(R.id.dismiss_text).hasOnClickListeners());
-    }
-
-    @Test
-    public void testUpdateFooter_noNotifications() {
-        mStatusBar.setBarStateForTest(StatusBarState.SHADE);
-        assertEquals(0, mEntryManager.getNotificationData().getActiveNotifications().size());
-
-        mStatusBar.updateFooter();
-        verify(mStackScroller).updateFooterView(false, false);
-    }
-
-    @Test
-    public void testUpdateFooter_remoteInput() {
-        mStatusBar.setBarStateForTest(StatusBarState.SHADE);
-        ArrayList<Entry> entries = new ArrayList<>();
-        entries.add(mock(Entry.class));
-        when(mNotificationData.getActiveNotifications()).thenReturn(entries);
-
-        ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        when(row.canViewBeDismissed()).thenReturn(true);
-        when(mStackScroller.getChildCount()).thenReturn(1);
-        when(mStackScroller.getChildAt(anyInt())).thenReturn(row);
-        when(mRemoteInputController.isRemoteInputActive()).thenReturn(true);
-
-        mStatusBar.updateFooter();
-        verify(mStackScroller).updateFooterView(false, true);
-    }
-
-    @Test
-    public void testUpdateFooter_oneClearableNotification() {
-        mStatusBar.setBarStateForTest(StatusBarState.SHADE);
-        ArrayList<Entry> entries = new ArrayList<>();
-        entries.add(mock(Entry.class));
-        when(mNotificationData.getActiveNotifications()).thenReturn(entries);
-
-        ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        when(row.canViewBeDismissed()).thenReturn(true);
-        when(mStackScroller.getChildCount()).thenReturn(1);
-        when(mStackScroller.getChildAt(anyInt())).thenReturn(row);
-
-        mStatusBar.updateFooter();
-        verify(mStackScroller).updateFooterView(true, true);
-    }
-
-    @Test
-    public void testUpdateFooter_oneNonClearableNotification() {
-        mStatusBar.setBarStateForTest(StatusBarState.SHADE);
-        ArrayList<Entry> entries = new ArrayList<>();
-        entries.add(mock(Entry.class));
-        when(mNotificationData.getActiveNotifications()).thenReturn(entries);
-
-        mStatusBar.updateFooter();
-        verify(mStackScroller).updateFooterView(true, false);
-    }
-
-    @Test
-    public void testUpdateFooter_atEnd() {
-        // add footer
-        mStatusBar.inflateFooterView();
-
-        // add notification
-        ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        when(row.isClearable()).thenReturn(true);
-        mStackScroller.addContainerView(row);
-
-        mStatusBar.onUpdateRowStates();
-
-        // move footer to end
-        verify(mStackScroller).changeViewPosition(any(FooterView.class), eq(-1 /* end */));
-    }
-
-    @Test
     public void testSetState_changesIsFullScreenUserSwitcherState() {
         mStatusBar.setBarStateForTest(StatusBarState.KEYGUARD);
         assertFalse(mStatusBar.isFullScreenUserSwitcherState());
@@ -695,13 +614,6 @@ public class StatusBarTest extends SysuiTestCase {
         when(mStatusBar.mUserSwitcherController.useFullscreenUserSwitcher()).thenReturn(true);
         mStatusBar.showKeyguardImpl();
         verify(mStatusBarStateController).setState(eq(StatusBarState.FULLSCREEN_USER_SWITCHER));
-    }
-
-    @Test
-    public void testOnDensityOrFontScaleChanged_reInflatesFooterViews() {
-        mStatusBar.onDensityOrFontScaleChanged();
-        verify(mStackScroller).setFooterView(any());
-        verify(mStackScroller).setEmptyShadeView(any());
     }
 
     static class TestableStatusBar extends StatusBar {
@@ -743,7 +655,6 @@ public class StatusBarTest extends SysuiTestCase {
             mBiometricUnlockController = biometricUnlockController;
             mActivityLaunchAnimator = launchAnimator;
             mKeyguardViewMediator = keyguardViewMediator;
-            mClearAllEnabled = true;
             mRemoteInputManager = notificationRemoteInputManager;
             mGroupManager = notificationGroupManager;
             mFalsingManager = falsingManager;
@@ -777,12 +688,12 @@ public class StatusBarTest extends SysuiTestCase {
 
     }
 
-    private class TestableNotificationEntryManager extends NotificationEntryManager {
+    public static class TestableNotificationEntryManager extends NotificationEntryManager {
 
-        public TestableNotificationEntryManager(SystemServicesProxy systemServicesProxy,
+        public TestableNotificationEntryManager(IDreamManager dreamManager,
                 PowerManager powerManager, Context context) {
             super(context);
-            mSystemServicesProxy = systemServicesProxy;
+            mDreamManager = dreamManager;
             mPowerManager = powerManager;
         }
 

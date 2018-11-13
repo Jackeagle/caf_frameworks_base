@@ -16,6 +16,15 @@
 
 package com.android.server;
 
+import static android.app.AppOpsManager.UID_STATE_BACKGROUND;
+import static android.app.AppOpsManager.UID_STATE_CACHED;
+import static android.app.AppOpsManager.UID_STATE_FOREGROUND;
+import static android.app.AppOpsManager.UID_STATE_FOREGROUND_SERVICE;
+import static android.app.AppOpsManager.UID_STATE_LAST_NON_RESTRICTED;
+import static android.app.AppOpsManager.UID_STATE_PERSISTENT;
+import static android.app.AppOpsManager.UID_STATE_TOP;
+import static android.app.AppOpsManager._NUM_UID_STATE;
+
 import android.Manifest;
 import android.app.ActivityManager;
 import android.app.ActivityThread;
@@ -45,8 +54,10 @@ import android.os.ServiceManager;
 import android.os.ShellCallback;
 import android.os.ShellCommand;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.os.storage.StorageManager;
 import android.os.storage.StorageManagerInternal;
 import android.provider.Settings;
 import android.util.ArrayMap;
@@ -95,15 +106,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
-import static android.app.AppOpsManager._NUM_UID_STATE;
-import static android.app.AppOpsManager.UID_STATE_BACKGROUND;
-import static android.app.AppOpsManager.UID_STATE_CACHED;
-import static android.app.AppOpsManager.UID_STATE_FOREGROUND;
-import static android.app.AppOpsManager.UID_STATE_FOREGROUND_SERVICE;
-import static android.app.AppOpsManager.UID_STATE_LAST_NON_RESTRICTED;
-import static android.app.AppOpsManager.UID_STATE_PERSISTENT;
-import static android.app.AppOpsManager.UID_STATE_TOP;
 
 public class AppOpsService extends IAppOpsService.Stub {
     static final String TAG = "AppOps";
@@ -657,33 +659,35 @@ public class AppOpsService extends IAppOpsService.Stub {
                     }
                 });
 
-        StorageManagerInternal storageManagerInternal = LocalServices.getService(
-                StorageManagerInternal.class);
-        storageManagerInternal.addExternalStoragePolicy(
-                new StorageManagerInternal.ExternalStorageMountPolicy() {
-                    @Override
-                    public int getMountMode(int uid, String packageName) {
-                        if (Process.isIsolated(uid)) {
-                            return Zygote.MOUNT_EXTERNAL_NONE;
+        if (!SystemProperties.getBoolean(StorageManager.PROP_ISOLATED_STORAGE, false)) {
+            StorageManagerInternal storageManagerInternal = LocalServices.getService(
+                    StorageManagerInternal.class);
+            storageManagerInternal.addExternalStoragePolicy(
+                    new StorageManagerInternal.ExternalStorageMountPolicy() {
+                        @Override
+                        public int getMountMode(int uid, String packageName) {
+                            if (Process.isIsolated(uid)) {
+                                return Zygote.MOUNT_EXTERNAL_NONE;
+                            }
+                            if (noteOperation(AppOpsManager.OP_READ_EXTERNAL_STORAGE, uid,
+                                    packageName) != AppOpsManager.MODE_ALLOWED) {
+                                return Zygote.MOUNT_EXTERNAL_NONE;
+                            }
+                            if (noteOperation(AppOpsManager.OP_WRITE_EXTERNAL_STORAGE, uid,
+                                    packageName) != AppOpsManager.MODE_ALLOWED) {
+                                return Zygote.MOUNT_EXTERNAL_READ;
+                            }
+                            return Zygote.MOUNT_EXTERNAL_WRITE;
                         }
-                        if (noteOperation(AppOpsManager.OP_READ_EXTERNAL_STORAGE, uid,
-                                packageName) != AppOpsManager.MODE_ALLOWED) {
-                            return Zygote.MOUNT_EXTERNAL_NONE;
-                        }
-                        if (noteOperation(AppOpsManager.OP_WRITE_EXTERNAL_STORAGE, uid,
-                                packageName) != AppOpsManager.MODE_ALLOWED) {
-                            return Zygote.MOUNT_EXTERNAL_READ;
-                        }
-                        return Zygote.MOUNT_EXTERNAL_WRITE;
-                    }
 
-                    @Override
-                    public boolean hasExternalStorage(int uid, String packageName) {
-                        final int mountMode = getMountMode(uid, packageName);
-                        return mountMode == Zygote.MOUNT_EXTERNAL_READ
-                                || mountMode == Zygote.MOUNT_EXTERNAL_WRITE;
-                    }
-                });
+                        @Override
+                        public boolean hasExternalStorage(int uid, String packageName) {
+                            final int mountMode = getMountMode(uid, packageName);
+                            return mountMode == Zygote.MOUNT_EXTERNAL_READ
+                                    || mountMode == Zygote.MOUNT_EXTERNAL_WRITE;
+                        }
+                    });
+        }
     }
 
     public void packageRemoved(int uid, String packageName) {
@@ -1012,7 +1016,7 @@ public class AppOpsService extends IAppOpsService.Stub {
                     scheduleWriteLocked();
                 }
             } else {
-                if (uidState.opModes.get(code) == mode) {
+                if (uidState.opModes.indexOfKey(code) >= 0 && uidState.opModes.get(code) == mode) {
                     return;
                 }
                 if (mode == defaultMode) {
@@ -1967,6 +1971,7 @@ public class AppOpsService extends IAppOpsService.Stub {
                             continue;
                         }
                         boolean doAllPackages = uidState.opModes != null
+                                && uidState.opModes.indexOfKey(code) >= 0
                                 && uidState.opModes.get(code) == AppOpsManager.MODE_FOREGROUND;
                         if (uidState.pkgOps != null) {
                             for (int pkgi = uidState.pkgOps.size() - 1; pkgi >= 0; pkgi--) {

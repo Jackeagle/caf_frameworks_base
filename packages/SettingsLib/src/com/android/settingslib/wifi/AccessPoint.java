@@ -48,13 +48,11 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
-import androidx.annotation.NonNull;
-import android.text.Spannable;
-import android.text.SpannableString;
 import android.text.TextUtils;
-import android.text.style.TtsSpan;
 import android.util.ArraySet;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.settingslib.R;
@@ -163,9 +161,9 @@ public class AccessPoint implements Comparable<AccessPoint> {
     public static final int SECURITY_WEP = 1;
     public static final int SECURITY_PSK = 2;
     public static final int SECURITY_EAP = 3;
-    public static final int SECURITY_DPP = 4;
+    public static final int SECURITY_OWE = 4;
     public static final int SECURITY_SAE = 5;
-    public static final int SECURITY_OWE = 6;
+    public static final int SECURITY_DPP = 6;
 
     private static final int PSK_UNKNOWN = 0;
     private static final int PSK_WPA = 1;

@@ -17,6 +17,7 @@
 package android.os.storage;
 
 import android.content.pm.IPackageMoveObserver;
+import android.content.res.ObbInfo;
 import android.os.IVoldTaskListener;
 import android.os.ParcelFileDescriptor;
 import android.os.storage.DiskInfo;
@@ -57,7 +58,7 @@ interface IStorageManager {
      * it of the terminal state of the call.
      */
     void mountObb(in String rawPath, in String canonicalPath, in String key,
-            IObbActionListener token, int nonce) = 21;
+            IObbActionListener token, int nonce, in ObbInfo obbInfo) = 21;
     /**
      * Unmounts an Opaque Binary Blob (OBB). When the force flag is specified,
      * any program using it will be forcibly killed to unmount the image.
@@ -189,4 +190,5 @@ interface IStorageManager {
     void abortIdleMaintenance() = 80;
     String translateAppToSystem(String path, String packageName, int userId) = 81;
     String translateSystemToApp(String path, String packageName, int userId) = 82;
+    void clearUserKeyAuth(int userId, int serialNumber, in byte[] token, in byte[] secret) = 83;
 }

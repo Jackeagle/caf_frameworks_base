@@ -20,14 +20,13 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_TASK_POSITION
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.Nullable;
-import android.app.IActivityManager;
 import android.app.IActivityTaskManager;
-import android.os.RemoteException;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.util.Slog;
-import android.view.Display;
 import android.view.IWindow;
+
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.input.InputManagerService;
 import com.android.server.input.InputWindowHandle;
@@ -124,19 +123,17 @@ class TaskPositioningController {
             return false;
         }
 
-        Display display = displayContent.getDisplay();
         mTaskPositioner = TaskPositioner.create(mService);
         mTaskPositioner.register(displayContent);
-        displayContent.getInputMonitor().updateInputWindowsLw(true /*force*/);
 
         // We need to grab the touch focus so that the touch events during the
         // resizing/scrolling are not sent to the app. 'win' is the main window
         // of the app, it may not have focus since there might be other windows
         // on top (eg. a dialog window).
         WindowState transferFocusFromWin = win;
-        if (mService.mCurrentFocus != null && mService.mCurrentFocus != win
-                && mService.mCurrentFocus.mAppToken == win.mAppToken) {
-            transferFocusFromWin = mService.mCurrentFocus;
+        if (displayContent.mCurrentFocus != null && displayContent.mCurrentFocus != win
+                && displayContent.mCurrentFocus.mAppToken == win.mAppToken) {
+            transferFocusFromWin = displayContent.mCurrentFocus;
         }
         if (!mInputManager.transferTouchFocus(
                 transferFocusFromWin.mInputChannel, mTaskPositioner.mServerChannel)) {

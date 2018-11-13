@@ -32,29 +32,11 @@ import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
-
+import static android.view.WindowManager.TRANSIT_UNSET;
 import static android.view.WindowManager.TRANSIT_WALLPAPER_OPEN;
+
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_ANIM;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
-import static android.view.WindowManager.TRANSIT_UNSET;
-
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ADD_REMOVE;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ANIM;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_FOCUS_LIGHT;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_LAYOUT_REPEATS;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW_VERBOSE;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_TOKEN_MOVEMENT;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_WINDOW_MOVEMENT;
-import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
-import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
-import static com.android.server.wm.WindowManagerService.H.NOTIFY_ACTIVITY_DRAWN;
-import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
-import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE_SURFACES;
-import static com.android.server.wm.WindowManagerService.logWithStack;
 import static com.android.server.wm.AppWindowTokenProto.ALL_DRAWN;
 import static com.android.server.wm.AppWindowTokenProto.APP_STOPPED;
 import static com.android.server.wm.AppWindowTokenProto.CLIENT_HIDDEN;
@@ -78,6 +60,23 @@ import static com.android.server.wm.AppWindowTokenProto.STARTING_MOVED;
 import static com.android.server.wm.AppWindowTokenProto.STARTING_WINDOW;
 import static com.android.server.wm.AppWindowTokenProto.THUMBNAIL;
 import static com.android.server.wm.AppWindowTokenProto.WINDOW_TOKEN;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ADD_REMOVE;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ANIM;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_FOCUS_LIGHT;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_LAYOUT_REPEATS;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW_VERBOSE;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_TOKEN_MOVEMENT;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_WINDOW_MOVEMENT;
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
+import static com.android.server.wm.WindowManagerService.H.NOTIFY_ACTIVITY_DRAWN;
+import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
+import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE_SURFACES;
+import static com.android.server.wm.WindowManagerService.logWithStack;
 import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_AFTER_ANIM;
 
 import android.annotation.CallSuper;
@@ -680,11 +679,12 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         removed = true;
         stopFreezingScreen(true, true);
 
-        if (mService.mFocusedApp == this) {
-            if (DEBUG_FOCUS_LIGHT) Slog.v(TAG_WM, "Removing focused app token:" + this);
-            mService.mFocusedApp = null;
+        final DisplayContent dc = getDisplayContent();
+        if (dc.mFocusedApp == this) {
+            if (DEBUG_FOCUS_LIGHT) Slog.v(TAG_WM, "Removing focused app token:" + this
+                   + " displayId=" + dc.getDisplayId());
+            dc.setFocusedApp(null);
             mService.updateFocusedWindowLocked(UPDATE_FOCUS_NORMAL, true /*updateInputWindows*/);
-            getDisplayContent().getInputMonitor().setFocusedAppLw(null);
         }
 
         if (!delayed) {
@@ -1062,6 +1062,18 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         if (prevDisplayContent != displayContent) {
             onDisplayChanged(displayContent);
             prevDisplayContent.setLayoutNeeded();
+        }
+    }
+
+    @Override
+    void onDisplayChanged(DisplayContent dc) {
+        DisplayContent prevDc = mDisplayContent;
+        super.onDisplayChanged(dc);
+        if (prevDc != null && prevDc.mFocusedApp == this) {
+            prevDc.setFocusedApp(null);
+            if (dc.getTopStack().getTopChild().getTopChild() == this) {
+                dc.setFocusedApp(this);
+            }
         }
     }
 
@@ -1633,17 +1645,6 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         return null;
     }
 
-    int getLowestAnimLayer() {
-        for (int i = 0; i < mChildren.size(); i++) {
-            final WindowState w = mChildren.get(i);
-            if (w.mRemoved) {
-                continue;
-            }
-            return w.mWinAnimator.mAnimLayer;
-        }
-        return Integer.MAX_VALUE;
-    }
-
     WindowState getHighestAnimLayerWindow(WindowState currentTarget) {
         WindowState candidate = null;
         for (int i = mChildren.indexOf(currentTarget); i >= 0; i--) {
@@ -1651,8 +1652,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             if (w.mRemoved) {
                 continue;
             }
-            if (candidate == null || w.mWinAnimator.mAnimLayer >
-                    candidate.mWinAnimator.mAnimLayer) {
+            if (candidate == null) {
                 candidate = w;
             }
         }
@@ -1845,8 +1845,8 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             surfaceInsets = win.getAttrs().surfaceInsets;
             // XXX(b/72757033): These are insets relative to the window frame, but we're really
             // interested in the insets relative to the frame we chose in the if-blocks above.
-            insets.set(win.mContentInsets);
-            stableInsets.set(win.mStableInsets);
+            win.getContentInsets(insets);
+            win.getStableInsets(stableInsets);
         }
 
         if (mLaunchTaskBehind) {
@@ -2099,7 +2099,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         WindowState win = findMainWindow();
         Rect appRect = win != null ? win.getContentFrameLw() :
                 new Rect(0, 0, displayInfo.appWidth, displayInfo.appHeight);
-        Rect insets = win != null ? win.mContentInsets : null;
+        final Rect insets = win != null ? win.getContentInsets() : null;
         final Configuration displayConfig = mDisplayContent.getConfiguration();
         return mService.mAppTransition.createThumbnailAspectScaleAnimationLocked(
                 appRect, insets, thumbnailHeader, getTask().mTaskId, displayConfig.uiMode,

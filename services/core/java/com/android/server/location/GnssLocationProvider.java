@@ -254,6 +254,9 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
     private static final long LOCATION_UPDATE_MIN_TIME_INTERVAL_MILLIS = 1000;
     // Default update duration in milliseconds for REQUEST_LOCATION.
     private static final long LOCATION_UPDATE_DURATION_MILLIS = 10 * 1000;
+    // Default time limit in milliseconds for the ConnectivityManager to find a suitable
+    // network with SUPL connectivity or report an error.
+    private static final int SUPL_NETWORK_REQUEST_TIMEOUT_MILLIS = 10 * 1000;
 
     /** simpler wrapper for ProviderRequest + Worksource */
     private static class GpsRequest {
@@ -541,13 +544,22 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
             new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onAvailable(Network network) {
+                    if (DEBUG) Log.d(TAG, "SUPL network connection available.");
                     // Specific to a change to a SUPL enabled network becoming ready
                     sendMessage(UPDATE_NETWORK_STATE, 0 /*arg*/, network);
                 }
 
                 @Override
                 public void onLost(Network network) {
+                    Log.i(TAG, "SUPL network connection lost.");
                     releaseSuplConnection(GPS_RELEASE_AGPS_DATA_CONN);
+                }
+
+                @Override
+                public void onUnavailable() {
+                    Log.i(TAG, "SUPL network connection request timed out.");
+                    // Could not setup the connection to the network in the specified time duration.
+                    releaseSuplConnection(GPS_AGPS_DATA_CONN_FAILED);
                 }
             };
 
@@ -965,7 +977,8 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
         NetworkRequest request = requestBuilder.build();
         mConnMgr.requestNetwork(
                 request,
-                mSuplConnectivityCallback);
+                mSuplConnectivityCallback,
+                SUPL_NETWORK_REQUEST_TIMEOUT_MILLIS);
     }
 
     private void handleReleaseSuplConnection(int agpsDataConnStatus) {
@@ -1588,6 +1601,8 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
             mSingleShot = false;
             native_stop();
             mLastFixTime = 0;
+            // native_stop() may reset the position mode in hardware.
+            mLastPositionMode = null;
 
             // reset SV count to zero
             updateStatus(LocationProvider.TEMPORARILY_UNAVAILABLE);
@@ -2519,13 +2534,20 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
         if (apn == null) {
             return APN_INVALID;
         }
-
+        TelephonyManager phone = (TelephonyManager)
+                mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        // Carrier configuration may override framework roaming state, we need to use the actual
+        // modem roaming state instead of the framework roaming state.
+        boolean isDataRoamingFromRegistration = phone.getServiceState().
+                getDataRoamingFromRegistration();
+        String projection = isDataRoamingFromRegistration ? Carriers.ROAMING_PROTOCOL :
+                Carriers.PROTOCOL;
         String selection = String.format("current = 1 and apn = '%s' and carrier_enabled = 1", apn);
         Cursor cursor = null;
         try {
             cursor = mContext.getContentResolver().query(
                     Carriers.CONTENT_URI,
-                    new String[]{Carriers.PROTOCOL},
+                    new String[]{projection},
                     selection,
                     null,
                     Carriers.DEFAULT_SORT_ORDER);
@@ -2799,4 +2821,3 @@ public class GnssLocationProvider implements LocationProviderInterface, InjectNt
 
     private static native boolean native_set_satellite_blacklist(int[] constellations, int[] svIds);
 }
-

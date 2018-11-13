@@ -21,6 +21,7 @@ import static android.content.pm.PackageManager.INSTALL_FAILED_CONTAINER_ERROR;
 import static android.content.pm.PackageManager.INSTALL_FAILED_INSUFFICIENT_STORAGE;
 import static android.content.pm.PackageManager.INSTALL_FAILED_INTERNAL_ERROR;
 import static android.content.pm.PackageManager.INSTALL_FAILED_INVALID_APK;
+import static android.content.pm.PackageManager.INSTALL_FAILED_MISSING_SPLIT;
 import static android.content.pm.PackageParser.APK_FILE_EXTENSION;
 import static android.system.OsConstants.O_CREAT;
 import static android.system.OsConstants.O_RDONLY;
@@ -59,6 +60,7 @@ import android.content.pm.PackageParser;
 import android.content.pm.PackageParser.ApkLite;
 import android.content.pm.PackageParser.PackageLite;
 import android.content.pm.PackageParser.PackageParserException;
+import android.content.pm.dex.DexMetadataHelper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Binder;
@@ -99,7 +101,6 @@ import com.android.server.LocalServices;
 import com.android.server.pm.Installer.InstallerException;
 import com.android.server.pm.PackageInstallerService.PackageInstallObserverAdapter;
 
-import android.content.pm.dex.DexMetadataHelper;
 import libcore.io.IoUtils;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -122,7 +123,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private static final boolean LOGD = true;
     private static final String REMOVE_SPLIT_MARKER_EXTENSION = ".removed";
 
-    private static final int MSG_EARLY_BIND = 0;
     private static final int MSG_COMMIT = 1;
     private static final int MSG_ON_PACKAGE_INSTALLED = 2;
 
@@ -168,7 +168,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     final int userId;
     final SessionParams params;
     final long createdMillis;
-    final int defaultContainerGid;
 
     /** Staging location where client data is written. */
     final File stageDir;
@@ -285,9 +284,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         @Override
         public boolean handleMessage(Message msg) {
             switch (msg.what) {
-                case MSG_EARLY_BIND:
-                    earlyBindToDefContainer();
-                    break;
                 case MSG_COMMIT:
                     synchronized (mLock) {
                         try {
@@ -322,10 +318,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             return true;
         }
     };
-
-    private void earlyBindToDefContainer() {
-        mPm.earlyBindToDefContainer();
-    }
 
     /**
      * @return {@code true} iff the installing is app an device owner or affiliated profile owner.
@@ -412,19 +404,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     throw new IllegalArgumentException(e);
                 }
             }
-        }
-
-        final long identity = Binder.clearCallingIdentity();
-        try {
-            final int uid = mPm.getPackageUid(PackageManagerService.DEFAULT_CONTAINER_PACKAGE,
-                    PackageManager.MATCH_SYSTEM_ONLY, UserHandle.USER_SYSTEM);
-            defaultContainerGid = UserHandle.getSharedAppGid(uid);
-        } finally {
-            Binder.restoreCallingIdentity(identity);
-        }
-        // attempt to bind to the DefContainer as early as possible
-        if ((params.installFlags & PackageManager.INSTALL_INSTANT_APP) != 0) {
-            mHandler.sendMessage(mHandler.obtainMessage(MSG_EARLY_BIND));
         }
     }
 
@@ -1082,6 +1061,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private void validateInstallLocked(@Nullable PackageInfo pkgInfo)
             throws PackageManagerException {
+        ApkLite baseApk = null;
         mPackageName = null;
         mVersionCode = -1;
         mSigningDetails = PackageParser.SigningDetails.UNKNOWN;
@@ -1158,6 +1138,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // Base is coming from session
             if (apk.splitName == null) {
                 mResolvedBaseFile = targetFile;
+                baseApk = apk;
             }
 
             mResolvedStagedFiles.add(targetFile);
@@ -1243,6 +1224,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 if (baseDexMetadataFile != null) {
                     mResolvedInheritedFiles.add(baseDexMetadataFile);
                 }
+                baseApk = existingBase;
             }
 
             // Inherit splits if not overridden
@@ -1321,6 +1303,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     mResolvedInheritedFiles.addAll(libDirsToInherit);
                 }
             }
+        }
+        if (baseApk.isSplitRequired && stagedSplits.size() <= 1) {
+            throw new PackageManagerException(INSTALL_FAILED_MISSING_SPLIT,
+                    "Missing split for " + mPackageName);
         }
     }
 

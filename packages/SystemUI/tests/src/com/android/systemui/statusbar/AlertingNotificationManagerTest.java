@@ -34,7 +34,6 @@ import android.testing.TestableLooper;
 
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
-import com.android.systemui.statusbar.AlertingNotificationManager;
 import com.android.systemui.statusbar.notification.NotificationData;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 
@@ -57,19 +56,19 @@ public class AlertingNotificationManagerTest extends SysuiTestCase {
     private static final String TEST_PACKAGE_NAME = "test";
     private static final int TEST_UID = 0;
 
-    private static final int TEST_MINIMUM_DISPLAY_TIME = 200;
-    private static final int TEST_AUTO_DISMISS_TIME = 500;
+    protected static final int TEST_MINIMUM_DISPLAY_TIME = 200;
+    protected static final int TEST_AUTO_DISMISS_TIME = 500;
     // Number of notifications to use in tests requiring multiple notifications
     private static final int TEST_NUM_NOTIFICATIONS = 4;
-    private static final int TEST_TIMEOUT_TIME = 10000;
-    private final Runnable TEST_TIMEOUT_RUNNABLE = () -> mTimedOut = true;
+    protected static final int TEST_TIMEOUT_TIME = 10000;
+    protected final Runnable TEST_TIMEOUT_RUNNABLE = () -> mTimedOut = true;
 
     private AlertingNotificationManager mAlertingNotificationManager;
 
     protected NotificationData.Entry mEntry;
     protected Handler mTestHandler;
     private StatusBarNotification mSbn;
-    private boolean mTimedOut = false;
+    protected boolean mTimedOut = false;
 
     @Mock protected ExpandableNotificationRow mRow;
 
@@ -91,7 +90,7 @@ public class AlertingNotificationManagerTest extends SysuiTestCase {
         return new TestableAlertingNotificationManager();
     }
 
-    private StatusBarNotification createNewNotification(int id) {
+    protected StatusBarNotification createNewNotification(int id) {
         Notification.Builder n = new Notification.Builder(mContext, "")
                 .setSmallIcon(R.drawable.ic_person)
                 .setContentTitle("Title")
@@ -123,7 +122,7 @@ public class AlertingNotificationManagerTest extends SysuiTestCase {
     public void testShowNotification_addsEntry() {
         mAlertingNotificationManager.showNotification(mEntry);
 
-        assertTrue(mAlertingNotificationManager.contains(mEntry.key));
+        assertTrue(mAlertingNotificationManager.isAlerting(mEntry.key));
         assertTrue(mAlertingNotificationManager.hasNotifications());
         assertEquals(mEntry, mAlertingNotificationManager.getEntry(mEntry.key));
     }
@@ -137,7 +136,7 @@ public class AlertingNotificationManagerTest extends SysuiTestCase {
         TestableLooper.get(this).processMessages(1);
 
         assertFalse("Test timed out", mTimedOut);
-        assertFalse(mAlertingNotificationManager.contains(mEntry.key));
+        assertFalse(mAlertingNotificationManager.isAlerting(mEntry.key));
     }
 
     @Test
@@ -147,17 +146,17 @@ public class AlertingNotificationManagerTest extends SysuiTestCase {
         // Try to remove but defer, since the notification has not been shown long enough.
         mAlertingNotificationManager.removeNotification(mEntry.key, false /* releaseImmediately */);
 
-        assertTrue(mAlertingNotificationManager.contains(mEntry.key));
+        assertTrue(mAlertingNotificationManager.isAlerting(mEntry.key));
     }
 
     @Test
     public void testRemoveNotification_forceRemove() {
         mAlertingNotificationManager.showNotification(mEntry);
 
-        //Remove forcibly with releaseImmediately = true.
+        // Remove forcibly with releaseImmediately = true.
         mAlertingNotificationManager.removeNotification(mEntry.key, true /* releaseImmediately */);
 
-        assertFalse(mAlertingNotificationManager.contains(mEntry.key));
+        assertFalse(mAlertingNotificationManager.isAlerting(mEntry.key));
     }
 
     @Test
@@ -172,5 +171,39 @@ public class AlertingNotificationManagerTest extends SysuiTestCase {
         mAlertingNotificationManager.releaseAllImmediately();
 
         assertEquals(0, mAlertingNotificationManager.getAllEntries().count());
+    }
+
+    @Test
+    public void testCanRemoveImmediately_notShownLongEnough() {
+        mAlertingNotificationManager.showNotification(mEntry);
+
+        // The entry has just been added so we should not remove immediately.
+        assertFalse(mAlertingNotificationManager.canRemoveImmediately(mEntry.key));
+    }
+
+    @Test
+    public void testShouldExtendLifetime() {
+        mAlertingNotificationManager.showNotification(mEntry);
+
+        // While the entry is alerting, it should not be removable.
+        assertTrue(mAlertingNotificationManager.shouldExtendLifetime(mEntry));
+    }
+
+    @Test
+    public void testSetShouldManageLifetime_setShouldManage() {
+        mAlertingNotificationManager.showNotification(mEntry);
+
+        mAlertingNotificationManager.setShouldManageLifetime(mEntry, true /* shouldManage */);
+
+        assertTrue(mAlertingNotificationManager.mExtendedLifetimeAlertEntries.contains(mEntry));
+    }
+
+    @Test
+    public void testSetShouldManageLifetime_setShouldNotManage() {
+        mAlertingNotificationManager.mExtendedLifetimeAlertEntries.add(mEntry);
+
+        mAlertingNotificationManager.setShouldManageLifetime(mEntry, false /* shouldManage */);
+
+        assertFalse(mAlertingNotificationManager.mExtendedLifetimeAlertEntries.contains(mEntry));
     }
 }

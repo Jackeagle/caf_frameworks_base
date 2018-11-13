@@ -235,18 +235,23 @@ public final class SaveInfo implements Parcelable {
      */
     public static final int FLAG_DONT_SAVE_ON_FINISH = 0x2;
 
+
     /**
-     * Don't trigger the autofill save UI when the autofill context associated with the response
-     * associated with this {@link SaveInfo} is {@link AutofillManager#commit() committed},
-     * but keep its {@link FillContext} so it's delivered in a future
-     * {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback) save request} of an
-     * activity belonging to the same task.
+     * Postpone the autofill save UI.
+     *
+     * <p>If flag is set, the autofill save UI is not triggered when the
+     * autofill context associated with the response associated with this {@link SaveInfo} is
+     * committed (with {@link AutofillManager#commit()}). Instead, the {@link FillContext}
+     * is delivered in future fill requests (with {@link
+     * AutofillService#onFillRequest(FillRequest, android.os.CancellationSignal, FillCallback)})
+     * and save request (with {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)})
+     * of an activity belonging to the same task.
      *
      * <p>This flag should be used when the service detects that the application uses
      * multiple screens to implement an autofillable workflow (for example, one screen for the
      * username field, another for password).
      */
-    // TODO(b/112051762): improve documentation: add example, document relationship with other
+    // TODO(b/113281366): improve documentation: add example, document relationship with other
     // flagss, etc...
     public static final int FLAG_DELAY_SAVE = 0x4;
 

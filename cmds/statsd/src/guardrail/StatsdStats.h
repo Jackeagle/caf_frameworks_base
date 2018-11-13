@@ -156,7 +156,7 @@ public:
      * Report a config has been removed.
      */
     void noteConfigRemoved(const ConfigKey& key);
-   /**
+    /**
      * Report a config has been reset when ttl expires.
      */
     void noteConfigReset(const ConfigKey& key);
@@ -201,7 +201,6 @@ public:
      * [size]: The output tuple size.
      */
     void noteMetricDimensionSize(const ConfigKey& key, const int64_t& id, int size);
-
 
     /**
      * Report the max size of output tuple of dimension in condition across dimensions in what.
@@ -271,20 +270,15 @@ public:
     // Notify pull request for an atom served from cached data
     void notePullFromCache(int pullAtomId);
 
-    /**
-     * Records statsd met an error while reading from logd.
-     */
-    void noteLoggerError(int error);
-
     /*
-    * Records when system server restarts.
-    */
+     * Records when system server restarts.
+     */
     void noteSystemServerRestart(int32_t timeSec);
 
     /**
      * Records statsd skipped an event.
      */
-    void noteLogLost(int64_t timestamp, int32_t count);
+    void noteLogLost(int32_t wallClockTimeSec, int32_t count);
 
     /**
      * Reset the historical stats. Including all stats in icebox, and the tracked stats about
@@ -301,9 +295,9 @@ public:
     void dumpStats(std::vector<uint8_t>* buffer, bool reset);
 
     /**
-     * Output statsd stats in human readable format to [out] file.
+     * Output statsd stats in human readable format to [out] file descriptor.
      */
-    void dumpStats(FILE* out) const;
+    void dumpStats(int outFd) const;
 
     typedef struct {
         long totalPull;
@@ -338,11 +332,8 @@ private:
     // Maps PullAtomId to its stats. The size is capped by the puller atom counts.
     std::map<int, PulledAtomStats> mPulledAtomStats;
 
-    // Logd errors. Size capped by kMaxLoggerErrors.
-    std::list<const std::pair<int, int>> mLoggerErrors;
-
     // Timestamps when we detect log loss, and the number of logs lost.
-    std::list<std::pair<int64_t, int32_t>> mLogLossTimestampNs;
+    std::list<std::pair<int32_t, int32_t>> mLogLossStats;
 
     std::list<int32_t> mSystemServerRestartSec;
 

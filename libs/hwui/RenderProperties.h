@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "Caches.h"
 #include "DeviceInfo.h"
 #include "Outline.h"
 #include "Rect.h"
@@ -536,6 +535,14 @@ public:
         return CC_UNLIKELY(promotedToLayer()) ? LayerType::RenderLayer : mLayerProperties.mType;
     }
 
+    bool setAllowForceDark(bool allow) {
+        return RP_SET(mPrimitiveFields.mAllowForceDark, allow);
+    }
+
+    bool getAllowForceDark() const {
+        return mPrimitiveFields.mAllowForceDark;
+    }
+
 private:
     // Rendering properties
     struct PrimitiveFields {
@@ -555,6 +562,7 @@ private:
         bool mMatrixOrPivotDirty = false;
         bool mProjectBackwards = false;
         bool mProjectionReceiver = false;
+        bool mAllowForceDark = true;
         Rect mClipBounds;
         Outline mOutline;
         RevealClip mRevealClip;

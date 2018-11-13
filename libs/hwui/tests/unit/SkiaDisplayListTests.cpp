@@ -20,6 +20,7 @@
 #include "AnimationContext.h"
 #include "DamageAccumulator.h"
 #include "IContextFactory.h"
+#include "pipeline/skia/GLFunctorDrawable.h"
 #include "pipeline/skia/SkiaDisplayList.h"
 #include "renderthread/CanvasContext.h"
 #include "tests/common/TestUtils.h"
@@ -36,32 +37,37 @@ TEST(SkiaDisplayList, create) {
 }
 
 TEST(SkiaDisplayList, reset) {
-    SkiaDisplayList skiaDL;
+    std::unique_ptr<SkiaDisplayList> skiaDL;
+    {
+        SkiaRecordingCanvas canvas{nullptr, 1, 1};
+        canvas.drawColor(0, SkBlendMode::kSrc);
+        skiaDL.reset(canvas.finishRecording());
+    }
 
     SkCanvas dummyCanvas;
     RenderNodeDrawable drawable(nullptr, &dummyCanvas);
-    skiaDL.mChildNodes.emplace_back(nullptr, &dummyCanvas);
-    skiaDL.mChildFunctors.emplace_back(nullptr, nullptr, &dummyCanvas);
-    skiaDL.mMutableImages.push_back(nullptr);
-    skiaDL.mVectorDrawables.push_back(nullptr);
-    skiaDL.mDisplayList.drawAnnotation(SkRect::MakeWH(200, 200), "testAnnotation", nullptr);
-    skiaDL.mProjectionReceiver = &drawable;
+    skiaDL->mChildNodes.emplace_back(nullptr, &dummyCanvas);
+    GLFunctorDrawable functorDrawable(nullptr, nullptr, &dummyCanvas);
+    skiaDL->mChildFunctors.push_back(&functorDrawable);
+    skiaDL->mMutableImages.push_back(nullptr);
+    skiaDL->mVectorDrawables.push_back(nullptr);
+    skiaDL->mProjectionReceiver = &drawable;
 
-    ASSERT_FALSE(skiaDL.mChildNodes.empty());
-    ASSERT_FALSE(skiaDL.mChildFunctors.empty());
-    ASSERT_FALSE(skiaDL.mMutableImages.empty());
-    ASSERT_FALSE(skiaDL.mVectorDrawables.empty());
-    ASSERT_FALSE(skiaDL.isEmpty());
-    ASSERT_TRUE(skiaDL.mProjectionReceiver);
+    ASSERT_FALSE(skiaDL->mChildNodes.empty());
+    ASSERT_FALSE(skiaDL->mChildFunctors.empty());
+    ASSERT_FALSE(skiaDL->mMutableImages.empty());
+    ASSERT_FALSE(skiaDL->mVectorDrawables.empty());
+    ASSERT_FALSE(skiaDL->isEmpty());
+    ASSERT_TRUE(skiaDL->mProjectionReceiver);
 
-    skiaDL.reset();
+    skiaDL->reset();
 
-    ASSERT_TRUE(skiaDL.mChildNodes.empty());
-    ASSERT_TRUE(skiaDL.mChildFunctors.empty());
-    ASSERT_TRUE(skiaDL.mMutableImages.empty());
-    ASSERT_TRUE(skiaDL.mVectorDrawables.empty());
-    ASSERT_TRUE(skiaDL.isEmpty());
-    ASSERT_FALSE(skiaDL.mProjectionReceiver);
+    ASSERT_TRUE(skiaDL->mChildNodes.empty());
+    ASSERT_TRUE(skiaDL->mChildFunctors.empty());
+    ASSERT_TRUE(skiaDL->mMutableImages.empty());
+    ASSERT_TRUE(skiaDL->mVectorDrawables.empty());
+    ASSERT_TRUE(skiaDL->isEmpty());
+    ASSERT_FALSE(skiaDL->mProjectionReceiver);
 }
 
 TEST(SkiaDisplayList, reuseDisplayList) {
@@ -91,7 +97,8 @@ TEST(SkiaDisplayList, syncContexts) {
 
     SkCanvas dummyCanvas;
     TestUtils::MockFunctor functor;
-    skiaDL.mChildFunctors.emplace_back(&functor, nullptr, &dummyCanvas);
+    GLFunctorDrawable functorDrawable(&functor, nullptr, &dummyCanvas);
+    skiaDL.mChildFunctors.push_back(&functorDrawable);
 
     SkRect bounds = SkRect::MakeWH(200, 200);
     VectorDrawableRoot vectorDrawable(new VectorDrawable::Group());

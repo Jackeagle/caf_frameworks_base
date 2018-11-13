@@ -41,14 +41,15 @@ import android.os.Message;
 import android.os.Process;
 import android.os.SystemClock;
 import android.provider.Settings;
-import androidx.annotation.GuardedBy;
-import androidx.annotation.NonNull;
-import androidx.annotation.VisibleForTesting;
 import android.text.format.DateUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 import android.widget.Toast;
+
+import androidx.annotation.GuardedBy;
+import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.settingslib.R;
 import com.android.settingslib.core.lifecycle.Lifecycle;
@@ -80,7 +81,7 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
     private static final long DEFAULT_MAX_CACHED_SCORE_AGE_MILLIS = 20 * DateUtils.MINUTE_IN_MILLIS;
 
     /** Maximum age of scan results to hold onto while actively scanning. **/
-    private static final long MAX_SCAN_RESULT_AGE_MILLIS = 25000;
+    private static final long MAX_SCAN_RESULT_AGE_MILLIS = 15000;
 
     private static final String TAG = "WifiTracker";
     private static final boolean DBG() {
@@ -133,8 +134,8 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
     /**
      * Tracks whether fresh scan results have been received since scanning start.
      *
-     * <p>If this variable is false, we will not evict the scan result cache or invoke callbacks
-     * so that we do not update the UI with stale data / clear out existing UI elements prematurely.
+     * <p>If this variable is false, we will not invoke callbacks so that we do not
+     * update the UI with stale data / clear out existing UI elements prematurely.
      */
     private boolean mStaleScanResults = true;
 
@@ -325,7 +326,8 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
      * <p>Intended to only be invoked within {@link #onStart()}.
      */
     @MainThread
-    private void forceUpdate() {
+    @VisibleForTesting
+    void forceUpdate() {
         mLastInfo = mWifiManager.getConnectionInfo();
         mLastNetworkInfo = mConnectivityManager.getNetworkInfo(mWifiManager.getCurrentNetwork());
 
@@ -441,10 +443,8 @@ public class WifiTracker implements LifecycleObserver, OnStart, OnStop, OnDestro
             mScanResultCache.put(newResult.BSSID, newResult);
         }
 
-        // Don't evict old results if no new scan results
-        if (!mStaleScanResults) {
-            evictOldScans();
-        }
+        // Evict old results in all conditions
+        evictOldScans();
 
         ArrayMap<String, List<ScanResult>> scanResultsByApKey = new ArrayMap<>();
         for (ScanResult result : mScanResultCache.values()) {

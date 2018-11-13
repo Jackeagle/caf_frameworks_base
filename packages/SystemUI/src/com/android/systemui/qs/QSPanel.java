@@ -25,10 +25,12 @@ import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.metrics.LogMaker;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.service.quicksettings.Tile;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -59,6 +61,8 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
 
     public static final String QS_SHOW_BRIGHTNESS = "qs_show_brightness";
     public static final String QS_SHOW_HEADER = "qs_show_header";
+
+    private static final String TAG = "QSPanel";
 
     protected final Context mContext;
     protected final ArrayList<TileRecord> mRecords = new ArrayList<>();
@@ -196,7 +200,11 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
 
     public void openDetails(String subPanel) {
         QSTile tile = getTile(subPanel);
-        showDetailAdapter(true, tile.getDetailAdapter(), new int[]{getWidth() / 2, 0});
+        // If there's no tile with that name (as defined in QSFactoryImpl or other QSFactory),
+        // QSFactory will not be able to create a tile and getTile will return null
+        if (tile != null) {
+            showDetailAdapter(true, tile.getDetailAdapter(), new int[]{getWidth() / 2, 0});
+        }
     }
 
     private QSTile getTile(String subPanel) {
@@ -316,7 +324,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
 
     public void onCollapse() {
         if (mCustomizePanel != null && mCustomizePanel.isShown()) {
-            mCustomizePanel.hide(mCustomizePanel.getWidth() / 2, mCustomizePanel.getHeight() / 2);
+            mCustomizePanel.hide();
         }
     }
 
@@ -350,16 +358,24 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
         if (mTileLayout != null) {
             mTileLayout.setListening(listening);
         }
-        mFooter.setListening(mListening);
         if (mListening) {
             refreshAllTiles();
         }
-        if (mBrightnessView.getVisibility() == View.VISIBLE) {
-            if (listening) {
-                mBrightnessController.registerCallbacks();
-            } else {
-                mBrightnessController.unregisterCallbacks();
-            }
+    }
+
+    public void setListening(boolean listening, boolean expanded) {
+        setListening(listening && expanded);
+        getFooter().setListening(listening);
+        // Set the listening as soon as the QS fragment starts listening regardless of the expansion,
+        // so it will update the current brightness before the slider is visible.
+        setBrightnessListening(listening);
+    }
+
+    public void setBrightnessListening(boolean listening) {
+        if (listening) {
+            mBrightnessController.registerCallbacks();
+        } else {
+            mBrightnessController.unregisterCallbacks();
         }
     }
 
@@ -483,8 +499,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
             public void run() {
                 if (mCustomizePanel != null) {
                     if (!mCustomizePanel.isCustomizing()) {
-                        int[] loc = new int[2];
-                        v.getLocationInWindow(loc);
+                        int[] loc = v.getLocationOnScreen();
                         int x = loc[0] + v.getWidth() / 2;
                         int y = loc[1] + v.getHeight() / 2;
                         mCustomizePanel.show(x, y);
@@ -498,7 +513,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
     public void closeDetail() {
         if (mCustomizePanel != null && mCustomizePanel.isShown()) {
             // Treat this as a detail panel for now, to make things easy.
-            mCustomizePanel.hide(mCustomizePanel.getWidth() / 2, mCustomizePanel.getHeight() / 2);
+            mCustomizePanel.hide();
             return;
         }
         showDetail(false, mDetailRecord);
@@ -655,6 +670,11 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
     }
 
     public interface QSTileLayout {
+
+        default void saveInstanceState(Bundle outState) {}
+
+        default void restoreInstanceState(Bundle savedInstanceState) {}
+
         void addTile(TileRecord tile);
 
         void removeTile(TileRecord tile);
@@ -666,5 +686,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback, Brightne
         void setListening(boolean listening);
 
         default void setExpansion(float expansion) {}
+
+        int getNumVisibleTiles();
     }
 }

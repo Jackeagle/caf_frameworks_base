@@ -19,6 +19,7 @@ package com.android.settingslib.license;
 import android.content.Context;
 import android.util.Log;
 
+import com.android.settingslib.R;
 import com.android.settingslib.utils.AsyncLoaderCompat;
 
 import java.io.File;
@@ -36,7 +37,8 @@ public class LicenseHtmlLoaderCompat extends AsyncLoaderCompat<File> {
             "/vendor/etc/NOTICE.xml.gz",
             "/odm/etc/NOTICE.xml.gz",
             "/oem/etc/NOTICE.xml.gz",
-            "/product/etc/NOTICE.xml.gz"};
+            "/product/etc/NOTICE.xml.gz",
+            "/product_services/etc/NOTICE.xml.gz"};
     static final String NOTICE_HTML_FILE_NAME = "NOTICE.html";
 
     private final Context mContext;
@@ -64,7 +66,7 @@ public class LicenseHtmlLoaderCompat extends AsyncLoaderCompat<File> {
 
         File cachedHtmlFile = getCachedHtmlFile(mContext);
         if (!isCachedHtmlFileOutdated(xmlFiles, cachedHtmlFile)
-                || generateHtmlFile(xmlFiles, cachedHtmlFile)) {
+                || generateHtmlFile(mContext, xmlFiles, cachedHtmlFile)) {
             return cachedHtmlFile;
         }
 
@@ -100,7 +102,8 @@ public class LicenseHtmlLoaderCompat extends AsyncLoaderCompat<File> {
         return outdated;
     }
 
-    static boolean generateHtmlFile(List<File> xmlFiles, File htmlFile) {
-        return LicenseHtmlGeneratorFromXml.generateHtml(xmlFiles, htmlFile);
+    static boolean generateHtmlFile(Context context, List<File> xmlFiles, File htmlFile) {
+        return LicenseHtmlGeneratorFromXml.generateHtml(xmlFiles, htmlFile,
+                context.getString(R.string.notice_header));
     }
 }

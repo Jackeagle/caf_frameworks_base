@@ -11,6 +11,14 @@ android_library {
         "androidx.lifecycle_lifecycle-runtime",
     ],
 
+    static_libs: [
+        "SettingsLibHelpUtils",
+        "SettingsLibRestrictedLockUtils",
+        "SettingsLibAppPreference",
+        "SettingsLibSearchWidget",
+        "SettingsLibSettingsSpinner",
+    ],
+
     // ANDROIDMK TRANSLATION ERROR: unsupported assignment to LOCAL_SHARED_JAVA_LIBRARIES
     // LOCAL_SHARED_JAVA_LIBRARIES := androidx.lifecycle_lifecycle-common
 

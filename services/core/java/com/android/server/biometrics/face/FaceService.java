@@ -17,9 +17,9 @@
 package com.android.server.biometrics.face;
 
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
-import static android.Manifest.permission.MANAGE_FACE;
+import static android.Manifest.permission.MANAGE_BIOMETRIC;
 import static android.Manifest.permission.RESET_FACE_LOCKOUT;
-import static android.Manifest.permission.USE_BIOMETRIC;
+import static android.Manifest.permission.USE_BIOMETRIC_INTERNAL;
 
 import android.app.ActivityManager;
 import android.app.AppOpsManager;
@@ -29,9 +29,12 @@ import android.hardware.biometrics.BiometricAuthenticator;
 import android.hardware.biometrics.BiometricConstants;
 import android.hardware.biometrics.IBiometricPromptReceiver;
 import android.hardware.biometrics.IBiometricServiceLockoutResetCallback;
+import android.hardware.biometrics.IBiometricServiceReceiver;
 import android.hardware.biometrics.face.V1_0.IBiometricsFace;
 import android.hardware.biometrics.face.V1_0.IBiometricsFaceClientCallback;
+import android.hardware.biometrics.face.V1_0.Status;
 import android.hardware.face.Face;
+import android.hardware.face.FaceManager;
 import android.hardware.face.IFaceService;
 import android.hardware.face.IFaceServiceReceiver;
 import android.os.Binder;
@@ -40,7 +43,6 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.SELinux;
-import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Slog;
@@ -51,9 +53,9 @@ import com.android.internal.logging.MetricsLogger;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.DumpUtils;
 import com.android.server.SystemServerInitThreadPool;
-import com.android.server.biometrics.common.BiometricService;
-import com.android.server.biometrics.common.BiometricUtils;
-import com.android.server.biometrics.common.Metrics;
+import com.android.server.biometrics.BiometricServiceBase;
+import com.android.server.biometrics.BiometricUtils;
+import com.android.server.biometrics.Metrics;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -72,7 +74,7 @@ import java.util.List;
  *
  * @hide
  */
-public class FaceService extends BiometricService {
+public class FaceService extends BiometricServiceBase {
 
     protected static final String TAG = "FaceService";
     private static final boolean DEBUG = true;
@@ -81,6 +83,35 @@ public class FaceService extends BiometricService {
             "com.android.server.biometrics.face.ACTION_LOCKOUT_RESET";
     private static final int MAX_FAILED_ATTEMPTS_LOCKOUT_TIMED = 3;
     private static final int MAX_FAILED_ATTEMPTS_LOCKOUT_PERMANENT = 12;
+    private static final int CHALLENGE_TIMEOUT_SEC = 600; // 10 minutes
+
+    private final class FaceAuthClient extends AuthenticationClientImpl {
+        public FaceAuthClient(Context context,
+                DaemonWrapper daemon, long halDeviceId, IBinder token,
+                ServiceListener listener, int targetUserId, int groupId, long opId,
+                boolean restricted, String owner, Bundle bundle,
+                IBiometricPromptReceiver dialogReceiver, IStatusBarService statusBarService,
+                boolean requireConfirmation) {
+            super(context, daemon, halDeviceId, token, listener, targetUserId, groupId, opId,
+                    restricted, owner, bundle, dialogReceiver, statusBarService,
+                    requireConfirmation);
+        }
+
+        @Override
+        public String getErrorString(int error, int vendorCode) {
+            return FaceManager.getErrorString(getContext(), error, vendorCode);
+        }
+
+        @Override
+        public String getAcquiredString(int acquireInfo, int vendorCode) {
+            return FaceManager.getAcquiredString(getContext(), acquireInfo, vendorCode);
+        }
+
+        @Override
+        public int getBiometricType() {
+            return BiometricAuthenticator.TYPE_FACE;
+        }
+    }
 
     /**
      * Receives the incoming binder calls from FaceManager.
@@ -91,22 +122,22 @@ public class FaceService extends BiometricService {
          * The following methods contain common code which is shared in biometrics/common.
          */
         @Override // Binder call
-        public long preEnroll(IBinder token) {
-            checkPermission(MANAGE_FACE);
-            return startPreEnroll(token);
+        public long generateChallenge(IBinder token) {
+            checkPermission(MANAGE_BIOMETRIC);
+            return startGenerateChallenge(token);
         }
 
         @Override // Binder call
-        public int postEnroll(IBinder token) {
-            checkPermission(MANAGE_FACE);
-            return startPostEnroll(token);
+        public int revokeChallenge(IBinder token) {
+            checkPermission(MANAGE_BIOMETRIC);
+            return startRevokeChallenge(token);
         }
 
         @Override // Binder call
         public void enroll(final IBinder token, final byte[] cryptoToken, final int userId,
                 final IFaceServiceReceiver receiver, final int flags,
                 final String opPackageName) {
-            checkPermission(MANAGE_FACE);
+            checkPermission(MANAGE_BIOMETRIC);
 
             final boolean restricted = isRestricted();
             final EnrollClientImpl client = new EnrollClientImpl(getContext(), mDaemonWrapper,
@@ -118,39 +149,64 @@ public class FaceService extends BiometricService {
 
         @Override // Binder call
         public void cancelEnrollment(final IBinder token) {
-            checkPermission(MANAGE_FACE);
+            checkPermission(MANAGE_BIOMETRIC);
             cancelEnrollmentInternal(token);
         }
 
         @Override // Binder call
         public void authenticate(final IBinder token, final long opId,
                 final IFaceServiceReceiver receiver, final int flags,
-                final String opPackageName, final Bundle bundle,
-                final IBiometricPromptReceiver dialogReceiver) {
+                final String opPackageName) {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
             final boolean restricted = isRestricted();
-            final AuthenticationClientImpl client = new AuthenticationClientImpl(getContext(),
+            final AuthenticationClientImpl client = new FaceAuthClient(getContext(),
                     mDaemonWrapper, mHalDeviceId, token, new ServiceListenerImpl(receiver),
-                    mCurrentUserId, 0 /* groupId */, opId, restricted, opPackageName, bundle,
-                    dialogReceiver, mStatusBarService);
-
+                    mCurrentUserId, 0 /* groupId */, opId, restricted, opPackageName,
+                    null /* bundle */, null /* dialogReceiver */, mStatusBarService,
+                    false /* requireConfirmation */);
             authenticateInternal(client, opId, opPackageName);
         }
 
         @Override // Binder call
+        public void authenticateFromService(boolean requireConfirmation, IBinder token, long opId,
+                int groupId, IBiometricServiceReceiver receiver, int flags,
+                String opPackageName, Bundle bundle, IBiometricPromptReceiver dialogReceiver,
+                int callingUid, int callingPid, int callingUserId) {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
+            final boolean restricted = true; // BiometricPrompt is always restricted
+            final AuthenticationClientImpl client = new FaceAuthClient(getContext(),
+                    mDaemonWrapper, mHalDeviceId, token,
+                    new BiometricPromptServiceListenerImpl(receiver),
+                    mCurrentUserId, 0 /* groupId */, opId, restricted, opPackageName,
+                    bundle, dialogReceiver, mStatusBarService, true /* requireConfirmation */);
+            authenticateInternal(client, opId, opPackageName, callingUid, callingPid,
+                    callingUserId);
+        }
+
+        @Override // Binder call
         public void cancelAuthentication(final IBinder token, final String opPackageName) {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
             cancelAuthenticationInternal(token, opPackageName);
         }
 
         @Override // Binder call
+        public void cancelAuthenticationFromService(final IBinder token, final String opPackageName,
+                int callingUid, int callingPid, int callingUserId) {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
+            cancelAuthenticationInternal(token, opPackageName,
+                    callingUid, callingPid, callingUserId);
+        }
+
+        @Override // Binder call
         public void setActiveUser(final int userId) {
-            checkPermission(MANAGE_FACE);
+            checkPermission(MANAGE_BIOMETRIC);
             setActiveUserInternal(userId);
         }
 
         @Override // Binder call
         public void remove(final IBinder token, final int faceId, final int userId,
                 final IFaceServiceReceiver receiver) {
-            checkPermission(MANAGE_FACE);
+            checkPermission(MANAGE_BIOMETRIC);
 
             if (token == null) {
                 Slog.w(TAG, "remove(): token is null");
@@ -168,7 +224,7 @@ public class FaceService extends BiometricService {
         @Override
         public void enumerate(final IBinder token, final int userId,
                 final IFaceServiceReceiver receiver) {
-            checkPermission(MANAGE_FACE);
+            checkPermission(MANAGE_BIOMETRIC);
 
             final boolean restricted = isRestricted();
             final EnumerateClientImpl client = new EnumerateClientImpl(getContext(), mDaemonWrapper,
@@ -180,6 +236,7 @@ public class FaceService extends BiometricService {
         @Override
         public void addLockoutResetCallback(final IBiometricServiceLockoutResetCallback callback)
                 throws RemoteException {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
             FaceService.super.addLockoutResetCallback(callback);
         }
 
@@ -208,6 +265,7 @@ public class FaceService extends BiometricService {
         // TODO: refactor out common code here
         @Override // Binder call
         public boolean isHardwareDetected(long deviceId, String opPackageName) {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
             if (!canUseBiometric(opPackageName, false /* foregroundOnly */,
                     Binder.getCallingUid(), Binder.getCallingPid(),
                     UserHandle.getCallingUserId())) {
@@ -225,7 +283,7 @@ public class FaceService extends BiometricService {
 
         @Override // Binder call
         public void rename(final int faceId, final String name) {
-            checkPermission(MANAGE_FACE);
+            checkPermission(MANAGE_BIOMETRIC);
             if (!isCurrentUserOrProfile(UserHandle.getCallingUserId())) {
                 return;
             }
@@ -240,6 +298,7 @@ public class FaceService extends BiometricService {
 
         @Override // Binder call
         public List<Face> getEnrolledFaces(int userId, String opPackageName) {
+            checkPermission(MANAGE_BIOMETRIC);
             if (!canUseBiometric(opPackageName, false /* foregroundOnly */,
                     Binder.getCallingUid(), Binder.getCallingPid(),
                     UserHandle.getCallingUserId())) {
@@ -251,6 +310,7 @@ public class FaceService extends BiometricService {
 
         @Override // Binder call
         public boolean hasEnrolledFaces(int userId, String opPackageName) {
+            checkPermission(USE_BIOMETRIC_INTERNAL);
             if (!canUseBiometric(opPackageName, false /* foregroundOnly */,
                     Binder.getCallingUid(), Binder.getCallingPid(),
                     UserHandle.getCallingUserId())) {
@@ -283,9 +343,97 @@ public class FaceService extends BiometricService {
 
         @Override // Binder call
         public void resetTimeout(byte[] token) {
-            checkPermission(RESET_FACE_LOCKOUT);
+            checkPermission(MANAGE_BIOMETRIC);
             // TODO: confirm security token when we move timeout management into the HAL layer.
             mHandler.post(mResetFailedAttemptsForCurrentUserRunnable);
+        }
+
+        @Override
+        public int setRequireAttention(boolean requireAttention, final byte[] token) {
+            checkPermission(MANAGE_BIOMETRIC);
+
+            final ArrayList<Byte> byteToken = new ArrayList<>();
+            for (int i = 0; i < token.length; i++) {
+                byteToken.add(token[i]);
+            }
+
+            int result;
+            try {
+                result = mDaemon != null ? mDaemon.setRequireAttention(requireAttention, byteToken)
+                        : Status.INTERNAL_ERROR;
+            } catch (RemoteException e) {
+                Slog.e(getTag(), "Unable to setRequireAttention to " + requireAttention);
+                result = Status.INTERNAL_ERROR;
+            }
+
+            return result;
+        }
+
+        @Override
+        public boolean getRequireAttention(final byte[] token) {
+            checkPermission(MANAGE_BIOMETRIC);
+
+            final ArrayList<Byte> byteToken = new ArrayList<>();
+            for (int i = 0; i < token.length; i++) {
+                byteToken.add(token[i]);
+            }
+
+            boolean result = true;
+            try {
+                result = mDaemon != null ? mDaemon.getRequireAttention(byteToken).value : true;
+            } catch (RemoteException e) {
+                Slog.e(getTag(), "Unable to getRequireAttention");
+            }
+            return result;
+        }
+    }
+
+    /**
+     * Receives callbacks from the ClientMonitor implementations. The results are forwarded to
+     * BiometricPrompt.
+     */
+    private class BiometricPromptServiceListenerImpl implements ServiceListener {
+
+        private IBiometricServiceReceiver mBiometricServiceReceiver;
+
+        public BiometricPromptServiceListenerImpl(IBiometricServiceReceiver receiver) {
+            mBiometricServiceReceiver = receiver;
+        }
+
+        @Override
+        public void onAcquired(long deviceId, int acquiredInfo, int vendorCode)
+                throws RemoteException {
+            /**
+             * Map the acquired codes onto existing {@link BiometricConstants} acquired codes.
+             */
+            if (mBiometricServiceReceiver != null) {
+                mBiometricServiceReceiver.onAcquired(deviceId,
+                        FaceManager.getMappedAcquiredInfo(acquiredInfo, vendorCode),
+                        FaceManager.getAcquiredString(getContext(), acquiredInfo, vendorCode));
+            }
+        }
+
+        @Override
+        public void onAuthenticationSucceeded(long deviceId,
+                BiometricAuthenticator.Identifier biometric, int userId) throws RemoteException {
+            if (mBiometricServiceReceiver != null) {
+                mBiometricServiceReceiver.onAuthenticationSucceeded(deviceId);
+            }
+        }
+
+        @Override
+        public void onAuthenticationFailed(long deviceId) throws RemoteException {
+            if (mBiometricServiceReceiver != null) {
+                mBiometricServiceReceiver.onAuthenticationFailed(deviceId);
+            }
+        }
+
+        @Override
+        public void onError(long deviceId, int error, int vendorCode) throws RemoteException {
+            if (mBiometricServiceReceiver != null) {
+                mBiometricServiceReceiver.onError(deviceId, error,
+                        FaceManager.getErrorString(getContext(), error, vendorCode));
+            }
         }
     }
 
@@ -368,9 +516,7 @@ public class FaceService extends BiometricService {
 
     @GuardedBy("this")
     private IBiometricsFace mDaemon;
-
     private long mHalDeviceId;
-    private IStatusBarService mStatusBarService;
 
     /**
      * Receives callbacks from the HAL.
@@ -496,20 +642,19 @@ public class FaceService extends BiometricService {
             for (int i = 0; i < cryptoToken.length; i++) {
                 token.add(cryptoToken[i]);
             }
-            return daemon.enroll(token, timeout);
+            // TODO: plumb requireAttention down from framework
+            return daemon.enroll(token, timeout, true /* requireAttention */);
         }
     };
 
 
     public FaceService(Context context) {
         super(context);
-        // TODO: can this be retrieved from AuthenticationClient, or BiometricService?
-        mStatusBarService = IStatusBarService.Stub.asInterface(
-                ServiceManager.getService(Context.STATUS_BAR_SERVICE));
     }
 
     @Override
     public void onStart() {
+        super.onStart();
         publishBinderService(Context.FACE_SERVICE, new FaceServiceWrapper());
         SystemServerInitThreadPool.get().submit(this::getFaceDaemon, TAG + ".onStart");
     }
@@ -616,17 +761,19 @@ public class FaceService extends BiometricService {
 
     @Override
     protected String getManageBiometricPermission() {
-        return MANAGE_FACE;
+        return MANAGE_BIOMETRIC;
     }
 
     @Override
     protected void checkUseBiometricPermission() {
-        checkPermission(USE_BIOMETRIC);
+        // noop for Face. The permission checks are all done on the incoming binder call.
+        // TODO: Perhaps do the same in FingerprintService
     }
 
     @Override
-    protected int getAppOp() {
-        return AppOpsManager.OP_USE_FACE;
+    protected boolean checkAppOps(int uid, String opPackageName) {
+        return mAppOps.noteOp(AppOpsManager.OP_USE_BIOMETRIC, uid, opPackageName)
+                == AppOpsManager.MODE_ALLOWED;
     }
 
     @Override
@@ -672,30 +819,30 @@ public class FaceService extends BiometricService {
         return mDaemon;
     }
 
-    private long startPreEnroll(IBinder token) {
+    private long startGenerateChallenge(IBinder token) {
         IBiometricsFace daemon = getFaceDaemon();
         if (daemon == null) {
-            Slog.w(TAG, "startPreEnroll: no face HAL!");
+            Slog.w(TAG, "startGenerateChallenge: no face HAL!");
             return 0;
         }
         try {
-            return daemon.preEnroll().value;
+            return daemon.generateChallenge(CHALLENGE_TIMEOUT_SEC).value;
         } catch (RemoteException e) {
-            Slog.e(TAG, "startPreEnroll failed", e);
+            Slog.e(TAG, "startGenerateChallenge failed", e);
         }
         return 0;
     }
 
-    private int startPostEnroll(IBinder token) {
+    private int startRevokeChallenge(IBinder token) {
         IBiometricsFace daemon = getFaceDaemon();
         if (daemon == null) {
-            Slog.w(TAG, "startPostEnroll: no face HAL!");
+            Slog.w(TAG, "startRevokeChallenge: no face HAL!");
             return 0;
         }
         try {
-            return daemon.postEnroll();
+            return daemon.revokeChallenge();
         } catch (RemoteException e) {
-            Slog.e(TAG, "startPostEnroll failed", e);
+            Slog.e(TAG, "startRevokeChallenge failed", e);
         }
         return 0;
     }

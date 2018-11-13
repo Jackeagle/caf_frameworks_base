@@ -43,6 +43,7 @@ import android.content.pm.PackageManager;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -52,7 +53,6 @@ import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.Region;
-import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.Drawable;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManager.DisplayListener;
@@ -82,6 +82,7 @@ import android.util.TimeUtils;
 import android.util.TypedValue;
 import android.util.BoostFramework;
 import android.view.Surface.OutOfResourcesException;
+import android.view.SurfaceControl.Transaction;
 import android.view.ThreadedRenderer.FrameDrawingCallback;
 import android.view.View.AttachInfo;
 import android.view.View.FocusDirection;
@@ -242,6 +243,12 @@ public final class ViewRootImpl implements ViewParent,
     final ArrayList<WindowCallbacks> mWindowCallbacks = new ArrayList<>();
     @UnsupportedAppUsage
     final Context mContext;
+    /**
+     * TODO(b/116349163): Check if we can merge this into {@link #mContext}.
+     */
+    @NonNull
+    private Context mDisplayContext;
+
     @UnsupportedAppUsage
     final IWindowSession mWindowSession;
     @NonNull Display mDisplay;
@@ -346,6 +353,7 @@ public final class ViewRootImpl implements ViewParent,
 
     final Rect mTempRect; // used in the transaction to not thrash the heap.
     final Rect mVisRect; // used to retrieve visible rect of focused view.
+    private final Rect mTempBoundsRect = new Rect(); // used to set the size of the bounds surface.
 
     // This is used to reduce the race between window focus changes being dispatched from
     // the window manager and input events coming through the input system.
@@ -407,6 +415,18 @@ public final class ViewRootImpl implements ViewParent,
     // Surface can never be reassigned or cleared (use Surface.clear()).
     @UnsupportedAppUsage
     public final Surface mSurface = new Surface();
+
+    /**
+     * Child surface of {@code mSurface} with the same bounds as its parent, and crop bounds
+     * are set to the parent's bounds adjusted for surface insets. This surface is created when
+     * {@link ViewRootImpl#createBoundsSurface(int)} is called.
+     * By parenting to this bounds surface, child surfaces can ensure they do not draw into the
+     * surface inset regions set by the parent window.
+     */
+    public final Surface mBoundsSurface = new Surface();
+    private SurfaceSession mSurfaceSession;
+    private SurfaceControl mBoundsSurfaceControl;
+    private final Transaction mTransaction = new Transaction();
 
     @UnsupportedAppUsage
     boolean mAdded;
@@ -525,6 +545,7 @@ public final class ViewRootImpl implements ViewParent,
 
     public ViewRootImpl(Context context, Display display) {
         mContext = context;
+        mDisplayContext = context.createDisplayContext(display);
         mWindowSession = WindowManagerGlobal.getWindowSession();
         mDisplay = display;
         mBasePackageName = context.getBasePackageName();
@@ -978,6 +999,9 @@ public final class ViewRootImpl implements ViewParent,
         ThreadedRenderer.invokeFunctor(functor, waitForCompletion);
     }
 
+    /**
+     * @param animator animator to register with the hardware renderer
+     */
     public void registerAnimatingRenderNode(RenderNode animator) {
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.registerAnimatingRenderNode(animator);
@@ -989,8 +1013,10 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
-    public void registerVectorDrawableAnimator(
-            AnimatedVectorDrawable.VectorDrawableAnimatorRT animator) {
+    /**
+     * @param animator animator to register with the hardware renderer
+     */
+    public void registerVectorDrawableAnimator(NativeVectorDrawableAnimator animator) {
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.registerVectorDrawableAnimator(animator);
         }
@@ -1060,11 +1086,33 @@ public final class ViewRootImpl implements ViewParent,
                 mAttachInfo.mThreadedRenderer = ThreadedRenderer.create(mContext, translucent,
                         attrs.getTitle().toString());
                 mAttachInfo.mThreadedRenderer.setWideGamut(wideGamut);
+                updateForceDarkMode();
                 if (mAttachInfo.mThreadedRenderer != null) {
                     mAttachInfo.mHardwareAccelerated =
                             mAttachInfo.mHardwareAccelerationRequested = true;
                 }
             }
+        }
+    }
+
+    private int getNightMode() {
+        return mContext.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+    }
+
+    private void updateForceDarkMode() {
+        if (mAttachInfo.mThreadedRenderer == null) return;
+
+        boolean nightMode = getNightMode() == Configuration.UI_MODE_NIGHT_YES;
+        TypedArray a = mContext.obtainStyledAttributes(R.styleable.Theme);
+        boolean isLightTheme = a.getBoolean(R.styleable.Theme_isLightTheme, false);
+        a.recycle();
+
+        boolean changed = mAttachInfo.mThreadedRenderer.setForceDark(nightMode);
+        changed |= mAttachInfo.mThreadedRenderer.getRootNode().setAllowForceDark(isLightTheme);
+
+        if (changed) {
+            // TODO: Don't require regenerating all display lists to apply this setting
+            invalidateWorld(mView);
         }
     }
 
@@ -1243,6 +1291,7 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             mDisplay = preferredDisplay;
         }
+        mDisplayContext = mContext.createDisplayContext(mDisplay);
     }
 
     void pokeDrawLockIfNeeded() {
@@ -1398,8 +1447,75 @@ public final class ViewRootImpl implements ViewParent,
             }
 
             if (mStopped) {
-                mSurface.release();
+                destroySurface();
             }
+        }
+    }
+
+    /**
+     * Creates a surface as a child of {@code mSurface} with the same bounds as its parent and
+     * crop bounds set to the parent's bounds adjusted for surface insets.
+     *
+     * @param zOrderLayer Z order relative to the parent surface.
+     */
+    public void createBoundsSurface(int zOrderLayer) {
+        if (mSurfaceSession == null) {
+            mSurfaceSession = new SurfaceSession(mSurface);
+        }
+        if (mBoundsSurfaceControl != null && mBoundsSurface.isValid()) {
+            return; // surface control for bounds surface already exists.
+        }
+
+        mBoundsSurfaceControl = new SurfaceControl.Builder(mSurfaceSession)
+                .setName("Bounds for - " + getTitle().toString())
+                .setSize(mWidth, mHeight)
+                .build();
+
+        setBoundsSurfaceSizeAndCrop();
+        mTransaction.setLayer(mBoundsSurfaceControl, zOrderLayer)
+                    .show(mBoundsSurfaceControl)
+                    .apply();
+        mBoundsSurface.copyFrom(mBoundsSurfaceControl);
+    }
+
+    private void setBoundsSurfaceSizeAndCrop() {
+        // mWinFrame is already adjusted for surface insets. So offset it and use it as
+        // the cropping bounds.
+        mTempBoundsRect.set(mWinFrame);
+        mTempBoundsRect.offsetTo(mWindowAttributes.surfaceInsets.left,
+                mWindowAttributes.surfaceInsets.top);
+        mTransaction.setWindowCrop(mBoundsSurfaceControl, mTempBoundsRect);
+
+        // Expand the bounds by the surface insets to get the size of surface.
+        mTempBoundsRect.inset(-mWindowAttributes.surfaceInsets.left,
+                -mWindowAttributes.surfaceInsets.top,
+                -mWindowAttributes.surfaceInsets.right,
+                -mWindowAttributes.surfaceInsets.bottom);
+        mTransaction.setSize(mBoundsSurfaceControl, mTempBoundsRect.width(),
+                mTempBoundsRect.height());
+    }
+
+    /**
+     * Called after window layout to update the bounds surface. If the surface insets have
+     * changed or the surface has resized, update the bounds surface.
+     */
+    private void updateBoundsSurface() {
+        if (mBoundsSurfaceControl != null && mSurface.isValid()) {
+            setBoundsSurfaceSizeAndCrop();
+            mTransaction.deferTransactionUntilSurface(mBoundsSurfaceControl,
+                    mSurface, mSurface.getNextFrameNumber())
+                    .apply();
+        }
+    }
+
+    private void destroySurface() {
+        mSurface.release();
+        mSurfaceSession = null;
+
+        if (mBoundsSurfaceControl != null) {
+            mBoundsSurfaceControl.destroy();
+            mBoundsSurface.release();
+            mBoundsSurfaceControl = null;
         }
     }
 
@@ -2358,6 +2474,10 @@ public final class ViewRootImpl implements ViewParent,
             maybeHandleWindowMove(frame);
         }
 
+        if (surfaceChanged) {
+            updateBoundsSurface();
+        }
+
         final boolean didLayout = layoutRequested && (!mStopped || mReportNextDraw);
         boolean triggerGlobalLayoutListener = didLayout
                 || mAttachInfo.mRecomputeGlobalAttributes;
@@ -2502,7 +2622,7 @@ public final class ViewRootImpl implements ViewParent,
                     .mayUseInputMethod(mWindowAttributes.flags);
             if (imTarget != mLastWasImTarget) {
                 mLastWasImTarget = imTarget;
-                InputMethodManager imm = InputMethodManager.peekInstance();
+                InputMethodManager imm = mDisplayContext.getSystemService(InputMethodManager.class);
                 if (imm != null && imTarget) {
                     imm.onPreWindowFocus(mView, hasWindowFocus);
                     imm.onPostWindowFocus(mView, mView.findFocus(),
@@ -2618,7 +2738,7 @@ public final class ViewRootImpl implements ViewParent,
             mLastWasImTarget = WindowManager.LayoutParams
                     .mayUseInputMethod(mWindowAttributes.flags);
 
-            InputMethodManager imm = InputMethodManager.peekInstance();
+            InputMethodManager imm = mDisplayContext.getSystemService(InputMethodManager.class);
             if (imm != null && mLastWasImTarget && !isInLocalFocusMode()) {
                 imm.onPreWindowFocus(mView, hasWindowFocus);
             }
@@ -3875,7 +3995,7 @@ public final class ViewRootImpl implements ViewParent,
         mView = null;
         mAttachInfo.mRootView = null;
 
-        mSurface.release();
+        destroySurface();
 
         if (mInputQueueCallback != null && mInputQueue != null) {
             mInputQueueCallback.onInputQueueDestroyed(mInputQueue);
@@ -3995,6 +4115,8 @@ public final class ViewRootImpl implements ViewParent,
             mForceNextWindowRelayout = true;
             requestLayout();
         }
+
+        updateForceDarkMode();
     }
 
     /**
@@ -4259,7 +4381,8 @@ public final class ViewRootImpl implements ViewParent,
                     enqueueInputEvent(event, null, 0, true);
                 } break;
                 case MSG_CHECK_FOCUS: {
-                    InputMethodManager imm = InputMethodManager.peekInstance();
+                    InputMethodManager imm =
+                            mDisplayContext.getSystemService(InputMethodManager.class);
                     if (imm != null) {
                         imm.checkFocus();
                     }
@@ -4801,7 +4924,7 @@ public final class ViewRootImpl implements ViewParent,
         @Override
         protected int onProcess(QueuedInputEvent q) {
             if (mLastWasImTarget && !isInLocalFocusMode()) {
-                InputMethodManager imm = InputMethodManager.peekInstance();
+                InputMethodManager imm = mDisplayContext.getSystemService(InputMethodManager.class);
                 if (imm != null) {
                     final InputEvent event = q.mEvent;
                     if (DEBUG_IMF) Log.v(mTag, "Sending input event to IME: " + event);
@@ -6833,7 +6956,7 @@ public final class ViewRootImpl implements ViewParent,
                         }
                     }
 
-                    mSurface.release();
+                    destroySurface();
                 }
             }
 

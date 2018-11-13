@@ -54,10 +54,10 @@ public class KeyguardAffordanceView extends ImageView {
     public static final float MAX_ICON_SCALE_AMOUNT = 1.5f;
     public static final float MIN_ICON_SCALE_AMOUNT = 0.8f;
 
+    protected final int mDarkIconColor;
+    protected final int mNormalColor;
     private final int mMinBackgroundRadius;
     private final Paint mCirclePaint;
-    private final int mDarkIconColor;
-    private final int mNormalColor;
     private final ArgbEvaluator mColorInterpolator;
     private final FlingAnimationUtils mFlingAnimationUtils;
     private float mCircleRadius;
@@ -76,7 +76,7 @@ public class KeyguardAffordanceView extends ImageView {
     private float mCircleStartRadius;
     private float mMaxCircleSize;
     private Animator mPreviewClipper;
-    private float mRestingAlpha = KeyguardAffordanceHelper.SWIPE_RESTING_ALPHA_AMOUNT;
+    private float mRestingAlpha = 1f;
     private boolean mSupportHardware;
     private boolean mFinishing;
     private boolean mLaunchingAffordance;

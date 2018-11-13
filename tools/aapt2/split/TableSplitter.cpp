@@ -24,10 +24,12 @@
 #include <vector>
 
 #include "android-base/logging.h"
+#include "androidfw/ConfigDescription.h"
 
-#include "ConfigDescription.h"
 #include "ResourceTable.h"
 #include "util/Util.h"
+
+using ::android::ConfigDescription;
 
 namespace aapt {
 
@@ -154,6 +156,12 @@ static void MarkNonPreferredDensitiesAsClaimed(
 bool TableSplitter::VerifySplitConstraints(IAaptContext* context) {
   bool error = false;
   for (size_t i = 0; i < split_constraints_.size(); i++) {
+    if (split_constraints_[i].configs.size() == 0) {
+      // For now, treat this as a warning. We may consider aborting processing.
+      context->GetDiagnostics()->Warn(DiagMessage()
+                                       << "no configurations for constraint '"
+                                       << split_constraints_[i].name << "'");
+    }
     for (size_t j = i + 1; j < split_constraints_.size(); j++) {
       for (const ConfigDescription& config : split_constraints_[i].configs) {
         if (split_constraints_[j].configs.find(config) != split_constraints_[j].configs.end()) {

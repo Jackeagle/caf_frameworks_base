@@ -36,8 +36,8 @@
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"הודעות"</string>
     <string name="battery_low_title" msgid="9187898087363540349">"ייתכן שהסוללה תתרוקן בקרוב"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"נותרו <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
-    <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"נותרו <xliff:g id="PERCENTAGE">%s</xliff:g>, נשארו בערך <xliff:g id="TIME">%s</xliff:g> על סמך השימוש במכשיר"</string>
-    <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"נותרו <xliff:g id="PERCENTAGE">%s</xliff:g>, נשארו בערך <xliff:g id="TIME">%s</xliff:g>"</string>
+    <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"נותרו <xliff:g id="PERCENTAGE">%1$s</xliff:g>, נשארו בערך <xliff:g id="TIME">%2$s</xliff:g> על סמך השימוש במכשיר"</string>
+    <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"נותרו <xliff:g id="PERCENTAGE">%1$s</xliff:g>, נשארו בערך <xliff:g id="TIME">%2$s</xliff:g>"</string>
     <string name="battery_low_percent_format_saver_started" msgid="7879389868952879166">"נותרו <xliff:g id="PERCENTAGE">%s</xliff:g>. הופעלה תכונת החיסכון בסוללה."</string>
     <string name="invalid_charger" msgid="2741987096648693172">"‏לא ניתן לטעון באמצעות USB. ניתן להשתמש במטען שצורף למכשיר שלך."</string>
     <string name="invalid_charger_title" msgid="2836102177577255404">"‏לא ניתן לטעון באמצעות USB"</string>
@@ -105,10 +105,12 @@
     <string name="camera_label" msgid="7261107956054836961">"פתח את המצלמה"</string>
     <string name="recents_caption_resize" msgid="3517056471774958200">"בחר פריסה חדשה להצגת משימות"</string>
     <string name="cancel" msgid="6442560571259935130">"ביטול"</string>
+    <string name="accessibility_biometric_dialog_help_area" msgid="8953787076940186847">"אזור הודעת עזרה"</string>
+    <string name="biometric_dialog_confirm" msgid="6468457350041712674">"אישור"</string>
     <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"יש לגעת בחיישן טביעות האצבע"</string>
     <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"סמל טביעת אצבע"</string>
-    <string name="accessibility_fingerprint_dialog_app_icon" msgid="3228052542929174609">"סמל אפליקציה"</string>
-    <string name="accessibility_fingerprint_dialog_help_area" msgid="5730471601819225159">"אזור הודעת עזרה"</string>
+    <string name="face_dialog_looking_for_face" msgid="7049276266074494689">"מחפש אותך…"</string>
+    <string name="accessibility_face_dialog_face_icon" msgid="2658119009870383490">"סמל הפנים"</string>
     <string name="accessibility_compatibility_zoom_button" msgid="8461115318742350699">"לחצן מרחק מתצוגה של תאימות."</string>
     <string name="accessibility_compatibility_zoom_example" msgid="4220687294564945780">"שנה מרחק מתצוגה של מסך קטן לגדול יותר."</string>
     <string name="accessibility_bluetooth_connected" msgid="2707027633242983370">"‏Bluetooth מחובר."</string>
@@ -194,7 +196,7 @@
     <string name="accessibility_recents_item_open_app_info" msgid="5107479759905883540">"פתח מידע על האפליקציה <xliff:g id="APP">%s</xliff:g>."</string>
     <string name="accessibility_recents_item_launched" msgid="7616039892382525203">"מפעיל את <xliff:g id="APP">%s</xliff:g>."</string>
     <string name="accessibility_notification_dismissed" msgid="854211387186306927">"הודעה נדחתה."</string>
-    <string name="accessibility_desc_notification_shade" msgid="4690274844447504208">"לוח הודעות."</string>
+    <string name="accessibility_desc_notification_shade" msgid="4690274844447504208">"לוח התראות."</string>
     <string name="accessibility_desc_quick_settings" msgid="6186378411582437046">"הגדרות מהירות."</string>
     <string name="accessibility_desc_lock_screen" msgid="5625143713611759164">"מסך נעילה."</string>
     <string name="accessibility_desc_settings" msgid="3417884241751434521">"הגדרות"</string>
@@ -259,14 +261,14 @@
     <string name="accessibility_location_active" msgid="2427290146138169014">"בקשות מיקום פעילות"</string>
     <string name="accessibility_clear_all" msgid="5235938559247164925">"נקה את כל ההודעות."</string>
     <string name="notification_group_overflow_indicator" msgid="1863231301642314183">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
-    <string name="notification_group_overflow_indicator_ambient" msgid="879560382990377886">"<xliff:g id="NOTIFICATION_TITLE">%s</xliff:g>, +<xliff:g id="OVERFLOW">%s</xliff:g>"</string>
+    <string name="notification_group_overflow_indicator_ambient" msgid="879560382990377886">"<xliff:g id="NOTIFICATION_TITLE">%1$s</xliff:g>, +<xliff:g id="OVERFLOW">%2$s</xliff:g>"</string>
     <plurals name="notification_group_overflow_description" formatted="false" msgid="4579313201268495404">
       <item quantity="two">יש בפנים עוד <xliff:g id="NUMBER_1">%s</xliff:g> הודעות.</item>
       <item quantity="many">יש בפנים עוד <xliff:g id="NUMBER_1">%s</xliff:g> הודעות.</item>
       <item quantity="other">יש בפנים עוד <xliff:g id="NUMBER_1">%s</xliff:g> הודעות.</item>
       <item quantity="one">יש בפנים עוד הודעה <xliff:g id="NUMBER_0">%s</xliff:g>.</item>
     </plurals>
-    <string name="status_bar_notification_inspect_item_title" msgid="5668348142410115323">"הגדרות עבור הודעות"</string>
+    <string name="status_bar_notification_inspect_item_title" msgid="5668348142410115323">"הגדרת התראות"</string>
     <string name="status_bar_notification_app_settings_title" msgid="5525260160341558869">"הגדרות <xliff:g id="APP_NAME">%s</xliff:g>"</string>
     <string name="accessibility_rotation_lock_off" msgid="4062780228931590069">"המסך יסתובב באופן אוטומטי."</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="6731197337665366273">"המסך נעול כעת לרוחב."</string>
@@ -405,9 +407,9 @@
     <string name="interruption_level_none_twoline" msgid="3957581548190765889">"שקט\nמוחלט"</string>
     <string name="interruption_level_priority_twoline" msgid="1564715335217164124">"הודעות בעדיפות\nבלבד"</string>
     <string name="interruption_level_alarms_twoline" msgid="3266909566410106146">"התראות\nבלבד"</string>
-    <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • בטעינה (<xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> עד לסיום)"</string>
-    <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • בטעינה מהירה (<xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> עד לסיום)"</string>
-    <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • בטעינה איטית (<xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> עד לסיום)"</string>
+    <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • בטעינה (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> עד לסיום)"</string>
+    <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • בטעינה מהירה (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> עד לסיום)"</string>
+    <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • בטעינה איטית (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> עד לסיום)"</string>
     <string name="accessibility_multi_user_switch_switcher" msgid="7305948938141024937">"החלפת משתמש"</string>
     <string name="accessibility_multi_user_switch_switcher_with_current" msgid="8434880595284601601">"החלף משתמש. המשתמש הנוכחי הוא <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
     <string name="accessibility_multi_user_switch_inactive" msgid="1424081831468083402">"משתמש נוכחי <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
@@ -432,6 +434,13 @@
     <string name="user_logout_notification_action" msgid="1195428991423425062">"נתק משתמש"</string>
     <string name="user_add_user_title" msgid="4553596395824132638">"האם להוסיף משתמש חדש?"</string>
     <string name="user_add_user_message_short" msgid="2161624834066214559">"בעת הוספת משתמש חדש, על משתמש זה להגדיר את השטח שלו.\n\nכל משתמש יכול לעדכן אפליקציות עבור כל המשתמשים האחרים."</string>
+    <string name="user_limit_reached_title" msgid="7374910700117359177">"הגעת למגבלת המשתמשים שניתן להוסיף"</string>
+    <plurals name="user_limit_reached_message" formatted="false" msgid="1855040563671964242">
+      <item quantity="two">ניתן להוסיף עד <xliff:g id="COUNT">%d</xliff:g> משתמשים.</item>
+      <item quantity="many">ניתן להוסיף עד <xliff:g id="COUNT">%d</xliff:g> משתמשים.</item>
+      <item quantity="other">ניתן להוסיף עד <xliff:g id="COUNT">%d</xliff:g> משתמשים.</item>
+      <item quantity="one">ניתן ליצור רק משתמש אחד.</item>
+    </plurals>
     <string name="user_remove_user_title" msgid="4681256956076895559">"האם להסיר את המשתמש?"</string>
     <string name="user_remove_user_message" msgid="1453218013959498039">"כל האפליקציות והנתונים של המשתמש הזה יימחקו."</string>
     <string name="user_remove_user_remove" msgid="7479275741742178297">"הסר"</string>
@@ -441,7 +450,7 @@
     <string name="media_projection_dialog_text" msgid="3071431025448218928">"<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> יתחיל להקליט את כל התוכן המוצג במסך שלך."</string>
     <string name="media_projection_remember_text" msgid="3103510882172746752">"אל תציג שוב"</string>
     <string name="clear_all_notifications_text" msgid="814192889771462828">"נקה הכל"</string>
-    <string name="manage_notifications_text" msgid="8035284146227267681">"ניהול התראות"</string>
+    <string name="manage_notifications_text" msgid="2386728145475108753">"ניהול"</string>
     <string name="dnd_suppressing_shade_text" msgid="1904574852846769301">"הודעות הושהו על ידי מצב \'נא לא להפריע\'"</string>
     <string name="media_projection_action_text" msgid="8470872969457985954">"התחל כעת"</string>
     <string name="empty_shade_text" msgid="708135716272867002">"אין הודעות"</string>
@@ -739,6 +748,7 @@
     <string name="left_icon" msgid="3096287125959387541">"סמל שמאלי"</string>
     <string name="right_icon" msgid="3952104823293824311">"סמל ימני"</string>
     <string name="drag_to_add_tiles" msgid="230586591689084925">"יש ללחוץ ולגרור כדי להוסיף אריחים"</string>
+    <string name="drag_to_rearrange_tiles" msgid="4566074720193667473">"יש ללחוץ ולגרור כדי לסדר מחדש את האריחים"</string>
     <string name="drag_to_remove_tiles" msgid="3361212377437088062">"גרור לכאן כדי להסיר"</string>
     <string name="drag_to_remove_disabled" msgid="2390968976638993382">"יש צורך בשישה אריחים לכל הפחות"</string>
     <string name="qs_edit" msgid="2232596095725105230">"עריכה"</string>
@@ -767,12 +777,10 @@
     <string name="accessibility_action_divider_bottom_full" msgid="301433196679548001">"מסך תחתון מלא"</string>
     <string name="accessibility_qs_edit_tile_label" msgid="8374924053307764245">"מיקום <xliff:g id="POSITION">%1$d</xliff:g>, <xliff:g id="TILE_NAME">%2$s</xliff:g>. הקש פעמיים כדי לערוך."</string>
     <string name="accessibility_qs_edit_add_tile_label" msgid="8133209638023882667">"<xliff:g id="TILE_NAME">%1$s</xliff:g>. הקש פעמיים כדי להוסיף."</string>
-    <string name="accessibility_qs_edit_position_label" msgid="5055306305919289819">"מיקום <xliff:g id="POSITION">%1$d</xliff:g>. הקש פעמיים כדי לבחור."</string>
     <string name="accessibility_qs_edit_move_tile" msgid="2461819993780159542">"הזזת <xliff:g id="TILE_NAME">%1$s</xliff:g>"</string>
     <string name="accessibility_qs_edit_remove_tile" msgid="7484493384665907197">"הסרת <xliff:g id="TILE_NAME">%1$s</xliff:g>"</string>
-    <string name="accessibility_qs_edit_tile_added" msgid="8050200862063548309">"<xliff:g id="TILE_NAME">%1$s</xliff:g> התווסף למיקום <xliff:g id="POSITION">%2$d</xliff:g>"</string>
-    <string name="accessibility_qs_edit_tile_removed" msgid="8584304916627913440">"<xliff:g id="TILE_NAME">%1$s</xliff:g> הוסר"</string>
-    <string name="accessibility_qs_edit_tile_moved" msgid="4343693412689365038">"<xliff:g id="TILE_NAME">%1$s</xliff:g> הועבר למיקום <xliff:g id="POSITION">%2$d</xliff:g>"</string>
+    <string name="accessibility_qs_edit_tile_add" msgid="3520406665865985109">"הוספת <xliff:g id="TILE_NAME">%1$s</xliff:g> למיקום <xliff:g id="POSITION">%2$d</xliff:g>"</string>
+    <string name="accessibility_qs_edit_tile_move" msgid="3108103090006972938">"העברת <xliff:g id="TILE_NAME">%1$s</xliff:g> למיקום <xliff:g id="POSITION">%2$d</xliff:g>"</string>
     <string name="accessibility_desc_quick_settings_edit" msgid="8073587401747016103">"עורך הגדרות מהירות."</string>
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"הודעת <xliff:g id="ID_1">%1$s</xliff:g>: <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"ייתכן שהיישום לא יפעל עם מסך מפוצל."</string>
@@ -829,11 +837,13 @@
     <string name="notification_channel_storage" msgid="3077205683020695313">"אחסון"</string>
     <string name="notification_channel_hints" msgid="7323870212489152689">"טיפים"</string>
     <string name="instant_apps" msgid="6647570248119804907">"אפליקציות אינסטנט"</string>
-    <string name="instant_apps_message" msgid="8116608994995104836">"אפליקציות אינסטנט לא דורשות התקנה."</string>
+    <string name="instant_apps_title" msgid="8738419517367449783">"<xliff:g id="APP">%1$s</xliff:g> פועלת"</string>
+    <string name="instant_apps_message" msgid="1183313016396018086">"האפליקציה נפתחת בלי התקנה."</string>
+    <string name="instant_apps_message_with_help" msgid="6179830437630729747">"האפליקציה נפתחת בלי התקנה. אפשר להקיש כדי לקבל מידע נוסף."</string>
     <string name="app_info" msgid="6856026610594615344">"פרטי אפליקציה"</string>
-    <string name="go_to_web" msgid="2650669128861626071">"מעבר אל הדפדפן"</string>
+    <string name="go_to_web" msgid="1106022723459948514">"התחבר לאינטרנט"</string>
     <string name="mobile_data" msgid="7094582042819250762">"נתונים סלולריים"</string>
-    <string name="mobile_data_text_format" msgid="3526214522670876454">"<xliff:g id="ID_1">%s</xliff:g> ‏— <xliff:g id="ID_2">%s</xliff:g>"</string>
+    <string name="mobile_data_text_format" msgid="3526214522670876454">"<xliff:g id="ID_1">%1$s</xliff:g> ‏— <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="wifi_is_off" msgid="1838559392210456893">"‏Wi-Fi כבוי"</string>
     <string name="bt_is_off" msgid="2640685272289706392">"‏Bluetooth כבוי"</string>
     <string name="dnd_is_off" msgid="6167780215212497572">"מצב \'נא לא להפריע\' כבוי"</string>

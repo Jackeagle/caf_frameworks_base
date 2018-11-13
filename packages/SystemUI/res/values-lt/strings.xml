@@ -36,8 +36,8 @@
     <string name="status_bar_latest_events_title" msgid="6594767438577593172">"Pranešimai"</string>
     <string name="battery_low_title" msgid="9187898087363540349">"Akumuliatoriaus energija gali netrukus išsekti"</string>
     <string name="battery_low_percent_format" msgid="2900940511201380775">"Liko <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
-    <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"Liko: <xliff:g id="PERCENTAGE">%s</xliff:g> (atsižvelgiant į naudojimą liko maždaug <xliff:g id="TIME">%s</xliff:g>)"</string>
-    <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"Liko: <xliff:g id="PERCENTAGE">%s</xliff:g> (liko maždaug <xliff:g id="TIME">%s</xliff:g>)"</string>
+    <string name="battery_low_percent_format_hybrid" msgid="6838677459286775617">"Liko: <xliff:g id="PERCENTAGE">%1$s</xliff:g> (atsižvelgiant į naudojimą liko maždaug <xliff:g id="TIME">%2$s</xliff:g>)"</string>
+    <string name="battery_low_percent_format_hybrid_short" msgid="9025795469949145586">"Liko: <xliff:g id="PERCENTAGE">%1$s</xliff:g> (liko maždaug <xliff:g id="TIME">%2$s</xliff:g>)"</string>
     <string name="battery_low_percent_format_saver_started" msgid="7879389868952879166">"Liko <xliff:g id="PERCENTAGE">%s</xliff:g>. Akumuliatoriaus tausojimo priemonė įjungta."</string>
     <string name="invalid_charger" msgid="2741987096648693172">"Negalima įkrauti naudojant USB. Naudokite originalų su įrenginiu pateiktą įkroviklį."</string>
     <string name="invalid_charger_title" msgid="2836102177577255404">"Negalima įkrauti naudojant USB"</string>
@@ -65,7 +65,7 @@
     <string name="always_use_device" msgid="4015357883336738417">"Visada atidaryti „<xliff:g id="APPLICATION">%1$s</xliff:g>“, kai prijungiamas (-a) <xliff:g id="USB_DEVICE">%2$s</xliff:g>"</string>
     <string name="always_use_accessory" msgid="3257892669444535154">"Visada atidaryti „<xliff:g id="APPLICATION">%1$s</xliff:g>“, kai prijungiamas (-a) <xliff:g id="USB_ACCESSORY">%2$s</xliff:g>"</string>
     <string name="usb_debugging_title" msgid="4513918393387141949">"Leisti USB derinimą?"</string>
-    <string name="usb_debugging_message" msgid="2220143855912376496">"Šio kompiuterio RSA rakto kontrolinis kodas yra:\n<xliff:g id="FINGERPRINT">%1$s</xliff:g>"</string>
+    <string name="usb_debugging_message" msgid="2220143855912376496">"Šio kompiuterio RSA rakto piršto antspaudas yra:\n<xliff:g id="FINGERPRINT">%1$s</xliff:g>"</string>
     <string name="usb_debugging_always" msgid="303335496705863070">"Visada leisti iš šio kompiuterio"</string>
     <string name="usb_debugging_secondary_user_title" msgid="6353808721761220421">"USB derinimas neleidžiamas"</string>
     <string name="usb_debugging_secondary_user_message" msgid="6067122453571699801">"Šiuo metu prie įrenginio prisijungęs naudotojas negali įjungti USB derinimo. Kad galėtumėte naudoti šią funkciją, perjunkite į pagrindinį naudotoją."</string>
@@ -95,8 +95,8 @@
     <string name="accessibility_phone_button" msgid="6738112589538563574">"Telefonas"</string>
     <string name="accessibility_voice_assist_button" msgid="487611083884852965">"Voice Assist"</string>
     <string name="accessibility_unlock_button" msgid="128158454631118828">"Atrakinti"</string>
-    <string name="accessibility_waiting_for_fingerprint" msgid="4808860050517462885">"Laukiama kontrolinio kodo"</string>
-    <string name="accessibility_unlock_without_fingerprint" msgid="7541705575183694446">"Atrakinti nenaudojant kontrolinio kodo"</string>
+    <string name="accessibility_waiting_for_fingerprint" msgid="4808860050517462885">"Laukiama piršto antspaudo"</string>
+    <string name="accessibility_unlock_without_fingerprint" msgid="7541705575183694446">"Atrakinti nenaudojant piršto antspaudo"</string>
     <string name="accessibility_scanning_face" msgid="769545173211758586">"Nuskaitomas veidas"</string>
     <string name="accessibility_send_smart_reply" msgid="7766727839703044493">"Siųsti"</string>
     <string name="unlock_label" msgid="8779712358041029439">"atrakinti"</string>
@@ -105,10 +105,12 @@
     <string name="camera_label" msgid="7261107956054836961">"atidaryti fotoaparatą"</string>
     <string name="recents_caption_resize" msgid="3517056471774958200">"Pasirinkti naują užduoties išdėstymą"</string>
     <string name="cancel" msgid="6442560571259935130">"Atšaukti"</string>
-    <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"Palieskite kontrolinio kodo jutiklį"</string>
-    <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"Kontrolinio kodo piktograma"</string>
-    <string name="accessibility_fingerprint_dialog_app_icon" msgid="3228052542929174609">"Programos piktograma"</string>
-    <string name="accessibility_fingerprint_dialog_help_area" msgid="5730471601819225159">"Pagalbos pranešimo sritis"</string>
+    <string name="accessibility_biometric_dialog_help_area" msgid="8953787076940186847">"Pagalbos pranešimo sritis"</string>
+    <string name="biometric_dialog_confirm" msgid="6468457350041712674">"Patvirtinkite"</string>
+    <string name="fingerprint_dialog_touch_sensor" msgid="8511557690663181761">"Palieskite piršto antspaudo jutiklį"</string>
+    <string name="accessibility_fingerprint_dialog_fingerprint_icon" msgid="3125122495414253226">"Piršto antspaudo piktograma"</string>
+    <string name="face_dialog_looking_for_face" msgid="7049276266074494689">"Ieškoma jūsų…"</string>
+    <string name="accessibility_face_dialog_face_icon" msgid="2658119009870383490">"Veido piktograma"</string>
     <string name="accessibility_compatibility_zoom_button" msgid="8461115318742350699">"Suderinamumo priartinimo mygtukas."</string>
     <string name="accessibility_compatibility_zoom_example" msgid="4220687294564945780">"Padidinti ekraną."</string>
     <string name="accessibility_bluetooth_connected" msgid="2707027633242983370">"„Bluetooth“ prijungtas."</string>
@@ -259,7 +261,7 @@
     <string name="accessibility_location_active" msgid="2427290146138169014">"Vietovės užklausos aktyvios"</string>
     <string name="accessibility_clear_all" msgid="5235938559247164925">"Išvalyti visus pranešimus."</string>
     <string name="notification_group_overflow_indicator" msgid="1863231301642314183">"Dar <xliff:g id="NUMBER">%s</xliff:g>"</string>
-    <string name="notification_group_overflow_indicator_ambient" msgid="879560382990377886">"<xliff:g id="NOTIFICATION_TITLE">%s</xliff:g>, +<xliff:g id="OVERFLOW">%s</xliff:g>"</string>
+    <string name="notification_group_overflow_indicator_ambient" msgid="879560382990377886">"<xliff:g id="NOTIFICATION_TITLE">%1$s</xliff:g>, +<xliff:g id="OVERFLOW">%2$s</xliff:g>"</string>
     <plurals name="notification_group_overflow_description" formatted="false" msgid="4579313201268495404">
       <item quantity="one">Grupėje yra dar <xliff:g id="NUMBER_1">%s</xliff:g> pranešimas.</item>
       <item quantity="few">Grupėje yra dar <xliff:g id="NUMBER_1">%s</xliff:g> pranešimai.</item>
@@ -405,9 +407,9 @@
     <string name="interruption_level_none_twoline" msgid="3957581548190765889">"Visiška\ntyla"</string>
     <string name="interruption_level_priority_twoline" msgid="1564715335217164124">"Tik\nprioritetiniai"</string>
     <string name="interruption_level_alarms_twoline" msgid="3266909566410106146">"Tik\nsignalai"</string>
-    <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Įkraunama (<xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> iki visiško įkrovimo)"</string>
-    <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Greitai įkraunama (<xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> iki visiško įkr.)"</string>
-    <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Lėtai įkraunama (<xliff:g id="CHARGING_TIME_LEFT">%s</xliff:g> iki visiško įkr.)"</string>
+    <string name="keyguard_indication_charging_time" msgid="2056340799276374421">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Įkraunama (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> iki visiško įkrovimo)"</string>
+    <string name="keyguard_indication_charging_time_fast" msgid="7767562163577492332">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Greitai įkraunama (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> iki visiško įkr.)"</string>
+    <string name="keyguard_indication_charging_time_slowly" msgid="3769655133567307069">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Lėtai įkraunama (<xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> iki visiško įkr.)"</string>
     <string name="accessibility_multi_user_switch_switcher" msgid="7305948938141024937">"Perjungti naudotoją"</string>
     <string name="accessibility_multi_user_switch_switcher_with_current" msgid="8434880595284601601">"Perjungti naudotoją, dabartinis naudotojas <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
     <string name="accessibility_multi_user_switch_inactive" msgid="1424081831468083402">"Dabartinis naudotojas <xliff:g id="CURRENT_USER_NAME">%s</xliff:g>"</string>
@@ -432,6 +434,13 @@
     <string name="user_logout_notification_action" msgid="1195428991423425062">"ATJUNGTI NAUDOTOJĄ"</string>
     <string name="user_add_user_title" msgid="4553596395824132638">"Pridėti naują naudotoją?"</string>
     <string name="user_add_user_message_short" msgid="2161624834066214559">"Kai pridedate naują naudotoją, šis asmuo turi nustatyti savo erdvę.\n\nBet kuris naudotojas gali atnaujinti visų kitų naudotojų programas."</string>
+    <string name="user_limit_reached_title" msgid="7374910700117359177">"Pasiekta naudotojų riba"</string>
+    <plurals name="user_limit_reached_message" formatted="false" msgid="1855040563671964242">
+      <item quantity="one">Galite pridėti iki <xliff:g id="COUNT">%d</xliff:g> naudotojo.</item>
+      <item quantity="few">Galite pridėti iki <xliff:g id="COUNT">%d</xliff:g> naudotojų.</item>
+      <item quantity="many">Galite pridėti iki <xliff:g id="COUNT">%d</xliff:g> naudotojo.</item>
+      <item quantity="other">Galite pridėti iki <xliff:g id="COUNT">%d</xliff:g> naudotojų.</item>
+    </plurals>
     <string name="user_remove_user_title" msgid="4681256956076895559">"Pašalinti naudotoją?"</string>
     <string name="user_remove_user_message" msgid="1453218013959498039">"Bus ištrinti visi šio naudotojo duomenys ir programos."</string>
     <string name="user_remove_user_remove" msgid="7479275741742178297">"Pašalinti"</string>
@@ -441,7 +450,7 @@
     <string name="media_projection_dialog_text" msgid="3071431025448218928">"„<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g>“ pradės fiksuoti viską, kas rodoma jūsų ekrane."</string>
     <string name="media_projection_remember_text" msgid="3103510882172746752">"Daugiau neberodyti"</string>
     <string name="clear_all_notifications_text" msgid="814192889771462828">"Viską išvalyti"</string>
-    <string name="manage_notifications_text" msgid="8035284146227267681">"Pranešimų tvarkymas"</string>
+    <string name="manage_notifications_text" msgid="2386728145475108753">"Tvarkyti"</string>
     <string name="dnd_suppressing_shade_text" msgid="1904574852846769301">"Pranešimai pristabdyti naudojant netrukdymo režimą"</string>
     <string name="media_projection_action_text" msgid="8470872969457985954">"Pradėti dabar"</string>
     <string name="empty_shade_text" msgid="708135716272867002">"Nėra įspėjimų"</string>
@@ -739,6 +748,7 @@
     <string name="left_icon" msgid="3096287125959387541">"Piktograma kairėje"</string>
     <string name="right_icon" msgid="3952104823293824311">"Piktograma dešinėje"</string>
     <string name="drag_to_add_tiles" msgid="230586591689084925">"Jei norite pridėti išklotinių, laikykite nuspaudę ir vilkite"</string>
+    <string name="drag_to_rearrange_tiles" msgid="4566074720193667473">"Norėdami pertvarkyti išklot., laikykite nuspaudę ir vilkite"</string>
     <string name="drag_to_remove_tiles" msgid="3361212377437088062">"Vilkite čia, jei norite pašalinti"</string>
     <string name="drag_to_remove_disabled" msgid="2390968976638993382">"Turi būti bent 6 išklotinės"</string>
     <string name="qs_edit" msgid="2232596095725105230">"Redaguoti"</string>
@@ -767,12 +777,10 @@
     <string name="accessibility_action_divider_bottom_full" msgid="301433196679548001">"Apatinis ekranas viso ekrano režimu"</string>
     <string name="accessibility_qs_edit_tile_label" msgid="8374924053307764245">"<xliff:g id="POSITION">%1$d</xliff:g> padėtis, išklotinės elementas „<xliff:g id="TILE_NAME">%2$s</xliff:g>“. Dukart palieskite, kad redaguotumėte."</string>
     <string name="accessibility_qs_edit_add_tile_label" msgid="8133209638023882667">"Išklotinės elementas „<xliff:g id="TILE_NAME">%1$s</xliff:g>“. Dukart palieskite, kad pridėtumėte."</string>
-    <string name="accessibility_qs_edit_position_label" msgid="5055306305919289819">"<xliff:g id="POSITION">%1$d</xliff:g> padėtis. Dukart palieskite, kad pasirinktumėte."</string>
     <string name="accessibility_qs_edit_move_tile" msgid="2461819993780159542">"Perkelti išklotinės elementą „<xliff:g id="TILE_NAME">%1$s</xliff:g>“"</string>
     <string name="accessibility_qs_edit_remove_tile" msgid="7484493384665907197">"Pašalinti išklotinės elementą „<xliff:g id="TILE_NAME">%1$s</xliff:g>“"</string>
-    <string name="accessibility_qs_edit_tile_added" msgid="8050200862063548309">"Išklotinės elementas „<xliff:g id="TILE_NAME">%1$s</xliff:g>“ pridėtas prie <xliff:g id="POSITION">%2$d</xliff:g> padėties"</string>
-    <string name="accessibility_qs_edit_tile_removed" msgid="8584304916627913440">"Išklotinės elementas „<xliff:g id="TILE_NAME">%1$s</xliff:g>“ pašalintas"</string>
-    <string name="accessibility_qs_edit_tile_moved" msgid="4343693412689365038">"Išklotinės elementas „<xliff:g id="TILE_NAME">%1$s</xliff:g>“ perkeltas į <xliff:g id="POSITION">%2$d</xliff:g> padėtį"</string>
+    <string name="accessibility_qs_edit_tile_add" msgid="3520406665865985109">"Pridėti išklotinės elementą „<xliff:g id="TILE_NAME">%1$s</xliff:g>“ į <xliff:g id="POSITION">%2$d</xliff:g> padėtį"</string>
+    <string name="accessibility_qs_edit_tile_move" msgid="3108103090006972938">"Perkelti išklotinės elementą „<xliff:g id="TILE_NAME">%1$s</xliff:g>“ į <xliff:g id="POSITION">%2$d</xliff:g> padėtį"</string>
     <string name="accessibility_desc_quick_settings_edit" msgid="8073587401747016103">"Sparčiųjų nustatymų redagavimo priemonė."</string>
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"„<xliff:g id="ID_1">%1$s</xliff:g>“ pranešimas: <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"Programa gali neveikti naudojant skaidytą ekraną."</string>
@@ -829,11 +837,13 @@
     <string name="notification_channel_storage" msgid="3077205683020695313">"Saugykla"</string>
     <string name="notification_channel_hints" msgid="7323870212489152689">"Užuominos"</string>
     <string name="instant_apps" msgid="6647570248119804907">"Akimirksniu įkeliamos programos"</string>
-    <string name="instant_apps_message" msgid="8116608994995104836">"Akimirksniu įkeliamų programų nereikia įdiegti."</string>
+    <string name="instant_apps_title" msgid="8738419517367449783">"Programa „<xliff:g id="APP">%1$s</xliff:g>“ paleista"</string>
+    <string name="instant_apps_message" msgid="1183313016396018086">"Programa atidaryta jos neįdiegus."</string>
+    <string name="instant_apps_message_with_help" msgid="6179830437630729747">"Programa atidaryta jos neįdiegus. Palieskite, kad sužinotumėte daugiau."</string>
     <string name="app_info" msgid="6856026610594615344">"Programos informacija"</string>
-    <string name="go_to_web" msgid="2650669128861626071">"Eiti į naršyklę"</string>
+    <string name="go_to_web" msgid="1106022723459948514">"Eiti į žiniatinklį"</string>
     <string name="mobile_data" msgid="7094582042819250762">"Mobilieji duomenys"</string>
-    <string name="mobile_data_text_format" msgid="3526214522670876454">"<xliff:g id="ID_1">%s</xliff:g>–<xliff:g id="ID_2">%s</xliff:g>"</string>
+    <string name="mobile_data_text_format" msgid="3526214522670876454">"<xliff:g id="ID_1">%1$s</xliff:g>–<xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="wifi_is_off" msgid="1838559392210456893">"„Wi-Fi“ išjungtas"</string>
     <string name="bt_is_off" msgid="2640685272289706392">"„Bluetooth“ išjungtas"</string>
     <string name="dnd_is_off" msgid="6167780215212497572">"Netrukdymo režimas išjungtas"</string>

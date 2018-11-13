@@ -39,27 +39,36 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import android.graphics.Insets;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.platform.test.annotations.Presubmit;
+import android.util.Size;
+import android.view.DisplayCutout;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 
-import androidx.test.filters.FlakyTest;
-import androidx.test.filters.SmallTest;
-import androidx.test.runner.AndroidJUnit4;
+import com.android.server.wm.utils.WmDisplayCutout;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Arrays;
 import java.util.LinkedList;
+
+import androidx.test.filters.FlakyTest;
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 /**
  * Tests for the {@link WindowState} class.
@@ -68,7 +77,8 @@ import java.util.LinkedList;
  */
 @SmallTest
 @FlakyTest(bugId = 74078662)
-@Presubmit
+// TODO(b/116597907): Re-enable this test in postsubmit after the bug is fixed.
+// @Presubmit
 @RunWith(AndroidJUnit4.class)
 public class WindowStateTests extends WindowTestsBase {
 
@@ -362,23 +372,49 @@ public class WindowStateTests extends WindowTestsBase {
 
         app.mHasSurface = true;
         app.mSurfaceControl = mock(SurfaceControl.class);
-        app.mWinAnimator.mSurfaceController = mock(WindowSurfaceController.class);
         try {
             app.getFrameLw().set(10, 20, 60, 80);
+            app.updateSurfacePosition(t);
 
-            app.seamlesslyRotate(t, ROTATION_0, ROTATION_90);
+            app.seamlesslyRotateIfAllowed(t, ROTATION_0, ROTATION_90, true);
 
             assertTrue(app.mSeamlesslyRotated);
-            assertEquals(new Rect(20, mDisplayInfo.logicalWidth - 60,
-                    80, mDisplayInfo.logicalWidth - 10), app.getFrameLw());
 
-            verify(t).setPosition(app.mSurfaceControl, app.getFrameLw().left, app.getFrameLw().top);
-            verify(app.mWinAnimator.mSurfaceController).setPosition(t, 0, 50, false);
-            verify(app.mWinAnimator.mSurfaceController).setMatrix(t, 0, -1, 1, 0, false);
+            // Verify we un-rotate the window state surface.
+            Matrix matrix = new Matrix();
+            // Un-rotate 90 deg
+            matrix.setRotate(270);
+            // Translate it back to origin
+            matrix.postTranslate(0, mDisplayInfo.logicalWidth);
+            verify(t).setMatrix(eq(app.mSurfaceControl), eq(matrix), any(float[].class));
+
+            // Verify we update the position as well.
+            float[] currentSurfacePos = {app.mLastSurfacePosition.x, app.mLastSurfacePosition.y};
+            matrix.mapPoints(currentSurfacePos);
+            verify(t).setPosition(eq(app.mSurfaceControl), eq(currentSurfacePos[0]),
+                    eq(currentSurfacePos[1]));
         } finally {
             app.mSurfaceControl = null;
             app.mHasSurface = false;
         }
+    }
+
+    @Test
+    public void testDisplayCutoutIsCalculatedRelativeToFrame() {
+        final WindowState app = createWindow(null, TYPE_APPLICATION, "app");
+        WindowFrames wf = app.getWindowFrames();
+        wf.mParentFrame.set(7, 10, 185, 380);
+        wf.mDisplayFrame.set(wf.mParentFrame);
+        final DisplayCutout cutout = new DisplayCutout(
+                Insets.of(0, 15, 0, 22) /* safeInset */,
+                null /* boundLeft */,
+                new Rect(95, 0, 105, 15),
+                null /* boundRight */,
+                new Rect(95, 378, 105, 400));
+        wf.setDisplayCutout(new WmDisplayCutout(cutout, new Size(200, 400)));
+
+        app.computeFrameLw();
+        assertThat(app.getWmDisplayCutout().getDisplayCutout(), is(cutout.inset(7, 10, 5, 20)));
     }
 
     private void testPrepareWindowToDisplayDuringRelayout(boolean wasVisible) {

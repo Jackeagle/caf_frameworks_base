@@ -776,7 +776,7 @@ public class ActivityManager {
     /** @hide */
     public int getPackageScreenCompatMode(String packageName) {
         try {
-            return getService().getPackageScreenCompatMode(packageName);
+            return getTaskService().getPackageScreenCompatMode(packageName);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -785,7 +785,7 @@ public class ActivityManager {
     /** @hide */
     public void setPackageScreenCompatMode(String packageName, int mode) {
         try {
-            getService().setPackageScreenCompatMode(packageName, mode);
+            getTaskService().setPackageScreenCompatMode(packageName, mode);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -794,7 +794,7 @@ public class ActivityManager {
     /** @hide */
     public boolean getPackageAskScreenCompat(String packageName) {
         try {
-            return getService().getPackageAskScreenCompat(packageName);
+            return getTaskService().getPackageAskScreenCompat(packageName);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -803,7 +803,7 @@ public class ActivityManager {
     /** @hide */
     public void setPackageAskScreenCompat(String packageName, boolean ask) {
         try {
-            getService().setPackageAskScreenCompat(packageName, ask);
+            getTaskService().setPackageAskScreenCompat(packageName, ask);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1221,7 +1221,7 @@ public class ActivityManager {
          * @return The background color.
          * @hide
          */
-        @UnsupportedAppUsage
+        @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
         public int getBackgroundColor() {
             return mColorBackground;
         }
@@ -2747,6 +2747,7 @@ public class ActivityManager {
          *
          * @hide
          */
+        @TestApi
         public static final int IMPORTANCE_CANT_SAVE_STATE_PRE_26 = 170;
 
         /**
@@ -3266,6 +3267,13 @@ public class ActivityManager {
      * <p><b>Note: this method is only intended for debugging or building
      * a user-facing process management UI.</b></p>
      *
+     * <p>As of {@link android.os.Build.VERSION_CODES#Q Android Q}, for regular apps this method
+     * will only return information about the memory info for the processes running as the
+     * caller's uid; no other process memory info is available and will be zero.
+     * Also of {@link android.os.Build.VERSION_CODES#Q Android Q} the sample rate allowed
+     * by this API is significantly limited, if called faster the limit you will receive the
+     * same data as the previous call.</p>
+     *
      * @param pids The pids of the processes whose memory usage is to be
      * retrieved.
      * @return Returns an array of memory information, one for each
@@ -3371,7 +3379,7 @@ public class ActivityManager {
      */
     public ConfigurationInfo getDeviceConfigurationInfo() {
         try {
-            return getService().getDeviceConfigurationInfo();
+            return getTaskService().getDeviceConfigurationInfo();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

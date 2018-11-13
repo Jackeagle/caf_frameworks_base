@@ -42,24 +42,24 @@ public:
     void unpinImages() override;
     void onPrepareTree() override;
 
-    void renderLayers(const LightGeometry& lightGeometry,
-                      LayerUpdateQueue* layerUpdateQueue, bool opaque, bool wideColorGamut,
-                      const LightInfo& lightInfo) override;
+    void renderLayers(const LightGeometry& lightGeometry, LayerUpdateQueue* layerUpdateQueue,
+                      bool opaque, const LightInfo& lightInfo) override;
 
     bool createOrUpdateLayer(RenderNode* node, const DamageAccumulator& damageAccumulator,
-                             bool wideColorGamut, ErrorHandler* errorHandler) override;
+                             ErrorHandler* errorHandler) override;
+
+    SkColorType getSurfaceColorType() const { return mSurfaceColorType; }
+    sk_sp<SkColorSpace> getSurfaceColorSpace() override { return mSurfaceColorSpace; }
 
     void renderFrame(const LayerUpdateQueue& layers, const SkRect& clip,
-                     const std::vector<sp<RenderNode>>& nodes, bool opaque, bool wideColorGamut,
+                     const std::vector<sp<RenderNode>>& nodes, bool opaque,
                      const Rect& contentDrawBounds, sk_sp<SkSurface> surface);
 
     std::vector<VectorDrawableRoot*>* getVectorDrawables() { return &mVectorDrawables; }
 
-    static void destroyLayer(RenderNode* node);
-
     static void prepareToDraw(const renderthread::RenderThread& thread, Bitmap* bitmap);
 
-    void renderLayersImpl(const LayerUpdateQueue& layers, bool opaque, bool wideColorGamut);
+    void renderLayersImpl(const LayerUpdateQueue& layers, bool opaque);
 
     static float getLightRadius() {
         if (CC_UNLIKELY(Properties::overrideLightRadius > 0)) {
@@ -109,10 +109,12 @@ protected:
     void dumpResourceCacheUsage() const;
 
     renderthread::RenderThread& mRenderThread;
+    SkColorType mSurfaceColorType;
+    sk_sp<SkColorSpace> mSurfaceColorSpace;
 
 private:
     void renderFrameImpl(const LayerUpdateQueue& layers, const SkRect& clip,
-                         const std::vector<sp<RenderNode>>& nodes, bool opaque, bool wideColorGamut,
+                         const std::vector<sp<RenderNode>>& nodes, bool opaque,
                          const Rect& contentDrawBounds, SkCanvas* canvas);
 
     /**

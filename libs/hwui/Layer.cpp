@@ -17,17 +17,16 @@
 #include "Layer.h"
 
 #include "renderstate/RenderState.h"
+#include "utils/Color.h"
 
 #include <SkToSRGBColorFilter.h>
 
 namespace android {
 namespace uirenderer {
 
-Layer::Layer(RenderState& renderState, Api api, sk_sp<SkColorFilter> colorFilter, int alpha,
-             SkBlendMode mode)
-        : GpuMemoryTracker(GpuObjectType::Layer)
-        , mRenderState(renderState)
-        , mApi(api)
+Layer::Layer(RenderState& renderState, sk_sp<SkColorFilter> colorFilter, int alpha,
+        SkBlendMode mode)
+        : mRenderState(renderState)
         , mColorFilter(colorFilter)
         , alpha(alpha)
         , mode(mode) {
@@ -36,6 +35,8 @@ Layer::Layer(RenderState& renderState, Api api, sk_sp<SkColorFilter> colorFilter
     incStrong(nullptr);
     buildColorSpaceWithFilter();
     renderState.registerLayer(this);
+    texTransform.setIdentity();
+    transform.setIdentity();
 }
 
 Layer::~Layer() {
@@ -74,6 +75,14 @@ void Layer::buildColorSpaceWithFilter() {
 
 void Layer::postDecStrong() {
     mRenderState.postDecStrong(this);
+}
+
+SkBlendMode Layer::getMode() const {
+    if (mBlend || mode != SkBlendMode::kSrcOver) {
+        return mode;
+    } else {
+        return SkBlendMode::kSrc;
+    }
 }
 
 };  // namespace uirenderer

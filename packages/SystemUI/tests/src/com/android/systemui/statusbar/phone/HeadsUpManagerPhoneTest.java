@@ -23,6 +23,7 @@ import android.testing.TestableLooper;
 
 import com.android.systemui.statusbar.AlertingNotificationManager;
 import com.android.systemui.statusbar.AlertingNotificationManagerTest;
+import com.android.systemui.statusbar.notification.NotificationData;
 import com.android.systemui.statusbar.notification.VisualStabilityManager;
 
 import org.junit.Before;
@@ -81,6 +82,26 @@ public class HeadsUpManagerPhoneTest extends AlertingNotificationManagerTest {
         // Remove should succeed because the notification is swiped out
         mHeadsUpManager.removeNotification(mEntry.key, false /* releaseImmediately */);
 
-        assertFalse(mHeadsUpManager.contains(mEntry.key));
+        assertFalse(mHeadsUpManager.isAlerting(mEntry.key));
+    }
+
+    @Test
+    public void testCanRemoveImmediately_swipedOut() {
+        mHeadsUpManager.showNotification(mEntry);
+        mHeadsUpManager.addSwipedOutNotification(mEntry.key);
+
+        // Notification is swiped so it can be immediately removed.
+        assertTrue(mHeadsUpManager.canRemoveImmediately(mEntry.key));
+    }
+
+    @Test
+    public void testCanRemoveImmediately_notTopEntry() {
+        NotificationData.Entry laterEntry = new NotificationData.Entry(createNewNotification(1));
+        laterEntry.row = mRow;
+        mHeadsUpManager.showNotification(mEntry);
+        mHeadsUpManager.showNotification(laterEntry);
+
+        // Notification is "behind" a higher priority notification so we can remove it immediately.
+        assertTrue(mHeadsUpManager.canRemoveImmediately(mEntry.key));
     }
 }

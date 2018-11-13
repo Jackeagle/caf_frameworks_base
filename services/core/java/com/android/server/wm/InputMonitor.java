@@ -64,7 +64,6 @@ final class InputMonitor {
     // Array of window handles to provide to the input dispatcher.
     private InputWindowHandle[] mInputWindowHandles;
     private int mInputWindowHandleCount;
-    private InputWindowHandle mFocusedInputWindowHandle;
 
     private boolean mDisableWallpaperTouchEvents;
     private final Rect mTmpRect = new Rect();
@@ -229,16 +228,12 @@ final class InputMonitor {
                     + child + ", " + inputWindowHandle);
         }
         addInputWindowHandle(inputWindowHandle);
-        if (hasFocus) {
-            mFocusedInputWindowHandle = inputWindowHandle;
-        }
     }
 
     private void clearInputWindowHandlesLw() {
         while (mInputWindowHandleCount != 0) {
             mInputWindowHandles[--mInputWindowHandleCount] = null;
         }
-        mFocusedInputWindowHandle = null;
     }
 
     void setUpdateInputWindowsNeededLw() {
@@ -268,11 +263,11 @@ final class InputMonitor {
             }
             final InputWindowHandle dragWindowHandle =
                     mService.mDragDropController.getInputWindowHandleLocked();
-            if (dragWindowHandle != null) {
-                addInputWindowHandle(dragWindowHandle);
-            } else {
+            if (dragWindowHandle == null) {
                 Slog.w(TAG_WM, "Drag is in progress but there is no "
                         + "drag window handle.");
+            } else if (dragWindowHandle.displayId == mDisplayId) {
+                addInputWindowHandle(dragWindowHandle);
             }
         }
 
@@ -283,11 +278,11 @@ final class InputMonitor {
             }
             final InputWindowHandle dragWindowHandle =
                     mService.mTaskPositioningController.getDragWindowHandleLocked();
-            if (dragWindowHandle != null) {
-                addInputWindowHandle(dragWindowHandle);
-            } else {
+            if (dragWindowHandle == null) {
                 Slog.e(TAG_WM,
                         "Repositioning is in progress but there is no drag window handle.");
+            } else if (dragWindowHandle.displayId == mDisplayId) {
+                addInputWindowHandle(dragWindowHandle);
             }
         }
 
@@ -325,13 +320,13 @@ final class InputMonitor {
     public void setFocusedAppLw(AppWindowToken newApp) {
         // Focused app has changed.
         if (newApp == null) {
-            mService.mInputManager.setFocusedApplication(null);
+            mService.mInputManager.setFocusedApplication(mDisplayId, null);
         } else {
             final InputApplicationHandle handle = newApp.mInputApplicationHandle;
             handle.name = newApp.toString();
             handle.dispatchingTimeoutNanos = newApp.mInputDispatchingTimeoutNanos;
 
-            mService.mInputManager.setFocusedApplication(handle);
+            mService.mInputManager.setFocusedApplication(mDisplayId, handle);
         }
     }
 
@@ -367,6 +362,12 @@ final class InputMonitor {
         }
     }
 
+    void onRemoved() {
+        // If DisplayContent removed, we need find a way to remove window handles of this display
+        // from InputDispatcher, so pass an empty InputWindowHandles to remove them.
+        mService.mInputManager.setInputWindows(mInputWindowHandles, mDisplayId);
+    }
+
     private final class UpdateInputForAllWindowsConsumer implements Consumer<WindowState> {
         InputConsumerImpl navInputConsumer;
         InputConsumerImpl pipInputConsumer;
@@ -399,8 +400,7 @@ final class InputMonitor {
             this.inDrag = inDrag;
             wallpaperController = mService.mRoot.mWallpaperController;
 
-            // TODO(b/112081256): Use independent InputMonitor for each display.
-            mService.mRoot/*.getDisplayContent(mDisplayId)*/.forAllWindows(this,
+            mService.mRoot.getDisplayContent(mDisplayId).forAllWindows(this,
                     true /* traverseTopToBottom */);
             if (mAddWallpaperInputConsumerHandle) {
                 // No visible wallpaper found, add the wallpaper input consumer at the end.
@@ -408,8 +408,7 @@ final class InputMonitor {
             }
 
             // Send windows to native code.
-            // TODO: Update Input windows and focus by display?
-            mService.mInputManager.setInputWindows(mInputWindowHandles, mFocusedInputWindowHandle);
+            mService.mInputManager.setInputWindows(mInputWindowHandles, mDisplayId);
 
             clearInputWindowHandlesLw();
 
@@ -429,7 +428,7 @@ final class InputMonitor {
             final int flags = w.mAttrs.flags;
             final int privateFlags = w.mAttrs.privateFlags;
             final int type = w.mAttrs.type;
-            final boolean hasFocus = w == mInputFocus;
+            final boolean hasFocus = w.isFocused();
             final boolean isVisible = w.isVisibleLw();
 
             if (mAddRecentsAnimationInputConsumerHandle) {

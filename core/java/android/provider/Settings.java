@@ -363,6 +363,21 @@ public final class Settings {
             "android.settings.MANAGE_UNKNOWN_APP_SOURCES";
 
     /**
+     * Activity Action: Show the "Open by Default" page in a particular application's details page.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you safeguard against this.
+     * <p>
+     * Input: The Intent's data URI specifies the application package name
+     * to be shown, with the "package" scheme. That is "package:com.my.app".
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_APP_OPEN_BY_DEFAULT_SETTINGS =
+            "com.android.settings.APP_OPEN_BY_DEFAULT_SETTINGS";
+
+    /**
      * Activity Action: Show trusted credentials settings, opening to the user tab,
      * to allow management of installed credentials.
      * <p>
@@ -480,6 +495,16 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_BLUETOOTH_SETTINGS =
             "android.settings.BLUETOOTH_SETTINGS";
+
+    /**
+     * Activity action: Show Settings app search UI when this action is available for device.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_APP_SEARCH_SETTINGS = "android.settings.APP_SEARCH_SETTINGS";
 
     /**
      * Activity Action: Show settings to allow configuration of Assist Gesture.
@@ -807,21 +832,6 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APPLICATION_DETAILS_SETTINGS =
             "android.settings.APPLICATION_DETAILS_SETTINGS";
-
-    /**
-     * Activity Action: Show the "Open by Default" page in a particular application's details page.
-     * <p>
-     * In some cases, a matching Activity may not exist, so ensure you safeguard against this.
-     * <p>
-     * Input: The Intent's data URI specifies the application package name
-     * to be shown, with the "package" scheme. That is "package:com.my.app".
-     * <p>
-     * Output: Nothing.
-     * @hide
-     */
-    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_APPLICATION_DETAILS_SETTINGS_OPEN_BY_DEFAULT_PAGE =
-            "android.settings.APPLICATION_DETAILS_SETTINGS_OPEN_BY_DEFAULT_PAGE";
 
     /**
      * Activity Action: Show list of applications that have been running
@@ -1469,6 +1479,7 @@ public final class Settings {
      *
      * @hide
      */
+    @SystemApi
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_SHOW_ADMIN_SUPPORT_DETAILS
             = "android.settings.SHOW_ADMIN_SUPPORT_DETAILS";
@@ -4818,6 +4829,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.NITZ_UPDATE_SPACING);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_TIMEOUT);
+            MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER_2);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_ERROR_POLL_COUNT);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_LONG_POLL_INTERVAL_MS);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_MAX_PDP_RESET_FAIL_COUNT);
@@ -6520,6 +6532,25 @@ public final class Settings {
         public static final String MULTI_PRESS_TIMEOUT = "multi_press_timeout";
 
         /**
+         * Whether the user specifies a minimum ui timeout to override minimum ui timeout of
+         * accessibility service
+         *
+         * Type: int (0 for false, 1 for true)
+         * @hide
+         */
+        public static final String ACCESSIBILITY_MINIMUM_UI_TIMEOUT_ENABLED =
+                "accessibility_minimum_ui_timeout_enabled";
+
+        /**
+         * Setting that specifies ui minimum timeout in milliseconds.
+         *
+         * @see #ACCESSIBILITY_MINIMUM_UI_TIMEOUT_ENABLED
+         * @hide
+         */
+        public static final String ACCESSIBILITY_MINIMUM_UI_TIMEOUT_MS =
+                "accessibility_minimum_ui_timeout_ms";
+
+        /**
          * List of the enabled print services.
          *
          * N and beyond uses {@link #DISABLED_PRINT_SERVICES}. But this might be used in an upgrade
@@ -7260,12 +7291,20 @@ public final class Settings {
         private static final Validator DOZE_DOUBLE_TAP_GESTURE_VALIDATOR = BOOLEAN_VALIDATOR;
 
         /**
-         * Whether the device should pulse on reach gesture.
+         * Gesture that wakes up the lock screen.
          * @hide
          */
-        public static final String DOZE_REACH_GESTURE = "doze_reach_gesture";
+        public static final String DOZE_WAKE_LOCK_SCREEN_GESTURE = "doze_wake_lock_screen_gesture";
 
-        private static final Validator DOZE_REACH_GESTURE_VALIDATOR = BOOLEAN_VALIDATOR;
+        private static final Validator DOZE_WAKE_LOCK_SCREEN_GESTURE_VALIDATOR = BOOLEAN_VALIDATOR;
+
+        /**
+         * Gesture that wakes up the display, showing the ambient version of the status bar.
+         * @hide
+         */
+        public static final String DOZE_WAKE_SCREEN_GESTURE = "doze_wake_screen_gesture";
+
+        private static final Validator DOZE_WAKE_SCREEN_GESTURE_VALIDATOR = BOOLEAN_VALIDATOR;
 
         /**
          * The current night mode that has been selected by the user.  Owned
@@ -7348,6 +7387,15 @@ public final class Settings {
          */
         @UnsupportedAppUsage
         public static final String DIALER_DEFAULT_APPLICATION = "dialer_default_application";
+
+        /**
+         * Specifies the package name currently configured to be the default application to perform
+         * the user-defined call redirection service with Telecom.
+         * @hide
+         */
+        @UnsupportedAppUsage
+        public static final String CALL_REDIRECTION_DEFAULT_APPLICATION =
+                "call_redirection_default_application";
 
         /**
          * Specifies the package name currently configured to be the emergency assistance application
@@ -7671,6 +7719,15 @@ public final class Settings {
         public static final String FACE_UNLOCK_KEYGUARD_ENABLED = "face_unlock_keyguard_enabled";
 
         private static final Validator FACE_UNLOCK_KEYGUARD_ENABLED_VALIDATOR =
+                BOOLEAN_VALIDATOR;
+
+        /**
+         * Whether or not face unlock is allowed for apps (through BiometricPrompt).
+         * @hide
+         */
+        public static final String FACE_UNLOCK_APP_ENABLED = "face_unlock_app_enabled";
+
+        private static final Validator FACE_UNLOCK_APP_ENABLED_VALIDATOR =
                 BOOLEAN_VALIDATOR;
 
         /**
@@ -8169,10 +8226,12 @@ public final class Settings {
             DOZE_ALWAYS_ON,
             DOZE_PICK_UP_GESTURE,
             DOZE_DOUBLE_TAP_GESTURE,
-            DOZE_REACH_GESTURE,
+            DOZE_WAKE_LOCK_SCREEN_GESTURE,
+            DOZE_WAKE_SCREEN_GESTURE,
             NFC_PAYMENT_DEFAULT_COMPONENT,
             AUTOMATIC_STORAGE_MANAGER_DAYS_TO_RETAIN,
             FACE_UNLOCK_KEYGUARD_ENABLED,
+            FACE_UNLOCK_APP_ENABLED,
             ASSIST_GESTURE_ENABLED,
             ASSIST_GESTURE_SILENCE_ALERTS_ENABLED,
             ASSIST_GESTURE_WAKE_ENABLED,
@@ -8198,6 +8257,8 @@ public final class Settings {
             ZEN_SETTINGS_SUGGESTION_VIEWED,
             CHARGING_SOUNDS_ENABLED,
             CHARGING_VIBRATION_ENABLED,
+            ACCESSIBILITY_MINIMUM_UI_TIMEOUT_ENABLED,
+            ACCESSIBILITY_MINIMUM_UI_TIMEOUT_MS,
             WIFI_DISCONNECT_DELAY_DURATION,
         };
 
@@ -8314,11 +8375,13 @@ public final class Settings {
             VALIDATORS.put(DOZE_ALWAYS_ON, DOZE_ALWAYS_ON_VALIDATOR);
             VALIDATORS.put(DOZE_PICK_UP_GESTURE, DOZE_PICK_UP_GESTURE_VALIDATOR);
             VALIDATORS.put(DOZE_DOUBLE_TAP_GESTURE, DOZE_DOUBLE_TAP_GESTURE_VALIDATOR);
-            VALIDATORS.put(DOZE_REACH_GESTURE, DOZE_REACH_GESTURE_VALIDATOR);
+            VALIDATORS.put(DOZE_WAKE_LOCK_SCREEN_GESTURE, DOZE_WAKE_LOCK_SCREEN_GESTURE_VALIDATOR);
+            VALIDATORS.put(DOZE_WAKE_SCREEN_GESTURE, DOZE_WAKE_SCREEN_GESTURE_VALIDATOR);
             VALIDATORS.put(NFC_PAYMENT_DEFAULT_COMPONENT, NFC_PAYMENT_DEFAULT_COMPONENT_VALIDATOR);
             VALIDATORS.put(AUTOMATIC_STORAGE_MANAGER_DAYS_TO_RETAIN,
                     AUTOMATIC_STORAGE_MANAGER_DAYS_TO_RETAIN_VALIDATOR);
             VALIDATORS.put(FACE_UNLOCK_KEYGUARD_ENABLED, FACE_UNLOCK_KEYGUARD_ENABLED_VALIDATOR);
+            VALIDATORS.put(FACE_UNLOCK_APP_ENABLED, FACE_UNLOCK_APP_ENABLED_VALIDATOR);
             VALIDATORS.put(ASSIST_GESTURE_ENABLED, ASSIST_GESTURE_ENABLED_VALIDATOR);
             VALIDATORS.put(ASSIST_GESTURE_SILENCE_ALERTS_ENABLED,
                     ASSIST_GESTURE_SILENCE_ALERTS_ENABLED_VALIDATOR);
@@ -8352,6 +8415,8 @@ public final class Settings {
             VALIDATORS.put(ZEN_SETTINGS_SUGGESTION_VIEWED, BOOLEAN_VALIDATOR);
             VALIDATORS.put(CHARGING_SOUNDS_ENABLED, BOOLEAN_VALIDATOR);
             VALIDATORS.put(CHARGING_VIBRATION_ENABLED, BOOLEAN_VALIDATOR);
+            VALIDATORS.put(ACCESSIBILITY_MINIMUM_UI_TIMEOUT_ENABLED, BOOLEAN_VALIDATOR);
+            VALIDATORS.put(ACCESSIBILITY_MINIMUM_UI_TIMEOUT_MS, NON_NEGATIVE_INTEGER_VALIDATOR);
             VALIDATORS.put(WIFI_DISCONNECT_DELAY_DURATION, WIFI_DISCONNECT_DELAY_DURATION_VALIDATOR);
         }
 
@@ -9223,6 +9288,19 @@ public final class Settings {
        public static final String MOBILE_DATA_ALWAYS_ON = "mobile_data_always_on";
 
         /**
+         * Whether the wifi data connection should remain active even when higher
+         * priority networks like Ethernet are active, to keep both networks.
+         * In the case where higher priority networks are connected, wifi will be
+         * unused unless an application explicitly requests to use it.
+         *
+         * See ConnectivityService for more info.
+         *
+         * (0 = disabled, 1 = enabled)
+         * @hide
+         */
+        public static final String WIFI_ALWAYS_REQUESTED = "wifi_always_requested";
+
+        /**
          * Size of the event buffer for IP connectivity metrics.
          * @hide
          */
@@ -9325,6 +9403,8 @@ public final class Settings {
        public static final String NTP_SERVER = "ntp_server";
        /** Timeout in milliseconds to wait for NTP server. {@hide} */
        public static final String NTP_TIMEOUT = "ntp_timeout";
+       /** Secondary NTP server. {@hide} */
+       public static final String NTP_SERVER_2 = "ntp_server_2";
 
        /** {@hide} */
        public static final String STORAGE_BENCHMARK_INTERVAL = "storage_benchmark_interval";
@@ -9569,6 +9649,16 @@ public final class Settings {
          * @hide
          */
         public static final String TETHER_OFFLOAD_DISABLED = "tether_offload_disabled";
+
+        /**
+         * Use the old dnsmasq DHCP server for tethering instead of the framework implementation.
+         *
+         * Integer values are interpreted as boolean, and the absence of an explicit setting
+         * is interpreted as |false|.
+         * @hide
+         */
+        public static final String TETHER_ENABLE_LEGACY_DHCP_SERVER =
+                "tether_enable_legacy_dhcp_server";
 
         /**
          * List of certificate (hex string representation of the application's certificate - SHA-1
@@ -10789,6 +10879,12 @@ public final class Settings {
                 = "activity_starts_logging_enabled";
 
         /**
+         * @hide
+         * @see com.android.server.appbinding.AppBindingConstants
+         */
+        public static final String APP_BINDING_CONSTANTS = "app_binding_constants";
+
+        /**
          * App ops specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          *
@@ -11515,14 +11611,6 @@ public final class Settings {
         public static final String EMERGENCY_AFFORDANCE_NEEDED = "emergency_affordance_needed";
 
         /**
-         * Enable faster emergency phone call feature.
-         * The value is a boolean (1 or 0).
-         * @hide
-         */
-        public static final String FASTER_EMERGENCY_PHONE_CALL_ENABLED =
-                "faster_emergency_phone_call_enabled";
-
-        /**
          * See RIL_PreferredNetworkType in ril.h
          * @hide
          */
@@ -11554,6 +11642,12 @@ public final class Settings {
          * @hide
          */
         public static final String GPU_DEBUG_APP = "gpu_debug_app";
+
+        /**
+         * App should try to use ANGLE
+         * @hide
+         */
+        public static final String ANGLE_ENABLED_APP = "angle_enabled_app";
 
         /**
          * Ordered GPU debug layer list
@@ -12281,6 +12375,18 @@ public final class Settings {
         @TestApi
         public static final String LOCATION_GLOBAL_KILL_SWITCH =
                 "location_global_kill_switch";
+
+        /**
+         * If set to 1, app cannot request read sms permission unless it's the default sms handler.
+         *
+         * STOPSHIP: Remove this once we ship with the restriction enabled.
+         *
+         * @hide
+         */
+        @SystemApi
+        @TestApi
+        public static final String SMS_ACCESS_RESTRICTION_ENABLED =
+                "sms_access_restriction_enabled";
 
         /**
          * If set to 1, SettingsProvider's restoreAnyVersion="true" attribute will be ignored
@@ -13137,6 +13243,7 @@ public final class Settings {
          * Supported keys:
          * compatibility_wal_supported      (boolean)
          * wal_syncmode       (String)
+         * truncate_size      (int)
          *
          * @hide
          */
@@ -13318,6 +13425,36 @@ public final class Settings {
          * @hide
          */
         public static final String BINDER_CALLS_STATS = "binder_calls_stats";
+
+        /**
+         * Looper stats settings.
+         *
+         * The following strings are supported as keys:
+         * <pre>
+         *     enabled              (boolean)
+         *     sampling_interval    (int)
+         * </pre>
+         *
+         * @hide
+         */
+        public static final String LOOPER_STATS = "looper_stats";
+
+        /**
+         * Default user id to boot into. They map to user ids, for example, 10, 11, 12.
+         *
+         * @hide
+         */
+        public static final String DEFAULT_USER_ID_TO_BOOT_INTO = "default_boot_into_user_id";
+
+        /**
+         * Persistent user id that is last logged in to.
+         *
+         * They map to user ids, for example, 10, 11, 12.
+         *
+         * @hide
+         */
+        public static final String LAST_ACTIVE_USER_ID = "last_active_persistent_user_id";
+
     }
 
     /**

@@ -16,6 +16,7 @@
 
 package com.android.server.am;
 
+import static android.app.ActivityManagerInternal.ALLOW_FULL_ONLY;
 import static android.app.ActivityTaskManager.RESIZE_MODE_SYSTEM;
 import static android.app.ActivityTaskManager.RESIZE_MODE_USER;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
@@ -302,7 +303,9 @@ final class ActivityManagerShellCommand extends ShellCommand {
         mSamplingInterval = 0;
         mAutoStop = false;
         mStreaming = false;
-        mUserId = defUser;
+        mUserId = mInternal.mUserController.handleIncomingUser(Binder.getCallingPid(),
+            Binder.getCallingUid(), defUser, false, ALLOW_FULL_ONLY,
+            "ActivityManagerShellCommand", null);
         mDisplayId = INVALID_DISPLAY;
         mWindowingMode = WINDOWING_MODE_UNDEFINED;
         mActivityType = ACTIVITY_TYPE_UNDEFINED;
@@ -564,9 +567,6 @@ final class ActivityManagerShellCommand extends ShellCommand {
                 pw.println("Status: " + (result.timeout ? "timeout" : "ok"));
                 if (result.who != null) {
                     pw.println("Activity: " + result.who.flattenToShortString());
-                }
-                if (result.thisTime >= 0) {
-                    pw.println("ThisTime: " + result.thisTime);
                 }
                 if (result.totalTime >= 0) {
                     pw.println("TotalTime: " + result.totalTime);
@@ -2060,7 +2060,12 @@ final class ActivityManagerShellCommand extends ShellCommand {
             pw.print("has-secure-screen-lock: "); pw.println(kgm.isDeviceSecure());
         }
 
-        ConfigurationInfo configInfo = mInternal.getDeviceConfigurationInfo();
+        ConfigurationInfo configInfo = null;
+        try {
+            configInfo = mTaskInterface.getDeviceConfigurationInfo();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
         if (configInfo.reqGlEsVersion != ConfigurationInfo.GL_ES_VERSION_UNDEFINED) {
             if (protoOutputStream != null) {
                 protoOutputStream.write(DeviceConfigurationProto.OPENGL_VERSION,

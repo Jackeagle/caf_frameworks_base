@@ -94,11 +94,6 @@ protected:
         mOutput << mIdent << "drawPosTextH" << std::endl;
     }
 
-    void onDrawTextOnPath(const void*, size_t, const SkPath&, const SkMatrix*,
-                          const SkPaint&) override {
-        mOutput << mIdent << "drawTextOnPath" << std::endl;
-    }
-
     void onDrawTextRSXform(const void*, size_t, const SkRSXform[], const SkRect*,
                            const SkPaint&) override {
         mOutput << mIdent << "drawTextRSXform" << std::endl;
@@ -143,7 +138,7 @@ protected:
             renderNodeDrawable->getRenderNode()->output(mOutput, mLevel + 1);
             return;
         }
-        auto glFunctorDrawable = getGLFunctorDrawable(drawable);
+        auto glFunctorDrawable = getFunctorDrawable(drawable);
         if (nullptr != glFunctorDrawable) {
             mOutput << std::string(mLevel * 2, ' ') << "drawGLFunctorDrawable" << std::endl;
             return;
@@ -162,10 +157,10 @@ private:
         return nullptr;
     }
 
-    GLFunctorDrawable* getGLFunctorDrawable(SkDrawable* drawable) {
+    FunctorDrawable* getFunctorDrawable(SkDrawable* drawable) {
         for (auto& child : mDisplayList.mChildFunctors) {
-            if (drawable == &child) {
-                return &child;
+            if (drawable == child) {
+                return child;
             }
         }
         return nullptr;

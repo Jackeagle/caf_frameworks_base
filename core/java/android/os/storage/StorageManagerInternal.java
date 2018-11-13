@@ -16,6 +16,9 @@
 
 package android.os.storage;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+
 /**
  * Mount service local interface.
  *
@@ -79,4 +82,31 @@ public abstract class StorageManagerInternal {
      * @return The mount mode.
      */
     public abstract int getExternalStorageMountMode(int uid, String packageName);
+
+    /**
+     * Create storage sandbox for the given package.
+     *
+     * <p> This will involve calling into vold to setup appropriate bind mounts.
+     *
+     * @param packageName The package for which the sandbox needs to be created.
+     * @param appId The appId for the given package.
+     * @param sharedUserId The sharedUserId for given package if it specified
+     *      {@code android:sharedUserId} in the manifest, otherwise {@code null}
+     * @param userId The userId in which the sandbox needs to be created.
+     */
+    public abstract void prepareSandboxForApp(@NonNull String packageName, int appId,
+            @Nullable String sharedUserId, int userId);
+
+    /**
+     * Delete storage sandbox for the given package.
+     *
+     * @param packageName The package for which the sandbox needs to be destroyed.
+     * @param userId The userId in which the sandbox needs to be destroyed.
+     */
+    public abstract void destroySandboxForApp(@NonNull String packageName, int userId);
+
+    /**
+     * @return Labels of storage volumes that are visible to the given userId.
+     */
+    public abstract String[] getVisibleVolumesForUser(int userId);
 }

@@ -17,10 +17,9 @@
 package android.hardware.face;
 
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
-import static android.Manifest.permission.MANAGE_FACE;
-import static android.Manifest.permission.USE_BIOMETRIC;
+import static android.Manifest.permission.MANAGE_BIOMETRIC;
+import static android.Manifest.permission.USE_BIOMETRIC_INTERNAL;
 
-import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -28,13 +27,11 @@ import android.annotation.SystemService;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.hardware.biometrics.BiometricAuthenticator;
+import android.hardware.biometrics.BiometricConstants;
 import android.hardware.biometrics.BiometricFaceConstants;
-import android.hardware.biometrics.BiometricPrompt;
 import android.hardware.biometrics.CryptoObject;
-import android.hardware.biometrics.IBiometricPromptReceiver;
 import android.hardware.biometrics.IBiometricServiceLockoutResetCallback;
 import android.os.Binder;
-import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.CancellationSignal.OnCancelListener;
 import android.os.Handler;
@@ -50,15 +47,13 @@ import android.util.Slog;
 import com.android.internal.R;
 
 import java.util.List;
-import java.util.concurrent.Executor;
 
 /**
  * A class that coordinates access to the face authentication hardware.
  * @hide
  */
 @SystemService(Context.FACE_SERVICE)
-public class FaceManager implements BiometricFaceConstants {
-
+public class FaceManager implements BiometricAuthenticator, BiometricFaceConstants {
 
     private static final String TAG = "FaceManager";
     private static final boolean DEBUG = true;
@@ -72,13 +67,12 @@ public class FaceManager implements BiometricFaceConstants {
     private IFaceService mService;
     private final Context mContext;
     private IBinder mToken = new Binder();
-    private BiometricAuthenticator.AuthenticationCallback mAuthenticationCallback;
+    private AuthenticationCallback mAuthenticationCallback;
     private EnrollmentCallback mEnrollmentCallback;
     private RemovalCallback mRemovalCallback;
     private CryptoObject mCryptoObject;
     private Face mRemovalFace;
     private Handler mHandler;
-    private Executor mExecutor;
 
     private IFaceServiceReceiver mServiceReceiver = new IFaceServiceReceiver.Stub() {
 
@@ -147,7 +141,7 @@ public class FaceManager implements BiometricFaceConstants {
      * @throws IllegalStateException    if the crypto primitive is not initialized.
      * @hide
      */
-    @RequiresPermission(USE_BIOMETRIC)
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
     public void authenticate(@Nullable CryptoObject crypto, @Nullable CancellationSignal cancel,
             int flags, @NonNull AuthenticationCallback callback, @Nullable Handler handler) {
         if (callback == null) {
@@ -170,14 +164,15 @@ public class FaceManager implements BiometricFaceConstants {
                 mCryptoObject = crypto;
                 long sessionId = crypto != null ? crypto.getOpId() : 0;
                 mService.authenticate(mToken, sessionId, mServiceReceiver, flags,
-                        mContext.getOpPackageName(), null /* bundle */, null /* receiver */);
+                        mContext.getOpPackageName());
             } catch (RemoteException e) {
                 Log.w(TAG, "Remote exception while authenticating: ", e);
                 if (callback != null) {
-                    // Though this may not be a hardware issue, it will cause apps to give up or try
-                    // again later.
+                    // Though this may not be a hardware issue, it will cause apps to give up or
+                    // try again later.
                     callback.onAuthenticationError(FACE_ERROR_HW_UNAVAILABLE,
-                            getErrorString(FACE_ERROR_HW_UNAVAILABLE, 0 /* vendorCode */));
+                            getErrorString(mContext, FACE_ERROR_HW_UNAVAILABLE,
+                                0 /* vendorCode */));
                 }
             }
         }
@@ -192,108 +187,6 @@ public class FaceManager implements BiometricFaceConstants {
         } else if (mHandler.getLooper() != mContext.getMainLooper()) {
             mHandler = new MyHandler(mContext.getMainLooper());
         }
-    }
-
-    /**
-     * This method invokes the BiometricPrompt.
-     */
-    private void authenticateWithPrompt(@Nullable android.hardware.biometrics.CryptoObject crypto,
-            @NonNull CancellationSignal cancel,
-            @NonNull Bundle bundle,
-            @NonNull @CallbackExecutor Executor executor,
-            @NonNull IBiometricPromptReceiver receiver,
-            @NonNull BiometricAuthenticator.AuthenticationCallback callback) {
-        mCryptoObject = crypto;
-        if (cancel.isCanceled()) {
-            Slog.w(TAG, "authentication already canceled");
-            return;
-        } else {
-            cancel.setOnCancelListener(new OnAuthenticationCancelListener(crypto));
-        }
-
-        if (mService != null) {
-            try {
-                mExecutor = executor;
-                mAuthenticationCallback = callback;
-                final long sessionId = crypto != null ? crypto.getOpId() : 0;
-                mService.authenticate(mToken, sessionId, mServiceReceiver,
-                        0 /* flags */, mContext.getOpPackageName(), bundle, receiver);
-            } catch (RemoteException e) {
-                Slog.w(TAG, "Remote exception while authenticating", e);
-                mExecutor.execute(() -> {
-                    callback.onAuthenticationError(FACE_ERROR_HW_UNAVAILABLE,
-                            getErrorString(FACE_ERROR_HW_UNAVAILABLE, 0 /* vendorCode */));
-                });
-            }
-        }
-    }
-
-    /**
-     * Private method, see {@link BiometricPrompt#authenticate(CancellationSignal, Executor,
-     * BiometricPrompt.AuthenticationCallback)}
-     * @param cancel
-     * @param executor
-     * @param callback
-     * @hide
-     */
-    public void authenticate(
-            @NonNull CancellationSignal cancel,
-            @NonNull Bundle bundle,
-            @NonNull @CallbackExecutor Executor executor,
-            @NonNull IBiometricPromptReceiver receiver,
-            @NonNull BiometricAuthenticator.AuthenticationCallback callback) {
-        if (cancel == null) {
-            throw new IllegalArgumentException("Must supply a cancellation signal");
-        }
-        if (bundle == null) {
-            throw new IllegalArgumentException("Must supply a bundle");
-        }
-        if (executor == null) {
-            throw new IllegalArgumentException("Must supply an executor");
-        }
-        if (receiver == null) {
-            throw new IllegalArgumentException("Must supply a receiver");
-        }
-        if (callback == null) {
-            throw new IllegalArgumentException("Must supply a calback");
-        }
-        authenticateWithPrompt(null, cancel, bundle, executor, receiver, callback);
-    }
-
-    /**
-     * Private method, see {@link BiometricPrompt#authenticate(BiometricPrompt.CryptoObject,
-     * CancellationSignal, Executor, BiometricPrompt.AuthenticationCallback)}
-     * @param crypto
-     * @param cancel
-     * @param executor
-     * @param callback
-     * @hide
-     */
-    public void authenticate(@NonNull android.hardware.biometrics.CryptoObject crypto,
-            @NonNull CancellationSignal cancel,
-            @NonNull Bundle bundle,
-            @NonNull @CallbackExecutor Executor executor,
-            @NonNull IBiometricPromptReceiver receiver,
-            @NonNull BiometricAuthenticator.AuthenticationCallback callback) {
-        if (crypto == null) {
-            throw new IllegalArgumentException("Must supply a crypto object");
-        }
-        if (cancel == null) {
-            throw new IllegalArgumentException("Must supply a cancellation signal");
-        }
-        if (bundle == null) {
-            throw new IllegalArgumentException("Must supply a bundle");
-        }
-        if (executor == null) {
-            throw new IllegalArgumentException("Must supply an executor");
-        }
-        if (receiver == null) {
-            throw new IllegalArgumentException("Must supply a receiver");
-        }
-        if (callback == null) {
-            throw new IllegalArgumentException("Must supply a callback");
-        }
-        authenticateWithPrompt(crypto, cancel, bundle, executor, receiver, callback);
     }
 
     /**
@@ -313,7 +206,7 @@ public class FaceManager implements BiometricFaceConstants {
      * @param callback an object to receive enrollment events
      * @hide
      */
-    @RequiresPermission(MANAGE_FACE)
+    @RequiresPermission(MANAGE_BIOMETRIC)
     public void enroll(byte[] token, CancellationSignal cancel, int flags,
             int userId, EnrollmentCallback callback) {
         if (userId == UserHandle.USER_CURRENT) {
@@ -340,27 +233,28 @@ public class FaceManager implements BiometricFaceConstants {
             } catch (RemoteException e) {
                 Log.w(TAG, "Remote exception in enroll: ", e);
                 if (callback != null) {
-                    // Though this may not be a hardware issue, it will cause apps to give up or try
-                    // again later.
+                    // Though this may not be a hardware issue, it will cause apps to give up or
+                    // try again later.
                     callback.onEnrollmentError(FACE_ERROR_HW_UNAVAILABLE,
-                            getErrorString(FACE_ERROR_HW_UNAVAILABLE, 0 /* vendorCode */));
+                            getErrorString(mContext, FACE_ERROR_HW_UNAVAILABLE,
+                                0 /* vendorCode */));
                 }
             }
         }
     }
 
     /**
-     * Requests a pre-enrollment auth token to tie enrollment to the confirmation of
+     * Requests an auth token to tie sensitive operations to the confirmation of
      * existing device credentials (e.g. pin/pattern/password).
      *
      * @hide
      */
-    @RequiresPermission(MANAGE_FACE)
-    public long preEnroll() {
+    @RequiresPermission(MANAGE_BIOMETRIC)
+    public long generateChallenge() {
         long result = 0;
         if (mService != null) {
             try {
-                result = mService.preEnroll(mToken);
+                result = mService.generateChallenge(mToken);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -369,16 +263,46 @@ public class FaceManager implements BiometricFaceConstants {
     }
 
     /**
-     * Finishes enrollment and cancels the current auth token.
+     * Invalidates the current auth token.
      *
      * @hide
      */
-    @RequiresPermission(MANAGE_FACE)
-    public int postEnroll() {
+    @RequiresPermission(MANAGE_BIOMETRIC)
+    public int revokeChallenge() {
         int result = 0;
         if (mService != null) {
             try {
-                result = mService.postEnroll(mToken);
+                result = mService.revokeChallenge(mToken);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @hide
+     */
+    @RequiresPermission(MANAGE_BIOMETRIC)
+    public void setRequireAttention(boolean requireAttention, byte[] token) {
+        if (mService != null) {
+            try {
+                mService.setRequireAttention(requireAttention, token);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * @hide
+     */
+    @RequiresPermission(MANAGE_BIOMETRIC)
+    public boolean getRequireAttention(byte[] token) {
+        boolean result = true;
+        if (mService != null) {
+            try {
+                mService.getRequireAttention(token);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -392,7 +316,8 @@ public class FaceManager implements BiometricFaceConstants {
      *
      * @hide
      */
-    @RequiresPermission(MANAGE_FACE)
+    @RequiresPermission(MANAGE_BIOMETRIC)
+    @Override
     public void setActiveUser(int userId) {
         if (mService != null) {
             try {
@@ -412,7 +337,7 @@ public class FaceManager implements BiometricFaceConstants {
      *                 successfully removed. May be null if no callback is required.
      * @hide
      */
-    @RequiresPermission(MANAGE_FACE)
+    @RequiresPermission(MANAGE_BIOMETRIC)
     public void remove(Face face, int userId, RemovalCallback callback) {
         if (mService != null) {
             try {
@@ -423,7 +348,8 @@ public class FaceManager implements BiometricFaceConstants {
                 Log.w(TAG, "Remote exception in remove: ", e);
                 if (callback != null) {
                     callback.onRemovalError(face, FACE_ERROR_HW_UNAVAILABLE,
-                            getErrorString(FACE_ERROR_HW_UNAVAILABLE, 0 /* vendorCode */));
+                            getErrorString(mContext, FACE_ERROR_HW_UNAVAILABLE,
+                                0 /* vendorCode */));
                 }
             }
         }
@@ -435,7 +361,7 @@ public class FaceManager implements BiometricFaceConstants {
      * @return the current face item
      * @hide
      */
-    @RequiresPermission(USE_BIOMETRIC)
+    @RequiresPermission(MANAGE_BIOMETRIC)
     public List<Face> getEnrolledFaces(int userId) {
         if (mService != null) {
             try {
@@ -453,7 +379,7 @@ public class FaceManager implements BiometricFaceConstants {
      * @return the current face item
      * @hide
      */
-    @RequiresPermission(USE_BIOMETRIC)
+    @RequiresPermission(MANAGE_BIOMETRIC)
     public List<Face> getEnrolledFaces() {
         return getEnrolledFaces(UserHandle.myUserId());
     }
@@ -463,8 +389,9 @@ public class FaceManager implements BiometricFaceConstants {
      *
      * @return true if a face is enrolled, false otherwise
      */
-    @RequiresPermission(USE_BIOMETRIC)
-    public boolean hasEnrolledFaces() {
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
+    @Override
+    public boolean hasEnrolledTemplates() {
         if (mService != null) {
             try {
                 return mService.hasEnrolledFaces(
@@ -480,9 +407,10 @@ public class FaceManager implements BiometricFaceConstants {
      * @hide
      */
     @RequiresPermission(allOf = {
-            USE_BIOMETRIC,
+            USE_BIOMETRIC_INTERNAL,
             INTERACT_ACROSS_USERS})
-    public boolean hasEnrolledFaces(int userId) {
+    @Override
+    public boolean hasEnrolledTemplates(int userId) {
         if (mService != null) {
             try {
                 return mService.hasEnrolledFaces(userId, mContext.getOpPackageName());
@@ -498,7 +426,8 @@ public class FaceManager implements BiometricFaceConstants {
      *
      * @return true if hardware is present and functional, false otherwise.
      */
-    @RequiresPermission(USE_BIOMETRIC)
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
+    @Override
     public boolean isHardwareDetected() {
         if (mService != null) {
             try {
@@ -538,6 +467,7 @@ public class FaceManager implements BiometricFaceConstants {
      * @param token an opaque token returned by password confirmation.
      * @hide
      */
+    @RequiresPermission(MANAGE_BIOMETRIC)
     public void resetTimeout(byte[] token) {
         if (mService != null) {
             try {
@@ -553,6 +483,7 @@ public class FaceManager implements BiometricFaceConstants {
     /**
      * @hide
      */
+    @RequiresPermission(USE_BIOMETRIC_INTERNAL)
     public void addLockoutResetCallback(final LockoutResetCallback callback) {
         if (mService != null) {
             try {
@@ -617,31 +548,36 @@ public class FaceManager implements BiometricFaceConstants {
         }
     }
 
-    private String getErrorString(int errMsg, int vendorCode) {
+    /**
+     * @hide
+     */
+    public static String getErrorString(Context context, int errMsg, int vendorCode) {
         switch (errMsg) {
-            case FACE_ERROR_HW_UNAVAILABLE:
-                return mContext.getString(
-                        com.android.internal.R.string.face_error_hw_not_available);
             case FACE_ERROR_UNABLE_TO_PROCESS:
-                return mContext.getString(
+                return context.getString(
                         com.android.internal.R.string.face_error_unable_to_process);
-            case FACE_ERROR_TIMEOUT:
-                return mContext.getString(com.android.internal.R.string.face_error_timeout);
+            case FACE_ERROR_HW_UNAVAILABLE:
+                return context.getString(
+                        com.android.internal.R.string.face_error_hw_not_available);
             case FACE_ERROR_NO_SPACE:
-                return mContext.getString(com.android.internal.R.string.face_error_no_space);
+                return context.getString(com.android.internal.R.string.face_error_no_space);
+            case FACE_ERROR_TIMEOUT:
+                return context.getString(com.android.internal.R.string.face_error_timeout);
             case FACE_ERROR_CANCELED:
-                return mContext.getString(com.android.internal.R.string.face_error_canceled);
+                return context.getString(com.android.internal.R.string.face_error_canceled);
             case FACE_ERROR_LOCKOUT:
-                return mContext.getString(com.android.internal.R.string.face_error_lockout);
+                return context.getString(com.android.internal.R.string.face_error_lockout);
             case FACE_ERROR_LOCKOUT_PERMANENT:
-                return mContext.getString(
+                return context.getString(
                         com.android.internal.R.string.face_error_lockout_permanent);
+            case FACE_ERROR_USER_CANCELED:
+                return context.getString(com.android.internal.R.string.face_error_user_canceled);
             case FACE_ERROR_NOT_ENROLLED:
-                return mContext.getString(com.android.internal.R.string.face_error_not_enrolled);
+                return context.getString(com.android.internal.R.string.face_error_not_enrolled);
             case FACE_ERROR_HW_NOT_PRESENT:
-                return mContext.getString(com.android.internal.R.string.face_error_hw_not_present);
+                return context.getString(com.android.internal.R.string.face_error_hw_not_present);
             case FACE_ERROR_VENDOR: {
-                String[] msgArray = mContext.getResources().getStringArray(
+                String[] msgArray = context.getResources().getStringArray(
                         com.android.internal.R.array.face_error_vendor);
                 if (vendorCode < msgArray.length) {
                     return msgArray[vendorCode];
@@ -652,34 +588,37 @@ public class FaceManager implements BiometricFaceConstants {
         return null;
     }
 
-    private String getAcquiredString(int acquireInfo, int vendorCode) {
+    /**
+     * @hide
+     */
+    public static String getAcquiredString(Context context, int acquireInfo, int vendorCode) {
         switch (acquireInfo) {
             case FACE_ACQUIRED_GOOD:
                 return null;
             case FACE_ACQUIRED_INSUFFICIENT:
-                return mContext.getString(R.string.face_acquired_insufficient);
+                return context.getString(R.string.face_acquired_insufficient);
             case FACE_ACQUIRED_TOO_BRIGHT:
-                return mContext.getString(R.string.face_acquired_too_bright);
+                return context.getString(R.string.face_acquired_too_bright);
             case FACE_ACQUIRED_TOO_DARK:
-                return mContext.getString(R.string.face_acquired_too_dark);
+                return context.getString(R.string.face_acquired_too_dark);
             case FACE_ACQUIRED_TOO_CLOSE:
-                return mContext.getString(R.string.face_acquired_too_close);
+                return context.getString(R.string.face_acquired_too_close);
             case FACE_ACQUIRED_TOO_FAR:
-                return mContext.getString(R.string.face_acquired_too_far);
+                return context.getString(R.string.face_acquired_too_far);
             case FACE_ACQUIRED_TOO_HIGH:
-                return mContext.getString(R.string.face_acquired_too_high);
+                return context.getString(R.string.face_acquired_too_high);
             case FACE_ACQUIRED_TOO_LOW:
-                return mContext.getString(R.string.face_acquired_too_low);
+                return context.getString(R.string.face_acquired_too_low);
             case FACE_ACQUIRED_TOO_RIGHT:
-                return mContext.getString(R.string.face_acquired_too_right);
+                return context.getString(R.string.face_acquired_too_right);
             case FACE_ACQUIRED_TOO_LEFT:
-                return mContext.getString(R.string.face_acquired_too_left);
+                return context.getString(R.string.face_acquired_too_left);
             case FACE_ACQUIRED_POOR_GAZE:
-                return mContext.getString(R.string.face_acquired_poor_gaze);
+                return context.getString(R.string.face_acquired_poor_gaze);
             case FACE_ACQUIRED_NOT_DETECTED:
-                return mContext.getString(R.string.face_acquired_not_detected);
+                return context.getString(R.string.face_acquired_not_detected);
             case FACE_ACQUIRED_VENDOR: {
-                String[] msgArray = mContext.getResources().getStringArray(
+                String[] msgArray = context.getResources().getStringArray(
                         R.array.face_acquired_vendor);
                 if (vendorCode < msgArray.length) {
                     return msgArray[vendorCode];
@@ -688,6 +627,37 @@ public class FaceManager implements BiometricFaceConstants {
         }
         Slog.w(TAG, "Invalid acquired message: " + acquireInfo + ", " + vendorCode);
         return null;
+    }
+
+    /**
+     * Used so BiometricPrompt can map the face ones onto existing public constants.
+     * @hide
+     */
+    public static int getMappedAcquiredInfo(int acquireInfo, int vendorCode) {
+        switch (acquireInfo) {
+            case FACE_ACQUIRED_GOOD:
+                return BiometricConstants.BIOMETRIC_ACQUIRED_GOOD;
+            case FACE_ACQUIRED_INSUFFICIENT:
+            case FACE_ACQUIRED_TOO_BRIGHT:
+            case FACE_ACQUIRED_TOO_DARK:
+                return BiometricConstants.BIOMETRIC_ACQUIRED_INSUFFICIENT;
+            case FACE_ACQUIRED_TOO_CLOSE:
+            case FACE_ACQUIRED_TOO_FAR:
+            case FACE_ACQUIRED_TOO_HIGH:
+            case FACE_ACQUIRED_TOO_LOW:
+            case FACE_ACQUIRED_TOO_RIGHT:
+            case FACE_ACQUIRED_TOO_LEFT:
+                return BiometricConstants.BIOMETRIC_ACQUIRED_PARTIAL;
+            case FACE_ACQUIRED_POOR_GAZE:
+            case FACE_ACQUIRED_NOT_DETECTED:
+            case FACE_ACQUIRED_TOO_MUCH_MOTION:
+            case FACE_ACQUIRED_RECALIBRATE:
+                return BiometricConstants.BIOMETRIC_ACQUIRED_INSUFFICIENT;
+            case FACE_ACQUIRED_VENDOR:
+                return BiometricConstants.BIOMETRIC_ACQUIRED_VENDOR_BASE + vendorCode;
+            default:
+                return BiometricConstants.BIOMETRIC_ACQUIRED_GOOD;
+        }
     }
 
     /**
@@ -796,18 +766,6 @@ public class FaceManager implements BiometricFaceConstants {
          */
         public void onAuthenticationAcquired(int acquireInfo) {
         }
-
-        /**
-         * @hide
-         * @param result
-         */
-        @Override
-        public void onAuthenticationSucceeded(BiometricAuthenticator.AuthenticationResult result) {
-            onAuthenticationSucceeded(new AuthenticationResult(
-                    result.getCryptoObject(),
-                    (Face) result.getId(), result.getUserId()));
-        }
-
     }
 
     /**
@@ -970,13 +928,13 @@ public class FaceManager implements BiometricFaceConstants {
                 ? (vendorCode + FACE_ERROR_VENDOR_BASE) : errMsgId;
         if (mEnrollmentCallback != null) {
             mEnrollmentCallback.onEnrollmentError(clientErrMsgId,
-                    getErrorString(errMsgId, vendorCode));
+                    getErrorString(mContext, errMsgId, vendorCode));
         } else if (mAuthenticationCallback != null) {
             mAuthenticationCallback.onAuthenticationError(clientErrMsgId,
-                    getErrorString(errMsgId, vendorCode));
+                    getErrorString(mContext, errMsgId, vendorCode));
         } else if (mRemovalCallback != null) {
             mRemovalCallback.onRemovalError(mRemovalFace, clientErrMsgId,
-                    getErrorString(errMsgId, vendorCode));
+                    getErrorString(mContext, errMsgId, vendorCode));
         }
     }
 
@@ -988,8 +946,8 @@ public class FaceManager implements BiometricFaceConstants {
 
     private void sendAuthenticatedSucceeded(Face face, int userId) {
         if (mAuthenticationCallback != null) {
-            final BiometricAuthenticator.AuthenticationResult result =
-                    new BiometricAuthenticator.AuthenticationResult(mCryptoObject, face, userId);
+            final AuthenticationResult result =
+                    new AuthenticationResult(mCryptoObject, face, userId);
             mAuthenticationCallback.onAuthenticationSucceeded(result);
         }
     }
@@ -1004,7 +962,7 @@ public class FaceManager implements BiometricFaceConstants {
         if (mAuthenticationCallback != null) {
             mAuthenticationCallback.onAuthenticationAcquired(acquireInfo);
         }
-        final String msg = getAcquiredString(acquireInfo, vendorCode);
+        final String msg = getAcquiredString(mContext, acquireInfo, vendorCode);
         if (msg == null) {
             return;
         }

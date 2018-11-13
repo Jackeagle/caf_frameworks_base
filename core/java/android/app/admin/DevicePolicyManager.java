@@ -664,8 +664,8 @@ public class DevicePolicyManager {
 
     /**
      * A String extra indicating the security type of the wifi network in
-     * {@link #EXTRA_PROVISIONING_WIFI_SSID} and could be one of {@code NONE}, {@code WPA} or
-     * {@code WEP}.
+     * {@link #EXTRA_PROVISIONING_WIFI_SSID} and could be one of {@code NONE}, {@code WPA},
+     * {@code WEP} or {@code EAP}.
      *
      * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
      * provisioning via an NFC bump.
@@ -680,8 +680,89 @@ public class DevicePolicyManager {
      * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
      * provisioning via an NFC bump.
      */
-    public static final String EXTRA_PROVISIONING_WIFI_PASSWORD
-        = "android.app.extra.PROVISIONING_WIFI_PASSWORD";
+    public static final String EXTRA_PROVISIONING_WIFI_PASSWORD =
+            "android.app.extra.PROVISIONING_WIFI_PASSWORD";
+
+    /**
+     * The EAP method of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}
+     * and could be one of {@code PEAP}, {@code TLS}, {@code TTLS}, {@code PWD}, {@code SIM},
+     * {@code AKA} or {@code AKA_PRIME}. This is only used if the
+     * {@link #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+    public static final String EXTRA_PROVISIONING_WIFI_EAP_METHOD =
+            "android.app.extra.PROVISIONING_WIFI_EAP_METHOD";
+
+    /**
+     * The phase 2 authentication of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}
+     * and could be one of {@code NONE}, {@code PAP}, {@code MSCHAP}, {@code MSCHAPV2}, {@code GTC},
+     * {@code SIM}, {@code AKA} or {@code AKA_PRIME}. This is only used if the
+     * {@link #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+    public static final String EXTRA_PROVISIONING_WIFI_PHASE2_AUTH =
+            "android.app.extra.PROVISIONING_WIFI_PHASE2_AUTH";
+
+    /**
+     * The CA certificate of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}. This should
+     * be an X.509 certificate Base64 encoded DER format, ie. PEM representation of a certificate
+     * without header, footer and line breaks. <a href=
+     * "https://tools.ietf.org/html/rfc7468"> More information</a> This is only
+     * used if the {@link
+     * #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+    public static final String EXTRA_PROVISIONING_WIFI_CA_CERTIFICATE =
+            "android.app.extra.PROVISIONING_WIFI_CA_CERTIFICATE";
+
+    /**
+     * The user certificate of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}. This
+     * should be an X.509 certificate and private key Base64 encoded DER format, ie. PEM
+     * representation of a certificate and key without header, footer and line breaks. <a href=
+     * "https://tools.ietf.org/html/rfc7468"> More information</a> This is only
+     * used if the {@link #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+    public static final String EXTRA_PROVISIONING_WIFI_USER_CERTIFICATE =
+            "android.app.extra.PROVISIONING_WIFI_USER_CERTIFICATE";
+
+    /**
+     * The identity of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}. This is only used
+     * if the {@link #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+    public static final String EXTRA_PROVISIONING_WIFI_IDENTITY =
+            "android.app.extra.PROVISIONING_WIFI_IDENTITY";
+
+    /**
+     * The anonymous identity of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}. This is
+     * only used if the {@link #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+
+    public static final String EXTRA_PROVISIONING_WIFI_ANONYMOUS_IDENTITY =
+            "android.app.extra.PROVISIONING_WIFI_ANONYMOUS_IDENTITY";
+    /**
+     * The domain of the wifi network in {@link #EXTRA_PROVISIONING_WIFI_SSID}. This is only used if
+     * the {@link #EXTRA_PROVISIONING_WIFI_SECURITY_TYPE} is {@code EAP}.
+     *
+     * <p>Use in an NFC record with {@link #MIME_TYPE_PROVISIONING_NFC} that starts device owner
+     * provisioning via an NFC bump. It can also be used for QR code provisioning.
+     */
+    public static final String EXTRA_PROVISIONING_WIFI_DOMAIN =
+            "android.app.extra.PROVISIONING_WIFI_DOMAIN";
 
     /**
      * A String extra holding the proxy host for the wifi network in
@@ -1067,8 +1148,22 @@ public class DevicePolicyManager {
      * <li>{@link #EXTRA_PROVISIONING_WIFI_PROXY_PORT} (convert to String), optional</li>
      * <li>{@link #EXTRA_PROVISIONING_WIFI_PROXY_BYPASS}, optional</li>
      * <li>{@link #EXTRA_PROVISIONING_WIFI_PAC_URL}, optional</li>
-     * <li>{@link #EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE}, optional, supported from
-     * {@link android.os.Build.VERSION_CODES#M} </li></ul>
+     * <li>{@link #EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#M} </li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_EAP_METHOD}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_PHASE2_AUTH}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_CA_CERTIFICATE}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_USER_CERTIFICATE}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_IDENTITY}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_ANONYMOUS_IDENTITY}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li>
+     * <li>{@link #EXTRA_PROVISIONING_WIFI_DOMAIN}, optional, supported from {@link
+     * android.os.Build.VERSION_CODES#Q}</li></ul>
      *
      * <p>
      * As of {@link android.os.Build.VERSION_CODES#M}, the properties should contain
@@ -1183,14 +1278,6 @@ public class DevicePolicyManager {
     public static final String POLICY_DISABLE_SCREEN_CAPTURE = "policy_disable_screen_capture";
 
     /**
-     * Constant to indicate the feature of mandatory backups. Used as argument to
-     * {@link #createAdminSupportIntent(String)}.
-     * @see #setMandatoryBackupTransport(ComponentName, ComponentName)
-     * @hide
-     */
-    public static final String POLICY_MANDATORY_BACKUPS = "policy_mandatory_backups";
-
-    /**
      * Constant to indicate the feature of suspending app. Use it as the value of
      * {@link #EXTRA_RESTRICTION}.
      * @hide
@@ -1200,12 +1287,11 @@ public class DevicePolicyManager {
     /**
      * A String indicating a specific restricted feature. Can be a user restriction from the
      * {@link UserManager}, e.g. {@link UserManager#DISALLOW_ADJUST_VOLUME}, or one of the values
-     * {@link #POLICY_DISABLE_CAMERA}, {@link #POLICY_DISABLE_SCREEN_CAPTURE} or
-     * {@link #POLICY_MANDATORY_BACKUPS}.
+     * {@link #POLICY_DISABLE_CAMERA} or {@link #POLICY_DISABLE_SCREEN_CAPTURE}.
      * @see #createAdminSupportIntent(String)
      * @hide
      */
-    @TestApi
+    @TestApi @SystemApi
     public static final String EXTRA_RESTRICTION = "android.app.extra.RESTRICTION";
 
     /**
@@ -3313,7 +3399,7 @@ public class DevicePolicyManager {
      * restrictions on the parent profile.
      *
      * @param admin The name of the admin component to check, or {@code null} to aggregate
-     *         accross all participating admins.
+     *         across all participating admins.
      * @return The timeout in milliseconds or 0 if not configured for the provided admin.
      */
     public long getRequiredStrongAuthTimeout(@Nullable ComponentName admin) {
@@ -3459,15 +3545,14 @@ public class DevicePolicyManager {
      * @param flags Bit mask of additional options: currently supported flags are
      *            {@link #WIPE_EXTERNAL_STORAGE} and {@link #WIPE_RESET_PROTECTION_DATA}.
      * @param reason a string that contains the reason for wiping data, which can be
-     *                          presented to the user.
+     *            presented to the user. If the string is null or empty, user won't be notified.
      * @throws SecurityException if the calling application does not own an active administrator
      *             that uses {@link DeviceAdminInfo#USES_POLICY_WIPE_DATA}
      * @throws IllegalArgumentException if the input reason string is null or empty.
      */
-    public void wipeData(int flags, @NonNull CharSequence reason) {
+    public void wipeData(int flags, CharSequence reason) {
         throwIfParentInstance("wipeData");
-        Preconditions.checkNotNull(reason, "CharSequence is null");
-        wipeDataInternal(flags, reason.toString());
+        wipeDataInternal(flags, reason != null ? reason.toString() : null);
     }
 
     /**
@@ -3478,7 +3563,7 @@ public class DevicePolicyManager {
      * @see #wipeData(int, CharSequence)
      * @hide
      */
-    private void wipeDataInternal(int flags, @NonNull String wipeReasonForUser) {
+    private void wipeDataInternal(int flags, String wipeReasonForUser) {
         if (mService != null) {
             try {
                 mService.wipeDataWithReason(flags, wipeReasonForUser);
@@ -3896,6 +3981,11 @@ public class DevicePolicyManager {
 
     /**
      * Installs the given certificate as a user CA.
+     * <p>
+     * Inserted user CAs aren't automatically trusted by apps in Android 7.0 (API level 24) and
+     * higher. App developers can change the default behavior for an app by adding a
+     * <a href="{@docRoot}training/articles/security-config.html">Security Configuration
+     * File</a> to the app manifest file.
      *
      * The caller must be a profile or device owner on that user, or a delegate package given the
      * {@link #DELEGATION_CERT_INSTALL} scope via {@link #setDelegatedScopes}; otherwise a
@@ -5134,11 +5224,28 @@ public class DevicePolicyManager {
     }
 
     /**
-     * @return ID of the user who runs device owner, or {@link UserHandle#USER_NULL} if there's
-     * no device owner.
+     * @return Handle of the user who runs device owner, or {@code null} if there's no device owner.
      *
-     * <p>Requires the MANAGE_USERS permission.
-     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_USERS)
+    @SystemApi
+    public @Nullable UserHandle getDeviceOwnerUser() {
+        if (mService != null) {
+            try {
+                int userId = mService.getDeviceOwnerUserId();
+
+                if (userId != UserHandle.USER_NULL) {
+                    return UserHandle.of(userId);
+                }
+            } catch (RemoteException re) {
+                throw re.rethrowFromSystemServer();
+            }
+        }
+        return null;
+    }
+
+    /**
      * @hide
      */
     public int getDeviceOwnerUserId() {
@@ -5560,12 +5667,27 @@ public class DevicePolicyManager {
      * @see #getProfileOwner()
      * @hide
      */
-    @UnsupportedAppUsage
-    public @Nullable ComponentName getProfileOwnerAsUser(final int userId)
-            throws IllegalArgumentException {
+    @RequiresPermission(value = android.Manifest.permission.INTERACT_ACROSS_USERS,
+            conditional = true)
+    @SystemApi
+    public @Nullable ComponentName getProfileOwnerAsUser(@NonNull UserHandle user) {
         if (mService != null) {
             try {
-                return mService.getProfileOwner(userId);
+                return mService.getProfileOwnerAsUser(user.getIdentifier());
+            } catch (RemoteException re) {
+                throw re.rethrowFromSystemServer();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @hide
+     */
+    public @Nullable ComponentName getProfileOwnerAsUser(final int userId) {
+        if (mService != null) {
+            try {
+                return mService.getProfileOwnerAsUser(userId);
             } catch (RemoteException re) {
                 throw re.rethrowFromSystemServer();
             }
@@ -5609,6 +5731,37 @@ public class DevicePolicyManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Returns whether the specified package can read the device identifiers.
+     *
+     * @param packageName The package name of the app to check for device identifier access.
+     * @return whether the package can read the device identifiers.
+     *
+     * @hide
+     */
+    public boolean checkDeviceIdentifierAccess(String packageName) {
+        return checkDeviceIdentifierAccessAsUser(packageName, myUserId());
+    }
+
+    /**
+     * @hide
+     */
+    @RequiresPermission(value = android.Manifest.permission.MANAGE_USERS, conditional = true)
+    public boolean checkDeviceIdentifierAccessAsUser(String packageName, int userId) {
+        throwIfParentInstance("checkDeviceIdentifierAccessAsUser");
+        if (packageName == null) {
+            return false;
+        }
+        if (mService != null) {
+            try {
+                return mService.checkDeviceIdentifierAccess(packageName, userId);
+            } catch (RemoteException re) {
+                throw re.rethrowFromSystemServer();
+            }
+        }
+        return false;
     }
 
     /**
@@ -6913,7 +7066,7 @@ public class DevicePolicyManager {
      * @param restriction Indicates for which feature the dialog should be displayed. Can be a
      *            user restriction from {@link UserManager}, e.g.
      *            {@link UserManager#DISALLOW_ADJUST_VOLUME}, or one of the constants
-     *            {@link #POLICY_DISABLE_CAMERA}, {@link #POLICY_DISABLE_SCREEN_CAPTURE}.
+     *            {@link #POLICY_DISABLE_CAMERA} or {@link #POLICY_DISABLE_SCREEN_CAPTURE}.
      * @return Intent An intent to be used to start the dialog-activity if the restriction is
      *            set by an admin, or null if the restriction does not exist or no admin set it.
      */
@@ -7408,6 +7561,10 @@ public class DevicePolicyManager {
      * If any app targeting {@link android.os.Build.VERSION_CODES#O} or higher calls this method
      * with {@link android.provider.Settings.Secure#INSTALL_NON_MARKET_APPS},
      * an {@link UnsupportedOperationException} is thrown.
+     *
+     * Starting from Android Q, the device and profile owner can also call
+     * {@link UserManager#DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY} to restrict unknown sources for
+     * all users.
      * </strong>
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
@@ -8909,55 +9066,6 @@ public class DevicePolicyManager {
             throw re.rethrowFromSystemServer();
         }
     }
-
-    /**
-     * Makes backups mandatory and enforces the usage of the specified backup transport.
-     *
-     * <p>When a {@code null} backup transport is specified, backups are made optional again.
-     * <p>Only device owner can call this method.
-     * <p>If backups were disabled and a non-null backup transport {@link ComponentName} is
-     * specified, backups will be enabled.
-     * <p> If the backup service is disabled after the mandatory backup transport has been set, the
-     * mandatory backup transport is cleared.
-     *
-     * <p>NOTE: The method shouldn't be called on the main thread.
-     *
-     * @param admin admin Which {@link DeviceAdminReceiver} this request is associated with.
-     * @param backupTransportComponent The backup transport layer to be used for mandatory backups.
-     * @return {@code true} if the backup transport was successfully set; {@code false} otherwise.
-     * @throws SecurityException if {@code admin} is not a device owner.
-     * @hide
-     */
-    @WorkerThread
-    public boolean setMandatoryBackupTransport(
-            @NonNull ComponentName admin,
-            @Nullable ComponentName backupTransportComponent) {
-        throwIfParentInstance("setMandatoryBackupTransport");
-        try {
-            return mService.setMandatoryBackupTransport(admin, backupTransportComponent);
-        } catch (RemoteException re) {
-            throw re.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Returns the backup transport which has to be used for backups if backups are mandatory or
-     * {@code null} if backups are not mandatory.
-     *
-     * @return a {@link ComponentName} of the backup transport layer to be used if backups are
-     *         mandatory or {@code null} if backups are not mandatory.
-     * @hide
-     */
-    @UnsupportedAppUsage
-    public ComponentName getMandatoryBackupTransport() {
-        throwIfParentInstance("getMandatoryBackupTransport");
-        try {
-            return mService.getMandatoryBackupTransport();
-        } catch (RemoteException re) {
-            throw re.rethrowFromSystemServer();
-        }
-    }
-
 
     /**
      * Called by a device owner to control the network logging feature.

@@ -17,13 +17,12 @@
 #pragma once
 
 #include "hwui/AnimatedImageDrawable.h"
-#include "GLFunctorDrawable.h"
+#include "FunctorDrawable.h"
+#include "RecordingCanvas.h"
 #include "RenderNodeDrawable.h"
 #include "TreeInfo.h"
 #include "utils/LinearAllocator.h"
 
-#include <SkLiteDL.h>
-#include <SkLiteRecorder.h>
 #include <deque>
 
 namespace android {
@@ -50,9 +49,6 @@ namespace skiapipeline {
  */
 class SkiaDisplayList {
 public:
-    // index of DisplayListOp restore, after which projected descendants should be drawn
-    int projectionReceiveIndex = -1;
-
     size_t getUsedSize() { return allocator.usedSize(); }
 
     ~SkiaDisplayList() {
@@ -78,7 +74,7 @@ public:
      * that creates them. Allocator dtor invokes all SkDrawable dtors.
      */
     template <class T, typename... Params>
-    SkDrawable* allocateDrawable(Params&&... params) {
+    T* allocateDrawable(Params&&... params) {
         return allocator.create<T>(std::forward<Params>(params)...);
     }
 
@@ -96,6 +92,8 @@ public:
      * Returns true if this list directly contains a VectorDrawable drawing command.
      */
     bool hasVectorDrawables() const { return !mVectorDrawables.empty(); }
+
+    bool hasText() const { return mDisplayList.hasText(); }
 
     /**
      * Attempts to reset and reuse this DisplayList.
@@ -140,7 +138,7 @@ public:
      */
     inline bool containsProjectionReceiver() const { return mProjectionReceiver; }
 
-    void attachRecorder(SkLiteRecorder* recorder, const SkIRect& bounds) {
+    void attachRecorder(RecordingCanvas* recorder, const SkIRect& bounds) {
         recorder->reset(&mDisplayList, bounds);
     }
 
@@ -156,11 +154,11 @@ public:
      * cannot relocate.
      */
     std::deque<RenderNodeDrawable> mChildNodes;
-    std::deque<GLFunctorDrawable> mChildFunctors;
+    std::deque<FunctorDrawable*> mChildFunctors;
     std::vector<SkImage*> mMutableImages;
     std::vector<VectorDrawableRoot*> mVectorDrawables;
     std::vector<AnimatedImageDrawable*> mAnimatedImages;
-    SkLiteDL mDisplayList;
+    DisplayListData mDisplayList;
 
     // mProjectionReceiver points to a child node (stored in mChildNodes) that is as a projection
     // receiver. It is set at record time and used at both prepare and draw tree traversals to

@@ -125,7 +125,6 @@ public class RecentTasksTest extends ActivityTestsBase {
                 WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, true /* onTop */);
         mStack = mService.mStackSupervisor.getDefaultDisplay().createStack(
                 WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, true /* onTop */);
-        ((MyTestActivityStackSupervisor) mService.mStackSupervisor).setHomeStack(mHomeStack);
         mCallbacksRecorder = new CallbacksRecorder();
         mRecentTasks.registerCallback(mCallbacksRecorder);
         QUIET_USER_INFO.flags = UserInfo.FLAG_MANAGED_PROFILE | UserInfo.FLAG_QUIET_MODE;
@@ -558,9 +557,8 @@ public class RecentTasksTest extends ActivityTestsBase {
 
         final MyTestActivityStackSupervisor supervisor =
                 (MyTestActivityStackSupervisor) mService.mStackSupervisor;
-        final ActivityStack homeStack = new MyTestActivityStack(mDisplay, supervisor);
+        final ActivityStack homeStack = mDisplay.getHomeStack();
         final ActivityStack aboveHomeStack = new MyTestActivityStack(mDisplay, supervisor);
-        supervisor.setHomeStack(homeStack);
 
         // Add a number of tasks (beyond the max) but ensure that nothing is trimmed because all
         // the tasks belong in stacks above the home stack
@@ -579,9 +577,8 @@ public class RecentTasksTest extends ActivityTestsBase {
         final MyTestActivityStackSupervisor supervisor =
                 (MyTestActivityStackSupervisor) mService.mStackSupervisor;
         final ActivityStack behindHomeStack = new MyTestActivityStack(mDisplay, supervisor);
-        final ActivityStack homeStack = new MyTestActivityStack(mDisplay, supervisor);
+        final ActivityStack homeStack = mDisplay.getHomeStack();
         final ActivityStack aboveHomeStack = new MyTestActivityStack(mDisplay, supervisor);
-        supervisor.setHomeStack(homeStack);
 
         // Add a number of tasks (beyond the max) but ensure that only the task in the stack behind
         // the home stack is trimmed once a new task is added
@@ -601,9 +598,8 @@ public class RecentTasksTest extends ActivityTestsBase {
 
         final MyTestActivityStackSupervisor supervisor =
                 (MyTestActivityStackSupervisor) mService.mStackSupervisor;
-        final ActivityStack homeStack = new MyTestActivityStack(mDisplay, supervisor);
+        final ActivityStack homeStack = mDisplay.getHomeStack();
         final ActivityStack otherDisplayStack = new MyTestActivityStack(mOtherDisplay, supervisor);
-        supervisor.setHomeStack(homeStack);
 
         // Add a number of tasks (beyond the max) on each display, ensure that the tasks are not
         // removed
@@ -870,20 +866,16 @@ public class RecentTasksTest extends ActivityTestsBase {
         @Override
         public void initialize() {
             super.initialize();
-            mDisplay = new TestActivityDisplay(this, DEFAULT_DISPLAY);
-            mOtherDisplay = new TestActivityDisplay(this, DEFAULT_DISPLAY);
-            attachDisplay(mOtherDisplay);
-            attachDisplay(mDisplay);
+            mDisplay = getActivityDisplay(DEFAULT_DISPLAY);
+            mOtherDisplay = TestActivityDisplay.create(this, DEFAULT_DISPLAY + 1);
+            addChild(mOtherDisplay, ActivityDisplay.POSITION_TOP);
+            addChild(mDisplay, ActivityDisplay.POSITION_TOP);
         }
 
         @Override
         RunningTasks createRunningTasks() {
             mRunningTasks = new TestRunningTasks();
             return mRunningTasks;
-        }
-
-        void setHomeStack(ActivityStack stack) {
-            mHomeStack = stack;
         }
     }
 
@@ -1045,7 +1037,7 @@ public class RecentTasksTest extends ActivityTestsBase {
 
         @Override
         void getTasks(int maxNum, List<RunningTaskInfo> list, int ignoreActivityType,
-                int ignoreWindowingMode, SparseArray<ActivityDisplay> activityDisplays,
+                int ignoreWindowingMode, ArrayList<ActivityDisplay> activityDisplays,
                 int callingUid, boolean allowed) {
             lastAllowed = allowed;
             super.getTasks(maxNum, list, ignoreActivityType, ignoreWindowingMode, activityDisplays,

@@ -659,6 +659,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.GPU_DEBUG_LAYERS,
                 GlobalSettingsProto.Gpu.DEBUG_LAYERS);
+        dumpSetting(s, p,
+                Settings.Global.ANGLE_ENABLED_APP,
+                GlobalSettingsProto.Gpu.ANGLE_ENABLED_APP);
         p.end(gpuToken);
 
         final long hdmiToken = p.start(GlobalSettingsProto.HDMI);
@@ -973,6 +976,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.NTP_TIMEOUT,
                 GlobalSettingsProto.Ntp.TIMEOUT_MS);
+        dumpSetting(s, p,
+                Settings.Global.NTP_SERVER_2,
+                GlobalSettingsProto.Ntp.SERVER_2);
         p.end(ntpToken);
 
         final long uasbToken = p.start(GlobalSettingsProto.USER_ABSENT_SMALL_BATTERY);
@@ -1140,6 +1146,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.SMS_SHORT_CODES_UPDATE_METADATA_URL,
                 GlobalSettingsProto.Sms.SHORT_CODES_UPDATE_METADATA_URL);
+        dumpSetting(s, p,
+                Settings.Global.SMS_ACCESS_RESTRICTION_ENABLED,
+                GlobalSettingsProto.Sms.ACCESS_RESTRICTION_ENABLED);
         p.end(smsToken);
 
         final long soundsToken = p.start(GlobalSettingsProto.SOUNDS);
@@ -1617,6 +1626,12 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.TOUCH_EXPLORATION_GRANTED_ACCESSIBILITY_SERVICES,
                 SecureSettingsProto.Accessibility.TOUCH_EXPLORATION_GRANTED_ACCESSIBILITY_SERVICES);
+        dumpSetting(s, p,
+                Settings.Secure.ACCESSIBILITY_MINIMUM_UI_TIMEOUT_ENABLED,
+                SecureSettingsProto.Accessibility.MINIMUM_UI_TIMEOUT_ENABLED);
+        dumpSetting(s, p,
+                Settings.Secure.ACCESSIBILITY_MINIMUM_UI_TIMEOUT_MS,
+                SecureSettingsProto.Accessibility.MINIMUM_UI_TIMEOUT_MS);
         p.end(accessibilityToken);
 
         dumpSetting(s, p,

@@ -16,9 +16,7 @@
 
 #pragma once
 
-#include <DeviceInfo.h>
 #include <DisplayList.h>
-#include <GlLayer.h>
 #include <Matrix.h>
 #include <Properties.h>
 #include <Rect.h>
@@ -26,6 +24,7 @@
 #include <Snapshot.h>
 #include <hwui/Bitmap.h>
 #include <pipeline/skia/SkiaRecordingCanvas.h>
+#include <private/hwui/DrawGlInfo.h>
 #include <renderstate/RenderState.h>
 #include <renderthread/RenderThread.h>
 
@@ -180,12 +179,6 @@ public:
     static sp<RenderNode> createNode(
             int left, int top, int right, int bottom,
             std::function<void(RenderProperties& props, Canvas& canvas)> setup) {
-#if HWUI_NULL_GPU
-        // if RenderNodes are being sync'd/used, device info will be needed, since
-        // DeviceInfo::maxTextureSize() affects layer property
-        DeviceInfo::initialize();
-#endif
-
         sp<RenderNode> node = new RenderNode();
         RenderProperties& props = node->mutateStagingProperties();
         props.setLeftTopRightBottom(left, top, right, bottom);
@@ -203,12 +196,6 @@ public:
     static sp<RenderNode> createNode(
             int left, int top, int right, int bottom,
             std::function<void(RenderProperties& props, RecordingCanvasType& canvas)> setup) {
-#if HWUI_NULL_GPU
-        // if RenderNodes are being sync'd/used, device info will be needed, since
-        // DeviceInfo::maxTextureSize() affects layer property
-        DeviceInfo::initialize();
-#endif
-
         sp<RenderNode> node = new RenderNode();
         RenderProperties& props = node->mutateStagingProperties();
         props.setLeftTopRightBottom(left, top, right, bottom);
@@ -234,11 +221,6 @@ public:
             std::function<void(RenderProperties& props, skiapipeline::SkiaRecordingCanvas& canvas)>
                     setup,
             const char* name = nullptr, skiapipeline::SkiaDisplayList* displayList = nullptr) {
-#if HWUI_NULL_GPU
-        // if RenderNodes are being sync'd/used, device info will be needed, since
-        // DeviceInfo::maxTextureSize() affects layer property
-        DeviceInfo::initialize();
-#endif
         sp<RenderNode> node = new RenderNode();
         if (name) {
             node->setName(name);

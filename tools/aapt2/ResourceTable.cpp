@@ -23,9 +23,9 @@
 
 #include "android-base/logging.h"
 #include "android-base/stringprintf.h"
+#include "androidfw/ConfigDescription.h"
 #include "androidfw/ResourceTypes.h"
 
-#include "ConfigDescription.h"
 #include "Debug.h"
 #include "NameMangler.h"
 #include "ResourceValues.h"
@@ -34,6 +34,7 @@
 #include "util/Util.h"
 
 using ::aapt::text::IsValidResourceEntryName;
+using ::android::ConfigDescription;
 using ::android::StringPiece;
 using ::android::base::StringPrintf;
 
@@ -51,7 +52,7 @@ static bool less_than_struct_with_name(const std::unique_ptr<T>& lhs, const Stri
 
 template <typename T>
 static bool less_than_struct_with_name_and_id(const std::unique_ptr<T>& lhs,
-                                              const std::pair<StringPiece, Maybe<uint8_t>>& rhs) {
+                                              const std::pair<StringPiece, Maybe<uint16_t>>& rhs) {
   int name_cmp = lhs->name.compare(0, lhs->name.size(), rhs.first.data(), rhs.first.size());
   return name_cmp < 0 || (name_cmp == 0 && rhs.second && lhs->id < rhs.second);
 }
@@ -141,7 +142,7 @@ ResourceTableType* ResourceTablePackage::FindOrCreateType(ResourceType type,
   return types.emplace(iter, std::move(new_type))->get();
 }
 
-ResourceEntry* ResourceTableType::FindEntry(const StringPiece& name, const Maybe<uint8_t> id) {
+ResourceEntry* ResourceTableType::FindEntry(const StringPiece& name, const Maybe<uint16_t> id) {
   const auto last = entries.end();
   auto iter = std::lower_bound(entries.begin(), last, std::make_pair(name, id),
       less_than_struct_with_name_and_id<ResourceEntry>);
@@ -152,7 +153,7 @@ ResourceEntry* ResourceTableType::FindEntry(const StringPiece& name, const Maybe
 }
 
 ResourceEntry* ResourceTableType::FindOrCreateEntry(const StringPiece& name,
-                                                    const Maybe<uint8_t> id) {
+                                                    const Maybe<uint16_t > id) {
   auto last = entries.end();
   auto iter = std::lower_bound(entries.begin(), last, std::make_pair(name, id),
                                less_than_struct_with_name_and_id<ResourceEntry>);
@@ -450,7 +451,7 @@ bool ResourceTable::AddResourceImpl(const ResourceNameRef& name, const ResourceI
   }
 
   ResourceEntry* entry = type->FindOrCreateEntry(name.entry, use_id ? res_id.entry_id()
-                                                                    : Maybe<uint8_t>());
+                                                                    : Maybe<uint16_t>());
 
   // Check for entries appearing twice with two different entry ids
   if (check_id && entry->id && entry->id.value() != res_id.entry_id()) {
@@ -561,7 +562,7 @@ bool ResourceTable::SetVisibilityImpl(const ResourceNameRef& name, const Visibil
   }
 
   ResourceEntry* entry = type->FindOrCreateEntry(name.entry, use_id ? res_id.entry_id()
-                                                                    : Maybe<uint8_t>());
+                                                                    : Maybe<uint16_t>());
 
   // Check for entries appearing twice with two different entry ids
   if (check_id && entry->id && entry->id.value() != res_id.entry_id()) {

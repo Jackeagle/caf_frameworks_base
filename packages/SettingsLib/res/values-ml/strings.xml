@@ -395,8 +395,6 @@
     <string name="battery_info_status_not_charging" msgid="8523453668342598579">"പ്ലഗ് ഇൻ ചെയ്‌തു, ഇപ്പോൾ ചാർജ് ചെയ്യാനാവില്ല"</string>
     <string name="battery_info_status_full" msgid="2824614753861462808">"നിറഞ്ഞു"</string>
     <string name="disabled_by_admin_summary_text" msgid="6750513964908334617">"അഡ്‌മിൻ നിയന്ത്രിക്കുന്നത്"</string>
-    <string name="enabled_by_admin" msgid="5302986023578399263">"അഡ്‌മിൻ പ്രവർത്തനക്ഷമമാക്കി"</string>
-    <string name="disabled_by_admin" msgid="8505398946020816620">"അഡ്‌മിൻ പ്രവർത്തനരഹിതമാക്കി"</string>
     <string name="disabled" msgid="9206776641295849915">"പ്രവർത്തനരഹിതമാക്കി"</string>
     <string name="external_source_trusted" msgid="2707996266575928037">"അനുവദനീയം"</string>
     <string name="external_source_untrusted" msgid="2677442511837596726">"അനുവദിച്ചിട്ടില്ല"</string>
@@ -415,7 +413,6 @@
     <string name="screen_zoom_summary_very_large" msgid="7108563375663670067">"കൂടുതൽ വലുത്"</string>
     <string name="screen_zoom_summary_extremely_large" msgid="7427320168263276227">"ഏറ്റവും വലുത്"</string>
     <string name="screen_zoom_summary_custom" msgid="5611979864124160447">"ഇഷ്ടാനുസൃതം ( <xliff:g id="DENSITYDPI">%d</xliff:g> )"</string>
-    <string name="help_feedback_label" msgid="6815040660801785649">"സഹായവും പ്രതികരണവും"</string>
     <string name="content_description_menu_button" msgid="8182594799812351266">"മെനു"</string>
     <string name="retail_demo_reset_message" msgid="118771671364131297">"ഡെമോ ‌മോഡിൽ ഫാക്ടറി റീസെറ്റിന് പാസ്‌വേഡ് നൽകുക"</string>
     <string name="retail_demo_reset_next" msgid="8356731459226304963">"അടുത്തത്"</string>

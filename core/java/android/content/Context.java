@@ -327,6 +327,15 @@ public abstract class Context {
     public static final int BIND_ADJUST_WITH_ACTIVITY = 0x0080;
 
     /**
+     * Flag for {@link #bindService}: If binding from something better than perceptible,
+     * still set the adjust below perceptible. This would be used for bound services that can
+     * afford to be evicted when under extreme memory pressure, but should be restarted as soon
+     * as possible.
+     * @hide
+     */
+    public static final int BIND_ADJUST_BELOW_PERCEPTIBLE = 0x0100;
+
+    /**
      * @hide Flag for {@link #bindService}: allows binding to a service provided
      * by an instant app. Note that the caller may not have access to the instant
      * app providing the service which is a violation of the instant app sandbox.
@@ -1701,7 +1710,7 @@ public abstract class Context {
      * @hide
      */
     @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
-    @UnsupportedAppUsage
+    @SystemApi
     public void startActivityAsUser(@RequiresPermission Intent intent, UserHandle user) {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
@@ -3022,6 +3031,7 @@ public abstract class Context {
             AUDIO_SERVICE,
             FINGERPRINT_SERVICE,
             //@hide: FACE_SERVICE,
+            BIOMETRIC_SERVICE,
             MEDIA_ROUTER_SERVICE,
             TELEPHONY_SERVICE,
             TELEPHONY_SUBSCRIPTION_SERVICE,
@@ -3078,6 +3088,7 @@ public abstract class Context {
             //@hide: SYSTEM_UPDATE_SERVICE,
             //@hide: TIME_DETECTOR_SERVICE,
             //@hide: TIME_ZONE_DETECTOR_SERVICE,
+            PERMISSION_SERVICE,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ServiceName {}
@@ -3158,11 +3169,11 @@ public abstract class Context {
      *
      * <p>Note: Instant apps, for which {@link PackageManager#isInstantApp()} returns true,
      * don't have access to the following system services: {@link #DEVICE_POLICY_SERVICE},
-     * {@link #FINGERPRINT_SERVICE}, {@link #SHORTCUT_SERVICE}, {@link #USB_SERVICE},
-     * {@link #WALLPAPER_SERVICE}, {@link #WIFI_P2P_SERVICE}, {@link #WIFI_SERVICE},
-     * {@link #WIFI_AWARE_SERVICE}. For these services this method will return <code>null</code>.
-     * Generally, if you are running as an instant app you should always check whether the result
-     * of this method is null.
+     * {@link #FINGERPRINT_SERVICE}, {@link #KEYGUARD_SERVICE}, {@link #SHORTCUT_SERVICE},
+     * {@link #USB_SERVICE}, {@link #WALLPAPER_SERVICE}, {@link #WIFI_P2P_SERVICE},
+     * {@link #WIFI_SERVICE}, {@link #WIFI_AWARE_SERVICE}. For these services this method will
+     * return <code>null</code>.  Generally, if you are running as an instant app you should always
+     * check whether the result of this method is null.
      *
      * @param name The name of the desired service.
      *
@@ -3249,11 +3260,11 @@ public abstract class Context {
      *
      * <p>Note: Instant apps, for which {@link PackageManager#isInstantApp()} returns true,
      * don't have access to the following system services: {@link #DEVICE_POLICY_SERVICE},
-     * {@link #FINGERPRINT_SERVICE}, {@link #SHORTCUT_SERVICE}, {@link #USB_SERVICE},
-     * {@link #WALLPAPER_SERVICE}, {@link #WIFI_P2P_SERVICE}, {@link #WIFI_SERVICE},
-     * {@link #WIFI_AWARE_SERVICE}. For these services this method will return <code>null</code>.
-     * Generally, if you are running as an instant app you should always check whether the result
-     * of this method is null.
+     * {@link #FINGERPRINT_SERVICE}, {@link #KEYGUARD_SERVICE}, {@link #SHORTCUT_SERVICE},
+     * {@link #USB_SERVICE}, {@link #WALLPAPER_SERVICE}, {@link #WIFI_P2P_SERVICE},
+     * {@link #WIFI_SERVICE}, {@link #WIFI_AWARE_SERVICE}. For these services this method will
+     * return <code>null</code>.  Generally, if you are running as an instant app you should always
+     * check whether the result of this method is null.
      *
      * @param serviceClass The class of the desired service.
      * @return The service or null if the class is not a supported system service.
@@ -3407,7 +3418,7 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
-     * {@link android.app.NotificationManager} for controlling keyguard.
+     * {@link android.app.KeyguardManager} for controlling keyguard.
      *
      * @see #getSystemService(String)
      * @see android.app.KeyguardManager
@@ -3431,7 +3442,7 @@ public abstract class Context {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static final String COUNTRY_DETECTOR = "country_detector";
 
     /**
@@ -3683,7 +3694,6 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
-     * Use with {@link #getSystemService} to retrieve a
      * {@link android.hardware.face.FaceManager} for handling management
      * of face authentication.
      *
@@ -3692,6 +3702,16 @@ public abstract class Context {
      * @see android.hardware.face.FaceManager
      */
     public static final String FACE_SERVICE = "face";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.hardware.biometrics.BiometricManager} for handling management
+     * of face authentication.
+     *
+     * @see #getSystemService
+     * @see android.hardware.biometrics.BiometricManager
+     */
+    public static final String BIOMETRIC_SERVICE = "biometric";
 
     /**
      * Use with {@link #getSystemService} to retrieve a
@@ -3841,6 +3861,14 @@ public abstract class Context {
      */
     public static final String SOUND_TRIGGER_SERVICE = "soundtrigger";
 
+    /**
+     * Official published name of the (internal) permission service.
+     *
+     * @see #getSystemService(String)
+     * @hide
+     */
+    @SystemApi
+    public static final String PERMISSION_SERVICE = "permission";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve an
@@ -4281,6 +4309,12 @@ public abstract class Context {
      * @see #getSystemService(String)
      */
     public static final String TIME_ZONE_DETECTOR_SERVICE = "time_zone_detector";
+
+    /**
+     * Binder service name for {@link AppBindingService}.
+     * @hide
+     */
+    public static final String APP_BINDING_SERVICE = "app_binding";
 
     /**
      * Determine whether the given permission is allowed for a particular
@@ -4783,6 +4817,7 @@ public abstract class Context {
      * @hide
      */
     @SystemApi
+    @TestApi
     public Context createPackageContextAsUser(
             String packageName, @CreatePackageOptions int flags, UserHandle user)
             throws PackageManager.NameNotFoundException {

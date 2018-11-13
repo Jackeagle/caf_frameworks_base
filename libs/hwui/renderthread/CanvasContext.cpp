@@ -18,7 +18,6 @@
 #include <GpuMemoryTracker.h>
 
 #include "AnimationContext.h"
-#include "Caches.h"
 #include "EglManager.h"
 #include "Frame.h"
 #include "LayerUpdateQueue.h"
@@ -28,7 +27,6 @@
 #include "pipeline/skia/SkiaOpenGLPipeline.h"
 #include "pipeline/skia/SkiaPipeline.h"
 #include "pipeline/skia/SkiaVulkanPipeline.h"
-#include "renderstate/RenderState.h"
 #include "utils/GLUtils.h"
 #include "utils/TimeUtils.h"
 #include "../Properties.h"
@@ -77,10 +75,6 @@ CanvasContext* CanvasContext::create(RenderThread& thread, bool translucent,
     return nullptr;
 }
 
-void CanvasContext::destroyLayer(RenderNode* node) {
-    skiapipeline::SkiaPipeline::destroyLayer(node);
-}
-
 void CanvasContext::invokeFunctor(const RenderThread& thread, Functor* functor) {
     ATRACE_CALL();
     auto renderType = Properties::getRenderPipelineType();
@@ -114,13 +108,11 @@ CanvasContext::CanvasContext(RenderThread& thread, bool translucent, RenderNode*
         , mRenderPipeline(std::move(renderPipeline)) {
     rootRenderNode->makeRoot();
     mRenderNodes.emplace_back(rootRenderNode);
-    mRenderThread.renderState().registerCanvasContext(this);
     mProfiler.setDensity(mRenderThread.mainDisplayInfo().density);
 }
 
 CanvasContext::~CanvasContext() {
     destroy();
-    mRenderThread.renderState().unregisterCanvasContext(this);
     for (auto& node : mRenderNodes) {
         node->clearRoot();
     }
@@ -152,7 +144,7 @@ void CanvasContext::setSurface(sp<Surface>&& surface) {
 
     mNativeSurface = std::move(surface);
 
-    ColorMode colorMode = mWideColorGamut ? ColorMode::WideColorGamut : ColorMode::Srgb;
+    ColorMode colorMode = mWideColorGamut ? ColorMode::WideColorGamut : ColorMode::SRGB;
     bool hasSurface = mRenderPipeline->setSurface(mNativeSurface.get(), mSwapBehavior, colorMode);
 
     mFrameNumber = -1;
@@ -417,7 +409,7 @@ void CanvasContext::draw() {
     SkRect windowDirty = computeDirtyRect(frame, &dirty);
 
     bool drew = mRenderPipeline->draw(frame, windowDirty, dirty, mLightGeometry, &mLayerUpdateQueue,
-                                      mContentDrawBounds, mOpaque, mWideColorGamut, mLightInfo,
+                                      mContentDrawBounds, mOpaque, mLightInfo,
                                       mRenderNodes, &(profiler()));
 
     int64_t frameCompleteNr = mFrameCompleteCallbacks.size() ? getFrameNumber() : -1;
@@ -495,13 +487,6 @@ void CanvasContext::draw() {
     }
 
     GpuMemoryTracker::onFrameCompleted();
-#ifdef BUGREPORT_FONT_CACHE_USAGE
-    auto renderType = Properties::getRenderPipelineType();
-    if (RenderPipelineType::OpenGL == renderType) {
-        Caches& caches = Caches::getInstance();
-        caches.fontRenderer.getFontRenderer().historyTracker().frameCompleted();
-    }
-#endif
 }
 
 // Called by choreographer to do an RT-driven animation
@@ -563,15 +548,10 @@ void CanvasContext::buildLayer(RenderNode* node) {
     // purposes when the frame is actually drawn
     node->setPropertyFieldsDirty(RenderNode::GENERIC);
 
-    mRenderPipeline->renderLayers(mLightGeometry, &mLayerUpdateQueue, mOpaque, mWideColorGamut,
-                                  mLightInfo);
+    mRenderPipeline->renderLayers(mLightGeometry, &mLayerUpdateQueue, mOpaque, mLightInfo);
 
     node->incStrong(nullptr);
     mPrefetchedLayers.insert(node);
-}
-
-bool CanvasContext::copyLayerInto(DeferredLayerUpdater* layer, SkBitmap* bitmap) {
-    return mRenderPipeline->copyLayerInto(layer, bitmap);
 }
 
 void CanvasContext::destroyHardwareResources() {

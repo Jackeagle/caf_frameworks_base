@@ -395,8 +395,6 @@
     <string name="battery_info_status_not_charging" msgid="8523453668342598579">"پلگ ان ہے، ابھی چارج نہیں کر سکتے"</string>
     <string name="battery_info_status_full" msgid="2824614753861462808">"مکمل"</string>
     <string name="disabled_by_admin_summary_text" msgid="6750513964908334617">"کنٹرول کردہ بذریعہ منتظم"</string>
-    <string name="enabled_by_admin" msgid="5302986023578399263">"منتظم کی طرف سے فعال کردہ"</string>
-    <string name="disabled_by_admin" msgid="8505398946020816620">"منتظم کی طرف سے غیر فعال کردہ"</string>
     <string name="disabled" msgid="9206776641295849915">"غیر فعال"</string>
     <string name="external_source_trusted" msgid="2707996266575928037">"اجازت ہے"</string>
     <string name="external_source_untrusted" msgid="2677442511837596726">"اجازت نہیں ہے"</string>
@@ -415,7 +413,6 @@
     <string name="screen_zoom_summary_very_large" msgid="7108563375663670067">"قدرے بڑا"</string>
     <string name="screen_zoom_summary_extremely_large" msgid="7427320168263276227">"سب سے بڑا"</string>
     <string name="screen_zoom_summary_custom" msgid="5611979864124160447">"حسب ضرورت (<xliff:g id="DENSITYDPI">%d</xliff:g>)"</string>
-    <string name="help_feedback_label" msgid="6815040660801785649">"مدد اور تاثرات"</string>
     <string name="content_description_menu_button" msgid="8182594799812351266">"مینو"</string>
     <string name="retail_demo_reset_message" msgid="118771671364131297">"ڈیمو موڈ میں فیکٹری ری سیٹ کیلئے پاس ورڈ درج کریں"</string>
     <string name="retail_demo_reset_next" msgid="8356731459226304963">"اگلا"</string>

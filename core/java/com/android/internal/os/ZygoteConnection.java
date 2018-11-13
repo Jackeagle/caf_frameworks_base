@@ -22,6 +22,7 @@ import static android.system.OsConstants.POLLIN;
 import static android.system.OsConstants.STDERR_FILENO;
 import static android.system.OsConstants.STDIN_FILENO;
 import static android.system.OsConstants.STDOUT_FILENO;
+
 import static com.android.internal.os.ZygoteConnectionConstants.CONNECTION_TIMEOUT_MILLIS;
 import static com.android.internal.os.ZygoteConnectionConstants.MAX_ZYGOTE_ARGC;
 import static com.android.internal.os.ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS;
@@ -36,20 +37,21 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.system.StructPollfd;
 import android.util.Log;
+
 import dalvik.system.VMRuntime;
+
+import libcore.io.IoUtils;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import libcore.io.IoUtils;
 
 /**
  * A connection that can make spawn requests.
@@ -239,7 +241,8 @@ class ZygoteConnection {
         pid = Zygote.forkAndSpecialize(parsedArgs.uid, parsedArgs.gid, parsedArgs.gids,
                 parsedArgs.runtimeFlags, rlimits, parsedArgs.mountExternal, parsedArgs.seInfo,
                 parsedArgs.niceName, fdsToClose, fdsToIgnore, parsedArgs.startChildZygote,
-                parsedArgs.instructionSet, parsedArgs.appDataDir, parsedArgs.packageName);
+                parsedArgs.instructionSet, parsedArgs.appDataDir, parsedArgs.packageName,
+                parsedArgs.packagesForUid, parsedArgs.visibleVolIds);
 
         try {
             if (pid == 0) {
@@ -377,6 +380,7 @@ class ZygoteConnection {
      *    are the settings for current and max value.</i>
      *   <li> --instruction-set=<i>instruction-set-string</i> which instruction set to use/emulate.
      *   <li> --nice-name=<i>nice name to appear in ps</i>
+     *   <li> --package-name=<i>package name this process belongs to</i>
      *   <li> --runtime-args indicates that the remaining arg list should
      * be handed off to com.android.internal.os.RuntimeInit, rather than
      * processed directly.
@@ -428,6 +432,12 @@ class ZygoteConnection {
 
         /** from --package-name */
         String packageName;
+
+        /** from --packages-for-uid */
+        String[] packagesForUid;
+
+        /** from --visible-vols */
+        String[] visibleVolIds;
 
         /**
          * Any args after and including the first non-option arg
@@ -644,7 +654,9 @@ class ZygoteConnection {
                     mountExternal = Zygote.MOUNT_EXTERNAL_READ;
                 } else if (arg.equals("--mount-external-write")) {
                     mountExternal = Zygote.MOUNT_EXTERNAL_WRITE;
-                } else if (arg.equals("--query-abi-list")) {
+                } else if (arg.equals("--mount-external-full")) {
+                    mountExternal = Zygote.MOUNT_EXTERNAL_FULL;
+                }  else if (arg.equals("--query-abi-list")) {
                     abiListQuery = true;
                 } else if (arg.equals("--get-pid")) {
                     pidQuery = true;
@@ -678,7 +690,14 @@ class ZygoteConnection {
                     }
                     expectRuntimeArgs = false;
                 } else if (arg.startsWith("--package-name=")) {
+                    if (packageName != null) {
+                        throw new IllegalArgumentException("Duplicate arg specified");
+                    }
                     packageName = arg.substring(arg.indexOf('=') + 1);
+                } else if (arg.startsWith("--packages-for-uid=")) {
+                    packagesForUid = arg.substring(arg.indexOf('=') + 1).split(",");
+                } else if (arg.startsWith("--visible-vols=")) {
+                    visibleVolIds = arg.substring(arg.indexOf('=') + 1).split(",");
                 } else {
                     break;
                 }

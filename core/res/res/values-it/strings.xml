@@ -128,10 +128,14 @@
   <string-array name="wfcOperatorErrorNotificationMessages">
     <item msgid="7372514042696663278">"Si è verificato un problema con la registrazione delle chiamate Wi‑Fi con l\'operatore: <xliff:g id="CODE">%1$s</xliff:g>"</item>
   </string-array>
-  <string-array name="wfcSpnFormats">
-    <item msgid="6830082633573257149">"%s"</item>
-    <item msgid="4397097370387921767">"Chiamata Wi-Fi %s"</item>
-  </string-array>
+    <!-- no translation found for wfcSpnFormat_spn (4998685024207291232) -->
+    <skip />
+    <string name="wfcSpnFormat_spn_wifi_calling" msgid="136001023263502280">"Chiamate Wi-Fi <xliff:g id="SPN">%s</xliff:g>"</string>
+    <string name="wfcSpnFormat_wlan_call" msgid="2533371081782489793">"Chiamata WLAN"</string>
+    <string name="wfcSpnFormat_spn_wlan_call" msgid="2315240198303197168">"Chiamata WLAN <xliff:g id="SPN">%s</xliff:g>"</string>
+    <string name="wfcSpnFormat_spn_wifi" msgid="6546481665561961938">"Wi-Fi <xliff:g id="SPN">%s</xliff:g>"</string>
+    <string name="wfcSpnFormat_wifi_calling_bar_spn" msgid="1726178784338466265">"Chiamate Wi-Fi | <xliff:g id="SPN">%s</xliff:g>"</string>
+    <string name="wfcSpnFormat_spn_vowifi" msgid="4444638298656953681">"VoWifi <xliff:g id="SPN">%s</xliff:g>"</string>
     <string name="wifi_calling_off_summary" msgid="8720659586041656098">"Non attiva"</string>
     <string name="wfc_mode_wifi_preferred_summary" msgid="1994113411286935263">"Rete preferita: Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="1988279625335345908">"Rete preferita: dati mobili"</string>
@@ -514,6 +518,7 @@
     <string name="permdesc_imagesWrite" msgid="7073662756617474375">"Consente all\'app di modificare la tua raccolta di foto."</string>
     <string name="permlab_mediaLocation" msgid="8675148183726247864">"Lettura delle posizioni dalla tua raccolta multimediale"</string>
     <string name="permdesc_mediaLocation" msgid="2237023389178865130">"Consente all\'app di leggere le posizioni dalla tua raccolta multimediale."</string>
+    <string name="biometric_error_hw_unavailable" msgid="645781226537551036">"Hardware biometrico non disponibile"</string>
     <string name="fingerprint_acquired_partial" msgid="735082772341716043">"Rilevata impronta digitale parziale. Riprova."</string>
     <string name="fingerprint_acquired_insufficient" msgid="4596546021310923214">"Impossibile elaborare l\'impronta digitale. Riprova."</string>
     <string name="fingerprint_acquired_imager_dirty" msgid="1087209702421076105">"Il sensore di impronte digitali è sporco. Puliscilo e riprova."</string>
@@ -521,8 +526,10 @@
     <string name="fingerprint_acquired_too_slow" msgid="59250885689661653">"Movimento del dito troppo lento. Riprova."</string>
   <string-array name="fingerprint_acquired_vendor">
   </string-array>
-    <string name="fingerprint_not_recognized" msgid="2690661881608146617">"Non riconosciuto"</string>
+    <string name="biometric_not_recognized" msgid="5770511773560736082">"Non riconosciuto"</string>
     <string name="fingerprint_authenticated" msgid="5309333983002526448">"Impronta digitale autenticata"</string>
+    <string name="face_authenticated_no_confirmation_required" msgid="4018680978348659031">"Volto autenticato"</string>
+    <string name="face_authenticated_confirmation_required" msgid="8778347003507633610">"Volto autenticato, premi Conferma"</string>
     <string name="fingerprint_error_hw_not_available" msgid="7955921658939936596">"Hardware per l\'impronta digitale non disponibile."</string>
     <string name="fingerprint_error_no_space" msgid="1055819001126053318">"Impossibile memorizzare l\'impronta digitale. Rimuovi un\'impronta esistente."</string>
     <string name="fingerprint_error_timeout" msgid="3927186043737732875">"Timeout impronta digitale. Riprova."</string>
@@ -559,6 +566,7 @@
     <string name="face_error_timeout" msgid="4014326147867150054">"Timeout operazione associata al volto. Riprova."</string>
     <string name="face_error_no_space" msgid="8224993703466381314">"Il volto non può essere memorizzato."</string>
     <string name="face_error_canceled" msgid="283945501061931023">"Operazione associata al volto annullata."</string>
+    <string name="face_error_user_canceled" msgid="8943921120862164539">"Autenticazione del volto annullata dall\'utente."</string>
     <string name="face_error_lockout" msgid="3407426963155388504">"Troppi tentativi. Riprova più tardi."</string>
     <string name="face_error_lockout_permanent" msgid="8198354656746088890">"Troppi tentativi. Autenticazione disattivata."</string>
     <string name="face_error_unable_to_process" msgid="238761109287767270">"Riprova."</string>
@@ -832,7 +840,7 @@
     <string name="lockscreen_forgot_pattern_button_text" msgid="2626999449610695930">"Hai dimenticato la sequenza?"</string>
     <string name="lockscreen_glogin_forgot_pattern" msgid="2588521501166032747">"Sblocco account"</string>
     <string name="lockscreen_glogin_too_many_attempts" msgid="2751368605287288808">"Troppi tentativi di inserimento della sequenza"</string>
-    <string name="lockscreen_glogin_instructions" msgid="3931816256100707784">"Per sbloccare, accedi tramite il tuo account Google."</string>
+    <string name="lockscreen_glogin_instructions" msgid="3931816256100707784">"Per sbloccare, accedi tramite il tuo Account Google."</string>
     <string name="lockscreen_glogin_username_hint" msgid="8846881424106484447">"Nome utente (email)"</string>
     <string name="lockscreen_glogin_password_hint" msgid="5958028383954738528">"Password"</string>
     <string name="lockscreen_glogin_submit_button" msgid="7130893694795786300">"Accedi"</string>
@@ -1585,7 +1593,7 @@
     <string name="kg_invalid_puk" msgid="3638289409676051243">"Inserisci di nuovo il codice PUK corretto. Ripetuti tentativi comportano la disattivazione definitiva della scheda SIM."</string>
     <string name="kg_invalid_confirm_pin_hint" product="default" msgid="7003469261464593516">"I codici PIN non corrispondono"</string>
     <string name="kg_login_too_many_attempts" msgid="6486842094005698475">"Troppi tentativi di inserimento della sequenza"</string>
-    <string name="kg_login_instructions" msgid="1100551261265506448">"Per sbloccare, accedi con il tuo account Google."</string>
+    <string name="kg_login_instructions" msgid="1100551261265506448">"Per sbloccare, accedi con il tuo Account Google."</string>
     <string name="kg_login_username_hint" msgid="5718534272070920364">"Nome utente (email)"</string>
     <string name="kg_login_password_hint" msgid="9057289103827298549">"Password"</string>
     <string name="kg_login_submit_button" msgid="5355904582674054702">"Accedi"</string>
@@ -1615,6 +1623,7 @@
     <string name="color_correction_feature_name" msgid="6779391426096954933">"Correzione del colore"</string>
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"La scorciatoia Accessibilità ha attivato <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"La scorciatoia Accessibilità ha disattivato <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
+    <string name="accessibility_shortcut_spoken_feedback" msgid="6143872712930414829">"Usa di nuovo la scorciatoia Accessibilità per avviare l\'attuale funzione di accessibilità"</string>
     <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"Scegli una funzione da usare quando tocchi il pulsante Accessibilità:"</string>
     <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"Per cambiare le funzioni, tocca e tieni premuto il pulsante Accessibilità."</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"Ingrandimento"</string>

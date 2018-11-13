@@ -49,6 +49,7 @@ struct LinkOptions {
   Maybe<std::string> generate_proguard_rules_path;
   Maybe<std::string> generate_main_dex_proguard_rules_path;
   bool generate_conditional_proguard_rules = false;
+  bool generate_minimal_proguard_rules = false;
   bool generate_non_final_ids = false;
   std::vector<std::string> javadoc_annotations;
   Maybe<std::string> private_symbols;
@@ -58,6 +59,7 @@ struct LinkOptions {
   bool no_version_vectors = false;
   bool no_version_transitions = false;
   bool no_resource_deduping = false;
+  bool no_resource_removal = false;
   bool no_xml_namespaces = false;
   bool do_not_compress_anything = false;
   std::unordered_set<std::string> extensions_to_not_compress;
@@ -119,6 +121,9 @@ class LinkCommand : public Command {
     AddOptionalSwitch("--proguard-conditional-keep-rules",
         "Generate conditional Proguard keep rules.",
         &options_.generate_conditional_proguard_rules);
+    AddOptionalSwitch("--proguard-minimal-keep-rules",
+        "Generate a minimal set of Proguard keep rules.",
+        &options_.generate_minimal_proguard_rules);
     AddOptionalSwitch("--no-auto-version", "Disables automatic style and layout SDK versioning.",
         &options_.no_auto_version);
     AddOptionalSwitch("--no-version-vectors",
@@ -132,6 +137,9 @@ class LinkCommand : public Command {
     AddOptionalSwitch("--no-resource-deduping", "Disables automatic deduping of resources with\n"
             "identical values across compatible configurations.",
         &options_.no_resource_deduping);
+    AddOptionalSwitch("--no-resource-removal", "Disables automatic removal of resources without\n"
+            "defaults. Use this only when building runtime resource overlay packages.",
+        &options_.no_resource_removal);
     AddOptionalSwitch("--enable-sparse-encoding",
         "This decreases APK size at the cost of resource retrieval performance.",
         &options_.table_flattener_options.use_sparse_entries);

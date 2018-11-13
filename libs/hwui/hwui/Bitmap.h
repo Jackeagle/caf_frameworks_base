@@ -34,6 +34,8 @@ enum class PixelStorageType {
     Hardware,
 };
 
+// TODO: Find a better home for this. It's here because hwui/Bitmap is exported and CanvasTransform
+// isn't, but cleanup should be done
 enum class BitmapPalette {
     Unknown,
     Light,
@@ -62,6 +64,8 @@ public:
                                               size_t rowBytes);
 
     static sk_sp<Bitmap> createFrom(sp<GraphicBuffer> graphicBuffer);
+    static sk_sp<Bitmap> createFrom(sp<GraphicBuffer> graphicBuffer,
+                                    sk_sp<SkColorSpace> colorSpace);
 
     static sk_sp<Bitmap> createFrom(const SkImageInfo&, SkPixelRef&);
 
@@ -69,7 +73,8 @@ public:
     Bitmap(void* address, void* context, FreeFunc freeFunc, const SkImageInfo& info,
            size_t rowBytes);
     Bitmap(void* address, int fd, size_t mappedSize, const SkImageInfo& info, size_t rowBytes);
-    Bitmap(GraphicBuffer* buffer, const SkImageInfo& info, BitmapPalette palette = BitmapPalette::Unknown);
+    Bitmap(GraphicBuffer* buffer, const SkImageInfo& info,
+           BitmapPalette palette = BitmapPalette::Unknown);
 
     int rowBytesAsPixels() const { return rowBytes() >> mInfo.shiftPerPixel(); }
 

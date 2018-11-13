@@ -23,6 +23,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.IPhoneStateListener;
 
 import java.lang.ref.WeakReference;
@@ -280,6 +281,16 @@ public class PhoneStateListener {
      */
     public static final int LISTEN_PHONE_CAPABILITY_CHANGE                 = 0x00200000;
 
+    /**
+     *  Listen for changes to preferred data subId.
+     *  See {@link SubscriptionManager#setPreferredData(int)}
+     *  for more details.
+     *
+     *  @see #onPreferredDataSubIdChanged
+     *  @hide
+     */
+    public static final int LISTEN_PREFERRED_DATA_SUBID_CHANGE              = 0x00400000;
+
     /*
      * Subscription used to listen to the phone state changes
      * @hide
@@ -405,6 +416,9 @@ public class PhoneStateListener {
                     case LISTEN_PHONE_CAPABILITY_CHANGE:
                         PhoneStateListener.this.onPhoneCapabilityChanged(
                                 (PhoneCapability) msg.obj);
+                        break;
+                    case LISTEN_PREFERRED_DATA_SUBID_CHANGE:
+                        PhoneStateListener.this.onPreferredDataSubIdChanged((int) msg.obj);
                         break;
                 }
             }
@@ -646,6 +660,18 @@ public class PhoneStateListener {
     }
 
     /**
+     * Callback invoked when preferred data subId changes. Requires
+     * the READ_PRIVILEGED_PHONE_STATE permission.
+     * @param subId the new preferred data subId. If it's INVALID_SUBSCRIPTION_ID,
+     *              it means it's unset and defaultDataSub is used to determine which
+     *              modem is preferred.
+     * @hide
+     */
+    public void onPreferredDataSubIdChanged(int subId) {
+        // default implementation empty
+    }
+
+    /**
      * Callback invoked when telephony has received notice from a carrier
      * app that a network action that could result in connectivity loss
      * has been requested by an app using
@@ -776,10 +802,19 @@ public class PhoneStateListener {
         public void onPhoneCapabilityChanged(PhoneCapability capability) {
             send(LISTEN_PHONE_CAPABILITY_CHANGE, 0, 0, capability);
         }
+
+        public void onPreferredDataSubIdChanged(int subId) {
+            send(LISTEN_PREFERRED_DATA_SUBID_CHANGE, 0, 0, subId);
+        }
+
     }
 
+    /**
+     * @hide
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     @UnsupportedAppUsage
-    IPhoneStateListener callback = new IPhoneStateListenerStub(this);
+    public final IPhoneStateListener callback = new IPhoneStateListenerStub(this);
 
     private void log(String s) {
         Rlog.d(LOG_TAG, s);

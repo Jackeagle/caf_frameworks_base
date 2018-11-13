@@ -30,13 +30,19 @@ import android.net.NetworkTemplate;
 import android.os.Bundle;
 import android.os.RemoteException;
 
-import com.android.settingslib.AppItem;
-
 import androidx.loader.content.AsyncTaskLoader;
+
+import com.android.settingslib.AppItem;
 
 /**
  * Loader for historical chart data for both network and UID details.
+ *
+ * Deprecated in favor of {@link NetworkCycleChartDataLoader} and
+ * {@link NetworkCycleDataForUidLoader}
+ *
+ * @deprecated
  */
+@Deprecated
 public class ChartDataLoaderCompat extends AsyncTaskLoader<ChartData> {
     private static final String KEY_TEMPLATE = "template";
     private static final String KEY_APP = "app";

@@ -16,7 +16,8 @@
 
 #include "VulkanManager.h"
 
-#include "DeviceInfo.h"
+#include <private/gui/SyncFeatures.h>
+
 #include "Properties.h"
 #include "RenderThread.h"
 #include "renderstate/RenderState.h"
@@ -40,8 +41,11 @@ namespace renderthread {
 VulkanManager::VulkanManager(RenderThread& thread) : mRenderThread(thread) {}
 
 void VulkanManager::destroy() {
-    mRenderThread.renderState().onVkContextDestroyed();
     mRenderThread.setGrContext(nullptr);
+
+    // We don't need to explicitly free the command buffer since it automatically gets freed when we
+    // delete the VkCommandPool below.
+    mDummyCB = VK_NULL_HANDLE;
 
     if (VK_NULL_HANDLE != mCommandPool) {
         mDestroyCommandPool(mDevice, mCommandPool, nullptr);
@@ -74,7 +78,7 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
         0,                                  // applicationVersion
         "android framework",                // pEngineName
         0,                                  // engineVerison
-        VK_MAKE_VERSION(1, 0, 0),           // apiVersion
+        VK_MAKE_VERSION(1, 1, 0),           // apiVersion
     };
 
     std::vector<const char*> instanceExtensions;
@@ -129,6 +133,7 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
 
     GET_INST_PROC(DestroyInstance);
     GET_INST_PROC(EnumeratePhysicalDevices);
+    GET_INST_PROC(GetPhysicalDeviceProperties);
     GET_INST_PROC(GetPhysicalDeviceQueueFamilyProperties);
     GET_INST_PROC(GetPhysicalDeviceFeatures2);
     GET_INST_PROC(CreateDevice);
@@ -156,6 +161,13 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
     err = mEnumeratePhysicalDevices(mInstance, &gpuCount, &mPhysicalDevice);
     // VK_INCOMPLETE is returned when the count we provide is less than the total device count.
     if (err && VK_INCOMPLETE != err) {
+        this->destroy();
+        return false;
+    }
+
+    VkPhysicalDeviceProperties physDeviceProperties;
+    mGetPhysicalDeviceProperties(mPhysicalDevice, &physDeviceProperties);
+    if (physDeviceProperties.apiVersion < VK_MAKE_VERSION(1, 1, 0)) {
         this->destroy();
         return false;
     }
@@ -227,6 +239,11 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
     };
     grExtensions.init(getProc, mInstance, mPhysicalDevice, instanceExtensions.size(),
             instanceExtensions.data(), deviceExtensions.size(), deviceExtensions.data());
+
+    if (!grExtensions.hasExtension(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME, 1)) {
+        this->destroy();
+        return false;
+    }
 
     memset(&features, 0, sizeof(VkPhysicalDeviceFeatures2));
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -315,6 +332,8 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
     GET_DEV_PROC(DeviceWaitIdle);
     GET_DEV_PROC(CreateSemaphore);
     GET_DEV_PROC(DestroySemaphore);
+    GET_DEV_PROC(ImportSemaphoreFdKHR);
+    GET_DEV_PROC(GetSemaphoreFdKHR);
     GET_DEV_PROC(CreateFence);
     GET_DEV_PROC(DestroyFence);
     GET_DEV_PROC(WaitForFences);
@@ -386,25 +405,30 @@ void VulkanManager::initialize() {
                 &mCommandPool);
         SkASSERT(VK_SUCCESS == res);
     }
+    LOG_ALWAYS_FATAL_IF(mCommandPool == VK_NULL_HANDLE);
+
+    if (!setupDummyCommandBuffer()) {
+        this->destroy();
+        return;
+    }
+    LOG_ALWAYS_FATAL_IF(mDummyCB == VK_NULL_HANDLE);
+
 
     mGetDeviceQueue(mDevice, mPresentQueueIndex, 0, &mPresentQueue);
 
     GrContextOptions options;
     options.fDisableDistanceFieldPaths = true;
-    mRenderThread.cacheManager().configureContext(&options);
+    // TODO: get a string describing the SPIR-V compiler version and use it here
+    mRenderThread.cacheManager().configureContext(&options, nullptr, 0);
     sk_sp<GrContext> grContext(GrContext::MakeVulkan(backendContext, options));
     LOG_ALWAYS_FATAL_IF(!grContext.get());
     mRenderThread.setGrContext(grContext);
 
     free_features_extensions_structs(features);
 
-    DeviceInfo::initialize(mRenderThread.getGrContext()->maxRenderTargetSize());
-
     if (Properties::enablePartialUpdates && Properties::useBufferAge) {
         mSwapBehavior = SwapBehavior::BufferAge;
     }
-
-    mRenderThread.renderState().onVkContextCreated();
 }
 
 // Returns the next BackbufferInfo to use for the next draw. The function will make sure all
@@ -472,13 +496,11 @@ SkSurface* VulkanManager::getBackbufferSurface(VulkanSurface* surface) {
     // set up layout transfer from initial to color attachment
     VkImageLayout layout = surface->mImageInfos[backbuffer->mImageIndex].mImageLayout;
     SkASSERT(VK_IMAGE_LAYOUT_UNDEFINED == layout || VK_IMAGE_LAYOUT_PRESENT_SRC_KHR == layout);
-    VkPipelineStageFlags srcStageMask = (VK_IMAGE_LAYOUT_UNDEFINED == layout)
-                                                ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                                                : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkAccessFlags srcAccessMask =
-            (VK_IMAGE_LAYOUT_UNDEFINED == layout) ? 0 : VK_ACCESS_MEMORY_READ_BIT;
-    VkAccessFlags dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    VkAccessFlags srcAccessMask = 0;
+    VkAccessFlags dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
     VkImageMemoryBarrier imageMemoryBarrier = {
             VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // sType
@@ -602,7 +624,8 @@ void VulkanManager::createBuffers(VulkanSurface* surface, VkFormat format, VkExt
         VulkanSurface::ImageInfo& imageInfo = surface->mImageInfos[i];
         imageInfo.mSurface = SkSurface::MakeFromBackendRenderTarget(
                 mRenderThread.getGrContext(), backendRT, kTopLeft_GrSurfaceOrigin,
-                kRGBA_8888_SkColorType, nullptr, &props);
+                surface->mColorMode == ColorMode::WideColorGamut ? kRGBA_F16_SkColorType
+                : kRGBA_8888_SkColorType, nullptr, &props);
     }
 
     SkASSERT(mCommandPool != VK_NULL_HANDLE);
@@ -717,37 +740,27 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
                     ? VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
                     : VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 
-    // Pick our surface format. For now, just make sure it matches our sRGB request:
-    VkFormat surfaceFormat = VK_FORMAT_UNDEFINED;
+    VkFormat surfaceFormat = VK_FORMAT_R8G8B8A8_UNORM;
     VkColorSpaceKHR colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-
-    bool wantSRGB = false;
-#ifdef ANDROID_ENABLE_LINEAR_BLENDING
-    wantSRGB = true;
-#endif
+    if (surface->mColorMode == ColorMode::WideColorGamut) {
+        surfaceFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+        colorSpace = VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT;
+    }
+    bool foundSurfaceFormat = false;
     for (uint32_t i = 0; i < surfaceFormatCount; ++i) {
-        // We are assuming we can get either R8G8B8A8_UNORM or R8G8B8A8_SRGB
-        VkFormat desiredFormat = wantSRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
-        if (desiredFormat == surfaceFormats[i].format) {
-            surfaceFormat = surfaceFormats[i].format;
-            colorSpace = surfaceFormats[i].colorSpace;
-        }
-    }
-
-    if (VK_FORMAT_UNDEFINED == surfaceFormat) {
-        return false;
-    }
-
-    // If mailbox mode is available, use it, as it is the lowest-latency non-
-    // tearing mode. If not, fall back to FIFO which is always available.
-    VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
-    for (uint32_t i = 0; i < presentModeCount; ++i) {
-        // use mailbox
-        if (VK_PRESENT_MODE_MAILBOX_KHR == presentModes[i]) {
-            mode = presentModes[i];
+        if (surfaceFormat == surfaceFormats[i].format
+                && colorSpace == surfaceFormats[i].colorSpace) {
+            foundSurfaceFormat = true;
             break;
         }
     }
+
+    if (!foundSurfaceFormat) {
+        return false;
+    }
+
+    // FIFO is always available and will match what we do on GL so just pick that here.
+    VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
 
     VkSwapchainCreateInfoKHR swapchainCreateInfo;
     memset(&swapchainCreateInfo, 0, sizeof(VkSwapchainCreateInfoKHR));
@@ -796,14 +809,14 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
     return true;
 }
 
-VulkanSurface* VulkanManager::createSurface(ANativeWindow* window) {
+VulkanSurface* VulkanManager::createSurface(ANativeWindow* window, ColorMode colorMode) {
     initialize();
 
     if (!window) {
         return nullptr;
     }
 
-    VulkanSurface* surface = new VulkanSurface();
+    VulkanSurface* surface = new VulkanSurface(colorMode);
 
     VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo;
     memset(&surfaceCreateInfo, 0, sizeof(VkAndroidSurfaceCreateInfoKHR));
@@ -834,17 +847,19 @@ VulkanSurface* VulkanManager::createSurface(ANativeWindow* window) {
 }
 
 // Helper to know which src stage flags we need to set when transitioning to the present layout
-static VkPipelineStageFlags layoutToPipelineStageFlags(const VkImageLayout layout) {
+static VkPipelineStageFlags layoutToPipelineSrcStageFlags(const VkImageLayout layout) {
     if (VK_IMAGE_LAYOUT_GENERAL == layout) {
         return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     } else if (VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL == layout ||
                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == layout) {
         return VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == layout ||
-               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL == layout ||
-               VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL == layout ||
-               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == layout) {
-        return VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+    } else if (VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == layout) {
+        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    } else if (VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL == layout ||
+               VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL == layout) {
+        return VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    } else if (VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == layout) {
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else if (VK_IMAGE_LAYOUT_PREINITIALIZED == layout) {
         return VK_PIPELINE_STAGE_HOST_BIT;
     }
@@ -901,10 +916,10 @@ void VulkanManager::swapBuffers(VulkanSurface* surface) {
     // We need to transition the image to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR and make sure that all
     // previous work is complete for before presenting. So we first add the necessary barrier here.
     VkImageLayout layout = imageInfo.fImageLayout;
-    VkPipelineStageFlags srcStageMask = layoutToPipelineStageFlags(layout);
+    VkPipelineStageFlags srcStageMask = layoutToPipelineSrcStageFlags(layout);
     VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     VkAccessFlags srcAccessMask = layoutToSrcAccessMask(layout);
-    VkAccessFlags dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    VkAccessFlags dstAccessMask = 0;
 
     VkImageMemoryBarrier imageMemoryBarrier = {
             VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // sType
@@ -979,6 +994,179 @@ int VulkanManager::getAge(VulkanSurface* surface) {
     }
     uint16_t lastUsed = surface->mImageInfos[backbuffer->mImageIndex].mLastUsed;
     return surface->mCurrentTime - lastUsed;
+}
+
+bool VulkanManager::setupDummyCommandBuffer() {
+    if (mDummyCB != VK_NULL_HANDLE) {
+        return true;
+    }
+
+    VkCommandBufferAllocateInfo commandBuffersInfo;
+    memset(&commandBuffersInfo, 0, sizeof(VkCommandBufferAllocateInfo));
+    commandBuffersInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBuffersInfo.pNext = nullptr;
+    commandBuffersInfo.commandPool = mCommandPool;
+    commandBuffersInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBuffersInfo.commandBufferCount = 1;
+
+    VkResult err = mAllocateCommandBuffers(mDevice, &commandBuffersInfo, &mDummyCB);
+    if (err != VK_SUCCESS) {
+        // It is probably unnecessary to set this back to VK_NULL_HANDLE, but we set it anyways to
+        // make sure the driver didn't set a value and then return a failure.
+        mDummyCB = VK_NULL_HANDLE;
+        return false;
+    }
+
+    VkCommandBufferBeginInfo beginInfo;
+    memset(&beginInfo, 0, sizeof(VkCommandBufferBeginInfo));
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+    mBeginCommandBuffer(mDummyCB, &beginInfo);
+    mEndCommandBuffer(mDummyCB);
+    return true;
+}
+
+status_t VulkanManager::fenceWait(sp<Fence>& fence) {
+    if (!hasVkContext()) {
+        ALOGE("VulkanManager::fenceWait: VkDevice not initialized");
+        return INVALID_OPERATION;
+    }
+
+    if (SyncFeatures::getInstance().useWaitSync() &&
+        SyncFeatures::getInstance().useNativeFenceSync()) {
+        // Block GPU on the fence.
+        int fenceFd = fence->dup();
+        if (fenceFd == -1) {
+            ALOGE("VulkanManager::fenceWait: error dup'ing fence fd: %d", errno);
+            return -errno;
+        }
+
+        VkSemaphoreCreateInfo semaphoreInfo;
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semaphoreInfo.pNext = nullptr;
+        semaphoreInfo.flags = 0;
+        VkSemaphore semaphore;
+        VkResult err = mCreateSemaphore(mDevice, &semaphoreInfo, nullptr, &semaphore);
+        if (VK_SUCCESS != err) {
+            ALOGE("Failed to create import semaphore, err: %d", err);
+            return UNKNOWN_ERROR;
+        }
+        VkImportSemaphoreFdInfoKHR importInfo;
+        importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
+        importInfo.pNext = nullptr;
+        importInfo.semaphore = semaphore;
+        importInfo.flags = VK_SEMAPHORE_IMPORT_TEMPORARY_BIT;
+        importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT;
+        importInfo.fd = fenceFd;
+
+        err = mImportSemaphoreFdKHR(mDevice, &importInfo);
+        if (VK_SUCCESS != err) {
+            ALOGE("Failed to import semaphore, err: %d", err);
+            return UNKNOWN_ERROR;
+        }
+
+        LOG_ALWAYS_FATAL_IF(mDummyCB == VK_NULL_HANDLE);
+
+        VkPipelineStageFlags waitDstStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+        VkSubmitInfo submitInfo;
+        memset(&submitInfo, 0, sizeof(VkSubmitInfo));
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 1;
+        // Wait to make sure aquire semaphore set above has signaled.
+        submitInfo.pWaitSemaphores = &semaphore;
+        submitInfo.pWaitDstStageMask = &waitDstStageFlags;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &mDummyCB;
+        submitInfo.signalSemaphoreCount = 0;
+
+        mQueueSubmit(mGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+
+        // On Android when we import a semaphore, it is imported using temporary permanence. That
+        // means as soon as we queue the semaphore for a wait it reverts to its previous permanent
+        // state before importing. This means it will now be in an idle state with no pending
+        // signal or wait operations, so it is safe to immediately delete it.
+        mDestroySemaphore(mDevice, semaphore, nullptr);
+    } else {
+        // Block CPU on the fence.
+        status_t err = fence->waitForever("VulkanManager::fenceWait");
+        if (err != NO_ERROR) {
+            ALOGE("VulkanManager::fenceWait: error waiting for fence: %d", err);
+            return err;
+        }
+    }
+    return OK;
+}
+
+status_t VulkanManager::createReleaseFence(sp<Fence>& nativeFence) {
+    if (!hasVkContext()) {
+        ALOGE("VulkanManager::createReleaseFence: VkDevice not initialized");
+        return INVALID_OPERATION;
+    }
+
+    if (SyncFeatures::getInstance().useFenceSync()) {
+        ALOGE("VulkanManager::createReleaseFence: Vk backend doesn't support non-native fences");
+        return INVALID_OPERATION;
+    }
+
+    if (!SyncFeatures::getInstance().useNativeFenceSync()) {
+        return OK;
+    }
+
+    VkExportSemaphoreCreateInfo exportInfo;
+    exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+    exportInfo.pNext = nullptr;
+    exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT;
+
+    VkSemaphoreCreateInfo semaphoreInfo;
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreInfo.pNext = &exportInfo;
+    semaphoreInfo.flags = 0;
+    VkSemaphore semaphore;
+    VkResult err = mCreateSemaphore(mDevice, &semaphoreInfo, nullptr, &semaphore);
+    if (VK_SUCCESS != err) {
+        ALOGE("VulkanManager::createReleaseFence: Failed to create semaphore");
+        return INVALID_OPERATION;
+    }
+
+    LOG_ALWAYS_FATAL_IF(mDummyCB == VK_NULL_HANDLE);
+
+    VkSubmitInfo submitInfo;
+    memset(&submitInfo, 0, sizeof(VkSubmitInfo));
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.pWaitSemaphores = nullptr;
+    submitInfo.pWaitDstStageMask = nullptr;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &mDummyCB;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &semaphore;
+
+    mQueueSubmit(mGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+
+    VkSemaphoreGetFdInfoKHR getFdInfo;
+    getFdInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+    getFdInfo.pNext = nullptr;
+    getFdInfo.semaphore = semaphore;
+    getFdInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT;
+
+    int fenceFd = 0;
+
+    err = mGetSemaphoreFdKHR(mDevice, &getFdInfo, &fenceFd);
+    if (VK_SUCCESS != err) {
+        ALOGE("VulkanManager::createReleaseFence: Failed to get semaphore Fd");
+        return INVALID_OPERATION;
+    }
+    nativeFence = new Fence(fenceFd);
+
+    // Exporting a semaphore with copy transference via vkGetSemahporeFdKHR, has the same effect of
+    // destroying the semaphore and creating a new one with the same handle, and the payloads
+    // ownership is move to the Fd we created. Thus the semahpore is in a state that we can delete
+    // it and we don't need to wait on the command buffer we submitted to finish.
+    mDestroySemaphore(mDevice, semaphore, nullptr);
+
+    return OK;
 }
 
 } /* namespace renderthread */

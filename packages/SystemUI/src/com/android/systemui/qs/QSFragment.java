@@ -101,13 +101,11 @@ public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
         if (savedInstanceState != null) {
             setExpanded(savedInstanceState.getBoolean(EXTRA_EXPANDED));
             setListening(savedInstanceState.getBoolean(EXTRA_LISTENING));
-            int[] loc = new int[2];
-            View edit = view.findViewById(android.R.id.edit);
-            edit.getLocationInWindow(loc);
-            int x = loc[0] + edit.getWidth() / 2;
-            int y = loc[1] + edit.getHeight() / 2;
-            mQSCustomizer.setEditLocation(x, y);
+            setEditLocation(view);
             mQSCustomizer.restoreInstanceState(savedInstanceState);
+            if (mQsExpanded) {
+                mQSPanel.getTileLayout().restoreInstanceState(savedInstanceState);
+            }
         }
         SysUiServiceProvider.getComponent(getContext(), CommandQueue.class).addCallbacks(this);
     }
@@ -132,6 +130,9 @@ public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
         outState.putBoolean(EXTRA_EXPANDED, mQsExpanded);
         outState.putBoolean(EXTRA_LISTENING, mListening);
         mQSCustomizer.saveInstanceState(outState);
+        if (mQsExpanded) {
+            mQSPanel.getTileLayout().saveInstanceState(outState);
+        }
     }
 
     @VisibleForTesting
@@ -161,13 +162,21 @@ public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        setEditLocation(getView());
         if (newConfig.getLayoutDirection() != mLayoutDirection) {
             mLayoutDirection = newConfig.getLayoutDirection();
-
             if (mQSAnimator != null) {
                 mQSAnimator.onRtlChanged();
             }
         }
+    }
+
+    private void setEditLocation(View view) {
+        View edit = view.findViewById(android.R.id.edit);
+        int[] loc = edit.getLocationOnScreen();
+        int x = loc[0] + edit.getWidth() / 2;
+        int y = loc[1] + edit.getHeight() / 2;
+        mQSCustomizer.setEditLocation(x, y);
     }
 
     @Override
@@ -252,7 +261,7 @@ public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
     public void setExpanded(boolean expanded) {
         if (DEBUG) Log.d(TAG, "setExpanded " + expanded);
         mQsExpanded = expanded;
-        mQSPanel.setListening(mListening && mQsExpanded);
+        mQSPanel.setListening(mListening, mQsExpanded);
         updateQsState();
     }
 
@@ -283,7 +292,7 @@ public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
         mListening = listening;
         mHeader.setListening(listening);
         mFooter.setListening(listening);
-        mQSPanel.setListening(mListening && mQsExpanded);
+        mQSPanel.setListening(mListening, mQsExpanded);
     }
 
     @Override
@@ -360,7 +369,11 @@ public class QSFragment extends Fragment implements QS, CommandQueue.Callbacks {
                 .setListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        getView().animate().setListener(null);
+                        if (getView() != null) {
+                            // The view could be destroyed before the animation completes when
+                            // switching users.
+                            getView().animate().setListener(null);
+                        }
                         mHeaderAnimating = false;
                         updateQsState();
                     }

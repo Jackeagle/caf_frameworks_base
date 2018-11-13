@@ -394,7 +394,7 @@ import java.util.List;
  *         <td>The final call you receive before your
  *             activity is destroyed.  This can happen either because the
  *             activity is finishing (someone called {@link Activity#finish} on
- *             it, or because the system is temporarily destroying this
+ *             it), or because the system is temporarily destroying this
  *             instance of the activity to save space.  You can distinguish
  *             between these two scenarios with the {@link
  *             Activity#isFinishing} method.</td>
@@ -545,12 +545,12 @@ import java.util.List;
  * <a name="SavingPersistentState"></a>
  * <h3>Saving Persistent State</h3>
  *
- * <p>There are generally two kinds of persistent state than an activity
+ * <p>There are generally two kinds of persistent state that an activity
  * will deal with: shared document-like data (typically stored in a SQLite
  * database using a {@linkplain android.content.ContentProvider content provider})
  * and internal state such as user preferences.</p>
  *
- * <p>For content provider data, we suggest that activities use a
+ * <p>For content provider data, we suggest that activities use an
  * "edit in place" user model.  That is, any edits a user makes are effectively
  * made immediately without requiring an additional confirmation step.
  * Supporting this model is generally a simple matter of following two rules:</p>
@@ -847,7 +847,7 @@ public class Activity extends ContextThemeWrapper
     /*package*/ ActionBar mActionBar = null;
     private boolean mEnableDefaultActionBarUp;
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private VoiceInteractor mVoiceInteractor;
 
     @UnsupportedAppUsage
@@ -1349,7 +1349,12 @@ public class Activity extends ContextThemeWrapper
      * to give the activity a hint that its state is no longer saved -- it will generally
      * be called after {@link #onSaveInstanceState} and prior to the activity being
      * resumed/started again.
+     *
+     * @deprecated starting with {@link android.os.Build.VERSION_CODES#P} onSaveInstanceState is
+     * called after {@link #onStop}, so this hint isn't accurate anymore: you should consider your
+     * state not saved in between {@code onStart} and {@code onStop} callbacks inclusively.
      */
+    @Deprecated
     public void onStateNotSaved() {
     }
 
@@ -1378,6 +1383,7 @@ public class Activity extends ContextThemeWrapper
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onResume " + this);
         getApplication().dispatchActivityResumed(this);
         mActivityTransitionState.onResume(this, isTopOfTask());
+        enableAutofillCompatibilityIfNeeded();
         if (mAutoFillResetNeeded) {
             if (!mAutoFillIgnoreFirstResumePause) {
                 View focus = getCurrentFocus();
@@ -1582,11 +1588,13 @@ public class Activity extends ContextThemeWrapper
      * @param outState The bundle to save the state to.
      */
     final void performSaveInstanceState(@NonNull Bundle outState) {
+        getApplication().dispatchActivityPreSaveInstanceState(this, outState);
         onSaveInstanceState(outState);
         saveManagedDialogs(outState);
         mActivityTransitionState.saveState(outState);
         storeHasCurrentPermissionRequest(outState);
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onSaveInstanceState " + this + ": " + outState);
+        getApplication().dispatchActivityPostSaveInstanceState(this, outState);
     }
 
     /**
@@ -1600,11 +1608,13 @@ public class Activity extends ContextThemeWrapper
      */
     final void performSaveInstanceState(@NonNull Bundle outState,
             @NonNull PersistableBundle outPersistentState) {
+        getApplication().dispatchActivityPreSaveInstanceState(this, outState);
         onSaveInstanceState(outState, outPersistentState);
         saveManagedDialogs(outState);
         storeHasCurrentPermissionRequest(outState);
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onSaveInstanceState " + this + ": " + outState +
                 ", " + outPersistentState);
+        getApplication().dispatchActivityPostSaveInstanceState(this, outState);
     }
 
     /**
@@ -1975,7 +1985,7 @@ public class Activity extends ContextThemeWrapper
     /**
      * Perform any final cleanup before an activity is destroyed.  This can
      * happen either because the activity is finishing (someone called
-     * {@link #finish} on it, or because the system is temporarily destroying
+     * {@link #finish} on it), or because the system is temporarily destroying
      * this instance of the activity to save space.  You can distinguish
      * between these two scenarios with the {@link #isFinishing} method.
      *
@@ -2305,7 +2315,7 @@ public class Activity extends ContextThemeWrapper
      *
      * @param newConfig The new device configuration.
      */
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onConfigurationChanged " + this + ": " + newConfig);
         mCalled = true;
 
@@ -2942,7 +2952,7 @@ public class Activity extends ContextThemeWrapper
     /**
      * Use with {@link #setDefaultKeyMode} to specify that unhandled keystrokes
      * will start an application-defined search.  (If the application or activity does not
-     * actually define a search, the the keys will be ignored.)
+     * actually define a search, the keys will be ignored.)
      *
      * <p>See {@link android.app.SearchManager android.app.SearchManager} for more details.
      *
@@ -3242,7 +3252,7 @@ public class Activity extends ContextThemeWrapper
      * interacted with the device in some way while your activity is running.
      * This callback and {@link #onUserLeaveHint} are intended to help
      * activities manage status bar notifications intelligently; specifically,
-     * for helping activities determine the proper time to cancel a notfication.
+     * for helping activities determine the proper time to cancel a notification.
      *
      * <p>All calls to your activity's {@link #onUserLeaveHint} callback will
      * be accompanied by calls to {@link #onUserInteraction}.  This
@@ -3518,7 +3528,7 @@ public class Activity extends ContextThemeWrapper
      * {@link android.view.Window#FEATURE_OPTIONS_PANEL} panel,
      * so that subclasses of Activity don't need to deal with feature codes.
      */
-    public boolean onCreatePanelMenu(int featureId, Menu menu) {
+    public boolean onCreatePanelMenu(int featureId, @NonNull Menu menu) {
         if (featureId == Window.FEATURE_OPTIONS_PANEL) {
             boolean show = onCreateOptionsMenu(menu);
             show |= mFragments.dispatchCreateOptionsMenu(menu, getMenuInflater());
@@ -3536,8 +3546,8 @@ public class Activity extends ContextThemeWrapper
      * panel, so that subclasses of
      * Activity don't need to deal with feature codes.
      */
-    public boolean onPreparePanel(int featureId, View view, Menu menu) {
-        if (featureId == Window.FEATURE_OPTIONS_PANEL && menu != null) {
+    public boolean onPreparePanel(int featureId, @Nullable View view, @NonNull Menu menu) {
+        if (featureId == Window.FEATURE_OPTIONS_PANEL) {
             boolean goforit = onPrepareOptionsMenu(menu);
             goforit |= mFragments.dispatchPrepareOptionsMenu(menu);
             return goforit;
@@ -3550,7 +3560,8 @@ public class Activity extends ContextThemeWrapper
      *
      * @return The default implementation returns true.
      */
-    public boolean onMenuOpened(int featureId, Menu menu) {
+    @Override
+    public boolean onMenuOpened(int featureId, @NonNull Menu menu) {
         if (featureId == Window.FEATURE_ACTION_BAR) {
             initWindowDecorActionBar();
             if (mActionBar != null) {
@@ -3571,7 +3582,7 @@ public class Activity extends ContextThemeWrapper
      * panel, so that subclasses of
      * Activity don't need to deal with feature codes.
      */
-    public boolean onMenuItemSelected(int featureId, MenuItem item) {
+    public boolean onMenuItemSelected(int featureId, @NonNull MenuItem item) {
         CharSequence titleCondensed = item.getTitleCondensed();
 
         switch (featureId) {
@@ -3621,7 +3632,7 @@ public class Activity extends ContextThemeWrapper
      * For context menus ({@link Window#FEATURE_CONTEXT_MENU}), the
      * {@link #onContextMenuClosed(Menu)} will be called.
      */
-    public void onPanelClosed(int featureId, Menu menu) {
+    public void onPanelClosed(int featureId, @NonNull Menu menu) {
         switch (featureId) {
             case Window.FEATURE_OPTIONS_PANEL:
                 mFragments.dispatchOptionsMenuClosed(menu);
@@ -3729,7 +3740,7 @@ public class Activity extends ContextThemeWrapper
      *
      * @see #onCreateOptionsMenu
      */
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (mParent != null) {
             return mParent.onOptionsItemSelected(item);
         }
@@ -3953,7 +3964,7 @@ public class Activity extends ContextThemeWrapper
      * @return boolean Return false to allow normal context menu processing to
      *         proceed, true to consume it here.
      */
-    public boolean onContextItemSelected(MenuItem item) {
+    public boolean onContextItemSelected(@NonNull MenuItem item) {
         if (mParent != null) {
             return mParent.onContextItemSelected(item);
         }
@@ -3967,7 +3978,7 @@ public class Activity extends ContextThemeWrapper
      *
      * @param menu The context menu that is being closed.
      */
-    public void onContextMenuClosed(Menu menu) {
+    public void onContextMenuClosed(@NonNull Menu menu) {
         if (mParent != null) {
             mParent.onContextMenuClosed(menu);
         }
@@ -4744,7 +4755,7 @@ public class Activity extends ContextThemeWrapper
     /**
      * @hide Implement to provide correct calling token.
      */
-    @UnsupportedAppUsage
+    @Override
     public void startActivityAsUser(Intent intent, UserHandle user) {
         startActivityAsUser(intent, null, user);
     }
@@ -6345,7 +6356,8 @@ public class Activity extends ContextThemeWrapper
      * @see android.view.Window#getLayoutInflater
      */
     @Nullable
-    public View onCreateView(String name, Context context, AttributeSet attrs) {
+    public View onCreateView(@NonNull String name, @NonNull Context context,
+            @NonNull AttributeSet attrs) {
         return null;
     }
 
@@ -6359,7 +6371,9 @@ public class Activity extends ContextThemeWrapper
      * @see android.view.LayoutInflater#createView
      * @see android.view.Window#getLayoutInflater
      */
-    public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
+    @Nullable
+    public View onCreateView(@Nullable View parent, @NonNull String name,
+            @NonNull Context context, @NonNull AttributeSet attrs) {
         if (!"fragment".equals(name)) {
             return onCreateView(name, context, attrs);
         }
@@ -6377,11 +6391,13 @@ public class Activity extends ContextThemeWrapper
      * closed for you after you return.
      * @param args additional arguments to the dump request.
      */
-    public void dump(String prefix, FileDescriptor fd, PrintWriter writer, String[] args) {
+    public void dump(@NonNull String prefix, @Nullable FileDescriptor fd,
+            @NonNull PrintWriter writer, @Nullable String[] args) {
         dumpInner(prefix, fd, writer, args);
     }
 
-    void dumpInner(String prefix, FileDescriptor fd, PrintWriter writer, String[] args) {
+    void dumpInner(@NonNull String prefix, @Nullable FileDescriptor fd,
+            @NonNull PrintWriter writer, @Nullable String[] args) {
         if (args != null && args.length > 0 && args[0].equals("--autofill")) {
             dumpAutofillManager(prefix, writer);
             return;
@@ -7089,7 +7105,7 @@ public class Activity extends ContextThemeWrapper
 
     // ------------------ Internal API ------------------
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     final void setParent(Activity parent) {
         mParent = parent;
     }
@@ -7154,7 +7170,6 @@ public class Activity extends ContextThemeWrapper
         mWindow.setColorMode(info.colorMode);
 
         setAutofillCompatibilityEnabled(application.isAutofillCompatibilityEnabled());
-        enableAutofillCompatibilityIfNeeded();
     }
 
     private void enableAutofillCompatibilityIfNeeded() {
@@ -7184,6 +7199,7 @@ public class Activity extends ContextThemeWrapper
 
     @UnsupportedAppUsage
     final void performCreate(Bundle icicle, PersistableBundle persistentState) {
+        getApplication().dispatchActivityPreCreated(this, icicle);
         mCanEnterPictureInPicture = true;
         restoreHasCurrentPermissionRequest(icicle);
         if (persistentState != null) {
@@ -7198,14 +7214,16 @@ public class Activity extends ContextThemeWrapper
                 com.android.internal.R.styleable.Window_windowNoDisplay, false);
         mFragments.dispatchActivityCreated();
         mActivityTransitionState.setEnterActivityOptions(this, getActivityOptions());
+        getApplication().dispatchActivityPostCreated(this, icicle);
     }
 
-    final void performNewIntent(Intent intent) {
+    final void performNewIntent(@NonNull Intent intent) {
         mCanEnterPictureInPicture = true;
         onNewIntent(intent);
     }
 
     final void performStart(String reason) {
+        getApplication().dispatchActivityPreStarted(this);
         mActivityTransitionState.setEnterActivityOptions(this, getActivityOptions());
         mFragments.noteStateNotSaved();
         mCalled = false;
@@ -7273,6 +7291,7 @@ public class Activity extends ContextThemeWrapper
         }
 
         mActivityTransitionState.enterReady(this);
+        getApplication().dispatchActivityPostStarted(this);
     }
 
     /**
@@ -7327,6 +7346,7 @@ public class Activity extends ContextThemeWrapper
     }
 
     final void performResume(boolean followedByPause, String reason) {
+        getApplication().dispatchActivityPreResumed(this);
         performRestart(true /* start */, reason);
 
         mFragments.execPendingActions();
@@ -7376,9 +7396,11 @@ public class Activity extends ContextThemeWrapper
                 "Activity " + mComponent.toShortString() +
                 " did not call through to super.onPostResume()");
         }
+        getApplication().dispatchActivityPostResumed(this);
     }
 
     final void performPause() {
+        getApplication().dispatchActivityPrePaused(this);
         mDoReportFullyDrawn = false;
         mFragments.dispatchPause();
         mCalled = false;
@@ -7391,6 +7413,7 @@ public class Activity extends ContextThemeWrapper
                     "Activity " + mComponent.toShortString() +
                     " did not call through to super.onPause()");
         }
+        getApplication().dispatchActivityPostPaused(this);
     }
 
     final void performUserLeaving() {
@@ -7406,6 +7429,7 @@ public class Activity extends ContextThemeWrapper
         mCanEnterPictureInPicture = false;
 
         if (!mStopped) {
+            getApplication().dispatchActivityPreStopped(this);
             if (mWindow != null) {
                 mWindow.closeAllPanels();
             }
@@ -7440,11 +7464,13 @@ public class Activity extends ContextThemeWrapper
             }
 
             mStopped = true;
+            getApplication().dispatchActivityPostStopped(this);
         }
         mResumed = false;
     }
 
     final void performDestroy() {
+        getApplication().dispatchActivityPreDestroyed(this);
         mDestroyed = true;
         mWindow.destroy();
         mFragments.dispatchDestroy();
@@ -7454,6 +7480,7 @@ public class Activity extends ContextThemeWrapper
         if (mVoiceInteractor != null) {
             mVoiceInteractor.detachActivity();
         }
+        getApplication().dispatchActivityPostDestroyed(this);
     }
 
     final void dispatchMultiWindowModeChanged(boolean isInMultiWindowMode,
@@ -7879,7 +7906,7 @@ public class Activity extends ContextThemeWrapper
     }
 
     /**
-     * Specifies whether an {@link Activity} should be shown on top of the the lock screen whenever
+     * Specifies whether an {@link Activity} should be shown on top of the lock screen whenever
      * the lockscreen is up and the activity is resumed. Normally an activity will be transitioned
      * to the stopped state if it is started while the lockscreen is up, but with this flag set the
      * activity will remain in the resumed state visible on-top of the lock screen. This value can
