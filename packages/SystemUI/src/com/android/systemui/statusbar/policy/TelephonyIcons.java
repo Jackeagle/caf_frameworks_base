@@ -50,10 +50,13 @@ class TelephonyIcons {
     static final int ICON_E = R.drawable.ic_e_mobiledata;
     static final int ICON_H = R.drawable.ic_h_mobiledata;
     static final int ICON_H_PLUS = R.drawable.ic_h_plus_mobiledata;
+    static final int ICON_2G = R.drawable.ic_2g_mobiledata;
     static final int ICON_3G = R.drawable.ic_3g_mobiledata;
     static final int ICON_4G = R.drawable.ic_4g_mobiledata;
     static final int ICON_4G_PLUS = R.drawable.ic_4g_plus_mobiledata;
     static final int ICON_1X = R.drawable.ic_1x_mobiledata;
+    static final int ICON_5G_BASIC = R.drawable.ic_5g_mobiledata;
+    static final int ICON_5G_UWB = R.drawable.ic_5g_uwb_mobiledata;
 
     static final MobileIconGroup CARRIER_NETWORK_CHANGE = new MobileIconGroup(
             "CARRIER_NETWORK_CHANGE",
@@ -231,6 +234,44 @@ class TelephonyIcons {
             AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
             R.string.cell_data_off_content_description,
             0,
+            false);
+    static final MobileIconGroup TWO_G = new MobileIconGroup(
+            "2G",
+            null,
+            null,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH,
+            0, 0,
+            0,
+            0,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
+            R.string.data_connection_2g,
+            TelephonyIcons.ICON_2G,
+            false);
+
+    static final MobileIconGroup FIVE_G_BASIC = new MobileIconGroup(
+            "5GBasic",
+            null,
+            null,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH,
+            0, 0,
+            0,
+            0,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
+            R.string.data_connection_5g_basic,
+            TelephonyIcons.ICON_5G_BASIC,
+            false);
+
+    static final MobileIconGroup FIVE_G_UWB = new MobileIconGroup(
+            "5GUWB",
+            null,
+            null,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH,
+            0, 0,
+            0,
+            0,
+            AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0],
+            R.string.data_connection_5g_uwb,
+            TelephonyIcons.ICON_5G_UWB,
             false);
 
     static final int DATA_TYPE_UNKNOWN = 0;
