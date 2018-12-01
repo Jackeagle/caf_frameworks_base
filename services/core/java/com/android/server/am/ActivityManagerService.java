@@ -533,7 +533,9 @@ public class ActivityManagerService extends IActivityManager.Stub
     ConnectivityManager mConnectivityManager;
 
     /* Freq Aggr boost objects */
+    public static BoostFramework mPerf = null;
     public static BoostFramework mPerfServiceStartHint = null;
+    public static boolean mIsPerfLockAcquired = false;
     /* UX perf event object */
     public static BoostFramework mUxPerf = new BoostFramework();
 
