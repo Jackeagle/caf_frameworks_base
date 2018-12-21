@@ -36,6 +36,10 @@ public abstract class InputManagerInternal {
     public abstract void setDisplayViewports(DisplayViewport defaultViewport,
             DisplayViewport externalTouchViewport, List<DisplayViewport> virtualTouchViewports);
 
+    public abstract void setDisplayViewports(DisplayViewport defaultViewport,
+            DisplayViewport externalTouchViewport, DisplayViewport tertiaryTouchViewport,
+            List<DisplayViewport> virtualTouchViewports);
+
     /**
      * Called by the power manager to tell the input manager whether it should start
      * watching for wake events.

@@ -296,6 +296,7 @@ public class InputManagerService extends IInputManager.Stub
     public static final int VIEWPORT_DEFAULT = 1;
     public static final int VIEWPORT_EXTERNAL = 2;
     public static final int VIEWPORT_VIRTUAL = 3;
+    public static final int VIEWPORT_TERTIARY = 4;
 
     public static final int SW_LID_BIT = 1 << SW_LID;
     public static final int SW_TABLET_MODE_BIT = 1 << SW_TABLET_MODE;
@@ -426,6 +427,28 @@ public class InputManagerService extends IInputManager.Stub
             setDisplayViewport(VIEWPORT_EXTERNAL, defaultViewport);
         }
 
+        nativeSetVirtualDisplayViewports(mPtr,
+                virtualTouchViewports.toArray(new DisplayViewport[0]));
+    }
+
+    private void setDisplayViewportsInternal(DisplayViewport defaultViewport,
+            DisplayViewport externalTouchViewport, DisplayViewport tertiaryTouchViewport,
+            List<DisplayViewport> virtualTouchViewports) {
+        if (defaultViewport.valid) {
+            setDisplayViewport(VIEWPORT_DEFAULT, defaultViewport);
+        }
+
+        if (externalTouchViewport.valid) {
+            setDisplayViewport(VIEWPORT_EXTERNAL, externalTouchViewport);
+        } else if (defaultViewport.valid) {
+            setDisplayViewport(VIEWPORT_EXTERNAL, defaultViewport);
+        }
+
+        if (tertiaryTouchViewport.valid) {
+            setDisplayViewport(VIEWPORT_TERTIARY, tertiaryTouchViewport);
+        } else if (defaultViewport.valid) {
+            setDisplayViewport(VIEWPORT_TERTIARY, defaultViewport);
+        }
         nativeSetVirtualDisplayViewports(mPtr,
                 virtualTouchViewports.toArray(new DisplayViewport[0]));
     }
@@ -2206,6 +2229,14 @@ public class InputManagerService extends IInputManager.Stub
                 List<DisplayViewport> virtualTouchViewports) {
             setDisplayViewportsInternal(defaultViewport, externalTouchViewport,
                     virtualTouchViewports);
+        }
+
+        @Override
+        public void setDisplayViewports(DisplayViewport defaultViewport,
+                DisplayViewport externalTouchViewport, DisplayViewport tertiaryTouchViewport,
+                List<DisplayViewport> virtualTouchViewports) {
+            setDisplayViewportsInternal(defaultViewport, externalTouchViewport,
+                    tertiaryTouchViewport, virtualTouchViewports);
         }
 
         @Override
