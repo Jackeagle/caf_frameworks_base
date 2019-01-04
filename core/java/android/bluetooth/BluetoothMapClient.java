@@ -50,6 +50,20 @@ public final class BluetoothMapClient implements BluetoothProfile {
     public static final String ACTION_MESSAGE_DELIVERED_SUCCESSFULLY =
             "android.bluetooth.mapmce.profile.action.MESSAGE_DELIVERED_SUCCESSFULLY";
 
+    /**
+     * Action to be used for notifying read status changed
+     * Always contains the extra fields EXTRA_MESSAGE_HANDLE
+     */
+    public static final String ACTION_MESSAGE_READ_STATUS_CHANGED =
+            "android.bluetooth.mapmce.profile.action.MESSAGE_READ_STATUS_CHANGED";
+
+    /**
+     * Extended action to be used for notifying delete status changed
+     * Always contains the extra fields EXTRA_MESSAGE_HANDLE
+     */
+    public static final String ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED =
+            "android.bluetooth.mapmce.profile.action.ext.MESSAGE_DELETED_STATUS_CHANGED";
+
     /* Extras used in ACTION_MESSAGE_RECEIVED intent.
      * NOTE: HANDLE is only valid for a single session with the device. */
     public static final String EXTRA_MESSAGE_HANDLE =
@@ -58,6 +72,50 @@ public final class BluetoothMapClient implements BluetoothProfile {
             "android.bluetooth.mapmce.profile.extra.SENDER_CONTACT_URI";
     public static final String EXTRA_SENDER_CONTACT_NAME =
             "android.bluetooth.mapmce.profile.extra.SENDER_CONTACT_NAME";
+
+    /**
+     * Used as a String extra field in ACTION_MESSAGE_RECEIVED
+     * It contains MAP message type
+     * Possible values are:
+     * "EMAIL"
+     * "SMS_GSM"
+     * "SMS_CDMA"
+     * "MMS"
+     */
+    public static final String EXTRA_TYPE =
+            "android.bluetooth.mapmce.profile.extra.TYPE";
+
+    /**
+     * Used as a String extra field in ACTION_MESSAGE_RECEIVED
+     * It contains MAP message read status
+     * Possible values are:
+     * "READ"
+     * "UNREAD"
+     */
+    public static final String EXTRA_READ_STATUS =
+            "android.bluetooth.mapmce.profile.extra.READ_STATUS";
+
+    /**
+     * Used as a String extra field in ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED
+     * It contains the MAP message deleted status
+     * Possible values are:
+     * "DELETED"
+     * "UNDELETED"
+     */
+    public static final String EXTRA_DELETED_STATUS =
+            "android.bluetooth.mapmce.profile.extra.DELETED_STATUS";
+
+    /**
+     * Used as a String extra field in ACTION_MESSAGE_READ_STATUS_CHANGED
+     * It contains the folder where the message status changed
+     */
+    public static final String EXTRA_FOLDER =
+            "android.bluetooth.mapmce.profile.extra.FOLDER";
+
+    /** Set message status to read */
+    public static final int READ = 0;
+    /** Set message status to deleted */
+    public static final int DELETED = 1;
 
     private volatile IBluetoothMapClient mService;
     private final Context mContext;
@@ -385,6 +443,57 @@ public final class BluetoothMapClient implements BluetoothProfile {
         if (service != null && isEnabled() && isValidDevice(device)) {
             try {
                 return service.getUnreadMessages(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Set message status of message on MSE
+     * <p>
+     * When read status changed, the result will be published via
+     * {@link #ACTION_MESSAGE_READ_STATUS_CHANGED}
+     * When deleted status changed, the result will be published via
+     * {@link #ACTION_MESSAGE_DELETED_STATUS_CHANGED}
+     *
+     * @param device Bluetooth device
+     * @param handle handle of message
+     * @param read <code>READ</code> for "read", <code>DELETED</code> for
+     *            "deleted", otherwise the status will not be set
+     *
+     * @return <code>true</code> if request has been sent, <code>false</code> on error
+     *
+     */
+    public boolean setMessageStatus(BluetoothDevice device, String handle, int status) {
+        if (DBG) Log.d(TAG, "setMessageStatus(" + device + ", " + handle + ", " + status + ")");
+        final IBluetoothMapClient service = mService;
+        if (service != null && isEnabled() && isValidDevice(device) && handle != null &&
+            (status == READ || status == DELETED)) {
+            try {
+                return service.setMessageStatus(device, handle, status);
+            } catch (RemoteException e) {
+                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Abort current obex operation
+     *
+     * @param device Bluetooth device
+     * @return <code>true</code> if request has been sent, <code>false</code> on error
+     */
+    public boolean abort(BluetoothDevice device) {
+        if (DBG) Log.d(TAG, "abort(" + device + ")");
+        final IBluetoothMapClient service = mService;
+        if (service != null && isEnabled() && isValidDevice(device)) {
+            try {
+                return service.abort(device);
             } catch (RemoteException e) {
                 Log.e(TAG, Log.getStackTraceString(new Throwable()));
                 return false;
