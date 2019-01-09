@@ -404,7 +404,8 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 } else if (mBuiltInDisplayId >= SurfaceControl.BUILT_IN_DISPLAY_ID_HDMI &&
                            mBuiltInDisplayId < SurfaceControl.BUILT_IN_DISPLAY_ID_EXT_MIN){
                     mInfo.type = Display.TYPE_HDMI;
-                    mInfo.flags |= DisplayDeviceInfo.FLAG_PRESENTATION;
+                    mInfo.flags |= DisplayDeviceInfo.FLAG_PRESENTATION
+                            | DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT;
                     mInfo.name = getContext().getResources().getString(
                             com.android.internal.R.string.display_manager_hdmi_display_name);
                     mInfo.touch = DisplayDeviceInfo.TOUCH_EXTERNAL;
