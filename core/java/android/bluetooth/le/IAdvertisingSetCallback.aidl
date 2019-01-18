@@ -30,4 +30,5 @@ oneway interface IAdvertisingSetCallback {
   void onPeriodicAdvertisingParametersUpdated(in int advertiserId, in int status);
   void onPeriodicAdvertisingDataSet(in int advertiserId, in int status);
   void onPeriodicAdvertisingEnabled(in int advertiserId, in boolean enable, in int status);
+  void onAdvertisingWhiteListUpdated(in int advertiserId, in int status);
 }
