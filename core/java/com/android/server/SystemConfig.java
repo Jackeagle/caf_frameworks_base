@@ -26,6 +26,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Process;
 import android.os.storage.StorageManager;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -703,6 +704,13 @@ public class SystemConfig {
             Slog.w(TAG, "Got exception parsing permissions.", e);
         } finally {
             IoUtils.closeQuietly(permReader);
+        }
+
+        //Remove vulkan specific features
+        if (SystemProperties.getBoolean("persist.graphics.vulkan.disable", false)) {
+            removeFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL);
+            removeFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION);
+            removeFeature(PackageManager.FEATURE_VULKAN_HARDWARE_COMPUTE);
         }
 
         // Some devices can be field-converted to FBE, so offer to splice in
