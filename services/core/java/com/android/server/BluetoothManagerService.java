@@ -105,7 +105,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     //Maximum msec to wait for restart due to error
     private static final int ERROR_RESTART_TIME_MS = 3000;
     //Maximum msec to delay MESSAGE_USER_SWITCHED
-    private static final int USER_SWITCHED_TIME_MS = 200;
+    private static final int USER_SWITCHED_TIME_MS = 300;
     // Delay for the addProxy function in msec
     private static final int ADD_PROXY_DELAY_MS = 100;
 
@@ -1414,6 +1414,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
             Message msg = mHandler.obtainMessage(MESSAGE_BLUETOOTH_SERVICE_CONNECTED);
             if (name.equals("com.android.bluetooth.btservice.AdapterService")) {
                 msg.arg1 = SERVICE_IBLUETOOTH;
+                mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
             } else if (name.equals("com.android.bluetooth.gatt.GattService")) {
                 msg.arg1 = SERVICE_IBLUETOOTHGATT;
             } else {
@@ -1644,9 +1645,6 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                             onBluetoothGattServiceUp();
                             break;
                         } // else must be SERVICE_IBLUETOOTH
-
-                        //Remove timeout
-                        mHandler.removeMessages(MESSAGE_TIMEOUT_BIND);
 
                         mBinding = false;
                         mTryBindOnBindTimeout = false;
@@ -1918,11 +1916,18 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     } else if (mBinding || mBluetooth != null) {
                         Message userMsg = mHandler.obtainMessage(MESSAGE_USER_SWITCHED);
                         userMsg.arg2 = 1 + msg.arg2;
-                        // if user is switched when service is binding retry after a delay
-                        mHandler.sendMessageDelayed(userMsg, USER_SWITCHED_TIME_MS);
-                        if (DBG) {
-                            Slog.d(TAG, "Retry MESSAGE_USER_SWITCHED " + userMsg.arg2);
+                        if ( userMsg.arg2 > 10) {
+                            if (DBG) {
+                                Slog.d(TAG, "Tried MESSAGE_USER_SWITCHED for " + userMsg.arg2 + " and returning from loop");
+                            }
+                        } else {
+                            // if user is switched when service is binding retry after a delay
+                            mHandler.sendMessageDelayed(userMsg, USER_SWITCHED_TIME_MS);
+                            if (DBG) {
+                                Slog.d(TAG, "Retry MESSAGE_USER_SWITCHED " + userMsg.arg2);
+                            }
                         }
+
                     }
                     break;
                 }
