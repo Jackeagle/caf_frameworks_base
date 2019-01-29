@@ -248,6 +248,7 @@ public final class DisplayManagerService extends SystemService {
     // input from an external source.  Used by the input system.
     private final DisplayViewport mDefaultViewport = new DisplayViewport();
     private final DisplayViewport mExternalTouchViewport = new DisplayViewport();
+    private final DisplayViewport mTertiaryTouchViewport = new DisplayViewport();
     private final ArrayList<DisplayViewport> mVirtualTouchViewports = new ArrayList<>();
 
     // Persistent data store for all internal settings maintained by the display manager service.
@@ -264,6 +265,7 @@ public final class DisplayManagerService extends SystemService {
     // input system.  May be used outside of the lock but only on the handler thread.
     private final DisplayViewport mTempDefaultViewport = new DisplayViewport();
     private final DisplayViewport mTempExternalTouchViewport = new DisplayViewport();
+    private final DisplayViewport mTempTertiaryTouchViewport = new DisplayViewport();
     private final ArrayList<DisplayViewport> mTempVirtualTouchViewports = new ArrayList<>();
 
     // The default color mode for default displays. Overrides the usual
@@ -1226,6 +1228,7 @@ public final class DisplayManagerService extends SystemService {
     private void clearViewportsLocked() {
         mDefaultViewport.valid = false;
         mExternalTouchViewport.valid = false;
+        mTertiaryTouchViewport.valid = false;
         mVirtualTouchViewports.clear();
     }
 
@@ -1264,6 +1267,9 @@ public final class DisplayManagerService extends SystemService {
         if (!mExternalTouchViewport.valid
                 && info.touch == DisplayDeviceInfo.TOUCH_EXTERNAL) {
             setViewportLocked(mExternalTouchViewport, display, device);
+        } else if (!mTertiaryTouchViewport.valid
+                && info.touch == DisplayDeviceInfo.TOUCH_EXTERNAL) {
+            setViewportLocked(mTertiaryTouchViewport, display, device);
         }
 
         if (info.touch == DisplayDeviceInfo.TOUCH_VIRTUAL && !TextUtils.isEmpty(info.uniqueId)) {
@@ -1371,6 +1377,7 @@ public final class DisplayManagerService extends SystemService {
             pw.println("  mNextNonDefaultDisplayId=" + mNextNonDefaultDisplayId);
             pw.println("  mDefaultViewport=" + mDefaultViewport);
             pw.println("  mExternalTouchViewport=" + mExternalTouchViewport);
+            pw.println("  mTertiaryTouchViewport=" + mTertiaryTouchViewport);
             pw.println("  mVirtualTouchViewports=" + mVirtualTouchViewports);
             pw.println("  mDefaultDisplayDefaultColorMode=" + mDefaultDisplayDefaultColorMode);
             pw.println("  mSingleDisplayDemoMode=" + mSingleDisplayDemoMode);
@@ -1494,6 +1501,7 @@ public final class DisplayManagerService extends SystemService {
                     synchronized (mSyncRoot) {
                         mTempDefaultViewport.copyFrom(mDefaultViewport);
                         mTempExternalTouchViewport.copyFrom(mExternalTouchViewport);
+                        mTempTertiaryTouchViewport.copyFrom(mTertiaryTouchViewport);
                         if (!mTempVirtualTouchViewports.equals(mVirtualTouchViewports)) {
                           mTempVirtualTouchViewports.clear();
                           for (DisplayViewport d : mVirtualTouchViewports) {
@@ -1502,7 +1510,8 @@ public final class DisplayManagerService extends SystemService {
                         }
                     }
                     mInputManagerInternal.setDisplayViewports(mTempDefaultViewport,
-                            mTempExternalTouchViewport, mTempVirtualTouchViewports);
+                            mTempExternalTouchViewport, mTempTertiaryTouchViewport,
+                            mTempVirtualTouchViewports);
                     break;
                 }
 
