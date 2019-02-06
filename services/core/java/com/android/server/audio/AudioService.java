@@ -3854,33 +3854,13 @@ public class AudioService extends IAudioService.Stub
         }
 
         String address = btDevice.getAddress();
-        BluetoothClass btClass = btDevice.getBluetoothClass();
         int inDevice = AudioSystem.DEVICE_IN_BLUETOOTH_SCO_HEADSET;
         int[] outDeviceTypes = {
             AudioSystem.DEVICE_OUT_BLUETOOTH_SCO,
             AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
             AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_CARKIT
         };
-        if (btClass != null) {
-            switch (btClass.getDeviceClass()) {
-                case BluetoothClass.Device.AUDIO_VIDEO_WEARABLE_HEADSET:
-                case BluetoothClass.Device.AUDIO_VIDEO_HANDSFREE:
-                    outDeviceTypes = new int[] { AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_HEADSET };
-                    break;
-                case BluetoothClass.Device.AUDIO_VIDEO_CAR_AUDIO:
-                    outDeviceTypes = new int[] { AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_CARKIT };
-                    break;
-            }
-        }
-        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
-            address = "";
-        }
-        String btDeviceName =  btDevice.getName();
-        if (btDeviceName == null) {
-            Slog.i(TAG, "handleBtScoActiveDeviceChange: btDeviceName is null," +
-                       " sending empty string");
-            btDeviceName = "";
-        }
+        String btDeviceName = "";
 
         boolean result = false;
         if (isActive) {
@@ -3910,14 +3890,29 @@ public class AudioService extends IAudioService.Stub
                 return;
             }
             if (!Objects.equals(btDevice, previousActiveDevice)) {
-                if (!handleBtScoActiveDeviceChange(previousActiveDevice, false)) {
-                    Log.w(TAG, "setBtScoActiveDevice() failed to remove previous device "
-                            + previousActiveDevice);
+                String DummyAddress = "00:00:00:00:00:00";
+                BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+                if (adapter == null) {
+                   Log.i(TAG, "adapter is null, returning from setBtScoActiveDevice");
+                   return;
                 }
-                if (!handleBtScoActiveDeviceChange(btDevice, true)) {
-                    Log.e(TAG, "setBtScoActiveDevice() failed to add new device " + btDevice);
-                    // set mBluetoothHeadsetDevice to null when failing to add new device
-                    btDevice = null;
+                final BluetoothDevice dummyActiveDevice = adapter.getRemoteDevice(DummyAddress);
+                if (mBluetoothHeadsetDevice == null && btDevice != null) {
+                    //SCO device entry is added to mConnectedDevices hash map only when active
+                    //device connects for the first time.
+                    if (!handleBtScoActiveDeviceChange(dummyActiveDevice, true)) {
+                        Log.e(TAG, "setBtScoActiveDevice() failed to add new device " + btDevice);
+                        // set mBluetoothHeadsetDevice to null when failing to add new device
+                        btDevice = null;
+                    }
+                }
+                if (mBluetoothHeadsetDevice != null && btDevice == null) {
+                    //SCO device entry is removed from mConnectedDevices hash map only when active
+                    //device is disconnected.
+                    if (!handleBtScoActiveDeviceChange(dummyActiveDevice, false)) {
+                        Log.w(TAG, "setBtScoActiveDevice() failed to remove previous device "
+                                + previousActiveDevice);
+                    }
                 }
                 mBluetoothHeadsetDevice = btDevice;
                 if (mBluetoothHeadsetDevice == null) {
@@ -3948,6 +3943,10 @@ public class AudioService extends IAudioService.Stub
                             int delay = checkSendBecomingNoisyIntent(
                                     AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, intState,
                                     AudioSystem.DEVICE_NONE);
+                            final String addr = btDevice == null ? "null" : btDevice.getAddress();
+                            mDeviceLogger.log(new AudioEventLogger.StringEvent(
+                                    "A2DP service connected: device addr=" + addr
+                                    + " state=" + state));
                             queueMsgUnderWakeLock(mAudioHandler,
                                     MSG_SET_A2DP_SINK_CONNECTION_STATE,
                                     state,
@@ -4827,7 +4826,14 @@ public class AudioService extends IAudioService.Stub
     public int setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(BluetoothDevice device,
                 int state, int profile, boolean suppressNoisyIntent, int a2dpVolume)
     {
+        mDeviceLogger.log(new AudioEventLogger.StringEvent(
+                "setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent state=" + state
+                // only querying address as this is the only readily available field on the device
+                + " addr=" + device.getAddress()
+                + " prof=" + profile + " supprNoisy=" + suppressNoisyIntent
+                + " vol=" + a2dpVolume));
         if (mAudioHandler.hasMessages(MSG_SET_A2DP_SINK_CONNECTION_STATE, device)) {
+            mDeviceLogger.log(new AudioEventLogger.StringEvent("A2DP connection state ignored"));
             return 0;
         }
         return setBluetoothA2dpDeviceConnectionStateInt(
@@ -5781,7 +5787,7 @@ public class AudioService extends IAudioService.Stub
                 case MSG_SET_WIRED_DEVICE_CONNECTION_STATE:
                     {   WiredDeviceConnectionState connectState =
                             (WiredDeviceConnectionState)msg.obj;
-                        mWiredDevLogger.log(new WiredDevConnectEvent(connectState));
+                        mDeviceLogger.log(new WiredDevConnectEvent(connectState));
                         onSetWiredDeviceConnectionState(connectState.mType, connectState.mState,
                                 connectState.mAddress, connectState.mName, connectState.mCaller);
                         mAudioEventWakeLock.release();
@@ -6236,10 +6242,14 @@ public class AudioService extends IAudioService.Stub
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             address = "";
         }
+        mDeviceLogger.log(new AudioEventLogger.StringEvent(
+                "onBluetoothA2dpDeviceConfigChange addr=" + address));
 
         int device = AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP;
         synchronized (mConnectedDevices) {
             if (mAudioHandler.hasMessages(MSG_SET_A2DP_SINK_CONNECTION_STATE, btDevice)) {
+                mDeviceLogger.log(new AudioEventLogger.StringEvent(
+                        "A2dp config change ignored"));
                 return;
             }
             final String key = makeDeviceListKey(device, address);
@@ -7418,19 +7428,20 @@ public class AudioService extends IAudioService.Stub
     //==========================================================================================
     // AudioService logging and dumpsys
     //==========================================================================================
-    final int LOG_NB_EVENTS_PHONE_STATE = 20;
-    final int LOG_NB_EVENTS_WIRED_DEV_CONNECTION = 30;
-    final int LOG_NB_EVENTS_FORCE_USE = 20;
-    final int LOG_NB_EVENTS_VOLUME = 40;
-    final int LOG_NB_EVENTS_DYN_POLICY = 10;
+    static final int LOG_NB_EVENTS_PHONE_STATE = 20;
+    static final int LOG_NB_EVENTS_DEVICE_CONNECTION = 30;
+    static final int LOG_NB_EVENTS_FORCE_USE = 20;
+    static final int LOG_NB_EVENTS_VOLUME = 40;
+    static final int LOG_NB_EVENTS_DYN_POLICY = 10;
 
     final private AudioEventLogger mModeLogger = new AudioEventLogger(LOG_NB_EVENTS_PHONE_STATE,
             "phone state (logged after successfull call to AudioSystem.setPhoneState(int))");
 
-    final private AudioEventLogger mWiredDevLogger = new AudioEventLogger(
-            LOG_NB_EVENTS_WIRED_DEV_CONNECTION,
-            "wired device connection (logged before onSetWiredDeviceConnectionState() is executed)"
-            );
+    // logs for wired + A2DP device connections:
+    // - wired: logged before onSetWiredDeviceConnectionState() is executed
+    // - A2DP: logged at reception of method call
+    final private AudioEventLogger mDeviceLogger = new AudioEventLogger(
+            LOG_NB_EVENTS_DEVICE_CONNECTION, "wired/A2DP device connection");
 
     final private AudioEventLogger mForceUseLogger = new AudioEventLogger(
             LOG_NB_EVENTS_FORCE_USE,
@@ -7519,7 +7530,7 @@ public class AudioService extends IAudioService.Stub
         pw.println("\nEvent logs:");
         mModeLogger.dump(pw);
         pw.println("\n");
-        mWiredDevLogger.dump(pw);
+        mDeviceLogger.dump(pw);
         pw.println("\n");
         mForceUseLogger.dump(pw);
         pw.println("\n");
