@@ -191,7 +191,7 @@ public class AssistManager implements ConfigurationChangedReceiver {
         if (isService) {
             startVoiceInteractor(args);
         } else {
-            startAssistActivity(args, assistComponent);
+            //startAssistActivity(args, assistComponent);
         }
     }
 

@@ -186,8 +186,8 @@ public class Dependency extends SystemUI {
         mProviders.put(HotspotController.class, () ->
                 new HotspotControllerImpl(mContext));
 
-        mProviders.put(CastController.class, () ->
-                new CastControllerImpl(mContext));
+        /*mProviders.put(CastController.class, () ->
+                new CastControllerImpl(mContext));*/
 
         mProviders.put(FlashlightController.class, () ->
                 new FlashlightControllerImpl(mContext));

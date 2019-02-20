@@ -148,7 +148,8 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
     public PhoneStatusBarPolicy(Context context, StatusBarIconController iconController) {
         mContext = context;
         mIconController = iconController;
-        mCast = Dependency.get(CastController.class);
+        //mCast = Dependency.get(CastController.class);
+        mCast = null;
         mHotspot = Dependency.get(HotspotController.class);
         mBluetooth = Dependency.get(BluetoothController.class);
         mNextAlarm = Dependency.get(NextAlarmController.class);
@@ -237,7 +238,9 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         mBluetooth.addCallback(this);
         mProvisionedController.addCallback(this);
         mZenController.addCallback(this);
-        mCast.addCallback(mCastCallback);
+        if (mCast != null) {
+            mCast.addCallback(mCastCallback);
+        }
         mHotspot.addCallback(mHotspotCallback);
         mNextAlarm.addCallback(mNextAlarmCallback);
         mDataSaver.addCallback(this);
@@ -265,7 +268,9 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         mBluetooth.removeCallback(this);
         mProvisionedController.removeCallback(this);
         mZenController.removeCallback(this);
-        mCast.removeCallback(mCastCallback);
+        if (mCast != null) {
+            mCast.removeCallback(mCastCallback);
+        }
         mHotspot.removeCallback(mHotspotCallback);
         mNextAlarm.removeCallback(mNextAlarmCallback);
         mDataSaver.removeCallback(this);
