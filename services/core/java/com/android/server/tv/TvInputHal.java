@@ -22,10 +22,12 @@ import android.media.tv.TvStreamConfig;
 import android.os.Handler;
 import android.os.Message;
 import android.os.MessageQueue;
+import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.view.Surface;
+import android.os.Bundle;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -57,6 +59,10 @@ final class TvInputHal implements Handler.Callback {
 
     private native long nativeOpen(MessageQueue queue);
 
+    private static native int nativeSetStreamParamFloat(long ptr, int deviceId, int streamId,
+            int paramName, float paramValue);
+    private static native int nativeSetStreamParamInt(long ptr, int deviceId, int streamId,
+            int paramName, int paramValue);
     private static native int nativeAddOrUpdateStream(long ptr, int deviceId, int streamId,
             Surface surface);
     private static native int nativeRemoveStream(long ptr, int deviceId, int streamId);
@@ -79,6 +85,45 @@ final class TvInputHal implements Handler.Callback {
     public void init() {
         synchronized (mLock) {
             mPtr = nativeOpen(mHandler.getLooper().getQueue());
+        }
+    }
+
+    public int sendAppPrivateCommand(int deviceId, String action, Bundle data) {
+        synchronized (mLock) {
+            if (mPtr == 0) {
+                Log.e(TAG, "mPtr is zero!");
+                return ERROR_NO_INIT;
+            }
+            TvStreamConfig[] configs = mStreamConfigs.get(deviceId);
+            if (configs.length == 0) {
+                Log.e(TAG, "mStreamConfigs is empty!");
+                return ERROR_UNKNOWN;
+            }
+            int result = SUCCESS;
+            TvStreamConfig streamConfig = configs[0];
+            String dataType = data.getString("data-type");
+            int param = data.getInt("param-id");
+            switch (dataType) {
+                case "int-type":
+                    int intvalue = data.getInt(action);
+                    Log.d(TAG, "int value sent in private command: " + intvalue);
+                    result = nativeSetStreamParamInt(mPtr, deviceId, streamConfig.getStreamId(), param, intvalue);
+                    break;
+                case "float-type":
+                    float floatvalue = data.getFloat(action);
+                    Log.d(TAG, "float value sent in private command: " + floatvalue);
+                    result = nativeSetStreamParamFloat(mPtr, deviceId, streamConfig.getStreamId(), param, floatvalue);
+                    break;
+                default:
+                    Log.e(TAG, "Unknown data-type sent as private command: " + dataType);
+                    return ERROR_UNKNOWN;
+            }
+            if (result == SUCCESS) {
+                return SUCCESS;
+            } else {
+                Log.e(TAG, "nativeSetStreamParam failed!");
+                return ERROR_UNKNOWN;
+            }
         }
     }
 

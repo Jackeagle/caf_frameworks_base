@@ -19,6 +19,7 @@ package android.media.tv;
 import android.media.tv.TvStreamConfig;
 import android.view.KeyEvent;
 import android.view.Surface;
+import android.os.Bundle;
 
 /**
  * TvInputService representing a physical port should connect to HAL through this interface.
@@ -33,6 +34,11 @@ interface ITvInputHardware {
      * trigger CEC commands for adjusting active HDMI source. Returns true on success.
      */
     boolean setSurface(in Surface surface, in TvStreamConfig config);
+
+    /**
+     * Send a private command from the app to the hardware
+     */
+    void sendAppPrivateCommand(in String action, in Bundle data);
 
     /**
      * Set volume for this stream via AudioGain.

@@ -44,6 +44,8 @@ using ::android::hardware::tv::input::V1_0::TvInputEvent;
 using ::android::hardware::tv::input::V1_0::TvInputEventType;
 using ::android::hardware::tv::input::V1_0::TvInputType;
 using ::android::hardware::tv::input::V1_0::TvStreamConfig;
+using ::android::hardware::tv::input::V1_0::TvInputParamType;
+using ::android::hardware::tv::input::V1_0::TvInputParamVal;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hardware::hidl_vec;
@@ -255,6 +257,8 @@ public:
 
     static JTvInputHal* createInstance(JNIEnv* env, jobject thiz, const sp<Looper>& looper);
 
+    int setStreamParam(int deviceId, int streamId, int paramName, TvInputParamType paramType, TvInputParamVal paramValue);
+    TvInputParamVal getStreamParam(int deviceId, int streamId, int paramName, TvInputParamType paramType);
     int addOrUpdateStream(int deviceId, int streamId, const sp<Surface>& surface);
     int removeStream(int deviceId, int streamId);
     const hidl_vec<TvStreamConfig> getStreamConfigs(int deviceId);
@@ -335,6 +339,27 @@ JTvInputHal* JTvInputHal::createInstance(JNIEnv* env, jobject thiz, const sp<Loo
     }
 
     return new JTvInputHal(env, thiz, tvInput, looper);
+}
+
+int JTvInputHal::setStreamParam(int deviceId, int streamId, int paramName, TvInputParamType paramType, TvInputParamVal paramValue) {
+    mTvInput->setStreamParam(deviceId, streamId, paramName, paramType, paramValue);
+    return NO_ERROR;
+}
+
+TvInputParamVal JTvInputHal::getStreamParam(int deviceId, int streamId, int paramName, TvInputParamType paramType) {
+    Result result = Result::UNKNOWN;
+    TvInputParamVal paramValue;
+    mTvInput->getStreamParam(deviceId, streamId, paramName, paramType,
+            [&result, &paramValue](Result res, TvInputParamVal paramVal) {
+                result = res;
+                if (res == Result::OK) {
+                    paramValue = paramVal;
+                }
+            });
+    if (result != Result::OK) {
+        ALOGE("Couldn't get param value for device id:%d paramName:%d result:%d", deviceId, paramName, result);
+    }
+    return paramValue;
 }
 
 int JTvInputHal::addOrUpdateStream(int deviceId, int streamId, const sp<Surface>& surface) {
@@ -581,6 +606,22 @@ static jlong nativeOpen(JNIEnv* env, jobject thiz, jobject messageQueueObj) {
     return (jlong)JTvInputHal::createInstance(env, thiz, messageQueue->getLooper());
 }
 
+static jint nativeSetStreamParamFloat(JNIEnv* env, jclass clazz,
+        jlong ptr, jint deviceId, jint streamId, jint paramName, jfloat paramValue) {
+    JTvInputHal* tvInputHal = (JTvInputHal*)ptr;
+    TvInputParamVal paramVal;
+    paramVal.floatval = paramValue;
+    return (jint)tvInputHal->setStreamParam(deviceId, streamId, paramName, (TvInputParamType)TV_INPUT_PARAM_TYPE_FLOAT, paramVal);
+}
+
+static jint nativeSetStreamParamInt(JNIEnv* env, jclass clazz,
+        jlong ptr, jint deviceId, jint streamId, jint paramName, jint paramValue) {
+    JTvInputHal* tvInputHal = (JTvInputHal*)ptr;
+    TvInputParamVal paramVal;
+    paramVal.intval = paramValue;
+    return (jint)tvInputHal->setStreamParam(deviceId, streamId, paramName, (TvInputParamType)TV_INPUT_PARAM_TYPE_INT, paramVal);
+}
+
 static int nativeAddOrUpdateStream(JNIEnv* env, jclass clazz,
         jlong ptr, jint deviceId, jint streamId, jobject jsurface) {
     JTvInputHal* tvInputHal = (JTvInputHal*)ptr;
@@ -641,6 +682,10 @@ static const JNINativeMethod gTvInputHalMethods[] = {
     /* name, signature, funcPtr */
     { "nativeOpen", "(Landroid/os/MessageQueue;)J",
             (void*) nativeOpen },
+    { "nativeSetStreamParamFloat", "(JIIIF)I",
+            (void*) nativeSetStreamParamFloat },
+    { "nativeSetStreamParamInt", "(JIIII)I",
+            (void*) nativeSetStreamParamInt },
     { "nativeAddOrUpdateStream", "(JIILandroid/view/Surface;)I",
             (void*) nativeAddOrUpdateStream },
     { "nativeRemoveStream", "(JII)I",
