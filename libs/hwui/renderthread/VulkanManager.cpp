@@ -34,6 +34,23 @@ namespace android {
 namespace uirenderer {
 namespace renderthread {
 
+static void free_features_extensions_structs(const VkPhysicalDeviceFeatures2& features) {
+    // All Vulkan structs that could be part of the features chain will start with the
+    // structure type followed by the pNext pointer. We cast to the CommonVulkanHeader
+    // so we can get access to the pNext for the next struct.
+    struct CommonVulkanHeader {
+        VkStructureType sType;
+        void*           pNext;
+    };
+
+    void* pNext = features.pNext;
+    while (pNext) {
+        void* current = pNext;
+        pNext = static_cast<CommonVulkanHeader*>(current)->pNext;
+        free(current);
+    }
+}
+
 #define GET_PROC(F) m##F = (PFN_vk##F)vkGetInstanceProcAddr(VK_NULL_HANDLE, "vk" #F)
 #define GET_INST_PROC(F) m##F = (PFN_vk##F)vkGetInstanceProcAddr(mInstance, "vk" #F)
 #define GET_DEV_PROC(F) m##F = (PFN_vk##F)vkGetDeviceProcAddr(mDevice, "vk" #F)
@@ -66,9 +83,13 @@ void VulkanManager::destroy() {
     mDevice = VK_NULL_HANDLE;
     mPhysicalDevice = VK_NULL_HANDLE;
     mInstance = VK_NULL_HANDLE;
+    mInstanceExtensions.clear();
+    mDeviceExtensions.clear();
+    free_features_extensions_structs(mPhysicalDeviceFeatures2);
+    mPhysicalDeviceFeatures2 = {};
 }
 
-bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFeatures2& features) {
+void VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFeatures2& features) {
     VkResult err;
 
     constexpr VkApplicationInfo app_info = {
@@ -78,28 +99,23 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
         0,                                  // applicationVersion
         "android framework",                // pEngineName
         0,                                  // engineVerison
-        VK_MAKE_VERSION(1, 1, 0),           // apiVersion
+        mAPIVersion,                        // apiVersion
     };
 
-    std::vector<const char*> instanceExtensions;
     {
         GET_PROC(EnumerateInstanceExtensionProperties);
 
         uint32_t extensionCount = 0;
         err = mEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-        if (VK_SUCCESS != err) {
-            return false;
-        }
+        LOG_ALWAYS_FATAL_IF(VK_SUCCESS != err);
         std::unique_ptr<VkExtensionProperties[]> extensions(
                 new VkExtensionProperties[extensionCount]);
         err = mEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.get());
-        if (VK_SUCCESS != err) {
-            return false;
-        }
+        LOG_ALWAYS_FATAL_IF(VK_SUCCESS != err);
         bool hasKHRSurfaceExtension = false;
         bool hasKHRAndroidSurfaceExtension = false;
         for (uint32_t i = 0; i < extensionCount; ++i) {
-            instanceExtensions.push_back(extensions[i].extensionName);
+            mInstanceExtensions.push_back(extensions[i].extensionName);
             if (!strcmp(extensions[i].extensionName, VK_KHR_SURFACE_EXTENSION_NAME)) {
                 hasKHRSurfaceExtension = true;
             }
@@ -107,10 +123,7 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
                 hasKHRAndroidSurfaceExtension = true;
             }
         }
-        if (!hasKHRSurfaceExtension || !hasKHRAndroidSurfaceExtension) {
-            this->destroy();
-            return false;
-        }
+        LOG_ALWAYS_FATAL_IF(!hasKHRSurfaceExtension || !hasKHRAndroidSurfaceExtension);
     }
 
     const VkInstanceCreateInfo instance_create = {
@@ -120,16 +133,13 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
         &app_info,                                 // pApplicationInfo
         0,                                         // enabledLayerNameCount
         nullptr,                                   // ppEnabledLayerNames
-        (uint32_t) instanceExtensions.size(),      // enabledExtensionNameCount
-        instanceExtensions.data(),                 // ppEnabledExtensionNames
+        (uint32_t) mInstanceExtensions.size(),     // enabledExtensionNameCount
+        mInstanceExtensions.data(),                // ppEnabledExtensionNames
     };
 
     GET_PROC(CreateInstance);
     err = mCreateInstance(&instance_create, nullptr, &mInstance);
-    if (err < 0) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(err < 0);
 
     GET_INST_PROC(DestroyInstance);
     GET_INST_PROC(EnumeratePhysicalDevices);
@@ -146,39 +156,23 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
     GET_INST_PROC(GetPhysicalDeviceSurfacePresentModesKHR);
 
     uint32_t gpuCount;
-    err = mEnumeratePhysicalDevices(mInstance, &gpuCount, nullptr);
-    if (err) {
-        this->destroy();
-        return false;
-    }
-    if (!gpuCount) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(mEnumeratePhysicalDevices(mInstance, &gpuCount, nullptr));
+    LOG_ALWAYS_FATAL_IF(!gpuCount);
     // Just returning the first physical device instead of getting the whole array. Since there
     // should only be one device on android.
     gpuCount = 1;
     err = mEnumeratePhysicalDevices(mInstance, &gpuCount, &mPhysicalDevice);
     // VK_INCOMPLETE is returned when the count we provide is less than the total device count.
-    if (err && VK_INCOMPLETE != err) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(err && VK_INCOMPLETE != err);
 
     VkPhysicalDeviceProperties physDeviceProperties;
     mGetPhysicalDeviceProperties(mPhysicalDevice, &physDeviceProperties);
-    if (physDeviceProperties.apiVersion < VK_MAKE_VERSION(1, 1, 0)) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(physDeviceProperties.apiVersion < VK_MAKE_VERSION(1, 1, 0));
 
     // query to get the initial queue props size
     uint32_t queueCount;
     mGetPhysicalDeviceQueueFamilyProperties(mPhysicalDevice, &queueCount, nullptr);
-    if (!queueCount) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(!queueCount);
 
     // now get the actual queue props
     std::unique_ptr<VkQueueFamilyProperties[]> queueProps(new VkQueueFamilyProperties[queueCount]);
@@ -192,43 +186,30 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
             break;
         }
     }
-    if (mGraphicsQueueIndex == queueCount) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(mGraphicsQueueIndex == queueCount);
 
     // All physical devices and queue families on Android must be capable of
     // presentation with any native window. So just use the first one.
     mPresentQueueIndex = 0;
 
-    std::vector<const char*> deviceExtensions;
     {
         uint32_t extensionCount = 0;
         err = mEnumerateDeviceExtensionProperties(mPhysicalDevice, nullptr, &extensionCount,
                 nullptr);
-        if (VK_SUCCESS != err) {
-            this->destroy();
-            return false;
-        }
+        LOG_ALWAYS_FATAL_IF(VK_SUCCESS != err);
         std::unique_ptr<VkExtensionProperties[]> extensions(
                 new VkExtensionProperties[extensionCount]);
         err = mEnumerateDeviceExtensionProperties(mPhysicalDevice, nullptr, &extensionCount,
                 extensions.get());
-        if (VK_SUCCESS != err) {
-            this->destroy();
-            return false;
-        }
+        LOG_ALWAYS_FATAL_IF(VK_SUCCESS != err);
         bool hasKHRSwapchainExtension = false;
         for (uint32_t i = 0; i < extensionCount; ++i) {
-            deviceExtensions.push_back(extensions[i].extensionName);
+            mDeviceExtensions.push_back(extensions[i].extensionName);
             if (!strcmp(extensions[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
                 hasKHRSwapchainExtension = true;
             }
         }
-        if (!hasKHRSwapchainExtension) {
-            this->destroy();
-            return false;
-        }
+        LOG_ALWAYS_FATAL_IF(!hasKHRSwapchainExtension);
     }
 
     auto getProc = [] (const char* proc_name, VkInstance instance, VkDevice device) {
@@ -237,13 +218,10 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
         }
         return vkGetInstanceProcAddr(instance, proc_name);
     };
-    grExtensions.init(getProc, mInstance, mPhysicalDevice, instanceExtensions.size(),
-            instanceExtensions.data(), deviceExtensions.size(), deviceExtensions.data());
+    grExtensions.init(getProc, mInstance, mPhysicalDevice, mInstanceExtensions.size(),
+            mInstanceExtensions.data(), mDeviceExtensions.size(), mDeviceExtensions.data());
 
-    if (!grExtensions.hasExtension(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME, 1)) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(!grExtensions.hasExtension(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME, 1));
 
     memset(&features, 0, sizeof(VkPhysicalDeviceFeatures2));
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -262,6 +240,15 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
         *tailPNext = blend;
         tailPNext = &blend->pNext;
     }
+
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures* ycbcrFeature;
+    ycbcrFeature = (VkPhysicalDeviceSamplerYcbcrConversionFeatures*) malloc(
+            sizeof(VkPhysicalDeviceSamplerYcbcrConversionFeatures));
+    LOG_ALWAYS_FATAL_IF(!ycbcrFeature);
+    ycbcrFeature->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+    ycbcrFeature->pNext = nullptr;
+    *tailPNext = ycbcrFeature;
+    tailPNext = &ycbcrFeature->pNext;
 
     // query to get the physical device features
     mGetPhysicalDeviceFeatures2(mPhysicalDevice, &features);
@@ -299,16 +286,12 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
         queueInfo,                               // pQueueCreateInfos
         0,                                       // layerCount
         nullptr,                                 // ppEnabledLayerNames
-        (uint32_t) deviceExtensions.size(),      // extensionCount
-        deviceExtensions.data(),                 // ppEnabledExtensionNames
+        (uint32_t) mDeviceExtensions.size(),     // extensionCount
+        mDeviceExtensions.data(),                // ppEnabledExtensionNames
         nullptr,                                 // ppEnabledFeatures
     };
 
-    err = mCreateDevice(mPhysicalDevice, &deviceInfo, nullptr, &mDevice);
-    if (err) {
-        this->destroy();
-        return false;
-    }
+    LOG_ALWAYS_FATAL_IF(mCreateDevice(mPhysicalDevice, &deviceInfo, nullptr, &mDevice));
 
     GET_DEV_PROC(GetDeviceQueue);
     GET_DEV_PROC(DeviceWaitIdle);
@@ -338,25 +321,6 @@ bool VulkanManager::setupDevice(GrVkExtensions& grExtensions, VkPhysicalDeviceFe
     GET_DEV_PROC(DestroyFence);
     GET_DEV_PROC(WaitForFences);
     GET_DEV_PROC(ResetFences);
-
-    return true;
-}
-
-static void free_features_extensions_structs(const VkPhysicalDeviceFeatures2& features) {
-    // All Vulkan structs that could be part of the features chain will start with the
-    // structure type followed by the pNext pointer. We cast to the CommonVulkanHeader
-    // so we can get access to the pNext for the next struct.
-    struct CommonVulkanHeader {
-        VkStructureType sType;
-        void*           pNext;
-    };
-
-    void* pNext = features.pNext;
-    while (pNext) {
-        void* current = pNext;
-        pNext = static_cast<CommonVulkanHeader*>(current)->pNext;
-        free(current);
-    }
 }
 
 void VulkanManager::initialize() {
@@ -365,13 +329,12 @@ void VulkanManager::initialize() {
     }
 
     GET_PROC(EnumerateInstanceVersion);
-    uint32_t instanceVersion = 0;
+    uint32_t instanceVersion;
     LOG_ALWAYS_FATAL_IF(mEnumerateInstanceVersion(&instanceVersion));
     LOG_ALWAYS_FATAL_IF(instanceVersion < VK_MAKE_VERSION(1, 1, 0));
 
     GrVkExtensions extensions;
-    VkPhysicalDeviceFeatures2 features;
-    LOG_ALWAYS_FATAL_IF(!this->setupDevice(extensions, features));
+    this->setupDevice(extensions, mPhysicalDeviceFeatures2);
 
     mGetDeviceQueue(mDevice, mGraphicsQueueIndex, 0, &mGraphicsQueue);
 
@@ -388,9 +351,9 @@ void VulkanManager::initialize() {
     backendContext.fDevice = mDevice;
     backendContext.fQueue = mGraphicsQueue;
     backendContext.fGraphicsQueueIndex = mGraphicsQueueIndex;
-    backendContext.fInstanceVersion = instanceVersion;
+    backendContext.fMaxAPIVersion = mAPIVersion;
     backendContext.fVkExtensions = &extensions;
-    backendContext.fDeviceFeatures2 = &features;
+    backendContext.fDeviceFeatures2 = &mPhysicalDeviceFeatures2;
     backendContext.fGetProc = std::move(getProc);
 
     // create the command pool for the command buffers
@@ -409,7 +372,7 @@ void VulkanManager::initialize() {
 
     if (!setupDummyCommandBuffer()) {
         this->destroy();
-        return;
+        // Pass through will crash on next line.
     }
     LOG_ALWAYS_FATAL_IF(mDummyCB == VK_NULL_HANDLE);
 
@@ -424,11 +387,27 @@ void VulkanManager::initialize() {
     LOG_ALWAYS_FATAL_IF(!grContext.get());
     mRenderThread.setGrContext(grContext);
 
-    free_features_extensions_structs(features);
-
     if (Properties::enablePartialUpdates && Properties::useBufferAge) {
         mSwapBehavior = SwapBehavior::BufferAge;
     }
+}
+
+VkFunctorInitParams VulkanManager::getVkFunctorInitParams() const {
+    return VkFunctorInitParams{
+            .instance = mInstance,
+            .physical_device = mPhysicalDevice,
+            .device = mDevice,
+            .queue = mGraphicsQueue,
+            .graphics_queue_index = mGraphicsQueueIndex,
+            .api_version = mAPIVersion,
+            .enabled_instance_extension_names = mInstanceExtensions.data(),
+            .enabled_instance_extension_names_length =
+                    static_cast<uint32_t>(mInstanceExtensions.size()),
+            .enabled_device_extension_names = mDeviceExtensions.data(),
+            .enabled_device_extension_names_length =
+                    static_cast<uint32_t>(mDeviceExtensions.size()),
+            .device_features_2 = &mPhysicalDeviceFeatures2,
+    };
 }
 
 // Returns the next BackbufferInfo to use for the next draw. The function will make sure all
@@ -454,6 +433,32 @@ VulkanSurface::BackbufferInfo* VulkanManager::getAvailableBackbuffer(VulkanSurfa
     return backbuffer;
 }
 
+static SkMatrix getPreTransformMatrix(int width, int height,
+                                      VkSurfaceTransformFlagBitsKHR transform) {
+    switch (transform) {
+        case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
+            return SkMatrix::I();
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            return SkMatrix::MakeAll(0, -1, height, 1, 0, 0, 0, 0, 1);
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            return SkMatrix::MakeAll(-1, 0, width, 0, -1, height, 0, 0, 1);
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            return SkMatrix::MakeAll(0, 1, 0, -1, 0, width, 0, 0, 1);
+        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_BIT_KHR:
+            return SkMatrix::MakeAll(-1, 0, width, 0, 1, 0, 0, 0, 1);
+        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR:
+            return SkMatrix::MakeAll(0, -1, height, -1, 0, width, 0, 0, 1);
+        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_180_BIT_KHR:
+            return SkMatrix::MakeAll(1, 0, 0, 0, -1, height, 0, 0, 1);
+        case VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR:
+            return SkMatrix::MakeAll(0, 1, 0, 1, 0, 0, 0, 0, 1);
+        default:
+            LOG_ALWAYS_FATAL("Unsupported pre transform of swapchain.");
+    }
+    return SkMatrix::I();
+}
+
+
 SkSurface* VulkanManager::getBackbufferSurface(VulkanSurface** surfaceOut) {
     // Recreate VulkanSurface, if ANativeWindow has been resized.
     VulkanSurface* surface = *surfaceOut;
@@ -463,9 +468,14 @@ SkSurface* VulkanManager::getBackbufferSurface(VulkanSurface** surfaceOut) {
     window->query(window, NATIVE_WINDOW_HEIGHT, &windowHeight);
     if (windowWidth != surface->mWindowWidth || windowHeight != surface->mWindowHeight) {
         ColorMode colorMode = surface->mColorMode;
+        sk_sp<SkColorSpace> colorSpace = surface->mColorSpace;
+        SkColorType colorType = surface->mColorType;
         destroySurface(surface);
-        *surfaceOut = createSurface(window, colorMode);
+        *surfaceOut = createSurface(window, colorMode, colorSpace, colorType);
         surface = *surfaceOut;
+        if (!surface) {
+            return nullptr;
+        }
     }
 
     VulkanSurface::BackbufferInfo* backbuffer = getAvailableBackbuffer(surface);
@@ -487,7 +497,7 @@ SkSurface* VulkanManager::getBackbufferSurface(VulkanSurface** surfaceOut) {
         // maybe use attach somehow? but need a Window
         return nullptr;
     }
-    if (VK_ERROR_OUT_OF_DATE_KHR == res) {
+    if (VK_ERROR_OUT_OF_DATE_KHR == res || VK_SUBOPTIMAL_KHR == res) {
         // tear swapchain down and try again
         if (!createSwapchain(surface)) {
             return nullptr;
@@ -566,6 +576,10 @@ SkSurface* VulkanManager::getBackbufferSurface(VulkanSurface** surfaceOut) {
     }
     backendRT.setVkImageLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
+    surface->mPreTransform = getPreTransformMatrix(surface->windowWidth(),
+                                                   surface->windowHeight(),
+                                                   surface->mTransform);
+
     surface->mBackbuffer = std::move(skSurface);
     return surface->mBackbuffer.get();
 }
@@ -637,8 +651,7 @@ void VulkanManager::createBuffers(VulkanSurface* surface, VkFormat format, VkExt
         VulkanSurface::ImageInfo& imageInfo = surface->mImageInfos[i];
         imageInfo.mSurface = SkSurface::MakeFromBackendRenderTarget(
                 mRenderThread.getGrContext(), backendRT, kTopLeft_GrSurfaceOrigin,
-                surface->mColorMode == ColorMode::WideColorGamut ? kRGBA_F16_SkColorType
-                : kRGBA_8888_SkColorType, nullptr, &props);
+                surface->mColorType, surface->mColorSpace, &props);
     }
 
     SkASSERT(mCommandPool != VK_NULL_HANDLE);
@@ -721,6 +734,17 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
         return false;
     }
 
+    if (!SkToBool(caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)) {
+        return false;
+    }
+    VkSurfaceTransformFlagBitsKHR transform;
+    if (SkToBool(caps.supportedTransforms & caps.currentTransform) &&
+        !SkToBool(caps.currentTransform & VK_SURFACE_TRANSFORM_INHERIT_BIT_KHR)) {
+        transform = caps.currentTransform;
+    } else {
+        transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    }
+
     VkExtent2D extent = caps.currentExtent;
     // clamp width; to handle currentExtent of -1 and  protect us from broken hints
     if (extent.width < caps.minImageExtent.width) {
@@ -732,10 +756,20 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
         extent.height = caps.minImageExtent.height;
     }
     SkASSERT(extent.height <= caps.maxImageExtent.height);
+
+    VkExtent2D swapExtent = extent;
+    if (transform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
+        transform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR ||
+        transform == VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR ||
+        transform == VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR) {
+        swapExtent.width = extent.height;
+        swapExtent.height = extent.width;
+    }
+
     surface->mWindowWidth = extent.width;
     surface->mWindowHeight = extent.height;
 
-    uint32_t imageCount = caps.minImageCount + 2;
+    uint32_t imageCount = std::max<uint32_t>(3, caps.minImageCount);
     if (caps.maxImageCount > 0 && imageCount > caps.maxImageCount) {
         // Application must settle for fewer images than desired:
         imageCount = caps.maxImageCount;
@@ -747,7 +781,7 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                    VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     SkASSERT((caps.supportedUsageFlags & usageFlags) == usageFlags);
-    SkASSERT(caps.supportedTransforms & caps.currentTransform);
+
     SkASSERT(caps.supportedCompositeAlpha &
              (VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR | VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR));
     VkCompositeAlphaFlagBitsKHR composite_alpha =
@@ -757,10 +791,23 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
 
     VkFormat surfaceFormat = VK_FORMAT_R8G8B8A8_UNORM;
     VkColorSpaceKHR colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-    if (surface->mColorMode == ColorMode::WideColorGamut) {
+    if (surface->mColorType == SkColorType::kRGBA_F16_SkColorType) {
         surfaceFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-        colorSpace = VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT;
     }
+
+    if (surface->mColorMode == ColorMode::WideColorGamut) {
+        skcms_Matrix3x3 surfaceGamut;
+        LOG_ALWAYS_FATAL_IF(!surface->mColorSpace->toXYZD50(&surfaceGamut),
+                            "Could not get gamut matrix from color space");
+        if (memcmp(&surfaceGamut, &SkNamedGamut::kSRGB, sizeof(surfaceGamut)) == 0) {
+            colorSpace = VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT;
+        } else if (memcmp(&surfaceGamut, &SkNamedGamut::kDCIP3, sizeof(surfaceGamut)) == 0) {
+            colorSpace = VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT;
+        } else {
+            LOG_ALWAYS_FATAL("Unreachable: unsupported wide color space.");
+        }
+    }
+
     bool foundSurfaceFormat = false;
     for (uint32_t i = 0; i < surfaceFormatCount; ++i) {
         if (surfaceFormat == surfaceFormats[i].format
@@ -784,7 +831,7 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
     swapchainCreateInfo.minImageCount = imageCount;
     swapchainCreateInfo.imageFormat = surfaceFormat;
     swapchainCreateInfo.imageColorSpace = colorSpace;
-    swapchainCreateInfo.imageExtent = extent;
+    swapchainCreateInfo.imageExtent = swapExtent;
     swapchainCreateInfo.imageArrayLayers = 1;
     swapchainCreateInfo.imageUsage = usageFlags;
 
@@ -799,7 +846,7 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
         swapchainCreateInfo.pQueueFamilyIndices = nullptr;
     }
 
-    swapchainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchainCreateInfo.preTransform = transform;
     swapchainCreateInfo.compositeAlpha = composite_alpha;
     swapchainCreateInfo.presentMode = mode;
     swapchainCreateInfo.clipped = true;
@@ -810,6 +857,8 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
         return false;
     }
 
+    surface->mTransform = transform;
+
     // destroy the old swapchain
     if (swapchainCreateInfo.oldSwapchain != VK_NULL_HANDLE) {
         mDeviceWaitIdle(mDevice);
@@ -819,19 +868,27 @@ bool VulkanManager::createSwapchain(VulkanSurface* surface) {
         mDestroySwapchainKHR(mDevice, swapchainCreateInfo.oldSwapchain, nullptr);
     }
 
-    createBuffers(surface, surfaceFormat, extent);
+    createBuffers(surface, surfaceFormat, swapExtent);
+
+    // The window content is not updated (frozen) until a buffer of the window size is received.
+    // This prevents temporary stretching of the window after it is resized, but before the first
+    // buffer with new size is enqueued.
+    native_window_set_scaling_mode(surface->mNativeWindow, NATIVE_WINDOW_SCALING_MODE_FREEZE);
 
     return true;
 }
 
-VulkanSurface* VulkanManager::createSurface(ANativeWindow* window, ColorMode colorMode) {
+VulkanSurface* VulkanManager::createSurface(ANativeWindow* window, ColorMode colorMode,
+                                            sk_sp<SkColorSpace> surfaceColorSpace,
+                                            SkColorType surfaceColorType) {
     initialize();
 
     if (!window) {
         return nullptr;
     }
 
-    VulkanSurface* surface = new VulkanSurface(colorMode, window);
+    VulkanSurface* surface = new VulkanSurface(colorMode, window, surfaceColorSpace,
+                                               surfaceColorType);
 
     VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo;
     memset(&surfaceCreateInfo, 0, sizeof(VkAndroidSurfaceCreateInfoKHR));

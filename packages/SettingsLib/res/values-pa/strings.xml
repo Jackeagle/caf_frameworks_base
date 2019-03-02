@@ -21,6 +21,7 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="wifi_fail_to_scan" msgid="1265540342578081461">"ਨੈਟਵਰਕਾਂ ਲਈ ਸਕੈਨ ਨਹੀਂ ਕਰ ਸਕਦਾ"</string>
+    <string name="wifi_security_none" msgid="7985461072596594400">"ਕੋਈ ਨਹੀਂ"</string>
     <string name="wifi_remembered" msgid="4955746899347821096">"ਰੱਖਿਅਤ ਕੀਤਾ"</string>
     <string name="wifi_disabled_generic" msgid="4259794910584943386">"ਅਯੋਗ ਬਣਾਇਆ"</string>
     <string name="wifi_disabled_network_failure" msgid="2364951338436007124">"IP ਕੌਂਫਿਗਰੇਸ਼ਨ ਅਸਫਲਤਾ"</string>
@@ -37,13 +38,50 @@
     <string name="connected_via_network_scorer" msgid="5713793306870815341">"%1$s ਰਾਹੀਂ ਆਪਣੇ-ਆਪ ਕਨੈਕਟ ਹੋਇਆ"</string>
     <string name="connected_via_network_scorer_default" msgid="7867260222020343104">"ਨੈੱਟਵਰਕ ਰੇਟਿੰਗ ਪ੍ਰਦਾਨਕ ਰਾਹੀਂ ਸਵੈਚਲਿਤ ਤੌਰ \'ਤੇ ਕਨੈਕਟ ਹੋਇਆ"</string>
     <string name="connected_via_passpoint" msgid="2826205693803088747">"%1$s ਰਾਹੀਂ ਕਨੈਕਟ ਕੀਤਾ"</string>
+    <string name="ssid_by_passpoint_provider" msgid="7898171424140673315">"<xliff:g id="PASSPOINTPROVIDER">%2$s</xliff:g> ਵੱਲੋਂ <xliff:g id="SSID">%1$s</xliff:g>"</string>
     <string name="available_via_passpoint" msgid="1617440946846329613">"%1$s ਰਾਹੀਂ ਉਪਲਬਧ"</string>
+    <string name="tap_to_set_up" msgid="2468970825530423314">"ਸੈੱਟਅੱਪ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ"</string>
     <string name="wifi_connected_no_internet" msgid="8202906332837777829">"ਕਨੈਕਟ ਕੀਤਾ, ਕੋਈ ਇੰਟਰਨੈੱਟ ਨਹੀਂ"</string>
     <string name="wifi_status_no_internet" msgid="5784710974669608361">"ਇੰਟਰਨੈੱਟ ਨਹੀਂ"</string>
     <string name="wifi_status_sign_in_required" msgid="123517180404752756">"ਸਾਈਨ-ਇਨ ਲੋੜੀਂਦਾ ਹੈ"</string>
     <string name="wifi_ap_unable_to_handle_new_sta" msgid="5348824313514404541">"ਐਕਸੈੱਸ ਪੁਆਇੰਟ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਸੰਪੂਰਨ ਰੁਝੇਂਵੇਂ ਵਿੱਚ ਹੈ"</string>
     <string name="connected_via_carrier" msgid="7583780074526041912">"%1$s ਰਾਹੀਂ ਕਨੈਕਟ ਕੀਤਾ"</string>
     <string name="available_via_carrier" msgid="1469036129740799053">"%1$s ਰਾਹੀਂ ਉਪਲਬਧ"</string>
+    <string name="osu_failure_ap_connection" msgid="598977488344424542">"ਕਨੈਕਸ਼ਨ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_server_url_invalid" msgid="2237477219243136714">"ਅਵੈਧ OSU ਸਰਵਰ URL"</string>
+    <string name="osu_failure_server_connection" msgid="8192988165059982174">"OSU ਸਰਵਰ ਕਨੈਕਸ਼ਨ ਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_server_validation" msgid="4631649978129606823">"OSU ਸਰਵਰ ਪ੍ਰਮਾਣਿਕਤਾ ਅਸਫਲ ਰਹੀ"</string>
+    <string name="osu_failure_service_provider_verification" msgid="4854091521439785597">"ਅਵੈਧ OSU ਸਰਵਰ ਸਰਟੀਫੀਕੇਟ"</string>
+    <string name="osu_failure_provisioning_aborted" msgid="424627208135320329">"ਵਿਵਸਥਾਕਰਨ ਰੱਦ ਕੀਤਾ ਗਿਆ"</string>
+    <string name="osu_failure_provisioning_not_available" msgid="3021783729256985432">"ਵਿਵਸਥਾਕਰਨ ਉਪਲਬਧ ਨਹੀਂ ਹੈ"</string>
+    <string name="osu_failure_invalid_server_url" msgid="8548886196179435758">"ਅਵੈਧ OSU ਸਰਵਰ URL"</string>
+    <string name="osu_failure_unexpected_command_type" msgid="8245921319866603904">"ਅਚਾਨਕ ਆਦੇਸ਼ ਦੀ ਕਿਸਮ"</string>
+    <string name="osu_failure_unexpected_soap_message_type" msgid="2255897608510053065">"ਅਚਾਨਕ SOAP ਦੀ ਸੁਨੇਹਾ ਕਿਸਮ"</string>
+    <string name="osu_failure_soap_message_exchange" msgid="4357358438685987192">"SOAP ਸੁਨੇਹੇ ਦਾ ਵਟਾਂਦਰਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_start_redirect_listener" msgid="4292769407279548482">"ਰੀਡਾਇਰੈਕਟ ਲਿਸਨਰ ਨੂੰ ਸ਼ੁਰੂ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_timed_out_redirect_listener" msgid="3168657820278807508">"ਰੀਡਾਇਰੈਕਟ ਦੀ ਉਡੀਕ ਕਰਨ ਦਾ ਸਮਾਂ ਸਮਾਪਤ ਹੋਇਆ"</string>
+    <string name="osu_failure_no_osu_activity_found" msgid="4593038891437878675">"ਕੋਈ OSU ਸਰਗਰਮੀ ਨਹੀਂ ਮਿਲੀ"</string>
+    <string name="osu_failure_unexpected_soap_message_status" msgid="6568467710235256675">"ਅਚਾਨਕ SOAP ਦੀ ਸੁਨੇਹੇ ਦੀ ਸਥਿਤੀ"</string>
+    <string name="osu_failure_no_pps_mo" msgid="850567403039076835">"PPS-MO ਨੂੰ ਲੱਭਣਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_no_aaa_server_trust_root_node" msgid="8961455873459838456">"AAA ਸਰਵਰ ਲਈ ਭਰੋਸੇਯੋਗ ਰੂਟ ਨੋਡ ਲੱਭਣਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_no_remediation_server_trust_root_node" msgid="5041179688081545244">"ਰੇਮੇਡੀਅਸ਼ਨ ਸਰਵਰ ਲਈ ਭਰੋਸੇਯੋਗ ਰੂਟ ਨੋਡ ਲੱਭਣਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_no_policy_server_trust_root_node" msgid="6617290380940513539">"ਨੀਤੀ ਸਰਵਰ ਲਈ ਭਰੋਸੇਯੋਗ ਰੂਟ ਨੋਡ ਲੱਭਣਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_retrieve_trust_root_certificates" msgid="1499136256195528265">"ਭਰੋਸੇਯੋਗ ਰੂਟ ਸਰਟੀਫਿਕੇਟਾਂ ਨੂੰ ਮੁੜ-ਪ੍ਰਾਪਤ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_no_aaa_trust_root_certificate" msgid="1904322497042226984">"AAA ਸਰਵਰ ਲਈ ਭਰੋਸੇਯੋਗ ਰੂਟ ਸਰਟੀਫਿਕੇਟ ਲੱਭਣਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_add_passpoint_configuration" msgid="2173557755811446047">"PassPoint ਸੰਰੂਪਣ ਨੂੰ ਸ਼ਾਮਲ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_failure_osu_provider_not_found" msgid="6616172862116673082">"OSU ਪ੍ਰਦਾਨਕ ਲੱਭਣਾ ਅਸਫਲ ਰਿਹਾ"</string>
+    <string name="osu_status_ap_connecting" msgid="5296821043003441437">"ਕਨੈਕਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"</string>
+    <string name="osu_status_ap_connected" msgid="3777289375683170728">"ਕਨੈਕਟ ਹੈ"</string>
+    <string name="osu_status_server_connecting" msgid="8499785407540355867">"OSU ਸਰਵਰ ਨਾਲ ਕਨੈਕਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"</string>
+    <string name="osu_status_server_validated" msgid="3158727184762596355">"OSU ਸਰਵਰ ਪ੍ਰਮਾਣਿਤ ਕੀਤਾ ਗਿਆ"</string>
+    <string name="osu_status_server_connected" msgid="8382024481520158168">"OSU ਸਰਵਰ ਨਾਲ ਕਨੈਕਟ ਕੀਤਾ ਗਿਆ"</string>
+    <string name="osu_status_init_soap_exchange" msgid="8628063888912101981">"ਸ਼ੁਰੂਆਤੀ SOAP ਦਾ ਵਟਾਂਦਰਾ"</string>
+    <string name="osu_status_waiting_for_redirect_response" msgid="2343016207837053197">"ਰੀਡਾਇਰੈਕਟ ਜਵਾਬ ਲਈ ਉਡੀਕ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ"</string>
+    <string name="osu_status_redirect_response_received" msgid="5323368411922609405">"ਰੀਡਾਇਰੈਕਟ ਜਵਾਬ ਪ੍ਰਾਪਤ ਹੋਇਆ"</string>
+    <string name="osu_status_second_soap_exchange" msgid="7115332266758483909">"ਦੂਜੇ SOAP ਦਾ ਵਟਾਂਦਰਾ"</string>
+    <string name="osu_status_third_soap_exchange" msgid="8460901783597440766">"ਤੀਜੇ SOAP ਦਾ ਵਟਾਂਦਰਾ"</string>
+    <string name="osu_status_retrieving_trust_root_certs" msgid="1563445892926269689">"ਭਰੋਸੇਯੋਗ ਰੂਟ ਸਰਟੀਫਿਕੇਟਾਂ ਨੂੰ ਮੁੜ-ਪ੍ਰਾਪਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"</string>
+    <string name="osu_provisioning_complete" msgid="5120178802493970149">"ਵਿਵਸਥਾਕਰਨ ਪੂਰਾ ਹੋਇਆ"</string>
     <string name="speed_label_very_slow" msgid="1867055264243608530">"ਬਹੁਤ ਹੌਲੀ"</string>
     <string name="speed_label_slow" msgid="813109590815810235">"ਹੌਲੀ"</string>
     <string name="speed_label_okay" msgid="2331665440671174858">"ਠੀਕ ਹੈ"</string>
@@ -141,7 +179,7 @@
     <string name="launch_defaults_none" msgid="4241129108140034876">"ਕੋਈ ਡਿਫੌਲਟਸ ਸੈਟ ਨਹੀਂ ਕੀਤੇ"</string>
     <string name="tts_settings" msgid="8186971894801348327">"ਲਿਖਤ ਤੋਂ ਬੋਲੀ ਸੈਟਿੰਗਾਂ"</string>
     <string name="tts_settings_title" msgid="1237820681016639683">"ਲਿਖਤ-ਤੋਂ-ਬੋਲੀ ਆਊਟਪੁੱਟ"</string>
-    <string name="tts_default_rate_title" msgid="6030550998379310088">"ਸਪੀਚ ਰੇਟ"</string>
+    <string name="tts_default_rate_title" msgid="6030550998379310088">"ਬੋਲਣ ਦੀ ਗਤੀ"</string>
     <string name="tts_default_rate_summary" msgid="4061815292287182801">"ਸਪੀਡ ਜਿਸਤੇ ਟੈਕਸਟ ਬੋਲਿਆ ਜਾਂਦਾ ਹੈ"</string>
     <string name="tts_default_pitch_title" msgid="6135942113172488671">"ਪਿਚ"</string>
     <string name="tts_default_pitch_summary" msgid="1944885882882650009">"ਬਣਾਵਟੀ ਬੋਲੀ ਦੇ ਲਹਿਜੇ \'ਤੇ ਅਸਰ ਪਾਉਂਦੀ ਹੈ"</string>
@@ -196,7 +234,8 @@
     <string name="keep_screen_on" msgid="1146389631208760344">"ਸੁਚੇਤ ਰਹੋ"</string>
     <string name="keep_screen_on_summary" msgid="2173114350754293009">"ਸਕ੍ਰੀਨ ਚਾਰਜਿੰਗ ਦੇ ਸਮੇਂ ਕਦੇ ਵੀ ਸਲੀਪ ਨਹੀਂ ਹੋਵੇਗੀ"</string>
     <string name="bt_hci_snoop_log" msgid="3340699311158865670">"ਬਲੂਟੁੱਥ HCI ਸਨੂਪ ਲੌਗ ਨੂੰ ਚਾਲੂ ਕਰੋ"</string>
-    <string name="bt_hci_snoop_log_summary" msgid="366083475849911315">"ਇੱਕ ਫ਼ਾਈਲ ਵਿੱਚ ਸਾਰੇ ਬਲੂਟੁੱਥ HCI ਪੈਕੇਟਾਂ ਨੂੰ ਕੈਪਚਰ ਕਰੋ (ਇਹ ਸੈਟਿੰਗ ਬਦਲਣ ਤੋਂ ਬਾਅਦ ਬਲੂਟੁੱਥ ਟੌਗਲ ਕਰੋ)"</string>
+    <!-- no translation found for bt_hci_snoop_log_summary (8857606786588106495) -->
+    <skip />
     <string name="oem_unlock_enable" msgid="6040763321967327691">"OEM ਅਣਲਾਕ ਕਰਨਾ"</string>
     <string name="oem_unlock_enable_summary" msgid="4720281828891618376">"ਬੂਟਲੋਡਰ ਨੂੰ ਅਣਲਾਕ ਕੀਤੇ ਜਾਣ ਦੀ ਆਗਿਆ ਦਿਓ"</string>
     <string name="confirm_enable_oem_unlock_title" msgid="4802157344812385674">"ਕੀ OEM ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਆਗਿਆ ਦੇਣੀ ਹੈ?"</string>
@@ -329,6 +368,7 @@
     <string name="local_backup_password_toast_success" msgid="582016086228434290">"ਨਵਾਂ ਬੈਕਅੱਪ ਪਾਸਵਰਡ ਸੈੱਟ ਕੀਤਾ ਗਿਆ"</string>
     <string name="local_backup_password_toast_confirmation_mismatch" msgid="7805892532752708288">"ਨਵਾਂ ਪਾਸਵਰਡ ਅਤੇ ਪੁਸ਼ਟੀ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ"</string>
     <string name="local_backup_password_toast_validation_failure" msgid="5646377234895626531">"ਬੈਕਅੱਪ ਪਾਸਵਰਡ ਸੈੱਟ ਕਰਨ ਵਿੱਚ ਅਸਫਲਤਾ"</string>
+    <string name="loading_injected_setting_summary" msgid="4095178591461231376">"ਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…"</string>
   <string-array name="color_mode_names">
     <item msgid="2425514299220523812">"ਚਮਕੀਲਾ (ਪੂਰਵ-ਨਿਰਧਾਰਤ)"</item>
     <item msgid="8446070607501413455">"ਕੁਦਰਤੀ"</item>
@@ -374,6 +414,7 @@
     <string name="power_discharge_by_only_enhanced" msgid="2175151772952365149">"ਤੁਹਾਡੀ ਵਰਤੋਂ ਦੇ ਆਧਾਰ \'ਤੇ ਲਗਭਗ <xliff:g id="TIME">%1$s</xliff:g> ਚੱਲੇਗਾ"</string>
     <string name="power_discharge_by" msgid="6453537733650125582">"ਲਗਭਗ <xliff:g id="TIME">%1$s</xliff:g> ਚੱਲੇਗਾ (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
     <string name="power_discharge_by_only" msgid="107616694963545745">"ਲਗਭਗ <xliff:g id="TIME">%1$s</xliff:g> ਚੱਲੇਗਾ"</string>
+    <string name="power_discharge_by_only_short" msgid="1372817269546888804">"<xliff:g id="TIME">%1$s</xliff:g> ਤੱਕ"</string>
     <string name="power_remaining_less_than_duration_only" msgid="5996752448813295329">"<xliff:g id="THRESHOLD">%1$s</xliff:g> ਤੋਂ ਘੱਟ ਸਮਾਂ ਬਾਕੀ"</string>
     <string name="power_remaining_less_than_duration" msgid="5751885147712659423">"<xliff:g id="THRESHOLD">%1$s</xliff:g> ਤੋਂ ਘੱਟ ਸਮਾਂ ਬਾਕੀ (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
     <string name="power_remaining_more_than_subtext" msgid="3176771815132876675">"<xliff:g id="TIME_REMAINING">%1$s</xliff:g> ਤੋਂ ਵੱਧ ਸਮਾਂ ਬਾਕੀ (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
@@ -447,4 +488,5 @@
     <string name="zen_mode_duration_always_prompt_title" msgid="6478923750878945501">"ਹਰ ਵਾਰ ਪੁੱਛੋ"</string>
     <string name="zen_mode_forever" msgid="2704305038191592967">"ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਬੰਦ ਨਹੀਂ ਕਰਦੇ"</string>
     <string name="time_unit_just_now" msgid="6363336622778342422">"ਹੁਣੇ ਹੀ"</string>
+    <string name="media_transfer_phone_device_name" msgid="1003823744105758574">"ਫ਼ੋਨ ਦਾ ਸਪੀਕਰ"</string>
 </resources>

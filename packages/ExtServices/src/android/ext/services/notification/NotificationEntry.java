@@ -27,7 +27,10 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.Person;
 import android.app.RemoteInput;
+import android.content.ComponentName;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
+import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
 import android.media.AudioSystem;
 import android.os.Build;
@@ -52,21 +55,29 @@ public class NotificationEntry {
     private NotificationChannel mChannel;
     private int mImportance;
     private boolean mSeen;
+    private boolean mExpanded;
+    private boolean mIsShowActionEventLogged;
+    private SmsHelper mSmsHelper;
 
     public NotificationEntry(IPackageManager packageManager, StatusBarNotification sbn,
-            NotificationChannel channel) {
+            NotificationChannel channel, SmsHelper smsHelper) {
         mSbn = sbn;
         mChannel = channel;
         mPackageManager = packageManager;
         mPreChannelsNotification = isPreChannelsNotification();
         mAttributes = calculateAudioAttributes();
         mImportance = calculateInitialImportance();
+        mSmsHelper = smsHelper;
     }
 
     private boolean isPreChannelsNotification() {
         try {
-            mTargetSdkVersion = mPackageManager.getApplicationInfo(
-                    mSbn.getPackageName(), 0, mSbn.getUserId()).targetSdkVersion;
+            ApplicationInfo info = mPackageManager.getApplicationInfo(
+                    mSbn.getPackageName(), PackageManager.MATCH_ALL,
+                    mSbn.getUserId());
+            if (info != null) {
+                mTargetSdkVersion = info.targetSdkVersion;
+            }
         } catch (RemoteException e) {
             Log.w(TAG, "Couldn't look up " + mSbn.getPackageName());
         }
@@ -184,7 +195,16 @@ public class NotificationEntry {
     protected boolean involvesPeople() {
         return isMessaging()
                 || hasStyle(Notification.InboxStyle.class)
-                || hasPerson();
+                || hasPerson()
+                || isDefaultSmsApp();
+    }
+
+    private boolean isDefaultSmsApp() {
+        ComponentName defaultSmsApp = mSmsHelper.getDefaultSmsApplication();
+        if (defaultSmsApp == null) {
+            return false;
+        }
+        return mSbn.getPackageName().equals(defaultSmsApp.getPackageName());
     }
 
     protected boolean isMessaging() {
@@ -216,8 +236,20 @@ public class NotificationEntry {
         mSeen = true;
     }
 
+    public void setExpanded(boolean expanded) {
+        mExpanded = expanded;
+    }
+
+    public void setShowActionEventLogged() {
+        mIsShowActionEventLogged = true;
+    }
+
     public boolean hasSeen() {
         return mSeen;
+    }
+
+    public boolean isShowActionEventLogged() {
+        return mIsShowActionEventLogged;
     }
 
     public StatusBarNotification getSbn() {

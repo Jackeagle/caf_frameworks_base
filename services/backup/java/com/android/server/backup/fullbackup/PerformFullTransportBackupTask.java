@@ -19,9 +19,9 @@ package com.android.server.backup.fullbackup;
 import static com.android.server.backup.BackupManagerService.DEBUG;
 import static com.android.server.backup.BackupManagerService.DEBUG_SCHEDULING;
 import static com.android.server.backup.BackupManagerService.MORE_DEBUG;
-import static com.android.server.backup.BackupManagerService.OP_PENDING;
-import static com.android.server.backup.BackupManagerService.OP_TYPE_BACKUP;
-import static com.android.server.backup.BackupManagerService.OP_TYPE_BACKUP_WAIT;
+import static com.android.server.backup.UserBackupManagerService.OP_PENDING;
+import static com.android.server.backup.UserBackupManagerService.OP_TYPE_BACKUP;
+import static com.android.server.backup.UserBackupManagerService.OP_TYPE_BACKUP_WAIT;
 
 import android.annotation.Nullable;
 import android.app.IBackupAgent;
@@ -45,10 +45,10 @@ import com.android.internal.backup.IBackupTransport;
 import com.android.internal.util.Preconditions;
 import com.android.server.EventLogTags;
 import com.android.server.backup.BackupAgentTimeoutParameters;
-import com.android.server.backup.BackupManagerService;
 import com.android.server.backup.BackupRestoreTask;
 import com.android.server.backup.FullBackupJob;
 import com.android.server.backup.TransportManager;
+import com.android.server.backup.UserBackupManagerService;
 import com.android.server.backup.internal.OnTaskFinishedListener;
 import com.android.server.backup.internal.Operation;
 import com.android.server.backup.remote.RemoteCall;
@@ -97,7 +97,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class PerformFullTransportBackupTask extends FullBackupTask implements BackupRestoreTask {
     public static PerformFullTransportBackupTask newWithCurrentTransport(
-            BackupManagerService backupManagerService,
+            UserBackupManagerService backupManagerService,
             IFullBackupRestoreObserver observer,
             String[] whichPackages,
             boolean updateSchedule,
@@ -128,7 +128,7 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
 
     private static final String TAG = "PFTBT";
 
-    private BackupManagerService backupManagerService;
+    private UserBackupManagerService backupManagerService;
     private final Object mCancelLock = new Object();
 
     ArrayList<PackageInfo> mPackages;
@@ -143,6 +143,7 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
     private final int mBackupRunnerOpToken;
     private final OnTaskFinishedListener mListener;
     private final TransportClient mTransportClient;
+    private final int mUserId;
 
     // This is true when a backup operation for some package is in progress.
     private volatile boolean mIsDoingBackup;
@@ -150,7 +151,7 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
     private final int mCurrentOpToken;
     private final BackupAgentTimeoutParameters mAgentTimeoutParameters;
 
-    public PerformFullTransportBackupTask(BackupManagerService backupManagerService,
+    public PerformFullTransportBackupTask(UserBackupManagerService backupManagerService,
             TransportClient transportClient,
             IFullBackupRestoreObserver observer,
             String[] whichPackages, boolean updateSchedule,
@@ -173,6 +174,7 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
         mAgentTimeoutParameters = Preconditions.checkNotNull(
                 backupManagerService.getAgentTimeoutParameters(),
                 "Timeout parameters cannot be null");
+        mUserId = backupManagerService.getUserId();
 
         if (backupManagerService.isBackupOperationInProgress()) {
             if (DEBUG) {
@@ -187,9 +189,10 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
         for (String pkg : whichPackages) {
             try {
                 PackageManager pm = backupManagerService.getPackageManager();
-                PackageInfo info = pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES);
+                PackageInfo info = pm.getPackageInfoAsUser(pkg,
+                        PackageManager.GET_SIGNING_CERTIFICATES, mUserId);
                 mCurrentPackage = info;
-                if (!AppBackupUtils.appIsEligibleForBackup(info.applicationInfo, pm)) {
+                if (!AppBackupUtils.appIsEligibleForBackup(info.applicationInfo, mUserId)) {
                     // Cull any packages that have indicated that backups are not permitted,
                     // that run as system-domain uids but do not define their own backup agents,
                     // as well as any explicit mention of the 'special' shared-storage agent
@@ -317,16 +320,16 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
         int backupRunStatus = BackupManager.SUCCESS;
 
         try {
-            if (!backupManagerService.isEnabled() || !backupManagerService.isProvisioned()) {
+            if (!backupManagerService.isEnabled() || !backupManagerService.isSetupComplete()) {
                 // Backups are globally disabled, so don't proceed.
                 if (DEBUG) {
                     Slog.i(TAG, "full backup requested but enabled=" + backupManagerService
                             .isEnabled()
-                            + " provisioned=" + backupManagerService.isProvisioned()
+                            + " setupComplete=" + backupManagerService.isSetupComplete()
                             + "; ignoring");
                 }
                 int monitoringEvent;
-                if (backupManagerService.isProvisioned()) {
+                if (backupManagerService.isSetupComplete()) {
                     monitoringEvent = BackupManagerMonitor.LOG_EVENT_ID_BACKUP_DISABLED;
                 } else {
                     monitoringEvent = BackupManagerMonitor.LOG_EVENT_ID_DEVICE_NOT_PROVISIONED;
@@ -633,7 +636,7 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
             unregisterTask();
 
             if (mJob != null) {
-                mJob.finishBackupPass();
+                mJob.finishBackupPass(mUserId);
             }
 
             synchronized (backupManagerService.getQueueLock()) {

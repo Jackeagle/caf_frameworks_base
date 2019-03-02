@@ -43,6 +43,7 @@ import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.Log;
 
 import com.android.internal.location.ProviderProperties;
@@ -146,9 +147,14 @@ public class LocationManager {
     public static final String KEY_PROXIMITY_ENTERING = "entering";
 
     /**
+     * This key is no longer in use.
+     *
      * Key used for a Bundle extra holding an Integer status value
      * when a status change is broadcast using a PendingIntent.
+     *
+     * @deprecated Status changes are deprecated and no longer broadcast.
      */
+    @Deprecated
     public static final String KEY_STATUS_CHANGED = "status";
 
     /**
@@ -175,22 +181,14 @@ public class LocationManager {
         "android.location.GPS_ENABLED_CHANGE";
 
     /**
-     * Broadcast intent action when the configured location providers
-     * change. For use with {@link #isProviderEnabled(String)}. If you're interacting with the
-     * {@link android.provider.Settings.Secure#LOCATION_MODE} API, use {@link #MODE_CHANGED_ACTION}
-     * instead.
+     * Broadcast intent action when the set of enabled location providers changes. To check the
+     * status of a provider, use {@link #isProviderEnabled(String)}.
      */
-    public static final String PROVIDERS_CHANGED_ACTION =
-        "android.location.PROVIDERS_CHANGED";
+    public static final String PROVIDERS_CHANGED_ACTION = "android.location.PROVIDERS_CHANGED";
 
     /**
-     * Broadcast intent action when {@link android.provider.Settings.Secure#LOCATION_MODE} changes.
-     * For use with the {@link android.provider.Settings.Secure#LOCATION_MODE} API.
-     * If you're interacting with {@link #isProviderEnabled(String)}, use
-     * {@link #PROVIDERS_CHANGED_ACTION} instead.
-     *
-     * In the future, there may be mode changes that do not result in
-     * {@link #PROVIDERS_CHANGED_ACTION} broadcasts.
+     * Broadcast intent action when the device location mode changes. To check the location mode,
+     * use {@link #isLocationEnabled()}.
      */
     public static final String MODE_CHANGED_ACTION = "android.location.MODE_CHANGED";
 
@@ -201,8 +199,10 @@ public class LocationManager {
      * If you're interacting with {@link #isProviderEnabled(String)}, use
      * {@link #PROVIDERS_CHANGED_ACTION} instead.
      *
+     * @deprecated Do not use.
      * @hide
      */
+    @Deprecated
     public static final String MODE_CHANGING_ACTION = "com.android.settings.location.MODE_CHANGING";
 
     /**
@@ -293,7 +293,7 @@ public class LocationManager {
             "com.android.settings.location.FOOTER_STRING";
 
     // Map from LocationListeners to their associated ListenerTransport objects
-    private HashMap<LocationListener,ListenerTransport> mListeners =
+    private final HashMap<LocationListener, ListenerTransport> mListeners =
         new HashMap<LocationListener,ListenerTransport>();
 
     private class ListenerTransport extends ILocationListener.Stub {
@@ -1271,37 +1271,20 @@ public class LocationManager {
     }
 
     /**
-     * Returns the current enabled/disabled status of location
+     * Returns the current enabled/disabled state of location. To listen for changes, see
+     * {@link #MODE_CHANGED_ACTION}.
      *
-     * @return true if location is enabled. false if location is disabled.
+     * @return true if location is enabled and false if location is disabled.
      */
     public boolean isLocationEnabled() {
         return isLocationEnabledForUser(Process.myUserHandle());
     }
 
     /**
-     * Method for enabling or disabling location.
-     *
-     * @param enabled true to enable location. false to disable location
-     * @param userHandle the user to set
-     *
-     * @hide
-     */
-    @SystemApi
-    @RequiresPermission(WRITE_SECURE_SETTINGS)
-    public void setLocationEnabledForUser(boolean enabled, UserHandle userHandle) {
-        try {
-            mService.setLocationEnabledForUser(enabled, userHandle.getIdentifier());
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Returns the current enabled/disabled status of location
+     * Returns the current enabled/disabled state of location.
      *
      * @param userHandle the user to query
-     * @return true location is enabled. false if location is disabled.
+     * @return true if location is enabled and false if location is disabled.
      *
      * @hide
      */
@@ -1315,19 +1298,32 @@ public class LocationManager {
     }
 
     /**
-     * Returns the current enabled/disabled status of the given provider.
+     * Enables or disables the location setting.
      *
-     * <p>If the user has enabled this provider in the Settings menu, true
-     * is returned otherwise false is returned
+     * @param enabled true to enable location and false to disable location.
+     * @param userHandle the user to set
      *
-     * <p>Callers should instead use {@link #isLocationEnabled()}
-     * unless they depend on provider-specific APIs such as
-     * {@link #requestLocationUpdates(String, long, float, LocationListener)}.
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(WRITE_SECURE_SETTINGS)
+    public void setLocationEnabledForUser(boolean enabled, UserHandle userHandle) {
+        Settings.Secure.putIntForUser(
+                mContext.getContentResolver(),
+                Settings.Secure.LOCATION_MODE,
+                enabled
+                        ? Settings.Secure.LOCATION_MODE_ON
+                        : Settings.Secure.LOCATION_MODE_OFF,
+                userHandle.getIdentifier());
+    }
+
+    /**
+     * Returns the current enabled/disabled status of the given provider. To listen for changes, see
+     * {@link #PROVIDERS_CHANGED_ACTION}.
      *
-     * <p>
-     * Before API version {@link android.os.Build.VERSION_CODES#LOLLIPOP}, this
-     * method would throw {@link SecurityException} if the location permissions
-     * were not sufficient to use the specified provider.
+     * Before API version {@link android.os.Build.VERSION_CODES#LOLLIPOP}, this method would throw
+     * {@link SecurityException} if the location permissions were not sufficient to use the
+     * specified provider.
      *
      * @param provider the name of the provider
      * @return true if the provider exists and is enabled
@@ -1339,19 +1335,13 @@ public class LocationManager {
     }
 
     /**
-     * Returns the current enabled/disabled status of the given provider and user.
+     * Returns the current enabled/disabled status of the given provider and user. Callers should
+     * prefer {@link #isLocationEnabledForUser(UserHandle)} unless they depend on provider-specific
+     * APIs.
      *
-     * <p>If the user has enabled this provider in the Settings menu, true
-     * is returned otherwise false is returned
-     *
-     * <p>Callers should instead use {@link #isLocationEnabled()}
-     * unless they depend on provider-specific APIs such as
-     * {@link #requestLocationUpdates(String, long, float, LocationListener)}.
-     *
-     * <p>
-     * Before API version {@link android.os.Build.VERSION_CODES#LOLLIPOP}, this
-     * method would throw {@link SecurityException} if the location permissions
-     * were not sufficient to use the specified provider.
+     * Before API version {@link android.os.Build.VERSION_CODES#LOLLIPOP}, this method would throw
+     * {@link SecurityException} if the location permissions were not sufficient to use the
+     * specified provider.
      *
      * @param provider the name of the provider
      * @param userHandle the user to query
@@ -1372,28 +1362,32 @@ public class LocationManager {
     }
 
     /**
-     * Method for enabling or disabling a single location provider.
+     * Method for enabling or disabling a single location provider. This method is deprecated and
+     * functions as a best effort. It should not be relied on in any meaningful sense as providers
+     * may no longer be enabled or disabled by clients.
      *
      * @param provider the name of the provider
      * @param enabled true to enable the provider. false to disable the provider
      * @param userHandle the user to set
-     * @return true if the value was set, false on database errors
+     * @return true if the value was set, false otherwise
      *
      * @throws IllegalArgumentException if provider is null
+     * @deprecated Do not manipulate providers individually, use
+     * {@link #setLocationEnabledForUser(boolean, UserHandle)} instead.
      * @hide
      */
+    @Deprecated
     @SystemApi
     @RequiresPermission(WRITE_SECURE_SETTINGS)
     public boolean setProviderEnabledForUser(
             String provider, boolean enabled, UserHandle userHandle) {
         checkProvider(provider);
 
-        try {
-            return mService.setProviderEnabledForUser(
-                    provider, enabled, userHandle.getIdentifier());
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        return Settings.Secure.setLocationProviderEnabledForUser(
+                mContext.getContentResolver(),
+                provider,
+                enabled,
+                userHandle.getIdentifier());
     }
 
     /**
@@ -1547,14 +1541,11 @@ public class LocationManager {
      * mock location app op} is not set to {@link android.app.AppOpsManager#MODE_ALLOWED
      * allowed} for your app.
      * @throws IllegalArgumentException if no provider with the given name exists
+     *
+     * @deprecated This function has always been a no-op, and may be removed in the future.
      */
-    public void clearTestProviderLocation(String provider) {
-        try {
-            mService.clearTestProviderLocation(provider, mContext.getOpPackageName());
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
+    @Deprecated
+    public void clearTestProviderLocation(String provider) {}
 
     /**
      * Sets a mock enabled value for the given provider.  This value will be used in place
@@ -1585,18 +1576,16 @@ public class LocationManager {
      * mock location app op} is not set to {@link android.app.AppOpsManager#MODE_ALLOWED
      * allowed} for your app.
      * @throws IllegalArgumentException if no provider with the given name exists
+     *
+     * @deprecated Use {@link #setTestProviderEnabled(String, boolean)} instead.
      */
+    @Deprecated
     public void clearTestProviderEnabled(String provider) {
-        try {
-            mService.clearTestProviderEnabled(provider, mContext.getOpPackageName());
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        setTestProviderEnabled(provider, false);
     }
 
     /**
-     * Sets mock status values for the given provider.  These values will be used in place
-     * of any actual values from the provider.
+     * This method has no effect as provider status has been deprecated and is no longer supported.
      *
      * @param provider the provider name
      * @param status the mock status
@@ -1607,7 +1596,10 @@ public class LocationManager {
      * mock location app op} is not set to {@link android.app.AppOpsManager#MODE_ALLOWED
      * allowed} for your app.
      * @throws IllegalArgumentException if no provider with the given name exists
+     *
+     * @deprecated This method has no effect.
      */
+    @Deprecated
     public void setTestProviderStatus(String provider, int status, Bundle extras, long updateTime) {
         try {
             mService.setTestProviderStatus(provider, status, extras, updateTime,
@@ -1618,21 +1610,19 @@ public class LocationManager {
     }
 
     /**
-     * Removes any mock status values associated with the given provider.
+     * This method has no effect as provider status has been deprecated and is no longer supported.
      *
      * @param provider the provider name
-     *
      * @throws SecurityException if {@link android.app.AppOpsManager#OPSTR_MOCK_LOCATION
      * mock location app op} is not set to {@link android.app.AppOpsManager#MODE_ALLOWED
      * allowed} for your app.
      * @throws IllegalArgumentException if no provider with the given name exists
+     *
+     * @deprecated This method has no effect.
      */
+    @Deprecated
     public void clearTestProviderStatus(String provider) {
-        try {
-            mService.clearTestProviderStatus(provider, mContext.getOpPackageName());
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        setTestProviderStatus(provider, LocationProvider.AVAILABLE, null, 0L);
     }
 
     // --- GPS-specific support ---
@@ -2095,17 +2085,54 @@ public class LocationManager {
     }
 
     /**
-     * No-op method to keep backward-compatibility.
-     * Don't use it. Use {@link #unregisterGnssMeasurementsCallback} instead.
+     * Injects GNSS measurement corrections into the GNSS chipset.
+     *
+     * @param measurementCorrections a {@link GnssMeasurementCorrections} object with the GNSS
+     *     measurement corrections to be injected into the GNSS chipset.
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(ACCESS_FINE_LOCATION)
+    public void injectGnssMeasurementCorrections(
+            @NonNull GnssMeasurementCorrections measurementCorrections) {
+        try {
+            mGnssMeasurementCallbackTransport.injectGnssMeasurementCorrections(
+                    measurementCorrections);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns an integer with flags representing the capabilities of the GNSS chipset.
+     *
+     * @hide
+     */
+    @SystemApi
+    /**
+     * Returns the integer capability flags of the GNSS chipset as defined in {@code
+     * IGnssCallback.hal}
+     */
+    public int getGnssCapabilities() {
+        try {
+            return mGnssMeasurementCallbackTransport.getGnssCapabilities();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * No-op method to keep backward-compatibility. Don't use it. Use {@link
+     * #unregisterGnssMeasurementsCallback} instead.
+     *
      * @hide
      * @deprecated use {@link #unregisterGnssMeasurementsCallback(GnssMeasurementsEvent.Callback)}
-     * instead.
+     *     instead.
      */
     @Deprecated
     @SystemApi
     @SuppressLint("Doclava125")
-    public void removeGpsMeasurementListener(GpsMeasurementsEvent.Listener listener) {
-    }
+    public void removeGpsMeasurementListener(GpsMeasurementsEvent.Listener listener) {}
 
     /**
      * Unregisters a GPS Measurement callback.
@@ -2351,7 +2378,7 @@ public class LocationManager {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public boolean sendNiResponse(int notifId, int userResponse) {
         try {
             return mService.sendNiResponse(notifId, userResponse);
@@ -2415,27 +2442,79 @@ public class LocationManager {
     }
 
     /**
-     * Allow the {@link android.location.LocationManager#getNetworkProviderPackage location
-     * provider} to start the UI to modify the location permission for a package.
-     *
-     * <p>Can only be called by the location provider.
-     *
-     * @param packageName The package the permission belongs to
-     * @param permission The (individual) location permission to switch
-     *
-     * @return A one-shot pending intent that starts the permission management UI or {@code null} if
-     *         the intent cannot be created
+     * Returns true if the given package name matches a location provider package, and false
+     * otherwise.
      *
      * @hide
      */
     @SystemApi
-    public @Nullable PendingIntent createManageLocationPermissionIntent(@NonNull String packageName,
-            @NonNull String permission) {
+    public boolean isProviderPackage(String packageName) {
         try {
-            return mService.createManageLocationPermissionIntent(packageName, permission);
+            return mService.isProviderPackage(packageName);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+            return false;
+        }
+    }
+
+    /**
+     * Set the extra location controller package for location services on the device.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(Manifest.permission.LOCATION_HARDWARE)
+    public void setLocationControllerExtraPackage(String packageName) {
+        try {
+            mService.setLocationControllerExtraPackage(packageName);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the extra location controller package on the device.
+     *
+     * @hide
+     */
+    @SystemApi
+    public @Nullable String getLocationControllerExtraPackage() {
+        try {
+            return mService.getLocationControllerExtraPackage();
         } catch (RemoteException e) {
             e.rethrowFromSystemServer();
             return null;
         }
     }
+
+    /**
+     * Set whether the extra location controller package is currently enabled on the device.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(Manifest.permission.LOCATION_HARDWARE)
+    public void setLocationControllerExtraPackageEnabled(boolean enabled) {
+        try {
+            mService.setLocationControllerExtraPackageEnabled(enabled);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns whether extra location controller package is currently enabled on the device.
+     *
+     * @hide
+     */
+    @SystemApi
+    public boolean isLocationControllerExtraPackageEnabled() {
+        try {
+            return mService.isLocationControllerExtraPackageEnabled();
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+            return false;
+        }
+    }
+
 }

@@ -14,26 +14,29 @@
  * limitations under the License.
  */
 
+#include <memory>
 #include <string>
-#include <utility>
 
 #include "androidfw/StringPiece.h"
 #include "androidfw/Util.h"
 
 #include "idmap2/ResourceUtils.h"
+#include "idmap2/Result.h"
+#include "idmap2/Xml.h"
+#include "idmap2/ZipFile.h"
 
 using android::StringPiece16;
+using android::idmap2::Result;
+using android::idmap2::Xml;
+using android::idmap2::ZipFile;
 using android::util::Utf16ToUtf8;
 
-namespace android {
-namespace idmap2 {
-namespace utils {
+namespace android::idmap2::utils {
 
-std::pair<bool, std::string> WARN_UNUSED ResToTypeEntryName(const AssetManager2& am,
-                                                            ResourceId resid) {
+Result<std::string> WARN_UNUSED ResToTypeEntryName(const AssetManager2& am, ResourceId resid) {
   AssetManager2::ResourceName name;
   if (!am.GetResourceName(resid, &name)) {
-    return std::make_pair(false, "");
+    return {};
   }
   std::string out;
   if (name.type != nullptr) {
@@ -47,9 +50,66 @@ std::pair<bool, std::string> WARN_UNUSED ResToTypeEntryName(const AssetManager2&
   } else {
     out += Utf16ToUtf8(StringPiece16(name.entry16, name.entry_len));
   }
-  return std::make_pair(true, out);
+  return {out};
 }
 
-}  // namespace utils
-}  // namespace idmap2
-}  // namespace android
+Result<OverlayManifestInfo> ExtractOverlayManifestInfo(const std::string& path,
+                                                       std::ostream& out_error,
+                                                       bool assert_overlay) {
+  std::unique_ptr<const ZipFile> zip = ZipFile::Open(path);
+  if (!zip) {
+    out_error << "error: failed to open " << path << " as a zip file" << std::endl;
+    return kResultError;
+  }
+
+  std::unique_ptr<const MemoryChunk> entry = zip->Uncompress("AndroidManifest.xml");
+  if (!entry) {
+    out_error << "error: failed to uncompress AndroidManifest.xml from " << path << std::endl;
+    return kResultError;
+  }
+
+  std::unique_ptr<const Xml> xml = Xml::Create(entry->buf, entry->size);
+  if (!xml) {
+    out_error << "error: failed to parse AndroidManifest.xml from " << path << std::endl;
+    return kResultError;
+  }
+
+  OverlayManifestInfo info{};
+  const auto tag = xml->FindTag("overlay");
+  if (!tag) {
+    if (assert_overlay) {
+      out_error << "error: <overlay> missing from AndroidManifest.xml of " << path << std::endl;
+      return kResultError;
+    }
+    return info;
+  }
+
+  auto iter = tag->find("targetPackage");
+  if (iter == tag->end()) {
+    if (assert_overlay) {
+      out_error << "error: android:targetPackage missing from <overlay> of " << path << std::endl;
+      return kResultError;
+    }
+  } else {
+    info.target_package = iter->second;
+  }
+
+  iter = tag->find("targetName");
+  if (iter != tag->end()) {
+    info.target_name = iter->second;
+  }
+
+  iter = tag->find("isStatic");
+  if (iter != tag->end()) {
+    info.is_static = std::stoul(iter->second) != 0U;
+  }
+
+  iter = tag->find("priority");
+  if (iter != tag->end()) {
+    info.priority = std::stoi(iter->second);
+  }
+
+  return info;
+}
+
+}  // namespace android::idmap2::utils

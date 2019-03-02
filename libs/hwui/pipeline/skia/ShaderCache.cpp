@@ -15,14 +15,15 @@
  */
 
 #include "ShaderCache.h"
-#include <algorithm>
 #include <log/log.h>
-#include <thread>
-#include <array>
 #include <openssl/sha.h>
+#include <algorithm>
+#include <array>
+#include <thread>
 #include "FileBlobCache.h"
 #include "Properties.h"
 #include "utils/TraceUtils.h"
+#include <GrContext.h>
 
 namespace android {
 namespace uirenderer {
@@ -30,8 +31,8 @@ namespace skiapipeline {
 
 // Cache size limits.
 static const size_t maxKeySize = 1024;
-static const size_t maxValueSize = 64 * 1024;
-static const size_t maxTotalSize = 512 * 1024;
+static const size_t maxValueSize = 512 * 1024;
+static const size_t maxTotalSize = 1024 * 1024;
 
 ShaderCache::ShaderCache() {
     // There is an "incomplete FileBlobCache type" compilation error, if ctor is moved to header.
@@ -44,8 +45,7 @@ ShaderCache& ShaderCache::get() {
 }
 
 bool ShaderCache::validateCache(const void* identity, ssize_t size) {
-    if (nullptr == identity && size == 0)
-        return true;
+    if (nullptr == identity && size == 0) return true;
 
     if (nullptr == identity || size < 0) {
         if (CC_UNLIKELY(Properties::debugLevel & kDebugCaches)) {
@@ -66,8 +66,7 @@ bool ShaderCache::validateCache(const void* identity, ssize_t size) {
     auto key = sIDKey;
     auto loaded = mBlobCache->get(&key, sizeof(key), hash.data(), hash.size());
 
-    if (loaded && std::equal(hash.begin(), hash.end(), mIDHash.begin()))
-        return true;
+    if (loaded && std::equal(hash.begin(), hash.end(), mIDHash.begin())) return true;
 
     if (CC_UNLIKELY(Properties::debugLevel & kDebugCaches)) {
         ALOGW("ShaderCache::validateCache cache validation fails");
@@ -119,7 +118,7 @@ sk_sp<SkData> ShaderCache::load(const SkData& key) {
     int maxTries = 3;
     while (valueSize > mObservedBlobValueSize && maxTries > 0) {
         mObservedBlobValueSize = std::min(valueSize, maxValueSize);
-        void *newValueBuffer = realloc(valueBuffer, mObservedBlobValueSize);
+        void* newValueBuffer = realloc(valueBuffer, mObservedBlobValueSize);
         if (!newValueBuffer) {
             free(valueBuffer);
             return nullptr;
@@ -133,7 +132,7 @@ sk_sp<SkData> ShaderCache::load(const SkData& key) {
         return nullptr;
     }
     if (valueSize > mObservedBlobValueSize) {
-        ALOGE("ShaderCache::load value size is too big %d", (int) valueSize);
+        ALOGE("ShaderCache::load value size is too big %d", (int)valueSize);
         free(valueBuffer);
         return nullptr;
     }
@@ -170,6 +169,24 @@ void ShaderCache::store(const SkData& key, const SkData& data) {
     const void* value = data.data();
 
     BlobCache* bc = getBlobCacheLocked();
+    if (mInStoreVkPipelineInProgress) {
+        if (mOldPipelineCacheSize == -1) {
+            // Record the initial pipeline cache size stored in the file.
+            mOldPipelineCacheSize = bc->get(key.data(), keySize, nullptr, 0);
+        }
+        if (mNewPipelineCacheSize != -1 && mNewPipelineCacheSize == valueSize) {
+            // There has not been change in pipeline cache size. Stop trying to save.
+            mTryToStorePipelineCache = false;
+            return;
+        }
+        mNewPipelineCacheSize = valueSize;
+    } else {
+        mCacheDirty = true;
+        // If there are new shaders compiled, we probably have new pipeline state too.
+        // Store pipeline cache on the next flush.
+        mNewPipelineCacheSize = -1;
+        mTryToStorePipelineCache = true;
+    }
     bc->set(key.data(), keySize, value, valueSize);
 
     if (!mSavePending && mDeferredSaveDelay > 0) {
@@ -177,10 +194,29 @@ void ShaderCache::store(const SkData& key, const SkData& data) {
         std::thread deferredSaveThread([this]() {
             sleep(mDeferredSaveDelay);
             std::lock_guard<std::mutex> lock(mMutex);
-            saveToDiskLocked();
+            // Store file on disk if there a new shader or Vulkan pipeline cache size changed.
+            if (mCacheDirty || mNewPipelineCacheSize != mOldPipelineCacheSize) {
+                saveToDiskLocked();
+                mOldPipelineCacheSize = mNewPipelineCacheSize;
+                mTryToStorePipelineCache = false;
+                mCacheDirty = false;
+            }
         });
         deferredSaveThread.detach();
     }
+}
+
+void ShaderCache::onVkFrameFlushed(GrContext* context) {
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+
+        if (!mInitialized || !mTryToStorePipelineCache) {
+            return;
+        }
+    }
+    mInStoreVkPipelineInProgress = true;
+    context->storeVkPipelineCacheData();
+    mInStoreVkPipelineInProgress = false;
 }
 
 } /* namespace skiapipeline */

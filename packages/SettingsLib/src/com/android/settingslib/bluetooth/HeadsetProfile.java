@@ -58,7 +58,6 @@ public class HeadsetProfile implements LocalBluetoothProfile {
             implements BluetoothProfile.ServiceListener {
 
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            Log.d(TAG,"Bluetooth service connected");
             mService = (BluetoothHeadset) proxy;
             // We just bound to the service, so refresh the UI for any connected HFP devices.
             List<BluetoothDevice> deviceList = mService.getConnectedDevices();
@@ -80,7 +79,6 @@ public class HeadsetProfile implements LocalBluetoothProfile {
         }
 
         public void onServiceDisconnected(int profile) {
-            Log.d(TAG,"Bluetooth service disconnected");
             mProfileManager.callServiceDisconnectedListeners();
             mIsProfileReady=false;
         }
@@ -228,7 +226,7 @@ public class HeadsetProfile implements LocalBluetoothProfile {
     }
 
     public int getDrawableResource(BluetoothClass btClass) {
-        return R.drawable.ic_bt_headset_hfp;
+        return com.android.internal.R.drawable.ic_bt_headset_hfp;
     }
 
     protected void finalize() {

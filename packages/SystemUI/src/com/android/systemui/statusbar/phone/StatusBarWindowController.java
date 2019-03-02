@@ -54,9 +54,13 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 /**
  * Encapsulates all logic for the status bar window state management.
  */
+@Singleton
 public class StatusBarWindowController implements Callback, Dumpable, ConfigurationListener {
 
     private static final String TAG = "StatusBarWindowController";
@@ -65,26 +69,27 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
     private final WindowManager mWindowManager;
     private final IActivityManager mActivityManager;
     private final DozeParameters mDozeParameters;
-    private View mStatusBarView;
+    private final WindowManager.LayoutParams mLpChanged;
+    private final boolean mKeyguardScreenRotation;
+    private ViewGroup mStatusBarView;
     private WindowManager.LayoutParams mLp;
-    private WindowManager.LayoutParams mLpChanged;
     private boolean mHasTopUi;
     private boolean mHasTopUiChanged;
     private int mBarHeight;
-    private final boolean mKeyguardScreenRotation;
     private float mScreenBrightnessDoze;
     private final State mCurrentState = new State();
     private OtherwisedCollapsedListener mListener;
 
     private final SysuiColorExtractor mColorExtractor = Dependency.get(SysuiColorExtractor.class);
 
+    @Inject
     public StatusBarWindowController(Context context) {
         this(context, context.getSystemService(WindowManager.class), ActivityManager.getService(),
                 DozeParameters.getInstance(context));
     }
 
     @VisibleForTesting
-    StatusBarWindowController(Context context, WindowManager windowManager,
+    public StatusBarWindowController(Context context, WindowManager windowManager,
             IActivityManager activityManager, DozeParameters dozeParameters) {
         mContext = context;
         mWindowManager = windowManager;
@@ -92,7 +97,8 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
         mKeyguardScreenRotation = shouldEnableKeyguardScreenRotation();
         mDozeParameters = dozeParameters;
         mScreenBrightnessDoze = mDozeParameters.getScreenBrightnessDoze();
-        Dependency.get(StatusBarStateController.class).addListener(
+        mLpChanged = new WindowManager.LayoutParams();
+        Dependency.get(StatusBarStateController.class).addCallback(
                 mStateListener, StatusBarStateController.RANK_STATUS_BAR_WINDOW_CONTROLLER);
         Dependency.get(ConfigurationController.class).addCallback(this);
     }
@@ -109,7 +115,7 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
      * @param statusBarView The view to add.
      * @param barHeight The height of the status bar in collapsed state.
      */
-    public void add(View statusBarView, int barHeight) {
+    public void add(ViewGroup statusBarView, int barHeight) {
 
         // Now that the status bar window encompasses the sliding panel and its
         // translucent backdrop, the entire thing is made TRANSLUCENT and is
@@ -133,9 +139,12 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
         mStatusBarView = statusBarView;
         mBarHeight = barHeight;
         mWindowManager.addView(mStatusBarView, mLp);
-        mLpChanged = new WindowManager.LayoutParams();
         mLpChanged.copyFrom(mLp);
         onThemeChanged();
+    }
+
+    public ViewGroup getStatusBarView() {
+        return mStatusBarView;
     }
 
     public void setDozeScreenBrightness(int value) {
@@ -219,7 +228,9 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
     private void applyHeight(State state) {
         boolean expanded = isExpanded(state);
         if (state.forcePluginOpen) {
-            mListener.setWouldOtherwiseCollapse(expanded);
+            if (mListener != null) {
+                mListener.setWouldOtherwiseCollapse(expanded);
+            }
             expanded = true;
         }
         if (expanded) {
@@ -232,13 +243,13 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
     private boolean isExpanded(State state) {
         return !state.forceCollapsed && (state.isKeyguardShowingAndNotOccluded()
                 || state.panelVisible || state.keyguardFadingAway || state.bouncerShowing
-                || state.headsUpShowing
+                || state.headsUpShowing || state.bubblesShowing
                 || state.scrimsVisibility != ScrimController.VISIBILITY_FULLY_TRANSPARENT);
     }
 
     private void applyFitsSystemWindows(State state) {
         boolean fitsSystemWindows = !state.isKeyguardShowingAndNotOccluded();
-        if (mStatusBarView.getFitsSystemWindows() != fitsSystemWindows) {
+        if (mStatusBarView != null && mStatusBarView.getFitsSystemWindows() != fitsSystemWindows) {
             mStatusBarView.setFitsSystemWindows(fitsSystemWindows);
             mStatusBarView.requestApplyInsets();
         }
@@ -279,9 +290,8 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
         applyModalFlag(state);
         applyBrightness(state);
         applyHasTopUi(state);
-        applySleepToken(state);
         applyNotTouchable(state);
-        if (mLp.copyFrom(mLpChanged) != 0) {
+        if (mLp != null && mLp.copyFrom(mLpChanged) != 0) {
             mWindowManager.updateViewLayout(mStatusBarView, mLp);
         }
         if (mHasTopUi != mHasTopUiChanged) {
@@ -322,14 +332,6 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
 
     private void applyHasTopUi(State state) {
         mHasTopUiChanged = isExpanded(state);
-    }
-
-    private void applySleepToken(State state) {
-        if (state.dozing) {
-            mLpChanged.privateFlags |= LayoutParams.PRIVATE_FLAG_ACQUIRES_SLEEP_TOKEN;
-        } else {
-            mLpChanged.privateFlags &= ~LayoutParams.PRIVATE_FLAG_ACQUIRES_SLEEP_TOKEN;
-        }
     }
 
     private void applyNotTouchable(State state) {
@@ -469,6 +471,21 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
         apply(mCurrentState);
     }
 
+    /**
+     * Sets whether there are bubbles showing on the screen.
+     */
+    public void setBubblesShowing(boolean bubblesShowing) {
+        mCurrentState.bubblesShowing = bubblesShowing;
+        apply(mCurrentState);
+    }
+
+    /**
+     * The bubbles showing state for the status bar.
+     */
+    public boolean getBubblesShowing() {
+        return mCurrentState.bubblesShowing;
+    }
+
     public void setStateListener(OtherwisedCollapsedListener listener) {
         mListener = listener;
     }
@@ -521,6 +538,7 @@ public class StatusBarWindowController implements Callback, Dumpable, Configurat
         boolean backdropShowing;
         boolean wallpaperSupportsAmbientMode;
         boolean notTouchable;
+        boolean bubblesShowing;
 
         /**
          * The {@link StatusBar} state from the status bar.

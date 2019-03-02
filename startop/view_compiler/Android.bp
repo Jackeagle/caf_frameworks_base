@@ -16,38 +16,62 @@
 
 cc_defaults {
     name: "viewcompiler_defaults",
+    defaults: ["libdexfile_static_defaults"],
     header_libs: [
         "libbase_headers",
     ],
     shared_libs: [
         "libbase",
-        "libdexfile",
+        "libz",
         "slicer",
     ],
+    static_libs: [
+        "libtinyxml2",
+        "liblog",
+        "libutils",
+        "libziparchive",
+    ],
     cppflags: ["-std=c++17"],
+    target: {
+        android: {
+            shared_libs: [
+                "libandroidfw",
+            ],
+        },
+        host: {
+            static_libs: [
+                "libandroidfw",
+            ],
+        },
+    },
 }
 
-cc_library_host_static {
+cc_library_static {
     name: "libviewcompiler",
     defaults: ["viewcompiler_defaults"],
     srcs: [
+        "apk_layout_compiler.cc",
         "dex_builder.cc",
+        "dex_layout_compiler.cc",
         "java_lang_builder.cc",
+        "tinyxml_layout_parser.cc",
         "util.cc",
+        "layout_validation.cc",
     ],
+    host_supported: true,
 }
 
-cc_binary_host {
+cc_binary {
     name: "viewcompiler",
     defaults: ["viewcompiler_defaults"],
     srcs: [
         "main.cc",
     ],
     static_libs: [
-        "libtinyxml2",
         "libgflags",
         "libviewcompiler",
     ],
+    host_supported: true
 }
 
 cc_test_host {
@@ -55,6 +79,7 @@ cc_test_host {
     defaults: ["viewcompiler_defaults"],
     srcs: [
         "dex_builder_test.cc",
+        "layout_validation_test.cc",
         "util_test.cc",
     ],
     static_libs: [

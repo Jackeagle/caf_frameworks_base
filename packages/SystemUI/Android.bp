@@ -44,7 +44,6 @@ android_library {
         "SystemUIPluginLib",
         "SystemUISharedLib",
         "SettingsLib",
-        "androidx.car_car",
         "androidx.legacy_legacy-support-v4",
         "androidx.recyclerview_recyclerview",
         "androidx.preference_preference",
@@ -58,16 +57,19 @@ android_library {
         "androidx.slice_slice-builders",
         "androidx.arch.core_core-runtime",
         "androidx.lifecycle_lifecycle-extensions",
-        "qtiNetworkLib",
+        "androidx.dynamicanimation_dynamicanimation",
         "SystemUI-tags",
         "SystemUI-proto",
+        "dagger2-2.19",
+        "jsr330"
     ],
     manifest: "AndroidManifest.xml",
 
     libs: [
-        "telephony-common",
         "android.car",
         "android.car.userlib",
+        "telephony-common",
+        "telephony-ext",
         "ims-common",
     ],
 
@@ -75,6 +77,8 @@ android_library {
         "--extra-packages",
         "com.android.keyguard",
     ],
+
+    plugins: ["dagger2-compiler-2.19"],
 }
 
 android_library {
@@ -96,7 +100,6 @@ android_library {
         "SystemUIPluginLib",
         "SystemUISharedLib",
         "SettingsLib",
-        "androidx.car_car",
         "androidx.legacy_legacy-support-v4",
         "androidx.recyclerview_recyclerview",
         "androidx.preference_preference",
@@ -110,7 +113,7 @@ android_library {
         "androidx.slice_slice-builders",
         "androidx.arch.core_core-runtime",
         "androidx.lifecycle_lifecycle-extensions",
-        "qtiNetworkLib",
+        "androidx.dynamicanimation_dynamicanimation",
         "SystemUI-tags",
         "SystemUI-proto",
         "metrics-helper-lib",
@@ -118,19 +121,21 @@ android_library {
         "mockito-target-inline-minus-junit4",
         "testables",
         "truth-prebuilt",
+        "dagger2-2.19",
+        "jsr330"
     ],
     libs: [
         "android.test.runner",
         "telephony-common",
-        "android.car",
-        "android.car.userlib",
         "android.test.base",
+        "telephony-ext",
         "ims-common",
     ],
     aaptflags: [
         "--extra-packages",
         "com.android.keyguard:com.android.systemui",
     ],
+    plugins: ["dagger2-compiler-2.19"],
 }
 
 android_app {
@@ -140,6 +145,7 @@ android_app {
     ],
 
     platform_apis: true,
+    product_specific: true,
     certificate: "platform",
     privileged: true,
 
@@ -148,10 +154,11 @@ android_app {
     },
 
     libs: [
-        "telephony-common",
         "android.car",
         "android.car.userlib",
         "ims-common",
+        "telephony-common",
+        "telephony-ext",
     ],
 
     dxflags: ["--multi-dex"],
@@ -159,6 +166,7 @@ android_app {
         "--extra-packages",
         "com.android.keyguard",
     ],
+    required: ["privapp_whitelist_com.android.systemui"],
 
 }
 
@@ -187,8 +195,6 @@ android_app {
     ],
     libs: [
         "telephony-common",
-        "android.car",
-        "android.car.userlib",
     ],
 
     srcs: [

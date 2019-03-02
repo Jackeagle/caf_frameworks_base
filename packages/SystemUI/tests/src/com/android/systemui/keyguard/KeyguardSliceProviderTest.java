@@ -21,23 +21,31 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import android.app.AlarmManager;
 import android.content.ContentResolver;
-import android.content.Intent;
+import android.media.MediaMetadata;
 import android.net.Uri;
 import android.provider.Settings;
 import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableLooper.RunWithLooper;
-import android.util.Log;
 
+import androidx.slice.Slice;
+import androidx.slice.SliceItem;
+import androidx.slice.SliceProvider;
+import androidx.slice.SliceSpecs;
+import androidx.slice.builders.ListBuilder;
+import androidx.slice.core.SliceQuery;
+
+import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.SysuiTestCase;
-import com.android.systemui.statusbar.policy.ZenModeController;
+import com.android.systemui.statusbar.NotificationMediaManager;
+import com.android.systemui.statusbar.StatusBarStateController;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -50,22 +58,19 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 
-import androidx.slice.Slice;
-import androidx.slice.SliceItem;
-import androidx.slice.SliceProvider;
-import androidx.slice.SliceSpecs;
-import androidx.slice.builders.ListBuilder;
-import androidx.slice.core.SliceQuery;
-
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
-@RunWithLooper(setAsMainLooper = true)
+@RunWithLooper
 public class KeyguardSliceProviderTest extends SysuiTestCase {
 
     @Mock
     private ContentResolver mContentResolver;
     @Mock
     private AlarmManager mAlarmManager;
+    @Mock
+    private NotificationMediaManager mNotificationMediaManager;
+    @Mock
+    private StatusBarStateController mStatusBarStateController;
     private TestableKeyguardSliceProvider mProvider;
     private boolean mIsZenMode;
 
@@ -75,6 +80,7 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
         mIsZenMode = false;
         mProvider = new TestableKeyguardSliceProvider();
         mProvider.attachInfo(getContext(), null);
+        mProvider.initDependencies(mNotificationMediaManager, mStatusBarStateController);
         SliceProvider.setSpecs(new HashSet<>(Arrays.asList(SliceSpecs.LIST)));
     }
 
@@ -94,8 +100,19 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
     }
 
     @Test
+    public void onBindSlice_readsMedia() {
+        MediaMetadata metadata = mock(MediaMetadata.class);
+        mProvider.onDozingChanged(true);
+        mProvider.onMetadataChanged(metadata);
+        mProvider.onBindSlice(mProvider.getUri());
+        verify(metadata).getText(eq(MediaMetadata.METADATA_KEY_TITLE));
+        verify(metadata).getText(eq(MediaMetadata.METADATA_KEY_ARTIST));
+        verify(mNotificationMediaManager).getMediaIcon();
+    }
+
+    @Test
     public void cleansDateFormat() {
-        mProvider.mIntentReceiver.onReceive(getContext(), new Intent(Intent.ACTION_TIMEZONE_CHANGED));
+        mProvider.mKeyguardUpdateMonitorCallback.onTimeZoneChanged(null);
         TestableLooper.get(this).processAllMessages();
         Assert.assertEquals("Date format should have been cleaned.", 1 /* expected */,
                 mProvider.mCleanDateFormatInvokations);
@@ -103,7 +120,7 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
 
     @Test
     public void updatesClock() {
-        mProvider.mIntentReceiver.onReceive(getContext(), new Intent(Intent.ACTION_TIME_TICK));
+        mProvider.mKeyguardUpdateMonitorCallback.onTimeChanged();
         TestableLooper.get(this).processAllMessages();
         verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
     }
@@ -139,12 +156,42 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
     public void addZenMode_addedToSlice() {
         ListBuilder listBuilder = spy(new ListBuilder(getContext(), mProvider.getUri(),
             ListBuilder.INFINITY));
-        mProvider.addZenMode(listBuilder);
+        mProvider.addZenModeLocked(listBuilder);
         verify(listBuilder, never()).addRow(any(ListBuilder.RowBuilder.class));
 
         mIsZenMode = true;
-        mProvider.addZenMode(listBuilder);
+        mProvider.addZenModeLocked(listBuilder);
         verify(listBuilder).addRow(any(ListBuilder.RowBuilder.class));
+    }
+
+    @Test
+    public void onMetadataChanged_updatesSlice() {
+        mProvider.onMetadataChanged(mock(MediaMetadata.class));
+        mProvider.onDozingChanged(true);
+        verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
+
+        // Hides after waking up
+        reset(mContentResolver);
+        mProvider.onDozingChanged(false);
+        verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
+
+        // And won't update slice if device is awake
+        reset(mContentResolver);
+        mProvider.onMetadataChanged(mock(MediaMetadata.class));
+        verify(mContentResolver, never()).notifyChange(eq(mProvider.getUri()), eq(null));
+    }
+
+    @Test
+    public void onDozingChanged_updatesSliceIfMedia() {
+        // Show media when dozing
+        mProvider.onMetadataChanged(mock(MediaMetadata.class));
+        mProvider.onDozingChanged(true);
+        verify(mContentResolver).notifyChange(eq(mProvider.getUri()), eq(null));
+
+        // Do not notify again if nothing changed
+        reset(mContentResolver);
+        mProvider.onDozingChanged(true);
+        verify(mContentResolver, never()).notifyChange(eq(mProvider.getUri()), eq(null));
     }
 
     private class TestableKeyguardSliceProvider extends KeyguardSliceProvider {
@@ -164,19 +211,24 @@ public class KeyguardSliceProviderTest extends SysuiTestCase {
         }
 
         @Override
-        protected boolean isDndSuppressingNotifications() {
+        protected boolean isDndOn() {
             return mIsZenMode;
         }
 
         @Override
-        void cleanDateFormat() {
-            super.cleanDateFormat();
+        void cleanDateFormatLocked() {
+            super.cleanDateFormatLocked();
             mCleanDateFormatInvokations++;
         }
 
         @Override
-        protected String getFormattedDate() {
-            return super.getFormattedDate() + mCounter++;
+        public KeyguardUpdateMonitor getKeyguardUpdateMonitor() {
+            return mock(KeyguardUpdateMonitor.class);
+        }
+
+        @Override
+        protected String getFormattedDateLocked() {
+            return super.getFormattedDateLocked() + mCounter++;
         }
     }
 

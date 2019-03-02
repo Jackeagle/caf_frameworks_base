@@ -16,6 +16,8 @@
 
 package android.os;
 
+import static android.app.ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE_LOCATION;
+
 import android.app.ActivityManager;
 import android.app.job.JobParameters;
 import android.content.Context;
@@ -578,7 +580,7 @@ public abstract class BatteryStats implements Parcelable {
             return ActivityManager.PROCESS_STATE_NONEXISTENT;
         } else if (procState == ActivityManager.PROCESS_STATE_TOP) {
             return Uid.PROCESS_STATE_TOP;
-        } else if (procState == ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE) {
+        } else if (ActivityManager.isForegroundService(procState)) {
             // State when app has put itself in the foreground.
             return Uid.PROCESS_STATE_FOREGROUND_SERVICE;
         } else if (procState <= ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND) {
@@ -818,7 +820,9 @@ public abstract class BatteryStats implements Parcelable {
          * is not attributed to any non-critical process states.
          */
         public static final int[] CRITICAL_PROC_STATES = {
-            PROCESS_STATE_TOP, PROCESS_STATE_FOREGROUND_SERVICE, PROCESS_STATE_FOREGROUND
+                PROCESS_STATE_TOP,
+                PROCESS_STATE_FOREGROUND_SERVICE_LOCATION, PROCESS_STATE_FOREGROUND_SERVICE,
+                PROCESS_STATE_FOREGROUND
         };
 
         public abstract long getProcessStateTime(int state, long elapsedRealtimeUs, int which);
@@ -834,10 +838,10 @@ public abstract class BatteryStats implements Parcelable {
          * also be bumped.
          */
         static final String[] USER_ACTIVITY_TYPES = {
-            "other", "button", "touch", "accessibility"
+            "other", "button", "touch", "accessibility", "attention"
         };
 
-        public static final int NUM_USER_ACTIVITY_TYPES = 4;
+        public static final int NUM_USER_ACTIVITY_TYPES = USER_ACTIVITY_TYPES.length;
 
         public abstract void noteUserActivityLocked(int type);
         public abstract boolean hasUserActivity();
@@ -2283,7 +2287,8 @@ public abstract class BatteryStats implements Parcelable {
     static final String[] DATA_CONNECTION_NAMES = {
         "none", "gprs", "edge", "umts", "cdma", "evdo_0", "evdo_A",
         "1xrtt", "hsdpa", "hsupa", "hspa", "iden", "evdo_b", "lte",
-        "ehrpd", "hspap", "gsm", "td_scdma", "iwlan", "lte_ca", "other"
+        "ehrpd", "hspap", "gsm", "td_scdma", "iwlan", "lte_ca", "nr",
+        "other"
     };
 
     public static final int NUM_DATA_CONNECTION_TYPES = DATA_CONNECTION_OTHER+1;
@@ -4730,7 +4735,7 @@ public abstract class BatteryStats implements Parcelable {
             sb.append("\n       ");
             sb.append(prefix);
             didOne = true;
-            sb.append(DATA_CONNECTION_NAMES[i]);
+            sb.append(i < DATA_CONNECTION_NAMES.length ? DATA_CONNECTION_NAMES[i] : "ERROR");
             sb.append(" ");
             formatTimeMs(sb, time/1000);
             sb.append("(");

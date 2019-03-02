@@ -23,6 +23,7 @@ import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.UnsupportedAppUsage;
+import android.app.role.RoleManagerCallback;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -31,6 +32,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.UserHandle;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
@@ -42,6 +44,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * Provides access to information about active calls and registration/call-management functionality.
@@ -478,6 +481,12 @@ public class TelecomManager {
             "android.telecom.extra.START_CALL_WITH_RTT";
 
     /**
+     * A boolean extra set to indicate whether an app is eligible to be bound to when there are
+     * ongoing calls on the device.
+     */
+    public static final String EXTRA_IS_ENABLED = "android.telecom.extra.IS_ENABLED";
+
+    /**
      * A boolean meta-data value indicating whether an {@link InCallService} implements an
      * in-call user interface. Dialer implementations (see {@link #getDefaultDialerPackage()}) which
      * would also like to replace the in-call interface should set this meta-data to {@code true} in
@@ -488,9 +497,7 @@ public class TelecomManager {
     /**
      * A boolean meta-data value indicating whether an {@link InCallService} implements an
      * in-call user interface to be used while the device is in car-mode (see
-     * {@link android.content.res.Configuration.UI_MODE_TYPE_CAR}).
-     *
-     * @hide
+     * {@link android.content.res.Configuration#UI_MODE_TYPE_CAR}).
      */
     public static final String METADATA_IN_CALL_SERVICE_CAR_MODE_UI =
             "android.telecom.IN_CALL_SERVICE_CAR_MODE_UI";
@@ -804,15 +811,17 @@ public class TelecomManager {
      * <p>
      * Apps must be prepared for this method to return {@code null}, indicating that there currently
      * exists no user-chosen default {@code PhoneAccount}.
+     * <p>
+     * The default dialer has access to use this method.
      *
      * @return The user outgoing phone account selected by the user.
-     * @hide
      */
-    @UnsupportedAppUsage
+    @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public PhoneAccountHandle getUserSelectedOutgoingPhoneAccount() {
         try {
             if (isServiceConnected()) {
-                return getTelecomService().getUserSelectedOutgoingPhoneAccount();
+                return getTelecomService().getUserSelectedOutgoingPhoneAccount(
+                        mContext.getOpPackageName());
             }
         } catch (RemoteException e) {
             Log.e(TAG, "Error calling ITelecomService#getUserSelectedOutgoingPhoneAccount", e);
@@ -821,10 +830,14 @@ public class TelecomManager {
     }
 
     /**
-     * Sets the user-chosen default for making outgoing phone calls.
+     * Sets the user-chosen default {@link PhoneAccountHandle} for making outgoing phone calls.
+     *
+     * @param accountHandle The {@link PhoneAccountHandle} which will be used by default for making
+     *                      outgoing voice calls.
      * @hide
      */
-    @UnsupportedAppUsage
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
+    @SystemApi
     public void setUserSelectedOutgoingPhoneAccount(PhoneAccountHandle accountHandle) {
         try {
             if (isServiceConnected()) {
@@ -1202,8 +1215,12 @@ public class TelecomManager {
      * Requires permission: {@link android.Manifest.permission#WRITE_SECURE_SETTINGS}
      *
      * @hide
+     * @deprecated Use
+     * {@link android.app.role.RoleManager#addRoleHolderAsUser(String, String, UserHandle, Executor,
+     * RoleManagerCallback)} instead.
      */
     @SystemApi
+    @Deprecated
     @RequiresPermission(allOf = {
             android.Manifest.permission.MODIFY_PHONE_STATE,
             android.Manifest.permission.WRITE_SECURE_SETTINGS})
@@ -1232,79 +1249,6 @@ public class TelecomManager {
             Log.e(TAG, "RemoteException attempting to get the system dialer package name.", e);
         }
         return null;
-    }
-
-    /**
-     * Used to trigger display of the ChangeDefaultCallScreeningApp activity to prompt the user to
-     * change the call screening app.
-     *
-     * A {@link SecurityException} will be thrown if calling package name doesn't match the package
-     * of the passed {@link ComponentName}
-     *
-     * @param componentName to verify that the calling package name matches the package of the
-     * passed ComponentName.
-     */
-    public void requestChangeDefaultCallScreeningApp(@NonNull ComponentName componentName) {
-        try {
-            if (isServiceConnected()) {
-                getTelecomService().requestChangeDefaultCallScreeningApp(componentName, mContext
-                    .getOpPackageName());
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG,
-                "RemoteException calling ITelecomService#requestChangeDefaultCallScreeningApp.",
-                e);
-        }
-    }
-
-    /**
-     * Used to verify that the passed ComponentName is default call screening app.
-     *
-     * @param componentName to verify that the package of the passed ComponentName matched the default
-     * call screening packageName.
-     *
-     * @return {@code true} if the passed componentName matches the default call screening's, {@code
-     * false} if the passed componentName is null, or it doesn't match default call screening's.
-     */
-    public boolean isDefaultCallScreeningApp(ComponentName componentName) {
-        try {
-            if (isServiceConnected()) {
-                return getTelecomService().isDefaultCallScreeningApp(componentName);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG,
-                "RemoteException calling ITelecomService#isDefaultCallScreeningApp.",
-                e);
-        }
-        return false;
-    }
-
-    /**
-     * Used to set the default call screening package.
-     *
-     * Requires permission: {@link android.Manifest.permission#MODIFY_PHONE_STATE} Requires
-     * permission: {@link android.Manifest.permission#WRITE_SECURE_SETTINGS}
-     *
-     * A {@link IllegalArgumentException} will be thrown if the specified package and component name
-     * of {@link ComponentName} does't exist, or the specified component of {@link ComponentName}
-     * does't have {@link android.Manifest.permission#BIND_SCREENING_SERVICE}.
-     *
-     * @param componentName to set the default call screening to.
-     * @hide
-     */
-    @RequiresPermission(anyOf = {
-        android.Manifest.permission.MODIFY_PHONE_STATE,
-        android.Manifest.permission.WRITE_SECURE_SETTINGS
-    })
-    public void setDefaultCallScreeningApp(ComponentName componentName) {
-        try {
-            if (isServiceConnected()) {
-                getTelecomService().setDefaultCallScreeningApp(componentName);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG,
-                "RemoteException calling ITelecomService#setDefaultCallScreeningApp.", e);
-        }
     }
 
     /**
@@ -1478,9 +1422,14 @@ public class TelecomManager {
      *
      * @return {@code true} if there is a call which will be rejected or terminated, {@code false}
      * otherwise.
+     * @deprecated Companion apps for wearable devices should use the {@link InCallService} API
+     * instead.  Apps performing call screening should use the {@link CallScreeningService} API
+     * instead.
      */
+
+
     @RequiresPermission(Manifest.permission.ANSWER_PHONE_CALLS)
-    @SystemApi
+    @Deprecated
     public boolean endCall() {
         try {
             if (isServiceConnected()) {
@@ -1501,11 +1450,15 @@ public class TelecomManager {
      *
      * Requires permission: {@link android.Manifest.permission#MODIFY_PHONE_STATE} or
      * {@link android.Manifest.permission#ANSWER_PHONE_CALLS}
+     *
+     * @deprecated Companion apps for wearable devices should use the {@link InCallService} API
+     * instead.
      */
     //TODO: L-release - need to convert all invocation of ITelecmmService#answerRingingCall to use
     // this method (clockwork & gearhead).
     @RequiresPermission(anyOf =
             {Manifest.permission.ANSWER_PHONE_CALLS, Manifest.permission.MODIFY_PHONE_STATE})
+    @Deprecated
     public void acceptRingingCall() {
         try {
             if (isServiceConnected()) {
@@ -1524,9 +1477,12 @@ public class TelecomManager {
      * {@link android.Manifest.permission#ANSWER_PHONE_CALLS}
      *
      * @param videoState The desired video state to answer the call with.
+     * @deprecated Companion apps for wearable devices should use the {@link InCallService} API
+     * instead.
      */
     @RequiresPermission(anyOf =
             {Manifest.permission.ANSWER_PHONE_CALLS, Manifest.permission.MODIFY_PHONE_STATE})
+    @Deprecated
     public void acceptRingingCall(int videoState) {
         try {
             if (isServiceConnected()) {
@@ -1557,7 +1513,6 @@ public class TelecomManager {
     /**
      * Returns whether TTY is supported on this device.
      */
-    @SystemApi
     @RequiresPermission(anyOf = {
             android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE,
             android.Manifest.permission.READ_PHONE_STATE
@@ -2046,6 +2001,33 @@ public class TelecomManager {
     }
 
     /**
+     * Called by the default dialer to report to Telecom when the user has marked a previous
+     * incoming call as a nuisance call or not.
+     * <p>
+     * Where the user has chosen a {@link CallScreeningService} to fill the call screening role,
+     * Telecom will notify that {@link CallScreeningService} of the user's report.
+     * <p>
+     * Requires that the caller is the default dialer app.
+     *
+     * @param handle The phone number of an incoming call which the user is reporting as either a
+     *               nuisance of non-nuisance call.
+     * @param isNuisanceCall {@code true} if the user is reporting the call as a nuisance call,
+     *                       {@code false} if the user is reporting the call as a non-nuisance call.
+     */
+    @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
+    public void reportNuisanceCallStatus(@NonNull Uri handle, boolean isNuisanceCall) {
+        ITelecomService service = getTelecomService();
+        if (service != null) {
+            try {
+                service.reportNuisanceCallStatus(handle, isNuisanceCall,
+                        mContext.getOpPackageName());
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error calling ITelecomService#showCallScreen", e);
+            }
+        }
+    }
+
+    /**
      * Handles {@link Intent#ACTION_CALL} intents trampolined from UserCallActivity.
      * @param intent The {@link Intent#ACTION_CALL} intent to handle.
      * @hide
@@ -2058,7 +2040,6 @@ public class TelecomManager {
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException handleCallIntent: " + e);
         }
-
     }
 
     private ITelecomService getTelecomService() {

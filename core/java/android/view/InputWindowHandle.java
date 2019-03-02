@@ -16,9 +16,10 @@
 
 package android.view;
 
+import static android.view.Display.INVALID_DISPLAY;
+
 import android.graphics.Region;
-import android.view.IWindow;
-import android.view.InputChannel;
+import android.os.IBinder;
 
 /**
  * Functions as a handle for a window that can receive input.
@@ -37,8 +38,8 @@ public final class InputWindowHandle {
     // The client window.
     public final IWindow clientWindow;
 
-    // The input channel associated with the window.
-    public InputChannel inputChannel;
+    // The token assosciated with the window.
+    public IBinder token;
 
     // The window name.
     public String name;
@@ -55,6 +56,8 @@ public final class InputWindowHandle {
     public int frameTop;
     public int frameRight;
     public int frameBottom;
+
+    public int surfaceInset;
 
     // Global scaling factor applied to touch events when they are dispatched
     // to the window
@@ -90,6 +93,10 @@ public final class InputWindowHandle {
 
     // Display this input is on.
     public int displayId;
+
+    // If this value is set to a valid display ID, it indicates this window is a portal which
+    // transports the touch of this window to the display indicated by portalToDisplayId.
+    public int portalToDisplayId = INVALID_DISPLAY;
 
     private native void nativeDispose();
 

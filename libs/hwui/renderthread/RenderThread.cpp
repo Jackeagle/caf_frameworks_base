@@ -132,6 +132,7 @@ RenderThread::RenderThread()
         , mFrameCallbackTaskPending(false)
         , mRenderState(nullptr)
         , mEglManager(nullptr)
+        , mFunctorManager(WebViewFunctorManager::instance())
         , mVkManager(nullptr) {
     Properties::load();
     start("RenderThread");
@@ -170,6 +171,9 @@ void RenderThread::initThreadLocals() {
     mRenderState = new RenderState(*this);
     mVkManager = new VulkanManager(*this);
     mCacheManager = new CacheManager(mDisplayInfo);
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaVulkan) {
+        mVkManager->initialize();
+    }
 }
 
 void RenderThread::requireGlContext() {
@@ -197,10 +201,18 @@ void RenderThread::requireGlContext() {
     setGrContext(grContext);
 }
 
-void RenderThread::destroyGlContext() {
-    if (mEglManager->hasEglContext()) {
-        setGrContext(nullptr);
-        mEglManager->destroy();
+void RenderThread::destroyRenderingContext() {
+    mFunctorManager.onContextDestroyed();
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaGL) {
+        if (mEglManager->hasEglContext()) {
+            setGrContext(nullptr);
+            mEglManager->destroy();
+        }
+    } else {
+        if (vulkanManager().hasVkContext()) {
+            setGrContext(nullptr);
+            vulkanManager().destroy();
+        }
     }
 }
 

@@ -73,6 +73,11 @@ public final class StatsManager {
      */
     public static final String EXTRA_STATS_DIMENSIONS_VALUE =
             "android.app.extra.STATS_DIMENSIONS_VALUE";
+    /**
+     * Long array extra of the active configs for the uid that added those configs.
+     */
+    public static final String EXTRA_STATS_ACTIVE_CONFIG_KEYS =
+            "android.app.extra.STATS_ACTIVE_CONFIG_KEYS";
 
     /**
      * Broadcast Action: Statsd has started.
@@ -119,6 +124,7 @@ public final class StatsManager {
     /**
      * @deprecated Use {@link #addConfig(long, byte[])}
      */
+    @Deprecated
     @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
     public boolean addConfiguration(long configKey, byte[] config) {
         try {
@@ -154,6 +160,7 @@ public final class StatsManager {
     /**
      * @deprecated Use {@link #removeConfig(long)}
      */
+    @Deprecated
     @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
     public boolean removeConfiguration(long configKey) {
         try {
@@ -222,6 +229,7 @@ public final class StatsManager {
     /**
      * @deprecated Use {@link #setBroadcastSubscriber(PendingIntent, long, long)}
      */
+    @Deprecated
     @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
     public boolean setBroadcastSubscriber(
             long configKey, long subscriberId, PendingIntent pendingIntent) {
@@ -271,10 +279,51 @@ public final class StatsManager {
         }
     }
 
+    /**
+     * Registers the operation that is called whenever there is a change in which configs are
+     * active. This must be called each time statsd starts. This operation allows
+     * statsd to inform clients that they should pull data of the configs that are currently
+     * active. The activeConfigsChangedOperation should set periodic alarms to pull data of configs
+     * that are active and stop pulling data of configs that are no longer active.
+     *
+     * @param pendingIntent the PendingIntent to use when broadcasting info to the subscriber
+     *                      associated with the given subscriberId. May be null, in which case
+     *                      it removes any associated pending intent for this client.
+     * @return A list of configs that are currently active for this client. If the pendingIntent is
+     *         null, this will be an empty list.
+     * @throws StatsUnavailableException if unsuccessful due to failing to connect to stats service
+     */
+    @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
+    public long[] setActiveConfigsChangedOperation(@Nullable PendingIntent pendingIntent)
+            throws StatsUnavailableException {
+        synchronized (this) {
+            try {
+                IStatsManager service = getIStatsManagerLocked();
+                if (pendingIntent == null) {
+                    service.removeActiveConfigsChangedOperation(mContext.getOpPackageName());
+                    return new long[0];
+                } else {
+                    // Extracts IIntentSender from the PendingIntent and turns it into an IBinder.
+                    IBinder intentSender = pendingIntent.getTarget().asBinder();
+                    return service.setActiveConfigsChangedOperation(intentSender,
+                            mContext.getOpPackageName());
+                }
+
+            } catch (RemoteException e) {
+                Slog.e(TAG,
+                        "Failed to connect to statsd when registering active configs listener.");
+                throw new StatsUnavailableException("could not connect", e);
+            } catch (SecurityException e) {
+                throw new StatsUnavailableException(e.getMessage(), e);
+            }
+        }
+    }
+
     // TODO: Temporary for backwards compatibility. Remove.
     /**
      * @deprecated Use {@link #setFetchReportsOperation(PendingIntent, long)}
      */
+    @Deprecated
     @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
     public boolean setDataFetchOperation(long configKey, PendingIntent pendingIntent) {
         try {
@@ -312,6 +361,7 @@ public final class StatsManager {
     /**
      * @deprecated Use {@link #getReports(long)}
      */
+    @Deprecated
     @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
     public @Nullable byte[] getData(long configKey) {
         try {
@@ -348,6 +398,7 @@ public final class StatsManager {
     /**
      * @deprecated Use {@link #getStatsMetadata()}
      */
+    @Deprecated
     @RequiresPermission(allOf = { DUMP, PACKAGE_USAGE_STATS })
     public @Nullable byte[] getMetadata() {
         try {

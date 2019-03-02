@@ -29,6 +29,7 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLED;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -60,12 +61,14 @@ import android.net.wifi.WifiManager.NetworkRequestMatchCallback;
 import android.net.wifi.WifiManager.NetworkRequestUserSelectionCallback;
 import android.net.wifi.WifiManager.SoftApCallback;
 import android.net.wifi.WifiManager.TrafficStateCallback;
+import android.net.wifi.WifiManager.WifiUsabilityStatsListener;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.test.TestLooper;
-import android.support.test.filters.SmallTest;
+
+import androidx.test.filters.SmallTest;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -75,7 +78,10 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executor;
 
 /**
  * Unit tests for {@link android.net.wifi.WifiManager}.
@@ -88,6 +94,7 @@ public class WifiManagerTest {
     private static final int TEST_UID = 14553;
     private static final String TEST_PACKAGE_NAME = "TestPackage";
     private static final String TEST_COUNTRY_CODE = "US";
+    private static final String[] TEST_MAC_ADDRESSES = {"da:a1:19:0:0:0"};
 
     @Mock Context mContext;
     @Mock
@@ -98,7 +105,9 @@ public class WifiManagerTest {
     @Mock SoftApCallback mSoftApCallback;
     @Mock TrafficStateCallback mTrafficStateCallback;
     @Mock NetworkRequestMatchCallback mNetworkRequestMatchCallback;
+    @Mock WifiUsabilityStatsListener mWifiUsabilityStatsListener;
 
+    private Executor mExecutor;
     private Handler mHandler;
     private TestLooper mLooper;
     private WifiManager mWifiManager;
@@ -1271,14 +1280,20 @@ i     * Verify that a call to cancel WPS immediately returns a failure.
     }
 
     /**
-     * Check the call to getAllMatchingWifiConfigs calls getAllMatchingWifiConfigs of WifiService
-     * with the provided a list of ScanResult.
+     * Check the call to getAllMatchingWifiConfigs calls getAllMatchingFqdnsForScanResults and
+     * getWifiConfigsForPasspointProfiles of WifiService in order.
      */
     @Test
     public void testGetAllMatchingWifiConfigs() throws Exception {
+        Map<String, List<ScanResult>> fqdns = new HashMap<>();
+        fqdns.put("www.test.com", new ArrayList<>());
+        when(mWifiService.getAllMatchingFqdnsForScanResults(any(List.class))).thenReturn(fqdns);
+        InOrder inOrder = inOrder(mWifiService);
+
         mWifiManager.getAllMatchingWifiConfigs(new ArrayList<>());
 
-        verify(mWifiService).getAllMatchingWifiConfigs(any(List.class));
+        inOrder.verify(mWifiService).getAllMatchingFqdnsForScanResults(any(List.class));
+        inOrder.verify(mWifiService).getWifiConfigsForPasspointProfiles(any(List.class));
     }
 
     /**
@@ -1298,13 +1313,73 @@ i     * Verify that a call to cancel WPS immediately returns a failure.
      */
     @Test
     public void addRemoveNetworkSuggestions() throws Exception {
-        when(mWifiService.addNetworkSuggestions(any(List.class), anyString())).thenReturn(true);
-        when(mWifiService.removeNetworkSuggestions(any(List.class), anyString())).thenReturn(true);
+        when(mWifiService.addNetworkSuggestions(any(List.class), anyString()))
+                .thenReturn(WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS);
+        when(mWifiService.removeNetworkSuggestions(any(List.class), anyString()))
+                .thenReturn(WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS);
 
-        assertTrue(mWifiManager.addNetworkSuggestions(new ArrayList<>()));
+        assertEquals(WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS,
+                mWifiManager.addNetworkSuggestions(new ArrayList<>()));
         verify(mWifiService).addNetworkSuggestions(anyList(), eq(TEST_PACKAGE_NAME));
 
-        assertTrue(mWifiManager.removeNetworkSuggestions(new ArrayList<>()));
+        assertEquals(WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS,
+                mWifiManager.removeNetworkSuggestions(new ArrayList<>()));
         verify(mWifiService).removeNetworkSuggestions(anyList(), eq(TEST_PACKAGE_NAME));
+    }
+
+    /**
+     * Verify call to {@link WifiManager#getMaxNumberOfNetworkSuggestionsPerApp()}.
+     */
+    @Test
+    public void getMaxNumberOfNetworkSuggestionsPerApp() {
+        assertEquals(WifiManager.NETWORK_SUGGESTIONS_MAX_PER_APP,
+                mWifiManager.getMaxNumberOfNetworkSuggestionsPerApp());
+    }
+
+    /**
+     * Verify getting the factory MAC address.
+     * @throws Exception
+     */
+    @Test
+    public void testGetFactoryMacAddress() throws Exception {
+        when(mWifiService.getFactoryMacAddresses()).thenReturn(TEST_MAC_ADDRESSES);
+        assertArrayEquals(TEST_MAC_ADDRESSES, mWifiManager.getFactoryMacAddresses());
+        verify(mWifiService).getFactoryMacAddresses();
+    }
+
+    /**
+     * Verify the call to addWifiUsabilityStatsListener goes to WifiServiceImpl.
+     */
+    @Test
+    public void addWifiUsabilityStatsListeneroesToWifiServiceImpl() throws Exception {
+        mExecutor = new SynchronousExecutor();
+        mWifiManager.addWifiUsabilityStatsListener(mExecutor, mWifiUsabilityStatsListener);
+        verify(mWifiService).addWifiUsabilityStatsListener(any(IBinder.class),
+                any(IWifiUsabilityStatsListener.Stub.class), anyInt());
+    }
+
+    /**
+     * Verify the call to removeWifiUsabilityStatsListener goes to WifiServiceImpl.
+     */
+    @Test
+    public void removeWifiUsabilityListenerGoesToWifiServiceImpl() throws Exception {
+        ArgumentCaptor<Integer> listenerIdentifier = ArgumentCaptor.forClass(Integer.class);
+        mExecutor = new SynchronousExecutor();
+        mWifiManager.addWifiUsabilityStatsListener(mExecutor, mWifiUsabilityStatsListener);
+        verify(mWifiService).addWifiUsabilityStatsListener(any(IBinder.class),
+                any(IWifiUsabilityStatsListener.Stub.class), listenerIdentifier.capture());
+
+        mWifiManager.removeWifiUsabilityStatsListener(mWifiUsabilityStatsListener);
+        verify(mWifiService).removeWifiUsabilityStatsListener(
+                eq((int) listenerIdentifier.getValue()));
+    }
+
+    /**
+     * Defined for testing purpose.
+     */
+    class SynchronousExecutor implements Executor {
+        public void execute(Runnable r) {
+            r.run();
+        }
     }
 }

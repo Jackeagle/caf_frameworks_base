@@ -20,7 +20,6 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.os.IBinder;
 import android.view.Surface;
-import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
 
 public class TransactionCompat {
@@ -53,7 +52,7 @@ public class TransactionCompat {
     }
 
     public TransactionCompat setSize(SurfaceControlCompat surfaceControl, int w, int h) {
-        mTransaction.setSize(surfaceControl.mSurfaceControl, w, h);
+        mTransaction.setBufferSize(surfaceControl.mSurfaceControl, w, h);
         return this;
     }
 
@@ -80,6 +79,11 @@ public class TransactionCompat {
 
     public TransactionCompat setWindowCrop(SurfaceControlCompat surfaceControl, Rect crop) {
         mTransaction.setWindowCrop(surfaceControl.mSurfaceControl, crop);
+        return this;
+    }
+
+    public TransactionCompat setCornerRadius(SurfaceControlCompat surfaceControl, float radius) {
+        mTransaction.setCornerRadius(surfaceControl.mSurfaceControl, radius);
         return this;
     }
 

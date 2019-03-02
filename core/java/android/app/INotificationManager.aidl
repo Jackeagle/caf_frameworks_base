@@ -65,6 +65,14 @@ interface INotificationManager
     boolean areNotificationsEnabled(String pkg);
     int getPackageImportance(String pkg);
 
+    boolean shouldHideSilentStatusIcons(String callingPkg);
+    void setHideSilentStatusIcons(boolean hide);
+
+    void setBubblesAllowed(String pkg, int uid, boolean allowed);
+    boolean areBubblesAllowed(String pkg);
+    boolean areBubblesAllowedForPackage(String pkg, int uid);
+    boolean hasUserApprovedBubblesForPackage(String pkg, int uid);
+
     void createNotificationChannelGroups(String pkg, in ParceledListSlice channelGroupList);
     void createNotificationChannels(String pkg, in ParceledListSlice channelsList);
     void createNotificationChannelsForPackage(String pkg, int uid, in ParceledListSlice channelsList);
@@ -90,6 +98,7 @@ interface INotificationManager
     boolean areChannelsBypassingDnd();
     int getAppsBypassingDndCount(int uid);
     ParceledListSlice getNotificationChannelsBypassingDnd(String pkg, int userId);
+    boolean isPackagePaused(String pkg);
 
     // TODO: Remove this when callers have been migrated to the equivalent
     // INotificationListener method.
@@ -145,6 +154,8 @@ interface INotificationManager
     void setNotificationAssistantAccessGrantedForUser(in ComponentName assistant, int userId, boolean enabled);
     List<String> getEnabledNotificationListenerPackages();
     List<ComponentName> getEnabledNotificationListeners(int userId);
+    ComponentName getAllowedNotificationAssistantForUser(int userId);
+    ComponentName getAllowedNotificationAssistant();
 
     int getZenMode();
     ZenModeConfig getZenModeConfig();
@@ -164,6 +175,7 @@ interface INotificationManager
     boolean removeAutomaticZenRule(String id);
     boolean removeAutomaticZenRules(String packageName);
     int getRuleInstanceCount(in ComponentName owner);
+    void setAutomaticZenRuleState(String id, in Condition condition);
 
     byte[] getBackupPayload(int user);
     void applyRestore(in byte[] payload, int user);
@@ -174,4 +186,7 @@ interface INotificationManager
     void revokeNotificationDelegate(String callingPkg);
     String getNotificationDelegate(String callingPkg);
     boolean canNotifyAsPackage(String callingPkg, String targetPkg);
+
+    void setPrivateNotificationsAllowed(boolean allow);
+    boolean getPrivateNotificationsAllowed();
 }

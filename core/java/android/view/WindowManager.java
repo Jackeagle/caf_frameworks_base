@@ -255,6 +255,12 @@ public interface WindowManager extends ViewManager {
     int TRANSIT_CRASHING_ACTIVITY_CLOSE = 26;
 
     /**
+     * A task is changing windowing modes
+     * @hide
+     */
+    int TRANSIT_TASK_CHANGE_WINDOWING_MODE = 27;
+
+    /**
      * @hide
      */
     @IntDef(prefix = { "TRANSIT_" }, value = {
@@ -280,7 +286,8 @@ public interface WindowManager extends ViewManager {
             TRANSIT_KEYGUARD_UNOCCLUDE,
             TRANSIT_TRANSLUCENT_ACTIVITY_OPEN,
             TRANSIT_TRANSLUCENT_ACTIVITY_CLOSE,
-            TRANSIT_CRASHING_ACTIVITY_CLOSE
+            TRANSIT_CRASHING_ACTIVITY_CLOSE,
+            TRANSIT_TASK_CHANGE_WINDOWING_MODE
     })
     @Retention(RetentionPolicy.SOURCE)
     @interface TransitionType {}
@@ -1752,15 +1759,6 @@ public interface WindowManager extends ViewManager {
         public static final int PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY = 0x00100000;
 
         /**
-         * If this flag is set on the window, window manager will acquire a sleep token that puts
-         * all activities to sleep as long as this window is visible. When this flag is set, the
-         * window needs to occlude all activity windows.
-         * @hide
-         */
-        @RequiresPermission(permission.DEVICE_POWER)
-        public static final int PRIVATE_FLAG_ACQUIRES_SLEEP_TOKEN = 0x00200000;
-
-        /**
          * Flag to indicate that this window should be considered a screen decoration similar to the
          * nav bar and status bar. This will cause this window to affect the window insets reported
          * to other windows when it is visible.
@@ -1871,10 +1869,6 @@ public interface WindowManager extends ViewManager {
                         mask = PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY,
                         equals = PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY,
                         name = "IS_ROUNDED_CORNERS_OVERLAY"),
-                @ViewDebug.FlagToString(
-                        mask = PRIVATE_FLAG_ACQUIRES_SLEEP_TOKEN,
-                        equals = PRIVATE_FLAG_ACQUIRES_SLEEP_TOKEN,
-                        name = "ACQUIRES_SLEEP_TOKEN"),
                 @ViewDebug.FlagToString(
                         mask = PRIVATE_FLAG_IS_SCREEN_DECOR,
                         equals = PRIVATE_FLAG_IS_SCREEN_DECOR,

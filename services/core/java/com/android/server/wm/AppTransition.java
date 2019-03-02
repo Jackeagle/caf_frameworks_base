@@ -29,6 +29,7 @@ import static android.view.WindowManager.TRANSIT_KEYGUARD_GOING_AWAY_ON_WALLPAPE
 import static android.view.WindowManager.TRANSIT_KEYGUARD_OCCLUDE;
 import static android.view.WindowManager.TRANSIT_KEYGUARD_UNOCCLUDE;
 import static android.view.WindowManager.TRANSIT_NONE;
+import static android.view.WindowManager.TRANSIT_TASK_CHANGE_WINDOWING_MODE;
 import static android.view.WindowManager.TRANSIT_TASK_CLOSE;
 import static android.view.WindowManager.TRANSIT_TASK_IN_PLACE;
 import static android.view.WindowManager.TRANSIT_TASK_OPEN;
@@ -65,6 +66,8 @@ import static com.android.internal.R.styleable.WindowAnimation_wallpaperIntraOpe
 import static com.android.internal.R.styleable.WindowAnimation_wallpaperIntraOpenExitAnimation;
 import static com.android.internal.R.styleable.WindowAnimation_wallpaperOpenEnterAnimation;
 import static com.android.internal.R.styleable.WindowAnimation_wallpaperOpenExitAnimation;
+import static com.android.server.wm.AppTransitionProto.APP_TRANSITION_STATE;
+import static com.android.server.wm.AppTransitionProto.LAST_USED_APP_TRANSITION;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ANIM;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
@@ -73,8 +76,6 @@ import static com.android.server.wm.WindowManagerInternal.AppTransitionListener;
 import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_AFTER_ANIM;
 import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_BEFORE_ANIM;
 import static com.android.server.wm.WindowStateAnimator.STACK_CLIP_NONE;
-import static com.android.server.wm.AppTransitionProto.APP_TRANSITION_STATE;
-import static com.android.server.wm.AppTransitionProto.LAST_USED_APP_TRANSITION;
 
 import android.annotation.DrawableRes;
 import android.annotation.NonNull;
@@ -84,6 +85,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.ResourceId;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -173,6 +175,7 @@ public class AppTransition implements Dump {
     private int mLastUsedAppTransition = TRANSIT_UNSET;
     private String mLastOpeningApp;
     private String mLastClosingApp;
+    private String mLastChangingApp;
 
     private static final int NEXT_TRANSIT_TYPE_NONE = 0;
     private static final int NEXT_TRANSIT_TYPE_CUSTOM = 1;
@@ -317,14 +320,16 @@ public class AppTransition implements Dump {
     private void setAppTransition(int transit, int flags) {
         mNextAppTransition = transit;
         mNextAppTransitionFlags |= flags;
-        setLastAppTransition(TRANSIT_UNSET, null, null);
+        setLastAppTransition(TRANSIT_UNSET, null, null, null);
         updateBooster();
     }
 
-    void setLastAppTransition(int transit, AppWindowToken openingApp, AppWindowToken closingApp) {
+    void setLastAppTransition(int transit, AppWindowToken openingApp, AppWindowToken closingApp,
+            AppWindowToken changingApp) {
         mLastUsedAppTransition = transit;
         mLastOpeningApp = "" + openingApp;
         mLastClosingApp = "" + closingApp;
+        mLastChangingApp = "" + changingApp;
     }
 
     boolean isReady() {
@@ -411,9 +416,7 @@ public class AppTransition implements Dump {
      * @return bit-map of WindowManagerPolicy#FINISH_LAYOUT_REDO_* to indicate whether another
      *         layout pass needs to be done
      */
-    int goodToGo(int transit, AppWindowToken topOpeningApp,
-            AppWindowToken topClosingApp, ArraySet<AppWindowToken> openingApps,
-            ArraySet<AppWindowToken> closingApps) {
+    int goodToGo(int transit, AppWindowToken topOpeningApp, ArraySet<AppWindowToken> openingApps) {
         mNextAppTransition = TRANSIT_UNSET;
         mNextAppTransitionFlags = 0;
         setAppTransitionState(APP_STATE_RUNNING);
@@ -421,8 +424,6 @@ public class AppTransition implements Dump {
                 ? topOpeningApp.getAnimation()
                 : null;
         int redoLayout = notifyAppTransitionStartingLocked(transit,
-                topOpeningApp != null ? topOpeningApp.token : null,
-                topClosingApp != null ? topClosingApp.token : null,
                 topOpeningAnim != null ? topOpeningAnim.getDurationHint() : 0,
                 topOpeningAnim != null
                         ? topOpeningAnim.getStatusBarTransitionsStartTime()
@@ -499,13 +500,12 @@ public class AppTransition implements Dump {
         }
     }
 
-    private int notifyAppTransitionStartingLocked(int transit, IBinder openToken,
-            IBinder closeToken, long duration, long statusBarAnimationStartTime,
-            long statusBarAnimationDuration) {
+    private int notifyAppTransitionStartingLocked(int transit, long duration,
+            long statusBarAnimationStartTime, long statusBarAnimationDuration) {
         int redoLayout = 0;
         for (int i = 0; i < mListeners.size(); i++) {
-            redoLayout |= mListeners.get(i).onAppTransitionStartingLocked(transit, openToken,
-                    closeToken, duration, statusBarAnimationStartTime, statusBarAnimationDuration);
+            redoLayout |= mListeners.get(i).onAppTransitionStartingLocked(transit, duration,
+                    statusBarAnimationStartTime, statusBarAnimationDuration);
         }
         return redoLayout;
     }
@@ -547,7 +547,7 @@ public class AppTransition implements Dump {
     }
 
     Animation loadAnimationAttr(LayoutParams lp, int animAttr, int transit) {
-        int resId = ResourceId.ID_NULL;
+        int resId = Resources.ID_NULL;
         Context context = mContext;
         if (animAttr >= 0) {
             AttributeCache.Entry ent = getCachedAnimations(lp);
@@ -1663,6 +1663,15 @@ public class AppTransition implements Dump {
                     "applyAnimation NEXT_TRANSIT_TYPE_OPEN_CROSS_PROFILE_APPS:"
                             + " anim=" + a + " transit=" + appTransitionToString(transit)
                             + " isEntrance=true" + " Callers=" + Debug.getCallers(3));
+        } else if (transit == TRANSIT_TASK_CHANGE_WINDOWING_MODE) {
+            // In the absence of a specific adapter, we just want to keep everything stationary.
+            a = new AlphaAnimation(1.f, 1.f);
+            a.setDuration(WindowChangeAnimationSpec.ANIMATION_DURATION);
+            if (DEBUG_APP_TRANSITIONS || DEBUG_ANIM) {
+                Slog.v(TAG, "applyAnimation:"
+                        + " anim=" + a + " transit=" + appTransitionToString(transit)
+                        + " isEntrance=" + enter + " Callers=" + Debug.getCallers(3));
+            }
         } else {
             int animAttr = 0;
             switch (transit) {
@@ -2127,6 +2136,8 @@ public class AppTransition implements Dump {
                     pw.println(mLastOpeningApp);
             pw.print(prefix); pw.print("mLastClosingApp=");
                     pw.println(mLastClosingApp);
+            pw.print(prefix); pw.print("mLastChangingApp=");
+            pw.println(mLastChangingApp);
         }
     }
 
@@ -2225,14 +2236,16 @@ public class AppTransition implements Dump {
             if (dc == null) {
                 return;
             }
-            if (isTransitionSet() || !dc.mOpeningApps.isEmpty() || !dc.mClosingApps.isEmpty()) {
+            if (isTransitionSet() || !dc.mOpeningApps.isEmpty() || !dc.mClosingApps.isEmpty()
+                    || !dc.mChangingApps.isEmpty()) {
                 if (DEBUG_APP_TRANSITIONS) {
                     Slog.v(TAG_WM, "*** APP TRANSITION TIMEOUT."
                             + " displayId=" + dc.getDisplayId()
                             + " isTransitionSet()="
                             + dc.mAppTransition.isTransitionSet()
                             + " mOpeningApps.size()=" + dc.mOpeningApps.size()
-                            + " mClosingApps.size()=" + dc.mClosingApps.size());
+                            + " mClosingApps.size()=" + dc.mClosingApps.size()
+                            + " mChangingApps.size()=" + dc.mChangingApps.size());
                 }
                 setTimeout();
                 mService.mWindowPlacerLocked.performSurfacePlacement();

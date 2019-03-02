@@ -57,8 +57,6 @@ import java.util.Objects;
  * </p>
  */
 final class LogicalDisplay {
-    private static final String PROP_MASKING_INSET_TOP = "persist.sys.displayinset.top";
-
     private final DisplayInfo mBaseDisplayInfo = new DisplayInfo();
 
     // The layer stack we use when the display has been blanked to prevent any
@@ -420,10 +418,15 @@ final class LogicalDisplay {
         // Now add back the offset for the masked area.
         mTempDisplayRect.offset(maskingInsets.left, maskingInsets.top);
 
-        mTempDisplayRect.left += mDisplayOffsetX;
-        mTempDisplayRect.right += mDisplayOffsetX;
-        mTempDisplayRect.top += mDisplayOffsetY;
-        mTempDisplayRect.bottom += mDisplayOffsetY;
+        if (orientation == Surface.ROTATION_0) {
+            mTempDisplayRect.offset(mDisplayOffsetX, mDisplayOffsetY);
+        } else if (orientation == Surface.ROTATION_90) {
+            mTempDisplayRect.offset(mDisplayOffsetY, -mDisplayOffsetX);
+        } else if (orientation == Surface.ROTATION_180) {
+            mTempDisplayRect.offset(-mDisplayOffsetX, -mDisplayOffsetY);
+        } else {  // Surface.ROTATION_270
+            mTempDisplayRect.offset(-mDisplayOffsetY, mDisplayOffsetX);
+        }
         device.setProjectionLocked(t, orientation, mTempLayerStackRect, mTempDisplayRect);
     }
 

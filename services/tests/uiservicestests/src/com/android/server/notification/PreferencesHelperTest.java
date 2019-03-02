@@ -809,7 +809,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         channel.setBypassDnd(true);
         channel.setLockscreenVisibility(Notification.VISIBILITY_SECRET);
         channel.setShowBadge(true);
-        channel.setAllowAppOverlay(false);
+        channel.setAllowBubbles(false);
         int lockMask = 0;
         for (int i = 0; i < NotificationChannel.LOCKABLE_FIELDS.length; i++) {
             lockMask |= NotificationChannel.LOCKABLE_FIELDS[i];
@@ -826,7 +826,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         assertFalse(savedChannel.canBypassDnd());
         assertFalse(Notification.VISIBILITY_SECRET == savedChannel.getLockscreenVisibility());
         assertEquals(channel.canShowBadge(), savedChannel.canShowBadge());
-        assertEquals(channel.canOverlayApps(), savedChannel.canOverlayApps());
+        assertEquals(channel.canBubble(), savedChannel.canBubble());
 
         verify(mHandler, never()).requestSort();
     }
@@ -840,7 +840,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         channel.setBypassDnd(true);
         channel.setLockscreenVisibility(Notification.VISIBILITY_SECRET);
         channel.setShowBadge(true);
-        channel.setAllowAppOverlay(false);
+        channel.setAllowBubbles(false);
         int lockMask = 0;
         for (int i = 0; i < NotificationChannel.LOCKABLE_FIELDS.length; i++) {
             lockMask |= NotificationChannel.LOCKABLE_FIELDS[i];
@@ -857,7 +857,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         assertFalse(savedChannel.canBypassDnd());
         assertFalse(Notification.VISIBILITY_SECRET == savedChannel.getLockscreenVisibility());
         assertEquals(channel.canShowBadge(), savedChannel.canShowBadge());
-        assertEquals(channel.canOverlayApps(), savedChannel.canOverlayApps());
+        assertEquals(channel.canBubble(), savedChannel.canBubble());
     }
 
     @Test
@@ -969,16 +969,16 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    public void testLockFields_appOverlay() {
+    public void testLockFields_allowBubble() {
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, getChannel(), true, false);
         assertEquals(0,
                 mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, getChannel().getId(), false)
                         .getUserLockedFields());
 
         final NotificationChannel update = getChannel();
-        update.setAllowAppOverlay(false);
+        update.setAllowBubbles(false);
         mHelper.updateNotificationChannel(PKG_N_MR1, UID_N_MR1, update, true);
-        assertEquals(NotificationChannel.USER_LOCKED_ALLOW_APP_OVERLAY,
+        assertEquals(NotificationChannel.USER_LOCKED_ALLOW_BUBBLE,
                 mHelper.getNotificationChannel(PKG_N_MR1, UID_N_MR1, update.getId(), false)
                         .getUserLockedFields());
     }
@@ -1087,6 +1087,24 @@ public class PreferencesHelperTest extends UiServiceTestCase {
 
         assertEquals(1, mHelper.getBlockedChannelCount(PKG_N_MR1, UID_N_MR1));
         assertEquals(0, mHelper.getBlockedChannelCount("pkg2", UID_O));
+    }
+
+    @Test
+    public void testUpdateChannelsBypassingDnd_onUserSwitch_onUserUnlocked() throws Exception {
+        int user = USER.getIdentifier();
+        NotificationChannelGroup ncg = new NotificationChannelGroup("group1", "name1");
+        NotificationChannel channel1 = new NotificationChannel("id1", "name1",
+                NotificationManager.IMPORTANCE_MAX);
+        channel1.setBypassDnd(true);
+        channel1.setGroup(ncg.getId());
+
+        // channel is associated with a group, then group is deleted
+        mHelper.createNotificationChannelGroup(PKG_N_MR1, user, ncg,  /* fromTargetApp */ true);
+        mHelper.createNotificationChannel(PKG_N_MR1, user, channel1, true, /*has DND access*/ true);
+        mHelper.deleteNotificationChannelGroup(PKG_N_MR1, user, ncg.getId());
+
+        mHelper.onUserSwitched(user);
+        mHelper.onUserUnlocked(user);
     }
 
     @Test
@@ -1566,39 +1584,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    public void testUpdateGroup_fromSystem_appOverlay() {
-        NotificationChannelGroup ncg = new NotificationChannelGroup("group1", "name1");
-        mHelper.createNotificationChannelGroup(PKG_N_MR1, UID_N_MR1, ncg, true);
-
-        // from system, allowed
-        NotificationChannelGroup update = ncg.clone();
-        update.setAllowAppOverlay(false);
-
-        mHelper.createNotificationChannelGroup(PKG_N_MR1, UID_N_MR1, update, false);
-        NotificationChannelGroup updated =
-                mHelper.getNotificationChannelGroup("group1", PKG_N_MR1, UID_N_MR1);
-        assertFalse(updated.canOverlayApps());
-        assertEquals(NotificationChannelGroup.USER_LOCKED_ALLOW_APP_OVERLAY,
-                updated.getUserLockedFields());
-    }
-
-    @Test
-    public void testUpdateGroup_fromApp_appOverlay() {
-        NotificationChannelGroup ncg = new NotificationChannelGroup("group1", "name1");
-        mHelper.createNotificationChannelGroup(PKG_N_MR1, UID_N_MR1, ncg, true);
-
-        // from app, not allowed
-        NotificationChannelGroup update = new NotificationChannelGroup("group1", "name1");
-        update.setAllowAppOverlay(false);
-
-        mHelper.createNotificationChannelGroup(PKG_N_MR1, UID_N_MR1, ncg, true);
-        NotificationChannelGroup updated =
-                mHelper.getNotificationChannelGroup("group1", PKG_N_MR1, UID_N_MR1);
-        assertTrue(updated.canOverlayApps());
-        assertEquals(0, updated.getUserLockedFields());
-    }
-
-    @Test
     public void testCannotCreateChannel_badGroup() {
         NotificationChannel channel1 =
                 new NotificationChannel("id1", "name1", NotificationManager.IMPORTANCE_HIGH);
@@ -2021,6 +2006,28 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
+    public void testXml_statusBarIcons_default() throws Exception {
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
+        loadStreamXml(baos, false);
+
+        assertEquals(PreferencesHelper.DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS,
+                mHelper.shouldHideSilentStatusIcons());
+    }
+
+    @Test
+    public void testXml_statusBarIcons() throws Exception {
+        mHelper.setHideSilentStatusIcons(!PreferencesHelper.DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS);
+
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
+        loadStreamXml(baos, false);
+
+        assertEquals(!PreferencesHelper.DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS,
+                mHelper.shouldHideSilentStatusIcons());
+    }
+
+    @Test
     public void testSetNotificationDelegate() {
         mHelper.setNotificationDelegate(PKG_O, UID_O, "other", 53);
         assertEquals("other", mHelper.getNotificationDelegate(PKG_O, UID_O));
@@ -2173,5 +2180,150 @@ public class PreferencesHelperTest extends UiServiceTestCase {
 
         mHelper.toggleNotificationDelegate(PKG_O, UID_O, true);
         assertEquals("other", mHelper.getNotificationDelegate(PKG_O, UID_O));
+    }
+
+    @Test
+    public void testAllowBubbles_defaults() throws Exception {
+        assertTrue(mHelper.areBubblesAllowed(PKG_O, UID_O));
+
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
+        loadStreamXml(baos, false);
+
+        assertTrue(mHelper.areBubblesAllowed(PKG_O, UID_O));
+        assertEquals(0, mHelper.getAppLockedFields(PKG_O, UID_O));
+    }
+
+    @Test
+    public void testAllowBubbles_xml() throws Exception {
+        mHelper.setBubblesAllowed(PKG_O, UID_O, false);
+        assertFalse(mHelper.areBubblesAllowed(PKG_O, UID_O));
+        assertEquals(PreferencesHelper.LockableAppFields.USER_LOCKED_BUBBLE,
+                mHelper.getAppLockedFields(PKG_O, UID_O));
+
+        ByteArrayOutputStream baos = writeXmlAndPurge(PKG_O, UID_O, false);
+        mHelper = new PreferencesHelper(getContext(), mPm, mHandler, mMockZenModeHelper);
+        loadStreamXml(baos, false);
+
+        assertFalse(mHelper.areBubblesAllowed(PKG_O, UID_O));
+        assertEquals(PreferencesHelper.LockableAppFields.USER_LOCKED_BUBBLE,
+                mHelper.getAppLockedFields(PKG_O, UID_O));
+    }
+
+    @Test
+    public void testLockChannelsForOEM_emptyList() {
+        mHelper.lockChannelsForOEM(null);
+        mHelper.lockChannelsForOEM(new String[0]);
+        // no exception
+    }
+
+    @Test
+    public void testLockChannelsForOEM_appWide() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        NotificationChannel c = new NotificationChannel("c", "c", IMPORTANCE_DEFAULT);
+        // different uids, same package
+        mHelper.createNotificationChannel(PKG_O, 3, a, true, false);
+        mHelper.createNotificationChannel(PKG_O, 3, b, false, false);
+        mHelper.createNotificationChannel(PKG_O, 30, c, true, true);
+
+        mHelper.lockChannelsForOEM(new String[] {PKG_O});
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 3, a.getId(), false)
+                .isImportanceLockedByOEM());
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 3, b.getId(), false)
+                .isImportanceLockedByOEM());
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 30, c.getId(), false)
+                .isImportanceLockedByOEM());
+    }
+
+    @Test
+    public void testLockChannelsForOEM_onlyGivenPkg() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        mHelper.createNotificationChannel(PKG_O, 3, a, true, false);
+        mHelper.createNotificationChannel(PKG_N_MR1, 30, b, false, false);
+
+        mHelper.lockChannelsForOEM(new String[] {PKG_O});
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 3, a.getId(), false)
+                .isImportanceLockedByOEM());
+        assertFalse(mHelper.getNotificationChannel(PKG_N_MR1, 30, b.getId(), false)
+                .isImportanceLockedByOEM());
+    }
+
+    @Test
+    public void testLockChannelsForOEM_channelSpecific() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        NotificationChannel c = new NotificationChannel("c", "c", IMPORTANCE_DEFAULT);
+        // different uids, same package
+        mHelper.createNotificationChannel(PKG_O, 3, a, true, false);
+        mHelper.createNotificationChannel(PKG_O, 3, b, false, false);
+        mHelper.createNotificationChannel(PKG_O, 30, c, true, true);
+
+        mHelper.lockChannelsForOEM(new String[] {PKG_O + ":b", PKG_O + ":c"});
+
+        assertFalse(mHelper.getNotificationChannel(PKG_O, 3, a.getId(), false)
+                .isImportanceLockedByOEM());
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 3, b.getId(), false)
+                .isImportanceLockedByOEM());
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 30, c.getId(), false)
+                .isImportanceLockedByOEM());
+    }
+
+    @Test
+    public void testLockChannelsForOEM_channelDoesNotExistYet_appWide() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        mHelper.createNotificationChannel(PKG_O, 3, a, true, false);
+
+        mHelper.lockChannelsForOEM(new String[] {PKG_O});
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 3, a.getId(), false)
+                .isImportanceLockedByOEM());
+
+        mHelper.createNotificationChannel(PKG_O, 3, b, true, false);
+        assertTrue(mHelper.getNotificationChannel(PKG_O, 3, b.getId(), false)
+                .isImportanceLockedByOEM());
+    }
+
+    @Test
+    public void testLockChannelsForOEM_channelDoesNotExistYet_channelSpecific() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        NotificationChannel b = new NotificationChannel("b", "b", IMPORTANCE_LOW);
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+
+        mHelper.lockChannelsForOEM(new String[] {PKG_O + ":a", PKG_O + ":b"});
+
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false)
+                .isImportanceLockedByOEM());
+
+        mHelper.createNotificationChannel(PKG_O, UID_O, b, true, false);
+        assertTrue(mHelper.getNotificationChannel(PKG_O, UID_O, b.getId(), false)
+                .isImportanceLockedByOEM());
+    }
+
+    @Test
+    public void testUpdateNotificationChannel_oemLockedImportance() {
+        NotificationChannel a = new NotificationChannel("a", "a", IMPORTANCE_HIGH);
+        mHelper.createNotificationChannel(PKG_O, UID_O, a, true, false);
+
+        mHelper.lockChannelsForOEM(new String[] {PKG_O});
+
+        NotificationChannel update = new NotificationChannel("a", "a", IMPORTANCE_NONE);
+        update.setAllowBubbles(false);
+
+        mHelper.updateNotificationChannel(PKG_O, UID_O, update, true);
+
+        assertEquals(IMPORTANCE_HIGH,
+                mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).getImportance());
+        assertEquals(false,
+                mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).canBubble());
+
+        mHelper.updateNotificationChannel(PKG_O, UID_O, update, true);
+
+        assertEquals(IMPORTANCE_HIGH,
+                mHelper.getNotificationChannel(PKG_O, UID_O, a.getId(), false).getImportance());
     }
 }

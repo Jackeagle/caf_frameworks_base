@@ -24,6 +24,7 @@ import android.animation.LayoutTransition;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import android.annotation.ColorInt;
+import android.annotation.StyleRes;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.graphics.Color;
@@ -89,7 +90,7 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
      */
     private Runnable mContentChangeListener;
     private Slice mSlice;
-    private boolean mPulsing;
+    private boolean mHasHeader;
 
     public KeyguardSliceView(Context context) {
         this(context, null, 0);
@@ -149,10 +150,18 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
         Dependency.get(ConfigurationController.class).removeCallback(this);
     }
 
+    /**
+     * Returns whether the current visible slice has a title/header.
+     */
+    public boolean hasHeader() {
+        return mHasHeader;
+    }
+
     private void showSlice() {
         Trace.beginSection("KeyguardSliceView#showSlice");
-        if (mPulsing || mSlice == null) {
+        if (mSlice == null) {
             mRow.setVisibility(GONE);
+            mHasHeader = false;
             if (mContentChangeListener != null) {
                 mContentChangeListener.run();
             }
@@ -161,7 +170,7 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
 
         ListContent lc = new ListContent(getContext(), mSlice);
         SliceContent headerContent = lc.getHeader();
-        boolean hasHeader = headerContent != null
+        mHasHeader = headerContent != null
                 && !headerContent.getSliceItem().hasHint(HINT_LIST_ITEM);
         List<SliceContent> subItems = new ArrayList<>();
         for (int i = 0; i < lc.getRowItems().size(); i++) {
@@ -176,7 +185,7 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
         mClickActions.clear();
         final int subItemsCount = subItems.size();
         final int blendedColor = getTextColor();
-        final int startIndex = hasHeader ? 1 : 0; // First item is header; skip it
+        final int startIndex = mHasHeader ? 1 : 0; // First item is header; skip it
         mRow.setVisibility(subItemsCount > 0 ? VISIBLE : GONE);
         for (int i = startIndex; i < subItemsCount; i++) {
             RowContent rc = (RowContent) subItems.get(i);
@@ -188,7 +197,7 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
                 button = new KeyguardSliceButton(mContext);
                 button.setTextColor(blendedColor);
                 button.setTag(itemTag);
-                final int viewIndex = i - (hasHeader ? 1 : 0);
+                final int viewIndex = i - (mHasHeader ? 1 : 0);
                 mRow.addView(button, viewIndex);
             }
 
@@ -207,9 +216,11 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
                     android.app.slice.SliceItem.FORMAT_IMAGE);
             if (icon != null) {
                 iconDrawable = icon.getIcon().loadDrawable(mContext);
-                final int width = (int) (iconDrawable.getIntrinsicWidth()
-                        / (float) iconDrawable.getIntrinsicHeight() * mIconSize);
-                iconDrawable.setBounds(0, 0, Math.max(width, 1), mIconSize);
+                if (iconDrawable != null) {
+                    final int width = (int) (iconDrawable.getIntrinsicWidth()
+                            / (float) iconDrawable.getIntrinsicHeight() * mIconSize);
+                    iconDrawable.setBounds(0, 0, Math.max(width, 1), mIconSize);
+                }
             }
             button.setCompoundDrawables(iconDrawable, null, null, null);
             button.setOnClickListener(this);
@@ -229,18 +240,6 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
             mContentChangeListener.run();
         }
         Trace.endSection();
-    }
-
-    public void setPulsing(boolean pulsing, boolean animate) {
-        mPulsing = pulsing;
-        LayoutTransition transition = getLayoutTransition();
-        if (!animate) {
-            setLayoutTransition(null);
-        }
-        showSlice();
-        if (!animate) {
-            setLayoutTransition(transition);
-        }
     }
 
     public void setDarkAmount(float darkAmount) {
@@ -444,9 +443,11 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
     static class KeyguardSliceButton extends Button implements
             ConfigurationController.ConfigurationListener {
 
+        @StyleRes
+        private static int sStyleId = R.style.TextAppearance_Keyguard_Secondary;
+
         public KeyguardSliceButton(Context context) {
-            super(context, null /* attrs */, 0 /* styleAttr */,
-                    com.android.keyguard.R.style.TextAppearance_Keyguard_Secondary);
+            super(context, null /* attrs */, 0 /* styleAttr */, sStyleId);
             onDensityOrFontScaleChanged();
             setEllipsize(TruncateAt.END);
         }
@@ -466,6 +467,11 @@ public class KeyguardSliceView extends LinearLayout implements View.OnClickListe
         @Override
         public void onDensityOrFontScaleChanged() {
             updatePadding();
+        }
+
+        @Override
+        public void onOverlayChanged() {
+            setTextAppearance(sStyleId);
         }
 
         @Override

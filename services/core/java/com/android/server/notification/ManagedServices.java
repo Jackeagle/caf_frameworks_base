@@ -558,7 +558,7 @@ abstract public class ManagedServices {
         if (pkgList != null && (pkgList.length > 0)) {
             boolean anyServicesInvolved = false;
             // Remove notification settings for uninstalled package
-            if (removingPackage) {
+            if (removingPackage && uidList != null) {
                 int size = Math.min(pkgList.length, uidList.length);
                 for (int i = 0; i < size; i++) {
                     final String pkg = pkgList[i];
@@ -570,9 +570,11 @@ abstract public class ManagedServices {
                 if (mEnabledServicesPackageNames.contains(pkgName)) {
                     anyServicesInvolved = true;
                 }
-                for (int uid : uidList) {
-                    if (isPackageAllowed(pkgName, UserHandle.getUserId(uid))) {
-                        anyServicesInvolved = true;
+                if (uidList != null && uidList.length > 0) {
+                    for (int uid : uidList) {
+                        if (isPackageAllowed(pkgName, UserHandle.getUserId(uid))) {
+                            anyServicesInvolved = true;
+                        }
                     }
                 }
             }
@@ -763,6 +765,23 @@ abstract public class ManagedServices {
             }
         }
         return installed;
+    }
+
+    protected Set<String> getAllowedPackages() {
+        final Set<String> allowedPackages = new ArraySet<>();
+        for (int k = 0; k < mApproved.size(); k++) {
+            ArrayMap<Boolean, ArraySet<String>> allowedByType = mApproved.valueAt(k);
+            for (int i = 0; i < allowedByType.size(); i++) {
+                final ArraySet<String> allowed = allowedByType.valueAt(i);
+                for (int j = 0; j < allowed.size(); j++) {
+                    String pkgName = getPackageName(allowed.valueAt(j));
+                    if (!TextUtils.isEmpty(pkgName)) {
+                        allowedPackages.add(pkgName);
+                    }
+                }
+            }
+        }
+        return allowedPackages;
     }
 
     private void trimApprovedListsAccordingToInstalledServices() {

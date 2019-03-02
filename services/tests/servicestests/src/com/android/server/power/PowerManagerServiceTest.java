@@ -21,7 +21,6 @@ import static android.os.PowerManagerInternal.WAKEFULNESS_AWAKE;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -37,6 +36,7 @@ import android.os.PowerSaveState;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.test.AndroidTestCase;
+import android.test.suitebuilder.annotation.MediumTest;
 import android.test.suitebuilder.annotation.SmallTest;
 
 import com.android.internal.app.IBatteryStats;
@@ -46,6 +46,7 @@ import com.android.server.lights.LightsManager;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.power.PowerManagerService.Injector;
 import com.android.server.power.PowerManagerService.NativeWrapper;
+import com.android.server.power.batterysaver.BatterySaverPolicy;
 import com.android.server.power.batterysaver.BatterySavingStats;
 
 import org.junit.Rule;
@@ -84,7 +85,7 @@ public class PowerManagerServiceTest extends AndroidTestCase {
                 .setBrightnessFactor(BRIGHTNESS_FACTOR)
                 .build();
         when(mBatterySaverPolicyMock.getBatterySaverPolicy(
-                eq(PowerManager.ServiceType.SCREEN_BRIGHTNESS), anyBoolean()))
+                eq(PowerManager.ServiceType.SCREEN_BRIGHTNESS)))
                 .thenReturn(mPowerSaveState);
 
         mDisplayPowerRequest = new DisplayPowerRequest();
@@ -192,5 +193,20 @@ public class PowerManagerServiceTest extends AndroidTestCase {
             PowerManager.GO_TO_SLEEP_REASON_APPLICATION, PowerManager.GO_TO_SLEEP_FLAG_NO_DOZE);
 
         assertThat(mService.getWakefulness()).isEqualTo(WAKEFULNESS_ASLEEP);
+    }
+
+    @MediumTest
+    public void testWasDeviceIdleFor_true() {
+        int interval = 1000;
+        mService.onUserActivity();
+        SystemClock.sleep(interval);
+        assertThat(mService.wasDeviceIdleForInternal(interval)).isTrue();
+    }
+
+    @SmallTest
+    public void testWasDeviceIdleFor_false() {
+        int interval = 1000;
+        mService.onUserActivity();
+        assertThat(mService.wasDeviceIdleForInternal(interval)).isFalse();
     }
 }

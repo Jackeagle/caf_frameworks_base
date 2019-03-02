@@ -16,33 +16,24 @@
 
 package android.view.textclassifier;
 
-import static java.time.temporal.ChronoUnit.MILLIS;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.WorkerThread;
 import android.app.PendingIntent;
 import android.app.RemoteAction;
-import android.app.SearchManager;
 import android.content.ComponentName;
-import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Icon;
 import android.icu.util.ULocale;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.LocaleList;
 import android.os.ParcelFileDescriptor;
-import android.os.UserManager;
-import android.provider.Browser;
-import android.provider.CalendarContract;
-import android.provider.ContactsContract;
-import android.text.TextUtils;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.Preconditions;
 
@@ -53,19 +44,15 @@ import com.google.android.textclassifier.LangIdModel;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Default implementation of the {@link TextClassifier} interface.
@@ -79,6 +66,8 @@ import java.util.concurrent.TimeUnit;
 public final class TextClassifierImpl implements TextClassifier {
 
     private static final String LOG_TAG = DEFAULT_LOG_TAG;
+
+    private static final boolean DEBUG = false;
 
     private static final File FACTORY_MODEL_DIR = new File("/etc/textclassifier/");
     // Annotator
@@ -109,17 +98,21 @@ public final class TextClassifierImpl implements TextClassifier {
     @GuardedBy("mLock") // Do not access outside this lock.
     private LangIdModel mLangIdImpl;
     @GuardedBy("mLock") // Do not access outside this lock.
+    private ModelFileManager.ModelFile mActionModelInUse;
+    @GuardedBy("mLock") // Do not access outside this lock.
     private ActionsSuggestionsModel mActionsImpl;
 
-    private final Object mLoggerLock = new Object();
-    @GuardedBy("mLoggerLock") // Do not access outside this lock.
-    private SelectionSessionLogger mSessionLogger;
+    private final SelectionSessionLogger mSessionLogger = new SelectionSessionLogger();
+    private final TextClassifierEventTronLogger mTextClassifierEventTronLogger =
+            new TextClassifierEventTronLogger();
 
     private final TextClassificationConstants mSettings;
 
     private final ModelFileManager mAnnotatorModelFileManager;
     private final ModelFileManager mLangIdModelFileManager;
     private final ModelFileManager mActionsModelFileManager;
+
+    private final IntentFactory mIntentFactory;
 
     public TextClassifierImpl(
             Context context, TextClassificationConstants settings, TextClassifier fallback) {
@@ -139,7 +132,7 @@ public final class TextClassifierImpl implements TextClassifier {
                         FACTORY_MODEL_DIR,
                         LANG_ID_FACTORY_MODEL_FILENAME_REGEX,
                         UPDATED_LANG_ID_MODEL_FILE,
-                        fd -> -1, // TODO: Replace this with LangIdModel.getVersion(fd)
+                        LangIdModel::getVersion,
                         fd -> ModelFileManager.ModelFile.LANGUAGE_INDEPENDENT));
         mActionsModelFileManager = new ModelFileManager(
                 new ModelFileManager.ModelFileSupplierImpl(
@@ -148,6 +141,10 @@ public final class TextClassifierImpl implements TextClassifier {
                         UPDATED_ACTIONS_MODEL,
                         ActionsSuggestionsModel::getVersion,
                         ActionsSuggestionsModel::getLocales));
+
+        mIntentFactory = mSettings.isTemplateIntentFactoryEnabled()
+                ? new TemplateIntentFactory(new LegacyIntentFactory())
+                : new LegacyIntentFactory();
     }
 
     public TextClassifierImpl(Context context, TextClassificationConstants settings) {
@@ -191,7 +188,8 @@ public final class TextClassifierImpl implements TextClassifier {
                                     new AnnotatorModel.ClassificationOptions(
                                             refTime.toInstant().toEpochMilli(),
                                             refTime.getZone().getId(),
-                                            localesString));
+                                            localesString),
+                                    mContext);
                     final int size = results.length;
                     for (int i = 0; i < size; i++) {
                         tsBuilder.setEntityType(results[i].getCollection(), results[i].getScore());
@@ -234,7 +232,8 @@ public final class TextClassifierImpl implements TextClassifier {
                                         new AnnotatorModel.ClassificationOptions(
                                                 refTime.toInstant().toEpochMilli(),
                                                 refTime.getZone().getId(),
-                                                localesString));
+                                                localesString),
+                                        mContext);
                 if (results.length > 0) {
                     return createClassificationResult(
                             results, string,
@@ -269,17 +268,17 @@ public final class TextClassifierImpl implements TextClassifier {
             final ZonedDateTime refTime = ZonedDateTime.now();
             final Collection<String> entitiesToIdentify = request.getEntityConfig() != null
                     ? request.getEntityConfig().resolveEntityListModifications(
-                            getEntitiesForHints(request.getEntityConfig().getHints()))
+                    getEntitiesForHints(request.getEntityConfig().getHints()))
                     : mSettings.getEntityListDefault();
             final AnnotatorModel annotatorImpl =
                     getAnnotatorImpl(request.getDefaultLocales());
             final AnnotatorModel.AnnotatedSpan[] annotations =
                     annotatorImpl.annotate(
-                        textString,
-                        new AnnotatorModel.AnnotationOptions(
-                                refTime.toInstant().toEpochMilli(),
-                                        refTime.getZone().getId(),
-                                concatenateLocales(request.getDefaultLocales())));
+                            textString,
+                            new AnnotatorModel.AnnotationOptions(
+                                    refTime.toInstant().toEpochMilli(),
+                                    refTime.getZone().getId(),
+                                    concatenateLocales(request.getDefaultLocales())));
             for (AnnotatorModel.AnnotatedSpan span : annotations) {
                 final AnnotatorModel.ClassificationResult[] results =
                         span.getClassification();
@@ -333,11 +332,18 @@ public final class TextClassifierImpl implements TextClassifier {
     @Override
     public void onSelectionEvent(SelectionEvent event) {
         Preconditions.checkNotNull(event);
-        synchronized (mLoggerLock) {
-            if (mSessionLogger == null) {
-                mSessionLogger = new SelectionSessionLogger();
-            }
-            mSessionLogger.writeEvent(event);
+        mSessionLogger.writeEvent(event);
+    }
+
+    @Override
+    public void onTextClassifierEvent(TextClassifierEvent event) {
+        if (DEBUG) {
+            Log.d(DEFAULT_LOG_TAG, "onTextClassifierEvent() called with: event = [" + event + "]");
+        }
+        try {
+            mTextClassifierEventTronLogger.writeEvent(event);
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "Error writing event", e);
         }
     }
 
@@ -373,27 +379,24 @@ public final class TextClassifierImpl implements TextClassifier {
                 // Actions model is optional, fallback if it is not available.
                 return mFallback.suggestConversationActions(request);
             }
-            List<ActionsSuggestionsModel.ConversationMessage> nativeMessages = new ArrayList<>();
-            for (ConversationActions.Message message : request.getConversation()) {
-                if (TextUtils.isEmpty(message.getText())) {
-                    continue;
-                }
-                // TODO: We need to map the Person object to user id.
-                int userId = 1;
-                nativeMessages.add(
-                        new ActionsSuggestionsModel.ConversationMessage(
-                                userId, message.getText().toString()));
+            ActionsSuggestionsModel.ConversationMessage[] nativeMessages =
+                    ActionsSuggestionsHelper.toNativeMessages(request.getConversation(),
+                            this::detectLanguageTagsFromText);
+            if (nativeMessages.length == 0) {
+                return mFallback.suggestConversationActions(request);
             }
             ActionsSuggestionsModel.Conversation nativeConversation =
-                    new ActionsSuggestionsModel.Conversation(nativeMessages.toArray(
-                            new ActionsSuggestionsModel.ConversationMessage[0]));
+                    new ActionsSuggestionsModel.Conversation(nativeMessages);
 
             ActionsSuggestionsModel.ActionSuggestion[] nativeSuggestions =
                     actionsImpl.suggestActions(nativeConversation, null);
 
             Collection<String> expectedTypes = resolveActionTypesFromRequest(request);
-            List<ConversationActions.ConversationAction> conversationActions = new ArrayList<>();
-            int maxSuggestions = Math.min(request.getMaxSuggestions(), nativeSuggestions.length);
+            List<ConversationAction> conversationActions = new ArrayList<>();
+            int maxSuggestions = nativeSuggestions.length;
+            if (request.getMaxSuggestions() > 0) {
+                maxSuggestions = Math.min(request.getMaxSuggestions(), nativeSuggestions.length);
+            }
             for (int i = 0; i < maxSuggestions; i++) {
                 ActionsSuggestionsModel.ActionSuggestion nativeSuggestion = nativeSuggestions[i];
                 String actionType = nativeSuggestion.getActionType();
@@ -401,12 +404,17 @@ public final class TextClassifierImpl implements TextClassifier {
                     continue;
                 }
                 conversationActions.add(
-                        new ConversationActions.ConversationAction.Builder(actionType)
+                        new ConversationAction.Builder(actionType)
                                 .setTextReply(nativeSuggestion.getResponseText())
                                 .setConfidenceScore(nativeSuggestion.getScore())
                                 .build());
             }
-            return new ConversationActions(conversationActions);
+            String resultId = ActionsSuggestionsHelper.createResultId(
+                    mContext,
+                    request.getConversation(),
+                    mActionModelInUse.getVersion(),
+                    mActionModelInUse.getSupportedLocales());
+            return new ConversationActions(conversationActions, resultId);
         } catch (Throwable t) {
             // Avoid throwing from this method. Log the error.
             Log.e(LOG_TAG, "Error suggesting conversation actions.", t);
@@ -414,12 +422,32 @@ public final class TextClassifierImpl implements TextClassifier {
         return mFallback.suggestConversationActions(request);
     }
 
+    @Nullable
+    private String detectLanguageTagsFromText(CharSequence text) {
+        TextLanguage.Request request = new TextLanguage.Request.Builder(text).build();
+        TextLanguage textLanguage = detectLanguage(request);
+        int localeHypothesisCount = textLanguage.getLocaleHypothesisCount();
+        List<String> languageTags = new ArrayList<>();
+        // TODO: Reconsider this and probably make the score threshold configurable.
+        for (int i = 0; i < localeHypothesisCount; i++) {
+            ULocale locale = textLanguage.getLocale(i);
+            if (textLanguage.getConfidenceScore(locale) < 0.5) {
+                break;
+            }
+            languageTags.add(locale.toLanguageTag());
+        }
+        if (languageTags.isEmpty()) {
+            return LocaleList.getDefault().toLanguageTags();
+        }
+        return String.join(",", languageTags);
+    }
+
     private Collection<String> resolveActionTypesFromRequest(ConversationActions.Request request) {
         List<String> defaultActionTypes =
-                request.getHints().contains(ConversationActions.HINT_FOR_NOTIFICATION)
+                request.getHints().contains(ConversationActions.Request.HINT_FOR_NOTIFICATION)
                         ? mSettings.getNotificationConversationActionTypes()
                         : mSettings.getInAppConversationActionTypes();
-        return request.getTypeConfig().resolveTypes(defaultActionTypes);
+        return request.getTypeConfig().resolveEntityListModifications(defaultActionTypes);
     }
 
     private AnnotatorModel getAnnotatorImpl(LocaleList localeList)
@@ -495,6 +523,7 @@ public final class TextClassifierImpl implements TextClassifier {
                 try {
                     if (pfd != null) {
                         mActionsImpl = new ActionsSuggestionsModel(pfd.getFd());
+                        mActionModelInUse = bestModel;
                     }
                 } finally {
                     maybeCloseAndLogError(pfd);
@@ -523,20 +552,34 @@ public final class TextClassifierImpl implements TextClassifier {
         final TextClassification.Builder builder = new TextClassification.Builder()
                 .setText(classifiedText);
 
-        final int size = classifications.length;
+        final int typeCount = classifications.length;
         AnnotatorModel.ClassificationResult highestScoringResult =
-                size > 0 ? classifications[0] : null;
-        for (int i = 0; i < size; i++) {
-            builder.setEntityType(classifications[i].getCollection(),
-                                  classifications[i].getScore());
+                typeCount > 0 ? classifications[0] : null;
+        for (int i = 0; i < typeCount; i++) {
+            builder.setEntityType(
+                    classifications[i].getCollection(),
+                    classifications[i].getScore());
             if (classifications[i].getScore() > highestScoringResult.getScore()) {
                 highestScoringResult = classifications[i];
             }
         }
 
+        final float foreignTextThreshold = mSettings.getLangIdThresholdOverride() >= 0
+                ? mSettings.getLangIdThresholdOverride()
+                : 0.5f /* TODO: Load this from the langId model. */;
+        final Bundle foreignLanguageBundle =
+                detectForeignLanguage(classifiedText, foreignTextThreshold);
+        builder.setForeignLanguageExtra(foreignLanguageBundle);
+
         boolean isPrimaryAction = true;
-        for (LabeledIntent labeledIntent : IntentFactory.create(
-                mContext, classifiedText, referenceTime, highestScoringResult)) {
+        final ArrayList<Intent> sourceIntents = new ArrayList<>();
+        List<LabeledIntent> labeledIntents = mIntentFactory.create(
+                mContext,
+                classifiedText,
+                foreignLanguageBundle != null,
+                referenceTime,
+                highestScoringResult);
+        for (LabeledIntent labeledIntent : labeledIntents) {
             final RemoteAction action = labeledIntent.asRemoteAction(mContext);
             if (action == null) {
                 continue;
@@ -552,10 +595,57 @@ public final class TextClassifierImpl implements TextClassifier {
                                 labeledIntent.getIntent(), labeledIntent.getRequestCode())));
                 isPrimaryAction = false;
             }
-            builder.addAction(action);
+            builder.addAction(action, labeledIntent.getIntent());
         }
 
         return builder.setId(createId(text, start, end)).build();
+    }
+
+    /**
+     * Returns a bundle with the language and confidence score if it finds the text to be
+     * in a foreign language. Otherwise returns null.
+     */
+    @Nullable
+    private Bundle detectForeignLanguage(String text, float threshold) {
+        if (threshold > 1) {
+            return null;
+        }
+
+        // TODO: Revisit this algorithm.
+        try {
+            final LangIdModel langId = getLangIdImpl();
+            final LangIdModel.LanguageResult[] langResults = langId.detectLanguages(text);
+            if (langResults.length <= 0) {
+                return null;
+            }
+
+            LangIdModel.LanguageResult highestScoringResult = langResults[0];
+            for (int i = 1; i < langResults.length; i++) {
+                if (langResults[i].getScore() > highestScoringResult.getScore()) {
+                    highestScoringResult = langResults[i];
+                }
+            }
+            if (highestScoringResult.getScore() < threshold) {
+                return null;
+            }
+            // TODO: Remove
+            Log.d(LOG_TAG, String.format("Language detected: <%s:%s>",
+                    highestScoringResult.getLanguage(), highestScoringResult.getScore()));
+
+            final Locale detected = new Locale(highestScoringResult.getLanguage());
+            final LocaleList deviceLocales = LocaleList.getDefault();
+            final int size = deviceLocales.size();
+            for (int i = 0; i < size; i++) {
+                if (deviceLocales.get(i).getLanguage().equals(detected.getLanguage())) {
+                    return null;
+                }
+            }
+            return ExtrasUtils.createForeignLanguageExtra(
+                    detected.getLanguage(), highestScoringResult.getScore(), langId.getVersion());
+        } catch (Throwable t) {
+            Log.e(LOG_TAG, "Error detecting foreign text. Ignored.", t);
+        }
+        return null;
     }
 
     @Override
@@ -608,7 +698,8 @@ public final class TextClassifierImpl implements TextClassifier {
     /**
      * Helper class to store the information from which RemoteActions are built.
      */
-    private static final class LabeledIntent {
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    public static final class LabeledIntent {
 
         static final int DEFAULT_REQUEST_CODE = 0;
 
@@ -635,19 +726,23 @@ public final class TextClassifierImpl implements TextClassifier {
             mRequestCode = requestCode;
         }
 
-        String getTitle() {
+        @VisibleForTesting
+        public String getTitle() {
             return mTitle;
         }
 
-        String getDescription() {
+        @VisibleForTesting
+        public String getDescription() {
             return mDescription;
         }
 
-        Intent getIntent() {
+        @VisibleForTesting
+        public Intent getIntent() {
             return mIntent;
         }
 
-        int getRequestCode() {
+        @VisibleForTesting
+        public int getRequestCode() {
             return mRequestCode;
         }
 
@@ -683,186 +778,5 @@ public final class TextClassifierImpl implements TextClassifier {
             return action;
         }
     }
-
-    /**
-     * Creates intents based on the classification type.
-     */
-    static final class IntentFactory {
-
-        private static final long MIN_EVENT_FUTURE_MILLIS = TimeUnit.MINUTES.toMillis(5);
-        private static final long DEFAULT_EVENT_DURATION = TimeUnit.HOURS.toMillis(1);
-
-        private IntentFactory() {}
-
-        @NonNull
-        public static List<LabeledIntent> create(
-                Context context,
-                String text,
-                @Nullable Instant referenceTime,
-                @Nullable AnnotatorModel.ClassificationResult classification) {
-            final String type = classification != null
-                    ? classification.getCollection().trim().toLowerCase(Locale.ENGLISH)
-                    : null;
-            text = text.trim();
-            switch (type) {
-                case TextClassifier.TYPE_EMAIL:
-                    return createForEmail(context, text);
-                case TextClassifier.TYPE_PHONE:
-                    return createForPhone(context, text);
-                case TextClassifier.TYPE_ADDRESS:
-                    return createForAddress(context, text);
-                case TextClassifier.TYPE_URL:
-                    return createForUrl(context, text);
-                case TextClassifier.TYPE_DATE:
-                case TextClassifier.TYPE_DATE_TIME:
-                    if (classification.getDatetimeResult() != null) {
-                        final Instant parsedTime = Instant.ofEpochMilli(
-                                classification.getDatetimeResult().getTimeMsUtc());
-                        return createForDatetime(context, type, referenceTime, parsedTime);
-                    } else {
-                        return new ArrayList<>();
-                    }
-                case TextClassifier.TYPE_FLIGHT_NUMBER:
-                    return createForFlight(context, text);
-                default:
-                    return new ArrayList<>();
-            }
-        }
-
-        @NonNull
-        private static List<LabeledIntent> createForEmail(Context context, String text) {
-            return Arrays.asList(
-                    new LabeledIntent(
-                            context.getString(com.android.internal.R.string.email),
-                            context.getString(com.android.internal.R.string.email_desc),
-                            new Intent(Intent.ACTION_SENDTO)
-                                    .setData(Uri.parse(String.format("mailto:%s", text))),
-                            LabeledIntent.DEFAULT_REQUEST_CODE),
-                    new LabeledIntent(
-                            context.getString(com.android.internal.R.string.add_contact),
-                            context.getString(com.android.internal.R.string.add_contact_desc),
-                            new Intent(Intent.ACTION_INSERT_OR_EDIT)
-                                    .setType(ContactsContract.Contacts.CONTENT_ITEM_TYPE)
-                                    .putExtra(ContactsContract.Intents.Insert.EMAIL, text),
-                            text.hashCode()));
-        }
-
-        @NonNull
-        private static List<LabeledIntent> createForPhone(Context context, String text) {
-            final List<LabeledIntent> actions = new ArrayList<>();
-            final UserManager userManager = context.getSystemService(UserManager.class);
-            final Bundle userRestrictions = userManager != null
-                    ? userManager.getUserRestrictions() : new Bundle();
-            if (!userRestrictions.getBoolean(UserManager.DISALLOW_OUTGOING_CALLS, false)) {
-                actions.add(new LabeledIntent(
-                        context.getString(com.android.internal.R.string.dial),
-                        context.getString(com.android.internal.R.string.dial_desc),
-                        new Intent(Intent.ACTION_DIAL).setData(
-                                Uri.parse(String.format("tel:%s", text))),
-                        LabeledIntent.DEFAULT_REQUEST_CODE));
-            }
-            actions.add(new LabeledIntent(
-                    context.getString(com.android.internal.R.string.add_contact),
-                    context.getString(com.android.internal.R.string.add_contact_desc),
-                    new Intent(Intent.ACTION_INSERT_OR_EDIT)
-                            .setType(ContactsContract.Contacts.CONTENT_ITEM_TYPE)
-                            .putExtra(ContactsContract.Intents.Insert.PHONE, text),
-                    text.hashCode()));
-            if (!userRestrictions.getBoolean(UserManager.DISALLOW_SMS, false)) {
-                actions.add(new LabeledIntent(
-                        context.getString(com.android.internal.R.string.sms),
-                        context.getString(com.android.internal.R.string.sms_desc),
-                        new Intent(Intent.ACTION_SENDTO)
-                                .setData(Uri.parse(String.format("smsto:%s", text))),
-                        LabeledIntent.DEFAULT_REQUEST_CODE));
-            }
-            return actions;
-        }
-
-        @NonNull
-        private static List<LabeledIntent> createForAddress(Context context, String text) {
-            final List<LabeledIntent> actions = new ArrayList<>();
-            try {
-                final String encText = URLEncoder.encode(text, "UTF-8");
-                actions.add(new LabeledIntent(
-                        context.getString(com.android.internal.R.string.map),
-                        context.getString(com.android.internal.R.string.map_desc),
-                        new Intent(Intent.ACTION_VIEW)
-                                .setData(Uri.parse(String.format("geo:0,0?q=%s", encText))),
-                        LabeledIntent.DEFAULT_REQUEST_CODE));
-            } catch (UnsupportedEncodingException e) {
-                Log.e(LOG_TAG, "Could not encode address", e);
-            }
-            return actions;
-        }
-
-        @NonNull
-        private static List<LabeledIntent> createForUrl(Context context, String text) {
-            if (Uri.parse(text).getScheme() == null) {
-                text = "http://" + text;
-            }
-            return Arrays.asList(new LabeledIntent(
-                    context.getString(com.android.internal.R.string.browse),
-                    context.getString(com.android.internal.R.string.browse_desc),
-                    new Intent(Intent.ACTION_VIEW, Uri.parse(text))
-                            .putExtra(Browser.EXTRA_APPLICATION_ID, context.getPackageName()),
-                    LabeledIntent.DEFAULT_REQUEST_CODE));
-        }
-
-        @NonNull
-        private static List<LabeledIntent> createForDatetime(
-                Context context, String type, @Nullable Instant referenceTime,
-                Instant parsedTime) {
-            if (referenceTime == null) {
-                // If no reference time was given, use now.
-                referenceTime = Instant.now();
-            }
-            List<LabeledIntent> actions = new ArrayList<>();
-            actions.add(createCalendarViewIntent(context, parsedTime));
-            final long millisUntilEvent = referenceTime.until(parsedTime, MILLIS);
-            if (millisUntilEvent > MIN_EVENT_FUTURE_MILLIS) {
-                actions.add(createCalendarCreateEventIntent(context, parsedTime, type));
-            }
-            return actions;
-        }
-
-        @NonNull
-        private static List<LabeledIntent> createForFlight(Context context, String text) {
-            return Arrays.asList(new LabeledIntent(
-                    context.getString(com.android.internal.R.string.view_flight),
-                    context.getString(com.android.internal.R.string.view_flight_desc),
-                    new Intent(Intent.ACTION_WEB_SEARCH)
-                            .putExtra(SearchManager.QUERY, text),
-                    text.hashCode()));
-        }
-
-        @NonNull
-        private static LabeledIntent createCalendarViewIntent(Context context, Instant parsedTime) {
-            Uri.Builder builder = CalendarContract.CONTENT_URI.buildUpon();
-            builder.appendPath("time");
-            ContentUris.appendId(builder, parsedTime.toEpochMilli());
-            return new LabeledIntent(
-                    context.getString(com.android.internal.R.string.view_calendar),
-                    context.getString(com.android.internal.R.string.view_calendar_desc),
-                    new Intent(Intent.ACTION_VIEW).setData(builder.build()),
-                    LabeledIntent.DEFAULT_REQUEST_CODE);
-        }
-
-        @NonNull
-        private static LabeledIntent createCalendarCreateEventIntent(
-                Context context, Instant parsedTime, @EntityType String type) {
-            final boolean isAllDay = TextClassifier.TYPE_DATE.equals(type);
-            return new LabeledIntent(
-                    context.getString(com.android.internal.R.string.add_calendar_event),
-                    context.getString(com.android.internal.R.string.add_calendar_event_desc),
-                    new Intent(Intent.ACTION_INSERT)
-                            .setData(CalendarContract.Events.CONTENT_URI)
-                            .putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, isAllDay)
-                            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,
-                                    parsedTime.toEpochMilli())
-                            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME,
-                                    parsedTime.toEpochMilli() + DEFAULT_EVENT_DURATION),
-                    parsedTime.hashCode());
-        }
-    }
 }
+

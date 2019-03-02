@@ -27,6 +27,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.telephony.AccessNetworkConstants.AccessNetworkType;
 import android.telephony.NetworkRegistrationState.Domain;
+import android.telephony.NetworkRegistrationState.NRStatus;
 import android.text.TextUtils;
 
 import java.lang.annotation.Retention;
@@ -118,6 +119,13 @@ public class ServiceState implements Parcelable {
      */
     public static final int FREQUENCY_RANGE_MMWAVE = 4;
 
+    private static final List<Integer> FREQUENCY_RANGE_ORDER = Arrays.asList(
+            FREQUENCY_RANGE_UNKNOWN,
+            FREQUENCY_RANGE_LOW,
+            FREQUENCY_RANGE_MID,
+            FREQUENCY_RANGE_HIGH,
+            FREQUENCY_RANGE_MMWAVE);
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "DUPLEX_MODE_",
@@ -162,7 +170,8 @@ public class ServiceState implements Parcelable {
                     RIL_RADIO_TECHNOLOGY_GSM,
                     RIL_RADIO_TECHNOLOGY_TD_SCDMA,
                     RIL_RADIO_TECHNOLOGY_IWLAN,
-                    RIL_RADIO_TECHNOLOGY_LTE_CA})
+                    RIL_RADIO_TECHNOLOGY_LTE_CA,
+                    RIL_RADIO_TECHNOLOGY_NR})
     public @interface RilRadioTechnology {}
     /**
      * Available radio technologies for GSM, UMTS and CDMA.
@@ -213,7 +222,7 @@ public class ServiceState implements Parcelable {
      * IWLAN
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public static final int RIL_RADIO_TECHNOLOGY_IWLAN = 18;
 
     /**
@@ -223,9 +232,15 @@ public class ServiceState implements Parcelable {
     public static final int RIL_RADIO_TECHNOLOGY_LTE_CA = 19;
 
     /**
-     * Number of radio technologies for GSM, UMTS and CDMA.
+     * NR(New Radio) 5G.
+     * @hide
      */
-    private static final int NEXT_RIL_RADIO_TECHNOLOGY = 20;
+    public static final int  RIL_RADIO_TECHNOLOGY_NR = 20;
+
+    /**
+     * The number of the radio technologies.
+     */
+    private static final int NEXT_RIL_RADIO_TECHNOLOGY = 21;
 
     /** @hide */
     public static final int RIL_RADIO_CDMA_TECHNOLOGY_BITMASK =
@@ -303,19 +318,19 @@ public class ServiceState implements Parcelable {
     @RilRadioTechnology
     private int mRilDataRadioTechnology;
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private boolean mCssIndicator;
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     private int mNetworkId;
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     private int mSystemId;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mCdmaRoamingIndicator;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mCdmaDefaultRoamingIndicator;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mCdmaEriIconIndex;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mCdmaEriIconMode;
 
     @UnsupportedAppUsage
@@ -525,7 +540,7 @@ public class ServiceState implements Parcelable {
      *
      * @hide
      */
-    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
+    @UnsupportedAppUsage
     public int getDataRegState() {
         return mDataRegState;
     }
@@ -595,7 +610,7 @@ public class ServiceState implements Parcelable {
      * @return roaming type
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public @RoamingType int getVoiceRoamingType() {
         final NetworkRegistrationState regState = getNetworkRegistrationState(
                 NetworkRegistrationState.DOMAIN_CS, AccessNetworkConstants.TransportType.WWAN);
@@ -634,7 +649,7 @@ public class ServiceState implements Parcelable {
      * @return roaming type
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public @RoamingType int getDataRoamingType() {
         final NetworkRegistrationState regState = getNetworkRegistrationState(
                 NetworkRegistrationState.DOMAIN_PS, AccessNetworkConstants.TransportType.WWAN);
@@ -785,7 +800,7 @@ public class ServiceState implements Parcelable {
      * @return numeric format of operator, null if unregistered or unknown
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public String getVoiceOperatorNumeric() {
         return mVoiceOperatorNumeric;
     }
@@ -1057,7 +1072,7 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setDataRegState(int state) {
         mDataRegState = state;
         if (VDBG) Rlog.d(LOG_TAG, "[ServiceState] setDataRegState=" + mDataRegState);
@@ -1087,7 +1102,7 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setVoiceRoamingType(@RoamingType int type) {
         NetworkRegistrationState regState = getNetworkRegistrationState(
                 NetworkRegistrationState.DOMAIN_CS, AccessNetworkConstants.TransportType.WWAN);
@@ -1108,7 +1123,7 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setDataRoamingType(@RoamingType int type) {
         NetworkRegistrationState regState = getNetworkRegistrationState(
                 NetworkRegistrationState.DOMAIN_PS, AccessNetworkConstants.TransportType.WWAN);
@@ -1125,7 +1140,7 @@ public class ServiceState implements Parcelable {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setEmergencyOnly(boolean emergencyOnly) {
         mIsEmergencyOnly = emergencyOnly;
     }
@@ -1133,7 +1148,7 @@ public class ServiceState implements Parcelable {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setCdmaRoamingIndicator(int roaming) {
         this.mCdmaRoamingIndicator = roaming;
     }
@@ -1141,7 +1156,7 @@ public class ServiceState implements Parcelable {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setCdmaDefaultRoamingIndicator (int roaming) {
         this.mCdmaDefaultRoamingIndicator = roaming;
     }
@@ -1149,7 +1164,7 @@ public class ServiceState implements Parcelable {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setCdmaEriIconIndex(int index) {
         this.mCdmaEriIconIndex = index;
     }
@@ -1157,7 +1172,7 @@ public class ServiceState implements Parcelable {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setCdmaEriIconMode(int mode) {
         this.mCdmaEriIconMode = mode;
     }
@@ -1218,7 +1233,7 @@ public class ServiceState implements Parcelable {
      * @param b second obj
      * @return true if two objects equal or both are null
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private static boolean equalsHandlesNulls (Object a, Object b) {
         return (a == null) ? (b == null) : a.equals (b);
     }
@@ -1345,6 +1360,18 @@ public class ServiceState implements Parcelable {
     }
 
     /**
+     * Get the NR 5G status of the mobile data network.
+     * @return the NR 5G status.
+     * @hide
+     */
+    public @NRStatus int getNrStatus() {
+        final NetworkRegistrationState regState = getNetworkRegistrationState(
+                NetworkRegistrationState.DOMAIN_PS, AccessNetworkConstants.TransportType.WWAN);
+        if (regState == null) return NetworkRegistrationState.NR_STATUS_NONE;
+        return regState.getNrStatus();
+    }
+
+    /**
      * @param nrFrequencyRange the frequency range of 5G NR.
      * @hide
      */
@@ -1363,7 +1390,7 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void setCssIndicator(int css) {
         this.mCssIndicator = (css != 0);
     }
@@ -1397,47 +1424,49 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    public static int rilRadioTechnologyToNetworkType(@RilRadioTechnology int rt) {
-        switch(rt) {
-        case ServiceState.RIL_RADIO_TECHNOLOGY_GPRS:
-            return TelephonyManager.NETWORK_TYPE_GPRS;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EDGE:
-            return TelephonyManager.NETWORK_TYPE_EDGE;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
-            return TelephonyManager.NETWORK_TYPE_UMTS;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
-            return TelephonyManager.NETWORK_TYPE_HSDPA;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSUPA:
-            return TelephonyManager.NETWORK_TYPE_HSUPA;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
-            return TelephonyManager.NETWORK_TYPE_HSPA;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_IS95A:
-        case ServiceState.RIL_RADIO_TECHNOLOGY_IS95B:
-            return TelephonyManager.NETWORK_TYPE_CDMA;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT:
-            return TelephonyManager.NETWORK_TYPE_1xRTT;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_0:
-            return TelephonyManager.NETWORK_TYPE_EVDO_0;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_A:
-            return TelephonyManager.NETWORK_TYPE_EVDO_A;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_B:
-            return TelephonyManager.NETWORK_TYPE_EVDO_B;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD:
-            return TelephonyManager.NETWORK_TYPE_EHRPD;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_LTE:
-            return TelephonyManager.NETWORK_TYPE_LTE;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
-            return TelephonyManager.NETWORK_TYPE_HSPAP;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_GSM:
-            return TelephonyManager.NETWORK_TYPE_GSM;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA:
-            return TelephonyManager.NETWORK_TYPE_TD_SCDMA;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_IWLAN:
-            return TelephonyManager.NETWORK_TYPE_IWLAN;
-        case ServiceState.RIL_RADIO_TECHNOLOGY_LTE_CA:
-            return TelephonyManager.NETWORK_TYPE_LTE_CA;
-        default:
-            return TelephonyManager.NETWORK_TYPE_UNKNOWN;
+    public static int rilRadioTechnologyToNetworkType(@RilRadioTechnology int rat) {
+        switch(rat) {
+            case ServiceState.RIL_RADIO_TECHNOLOGY_GPRS:
+                return TelephonyManager.NETWORK_TYPE_GPRS;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_EDGE:
+                return TelephonyManager.NETWORK_TYPE_EDGE;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_UMTS:
+                return TelephonyManager.NETWORK_TYPE_UMTS;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_HSDPA:
+                return TelephonyManager.NETWORK_TYPE_HSDPA;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_HSUPA:
+                return TelephonyManager.NETWORK_TYPE_HSUPA;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_HSPA:
+                return TelephonyManager.NETWORK_TYPE_HSPA;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_IS95A:
+            case ServiceState.RIL_RADIO_TECHNOLOGY_IS95B:
+                return TelephonyManager.NETWORK_TYPE_CDMA;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_1xRTT:
+                return TelephonyManager.NETWORK_TYPE_1xRTT;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_0:
+                return TelephonyManager.NETWORK_TYPE_EVDO_0;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_A:
+                return TelephonyManager.NETWORK_TYPE_EVDO_A;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_EVDO_B:
+                return TelephonyManager.NETWORK_TYPE_EVDO_B;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_EHRPD:
+                return TelephonyManager.NETWORK_TYPE_EHRPD;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_LTE:
+                return TelephonyManager.NETWORK_TYPE_LTE;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_HSPAP:
+                return TelephonyManager.NETWORK_TYPE_HSPAP;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_GSM:
+                return TelephonyManager.NETWORK_TYPE_GSM;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_TD_SCDMA:
+                return TelephonyManager.NETWORK_TYPE_TD_SCDMA;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_IWLAN:
+                return TelephonyManager.NETWORK_TYPE_IWLAN;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_LTE_CA:
+                return TelephonyManager.NETWORK_TYPE_LTE_CA;
+            case ServiceState.RIL_RADIO_TECHNOLOGY_NR:
+                return TelephonyManager.NETWORK_TYPE_NR;
+            default:
+                return TelephonyManager.NETWORK_TYPE_UNKNOWN;
         }
     }
 
@@ -1518,7 +1547,6 @@ public class ServiceState implements Parcelable {
         }
     }
 
-
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public @TelephonyManager.NetworkType int getDataNetworkType() {
@@ -1542,7 +1570,7 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public int getCssIndicator() {
         return this.mCssIndicator ? 1 : 0;
     }
@@ -1602,9 +1630,10 @@ public class ServiceState implements Parcelable {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
-    public static boolean bearerBitmapHasCdma(int radioTechnologyBitmap) {
-        return (RIL_RADIO_CDMA_TECHNOLOGY_BITMASK & radioTechnologyBitmap) != 0;
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
+    public static boolean bearerBitmapHasCdma(int networkTypeBitmask) {
+        return (RIL_RADIO_CDMA_TECHNOLOGY_BITMASK
+                & convertNetworkTypeBitmaskToBearerBitmask(networkTypeBitmask)) != 0;
     }
 
     /** @hide */
@@ -1828,5 +1857,14 @@ public class ServiceState implements Parcelable {
 
             mNetworkRegistrationStates.add(regState);
         }
+    }
+
+    /**
+     * @hide
+     */
+    public static final int getBetterNRFrequencyRange(int range1, int range2) {
+        return FREQUENCY_RANGE_ORDER.indexOf(range1) > FREQUENCY_RANGE_ORDER.indexOf(range2)
+                ? range1
+                : range2;
     }
 }

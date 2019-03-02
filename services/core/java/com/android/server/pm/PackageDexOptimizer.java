@@ -16,10 +16,33 @@
 
 package com.android.server.pm;
 
+import static android.content.pm.ApplicationInfo.HIDDEN_API_ENFORCEMENT_DISABLED;
+
+import static com.android.server.pm.Installer.DEXOPT_BOOTCOMPLETE;
+import static com.android.server.pm.Installer.DEXOPT_DEBUGGABLE;
+import static com.android.server.pm.Installer.DEXOPT_ENABLE_HIDDEN_API_CHECKS;
+import static com.android.server.pm.Installer.DEXOPT_FORCE;
+import static com.android.server.pm.Installer.DEXOPT_GENERATE_APP_IMAGE;
+import static com.android.server.pm.Installer.DEXOPT_GENERATE_COMPACT_DEX;
+import static com.android.server.pm.Installer.DEXOPT_IDLE_BACKGROUND_JOB;
+import static com.android.server.pm.Installer.DEXOPT_PROFILE_GUIDED;
+import static com.android.server.pm.Installer.DEXOPT_PUBLIC;
+import static com.android.server.pm.Installer.DEXOPT_SECONDARY_DEX;
+import static com.android.server.pm.Installer.DEXOPT_STORAGE_CE;
+import static com.android.server.pm.Installer.DEXOPT_STORAGE_DE;
+import static com.android.server.pm.InstructionSets.getAppDexInstructionSets;
+import static com.android.server.pm.InstructionSets.getDexCodeInstructionSets;
+import static com.android.server.pm.PackageManagerService.WATCHDOG_TIMEOUT;
+import static com.android.server.pm.PackageManagerServiceCompilerMapping.getReasonName;
+
+import static dalvik.system.DexFile.getSafeModeCompilerFilter;
+import static dalvik.system.DexFile.isProfileGuidedCompilerFilter;
+
 import android.annotation.Nullable;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageParser;
+import android.content.pm.SharedLibraryInfo;
 import android.content.pm.dex.ArtManager;
 import android.content.pm.dex.DexMetadataHelper;
 import android.os.FileUtils;
@@ -40,38 +63,14 @@ import com.android.server.pm.dex.DexoptOptions;
 import com.android.server.pm.dex.DexoptUtils;
 import com.android.server.pm.dex.PackageDexUsage;
 
+import dalvik.system.DexFile;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
-import dalvik.system.DexFile;
-
-import static android.content.pm.ApplicationInfo.HIDDEN_API_ENFORCEMENT_DISABLED;
-
-import static com.android.server.pm.Installer.DEXOPT_BOOTCOMPLETE;
-import static com.android.server.pm.Installer.DEXOPT_DEBUGGABLE;
-import static com.android.server.pm.Installer.DEXOPT_PROFILE_GUIDED;
-import static com.android.server.pm.Installer.DEXOPT_PUBLIC;
-import static com.android.server.pm.Installer.DEXOPT_SECONDARY_DEX;
-import static com.android.server.pm.Installer.DEXOPT_FORCE;
-import static com.android.server.pm.Installer.DEXOPT_STORAGE_CE;
-import static com.android.server.pm.Installer.DEXOPT_STORAGE_DE;
-import static com.android.server.pm.Installer.DEXOPT_IDLE_BACKGROUND_JOB;
-import static com.android.server.pm.Installer.DEXOPT_ENABLE_HIDDEN_API_CHECKS;
-import static com.android.server.pm.Installer.DEXOPT_GENERATE_COMPACT_DEX;
-import static com.android.server.pm.Installer.DEXOPT_GENERATE_APP_IMAGE;
-import static com.android.server.pm.InstructionSets.getAppDexInstructionSets;
-import static com.android.server.pm.InstructionSets.getDexCodeInstructionSets;
-
-import static com.android.server.pm.PackageManagerService.WATCHDOG_TIMEOUT;
-
-import static com.android.server.pm.PackageManagerServiceCompilerMapping.getReasonName;
-
-import static dalvik.system.DexFile.getSafeModeCompilerFilter;
-import static dalvik.system.DexFile.isProfileGuidedCompilerFilter;
 
 /**
  * Helper class for running dexopt command on packages.
@@ -85,9 +84,6 @@ public class PackageDexOptimizer {
     public static final int DEX_OPT_FAILED = -1;
     // One minute over PM WATCHDOG_TIMEOUT
     private static final long WAKELOCK_TIMEOUT_MS = WATCHDOG_TIMEOUT + 1000 * 60;
-
-    /** Special library name that skips shared libraries check during compilation. */
-    public static final String SKIP_SHARED_LIBRARY_CHECK = "&";
 
     @GuardedBy("mInstallLock")
     private final Installer mInstaller;
@@ -129,7 +125,7 @@ public class PackageDexOptimizer {
      * <p>Calls to {@link com.android.server.pm.Installer#dexopt} on {@link #mInstaller} are
      * synchronized on {@link #mInstallLock}.
      */
-    int performDexOpt(PackageParser.Package pkg, String[] sharedLibraries,
+    int performDexOpt(PackageParser.Package pkg, List<SharedLibraryInfo> sharedLibraries,
             String[] instructionSets, CompilerStats.PackageStats packageStats,
             PackageDexUsage.PackageUseInfo packageUseInfo, DexoptOptions options) {
         if (pkg.applicationInfo.uid == -1) {
@@ -155,7 +151,8 @@ public class PackageDexOptimizer {
      * It assumes the install lock is held.
      */
     @GuardedBy("mInstallLock")
-    private int performDexOptLI(PackageParser.Package pkg, String[] sharedLibraries,
+    private int performDexOptLI(PackageParser.Package pkg,
+            List<SharedLibraryInfo> sharedLibraries,
             String[] targetInstructionSets, CompilerStats.PackageStats packageStats,
             PackageDexUsage.PackageUseInfo packageUseInfo, DexoptOptions options) {
         final String[] instructionSets = targetInstructionSets != null ?
@@ -397,18 +394,23 @@ public class PackageDexOptimizer {
             Slog.e(TAG, "Could not infer CE/DE storage for package " + info.packageName);
             return DEX_OPT_FAILED;
         }
+        String classLoaderContext = null;
+        if (dexUseInfo.isUnknownClassLoaderContext() || dexUseInfo.isVariableClassLoaderContext()) {
+            // If we have an unknown (not yet set), or a variable class loader chain. Just extract
+            // the dex file.
+            compilerFilter = "extract";
+        } else {
+            classLoaderContext = dexUseInfo.getClassLoaderContext();
+        }
+
+        int reason = options.getCompilationReason();
         Log.d(TAG, "Running dexopt on: " + path
                 + " pkg=" + info.packageName + " isa=" + dexUseInfo.getLoaderIsas()
+                + " reason=" + getReasonName(reason)
                 + " dexoptFlags=" + printDexoptFlags(dexoptFlags)
-                + " target-filter=" + compilerFilter);
+                + " target-filter=" + compilerFilter
+                + " class-loader-context=" + classLoaderContext);
 
-        // TODO(calin): b/64530081 b/66984396. Use SKIP_SHARED_LIBRARY_CHECK for the context
-        // (instead of dexUseInfo.getClassLoaderContext()) in order to compile secondary dex files
-        // in isolation (and avoid to extract/verify the main apk if it's in the class path).
-        // Note this trades correctness for performance since the resulting slow down is
-        // unacceptable in some cases until b/64530081 is fixed.
-        String classLoaderContext = SKIP_SHARED_LIBRARY_CHECK;
-        int reason = options.getCompilationReason();
         try {
             for (String isa : dexUseInfo.getLoaderIsas()) {
                 // Reuse the same dexopt path as for the primary apks. We don't need all the
@@ -504,8 +506,10 @@ public class PackageDexOptimizer {
             boolean isUsedByOtherApps) {
         int flags = info.flags;
         boolean vmSafeMode = (flags & ApplicationInfo.FLAG_VM_SAFE_MODE) != 0;
-        // When a priv app is configured to run out of box, only verify it.
-        if (info.isPrivilegedApp() && DexManager.isPackageSelectedToRunOob(info.packageName)) {
+        // When an app or priv app is configured to run out of box, only verify it.
+        if (info.isEmbeddedDexUsed()
+                || (info.isPrivilegedApp()
+                    && DexManager.isPackageSelectedToRunOob(info.packageName))) {
             return "verify";
         }
         if (vmSafeMode) {
@@ -542,8 +546,7 @@ public class PackageDexOptimizer {
         // The flag isDexoptInstallWithDexMetadata applies only on installs when we know that
         // the user does not have an existing profile.
         boolean isProfileGuidedFilter = isProfileGuidedCompilerFilter(compilerFilter);
-        boolean isPublic = !info.isForwardLocked() &&
-                (!isProfileGuidedFilter || options.isDexoptInstallWithDexMetadata());
+        boolean isPublic = !isProfileGuidedFilter || options.isDexoptInstallWithDexMetadata();
         int profileFlag = isProfileGuidedFilter ? DEXOPT_PROFILE_GUIDED : 0;
         // Some apps are executed with restrictions on hidden API usage. If this app is one
         // of them, pass a flag to dexopt to enable the same restrictions during compilation.

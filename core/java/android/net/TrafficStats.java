@@ -128,10 +128,14 @@ public class TrafficStats {
     public static final int TAG_SYSTEM_APP = 0xFFFFFF05;
 
     /** @hide */
+    @SystemApi
+    @TestApi
     public static final int TAG_SYSTEM_DHCP = 0xFFFFFF40;
     /** @hide */
     public static final int TAG_SYSTEM_NTP = 0xFFFFFF41;
     /** @hide */
+    @SystemApi
+    @TestApi
     public static final int TAG_SYSTEM_PROBE = 0xFFFFFF42;
     /** @hide */
     public static final int TAG_SYSTEM_NEIGHBOR = 0xFFFFFF43;
@@ -140,6 +144,8 @@ public class TrafficStats {
     /** @hide */
     public static final int TAG_SYSTEM_PAC = 0xFFFFFF45;
     /** @hide */
+    @SystemApi
+    @TestApi
     public static final int TAG_SYSTEM_DHCP_SERVER = 0xFFFFFF46;
 
     private static INetworkStatsService sStatsService;
@@ -274,7 +280,6 @@ public class TrafficStats {
      * Changes only take effect during subsequent calls to
      * {@link #tagSocket(Socket)}.
      */
-    @SystemApi
     @SuppressLint("Doclava125")
     public static void setThreadStatsUid(int uid) {
         NetworkManagementSocketTagger.setThreadSocketStatsUid(uid);
@@ -313,7 +318,6 @@ public class TrafficStats {
      *
      * @see #setThreadStatsUid(int)
      */
-    @SystemApi
     @SuppressLint("Doclava125")
     public static void clearThreadStatsUid() {
         NetworkManagementSocketTagger.setThreadSocketStatsUid(-1);

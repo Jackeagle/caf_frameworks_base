@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.android.internal.inputmethod;
 
 import android.net.Uri;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodSubtype;
 
 import com.android.internal.inputmethod.IInputContentUriToken;
@@ -38,6 +39,7 @@ interface IInputMethodPrivilegedOperations {
     boolean switchToPreviousInputMethod();
     boolean switchToNextInputMethod(boolean onlyCurrentIme);
     boolean shouldOfferSwitchingToNextInputMethod();
-
-    oneway void notifyUserActionAsync();
+    void notifyUserAction();
+    void reportPreRendered(in EditorInfo info);
+    void applyImeVisibility(boolean setVisible);
 }

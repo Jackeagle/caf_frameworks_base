@@ -59,6 +59,7 @@
 #include "link/ManifestFixer.h"
 #include "link/NoDefaultResourceRemover.h"
 #include "link/ReferenceLinker.h"
+#include "link/ResourceExcluder.h"
 #include "link/TableMerger.h"
 #include "link/XmlCompatVersioner.h"
 #include "optimize/ResourceDeduper.h"
@@ -78,7 +79,7 @@ namespace aapt {
 
 class LinkContext : public IAaptContext {
  public:
-  LinkContext(IDiagnostics* diagnostics)
+  explicit LinkContext(IDiagnostics* diagnostics)
       : diagnostics_(diagnostics), name_mangler_({}), symbols_(&name_mangler_) {
   }
 
@@ -163,7 +164,7 @@ class LinkContext : public IAaptContext {
 // See b/37498913.
 class FeatureSplitSymbolTableDelegate : public DefaultSymbolTableDelegate {
  public:
-  FeatureSplitSymbolTableDelegate(IAaptContext* context) : context_(context) {
+  explicit FeatureSplitSymbolTableDelegate(IAaptContext* context) : context_(context) {
   }
 
   virtual ~FeatureSplitSymbolTableDelegate() = default;
@@ -236,6 +237,9 @@ static bool FlattenXml(IAaptContext* context, const xml::XmlResource& xml_res,
 
     case OutputFormat::kProto: {
       pb::XmlNode pb_node;
+      // Strip whitespace text nodes from tha AndroidManifest.xml
+      SerializeXmlOptions options;
+      options.remove_empty_text_nodes = (path == kAndroidManifestPath);
       SerializeXmlResourceToPb(xml_res, &pb_node);
       return io::CopyProtoToArchive(context, &pb_node, path.to_string(), ArchiveEntry::kCompress,
                                     writer);
@@ -1542,8 +1546,9 @@ class Linker {
   // to the IArchiveWriter.
   bool WriteApk(IArchiveWriter* writer, proguard::KeepSet* keep_set, xml::XmlResource* manifest,
                 ResourceTable* table) {
-    const bool keep_raw_values = context_->GetPackageType() == PackageType::kStaticLib;
-    bool result = FlattenXml(context_, *manifest, "AndroidManifest.xml", keep_raw_values,
+    const bool keep_raw_values = (context_->GetPackageType() == PackageType::kStaticLib)
+                                 || options_.keep_raw_values;
+    bool result = FlattenXml(context_, *manifest, kAndroidManifestPath, keep_raw_values,
                              true /*utf16*/, options_.output_format, writer);
     if (!result) {
       return false;
@@ -1820,6 +1825,29 @@ class Linker {
 
       VersionCollapser collapser;
       if (!collapser.Consume(context_, &final_table_)) {
+        return 1;
+      }
+    }
+
+    if (!options_.exclude_configs_.empty()) {
+      std::vector<ConfigDescription> excluded_configs;
+
+      for (auto& config_string : options_.exclude_configs_) {
+        ConfigDescription config_description;
+
+        if (!ConfigDescription::Parse(config_string, &config_description)) {
+          context_->GetDiagnostics()->Error(DiagMessage()
+                                                << "failed to parse --excluded-configs "
+                                                << config_string);
+          return 1;
+        }
+
+        excluded_configs.push_back(config_description);
+      }
+
+      ResourceExcluder excluder(excluded_configs);
+      if (!excluder.Consume(context_, &final_table_)) {
+        context_->GetDiagnostics()->Error(DiagMessage() << "failed excluding configurations");
         return 1;
       }
     }

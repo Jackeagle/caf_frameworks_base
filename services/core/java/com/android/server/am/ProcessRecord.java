@@ -31,6 +31,8 @@ import android.app.IApplicationThread;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.ServiceInfo;
+import android.content.pm.VersionedPackage;
 import android.content.res.CompatibilityInfo;
 import android.os.Binder;
 import android.os.Debug;
@@ -42,6 +44,7 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.server.ServerProtoEnums;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.DebugUtils;
@@ -65,6 +68,7 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Full information about a particular process that
@@ -76,6 +80,7 @@ final class ProcessRecord implements WindowProcessListener {
     private final ActivityManagerService mService; // where we came from
     final ApplicationInfo info; // all about the first app in the process
     final boolean isolated;     // true if this is a special isolated process
+    final boolean appZygote;    // true if this is forked from the app zygote
     final int uid;              // uid of process; may be different from 'info' if isolated
     final int userId;           // user of process.
     final String processName;   // name of the process
@@ -145,22 +150,30 @@ final class ProcessRecord implements WindowProcessListener {
     int curAdj;                 // Current OOM adjustment for this process
     int setAdj;                 // Last set OOM adjustment for this process
     int verifiedAdj;            // The last adjustment that was verified as actually being set
+    long lastCompactTime;       // The last time that this process was compacted
+    int reqCompactAction;       // The most recent compaction action requested for this app.
+    int lastCompactAction;      // The most recent compaction action performed for this app.
     private int mCurSchedGroup; // Currently desired scheduling class
     int setSchedGroup;          // Last set to background scheduling class
     int trimMemoryLevel;        // Last selected memory trimming level
     private int mCurProcState = PROCESS_STATE_NONEXISTENT; // Currently computed process state
     private int mRepProcState = PROCESS_STATE_NONEXISTENT; // Last reported process state
+    private int mCurRawProcState = PROCESS_STATE_NONEXISTENT; // Temp state during computation
     int setProcState = PROCESS_STATE_NONEXISTENT; // Last set process state in process tracker
     int pssProcState = PROCESS_STATE_NONEXISTENT; // Currently requesting pss for
     int pssStatType;            // The type of stat collection that we are currently requesting
     int savedPriority;          // Previous priority value if we're switching to non-SCHED_OTHER
     int renderThreadTid;        // TID for RenderThread
+    ServiceRecord connectionService; // Service that applied current connectionGroup/Importance
+    int connectionGroup;        // Last group set by a connection
+    int connectionImportance;   // Last importance set by a connection
     boolean serviceb;           // Process currently is on the service B list
     boolean serviceHighRam;     // We are forcing to service B list due to its RAM use
     boolean notCachedSinceIdle; // Has this process not been in a cached state since last idle?
     private boolean mHasClientActivities;  // Are there any client services with activities?
     boolean hasStartedServices; // Are there any started services running in this process?
     private boolean mHasForegroundServices; // Running any services that are foreground?
+    private int mFgServiceTypes; // Type of foreground service, if there is a foreground service.
     private boolean mHasForegroundActivities; // Running any activities that are foreground?
     boolean repForegroundActivities; // Last reported foreground activities.
     boolean systemNoUi;         // This is a system process, but not currently showing UI.
@@ -242,6 +255,9 @@ final class ProcessRecord implements WindowProcessListener {
     final ArrayMap<String, ContentProviderRecord> pubProviders = new ArrayMap<>();
     // All ContentProviderRecord process is using
     final ArrayList<ContentProviderConnection> conProviders = new ArrayList<>();
+    // A set of tokens that currently contribute to this process being temporarily whitelisted
+    // to start activities even if it's not in the foreground
+    final ArraySet<Binder> mAllowBackgroundActivityStartsTokens = new ArraySet<>();
 
     String isolatedEntryPoint;  // Class to run on start if this is a special isolated process.
     String[] isolatedEntryPointArgs; // Arguments to pass to isolatedEntryPoint's main().
@@ -253,7 +269,9 @@ final class ProcessRecord implements WindowProcessListener {
     boolean forceCrashReport;   // suppress normal auto-dismiss of crash dialog & report UI?
     private boolean mNotResponding; // does the app have a not responding dialog?
     Dialog anrDialog;           // dialog being displayed due to app not resp.
-    boolean removed;            // has app package been removed from device?
+    volatile boolean removed;   // Whether this process should be killed and removed from process
+                                // list. It is set when the package is force-stopped or the process
+                                // has crashed too many times.
     private boolean mDebugging; // was app launched for debugging?
     boolean waitedForDebugger;  // has process show wait for debugger dialog?
     Dialog waitDialog;          // current wait for debugger dialog
@@ -379,6 +397,8 @@ final class ProcessRecord implements WindowProcessListener {
                 pw.print(" setRaw="); pw.print(setRawAdj);
                 pw.print(" cur="); pw.print(curAdj);
                 pw.print(" set="); pw.println(setAdj);
+        pw.print(prefix); pw.print("lastCompactTime="); pw.print(lastCompactTime);
+                pw.print(" lastCompactAction="); pw.print(lastCompactAction);
         pw.print(prefix); pw.print("mCurSchedGroup="); pw.print(mCurSchedGroup);
                 pw.print(" setSchedGroup="); pw.print(setSchedGroup);
                 pw.print(" systemNoUi="); pw.print(systemNoUi);
@@ -395,6 +415,11 @@ final class ProcessRecord implements WindowProcessListener {
                     pw.print(" pendingUiClean="); pw.print(mPendingUiClean);
                     pw.print(" hasAboveClient="); pw.print(hasAboveClient);
                     pw.print(" treatLikeActivity="); pw.println(treatLikeActivity);
+        }
+        if (connectionService != null || connectionGroup != 0) {
+            pw.print(prefix); pw.print("connectionGroup="); pw.print(connectionGroup);
+            pw.print(" Importance="); pw.print(connectionImportance);
+            pw.print(" Service="); pw.println(connectionService);
         }
         if (hasTopUi() || hasOverlayUi() || runningRemoteAnimation) {
             pw.print(prefix); pw.print("hasTopUi="); pw.print(hasTopUi());
@@ -542,6 +567,8 @@ final class ProcessRecord implements WindowProcessListener {
         mService = _service;
         info = _info;
         isolated = _info.uid != _uid;
+        appZygote = (UserHandle.getAppId(_uid) >= Process.FIRST_APP_ZYGOTE_ISOLATED_UID
+                && UserHandle.getAppId(_uid) <= Process.LAST_APP_ZYGOTE_ISOLATED_UID);
         uid = _uid;
         userId = UserHandle.getUserId(_uid);
         processName = _processName;
@@ -590,7 +617,7 @@ final class ProcessRecord implements WindowProcessListener {
                 }
                 origBase.makeInactive();
             }
-            baseProcessTracker = tracker.getProcessStateLocked(info.packageName, uid,
+            baseProcessTracker = tracker.getProcessStateLocked(info.packageName, info.uid,
                     info.longVersionCode, processName);
             baseProcessTracker.makeActive();
             for (int i=0; i<pkgList.size(); i++) {
@@ -598,7 +625,7 @@ final class ProcessRecord implements WindowProcessListener {
                 if (holder.state != null && holder.state != origBase) {
                     holder.state.makeInactive();
                 }
-                tracker.updateProcessStateHolderLocked(holder, pkgList.keyAt(i), uid,
+                tracker.updateProcessStateHolderLocked(holder, pkgList.keyAt(i), info.uid,
                         info.longVersionCode, processName);
                 if (holder.state != baseProcessTracker) {
                     holder.state.makeActive();
@@ -653,20 +680,12 @@ final class ProcessRecord implements WindowProcessListener {
         return mWindowProcessController.hasActivities();
     }
 
-    void clearActivities() {
-        mWindowProcessController.clearActivities();
-    }
-
     boolean hasActivitiesOrRecentTasks() {
         return mWindowProcessController.hasActivitiesOrRecentTasks();
     }
 
     boolean hasRecentTasks() {
         return mWindowProcessController.hasRecentTasks();
-    }
-
-    void clearRecentTasks() {
-        mWindowProcessController.clearRecentTasks();
     }
 
     /**
@@ -780,19 +799,25 @@ final class ProcessRecord implements WindowProcessListener {
 
     @Override
     public void writeToProto(ProtoOutputStream proto, long fieldId) {
+        writeToProto(proto, fieldId, -1);
+    }
+
+    public void writeToProto(ProtoOutputStream proto, long fieldId, int lruIndex) {
         long token = proto.start(fieldId);
         proto.write(ProcessRecordProto.PID, pid);
         proto.write(ProcessRecordProto.PROCESS_NAME, processName);
-        if (info.uid < Process.FIRST_APPLICATION_UID) {
-            proto.write(ProcessRecordProto.UID, uid);
-        } else {
+        proto.write(ProcessRecordProto.UID, info.uid);
+        if (UserHandle.getAppId(info.uid) >= Process.FIRST_APPLICATION_UID) {
             proto.write(ProcessRecordProto.USER_ID, userId);
             proto.write(ProcessRecordProto.APP_ID, UserHandle.getAppId(info.uid));
-            if (uid != info.uid) {
-                proto.write(ProcessRecordProto.ISOLATED_APP_ID, UserHandle.getAppId(uid));
-            }
+        }
+        if (uid != info.uid) {
+            proto.write(ProcessRecordProto.ISOLATED_APP_ID, UserHandle.getAppId(uid));
         }
         proto.write(ProcessRecordProto.PERSISTENT, mPersistent);
+        if (lruIndex >= 0) {
+            proto.write(ProcessRecordProto.LRU_INDEX, lruIndex);
+        }
         proto.end(token);
     }
 
@@ -884,7 +909,8 @@ final class ProcessRecord implements WindowProcessListener {
             ProcessStats.ProcessStateHolder holder = new ProcessStats.ProcessStateHolder(
                     versionCode);
             if (baseProcessTracker != null) {
-                tracker.updateProcessStateHolderLocked(holder, pkg, uid, versionCode, processName);
+                tracker.updateProcessStateHolderLocked(holder, pkg, info.uid, versionCode,
+                        processName);
                 pkgList.put(pkg, holder);
                 if (holder.state != baseProcessTracker) {
                     holder.state.makeActive();
@@ -910,6 +936,7 @@ final class ProcessRecord implements WindowProcessListener {
         if (mRepProcState > newState) {
             mRepProcState = newState;
             setCurProcState(newState);
+            setCurRawProcState(newState);
             for (int ipkg = pkgList.size() - 1; ipkg >= 0; ipkg--) {
                 StatsLog.write(StatsLog.PROCESS_STATE_CHANGED,
                         uid, processName, pkgList.keyAt(ipkg),
@@ -945,7 +972,7 @@ final class ProcessRecord implements WindowProcessListener {
                 pkgList.clear();
                 ProcessStats.ProcessStateHolder holder = new ProcessStats.ProcessStateHolder(
                         info.longVersionCode);
-                tracker.updateProcessStateHolderLocked(holder, info.packageName, uid,
+                tracker.updateProcessStateHolderLocked(holder, info.packageName, info.uid,
                         info.longVersionCode, processName);
                 pkgList.put(info.packageName, holder);
                 if (holder.state != baseProcessTracker) {
@@ -970,6 +997,18 @@ final class ProcessRecord implements WindowProcessListener {
         return list;
     }
 
+    public List<VersionedPackage> getPackageListWithVersionCode() {
+        int size = pkgList.size();
+        if (size == 0) {
+            return null;
+        }
+        List<VersionedPackage> list = new ArrayList<>();
+        for (int i = 0; i < pkgList.size(); i++) {
+            list.add(new VersionedPackage(pkgList.keyAt(i), pkgList.valueAt(i).appVersion));
+        }
+        return list;
+    }
+
     WindowProcessController getWindowProcessController() {
         return mWindowProcessController;
     }
@@ -990,6 +1029,14 @@ final class ProcessRecord implements WindowProcessListener {
 
     int getCurProcState() {
         return mCurProcState;
+    }
+
+    void setCurRawProcState(int curRawProcState) {
+        mCurRawProcState = curRawProcState;
+    }
+
+    int getCurRawProcState() {
+        return mCurRawProcState;
     }
 
     void setReportedProcState(int repProcState) {
@@ -1043,13 +1090,19 @@ final class ProcessRecord implements WindowProcessListener {
         return mRequiredAbi;
     }
 
-    void setHasForegroundServices(boolean hasForegroundServices) {
+    void setHasForegroundServices(boolean hasForegroundServices, int fgServiceTypes) {
         mHasForegroundServices = hasForegroundServices;
+        mFgServiceTypes = fgServiceTypes;
         mWindowProcessController.setHasForegroundServices(hasForegroundServices);
     }
 
     boolean hasForegroundServices() {
         return mHasForegroundServices;
+    }
+
+    boolean hasLocationForegroundServices() {
+        return mHasForegroundServices
+                && (mFgServiceTypes & ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION) != 0;
     }
 
     void setHasForegroundActivities(boolean hasForegroundActivities) {
@@ -1133,9 +1186,24 @@ final class ProcessRecord implements WindowProcessListener {
         return mUsingWrapper;
     }
 
+    void addAllowBackgroundActivityStartsToken(Binder entity) {
+        if (entity == null) return;
+        mAllowBackgroundActivityStartsTokens.add(entity);
+        mWindowProcessController.setAllowBackgroundActivityStarts(true);
+    }
+
+    void removeAllowBackgroundActivityStartsToken(Binder entity) {
+        if (entity == null) return;
+        mAllowBackgroundActivityStartsTokens.remove(entity);
+        mWindowProcessController.setAllowBackgroundActivityStarts(
+                !mAllowBackgroundActivityStartsTokens.isEmpty());
+    }
+
     void setActiveInstrumentation(ActiveInstrumentation instr) {
         mInstr = instr;
-        mWindowProcessController.setInstrumenting(instr != null);
+        boolean isInstrumenting = instr != null;
+        mWindowProcessController.setInstrumenting(isInstrumenting,
+                isInstrumenting && instr.mHasBackgroundActivityStartsPermission);
     }
 
     ActiveInstrumentation getActiveInstrumentation() {
@@ -1207,10 +1275,8 @@ final class ProcessRecord implements WindowProcessListener {
     }
 
     @Override
-    public void setRemoved(boolean removed) {
-        synchronized (mService) {
-            this.removed = removed;
-        }
+    public boolean isRemoved() {
+        return removed;
     }
 
     /**
@@ -1251,6 +1317,17 @@ final class ProcessRecord implements WindowProcessListener {
 
     public long getInputDispatchingTimeout() {
         return mWindowProcessController.getInputDispatchingTimeout();
+    }
+
+    public int getProcessClassEnum() {
+        if (pid == MY_PID) {
+            return ServerProtoEnums.SYSTEM_SERVER;
+        }
+        if (info == null) {
+            return ServerProtoEnums.ERROR_SOURCE_UNKNOWN;
+        }
+        return (info.flags & ApplicationInfo.FLAG_SYSTEM) != 0 ? ServerProtoEnums.SYSTEM_APP :
+            ServerProtoEnums.DATA_APP;
     }
 
     void appNotResponding(String activityShortComponentName, ApplicationInfo aInfo,
@@ -1409,7 +1486,9 @@ final class ProcessRecord implements WindowProcessListener {
                         : StatsLog.ANROCCURRED__IS_INSTANT_APP__UNAVAILABLE,
                 isInterestingToUserLocked()
                         ? StatsLog.ANROCCURRED__FOREGROUND_STATE__FOREGROUND
-                        : StatsLog.ANROCCURRED__FOREGROUND_STATE__BACKGROUND);
+                        : StatsLog.ANROCCURRED__FOREGROUND_STATE__BACKGROUND,
+                getProcessClassEnum(),
+                (this.info != null) ? this.info.packageName : "");
         final ProcessRecord parentPr = parentProcess != null
                 ? (ProcessRecord) parentProcess.mOwner : null;
         mService.addErrorToDropBox("anr", this, processName, activityShortComponentName,

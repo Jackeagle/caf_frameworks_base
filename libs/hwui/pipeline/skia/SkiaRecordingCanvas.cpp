@@ -24,6 +24,7 @@
 #include "RenderNode.h"
 #include "pipeline/skia/AnimatedDrawables.h"
 #include "pipeline/skia/GLFunctorDrawable.h"
+#include "pipeline/skia/VkFunctorDrawable.h"
 #include "pipeline/skia/VkInteropFunctorDrawable.h"
 
 namespace android {
@@ -94,8 +95,8 @@ void SkiaRecordingCanvas::insertReorderBarrier(bool enableReorder) {
         drawDrawable(drawable);
     }
     if (enableReorder) {
-        mCurrentBarrier = mDisplayList->allocateDrawable<StartReorderBarrierDrawable>(
-                mDisplayList.get());
+        mCurrentBarrier =
+                mDisplayList->allocateDrawable<StartReorderBarrierDrawable>(mDisplayList.get());
         drawDrawable(mCurrentBarrier);
     }
 }
@@ -112,6 +113,10 @@ void SkiaRecordingCanvas::drawRenderNode(uirenderer::RenderNode* renderNode) {
     // Record the child node. Drawable dtor will be invoked when mChildNodes deque is cleared.
     mDisplayList->mChildNodes.emplace_back(renderNode, asSkCanvas(), true, mCurrentBarrier);
     auto& renderNodeDrawable = mDisplayList->mChildNodes.back();
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaVulkan) {
+        // Put Vulkan WebViews with non-rectangular clips in a HW layer
+        renderNode->mutateStagingProperties().setClipMayBeComplex(mRecorder.isClipMayBeComplex());
+    }
     drawDrawable(&renderNodeDrawable);
 
     // use staging property, since recording on UI thread
@@ -124,11 +129,25 @@ void SkiaRecordingCanvas::callDrawGLFunction(Functor* functor,
                                              uirenderer::GlFunctorLifecycleListener* listener) {
     FunctorDrawable* functorDrawable;
     if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaVulkan) {
-        functorDrawable = mDisplayList->allocateDrawable<VkInteropFunctorDrawable>(functor,
-                listener, asSkCanvas());
+        functorDrawable = mDisplayList->allocateDrawable<VkInteropFunctorDrawable>(
+                functor, listener, asSkCanvas());
     } else {
-        functorDrawable = mDisplayList->allocateDrawable<GLFunctorDrawable>(functor, listener,
-                asSkCanvas());
+        functorDrawable =
+                mDisplayList->allocateDrawable<GLFunctorDrawable>(functor, listener, asSkCanvas());
+    }
+    mDisplayList->mChildFunctors.push_back(functorDrawable);
+    drawDrawable(functorDrawable);
+}
+
+void SkiaRecordingCanvas::drawWebViewFunctor(int functor) {
+    FunctorDrawable* functorDrawable;
+    if (Properties::getRenderPipelineType() == RenderPipelineType::SkiaVulkan) {
+        // TODO(cblume) use VkFunctorDrawable instead of VkInteropFunctorDrawable here when the
+        // interop is disabled.
+        functorDrawable =
+                mDisplayList->allocateDrawable<VkInteropFunctorDrawable>(functor, asSkCanvas());
+    } else {
+        functorDrawable = mDisplayList->allocateDrawable<GLFunctorDrawable>(functor, asSkCanvas());
     }
     mDisplayList->mChildFunctors.push_back(functorDrawable);
     drawDrawable(functorDrawable);
@@ -164,7 +183,7 @@ SkiaCanvas::PaintCoW&& SkiaRecordingCanvas::filterBitmap(PaintCoW&& paint,
         if (colorSpaceFilter) {
             if (tmpPaint.getColorFilter()) {
                 tmpPaint.setColorFilter(SkColorFilter::MakeComposeFilter(
-                       tmpPaint.refColorFilter(), std::move(colorSpaceFilter)));
+                        tmpPaint.refColorFilter(), std::move(colorSpaceFilter)));
             } else {
                 tmpPaint.setColorFilter(std::move(colorSpaceFilter));
             }
@@ -179,9 +198,8 @@ SkiaCanvas::PaintCoW&& SkiaRecordingCanvas::filterBitmap(PaintCoW&& paint,
 }
 
 void SkiaRecordingCanvas::drawBitmap(Bitmap& bitmap, float left, float top, const SkPaint* paint) {
-    sk_sp<SkColorFilter> colorFilter;
-    sk_sp<SkImage> image = bitmap.makeImage(&colorFilter);
-    mRecorder.drawImage(image, left, top, filterBitmap(paint, std::move(colorFilter)), bitmap.palette());
+    sk_sp<SkImage> image = bitmap.makeImage();
+    mRecorder.drawImage(image, left, top, filterPaint(paint), bitmap.palette());
     // if image->unique() is true, then mRecorder.drawImage failed for some reason. It also means
     // it is not safe to store a raw SkImage pointer, because the image object will be destroyed
     // when this function ends.
@@ -194,9 +212,8 @@ void SkiaRecordingCanvas::drawBitmap(Bitmap& bitmap, const SkMatrix& matrix, con
     SkAutoCanvasRestore acr(&mRecorder, true);
     concat(matrix);
 
-    sk_sp<SkColorFilter> colorFilter;
-    sk_sp<SkImage> image = bitmap.makeImage(&colorFilter);
-    mRecorder.drawImage(image, 0, 0, filterBitmap(paint, std::move(colorFilter)), bitmap.palette());
+    sk_sp<SkImage> image = bitmap.makeImage();
+    mRecorder.drawImage(image, 0, 0, filterPaint(paint), bitmap.palette());
     if (!bitmap.isImmutable() && image.get() && !image->unique()) {
         mDisplayList->mMutableImages.push_back(image.get());
     }
@@ -208,9 +225,8 @@ void SkiaRecordingCanvas::drawBitmap(Bitmap& bitmap, float srcLeft, float srcTop
     SkRect srcRect = SkRect::MakeLTRB(srcLeft, srcTop, srcRight, srcBottom);
     SkRect dstRect = SkRect::MakeLTRB(dstLeft, dstTop, dstRight, dstBottom);
 
-    sk_sp<SkColorFilter> colorFilter;
-    sk_sp<SkImage> image = bitmap.makeImage(&colorFilter);
-    mRecorder.drawImageRect(image, srcRect, dstRect, filterBitmap(paint, std::move(colorFilter)),
+    sk_sp<SkImage> image = bitmap.makeImage();
+    mRecorder.drawImageRect(image, srcRect, dstRect, filterPaint(paint),
                             SkCanvas::kFast_SrcRectConstraint, bitmap.palette());
     if (!bitmap.isImmutable() && image.get() && !image->unique() && !srcRect.isEmpty() &&
         !dstRect.isEmpty()) {
@@ -247,10 +263,8 @@ void SkiaRecordingCanvas::drawNinePatch(Bitmap& bitmap, const Res_png_9patch& ch
     if (!filteredPaint || filteredPaint->getFilterQuality() != kLow_SkFilterQuality) {
         filteredPaint.writeable().setFilterQuality(kLow_SkFilterQuality);
     }
-    sk_sp<SkColorFilter> colorFilter;
-    sk_sp<SkImage> image = bitmap.makeImage(&colorFilter);
-    mRecorder.drawImageLattice(image, lattice, dst,
-                               filterBitmap(std::move(filteredPaint), std::move(colorFilter)),
+    sk_sp<SkImage> image = bitmap.makeImage();
+    mRecorder.drawImageLattice(image, lattice, dst, filterPaint(std::move(filteredPaint)),
                                bitmap.palette());
     if (!bitmap.isImmutable() && image.get() && !image->unique() && !dst.isEmpty()) {
         mDisplayList->mMutableImages.push_back(image.get());
@@ -263,6 +277,6 @@ double SkiaRecordingCanvas::drawAnimatedImage(AnimatedImageDrawable* animatedIma
     return 0;
 }
 
-};  // namespace skiapipeline
-};  // namespace uirenderer
-};  // namespace android
+}  // namespace skiapipeline
+}  // namespace uirenderer
+}  // namespace android

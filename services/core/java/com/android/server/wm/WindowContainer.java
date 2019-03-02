@@ -31,10 +31,13 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.CallSuper;
 import android.annotation.IntDef;
+import android.annotation.Nullable;
+import android.annotation.TestApi;
 import android.app.WindowConfiguration;
 import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.IBinder;
 import android.util.Pools;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -115,7 +118,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      */
     protected final Transaction mPendingTransaction;
     protected final SurfaceAnimator mSurfaceAnimator;
-    protected final WindowManagerService mService;
+    protected final WindowManagerService mWmService;
 
     private final Point mTmpPos = new Point();
     protected final Point mLastSurfacePosition = new Point();
@@ -129,10 +132,10 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      */
     private boolean mCommittedReparentToAnimationLeash;
 
-    WindowContainer(WindowManagerService service) {
-        mService = service;
-        mPendingTransaction = service.mTransactionFactory.make();
-        mSurfaceAnimator = new SurfaceAnimator(this, this::onAnimationFinished, service);
+    WindowContainer(WindowManagerService wms) {
+        mWmService = wms;
+        mPendingTransaction = wms.mTransactionFactory.make();
+        mSurfaceAnimator = new SurfaceAnimator(this, this::onAnimationFinished, wms);
     }
 
     @Override
@@ -159,23 +162,16 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
 
     final protected void setParent(WindowContainer<WindowContainer> parent) {
         mParent = parent;
-        // Removing parent usually means that we've detached this entity to destroy it or to attach
-        // to another parent. In both cases we don't need to update the configuration now.
-        if (mParent != null) {
-            // Update full configuration of this container and all its children.
-            onConfigurationChanged(mParent.getConfiguration());
-            // Update merged override configuration of this container and all its children.
-            onMergedOverrideConfigurationChanged();
-        }
-
-        onParentSet();
+        onParentChanged();
     }
 
     /**
      * Callback that is triggered when @link WindowContainer#setParent(WindowContainer)} was called.
      * Supposed to be overridden and contain actions that should be executed after parent was set.
      */
-    void onParentSet() {
+    @Override
+    void onParentChanged() {
+        super.onParentChanged();
         if (mParent == null) {
             return;
         }
@@ -324,7 +320,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
 
         if (mSurfaceControl != null) {
-            mPendingTransaction.destroy(mSurfaceControl);
+            mPendingTransaction.reparent(mSurfaceControl, null);
 
             // Merge to parent transaction to ensure the transactions on this WindowContainer are
             // applied in native even if WindowContainer is removed.
@@ -435,6 +431,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
                 if (mChildren.peekLast() != child) {
                     mChildren.remove(child);
                     mChildren.add(child);
+                    onChildPositionChanged();
                 }
                 if (includingParents && getParent() != null) {
                     getParent().positionChildAt(POSITION_TOP, this /* child */,
@@ -445,6 +442,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
                 if (mChildren.peekFirst() != child) {
                     mChildren.remove(child);
                     mChildren.addFirst(child);
+                    onChildPositionChanged();
                 }
                 if (includingParents && getParent() != null) {
                     getParent().positionChildAt(POSITION_BOTTOM, this /* child */,
@@ -458,8 +456,8 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
                 //       doing this adjustment here and remove any adjustments in the callers.
                 mChildren.remove(child);
                 mChildren.add(position, child);
+                onChildPositionChanged();
         }
-        onChildPositionChanged();
     }
 
     /**
@@ -469,15 +467,16 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
 
     /**
      * Update override configuration and recalculate full config.
-     * @see #mOverrideConfiguration
+     * @see #mRequestedOverrideConfiguration
      * @see #mFullConfiguration
      */
     @Override
-    public void onOverrideConfigurationChanged(Configuration overrideConfiguration) {
+    public void onRequestedOverrideConfigurationChanged(Configuration overrideConfiguration) {
         // We must diff before the configuration is applied so that we can capture the change
         // against the existing bounds.
-        final int diff = diffOverrideBounds(overrideConfiguration.windowConfiguration.getBounds());
-        super.onOverrideConfigurationChanged(overrideConfiguration);
+        final int diff = diffRequestedOverrideBounds(
+                overrideConfiguration.windowConfiguration.getBounds());
+        super.onRequestedOverrideConfigurationChanged(overrideConfiguration);
         if (mParent != null) {
             mParent.onDescendantOverrideConfigurationChanged();
         }
@@ -512,24 +511,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         for (int i = mChildren.size() - 1; i >= 0; --i) {
             final WindowContainer child = mChildren.get(i);
             child.onDisplayChanged(dc);
-        }
-    }
-
-    /**
-     * Update the surface size when display changed in order to avoid children being bound by the
-     * old display size.
-     *
-     * Note that we don't want to apply this to all layers, but only limiting this to layers that
-     * don't set their own size ({@link Task}, {@link WindowState} and {@link WindowToken}).
-     */
-    void updateSurfaceSize(DisplayContent dc) {
-        if (mSurfaceControl == null) {
-            return;
-        }
-
-        final int newSurfaceSize = dc.getSurfaceSize();
-        if (mSurfaceControl.getWidth() != newSurfaceSize) {
-            getPendingTransaction().setSize(mSurfaceControl, newSurfaceSize, newSurfaceSize);
         }
     }
 
@@ -715,8 +696,58 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
     }
 
+    /**
+     * Called when this container or one of its descendants changed its requested orientation, and
+     * wants this container to handle it or pass it to its parent.
+     *
+     * @param freezeDisplayToken freeze this app window token if display needs to freeze
+     * @param requestingContainer the container which orientation request has changed
+     * @return {@code true} if handled; {@code false} otherwise.
+     */
+    boolean onDescendantOrientationChanged(@Nullable IBinder freezeDisplayToken,
+            @Nullable ConfigurationContainer requestingContainer) {
+        final WindowContainer parent = getParent();
+        if (parent == null) {
+            return false;
+        }
+        return parent.onDescendantOrientationChanged(freezeDisplayToken,
+                requestingContainer);
+    }
+
+    /**
+     * Calls {@link #setOrientation(int, IBinder, ActivityRecord)} with {@code null} to the last 2
+     * parameters.
+     *
+     * @param orientation the specified orientation.
+     */
     void setOrientation(int orientation) {
+        setOrientation(orientation, null /* freezeDisplayToken */,
+                null /* ActivityRecord */);
+    }
+
+    /**
+     * Sets the specified orientation of this container. It percolates this change upward along the
+     * hierarchy to let each level of the hierarchy a chance to respond to it.
+     *
+     * @param orientation the specified orientation. Needs to be one of {@link
+     *      android.content.pm.ActivityInfo.ScreenOrientation}.
+     * @param freezeDisplayToken uses this token to freeze display if orientation change is not
+     *                           done. Display will not be frozen if this is {@code null}, which
+     *                           should only happen in tests.
+     * @param requestingContainer the container which orientation request has changed. Mostly used
+     *                            to ensure it gets correct configuration.
+     */
+    void setOrientation(int orientation, @Nullable IBinder freezeDisplayToken,
+            @Nullable ConfigurationContainer requestingContainer) {
+        final boolean changed = mOrientation != orientation;
         mOrientation = orientation;
+        if (!changed) {
+            return;
+        }
+        final WindowContainer parent = getParent();
+        if (parent != null) {
+            onDescendantOrientationChanged(freezeDisplayToken, requestingContainer);
+        }
     }
 
     int getOrientation() {
@@ -1066,17 +1097,25 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      *
      * @param proto     Stream to write the WindowContainer object to.
      * @param fieldId   Field Id of the WindowContainer as defined in the parent message.
-     * @param trim      If true, reduce the amount of data written.
+     * @param logLevel  Determines the amount of data to be written to the Protobuf.
      * @hide
      */
     @CallSuper
     @Override
-    public void writeToProto(ProtoOutputStream proto, long fieldId, boolean trim) {
+    public void writeToProto(ProtoOutputStream proto, long fieldId,
+            @WindowTraceLogLevel int logLevel) {
+        boolean isVisible = isVisible();
+        if (logLevel == WindowTraceLogLevel.CRITICAL && !isVisible) {
+            return;
+        }
+
         final long token = proto.start(fieldId);
-        super.writeToProto(proto, CONFIGURATION_CONTAINER, trim);
+        super.writeToProto(proto, CONFIGURATION_CONTAINER, logLevel);
         proto.write(ORIENTATION, mOrientation);
-        proto.write(VISIBLE, isVisible());
-        mSurfaceAnimator.writeToProto(proto, SURFACE_ANIMATOR);
+        proto.write(VISIBLE, isVisible);
+        if (mSurfaceAnimator.isAnimating()) {
+            mSurfaceAnimator.writeToProto(proto, SURFACE_ANIMATOR);
+        }
         proto.end(token);
     }
 
@@ -1284,7 +1323,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             return;
         }
 
-        getRelativePosition(mTmpPos);
+        getRelativeDisplayedPosition(mTmpPos);
         if (mTmpPos.equals(mLastSurfacePosition)) {
             return;
         }
@@ -1293,12 +1332,27 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         mLastSurfacePosition.set(mTmpPos.x, mTmpPos.y);
     }
 
-    void getRelativePosition(Point outPos) {
-        final Rect bounds = getBounds();
-        outPos.set(bounds.left, bounds.top);
+    @TestApi
+    Point getLastSurfacePosition() {
+        return mLastSurfacePosition;
+    }
+
+    /**
+     * Displayed bounds specify where to display this container at. It differs from bounds during
+     * certain operations (like animation or interactive dragging).
+     *
+     * @return the bounds to display this container at.
+     */
+    Rect getDisplayedBounds() {
+        return getBounds();
+    }
+
+    void getRelativeDisplayedPosition(Point outPos) {
+        final Rect dispBounds = getDisplayedBounds();
+        outPos.set(dispBounds.left, dispBounds.top);
         final WindowContainer parent = getParent();
         if (parent != null) {
-            final Rect parentBounds = parent.getBounds();
+            final Rect parentBounds = parent.getDisplayedBounds();
             outPos.offset(-parentBounds.left, -parentBounds.top);
         }
     }

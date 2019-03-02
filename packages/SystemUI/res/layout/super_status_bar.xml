@@ -43,6 +43,14 @@
                    android:visibility="invisible" />
     </com.android.systemui.statusbar.BackDropView>
 
+    <com.android.systemui.wallpaper.AodMaskView
+        android:id="@+id/aod_mask"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:visibility="invisible"
+        sysui:ignoreRightInset="true" />
+
     <com.android.systemui.statusbar.ScrimView
         android:id="@+id/scrim_behind"
         android:layout_width="match_parent"
@@ -55,11 +63,6 @@
         android:id="@+id/status_bar_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
-
-    <ViewStub android:id="@+id/fullscreen_user_switcher_stub"
-              android:layout="@layout/car_fullscreen_user_switcher"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"/>
 
     <include layout="@layout/status_bar_expanded"
         android:layout_width="match_parent"

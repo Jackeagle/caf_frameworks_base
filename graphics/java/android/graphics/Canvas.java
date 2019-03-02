@@ -17,11 +17,13 @@
 package android.graphics;
 
 import android.annotation.ColorInt;
+import android.annotation.ColorLong;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.Size;
 import android.annotation.UnsupportedAppUsage;
+import android.graphics.text.MeasuredText;
 import android.os.Build;
 
 import dalvik.annotation.optimization.CriticalNative;
@@ -64,7 +66,7 @@ public class Canvas extends BaseCanvas {
     public boolean isRecordingFor(Object o) { return false; }
 
     // may be null
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 117521088)
     private Bitmap mBitmap;
 
     // optional field set by the caller
@@ -556,7 +558,7 @@ public class Canvas extends BaseCanvas {
      * @hide
      */
     public int saveUnclippedLayer(int left, int top, int right, int bottom) {
-        return nSaveLayer(mNativeCanvasWrapper, left, top, right, bottom, 0, 0);
+        return nSaveUnclippedLayer(mNativeCanvasWrapper, left, top, right, bottom);
     }
 
     /**
@@ -1395,6 +1397,8 @@ public class Canvas extends BaseCanvas {
     private static native int nSaveLayerAlpha(long nativeCanvas, float l, float t, float r, float b,
             int alpha, int layerFlags);
     @CriticalNative
+    private static native int nSaveUnclippedLayer(long nativeCanvas, int l, int t, int r, int b);
+    @CriticalNative
     private static native boolean nRestore(long canvasHandle);
     @CriticalNative
     private static native void nRestoreToCount(long canvasHandle, int saveCount);
@@ -1679,13 +1683,52 @@ public class Canvas extends BaseCanvas {
     }
 
     /**
+     * Fill the entire canvas' bitmap (restricted to the current clip) with the specified color,
+     * using srcover porterduff mode.
+     *
+     * @param color the color to draw onto the canvas
+     * @throws IllegalArgumentException if the color space encoded in the long
+     *                                  is invalid or unknown.
+     */
+    public void drawColor(@ColorLong long color) {
+        super.drawColor(color, BlendMode.SRC_OVER);
+    }
+
+    /**
      * Fill the entire canvas' bitmap (restricted to the current clip) with the specified color and
      * porter-duff xfermode.
      *
      * @param color the color to draw with
      * @param mode the porter-duff mode to apply to the color
+     *
+     * @deprecated use {@link #drawColor(int, BlendMode)} instead
      */
+    @Deprecated
     public void drawColor(@ColorInt int color, @NonNull PorterDuff.Mode mode) {
+        super.drawColor(color, mode);
+    }
+
+    /**
+     * Fill the entire canvas' bitmap (restricted to the current clip) with the specified color and
+     * blendmode.
+     *
+     * @param color the color to draw with
+     * @param mode the blendmode to apply to the color
+     */
+    public void drawColor(@ColorInt int color, @NonNull BlendMode mode) {
+        super.drawColor(color, mode);
+    }
+
+    /**
+     * Fill the entire canvas' bitmap (restricted to the current clip) with the specified color and
+     * blendmode.
+     *
+     * @param color the color to draw with
+     * @param mode the blendmode to apply to the color
+     * @throws IllegalArgumentException if the color space encoded in the long
+     *                                  is invalid or unknown.
+     */
+    public void drawColor(@ColorLong long color, @NonNull BlendMode mode) {
         super.drawColor(color, mode);
     }
 
@@ -2106,7 +2149,8 @@ public class Canvas extends BaseCanvas {
      * the text next to it.
      * <p>
      * All text outside the range {@code contextStart..contextEnd} is ignored. The text between
-     * {@code start} and {@code end} will be laid out and drawn.
+     * {@code start} and {@code end} will be laid out and drawn. The context range is useful for
+     * contextual shaping, e.g. Kerning, Arabic contextural form.
      * <p>
      * The direction of the run is explicitly specified by {@code isRtl}. Thus, this method is
      * suitable only for runs of a single direction. Alignment of the text is as determined by the
@@ -2130,6 +2174,31 @@ public class Canvas extends BaseCanvas {
      * @see #drawTextRun(char[], int, int, int, int, float, float, boolean, Paint)
      */
     public void drawTextRun(@NonNull CharSequence text, int start, int end, int contextStart,
+            int contextEnd, float x, float y, boolean isRtl, @NonNull Paint paint) {
+        super.drawTextRun(text, start, end, contextStart, contextEnd, x, y, isRtl, paint);
+    }
+
+    /**
+     * Draw a run of text, all in a single direction, with optional context for complex text
+     * shaping.
+     * <p>
+     * See {@link #drawTextRun(CharSequence, int, int, int, int, float, float, boolean, Paint)} for
+     * more details. This method uses a {@link MeasuredText} rather than CharSequence to represent
+     * the string.
+     *
+     * @param text the text to render
+     * @param start the start of the text to render. Data before this position can be used for
+     *            shaping context.
+     * @param end the end of the text to render. Data at or after this position can be used for
+     *            shaping context.
+     * @param contextStart the index of the start of the shaping context
+     * @param contextEnd the index of the end of the shaping context
+     * @param x the x position at which to draw the text
+     * @param y the y position at which to draw the text
+     * @param isRtl whether the run is in RTL direction
+     * @param paint the paint
+     */
+    public void drawTextRun(@NonNull MeasuredText text, int start, int end, int contextStart,
             int contextEnd, float x, float y, boolean isRtl, @NonNull Paint paint) {
         super.drawTextRun(text, start, end, contextStart, contextEnd, x, y, isRtl, paint);
     }

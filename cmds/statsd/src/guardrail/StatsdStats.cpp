@@ -101,6 +101,7 @@ const int FIELD_ID_UID_MAP_DELETED_APPS = 4;
 
 const std::map<int, std::pair<size_t, size_t>> StatsdStats::kAtomDimensionKeySizeLimitMap = {
         {android::util::BINDER_CALLS, {6000, 10000}},
+        {android::util::LOOPER_STATS, {1500, 2500}},
         {android::util::CPU_TIME_PER_UID_FREQ, {6000, 10000}},
 };
 
@@ -372,6 +373,16 @@ void StatsdStats::notePullDataError(int pullAtomId) {
     mPulledAtomStats[pullAtomId].dataError++;
 }
 
+void StatsdStats::notePullTimeout(int pullAtomId) {
+    lock_guard<std::mutex> lock(mLock);
+    mPulledAtomStats[pullAtomId].pullTimeout++;
+}
+
+void StatsdStats::notePullExceedMaxDelay(int pullAtomId) {
+    lock_guard<std::mutex> lock(mLock);
+    mPulledAtomStats[pullAtomId].pullExceedMaxDelay++;
+}
+
 void StatsdStats::noteAtomLogged(int atomId, int32_t timeSec) {
     lock_guard<std::mutex> lock(mLock);
 
@@ -390,6 +401,60 @@ void StatsdStats::noteSystemServerRestart(int32_t timeSec) {
         mSystemServerRestartSec.pop_front();
     }
     mSystemServerRestartSec.push_back(timeSec);
+}
+
+void StatsdStats::notePullFailed(int atomId) {
+    lock_guard<std::mutex> lock(mLock);
+    mPulledAtomStats[atomId].pullFailed++;
+}
+
+void StatsdStats::noteStatsCompanionPullFailed(int atomId) {
+    lock_guard<std::mutex> lock(mLock);
+    mPulledAtomStats[atomId].statsCompanionPullFailed++;
+}
+
+void StatsdStats::noteStatsCompanionPullBinderTransactionFailed(int atomId) {
+    lock_guard<std::mutex> lock(mLock);
+    mPulledAtomStats[atomId].statsCompanionPullBinderTransactionFailed++;
+}
+
+void StatsdStats::noteEmptyData(int atomId) {
+    lock_guard<std::mutex> lock(mLock);
+    mPulledAtomStats[atomId].emptyData++;
+}
+
+void StatsdStats::noteHardDimensionLimitReached(int metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).hardDimensionLimitReached++;
+}
+
+void StatsdStats::noteLateLogEventSkipped(int metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).lateLogEventSkipped++;
+}
+
+void StatsdStats::noteSkippedForwardBuckets(int metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).skippedForwardBuckets++;
+}
+
+void StatsdStats::noteBadValueType(int metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).badValueType++;
+}
+
+void StatsdStats::noteConditionChangeInNextBucket(int metricId) {
+    lock_guard<std::mutex> lock(mLock);
+    getAtomMetricStats(metricId).conditionChangeInNextBucket++;
+}
+
+StatsdStats::AtomMetricStats& StatsdStats::getAtomMetricStats(int metricId) {
+    auto atomMetricStatsIter = mAtomMetricStats.find(metricId);
+    if (atomMetricStatsIter != mAtomMetricStats.end()) {
+        return atomMetricStatsIter->second;
+    }
+    auto emplaceResult = mAtomMetricStats.emplace(metricId, AtomMetricStats());
+    return emplaceResult.first->second;
 }
 
 void StatsdStats::reset() {
@@ -428,7 +493,10 @@ void StatsdStats::resetInternalLocked() {
         pullStats.second.maxPullDelayNs = 0;
         pullStats.second.numPullDelay = 0;
         pullStats.second.dataError = 0;
+        pullStats.second.pullTimeout = 0;
+        pullStats.second.pullExceedMaxDelay = 0;
     }
+    mAtomMetricStats.clear();
 }
 
 string buildTimeString(int64_t timeSec) {
@@ -534,13 +602,16 @@ void StatsdStats::dumpStats(int out) const {
     dprintf(out, "********Pulled Atom stats***********\n");
     for (const auto& pair : mPulledAtomStats) {
         dprintf(out,
-                "Atom %d->(total pull)%ld, (pull from cache)%ld, (min pull interval)%ld, (average "
-                "pull time nanos)%lld, (max pull time nanos)%lld, (average pull delay nanos)%lld, "
-                "(max pull delay nanos)%lld, (data error)%ld\n",
+                "Atom %d->(total pull)%ld, (pull from cache)%ld, (min pull interval)%ld \n"
+                "  (average pull time nanos)%lld, (max pull time nanos)%lld, (average pull delay "
+                "nanos)%lld, "
+                "  (max pull delay nanos)%lld, (data error)%ld\n"
+                "  (pull timeout)%ld, (pull exceed max delay)%ld\n",
                 (int)pair.first, (long)pair.second.totalPull, (long)pair.second.totalPullFromCache,
                 (long)pair.second.minPullIntervalSec, (long long)pair.second.avgPullTimeNs,
                 (long long)pair.second.maxPullTimeNs, (long long)pair.second.avgPullDelayNs,
-                (long long)pair.second.maxPullDelayNs, pair.second.dataError);
+                (long long)pair.second.maxPullDelayNs, pair.second.dataError,
+                pair.second.pullTimeout, pair.second.pullExceedMaxDelay);
     }
 
     if (mAnomalyAlarmRegisteredStats > 0) {
@@ -695,6 +766,10 @@ void StatsdStats::dumpStats(std::vector<uint8_t>* output, bool reset) {
 
     for (const auto& pair : mPulledAtomStats) {
         android::os::statsd::writePullerStatsToStream(pair, &proto);
+    }
+
+    for (const auto& pair : mAtomMetricStats) {
+        android::os::statsd::writeAtomMetricStatsToStream(pair, &proto);
     }
 
     if (mAnomalyAlarmRegisteredStats > 0) {

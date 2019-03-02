@@ -25,6 +25,7 @@
 #include "IRenderPipeline.h"
 #include "LayerUpdateQueue.h"
 #include "RenderNode.h"
+#include "ReliableSurface.h"
 #include "renderthread/RenderTask.h"
 #include "renderthread/RenderThread.h"
 #include "thread/Task.h"
@@ -183,6 +184,10 @@ public:
         mFrameCompleteCallbacks.push_back(std::move(func));
     }
 
+    void setPictureCapturedCallback(const std::function<void(sk_sp<SkPicture>&&)>& callback) {
+        mRenderPipeline->setPictureCapturedCallback(callback);
+    }
+
     void setForceDark(bool enable) {
         mUseForceDark = enable;
     }
@@ -219,7 +224,7 @@ private:
     EGLint mLastFrameHeight = 0;
 
     RenderThread& mRenderThread;
-    sp<Surface> mNativeSurface;
+    sp<ReliableSurface> mNativeSurface;
     // stopped indicates the CanvasContext will reject actual redraw operations,
     // and defer repaint until it is un-stopped
     bool mStopped = false;

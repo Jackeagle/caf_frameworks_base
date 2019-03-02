@@ -50,11 +50,9 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.ShellCallback;
-import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
-import android.text.style.SuggestionSpan;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -65,6 +63,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnectionInspector.MissingMethodFlags;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodSubtype;
+import android.view.inputmethod.InputMethodSystemProperty;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.inputmethod.IMultiClientInputMethod;
@@ -99,20 +98,6 @@ public final class MultiClientInputMethodManagerService {
     static final String TAG = "MultiClientInputMethodManagerService";
     static final boolean DEBUG = false;
 
-    /**
-     * System property key for the production use. The value must be either empty or a valid
-     * (flattened) component name of the multi-client IME.
-     */
-    private static final String PROP_PROD_MULTI_CLIENT_IME = "ro.sys.multi_client_ime";
-
-    /**
-     * System property key for debugging purpose. The value must be either empty or a valid
-     * (flattened) component name of the multi-client IME.
-     *
-     * <p>This value will be ignored when {@link Build#IS_DEBUGGABLE} returns {@code false}</p>
-     */
-    private static final String PROP_DEBUG_MULTI_CLIENT_IME = "persist.debug.multi_client_ime";
-
     private static final long RECONNECT_DELAY_MSEC = 1000;
 
     /**
@@ -125,36 +110,8 @@ public final class MultiClientInputMethodManagerService {
                     | Context.BIND_NOT_FOREGROUND
                     | Context.BIND_FOREGROUND_SERVICE;
 
-    /**
-     * Inner class to read system property on demand, not when
-     * {@link MultiClientInputMethodManagerService} class is accessed.
-     */
-    private static final class ImeComponentName {
-        private static ComponentName evaluate() {
-            if (Build.IS_DEBUGGABLE) {
-                // If debuggable, allow developers to override the multi-client IME component name
-                // with a different (writable) key.
-                final ComponentName debugIme = ComponentName.unflattenFromString(
-                        SystemProperties.get(PROP_DEBUG_MULTI_CLIENT_IME, ""));
-                if (debugIme != null) {
-                    return debugIme;
-                }
-            }
-            return ComponentName.unflattenFromString(
-                    SystemProperties.get(PROP_PROD_MULTI_CLIENT_IME, ""));
-        }
-
-        /**
-         * {@link ComponentName} of the multi-client IME.  {@code null} when the system is not
-         * configured to use multi-client IME.
-         */
-        @Nullable
-        static final ComponentName sValue = evaluate();
-    }
-
-    public static boolean isConfiguredToUse() {
-        return ImeComponentName.sValue != null;
-    }
+    private static final ComponentName sImeComponentName =
+            InputMethodSystemProperty.sMultiClientImeComponentName;
 
     private static void reportNotSupported() {
         if (DEBUG) {
@@ -202,8 +159,15 @@ public final class MultiClientInputMethodManagerService {
                         }
 
                         @Override
-                        public void startVrInputMethodNoCheck(ComponentName componentName) {
-                            reportNotSupported();
+                        public List<InputMethodInfo> getInputMethodListAsUser(
+                                @UserIdInt int userId) {
+                            return userIdToInputMethodInfoMapper.getAsList(userId);
+                        }
+
+                        @Override
+                        public List<InputMethodInfo> getEnabledInputMethodListAsUser(
+                                @UserIdInt int userId) {
+                            return userIdToInputMethodInfoMapper.getAsList(userId);
                         }
                     });
         }
@@ -270,10 +234,10 @@ public final class MultiClientInputMethodManagerService {
                 return;
             }
 
-            final InputMethodInfo imi = queryInputMethod(mContext, userId, ImeComponentName.sValue);
+            final InputMethodInfo imi = queryInputMethod(mContext, userId, sImeComponentName);
             if (imi == null) {
                 Slog.w(TAG, "Multi-client InputMethod is not found. component="
-                        + ImeComponentName.sValue);
+                        + sImeComponentName);
                 synchronized (data.mLock) {
                     switch (data.mState) {
                         case PerUserState.USER_LOCKED:
@@ -518,9 +482,9 @@ public final class MultiClientInputMethodManagerService {
                 return;
             }
             final String packageName = uri.getSchemeSpecificPart();
-            if (ImeComponentName.sValue == null
+            if (sImeComponentName == null
                     || packageName == null
-                    || !TextUtils.equals(ImeComponentName.sValue.getPackageName(), packageName)) {
+                    || !TextUtils.equals(sImeComponentName.getPackageName(), packageName)) {
                 return;
             }
             final int userId = UserHandle.getUserId(intent.getIntExtra(Intent.EXTRA_UID, 0));
@@ -1275,13 +1239,6 @@ public final class MultiClientInputMethodManagerService {
 
         @BinderThread
         @Override
-        public List<InputMethodInfo> getVrInputMethodList() {
-            reportNotSupported();
-            return Collections.emptyList();
-        }
-
-        @BinderThread
-        @Override
         public List<InputMethodInfo> getEnabledInputMethodList() {
             return mInputMethodInfoMap.getAsList(UserHandle.getUserId(Binder.getCallingUid()));
         }
@@ -1297,13 +1254,6 @@ public final class MultiClientInputMethodManagerService {
         @BinderThread
         @Override
         public InputMethodSubtype getLastInputMethodSubtype() {
-            reportNotSupported();
-            return null;
-        }
-
-        @BinderThread
-        @Override
-        public List getShortcutInputMethodsAndSubtypes() {
             reportNotSupported();
             return null;
         }
@@ -1541,6 +1491,13 @@ public final class MultiClientInputMethodManagerService {
 
         @BinderThread
         @Override
+        public void showInputMethodPickerFromSystem(
+                IInputMethodClient client, int auxiliarySubtypeMode, int displayId) {
+            reportNotSupported();
+        }
+
+        @BinderThread
+        @Override
         public void showInputMethodAndSubtypeEnablerFromClient(
                 IInputMethodClient client, String inputMethodId) {
             reportNotSupported();
@@ -1555,56 +1512,9 @@ public final class MultiClientInputMethodManagerService {
 
         @BinderThread
         @Override
-        public void setInputMethod(IBinder token, String id) {
-            reportNotSupported();
-        }
-
-        @BinderThread
-        @Override
-        public void setInputMethodAndSubtype(IBinder token, String id, InputMethodSubtype subtype) {
-            reportNotSupported();
-        }
-
-        @BinderThread
-        @Override
-        public void registerSuggestionSpansForNotification(SuggestionSpan[] suggestionSpans) {
-            reportNotSupported();
-        }
-
-        @BinderThread
-        @Override
-        public boolean notifySuggestionPicked(
-                SuggestionSpan span, String originalString, int index) {
-            reportNotSupported();
-            return false;
-        }
-
-        @BinderThread
-        @Override
         public InputMethodSubtype getCurrentInputMethodSubtype() {
             reportNotSupported();
             return null;
-        }
-
-        @BinderThread
-        @Override
-        public boolean setCurrentInputMethodSubtype(InputMethodSubtype subtype) {
-            reportNotSupported();
-            return false;
-        }
-
-        @BinderThread
-        @Override
-        public boolean switchToPreviousInputMethod(IBinder token) {
-            reportNotSupported();
-            return false;
-        }
-
-        @BinderThread
-        @Override
-        public boolean switchToNextInputMethod(IBinder token, boolean onlyCurrentIme) {
-            reportNotSupported();
-            return false;
         }
 
         @BinderThread

@@ -158,8 +158,10 @@ public class DozeParameters implements TunerService.Tunable {
      * @return duration in millis.
      */
     public long getWallpaperAodDuration() {
-        return shouldControlScreenOff() ? DozeScreenState.ENTER_DOZE_HIDE_WALLPAPER_DELAY
-                : mAlwaysOnPolicy.wallpaperVisibilityDuration;
+        if (shouldControlScreenOff()) {
+            return DozeScreenState.ENTER_DOZE_HIDE_WALLPAPER_DELAY;
+        }
+        return mAlwaysOnPolicy.wallpaperVisibilityDuration;
     }
 
     /**

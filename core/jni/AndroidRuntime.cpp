@@ -31,6 +31,7 @@
 #include <binder/Parcel.h>
 #include <utils/threads.h>
 #include <cutils/properties.h>
+#include <server_configurable_flags/get_flags.h>
 
 #include <SkGraphics.h>
 
@@ -103,9 +104,11 @@ extern int register_android_hardware_UsbDeviceConnection(JNIEnv *env);
 extern int register_android_hardware_UsbRequest(JNIEnv *env);
 extern int register_android_hardware_location_ActivityRecognitionHardware(JNIEnv* env);
 
+extern int register_android_media_AudioEffectDescriptor(JNIEnv *env);
 extern int register_android_media_AudioRecord(JNIEnv *env);
 extern int register_android_media_AudioSystem(JNIEnv *env);
 extern int register_android_media_AudioTrack(JNIEnv *env);
+extern int register_android_media_AudioAttributes(JNIEnv *env);
 extern int register_android_media_MicrophoneInfo(JNIEnv *env);
 extern int register_android_media_JetPlayer(JNIEnv *env);
 extern int register_android_media_ToneGenerator(JNIEnv *env);
@@ -131,6 +134,7 @@ extern int register_android_content_res_ApkAssets(JNIEnv* env);
 extern int register_android_graphics_Canvas(JNIEnv* env);
 extern int register_android_graphics_CanvasProperty(JNIEnv* env);
 extern int register_android_graphics_ColorFilter(JNIEnv* env);
+extern int register_android_graphics_ColorSpace(JNIEnv* env);
 extern int register_android_graphics_DrawFilter(JNIEnv* env);
 extern int register_android_graphics_FontFamily(JNIEnv* env);
 extern int register_android_graphics_Matrix(JNIEnv* env);
@@ -151,6 +155,8 @@ extern int register_android_graphics_text_MeasuredText(JNIEnv* env);
 extern int register_android_graphics_text_LineBreaker(JNIEnv *env);
 extern int register_android_view_DisplayEventReceiver(JNIEnv* env);
 extern int register_android_view_DisplayListCanvas(JNIEnv* env);
+extern int register_android_view_InputApplicationHandle(JNIEnv* env);
+extern int register_android_view_InputWindowHandle(JNIEnv* env);
 extern int register_android_view_TextureLayer(JNIEnv* env);
 extern int register_android_view_RenderNode(JNIEnv* env);
 extern int register_android_view_RenderNodeAnimator(JNIEnv* env);
@@ -218,6 +224,7 @@ extern int register_android_animation_PropertyValuesHolder(JNIEnv *env);
 extern int register_android_security_Scrypt(JNIEnv *env);
 extern int register_com_android_internal_content_NativeLibraryHelper(JNIEnv *env);
 extern int register_com_android_internal_net_NetworkStatsFactory(JNIEnv *env);
+extern int register_com_android_internal_os_AtomicDirectory(JNIEnv *env);
 extern int register_com_android_internal_os_ClassLoaderFactory(JNIEnv* env);
 extern int register_com_android_internal_os_FuseAppLoop(JNIEnv* env);
 extern int register_com_android_internal_os_Zygote(JNIEnv *env);
@@ -770,7 +777,17 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote)
       addOption("-XX:LowMemoryMode");
     }
 
-    parseRuntimeOption("dalvik.vm.gctype", gctypeOptsBuf, "-Xgc:");
+    std::string gc_type_override =
+            server_configurable_flags::GetServerConfigurableFlag("runtime_native", "gctype", "");
+    std::string gc_type_override_temp;
+    if (gc_type_override.empty()) {
+        parseRuntimeOption("dalvik.vm.gctype", gctypeOptsBuf, "-Xgc:");
+    } else {
+        // Copy the string so it doesn't go out of scope since addOption does not make a copy.
+        gc_type_override_temp = "-Xgc:" + gc_type_override;
+        addOption(gc_type_override_temp.c_str());
+    }
+
     parseRuntimeOption("dalvik.vm.backgroundgctype", backgroundgcOptsBuf, "-XX:BackgroundGC=");
 
     /*
@@ -1058,10 +1075,16 @@ void AndroidRuntime::start(const char* className, const Vector<String8>& options
     if (rootDir == NULL) {
         rootDir = "/system";
         if (!hasDir("/system")) {
-            LOG_FATAL("No root directory specified, and /android does not exist.");
+            LOG_FATAL("No root directory specified, and /system does not exist.");
             return;
         }
         setenv("ANDROID_ROOT", rootDir, 1);
+    }
+
+    const char* runtimeRootDir = getenv("ANDROID_RUNTIME_ROOT");
+    if (runtimeRootDir == NULL) {
+        LOG_FATAL("No runtime directory specified with ANDROID_RUNTIME_ROOT environment variable.");
+        return;
     }
 
     //const char* kernelHack = getenv("LD_ASSUME_KERNEL");
@@ -1356,11 +1379,16 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_os_VintfRuntimeInfo),
     REG_JNI(register_android_nio_utils),
     REG_JNI(register_android_graphics_Canvas),
+    // This needs to be before register_android_graphics_Graphics, or the latter
+    // will not be able to find the jmethodID for ColorSpace.get().
+    REG_JNI(register_android_graphics_ColorSpace),
     REG_JNI(register_android_graphics_Graphics),
     REG_JNI(register_android_view_DisplayEventReceiver),
     REG_JNI(register_android_view_RenderNode),
     REG_JNI(register_android_view_RenderNodeAnimator),
     REG_JNI(register_android_view_DisplayListCanvas),
+    REG_JNI(register_android_view_InputApplicationHandle),
+    REG_JNI(register_android_view_InputWindowHandle),
     REG_JNI(register_android_view_TextureLayer),
     REG_JNI(register_android_view_ThreadedRenderer),
     REG_JNI(register_android_view_Surface),
@@ -1453,9 +1481,11 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_hardware_UsbDeviceConnection),
     REG_JNI(register_android_hardware_UsbRequest),
     REG_JNI(register_android_hardware_location_ActivityRecognitionHardware),
-    REG_JNI(register_android_media_AudioRecord),
+    REG_JNI(register_android_media_AudioEffectDescriptor),
     REG_JNI(register_android_media_AudioSystem),
+    REG_JNI(register_android_media_AudioRecord),
     REG_JNI(register_android_media_AudioTrack),
+    REG_JNI(register_android_media_AudioAttributes),
     REG_JNI(register_android_media_JetPlayer),
     REG_JNI(register_android_media_MicrophoneInfo),
     REG_JNI(register_android_media_RemoteDisplay),
@@ -1490,6 +1520,7 @@ static const RegJNIRec gRegJNI[] = {
     REG_JNI(register_android_security_Scrypt),
     REG_JNI(register_com_android_internal_content_NativeLibraryHelper),
     REG_JNI(register_com_android_internal_net_NetworkStatsFactory),
+    REG_JNI(register_com_android_internal_os_AtomicDirectory),
     REG_JNI(register_com_android_internal_os_FuseAppLoop),
     REG_JNI(register_com_android_internal_app_ActivityTrigger),
 };

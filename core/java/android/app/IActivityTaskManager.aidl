@@ -119,6 +119,8 @@ interface IActivityTaskManager {
             in Intent intent, in String resolvedType, in IBinder resultTo, in String resultWho,
             int requestCode, int flags, in ProfilerInfo profilerInfo, in Bundle options,
             IBinder permissionToken, boolean ignoreTargetSecurity, int userId);
+    boolean isActivityStartAllowedOnDisplay(int displayId, in Intent intent, in String resolvedType,
+            int userId);
 
     void unhandledBack();
     boolean finishActivity(in IBinder token, int code, in Intent data, int finishTask);
@@ -417,6 +419,7 @@ interface IActivityTaskManager {
     void updateLockTaskFeatures(int userId, int flags);
 
     void setShowWhenLocked(in IBinder token, boolean showWhenLocked);
+    void setInheritShowWhenLocked(in IBinder token, boolean setInheritShownWhenLocked);
     void setTurnScreenOn(in IBinder token, boolean turnScreenOn);
 
     /**
@@ -430,6 +433,11 @@ interface IActivityTaskManager {
      */
     void registerRemoteAnimationForNextActivityStart(in String packageName,
            in RemoteAnimationAdapter adapter);
+
+    /**
+     * Registers remote animations for a display.
+     */
+    void registerRemoteAnimationsForDisplay(int displayId, in RemoteAnimationDefinition definition);
 
     /** @see android.app.ActivityManager#alwaysShowUnsupportedCompileSdkWarning */
     void alwaysShowUnsupportedCompileSdkWarning(in ComponentName activity);
@@ -445,4 +453,15 @@ interface IActivityTaskManager {
     void setPackageScreenCompatMode(in String packageName, int mode);
     boolean getPackageAskScreenCompat(in String packageName);
     void setPackageAskScreenCompat(in String packageName, boolean ask);
+
+    /**
+     * Clears launch params for given packages.
+     */
+    void clearLaunchParamsForPackages(in List<String> packageNames);
+
+    /**
+     * Makes the display with the given id a single task instance display. I.e the display can only
+     * contain one task.
+     */
+    void setDisplayToSingleTaskInstance(int displayId);
 }

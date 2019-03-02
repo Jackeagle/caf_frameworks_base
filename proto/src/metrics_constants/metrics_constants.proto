@@ -73,6 +73,10 @@ message MetricsEvent {
 
     // The view switched to summary mode (most relevant for notifications)
     TYPE_COLLAPSE = 14;
+
+    // The notification was adjusted by the assistant. Enum value is
+    // out of sequence due to b/122737498.
+    TYPE_NOTIFICATION_ASSISTANT_ADJUSTMENT = 1573;
   }
 
   // Types of alerts, as bit field values
@@ -212,6 +216,36 @@ message MetricsEvent {
         IOOP_UNMAP = 3;
         IOOP_SYNC = 4;
     }
+
+  // Subtypes of notifications blocking helper view
+  // (NOTIFICATION_BLOCKING_HELPER).
+  enum NotificationBlockingHelper {
+    BLOCKING_HELPER_UNKNOWN = 0;
+    BLOCKING_HELPER_DISPLAY = 1;
+    BLOCKING_HELPER_DISMISS = 2;
+    // When the view of the notification blocking helper was triggered by
+    // system.
+    BLOCKING_HELPER_TRIGGERED_BY_SYSTEM = 3;
+    // "block" was clicked.
+    BLOCKING_HELPER_CLICK_BLOCKED = 4;
+    // "stay silent" was clicked.
+    BLOCKING_HELPER_CLICK_STAY_SILENT = 5;
+    // "alert me" was clicked.
+    BLOCKING_HELPER_CLICK_ALERT_ME = 6;
+    // "undo" was clicked (enables the user to undo "stop notification" action).
+    BLOCKING_HELPER_CLICK_UNDO = 7;
+  }
+
+  // The (visual) location of a Notification.
+  enum NotificationLocation {
+    LOCATION_UNKNOWN = 0;
+    LOCATION_FIRST_HEADS_UP = 1; // visible heads-up
+    LOCATION_HIDDEN_TOP = 2; // hidden/scrolled away on the top
+    LOCATION_MAIN_AREA = 3; // visible in the shade
+    LOCATION_BOTTOM_STACK_PEEKING = 4; // in the bottom stack, and peeking
+    LOCATION_BOTTOM_STACK_HIDDEN = 5; // in the bottom stack, and hidden
+    LOCATION_GONE = 6; // the view isn't laid out at all
+  }
 
   // Known visual elements: views or controls.
   enum View {
@@ -3684,7 +3718,7 @@ message MetricsEvent {
     ACTION_SETTINGS_TILE_CLICK = 830;
 
     // OPEN: Notification unsnoozed. CLOSE: Notification snoozed. UPDATE: snoozed notification
-    // updated
+    // updated. TYPE_DISMISS: snoozing canceled due to data being cleared on package
     // CATEGORY: NOTIFICATION
     // OS: O
     NOTIFICATION_SNOOZED = 831;
@@ -4030,6 +4064,8 @@ message MetricsEvent {
     // - AUTOFILL_INVALID_DATASET_AUTHENTICATION
     // NOTE: starting on OS Q, it also added the following fields:
     // Tag FIELD_AUTOFILL_TEXT_LEN: length of the error message provided by the service
+    // Tag FIELD_AUTOFILL_NUMBER_AUGMENTED_REQUESTS: number of requests made to the augmented
+    //     autofill service
     AUTOFILL_REQUEST = 907;
 
     // Tag of a field for a package of an autofill service
@@ -5325,7 +5361,7 @@ message MetricsEvent {
     // OS: P
     ACCESSIBILITY_VIBRATION = 1292;
 
-    // OPEN: Settings > Accessibility > Vibration > Ring & notification vibration
+    // OPEN: Settings > Accessibility > Vibration > Notification vibration
     // CATEGORY: SETTINGS
     // OS: P
     ACCESSIBILITY_VIBRATION_NOTIFICATION = 1293;
@@ -6604,8 +6640,303 @@ message MetricsEvent {
     // OS: Q
     NOTIFICATION_DIRECT_REPLY_ACTION = 1590;
 
-    // ---- End Q Constants, all Q constants go above this line ----
+    // OPEN: Settings > Developer options > Disable > Info dialog
+    // CATEGORY: SETTINGS
+    // OS: Q
+    DIALOG_DISABLE_DEVELOPMENT_OPTIONS = 1591;
 
+    // Tag for an ACTION: QS -> Tile click / Secondary click / long press
+    //    indicating the StatusBarState when menu was pulled down
+    // CATEGORY: QUICK_SETTINGS
+    // OS: Q
+    FIELD_STATUS_BAR_STATE = 1592;
+
+    // Tag for an ACTION: QS -> Tile click / Secondary click / long press
+    //    indicating whether current state is full QS
+    // CATEGORY: QUICK_SETTINGS
+    // OS: Q
+    FIELD_IS_FULL_QS = 1593;
+
+    // ACTION: Display folding state was changed
+    // CATEGORY: OTHER
+    //   SUBTYPE: 1 if display is folded, 0 if not.
+    // OS: Q
+    ACTION_DISPLAY_FOLD = 1594;
+
+    // OPEN: WifiDppConfiguratorActivity (android.settings.WIFI_DPP_CONFIGURATOR_XXX action intents)
+    // CATEGORY: SETTINGS
+    // OS: Q
+    SETTINGS_WIFI_DPP_CONFIGURATOR = 1595;
+
+    // OPEN: WifiDppEnrolleeActivity (android.settings.WIFI_DPP_ENROLLEE_XXX action intents)
+    // CATEGORY: SETTINGS
+    // OS: Q
+    SETTINGS_WIFI_DPP_ENROLLEE = 1596;
+
+    // OPEN: Settings > Apps & Notifications -> Special app access -> Financial Apps Sms Access
+    // CATEGORY: SETTINGS
+    // OS: Q
+    SETTINGS_FINANCIAL_APPS_SMS_ACCESS = 1597;
+
+    // OPEN: QS Sensor Privacy Mode tile shown
+    // ACTION: QS Sensor Privacy Mode tile tapped
+    // SUBTYPE: 0 is off, 1 is on
+    // CATEGORY: QUICK_SETTINGS
+    // OS: Q
+    QS_SENSOR_PRIVACY = 1598;
+
+    // Tagged data for SMART_REPLY_VISIBLE. Count of number of smart actions.
+    // OS: Q
+    NOTIFICATION_SMART_ACTION_COUNT = 1599;
+
+    // Tagged data for SMART_REPLY_VISIBLE and NOTIFICATION_ITEM_ACTION.
+    // Whether the notification has notification-assistant generated
+    // actions/replies.
+    // OS: Q
+    NOTIFICATION_SMART_SUGGESTION_ASSISTANT_GENERATED = 1600;
+
+    // Tagged data for NOTIFICATION_ITEM_ACTION. Whether the action is a smart
+    // action.
+    // OS: Q
+    NOTIFICATION_ACTION_IS_SMART = 1601;
+
+    // FIELD: true if the associated ACTION_ZEN_ALLOW_* or ACTION_ZEN_BLOCK_* allows/blocks
+    // the effect/sound when DND is on.  false if set to disallow/show.
+    // OS: Q
+    FIELD_ZEN_TOGGLE_EXCEPTION = 1602;
+
+    // FIELD: rule id an ACTION_ZEN_ALLOW_* or ACTION_ZEN_BLOCK_* is associated with
+    // OS: Q
+    FIELD_ZEN_RULE_ID = 1603;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_SETTINGS = 1604;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Custom
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_SOUND_SETTINGS = 1605;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Use default Do Not Disturb behavior
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_DEFAULT_SETTINGS = 1606;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Custom
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_CUSTOM_SETTINGS = 1607;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Use default Do Not Disturb behavior
+    // > Notification restriction
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_NOTIFICATION_RESTRICTIONS = 1608;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Use default Do Not Disturb behavior
+    // > Notification restriction > Custom
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_VIS_EFFECTS = 1609;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Use default Do Not Disturb behavior
+    // > Notification restriction > Custom > Allow messages
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_MESSAGES = 1610;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Schedules > (Click on system rule)
+    // > Do Not Disturb behavior > Use default Do Not Disturb behavior
+    // > Notification restriction > Custom > Allow calls
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_RULE_CALLS = 1611;
+
+    // OPEN: Settings > Sound > Do Not Disturb > Click footer link if custom settings applied
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ZEN_CUSTOM_SETTINGS_DIALOG = 1612;
+
+    // OPEN: Settings > Developer Options > Game Driver Preferences
+    // CATEGORY: SETTINGS
+    // OS: Q
+    SETTINGS_GAME_DRIVER_DASHBOARD = 1613;
+
+    // CATEGORY: The category for all actions relating to language detection logging.
+    // OS: Q
+    LANGUAGE_DETECTION = 1614;
+
+    // CATEGORY: The category for all actions relating to conversation actions logging.
+    // OS: Q
+    CONVERSATION_ACTIONS = 1615;
+
+    // ACTION: Actions from a text classifier are shown to user.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    ACTION_TEXT_CLASSIFIER_ACTIONS_SHOWN = 1616;
+
+    // FIELD: Event time of a text classifier event in unix timestamp.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_EVENT_TIME = 1617;
+
+    // ACTION: Users compose their own replies instead of using suggested ones.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    ACTION_TEXT_CLASSIFIER_MANUAL_REPLY = 1618;
+
+    // ACTION: Text classifier generates an action.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    ACTION_TEXT_CLASSIFIER_ACTIONS_GENERATED = 1619;
+
+    // OPEN: Settings > Accessibility > Vibration > Ring vibration
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ACCESSIBILITY_VIBRATION_RING = 1620;
+
+    // ACTION: Notification blocking helper view, which helps the user to block
+    // application or channel from showing notifications.
+    // SUBTYPE: NotificationBlockingHelper enum.
+    // CATEGORY: NOTIFICATION
+    // OS: Q
+    NOTIFICATION_BLOCKING_HELPER = 1621;
+
+    // ACTION: Tap & Pay -> Default Application Setting -> Use Forground
+    // OS: Q
+    ACTION_NFC_PAYMENT_FOREGROUND_SETTING = 1622;
+
+    // ACTION: Tap & Pay -> Default Application Setting -> Use Default
+    // OS: Q
+    ACTION_NFC_PAYMENT_ALWAYS_SETTING = 1623;
+
+    // OPEN: Settings > System > Input & Gesture > Skip song gesture
+    // OS: Q
+    SETTINGS_GESTURE_SKIP_SONG = 1624;
+
+    // OPEN: Settings > System > Input & Gesture > Silence gesture
+    // OS: Q
+    SETTINGS_GESTURE_SILENCE = 1625;
+
+    // OPEN: Settings > System > Input & Gesture > Tap screen gesture
+    // OS: Q
+    SETTINGS_GESTURE_TAP_SCREEN = 1626;
+
+    // OPEN: Settings > Network & internet > Click Mobile network to land on a page with a list of
+    // SIM/eSIM subscriptions.
+    // CATEGORY: SETTINGS
+    // OS: Q
+    MOBILE_NETWORK_LIST = 1627;
+
+    // OPEN: Settings > Display > Adaptive sleep
+    // OS: Q
+    SETTINGS_ADAPTIVE_SLEEP = 1628;
+
+    // Tagged data for SMART_REPLY_VISIBLE and NOTIFICATION_ITEM_ACTION.
+    // The UI location of the notification containing the smart suggestions.
+    // This is a NotificationLocation object (see the NotificationLocation
+    // enum).
+    // OS: Q
+    NOTIFICATION_LOCATION = 1629;
+
+    // The autofill system made request to the system-provided augmented autofill service.
+    // OS: Q
+    // Package: Package of app that is autofilled
+    // Tag FIELD_CLASS_NAME: Class name of the activity that is autofilled.
+    // Tag FIELD_AUTOFILL_SERVICE: Package of the augmented autofill service that processed the
+    // request
+    // Tag FIELD_AUTOFILL_SESSION_ID: id of the autofill session associated with this metric.
+    // Tag FIELD_AUTOFILL_COMPAT_MODE: package is being autofilled on compatibility mode.
+    AUTOFILL_AUGMENTED_REQUEST = 1630;
+
+    // Tag of a field for the number of augmented autofill requests in a session
+    // OS: Q
+    FIELD_AUTOFILL_NUMBER_AUGMENTED_REQUESTS = 1631;
+
+    // OPEN: Settings > System > Aware
+    // OS: Q
+    SETTINGS_AWARE = 1632;
+
+    // OPEN: Settings > System > Aware > Disable > Dialog
+    // OS: Q
+    DIALOG_AWARE_DISABLE = 1633;
+
+    // FIELD: Session ID of TextClassifierEvent.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_SESSION_ID = 1634;
+
+    // FIELD: First entity type.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_FIRST_ENTITY_TYPE = 1635;
+    // FIELD: Second entity type.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_SECOND_ENTITY_TYPE = 1636;
+
+    // FIELD: Third entity type.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_THIRD_ENTITY_TYPE = 1637;
+
+    // FIELD: Score of the suggestion.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_SCORE = 1638;
+
+    // FIELD: widget type, e.g: notification, textview
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_WIDGET_TYPE = 1639;
+
+    // FIELD: version of the widget.
+    // CATEGORY: LANGUAGE_DETECTION, CONVERSATION_ACTIONS
+    // OS: Q
+    FIELD_TEXT_CLASSIFIER_WIDGET_VERSION = 1640;
+
+    // Tagged data for NOTIFICATION_ITEM. One of the CATEGORY String constants from
+    // https://developer.android.com/reference/android/app/Notification .
+    // OS: Q
+    // CATEGORY: NOTIFICATION
+    FIELD_NOTIFICATION_CATEGORY = 1641;
+
+    // OPEN: Settings > Settings > Network & internet > Click Mobile network to land on page with
+    // details for a SIM/eSIM mobile network > Click edit icon to bring up a rename dialog.
+    // OS: Q
+    MOBILE_NETWORK_RENAME_DIALOG = 1642;
+
+    // ACTION: Settings > Search Bar > Avatar
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ACTION_CLICK_ACCOUNT_AVATAR = 1643;
+
+    // OPEN: Set new password (action intents android.app.action.SET_NEW_PASSWORD or
+    // android.app.action.SET_NEW_PARENT_PROFILE_PASSWORD)
+    // CATEGORY: SETTINGS
+    // OS: Q
+    SET_NEW_PASSWORD_ACTIVITY = 1644;
+
+    // ACTION: Set new password (action intent android.app.action.SET_NEW_PASSWORD)
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ACTION_SET_NEW_PASSWORD = 1645;
+
+    // ACTION: Set new password (action intent android.app.action.SET_NEW_PARENT_PROFILE_PASSWORD)
+    // CATEGORY: SETTINGS
+    // OS: Q
+    ACTION_SET_NEW_PARENT_PROFILE_PASSWORD = 1646;
+
+    // ---- End Q Constants, all Q constants go above this line ----
     // Add new aosp constants above this line.
     // END OF AOSP CONSTANTS
   }

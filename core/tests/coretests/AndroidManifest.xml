@@ -56,15 +56,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.INJECT_EVENTS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_DEVICE_CONFIG" />
     <uses-permission android:name="android.permission.READ_DREAM_STATE" />
     <uses-permission android:name="android.permission.WRITE_DREAM_STATE" />
+    <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.READ_LOGS"/>
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND"/>
     <uses-permission android:name="android.permission.UPDATE_DEVICE_STATS" />
     <uses-permission android:name="android.permission.USE_CREDENTIALS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_DEVICE_CONFIG" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
@@ -90,6 +94,8 @@
 
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.KILL_UID" />
+
+    <uses-permission android:name="android.permission.ACCESS_SURFACE_FLINGER" />
 
     <!-- location test permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -1140,6 +1146,14 @@
             </intent-filter>
         </activity>
 
+        <activity android:name="android.view.accessibility.AccessibilityTestActivity"
+                  android:label="AccessibilityTestActivity" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.FRAMEWORK_INSTRUMENTATION_TEST" />
+            </intent-filter>
+        </activity>
+
         <!-- Activity-level metadata -->
         <meta-data android:name="com.android.frameworks.coretests.isApp" android:value="true" />
         <meta-data android:name="com.android.frameworks.coretests.string" android:value="foo" />
@@ -1316,6 +1330,12 @@
         <service android:name="android.os.BinderThreadPriorityService"
                 android:process=":BinderThreadPriorityService" />
 
+        <!-- Used by BinderWorkSourceTest -->
+        <service android:name="android.os.BinderWorkSourceService"
+                android:process=":BinderWorkSourceService" />
+        <service android:name="android.os.BinderWorkSourceNestedService"
+                android:process=":BinderWorkSourceNestedService" />
+
         <!-- Application components used for search manager tests -->
 
         <activity android:name="android.app.activity.SearchableActivity"
@@ -1417,7 +1437,7 @@
 
     </application>
 
-    <instrumentation android:name="android.support.test.runner.AndroidJUnitRunner"
+    <instrumentation android:name="androidx.test.runner.AndroidJUnitRunner"
             android:targetPackage="com.android.frameworks.coretests"
             android:label="Frameworks Core Tests" />
     <key-sets>

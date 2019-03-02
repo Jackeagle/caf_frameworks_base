@@ -18,6 +18,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     mockito-target-minus-junit4 \
     platform-test-annotations \
     services.core \
+    services.ipmemorystore \
     services.net
 
 LOCAL_JAVA_LIBRARIES := \
@@ -31,75 +32,6 @@ LOCAL_COMPATIBILITY_SUITE := device-tests
 
 LOCAL_CERTIFICATE := platform
 
-# These are not normally accessible from apps so they must be explicitly included.
-LOCAL_JNI_SHARED_LIBRARIES := \
-    android.hidl.token@1.0 \
-    libartbase \
-    libbacktrace \
-    libbase \
-    libbinder \
-    libbinderthreadstate \
-    libc++ \
-    libcrypto \
-    libcutils \
-    libdexfile \
-    libframeworksnettestsjni \
-    libhidl-gen-utils \
-    libhidlbase \
-    libhidltransport \
-    libhwbinder \
-    liblog \
-    liblzma \
-    libnativehelper \
-    libnetdaidl \
-    libpackagelistparser \
-    libpcre2 \
-    libselinux \
-    libui \
-    libutils \
-    libvintf \
-    libvndksupport \
-    libtinyxml2 \
-    libunwindstack \
-    libutilscallstack \
-    libziparchive \
-    libz \
-    netd_aidl_interface-cpp
-
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 include $(BUILD_PACKAGE)
-
-#########################################################################
-# Build JNI Shared Library
-#########################################################################
-
-LOCAL_PATH:= $(LOCAL_PATH)/jni
-
-include $(CLEAR_VARS)
-
-LOCAL_MODULE_TAGS := tests
-
-LOCAL_CFLAGS := -Wall -Wextra -Werror
-
-LOCAL_C_INCLUDES := \
-  libpcap \
-  hardware/google/apf
-
-LOCAL_SRC_FILES := $(call all-cpp-files-under)
-
-LOCAL_SHARED_LIBRARIES := \
-  libbinder \
-  liblog \
-  libcutils \
-  libnativehelper \
-  libnetdaidl \
-  netd_aidl_interface-cpp
-
-LOCAL_STATIC_LIBRARIES := \
-  libpcap \
-  libapf
-
-LOCAL_MODULE := libframeworksnettestsjni
-
-include $(BUILD_SHARED_LIBRARY)

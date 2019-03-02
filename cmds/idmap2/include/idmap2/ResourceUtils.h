@@ -17,23 +17,32 @@
 #ifndef IDMAP2_INCLUDE_IDMAP2_RESOURCEUTILS_H_
 #define IDMAP2_INCLUDE_IDMAP2_RESOURCEUTILS_H_
 
+#include <optional>
+#include <ostream>
 #include <string>
-#include <utility>
 
 #include "android-base/macros.h"
 #include "androidfw/AssetManager2.h"
 
 #include "idmap2/Idmap.h"
+#include "idmap2/Result.h"
+#include "idmap2/ZipFile.h"
 
-namespace android {
-namespace idmap2 {
-namespace utils {
+namespace android::idmap2::utils {
 
-std::pair<bool, std::string> WARN_UNUSED ResToTypeEntryName(const AssetManager2& am,
-                                                            ResourceId resid);
+struct OverlayManifestInfo {
+  std::string target_package;  // NOLINT(misc-non-private-member-variables-in-classes)
+  std::string target_name;     // NOLINT(misc-non-private-member-variables-in-classes)
+  bool is_static;              // NOLINT(misc-non-private-member-variables-in-classes)
+  int priority = -1;           // NOLINT(misc-non-private-member-variables-in-classes)
+};
 
-}  // namespace utils
-}  // namespace idmap2
-}  // namespace android
+Result<OverlayManifestInfo> ExtractOverlayManifestInfo(const std::string& path,
+                                                       std::ostream& out_error,
+                                                       bool assert_overlay = true);
+
+Result<std::string> WARN_UNUSED ResToTypeEntryName(const AssetManager2& am, ResourceId resid);
+
+}  // namespace android::idmap2::utils
 
 #endif  // IDMAP2_INCLUDE_IDMAP2_RESOURCEUTILS_H_

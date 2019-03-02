@@ -28,6 +28,7 @@ import android.content.pm.PackageManager.PackageInfoFlags;
 import android.content.pm.PackageManager.ResolveInfoFlags;
 import android.os.Bundle;
 import android.os.PersistableBundle;
+import android.util.ArraySet;
 import android.util.SparseArray;
 
 import com.android.internal.util.function.TriFunction;
@@ -37,6 +38,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 /**
  * Package manager local system service interface.
@@ -51,6 +53,11 @@ public abstract class PackageManagerInternal {
     public static final int PACKAGE_BROWSER = 4;
     public static final int PACKAGE_SYSTEM_TEXT_CLASSIFIER = 5;
     public static final int PACKAGE_PERMISSION_CONTROLLER = 6;
+    public static final int PACKAGE_WELLBEING = 7;
+    public static final int PACKAGE_DOCUMENTER = 8;
+    public static final int PACKAGE_CONFIGURATOR = 9;
+    public static final int PACKAGE_INCIDENT_REPORT_APPROVER = 10;
+    public static final int PACKAGE_APP_PREDICTOR = 11;
     @IntDef(value = {
         PACKAGE_SYSTEM,
         PACKAGE_SETUP_WIZARD,
@@ -59,6 +66,11 @@ public abstract class PackageManagerInternal {
         PACKAGE_BROWSER,
         PACKAGE_SYSTEM_TEXT_CLASSIFIER,
         PACKAGE_PERMISSION_CONTROLLER,
+        PACKAGE_WELLBEING,
+        PACKAGE_DOCUMENTER,
+        PACKAGE_CONFIGURATOR,
+        PACKAGE_INCIDENT_REPORT_APPROVER,
+        PACKAGE_APP_PREDICTOR,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface KnownPackage {}
@@ -125,10 +137,42 @@ public abstract class PackageManagerInternal {
     }
 
     /**
+     * Provider for default browser
+     */
+    public interface DefaultBrowserProvider {
+
+        /**
+         * Get the package name of the default browser.
+         *
+         * @param userId the user id
+         *
+         * @return the package name of the default browser, or {@code null} if none
+         */
+        @Nullable
+        String getDefaultBrowser(@UserIdInt int userId);
+
+        /**
+         * Set the package name of the default browser.
+         *
+         * @param packageName package name of the default browser, or {@code null} to remove
+         * @param userId the user id
+         *
+         * @return whether the default browser was successfully set.
+         */
+        boolean setDefaultBrowser(@Nullable String packageName, @UserIdInt int userId);
+    }
+
+    /**
      * Sets the location provider packages provider.
      * @param provider The packages provider.
      */
     public abstract void setLocationPackagesProvider(PackagesProvider provider);
+
+    /**
+     * Set the location extra packages provider.
+     * @param provider The packages provider.
+     */
+    public abstract  void setLocationExtraPackagesProvider(PackagesProvider provider);
 
     /**
      * Sets the voice interaction packages provider.
@@ -276,6 +320,17 @@ public abstract class PackageManagerInternal {
      */
     @Nullable
     public abstract SuspendDialogInfo getSuspendedDialogInfo(String suspendedPackage, int userId);
+
+    /**
+     * Gets any distraction flags set via
+     * {@link PackageManager#setDistractingPackageRestrictions(String[], int)}
+     *
+     * @param packageName
+     * @param userId
+     * @return A bitwise OR of any of the {@link PackageManager.DistractionRestriction}
+     */
+    public abstract @PackageManager.DistractionRestriction int getDistractingPackageRestrictions(
+            String packageName, int userId);
 
     /**
      * Do a straight uid lookup for the given package/application in the given user.
@@ -735,4 +790,100 @@ public abstract class PackageManagerInternal {
 
     /** Returns {@code true} if the given user requires extra badging for icons. */
     public abstract boolean userNeedsBadging(int userId);
+
+    /**
+     * Perform the given action for each package.
+     * Note that packages lock will be held while performin the actions.
+     *
+     * @param actionLocked action to be performed
+     */
+    public abstract void forEachPackage(Consumer<PackageParser.Package> actionLocked);
+
+    /** Returns the list of enabled components */
+    public abstract ArraySet<String> getEnabledComponents(String packageName, int userId);
+
+    /** Returns the list of disabled components */
+    public abstract ArraySet<String> getDisabledComponents(String packageName, int userId);
+
+    /** Returns whether the given package is enabled for the given user */
+    public abstract @PackageManager.EnabledState int getApplicationEnabledState(
+            String packageName, int userId);
+
+    /**
+     * Extra field name for the token of a request to enable rollback for a
+     * package.
+     */
+    public static final String EXTRA_ENABLE_ROLLBACK_TOKEN =
+            "android.content.pm.extra.ENABLE_ROLLBACK_TOKEN";
+
+    /**
+     * Extra field name for the installFlags of a request to enable rollback
+     * for a package.
+     */
+    public static final String EXTRA_ENABLE_ROLLBACK_INSTALL_FLAGS =
+            "android.content.pm.extra.ENABLE_ROLLBACK_INSTALL_FLAGS";
+
+    /**
+     * Extra field name for the set of installed users for a given rollback package.
+     */
+    public static final String EXTRA_ENABLE_ROLLBACK_INSTALLED_USERS =
+            "android.content.pm.extra.ENABLE_ROLLBACK_INSTALLED_USERS";
+
+    /**
+     * Used as the {@code enableRollbackCode} argument for
+     * {@link PackageManagerInternal#setEnableRollbackCode} to indicate that
+     * enabling rollback succeeded.
+     */
+    public static final int ENABLE_ROLLBACK_SUCCEEDED = 1;
+
+    /**
+     * Used as the {@code enableRollbackCode} argument for
+     * {@link PackageManagerInternal#setEnableRollbackCode} to indicate that
+     * enabling rollback failed.
+     */
+    public static final int ENABLE_ROLLBACK_FAILED = -1;
+
+    /**
+     * Allows the rollback manager listening to the
+     * {@link Intent#ACTION_PACKAGE_ENABLE_ROLLBACK enable rollback broadcast}
+     * to respond to the package manager. The response must include the
+     * {@code enableRollbackCode} which is one of
+     * {@link PackageManager#ENABLE_ROLLBACK_SUCCEEDED} or
+     * {@link PackageManager#ENABLE_ROLLBACK_FAILED}.
+     *
+     * @param token pending package identifier as passed via the
+     *            {@link PackageManager#EXTRA_ENABLE_ROLLBACK_TOKEN} Intent extra.
+     * @param enableRollbackCode the status code result of enabling rollback
+     * @throws SecurityException if the caller does not have the
+     *            PACKAGE_ROLLBACK_AGENT permission.
+     */
+    public abstract void setEnableRollbackCode(int token, int enableRollbackCode);
+
+    /**
+     * Ask the package manager to compile layouts in the given package.
+     */
+    public abstract boolean compileLayouts(String packageName);
+
+    /*
+     * Inform the package manager that the pending package install identified by
+     * {@code token} can be completed.
+     */
+    public abstract void finishPackageInstall(int token, boolean didLaunch);
+
+    /**
+     * Remove the default browser stored in the legacy package settings.
+     *
+     * @param userId the user id
+     *
+     * @return the package name of the default browser, or {@code null} if none
+     */
+    @Nullable
+    public abstract String removeLegacyDefaultBrowserPackageName(int userId);
+
+    /**
+     * Sets the default browser provider.
+     *
+     * @param provider the provider
+     */
+    public abstract void setDefaultBrowserProvider(@NonNull DefaultBrowserProvider provider);
 }

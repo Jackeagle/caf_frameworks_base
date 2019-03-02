@@ -30,7 +30,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Log;
 
-import com.android.internal.os.BackgroundThread;
+import com.android.server.FgThread;
 import com.android.server.ServiceWatcher;
 
 /**
@@ -82,7 +82,7 @@ public final class GeofenceProxy {
         mContext = context;
         mServiceWatcher = new ServiceWatcher(context, TAG, SERVICE_ACTION, overlaySwitchResId,
                 defaultServicePackageNameResId, initialPackageNamesResId,
-                BackgroundThread.getHandler()) {
+                FgThread.getHandler()) {
             @Override
             protected void onBind() {
                 runOnBinder(mUpdateGeofenceHardware);
@@ -113,8 +113,12 @@ public final class GeofenceProxy {
             IGeofenceHardware geofenceHardware = IGeofenceHardware.Stub.asInterface(service);
 
             try {
-                geofenceHardware.setGpsGeofenceHardware(mGpsGeofenceHardware);
-                geofenceHardware.setFusedGeofenceHardware(mFusedGeofenceHardware);
+                if (mGpsGeofenceHardware != null) {
+                    geofenceHardware.setGpsGeofenceHardware(mGpsGeofenceHardware);
+                }
+                if (mFusedGeofenceHardware != null) {
+                    geofenceHardware.setFusedGeofenceHardware(mFusedGeofenceHardware);
+                }
 
                 mGeofenceHardware = geofenceHardware;
                 mServiceWatcher.runOnBinder(mUpdateGeofenceHardware);

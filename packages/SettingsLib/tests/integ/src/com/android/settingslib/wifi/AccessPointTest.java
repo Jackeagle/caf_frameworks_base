@@ -19,14 +19,17 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.NetworkKey;
@@ -44,12 +47,12 @@ import android.net.wifi.hotspot2.pps.HomeSp;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.SystemClock;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
 import android.text.SpannableString;
 import android.text.format.DateUtils;
-import android.text.style.TtsSpan;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.settingslib.R;
 import com.android.settingslib.utils.ThreadUtils;
@@ -481,6 +484,45 @@ public class AccessPointTest {
                 .build();
         assertThat(ap.getSummary()).isEqualTo(String.format(mContext.getString(
                 R.string.connected_via_carrier), carrierName));
+    }
+
+    @Test
+    public void testSummaryString_showsConnectedViaSuggestionOrSpecifierApp() throws Exception {
+        final int rssi = -55;
+        final String appPackageName = "com.test.app";
+        final CharSequence appLabel = "Test App";
+        final String connectedViaAppResourceString = "Connected via ";
+
+        WifiInfo wifiInfo = new WifiInfo();
+        wifiInfo.setSSID(WifiSsid.createFromAsciiEncoded(TEST_SSID));
+        wifiInfo.setEphemeral(true);
+        wifiInfo.setNetworkSuggestionOrSpecifierPackageName(appPackageName);
+        wifiInfo.setRssi(rssi);
+
+        Context context = mock(Context.class);
+        Resources resources = mock(Resources.class);
+        PackageManager packageManager = mock(PackageManager.class);
+        ApplicationInfo applicationInfo = mock(ApplicationInfo.class);
+        when(context.getPackageManager()).thenReturn(packageManager);
+        when(context.getResources()).thenReturn(resources);
+        when(resources.getString(R.string.connected_via_app, appLabel))
+                .thenReturn(connectedViaAppResourceString + appLabel.toString());
+        when(packageManager.getApplicationInfoAsUser(eq(appPackageName), anyInt(), anyInt()))
+                .thenReturn(applicationInfo);
+        when(applicationInfo.loadLabel(packageManager)).thenReturn(appLabel);
+
+        NetworkInfo networkInfo =
+                new NetworkInfo(ConnectivityManager.TYPE_WIFI, 0 /* subtype */, "WIFI", "");
+        networkInfo.setDetailedState(NetworkInfo.DetailedState.CONNECTED, "", "");
+
+        AccessPoint ap = new TestAccessPointBuilder(context)
+                .setSsid(TEST_SSID)
+                .setNetworkInfo(networkInfo)
+                .setRssi(rssi)
+                .setSecurity(AccessPoint.SECURITY_NONE)
+                .setWifiInfo(wifiInfo)
+                .build();
+        assertThat(ap.getSummary()).isEqualTo("Connected via Test App");
     }
 
     @Test

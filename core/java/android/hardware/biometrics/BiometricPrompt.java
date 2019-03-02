@@ -73,6 +73,14 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
      * @hide
      */
     public static final String KEY_NEGATIVE_TEXT = "negative_text";
+    /**
+     * @hide
+     */
+    public static final String KEY_REQUIRE_CONFIRMATION = "require_confirmation";
+    /**
+     * @hide
+     */
+    public static final String KEY_ENABLE_FALLBACK = "enable_fallback";
 
     /**
      * Error/help message will show for this amount of time.
@@ -194,6 +202,9 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
          * Required: Set the text for the negative button. This would typically be used as a
          * "Cancel" button, but may be also used to show an alternative method for authentication,
          * such as screen that asks for a backup password.
+         *
+         * Note that this should not be set if {@link #setEnableFallback(boolean)} is set to true.
+         *
          * @param text
          * @return
          */
@@ -215,6 +226,45 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
         }
 
         /**
+         * Optional: A hint to the system to require user confirmation after a biometric has been
+         * authenticated. For example, implicit modalities like Face and Iris authentication are
+         * passive, meaning they don't require an explicit user action to complete. When set to
+         * 'false', the user action (e.g. pressing a button) will not be required. BiometricPrompt
+         * will require confirmation by default.
+         *
+         * A typical use case for not requiring confirmation would be for low-risk transactions,
+         * such as re-authenticating a recently authenticated application. A typical use case for
+         * requiring confirmation would be for authorizing a purchase.
+         *
+         * Note that this is a hint to the system. The system may choose to ignore the flag. For
+         * example, if the user disables implicit authentication in Settings, or if it does not
+         * apply to a modality (e.g. Fingerprint). When ignored, the system will default to
+         * requiring confirmation.
+         *
+         * @param requireConfirmation
+         */
+        public Builder setRequireConfirmation(boolean requireConfirmation) {
+            mBundle.putBoolean(KEY_REQUIRE_CONFIRMATION, requireConfirmation);
+            return this;
+        }
+
+        /**
+         * The user will first be prompted to authenticate with biometrics, but also given the
+         * option to authenticate with their device PIN, pattern, or password.
+         *
+         * Note that {@link #setNegativeButton(CharSequence, Executor,
+         * DialogInterface.OnClickListener)} should not be set if this is set to true.
+         *
+         * @param enable When true, the prompt will fall back to ask for the user's device
+         *               credentials (PIN, pattern, or password).
+         * @return
+         */
+        public Builder setEnableFallback(boolean enable) {
+            mBundle.putBoolean(KEY_ENABLE_FALLBACK, enable);
+            return this;
+        }
+
+        /**
          * Creates a {@link BiometricPrompt}.
          * @return a {@link BiometricPrompt}
          * @throws IllegalArgumentException if any of the required fields are not set.
@@ -223,11 +273,15 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
             final CharSequence title = mBundle.getCharSequence(KEY_TITLE);
             final CharSequence negative = mBundle.getCharSequence(KEY_NEGATIVE_TEXT);
             final boolean useDefaultTitle = mBundle.getBoolean(KEY_USE_DEFAULT_TITLE);
+            final boolean enableFallback = mBundle.getBoolean(KEY_ENABLE_FALLBACK);
 
             if (TextUtils.isEmpty(title) && !useDefaultTitle) {
                 throw new IllegalArgumentException("Title must be set and non-empty");
-            } else if (TextUtils.isEmpty(negative)) {
+            } else if (TextUtils.isEmpty(negative) && !enableFallback) {
                 throw new IllegalArgumentException("Negative text must be set and non-empty");
+            } else if (!TextUtils.isEmpty(negative) && enableFallback) {
+                throw new IllegalArgumentException("Can't have both negative button behavior"
+                        + " and fallback enabled");
             }
             return new BiometricPrompt(mContext, mBundle, mPositiveButtonInfo, mNegativeButtonInfo);
         }
@@ -251,9 +305,40 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
     private Executor mExecutor;
     private AuthenticationCallback mAuthenticationCallback;
 
-    IBiometricPromptReceiver mDialogReceiver = new IBiometricPromptReceiver.Stub() {
+    private final IBiometricServiceReceiver mBiometricServiceReceiver =
+            new IBiometricServiceReceiver.Stub() {
+
         @Override
-        public void onDialogDismissed(int reason) {
+        public void onAuthenticationSucceeded() throws RemoteException {
+            mExecutor.execute(() -> {
+                final AuthenticationResult result = new AuthenticationResult(mCryptoObject);
+                mAuthenticationCallback.onAuthenticationSucceeded(result);
+            });
+        }
+
+        @Override
+        public void onAuthenticationFailed() throws RemoteException {
+            mExecutor.execute(() -> {
+                mAuthenticationCallback.onAuthenticationFailed();
+            });
+        }
+
+        @Override
+        public void onError(int error, String message) throws RemoteException {
+            mExecutor.execute(() -> {
+                mAuthenticationCallback.onAuthenticationError(error, message);
+            });
+        }
+
+        @Override
+        public void onAcquired(int acquireInfo, String message) throws RemoteException {
+            mExecutor.execute(() -> {
+                mAuthenticationCallback.onAuthenticationHelp(acquireInfo, message);
+            });
+        }
+
+        @Override
+        public void onDialogDismissed(int reason) throws RemoteException {
             // Check the reason and invoke OnClickListener(s) if necessary
             if (reason == DISMISSED_REASON_POSITIVE) {
                 mPositiveButtonInfo.executor.execute(() -> {
@@ -264,40 +349,6 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
                     mNegativeButtonInfo.listener.onClick(null, DialogInterface.BUTTON_NEGATIVE);
                 });
             }
-        }
-    };
-
-    IBiometricServiceReceiver mBiometricServiceReceiver =
-            new IBiometricServiceReceiver.Stub() {
-
-        @Override
-        public void onAuthenticationSucceeded(long deviceId) throws RemoteException {
-            mExecutor.execute(() -> {
-                final AuthenticationResult result = new AuthenticationResult(mCryptoObject);
-                mAuthenticationCallback.onAuthenticationSucceeded(result);
-            });
-        }
-
-        @Override
-        public void onAuthenticationFailed(long deviceId) throws RemoteException {
-            mExecutor.execute(() -> {
-                mAuthenticationCallback.onAuthenticationFailed();
-            });
-        }
-
-        @Override
-        public void onError(long deviceId, int error, String message)
-                throws RemoteException {
-            mExecutor.execute(() -> {
-                mAuthenticationCallback.onAuthenticationError(error, message);
-            });
-        }
-
-        @Override
-        public void onAcquired(long deviceId, int acquireInfo, String message) {
-            mExecutor.execute(() -> {
-                mAuthenticationCallback.onAuthenticationHelp(acquireInfo, message);
-            });
         }
     };
 
@@ -490,6 +541,9 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
         if (callback == null) {
             throw new IllegalArgumentException("Must supply a callback");
         }
+        if (mBundle.getBoolean(KEY_ENABLE_FALLBACK)) {
+            throw new IllegalArgumentException("Fallback not supported with crypto");
+        }
         authenticateInternal(crypto, cancel, executor, callback, mContext.getUserId());
     }
 
@@ -557,9 +611,8 @@ public class BiometricPrompt implements BiometricAuthenticator, BiometricConstan
             mExecutor = executor;
             mAuthenticationCallback = callback;
             final long sessionId = crypto != null ? crypto.getOpId() : 0;
-            mService.authenticate(mToken, sessionId, userId,
-                    mBiometricServiceReceiver, 0 /* flags */, mContext.getOpPackageName(),
-                    mBundle, mDialogReceiver);
+            mService.authenticate(mToken, sessionId, userId, mBiometricServiceReceiver,
+                    mContext.getOpPackageName(), mBundle);
         } catch (RemoteException e) {
             Log.e(TAG, "Remote exception while authenticating", e);
             mExecutor.execute(() -> {

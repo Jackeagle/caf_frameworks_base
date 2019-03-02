@@ -35,7 +35,6 @@
 #include "bpf/BpfUtils.h"
 #include "netdbpf/BpfNetworkStats.h"
 
-using android::bpf::hasBpfSupport;
 using android::bpf::parseBpfNetworkStatsDetail;
 using android::bpf::stats_line;
 
@@ -96,7 +95,7 @@ static jlongArray get_long_array(JNIEnv* env, jobject obj, jfieldID field, int s
 static int legacyReadNetworkStatsDetail(std::vector<stats_line>* lines,
                                         const std::vector<std::string>& limitIfaces,
                                         int limitTag, int limitUid, const char* path) {
-    FILE* fp = fopen(path, "r");
+    FILE* fp = fopen(path, "re");
     if (fp == NULL) {
         return -1;
     }

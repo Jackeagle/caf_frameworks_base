@@ -64,6 +64,20 @@ const int FIELD_ID_MAX_PULL_TIME_NANOS = 6;
 const int FIELD_ID_AVERAGE_PULL_DELAY_NANOS = 7;
 const int FIELD_ID_MAX_PULL_DELAY_NANOS = 8;
 const int FIELD_ID_DATA_ERROR = 9;
+const int FIELD_ID_PULL_TIMEOUT = 10;
+const int FIELD_ID_PULL_EXCEED_MAX_DELAY = 11;
+const int FIELD_ID_PULL_FAILED = 12;
+const int FIELD_ID_STATS_COMPANION_FAILED = 13;
+const int FIELD_ID_STATS_COMPANION_BINDER_TRANSACTION_FAILED = 14;
+const int FIELD_ID_EMPTY_DATA = 15;
+// for AtomMetricStats proto
+const int FIELD_ID_ATOM_METRIC_STATS = 17;
+const int FIELD_ID_METRIC_ID = 1;
+const int FIELD_ID_HARD_DIMENSION_LIMIT_REACHED = 2;
+const int FIELD_ID_LATE_LOG_EVENT_SKIPPED = 3;
+const int FIELD_ID_SKIPPED_FORWARD_BUCKETS = 4;
+const int FIELD_ID_BAD_VALUE_TYPE = 5;
+const int FIELD_ID_CONDITION_CHANGE_IN_NEXT_BUCKET = 6;
 
 namespace {
 
@@ -343,9 +357,11 @@ void writeFieldValueTreeToStreamHelper(int tagId, const std::vector<FieldValue>&
                         }
                     }
                     if (isBytesField) {
-                        protoOutput->write(FIELD_TYPE_MESSAGE | fieldNum,
-                                           (const char*)dim.mValue.str_value.c_str(),
-                                           dim.mValue.str_value.length());
+                        if (dim.mValue.str_value.length() > 0) {
+                            protoOutput->write(FIELD_TYPE_MESSAGE | fieldNum,
+                                               (const char*)dim.mValue.str_value.c_str(),
+                                               dim.mValue.str_value.length());
+                        }
                     } else {
                         protoOutput->write(FIELD_TYPE_STRING | fieldNum, dim.mValue.str_value);
                     }
@@ -448,6 +464,36 @@ void writePullerStatsToStream(const std::pair<int, StatsdStats::PulledAtomStats>
     protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_MAX_PULL_DELAY_NANOS,
                        (long long)pair.second.maxPullDelayNs);
     protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_DATA_ERROR, (long long)pair.second.dataError);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_PULL_TIMEOUT,
+                       (long long)pair.second.pullTimeout);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_PULL_EXCEED_MAX_DELAY,
+                       (long long)pair.second.pullExceedMaxDelay);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_PULL_FAILED,
+                       (long long)pair.second.pullFailed);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_STATS_COMPANION_FAILED,
+                       (long long)pair.second.statsCompanionPullFailed);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_STATS_COMPANION_BINDER_TRANSACTION_FAILED,
+                       (long long)pair.second.statsCompanionPullBinderTransactionFailed);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_EMPTY_DATA,
+                       (long long)pair.second.emptyData);
+    protoOutput->end(token);
+}
+
+void writeAtomMetricStatsToStream(const std::pair<int, StatsdStats::AtomMetricStats> &pair,
+                                  util::ProtoOutputStream *protoOutput) {
+    uint64_t token = protoOutput->start(FIELD_TYPE_MESSAGE | FIELD_ID_ATOM_METRIC_STATS |
+                                        FIELD_COUNT_REPEATED);
+    protoOutput->write(FIELD_TYPE_INT32 | FIELD_ID_METRIC_ID, (int32_t)pair.first);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_HARD_DIMENSION_LIMIT_REACHED,
+                       (long long)pair.second.hardDimensionLimitReached);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_LATE_LOG_EVENT_SKIPPED,
+                       (long long)pair.second.lateLogEventSkipped);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_SKIPPED_FORWARD_BUCKETS,
+                       (long long)pair.second.skippedForwardBuckets);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_BAD_VALUE_TYPE,
+                       (long long)pair.second.badValueType);
+    protoOutput->write(FIELD_TYPE_INT64 | FIELD_ID_CONDITION_CHANGE_IN_NEXT_BUCKET,
+                       (long long)pair.second.conditionChangeInNextBucket);
     protoOutput->end(token);
 }
 

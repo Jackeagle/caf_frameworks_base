@@ -27,10 +27,8 @@ import static android.support.test.espresso.matcher.ViewMatchers.withId;
 import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static android.widget.espresso.CustomViewActions.longPressAtRelativeCoordinates;
 import static android.widget.espresso.DragHandleUtils.onHandleView;
-import static android.widget.espresso.FloatingToolbarEspressoUtils
-        .assertFloatingToolbarContainsItem;
-import static android.widget.espresso.FloatingToolbarEspressoUtils
-        .assertFloatingToolbarDoesNotContainItem;
+import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarContainsItem;
+import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarDoesNotContainItem;
 import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarIsDisplayed;
 import static android.widget.espresso.FloatingToolbarEspressoUtils.assertFloatingToolbarItemIndex;
 import static android.widget.espresso.FloatingToolbarEspressoUtils.clickFloatingToolbarItem;
@@ -62,13 +60,8 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.support.test.InstrumentationRegistry;
 import android.support.test.espresso.action.EspressoKey;
-import android.support.test.filters.MediumTest;
-import android.support.test.rule.ActivityTestRule;
-import android.support.test.runner.AndroidJUnit4;
 import android.support.test.uiautomator.UiDevice;
-import android.test.suitebuilder.annotation.Suppress;
 import android.text.InputType;
 import android.text.Selection;
 import android.text.Spannable;
@@ -84,6 +77,12 @@ import android.view.textclassifier.TextClassifier;
 import android.view.textclassifier.TextLinks;
 import android.view.textclassifier.TextLinksParams;
 import android.widget.espresso.CustomViewActions.RelativeCoordinatesProvider;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.MediumTest;
+import androidx.test.filters.Suppress;
+import androidx.test.rule.ActivityTestRule;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.frameworks.coretests.R;
 
@@ -978,6 +977,19 @@ public class TextViewActivityTest {
 
         onView(withId(R.id.textview)).perform(replaceText(password));
         onView(withId(R.id.textview)).perform(longPressOnTextAtIndex(password.indexOf('@')));
+        sleepForFloatingToolbarPopup();
+        assertFloatingToolbarDoesNotContainItem(android.R.id.textAssist);
+    }
+
+    @Test
+    public void testNoAssistItemForTextFieldWithUnsupportedCharacters() throws Throwable {
+        useSystemDefaultTextClassifier();
+        final String text = "\u202Emoc.diordna.com";
+        final TextView textView = mActivity.findViewById(R.id.textview);
+        mActivityRule.runOnUiThread(() -> textView.setText(text));
+        mInstrumentation.waitForIdleSync();
+
+        onView(withId(R.id.textview)).perform(longPressOnTextAtIndex(text.indexOf('.')));
         sleepForFloatingToolbarPopup();
         assertFloatingToolbarDoesNotContainItem(android.R.id.textAssist);
     }

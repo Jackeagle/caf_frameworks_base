@@ -43,6 +43,7 @@ import android.net.ConnectivityManager;
 import android.net.INetworkPolicyManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.BatteryStats;
 import android.os.Binder;
 import android.os.Bundle;
@@ -86,6 +87,10 @@ import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FastXmlSerializer;
 import com.android.internal.util.XmlUtils;
 import com.android.server.am.BatteryStatsService;
+import com.android.server.deviceidle.ConstraintController;
+import com.android.server.deviceidle.DeviceIdleConstraintTracker;
+import com.android.server.deviceidle.IDeviceIdleConstraint;
+import com.android.server.deviceidle.TvConstraintController;
 import com.android.server.net.NetworkPolicyManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
@@ -103,6 +108,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * Keeps track of device idleness and drives low power mode based on that.
@@ -272,6 +278,7 @@ public class DeviceIdleController extends SystemService
     private PowerManager mPowerManager;
     private INetworkPolicyManager mNetworkPolicyManager;
     private SensorManager mSensorManager;
+    private final boolean mUseMotionSensor;
     private Sensor mMotionSensor;
     private LocationRequest mLocationRequest;
     private Intent mIdleIntent;
@@ -294,6 +301,17 @@ public class DeviceIdleController extends SystemService
     private Location mLastGpsLocation;
     // Current locked state of the screen
     private boolean mScreenLocked;
+    private int mNumBlockingConstraints = 0;
+
+    /**
+     * Constraints are the "handbrakes" that stop the device from moving into a lower state until
+     * every one is released at the same time.
+     *
+     * @see #registerDeviceIdleConstraintInternal(IDeviceIdleConstraint, String, int)
+     */
+    private final ArrayMap<IDeviceIdleConstraint, DeviceIdleConstraintTracker>
+            mConstraints = new ArrayMap<>();
+    private ConstraintController mConstraintController;
 
     /** Device is currently active. */
     @VisibleForTesting
@@ -322,6 +340,29 @@ public class DeviceIdleController extends SystemService
      */
     @VisibleForTesting
     static final int STATE_QUICK_DOZE_DELAY = 7;
+
+    private static final int ACTIVE_REASON_UNKNOWN = 0;
+    private static final int ACTIVE_REASON_MOTION = 1;
+    private static final int ACTIVE_REASON_SCREEN = 2;
+    private static final int ACTIVE_REASON_CHARGING = 3;
+    private static final int ACTIVE_REASON_UNLOCKED = 4;
+    private static final int ACTIVE_REASON_FROM_BINDER_CALL = 5;
+    private static final int ACTIVE_REASON_FORCED = 6;
+    private static final int ACTIVE_REASON_ALARM = 7;
+    @VisibleForTesting
+    static final int SET_IDLE_FACTOR_RESULT_UNINIT = -1;
+    @VisibleForTesting
+    static final int SET_IDLE_FACTOR_RESULT_IGNORED = 0;
+    @VisibleForTesting
+    static final int SET_IDLE_FACTOR_RESULT_OK = 1;
+    @VisibleForTesting
+    static final int SET_IDLE_FACTOR_RESULT_NOT_SUPPORT = 2;
+    @VisibleForTesting
+    static final int SET_IDLE_FACTOR_RESULT_INVALID = 3;
+    @VisibleForTesting
+    static final long MIN_STATE_STEP_ALARM_CHANGE = 60 * 1000;
+    @VisibleForTesting
+    static final float MIN_PRE_IDLE_FACTOR_CHANGE = 0.05f;
 
     @VisibleForTesting
     static String stateToString(int state) {
@@ -387,6 +428,7 @@ public class DeviceIdleController extends SystemService
     private long mNextSensingTimeoutAlarmTime;
     private long mCurIdleBudget;
     private long mMaintenanceStartTime;
+    private long mIdleStartTime;
 
     private int mActiveIdleOpCount;
     private PowerManager.WakeLock mActiveIdleWakeLock; // held when there are operations in progress
@@ -396,6 +438,17 @@ public class DeviceIdleController extends SystemService
     private boolean mJobsActive;
     private boolean mAlarmsActive;
     private boolean mReportedMaintenanceActivity;
+
+    /* Factor to apply to INACTIVE_TIMEOUT and IDLE_AFTER_INACTIVE_TIMEOUT in order to enter
+     * STATE_IDLE faster or slower. Don't apply this to SENSING_TIMEOUT or LOCATING_TIMEOUT because:
+     *   - Both of them are shorter
+     *   - Device sensor might take time be to become be stabilized
+     * Also don't apply the factor if the device is in motion because device motion provides a
+     * stronger signal than a prediction algorithm.
+     */
+    private float mPreIdleFactor;
+    private float mLastPreIdleFactor;
+    private int mActiveReason;
 
     public final AtomicFile mConfigFile;
 
@@ -520,9 +573,10 @@ public class DeviceIdleController extends SystemService
                     updateConnectivityState(intent);
                 } break;
                 case Intent.ACTION_BATTERY_CHANGED: {
+                    boolean present = intent.getBooleanExtra(BatteryManager.EXTRA_PRESENT, true);
+                    boolean plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0;
                     synchronized (DeviceIdleController.this) {
-                        int plugged = intent.getIntExtra("plugged", 0);
-                        updateChargingLocked(plugged != 0);
+                        updateChargingLocked(present && plugged);
                     }
                 } break;
                 case Intent.ACTION_PACKAGE_REMOVED: {
@@ -700,8 +754,7 @@ public class DeviceIdleController extends SystemService
      * global Settings. Any access to this class or its fields should be done while
      * holding the DeviceIdleController lock.
      */
-    @VisibleForTesting
-    final class Constants extends ContentObserver {
+    public final class Constants extends ContentObserver {
         // Key names stored in the settings value.
         private static final String KEY_LIGHT_IDLE_AFTER_INACTIVE_TIMEOUT
                 = "light_after_inactive_to";
@@ -742,6 +795,10 @@ public class DeviceIdleController extends SystemService
          * exit doze. Default = true
          */
         private static final String KEY_WAIT_FOR_UNLOCK = "wait_for_unlock";
+        private static final String KEY_PRE_IDLE_FACTOR_LONG =
+                "pre_idle_factor_long";
+        private static final String KEY_PRE_IDLE_FACTOR_SHORT =
+                "pre_idle_factor_short";
 
         /**
          * This is the time, after becoming inactive, that we go in to the first
@@ -969,6 +1026,16 @@ public class DeviceIdleController extends SystemService
          */
         public long NOTIFICATION_WHITELIST_DURATION;
 
+        /**
+         * Pre idle time factor use to make idle delay longer
+         */
+        public float PRE_IDLE_FACTOR_LONG;
+
+        /**
+         * Pre idle time factor use to make idle delay shorter
+         */
+        public float PRE_IDLE_FACTOR_SHORT;
+
         public boolean WAIT_FOR_UNLOCK;
 
         private final ContentResolver mResolver;
@@ -1028,9 +1095,9 @@ public class DeviceIdleController extends SystemService
                 INACTIVE_TIMEOUT = mParser.getDurationMillis(KEY_INACTIVE_TIMEOUT,
                         !COMPRESS_TIME ? inactiveTimeoutDefault : (inactiveTimeoutDefault / 10));
                 SENSING_TIMEOUT = mParser.getDurationMillis(KEY_SENSING_TIMEOUT,
-                        !DEBUG ? 4 * 60 * 1000L : 60 * 1000L);
+                        !COMPRESS_TIME ? 4 * 60 * 1000L : 60 * 1000L);
                 LOCATING_TIMEOUT = mParser.getDurationMillis(KEY_LOCATING_TIMEOUT,
-                        !DEBUG ? 30 * 1000L : 15 * 1000L);
+                        !COMPRESS_TIME ? 30 * 1000L : 15 * 1000L);
                 LOCATION_ACCURACY = mParser.getFloat(KEY_LOCATION_ACCURACY, 20);
                 MOTION_INACTIVE_TIMEOUT = mParser.getDurationMillis(KEY_MOTION_INACTIVE_TIMEOUT,
                         !COMPRESS_TIME ? 10 * 60 * 1000L : 60 * 1000L);
@@ -1064,6 +1131,8 @@ public class DeviceIdleController extends SystemService
                 NOTIFICATION_WHITELIST_DURATION = mParser.getDurationMillis(
                         KEY_NOTIFICATION_WHITELIST_DURATION, 30 * 1000L);
                 WAIT_FOR_UNLOCK = mParser.getBoolean(KEY_WAIT_FOR_UNLOCK, false);
+                PRE_IDLE_FACTOR_LONG = mParser.getFloat(KEY_PRE_IDLE_FACTOR_LONG, 1.67f);
+                PRE_IDLE_FACTOR_SHORT = mParser.getFloat(KEY_PRE_IDLE_FACTOR_SHORT, 0.33f);
             }
         }
 
@@ -1178,6 +1247,12 @@ public class DeviceIdleController extends SystemService
 
             pw.print("    "); pw.print(KEY_WAIT_FOR_UNLOCK); pw.print("=");
             pw.println(WAIT_FOR_UNLOCK);
+
+            pw.print("    "); pw.print(KEY_PRE_IDLE_FACTOR_LONG); pw.print("=");
+            pw.println(PRE_IDLE_FACTOR_LONG);
+
+            pw.print("    "); pw.print(KEY_PRE_IDLE_FACTOR_SHORT); pw.print("=");
+            pw.println(PRE_IDLE_FACTOR_SHORT);
         }
     }
 
@@ -1225,6 +1300,9 @@ public class DeviceIdleController extends SystemService
     private static final int MSG_REPORT_MAINTENANCE_ACTIVITY = 7;
     private static final int MSG_FINISH_IDLE_OP = 8;
     private static final int MSG_REPORT_TEMP_APP_WHITELIST_CHANGED = 9;
+    private static final int MSG_SEND_CONSTRAINT_MONITORING = 10;
+    private static final int MSG_UPDATE_PRE_IDLE_TIMEOUT_FACTOR = 11;
+    private static final int MSG_RESET_PRE_IDLE_TIMEOUT_FACTOR = 12;
 
     final class MyHandler extends Handler {
         MyHandler(Looper looper) {
@@ -1344,6 +1422,22 @@ public class DeviceIdleController extends SystemService
                     final int appId = msg.arg1;
                     final boolean added = (msg.arg2 == 1);
                     mNetworkPolicyManagerInternal.onTempPowerSaveWhitelistChange(appId, added);
+                } break;
+                case MSG_SEND_CONSTRAINT_MONITORING: {
+                    final IDeviceIdleConstraint constraint = (IDeviceIdleConstraint) msg.obj;
+                    final boolean monitoring = (msg.arg1 == 1);
+                    if (monitoring) {
+                        constraint.startMonitoring();
+                    } else {
+                        constraint.stopMonitoring();
+                    }
+                } break;
+                case MSG_UPDATE_PRE_IDLE_TIMEOUT_FACTOR: {
+                    updatePreIdleFactor();
+                } break;
+                case MSG_RESET_PRE_IDLE_TIMEOUT_FACTOR: {
+                    updatePreIdleFactor();
+                    maybeDoImmediateMaintenance();
                 } break;
             }
         }
@@ -1498,6 +1592,28 @@ public class DeviceIdleController extends SystemService
             DeviceIdleController.this.unregisterMaintenanceActivityListener(listener);
         }
 
+        @Override public int setPreIdleTimeoutMode(int mode) {
+            getContext().enforceCallingOrSelfPermission(Manifest.permission.DEVICE_POWER,
+                    null);
+            long ident = Binder.clearCallingIdentity();
+            try {
+                return DeviceIdleController.this.setPreIdleTimeoutMode(mode);
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        }
+
+        @Override public void resetPreIdleTimeoutMode() {
+            getContext().enforceCallingOrSelfPermission(Manifest.permission.DEVICE_POWER,
+                    null);
+            long ident = Binder.clearCallingIdentity();
+            try {
+                DeviceIdleController.this.resetPreIdleTimeoutMode();
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        }
+
         @Override protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
             DeviceIdleController.this.dump(fd, pw, args);
         }
@@ -1509,6 +1625,25 @@ public class DeviceIdleController extends SystemService
     }
 
     public class LocalService {
+        public void onConstraintStateChanged(IDeviceIdleConstraint constraint, boolean active) {
+            synchronized (DeviceIdleController.this) {
+                onConstraintStateChangedLocked(constraint, active);
+            }
+        }
+
+        public void registerDeviceIdleConstraint(IDeviceIdleConstraint constraint, String name,
+                @IDeviceIdleConstraint.MinimumState int minState) {
+            registerDeviceIdleConstraintInternal(constraint, name, minState);
+        }
+
+        public void unregisterDeviceIdleConstraint(IDeviceIdleConstraint constraint) {
+            unregisterDeviceIdleConstraintInternal(constraint);
+        }
+
+        public void exitIdle(String reason) {
+            exitIdleInternal(reason);
+        }
+
         // duration in milliseconds
         public void addPowerSaveTempWhitelistApp(int callingUid, String packageName,
                 long duration, int userId, boolean sync, String reason) {
@@ -1559,6 +1694,7 @@ public class DeviceIdleController extends SystemService
     static class Injector {
         private final Context mContext;
         private ConnectivityService mConnectivityService;
+        private Constants mConstants;
         private LocationManager mLocationManager;
 
         Injector(Context ctx) {
@@ -1588,7 +1724,10 @@ public class DeviceIdleController extends SystemService
 
         Constants getConstants(DeviceIdleController controller, Handler handler,
                 ContentResolver resolver) {
-            return controller.new Constants(handler, resolver);
+            if (mConstants == null) {
+                mConstants = controller.new Constants(handler, resolver);
+            }
+            return mConstants;
         }
 
         LocationManager getLocationManager() {
@@ -1604,6 +1743,23 @@ public class DeviceIdleController extends SystemService
 
         PowerManager getPowerManager() {
             return mContext.getSystemService(PowerManager.class);
+        }
+
+        SensorManager getSensorManager() {
+            return mContext.getSystemService(SensorManager.class);
+        }
+
+        ConstraintController getConstraintController(Handler handler, LocalService localService) {
+            if (mContext.getPackageManager()
+                    .hasSystemFeature(PackageManager.FEATURE_LEANBACK_ONLY)) {
+                return new TvConstraintController(mContext, handler);
+            }
+            return null;
+        }
+
+        boolean useMotionSensor() {
+            return mContext.getResources().getBoolean(
+                   com.android.internal.R.bool.config_autoPowerModeUseMotionSensor);
         }
     }
 
@@ -1629,6 +1785,7 @@ public class DeviceIdleController extends SystemService
         mHandler = mInjector.getHandler(this);
         mAppStateTracker = mInjector.getAppStateTracker(context, FgThread.get().getLooper());
         LocalServices.addService(AppStateTracker.class, mAppStateTracker);
+        mUseMotionSensor = mInjector.useMotionSensor();
     }
 
     public DeviceIdleController(Context context) {
@@ -1699,9 +1856,12 @@ public class DeviceIdleController extends SystemService
             // Start out assuming we are charging.  If we aren't, we will at least get
             // a battery update the next time the level drops.
             mCharging = true;
+            mActiveReason = ACTIVE_REASON_UNKNOWN;
             mState = STATE_ACTIVE;
             mLightState = LIGHT_STATE_ACTIVE;
             mInactiveTimeout = mConstants.INACTIVE_TIMEOUT;
+            mPreIdleFactor = 1.0f;
+            mLastPreIdleFactor = 1.0f;
         }
 
         mBinderService = new BinderService();
@@ -1728,21 +1888,24 @@ public class DeviceIdleController extends SystemService
                 mNetworkPolicyManager = INetworkPolicyManager.Stub.asInterface(
                         ServiceManager.getService(Context.NETWORK_POLICY_SERVICE));
                 mNetworkPolicyManagerInternal = getLocalService(NetworkPolicyManagerInternal.class);
-                mSensorManager = (SensorManager) getContext().getSystemService(Context.SENSOR_SERVICE);
-                int sigMotionSensorId = getContext().getResources().getInteger(
-                        com.android.internal.R.integer.config_autoPowerModeAnyMotionSensor);
-                if (sigMotionSensorId > 0) {
-                    mMotionSensor = mSensorManager.getDefaultSensor(sigMotionSensorId, true);
-                }
-                if (mMotionSensor == null && getContext().getResources().getBoolean(
-                        com.android.internal.R.bool.config_autoPowerModePreferWristTilt)) {
-                    mMotionSensor = mSensorManager.getDefaultSensor(
-                            Sensor.TYPE_WRIST_TILT_GESTURE, true);
-                }
-                if (mMotionSensor == null) {
-                    // As a last ditch, fall back to SMD.
-                    mMotionSensor = mSensorManager.getDefaultSensor(
-                            Sensor.TYPE_SIGNIFICANT_MOTION, true);
+                mSensorManager = mInjector.getSensorManager();
+
+                if (mUseMotionSensor) {
+                    int sigMotionSensorId = getContext().getResources().getInteger(
+                            com.android.internal.R.integer.config_autoPowerModeAnyMotionSensor);
+                    if (sigMotionSensorId > 0) {
+                        mMotionSensor = mSensorManager.getDefaultSensor(sigMotionSensorId, true);
+                    }
+                    if (mMotionSensor == null && getContext().getResources().getBoolean(
+                            com.android.internal.R.bool.config_autoPowerModePreferWristTilt)) {
+                        mMotionSensor = mSensorManager.getDefaultSensor(
+                                Sensor.TYPE_WRIST_TILT_GESTURE, true);
+                    }
+                    if (mMotionSensor == null) {
+                        // As a last ditch, fall back to SMD.
+                        mMotionSensor = mSensorManager.getDefaultSensor(
+                                Sensor.TYPE_SIGNIFICANT_MOTION, true);
+                    }
                 }
 
                 if (getContext().getResources().getBoolean(
@@ -1752,6 +1915,12 @@ public class DeviceIdleController extends SystemService
                         .setInterval(0)
                         .setFastestInterval(0)
                         .setNumUpdates(1);
+                }
+
+                mConstraintController = mInjector.getConstraintController(
+                        mHandler, getLocalService(LocalService.class));
+                if (mConstraintController != null) {
+                    mConstraintController.start();
                 }
 
                 float angleThreshold = getContext().getResources().getInteger(
@@ -1806,6 +1975,99 @@ public class DeviceIdleController extends SystemService
                 updateInteractivityLocked();
             }
             updateConnectivityState(null);
+        }
+    }
+
+    @VisibleForTesting
+    boolean hasMotionSensor() {
+        return mUseMotionSensor && mMotionSensor != null;
+    }
+
+    private void registerDeviceIdleConstraintInternal(IDeviceIdleConstraint constraint,
+            final String name, final int type) {
+        final int minState;
+        switch (type) {
+            case IDeviceIdleConstraint.ACTIVE:
+                minState = STATE_ACTIVE;
+                break;
+            case IDeviceIdleConstraint.SENSING_OR_ABOVE:
+                minState = STATE_SENSING;
+                break;
+            default:
+                Slog.wtf(TAG, "Registering device-idle constraint with invalid type: " + type);
+                return;
+        }
+        synchronized (this) {
+            if (mConstraints.containsKey(constraint)) {
+                Slog.e(TAG, "Re-registering device-idle constraint: " + constraint + ".");
+                return;
+            }
+            DeviceIdleConstraintTracker tracker = new DeviceIdleConstraintTracker(name, minState);
+            mConstraints.put(constraint, tracker);
+            updateActiveConstraintsLocked();
+        }
+    }
+
+    private void unregisterDeviceIdleConstraintInternal(IDeviceIdleConstraint constraint) {
+        synchronized (this) {
+            // Artifically force the constraint to inactive to unblock anything waiting for it.
+            onConstraintStateChangedLocked(constraint, /* active= */ false);
+
+            // Let the constraint know that we are not listening to it any more.
+            setConstraintMonitoringLocked(constraint, /* monitoring= */ false);
+            mConstraints.remove(constraint);
+        }
+    }
+
+    @GuardedBy("this")
+    private void onConstraintStateChangedLocked(IDeviceIdleConstraint constraint, boolean active) {
+        DeviceIdleConstraintTracker tracker = mConstraints.get(constraint);
+        if (tracker == null) {
+            Slog.e(TAG, "device-idle constraint " + constraint + " has not been registered.");
+            return;
+        }
+        if (active != tracker.active && tracker.monitoring) {
+            tracker.active = active;
+            mNumBlockingConstraints += (tracker.active ? +1 : -1);
+            if (mNumBlockingConstraints == 0) {
+                if (mState == STATE_ACTIVE) {
+                    becomeInactiveIfAppropriateLocked();
+                } else if (mNextAlarmTime == 0 || mNextAlarmTime < SystemClock.elapsedRealtime()) {
+                    stepIdleStateLocked("s:" + tracker.name);
+                }
+            }
+        }
+    }
+
+    @GuardedBy("this")
+    private void setConstraintMonitoringLocked(IDeviceIdleConstraint constraint, boolean monitor) {
+        DeviceIdleConstraintTracker tracker = mConstraints.get(constraint);
+        if (tracker.monitoring != monitor) {
+            tracker.monitoring = monitor;
+            updateActiveConstraintsLocked();
+            // We send the callback on a separate thread instead of just relying on oneway as
+            // the client could be in the system server with us and cause re-entry problems.
+            mHandler.obtainMessage(MSG_SEND_CONSTRAINT_MONITORING,
+                    /* monitoring= */ monitor ? 1 : 0,
+                    /* <not used>= */ -1,
+                    /* constraint= */ constraint).sendToTarget();
+        }
+    }
+
+    @GuardedBy("this")
+    private void updateActiveConstraintsLocked() {
+        mNumBlockingConstraints = 0;
+        for (int i = 0; i < mConstraints.size(); i++) {
+            final IDeviceIdleConstraint constraint = mConstraints.keyAt(i);
+            final DeviceIdleConstraintTracker tracker = mConstraints.valueAt(i);
+            final boolean monitoring = (tracker.minState == mState);
+            if (monitoring != tracker.monitoring) {
+                setConstraintMonitoringLocked(constraint, monitoring);
+                tracker.active = monitoring;
+            }
+            if (tracker.monitoring && tracker.active) {
+                mNumBlockingConstraints++;
+            }
         }
     }
 
@@ -2223,6 +2485,7 @@ public class DeviceIdleController extends SystemService
 
     public void exitIdleInternal(String reason) {
         synchronized (this) {
+            mActiveReason = ACTIVE_REASON_FROM_BINDER_CALL;
             becomeActiveLocked(reason, Binder.getCallingUid());
         }
     }
@@ -2292,6 +2555,7 @@ public class DeviceIdleController extends SystemService
         } else if (screenOn) {
             mScreenOn = true;
             if (!mForceIdle && (!mScreenLocked || !mConstants.WAIT_FOR_UNLOCK)) {
+                mActiveReason = ACTIVE_REASON_SCREEN;
                 becomeActiveLocked("screen", Process.myUid());
             }
         }
@@ -2314,6 +2578,7 @@ public class DeviceIdleController extends SystemService
         } else if (charging) {
             mCharging = charging;
             if (!mForceIdle) {
+                mActiveReason = ACTIVE_REASON_CHARGING;
                 becomeActiveLocked("charging", Process.myUid());
             }
         }
@@ -2345,6 +2610,7 @@ public class DeviceIdleController extends SystemService
         if (mScreenLocked != showing) {
             mScreenLocked = showing;
             if (mScreenOn && !mForceIdle && !mScreenLocked) {
+                mActiveReason = ACTIVE_REASON_UNLOCKED;
                 becomeActiveLocked("unlocked", Process.myUid());
             }
         }
@@ -2416,7 +2682,11 @@ public class DeviceIdleController extends SystemService
                     mState = STATE_INACTIVE;
                     if (DEBUG) Slog.d(TAG, "Moved from STATE_ACTIVE to STATE_INACTIVE");
                     resetIdleManagementLocked();
-                    scheduleAlarmLocked(mInactiveTimeout, false);
+                    long delay = mInactiveTimeout;
+                    if (shouldUseIdleTimeoutFactorLocked()) {
+                        delay = (long) (mPreIdleFactor * delay);
+                    }
+                    scheduleAlarmLocked(delay, false);
                     EventLogTags.writeDeviceIdle(mState, "no activity");
                 }
             }
@@ -2434,11 +2704,13 @@ public class DeviceIdleController extends SystemService
         mNextIdlePendingDelay = 0;
         mNextIdleDelay = 0;
         mNextLightIdleDelay = 0;
+        mIdleStartTime = 0;
         cancelAlarmLocked();
         cancelSensingTimeoutAlarmLocked();
         cancelLocatingLocked();
         stopMonitoringMotionLocked();
         mAnyMotionDetector.stop();
+        updateActiveConstraintsLocked();
     }
 
     private void resetLightIdleManagementLocked() {
@@ -2449,6 +2721,7 @@ public class DeviceIdleController extends SystemService
         if (mForceIdle) {
             mForceIdle = false;
             if (mScreenOn || mCharging) {
+                mActiveReason = ACTIVE_REASON_FORCED;
                 becomeActiveLocked("exit-force", Process.myUid());
             }
         }
@@ -2568,8 +2841,21 @@ public class DeviceIdleController extends SystemService
         if ((now+mConstants.MIN_TIME_TO_ALARM) > mAlarmManager.getNextWakeFromIdleTime()) {
             // Whoops, there is an upcoming alarm.  We don't actually want to go idle.
             if (mState != STATE_ACTIVE) {
+                mActiveReason = ACTIVE_REASON_ALARM;
                 becomeActiveLocked("alarm", Process.myUid());
                 becomeInactiveIfAppropriateLocked();
+            }
+            return;
+        }
+
+        if (mNumBlockingConstraints != 0 && !mForceIdle) {
+            // We have some constraints from other parts of the system server preventing
+            // us from moving to the next state.
+            if (DEBUG) {
+                Slog.i(TAG, "Cannot step idle state. Blocked by: " + mConstraints.values().stream()
+                        .filter(x -> x.active)
+                        .map(x -> x.name)
+                        .collect(Collectors.joining(",")));
             }
             return;
         }
@@ -2579,28 +2865,37 @@ public class DeviceIdleController extends SystemService
                 // We have now been inactive long enough, it is time to start looking
                 // for motion and sleep some more while doing so.
                 startMonitoringMotionLocked();
-                scheduleAlarmLocked(mConstants.IDLE_AFTER_INACTIVE_TIMEOUT, false);
-                mState = STATE_IDLE_PENDING;
-                if (DEBUG) Slog.d(TAG, "Moved from STATE_INACTIVE to STATE_IDLE_PENDING.");
-                EventLogTags.writeDeviceIdle(mState, reason);
+                long delay = mConstants.IDLE_AFTER_INACTIVE_TIMEOUT;
+                if (shouldUseIdleTimeoutFactorLocked()) {
+                    delay = (long) (mPreIdleFactor * delay);
+                }
+                scheduleAlarmLocked(delay, false);
+                moveToStateLocked(STATE_IDLE_PENDING, reason);
                 break;
             case STATE_IDLE_PENDING:
-                mState = STATE_SENSING;
-                if (DEBUG) Slog.d(TAG, "Moved from STATE_IDLE_PENDING to STATE_SENSING.");
-                EventLogTags.writeDeviceIdle(mState, reason);
-                scheduleSensingTimeoutAlarmLocked(mConstants.SENSING_TIMEOUT);
+                moveToStateLocked(STATE_SENSING, reason);
                 cancelLocatingLocked();
-                mNotMoving = false;
                 mLocated = false;
                 mLastGenericLocation = null;
                 mLastGpsLocation = null;
-                mAnyMotionDetector.checkForAnyMotion();
-                break;
+                updateActiveConstraintsLocked();
+
+                // Wait for open constraints and an accelerometer reading before moving on.
+                if (mUseMotionSensor && mAnyMotionDetector.hasSensor()) {
+                    scheduleSensingTimeoutAlarmLocked(mConstants.SENSING_TIMEOUT);
+                    mNotMoving = false;
+                    mAnyMotionDetector.checkForAnyMotion();
+                    break;
+                } else if (mNumBlockingConstraints != 0) {
+                    cancelAlarmLocked();
+                    break;
+                }
+
+                mNotMoving = true;
+                // Otherwise, fall through and check this off the list of requirements.
             case STATE_SENSING:
                 cancelSensingTimeoutAlarmLocked();
-                mState = STATE_LOCATING;
-                if (DEBUG) Slog.d(TAG, "Moved from STATE_SENSING to STATE_LOCATING.");
-                EventLogTags.writeDeviceIdle(mState, reason);
+                moveToStateLocked(STATE_LOCATING, reason);
                 scheduleAlarmLocked(mConstants.LOCATING_TIMEOUT, false);
                 LocationManager locationManager = mInjector.getLocationManager();
                 if (locationManager != null
@@ -2645,16 +2940,16 @@ public class DeviceIdleController extends SystemService
                         " ms.");
                 mNextIdleDelay = (long)(mNextIdleDelay * mConstants.IDLE_FACTOR);
                 if (DEBUG) Slog.d(TAG, "Setting mNextIdleDelay = " + mNextIdleDelay);
+                mIdleStartTime = SystemClock.elapsedRealtime();
                 mNextIdleDelay = Math.min(mNextIdleDelay, mConstants.MAX_IDLE_TIMEOUT);
                 if (mNextIdleDelay < mConstants.IDLE_TIMEOUT) {
                     mNextIdleDelay = mConstants.IDLE_TIMEOUT;
                 }
-                mState = STATE_IDLE;
+                moveToStateLocked(STATE_IDLE, reason);
                 if (mLightState != LIGHT_STATE_OVERRIDE) {
                     mLightState = LIGHT_STATE_OVERRIDE;
                     cancelLightAlarmLocked();
                 }
-                EventLogTags.writeDeviceIdle(mState, reason);
                 addEvent(EVENT_DEEP_IDLE, null);
                 mGoingIdleWakeLock.acquire();
                 mHandler.sendEmptyMessage(MSG_REPORT_IDLE_ON);
@@ -2672,12 +2967,22 @@ public class DeviceIdleController extends SystemService
                 if (mNextIdlePendingDelay < mConstants.IDLE_PENDING_TIMEOUT) {
                     mNextIdlePendingDelay = mConstants.IDLE_PENDING_TIMEOUT;
                 }
-                mState = STATE_IDLE_MAINTENANCE;
-                EventLogTags.writeDeviceIdle(mState, reason);
+                moveToStateLocked(STATE_IDLE_MAINTENANCE, reason);
                 addEvent(EVENT_DEEP_MAINTENANCE, null);
                 mHandler.sendEmptyMessage(MSG_REPORT_IDLE_OFF);
                 break;
         }
+    }
+
+    private void moveToStateLocked(int state, String reason) {
+        final int oldState = mState;
+        mState = state;
+        if (DEBUG) {
+            Slog.d(TAG, String.format("Moved from STATE_%s to STATE_%s.",
+                    stateToString(oldState), stateToString(mState)));
+        }
+        EventLogTags.writeDeviceIdle(mState, reason);
+        updateActiveConstraintsLocked();
     }
 
     void incActiveIdleOps() {
@@ -2736,6 +3041,127 @@ public class DeviceIdleController extends SystemService
         }
     }
 
+    @VisibleForTesting
+    int setPreIdleTimeoutMode(int mode) {
+        return setPreIdleTimeoutFactor(getPreIdleTimeoutByMode(mode));
+    }
+
+    @VisibleForTesting
+    float getPreIdleTimeoutByMode(int mode) {
+        switch (mode) {
+            case PowerManager.PRE_IDLE_TIMEOUT_MODE_LONG: {
+                return mConstants.PRE_IDLE_FACTOR_LONG;
+            }
+            case PowerManager.PRE_IDLE_TIMEOUT_MODE_SHORT: {
+                return mConstants.PRE_IDLE_FACTOR_SHORT;
+            }
+            case PowerManager.PRE_IDLE_TIMEOUT_MODE_NORMAL: {
+                return 1.0f;
+            }
+            default: {
+                Slog.w(TAG, "Invalid time out factor mode: " + mode);
+                return 1.0f;
+            }
+        }
+    }
+
+    @VisibleForTesting
+    float getPreIdleTimeoutFactor() {
+        return mPreIdleFactor;
+    }
+
+    @VisibleForTesting
+    int setPreIdleTimeoutFactor(float ratio) {
+        if (!mDeepEnabled) {
+            if (DEBUG) Slog.d(TAG, "setPreIdleTimeoutFactor: Deep Idle disable");
+            return SET_IDLE_FACTOR_RESULT_NOT_SUPPORT;
+        } else if (ratio <= MIN_PRE_IDLE_FACTOR_CHANGE) {
+            if (DEBUG) Slog.d(TAG, "setPreIdleTimeoutFactor: Invalid input");
+            return SET_IDLE_FACTOR_RESULT_INVALID;
+        } else if (Math.abs(ratio - mPreIdleFactor) < MIN_PRE_IDLE_FACTOR_CHANGE) {
+            if (DEBUG) Slog.d(TAG, "setPreIdleTimeoutFactor: New factor same as previous factor");
+            return SET_IDLE_FACTOR_RESULT_IGNORED;
+        }
+        synchronized (this) {
+            mLastPreIdleFactor = mPreIdleFactor;
+            mPreIdleFactor = ratio;
+        }
+        if (DEBUG) Slog.d(TAG, "setPreIdleTimeoutFactor: " + ratio);
+        postUpdatePreIdleFactor();
+        return SET_IDLE_FACTOR_RESULT_OK;
+    }
+
+    @VisibleForTesting
+    void resetPreIdleTimeoutMode() {
+        synchronized (this) {
+            mLastPreIdleFactor = mPreIdleFactor;
+            mPreIdleFactor = 1.0f;
+        }
+        if (DEBUG) Slog.d(TAG, "resetPreIdleTimeoutMode to 1.0");
+        postResetPreIdleTimeoutFactor();
+    }
+
+    private void postUpdatePreIdleFactor() {
+        mHandler.sendEmptyMessage(MSG_UPDATE_PRE_IDLE_TIMEOUT_FACTOR);
+    }
+
+    private void postResetPreIdleTimeoutFactor() {
+        mHandler.sendEmptyMessage(MSG_RESET_PRE_IDLE_TIMEOUT_FACTOR);
+    }
+
+    @VisibleForTesting
+    void updatePreIdleFactor() {
+        synchronized (this) {
+            if (!shouldUseIdleTimeoutFactorLocked()) {
+                return;
+            }
+            if (mState == STATE_INACTIVE || mState == STATE_IDLE_PENDING) {
+                if (mNextAlarmTime == 0) {
+                    return;
+                }
+                long delay = mNextAlarmTime - SystemClock.elapsedRealtime();
+                if (delay < MIN_STATE_STEP_ALARM_CHANGE) {
+                    return;
+                }
+                long newDelay = (long) (delay / mLastPreIdleFactor * mPreIdleFactor);
+                if (Math.abs(delay - newDelay) < MIN_STATE_STEP_ALARM_CHANGE) {
+                    return;
+                }
+                scheduleAlarmLocked(newDelay, false);
+            }
+        }
+    }
+
+    @VisibleForTesting
+    void maybeDoImmediateMaintenance() {
+        synchronized (this) {
+            if (mState == STATE_IDLE) {
+                long duration = SystemClock.elapsedRealtime() - mIdleStartTime;
+                /* Let's trgger a immediate maintenance,
+                 * if it has been idle for a long time */
+                if (duration > mConstants.IDLE_TIMEOUT) {
+                    scheduleAlarmLocked(0, false);
+                }
+            }
+        }
+    }
+
+    private boolean shouldUseIdleTimeoutFactorLocked() {
+        // exclude ACTIVE_REASON_MOTION, for exclude device in pocket case
+        if (mActiveReason == ACTIVE_REASON_MOTION) {
+            return false;
+        }
+        return true;
+    }
+
+    /** Must only be used in tests. */
+    @VisibleForTesting
+    void setIdleStartTimeForTest(long idleStartTime) {
+        synchronized (this) {
+            mIdleStartTime = idleStartTime;
+        }
+    }
+
     void reportMaintenanceActivityIfNeededLocked() {
         boolean active = mJobsActive;
         if (active == mReportedMaintenanceActivity) {
@@ -2745,6 +3171,11 @@ public class DeviceIdleController extends SystemService
         Message msg = mHandler.obtainMessage(MSG_REPORT_MAINTENANCE_ACTIVITY,
                 mReportedMaintenanceActivity ? 1 : 0, 0);
         mHandler.sendMessage(msg);
+    }
+
+    @VisibleForTesting
+    long getNextAlarmTime() {
+        return mNextAlarmTime;
     }
 
     boolean isOpsInactiveLocked() {
@@ -2796,12 +3227,14 @@ public class DeviceIdleController extends SystemService
                 scheduleReportActiveLocked(type, Process.myUid());
                 addEvent(EVENT_NORMAL, type);
             }
+            mActiveReason = ACTIVE_REASON_MOTION;
             mState = STATE_ACTIVE;
             mInactiveTimeout = timeout;
             mCurIdleBudget = 0;
             mMaintenanceStartTime = 0;
             EventLogTags.writeDeviceIdle(mState, type);
             becomeInactive = true;
+            updateActiveConstraintsLocked();
         }
         if (mLightState == LIGHT_STATE_OVERRIDE) {
             // We went out of light idle mode because we had started deep idle mode...  let's
@@ -2893,9 +3326,12 @@ public class DeviceIdleController extends SystemService
 
     void scheduleAlarmLocked(long delay, boolean idleUntil) {
         if (DEBUG) Slog.d(TAG, "scheduleAlarmLocked(" + delay + ", " + idleUntil + ")");
-        if (mMotionSensor == null && !(mState == STATE_QUICK_DOZE_DELAY || mState == STATE_IDLE
-                  || mState == STATE_IDLE_MAINTENANCE)) {
-            // If there is no motion sensor on this device, then we won't schedule
+
+        if (mUseMotionSensor && mMotionSensor == null
+                && mState != STATE_QUICK_DOZE_DELAY
+                && mState != STATE_IDLE
+                && mState != STATE_IDLE_MAINTENANCE) {
+            // If there is no motion sensor on this device, but we need one, then we won't schedule
             // alarms, because we can't determine if the device is not moving.  This effectively
             // turns off normal execution of device idling, although it is still possible to
             // manually poke it by pretending like the alarm is going off.
@@ -3199,6 +3635,11 @@ public class DeviceIdleController extends SystemService
                 + "and any [-d] is ignored");
         pw.println("  motion");
         pw.println("    Simulate a motion event to bring the device out of deep doze");
+        pw.println("  pre-idle-factor [0|1|2]");
+        pw.println("    Set a new factor to idle time before step to idle"
+                + "(inactive_to and idle_after_inactive_to)");
+        pw.println("  reset-pre-idle-factor");
+        pw.println("    Reset factor to idle time to default");
     }
 
     class Shell extends ShellCommand {
@@ -3369,6 +3810,7 @@ public class DeviceIdleController extends SystemService
                         }
                     }
                     if (becomeActive) {
+                        mActiveReason = ACTIVE_REASON_FORCED;
                         becomeActiveLocked((arg == null ? "all" : arg) + "-disabled",
                                 Process.myUid());
                     }
@@ -3618,6 +4060,52 @@ public class DeviceIdleController extends SystemService
                     Binder.restoreCallingIdentity(token);
                 }
             }
+        } else if ("pre-idle-factor".equals(cmd)) {
+            getContext().enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER,
+                    null);
+            synchronized (this) {
+                long token = Binder.clearCallingIdentity();
+                int ret  = SET_IDLE_FACTOR_RESULT_UNINIT;
+                try {
+                    String arg = shell.getNextArg();
+                    boolean valid = false;
+                    int mode = 0;
+                    if (arg != null) {
+                        mode = Integer.parseInt(arg);
+                        ret = setPreIdleTimeoutMode(mode);
+                        if (ret == SET_IDLE_FACTOR_RESULT_OK) {
+                            pw.println("pre-idle-factor: " + mode);
+                            valid = true;
+                        } else if (ret == SET_IDLE_FACTOR_RESULT_NOT_SUPPORT) {
+                            valid = true;
+                            pw.println("Deep idle not supported");
+                        } else if (ret == SET_IDLE_FACTOR_RESULT_IGNORED) {
+                            valid = true;
+                            pw.println("Idle timeout factor not changed");
+                        }
+                    }
+                    if (!valid) {
+                        pw.println("Unknown idle timeout factor: " + arg
+                                + ",(error code: " + ret + ")");
+                    }
+                } catch (NumberFormatException e) {
+                    pw.println("Unknown idle timeout factor"
+                            + ",(error code: " + ret + ")");
+                } finally {
+                    Binder.restoreCallingIdentity(token);
+                }
+            }
+        } else if ("reset-pre-idle-factor".equals(cmd)) {
+            getContext().enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER,
+                    null);
+            synchronized (this) {
+                long token = Binder.clearCallingIdentity();
+                try {
+                    resetPreIdleTimeoutMode();
+                } finally {
+                    Binder.restoreCallingIdentity(token);
+                }
+            }
         } else {
             return shell.handleDefaultCommands(cmd);
         }
@@ -3765,13 +4253,34 @@ public class DeviceIdleController extends SystemService
             pw.print("  mLightEnabled="); pw.print(mLightEnabled);
             pw.print("  mDeepEnabled="); pw.println(mDeepEnabled);
             pw.print("  mForceIdle="); pw.println(mForceIdle);
-            pw.print("  mMotionSensor="); pw.println(mMotionSensor);
+            pw.print("  mUseMotionSensor="); pw.print(mUseMotionSensor);
+            if (mUseMotionSensor) {
+                pw.print(" mMotionSensor="); pw.println(mMotionSensor);
+            } else {
+                pw.println();
+            }
             pw.print("  mScreenOn="); pw.println(mScreenOn);
             pw.print("  mScreenLocked="); pw.println(mScreenLocked);
             pw.print("  mNetworkConnected="); pw.println(mNetworkConnected);
             pw.print("  mCharging="); pw.println(mCharging);
-            pw.print("  mMotionActive="); pw.println(mMotionListener.active);
-            pw.print("  mNotMoving="); pw.println(mNotMoving);
+            if (mConstraints.size() != 0) {
+                pw.println("  mConstraints={");
+                for (int i = 0; i < mConstraints.size(); i++) {
+                    final DeviceIdleConstraintTracker tracker = mConstraints.valueAt(i);
+                    pw.print("    \""); pw.print(tracker.name); pw.print("\"=");
+                    if (tracker.minState == mState) {
+                        pw.println(tracker.active);
+                    } else {
+                        pw.print("ignored <mMinState="); pw.print(stateToString(tracker.minState));
+                        pw.println(">");
+                    }
+                }
+                pw.println("  }");
+            }
+            if (mUseMotionSensor) {
+                pw.print("  mMotionActive="); pw.println(mMotionListener.active);
+                pw.print("  mNotMoving="); pw.println(mNotMoving);
+            }
             pw.print("  mLocating="); pw.print(mLocating); pw.print(" mHasGps=");
                     pw.print(mHasGps); pw.print(" mHasNetwork=");
                     pw.print(mHasNetworkLocation); pw.print(" mLocated="); pw.println(mLocated);
@@ -3829,6 +4338,9 @@ public class DeviceIdleController extends SystemService
             }
             if (mAlarmsActive) {
                 pw.print("  mAlarmsActive="); pw.println(mAlarmsActive);
+            }
+            if (Math.abs(mPreIdleFactor - 1.0f) > MIN_PRE_IDLE_FACTOR_CHANGE) {
+                pw.print("  mPreIdleFactor="); pw.println(mPreIdleFactor);
             }
         }
     }

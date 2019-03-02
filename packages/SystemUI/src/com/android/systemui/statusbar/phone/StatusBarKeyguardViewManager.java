@@ -151,7 +151,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
         mLockPatternUtils = lockPatternUtils;
         mStatusBarWindowController = Dependency.get(StatusBarWindowController.class);
         KeyguardUpdateMonitor.getInstance(context).registerCallback(mUpdateMonitorCallback);
-        Dependency.get(StatusBarStateController.class).addListener(this);
+        Dependency.get(StatusBarStateController.class).addCallback(this);
     }
 
     public void registerStatusBar(StatusBar statusBar,
@@ -187,7 +187,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
             mBouncer.setExpansion(KeyguardBouncer.EXPANSION_HIDDEN);
         } else if (bouncerNeedsScrimming()) {
             mBouncer.setExpansion(KeyguardBouncer.EXPANSION_VISIBLE);
-        } else if (mShowing && !mDozing) {
+        } else if (mShowing) {
             if (!isWakeAndUnlocking() && !mStatusBar.isInLaunchTransition()) {
                 mBouncer.setExpansion(expansion);
             }

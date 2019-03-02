@@ -58,7 +58,7 @@ import java.util.HashMap;
 public final class AssetManager implements AutoCloseable {
     private static final String TAG = "AssetManager";
     private static final boolean DEBUG_REFS = false;
-    private static final boolean FEATURE_FLAG_IDMAP2 = false;
+    private static final boolean FEATURE_FLAG_IDMAP2 = true;
 
     private static final String FRAMEWORK_APK_PATH = "/system/framework/framework-res.apk";
 
@@ -203,11 +203,13 @@ public final class AssetManager implements AutoCloseable {
             if (FEATURE_FLAG_IDMAP2) {
                 final String[] systemIdmapPaths =
                     nativeCreateIdmapsForStaticOverlaysTargetingAndroid();
-                if (systemIdmapPaths == null) {
-                    throw new IOException("idmap2 scan failed");
-                }
-                for (String idmapPath : systemIdmapPaths) {
-                    apkAssets.add(ApkAssets.loadOverlayFromPath(idmapPath, true /*system*/));
+                if (systemIdmapPaths != null) {
+                    for (String idmapPath : systemIdmapPaths) {
+                        apkAssets.add(ApkAssets.loadOverlayFromPath(idmapPath, true /*system*/));
+                    }
+                } else {
+                    Log.w(TAG, "'idmap2 --scan' failed: no static=\"true\" overlays targeting "
+                            + "\"android\" will be loaded");
                 }
             } else {
                 nativeVerifySystemIdmaps();
@@ -727,6 +729,38 @@ public final class AssetManager implements AutoCloseable {
             ensureValidLocked();
             // name is checked in JNI.
             return nativeGetResourceIdentifier(mObject, name, defType, defPackage);
+        }
+    }
+
+    /**
+     * Enable resource resolution logging to track the steps taken to resolve the last resource
+     * entry retrieved. Stores the configuration and package names for each step.
+     *
+     * Default disabled.
+     *
+     * @param enabled Boolean indicating whether to enable or disable logging.
+     *
+     * @hide
+     */
+    public void setResourceResolutionLoggingEnabled(boolean enabled) {
+        synchronized (this) {
+            ensureValidLocked();
+            nativeSetResourceResolutionLoggingEnabled(mObject, enabled);
+        }
+    }
+
+    /**
+     * Retrieve the last resource resolution path logged.
+     *
+     * @return Formatted string containing last resource ID/name and steps taken to resolve final
+     * entry, including configuration and package names.
+     *
+     * @hide
+     */
+    public @Nullable String getLastResourceResolution() {
+        synchronized (this) {
+            ensureValidLocked();
+            return nativeGetLastResourceResolution(mObject);
         }
     }
 
@@ -1381,6 +1415,8 @@ public final class AssetManager implements AutoCloseable {
     private static native @Nullable String nativeGetResourceEntryName(long ptr, @AnyRes int resid);
     private static native @Nullable String[] nativeGetLocales(long ptr, boolean excludeSystem);
     private static native @Nullable Configuration[] nativeGetSizeConfigurations(long ptr);
+    private static native void nativeSetResourceResolutionLoggingEnabled(long ptr, boolean enabled);
+    private static native @Nullable String nativeGetLastResourceResolution(long ptr);
 
     // Style attribute retrieval native methods.
     private static native void nativeApplyStyle(long ptr, long themePtr, @AttrRes int defStyleAttr,

@@ -620,9 +620,6 @@ public class UserRestrictionsUtils {
                         && callingUid != Process.SYSTEM_UID) {
                     return true;
                 } else if (String.valueOf(Settings.Secure.LOCATION_MODE_OFF).equals(value)) {
-                    // Note LOCATION_MODE will be converted into LOCATION_PROVIDERS_ALLOWED
-                    // in android.provider.Settings.Secure.putStringForUser(), so we shouldn't come
-                    // here normally, but we still protect it here from a direct provider write.
                     return false;
                 }
                 restriction = UserManager.DISALLOW_SHARE_LOCATION;
@@ -669,6 +666,7 @@ public class UserRestrictionsUtils {
 
             case android.provider.Settings.Secure.ALWAYS_ON_VPN_APP:
             case android.provider.Settings.Secure.ALWAYS_ON_VPN_LOCKDOWN:
+            case android.provider.Settings.Secure.ALWAYS_ON_VPN_LOCKDOWN_WHITELIST:
                 // Whitelist system uid (ConnectivityService) and root uid to change always-on vpn
                 final int appId = UserHandle.getAppId(callingUid);
                 if (appId == Process.SYSTEM_UID || appId == Process.ROOT_UID) {

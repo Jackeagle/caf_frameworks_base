@@ -72,10 +72,11 @@ public class WindowManagerShellCommand extends ShellCommand {
                     // XXX this should probably be changed to use openFileForSystem() to create
                     // the output trace file, so the shell gets the correct semantics for where
                     // trace files can be written.
-                    return mInternal.mWindowTracing.onShellCommand(this,
-                            getNextArgRequired());
+                    return mInternal.mWindowTracing.onShellCommand(this);
                 case "set-user-rotation":
                     return runSetDisplayUserRotation(pw);
+                case "set-fix-to-user-rotation":
+                    return runSetFixToUserRotation(pw);
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -297,6 +298,32 @@ public class WindowManagerShellCommand extends ShellCommand {
         }
     }
 
+    private int runSetFixToUserRotation(PrintWriter pw) {
+        int displayId = Display.DEFAULT_DISPLAY;
+        String arg = getNextArgRequired();
+        if ("-d".equals(arg)) {
+            displayId = Integer.parseInt(getNextArgRequired());
+            arg = getNextArgRequired();
+        }
+
+        final boolean enabled;
+        switch (arg) {
+            case "enabled":
+                enabled = true;
+                break;
+            case "disabled":
+                enabled = false;
+                break;
+            default:
+                getErrPrintWriter().println("Error: expecting enabled or disabled, but we get "
+                        + arg);
+                return -1;
+        }
+
+        mInternal.setRotateForApp(displayId, enabled);
+        return 0;
+    }
+
     @Override
     public void onHelp() {
         PrintWriter pw = getOutPrintWriter();
@@ -316,6 +343,8 @@ public class WindowManagerShellCommand extends ShellCommand {
         pw.println("    Dismiss the keyguard, prompting user for auth if necessary.");
         pw.println("  set-user-rotation [free|lock] [-d DISPLAY_ID] [rotation]");
         pw.println("    Set user rotation mode and user rotation.");
+        pw.println("  set-fix-to-user-rotation [-d DISPLAY_ID] [enabled|disabled]");
+        pw.println("    Enable or disable rotating display for app requested orientation.");
         if (!IS_USER) {
             pw.println("  tracing (start | stop)");
             pw.println("    Start or stop window tracing.");

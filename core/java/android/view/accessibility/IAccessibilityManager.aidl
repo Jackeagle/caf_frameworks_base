@@ -63,7 +63,7 @@ interface IAccessibilityManager {
 
     IBinder getWindowToken(int windowId, int userId);
 
-    void notifyAccessibilityButtonClicked();
+    void notifyAccessibilityButtonClicked(int displayId);
 
     void notifyAccessibilityButtonVisibilityChanged(boolean available);
 
@@ -75,6 +75,9 @@ interface IAccessibilityManager {
 
     // System process only
     boolean sendFingerprintGesture(int gestureKeyCode);
+
+    // System process only
+    int getAccessibilityWindowId(IBinder windowToken);
 
     long getRecommendedTimeoutMillis();
 }

@@ -16,9 +16,7 @@
 
 package com.android.server;
 
-import android.annotation.MainThread;
 import android.annotation.Nullable;
-import android.annotation.WorkerThread;
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -36,11 +34,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Log;
 import android.util.Slog;
 
-import com.android.internal.annotations.GuardedBy;
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.util.Preconditions;
 
@@ -50,6 +48,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 /**
  * Find the best Service, and bind to it.
@@ -63,16 +64,20 @@ public class ServiceWatcher implements ServiceConnection {
     public static final String EXTRA_SERVICE_VERSION = "serviceVersion";
     public static final String EXTRA_SERVICE_IS_MULTIUSER = "serviceIsMultiuser";
 
-    /**
-     * The runner that runs on the binder retrieved from {@link ServiceWatcher}.
-     */
+
+    /** Function to run on binder interface. */
     public interface BinderRunner {
-        /**
-         * Runs on the retrieved binder.
-         *
-         * @param binder the binder retrieved from the {@link ServiceWatcher}.
-         */
-        void run(IBinder binder);
+        /** Called to run client code with the binder. */
+        void run(IBinder binder) throws RemoteException;
+    }
+
+    /**
+     * Function to run on binder interface.
+     * @param <T> Type to return.
+     */
+    public interface BlockingBinderRunner<T> {
+        /** Called to run client code with the binder. */
+        T run(IBinder binder) throws RemoteException;
     }
 
     public static ArrayList<HashSet<Signature>> getSignatureSets(Context context,
@@ -122,18 +127,14 @@ public class ServiceWatcher implements ServiceConnection {
 
     private final Handler mHandler;
 
-    // this lock is held to ensure the service binder is not exposed (via runOnBinder) until after
-    // the new service initialization work has completed
-    private final Object mBindLock = new Object();
-
     // read/write from handler thread
+    private IBinder mBestService;
     private int mCurrentUserId;
 
     // read from any thread, write from handler thread
     private volatile ComponentName mBestComponent;
     private volatile int mBestVersion;
     private volatile int mBestUserId;
-    private volatile IBinder mBestService;
 
     public ServiceWatcher(Context context, String logTag, String action,
             int overlaySwitchResId, int defaultServicePackageNameResId,
@@ -165,17 +166,9 @@ public class ServiceWatcher implements ServiceConnection {
         mBestService = null;
     }
 
-    // called on handler thread
-    @GuardedBy("mBindLock")
-    protected void onBind() {
+    protected void onBind() {}
 
-    }
-
-    // called on handler thread
-    @GuardedBy("mBindLock")
-    protected void onUnbind() {
-
-    }
+    protected void onUnbind() {}
 
     /**
      * Start this watcher, including binding to the current best match and
@@ -205,12 +198,12 @@ public class ServiceWatcher implements ServiceConnection {
 
                 @Override
                 public void onPackageRemoved(String packageName, int uid) {
-                        bindBestPackage(Objects.equals(packageName, getCurrentPackageName()));
+                    bindBestPackage(Objects.equals(packageName, getCurrentPackageName()));
                 }
 
                 @Override
                 public boolean onPackageChanged(String packageName, int uid, String[] components) {
-                        bindBestPackage(Objects.equals(packageName, getCurrentPackageName()));
+                    bindBestPackage(Objects.equals(packageName, getCurrentPackageName()));
                     return super.onPackageChanged(packageName, uid, components);
                 }
             }.register(mContext, UserHandle.ALL, true, mHandler);
@@ -243,34 +236,11 @@ public class ServiceWatcher implements ServiceConnection {
         return true;
     }
 
-    /** Returns thje name of the currently connected package or null. */
+    /** Returns the name of the currently connected package or null. */
     @Nullable
     public String getCurrentPackageName() {
         ComponentName bestComponent = mBestComponent;
         return bestComponent == null ? null : bestComponent.getPackageName();
-    }
-
-    public int getCurrentPackageVersion() {
-        return mBestVersion;
-    }
-
-    /**
-     * Runs the given BinderRunner if currently connected. Returns true if it was run, and false
-     * otherwise. All invocations to runOnBinder are run serially.
-     */
-    public final void runOnBinder(BinderRunner runner) {
-        synchronized (mBindLock) {
-            IBinder service = mBestService;
-            if (service != null) {
-                try {
-                    runner.run(service);
-                } catch (Exception e) {
-                    // remote exceptions cannot be allowed to crash system server
-                    Log.e(TAG, "exception while while running " + runner + " on " + service
-                            + " from " + mBestComponent.toShortString(), e);
-                }
-            }
-        }
     }
 
     private boolean isServiceMissing() {
@@ -280,14 +250,6 @@ public class ServiceWatcher implements ServiceConnection {
                 UserHandle.USER_SYSTEM).isEmpty();
     }
 
-    /**
-     * Searches and binds to the best package, or do nothing if the best package
-     * is already bound, unless force rebinding is requested.
-     *
-     * @param forceRebind          Force a rebinding to the best package if it's already
-     *                             bound.
-     */
-    @WorkerThread
     private void bindBestPackage(boolean forceRebind) {
         Preconditions.checkState(Looper.myLooper() == mHandler.getLooper());
 
@@ -365,7 +327,6 @@ public class ServiceWatcher implements ServiceConnection {
         }
     }
 
-    @WorkerThread
     private void bind(ComponentName component, int version, int userId) {
         Preconditions.checkState(Looper.myLooper() == mHandler.getLooper());
 
@@ -382,7 +343,6 @@ public class ServiceWatcher implements ServiceConnection {
                 UserHandle.of(userId));
     }
 
-    @WorkerThread
     private void unbind() {
         Preconditions.checkState(Looper.myLooper() == mHandler.getLooper());
 
@@ -396,30 +356,66 @@ public class ServiceWatcher implements ServiceConnection {
         mBestUserId = UserHandle.USER_NULL;
     }
 
-    @MainThread
-    @Override
-    public final void onServiceConnected(ComponentName component, IBinder binder) {
-        mHandler.post(() -> {
-            if (D) Log.d(mTag, component + " connected");
+    /**
+     * Runs the given function asynchronously if currently connected. Suppresses any RemoteException
+     * thrown during execution.
+     */
+    public final void runOnBinder(BinderRunner runner) {
+        runOnHandler(() -> {
+            if (mBestService == null) {
+                return;
+            }
 
-            // hold the lock so that mBestService cannot be used by runOnBinder until complete
-            synchronized (mBindLock) {
-                mBestService = binder;
-                onBind();
+            try {
+                runner.run(mBestService);
+            } catch (RuntimeException e) {
+                // the code being run is privileged, but may be outside the system server, and thus
+                // we cannot allow runtime exceptions to crash the system server
+                Log.e(TAG, "exception while while running " + runner + " on " + mBestService
+                        + " from " + this, e);
+            } catch (RemoteException e) {
+                // do nothing
             }
         });
     }
 
-    @MainThread
+    /**
+     * Runs the given function synchronously if currently connected, and returns the default value
+     * if not currently connected or if any exception is thrown.
+     */
+    public final <T> T runOnBinderBlocking(BlockingBinderRunner<T> runner, T defaultValue) {
+        try {
+            return runOnHandlerBlocking(() -> {
+                if (mBestService == null) {
+                    return defaultValue;
+                }
+
+                try {
+                    return runner.run(mBestService);
+                } catch (RemoteException e) {
+                    return defaultValue;
+                }
+            });
+        } catch (InterruptedException e) {
+            return defaultValue;
+        }
+    }
+
+    @Override
+    public final void onServiceConnected(ComponentName component, IBinder binder) {
+        runOnHandler(() -> {
+            if (D) Log.d(mTag, component + " connected");
+            mBestService = binder;
+            onBind();
+        });
+    }
+
     @Override
     public final void onServiceDisconnected(ComponentName component) {
-        mHandler.post(() -> {
+        runOnHandler(() -> {
             if (D) Log.d(mTag, component + " disconnected");
-
             mBestService = null;
-            synchronized (mBindLock) {
-                onUnbind();
-            }
+            onUnbind();
         });
     }
 
@@ -427,5 +423,33 @@ public class ServiceWatcher implements ServiceConnection {
     public String toString() {
         ComponentName bestComponent = mBestComponent;
         return bestComponent == null ? "null" : bestComponent.toShortString() + "@" + mBestVersion;
+    }
+
+    private void runOnHandler(Runnable r) {
+        if (Looper.myLooper() == mHandler.getLooper()) {
+            r.run();
+        } else {
+            mHandler.post(r);
+        }
+    }
+
+    private <T> T runOnHandlerBlocking(Callable<T> c) throws InterruptedException {
+        if (Looper.myLooper() == mHandler.getLooper()) {
+            try {
+                return c.call();
+            } catch (Exception e) {
+                // Function cannot throw exception, this should never happen
+                throw new IllegalStateException(e);
+            }
+        } else {
+            FutureTask<T> task = new FutureTask<>(c);
+            mHandler.post(task);
+            try {
+                return task.get();
+            } catch (ExecutionException e) {
+                // Function cannot throw exception, this should never happen
+                throw new IllegalStateException(e);
+            }
+        }
     }
 }

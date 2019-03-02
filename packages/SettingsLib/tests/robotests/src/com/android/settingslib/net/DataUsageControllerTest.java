@@ -18,7 +18,6 @@ package com.android.settingslib.net;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -35,23 +34,20 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.INetworkStatsSession;
 import android.net.NetworkStatsHistory;
-import android.net.NetworkStatsHistory.Entry;
 import android.net.NetworkTemplate;
 import android.os.RemoteException;
 import android.telephony.TelephonyManager;
 import android.text.format.DateUtils;
-import android.util.FeatureFlagUtils;
-
-import com.android.settingslib.SettingsLibRobolectricTestRunner;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.robolectric.RuntimeEnvironment;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.shadows.ShadowSubscriptionManager;
 
-@RunWith(SettingsLibRobolectricTestRunner.class)
+@RunWith(RobolectricTestRunner.class)
 public class DataUsageControllerTest {
 
     private static final String SUB_ID = "Test Subscriber";
@@ -62,93 +58,47 @@ public class DataUsageControllerTest {
     private TelephonyManager mTelephonyManager;
     @Mock
     private NetworkStatsManager mNetworkStatsManager;
-
+    @Mock
     private Context mContext;
+
     private DataUsageController mController;
     private NetworkStatsHistory mNetworkStatsHistory;
 
     @Before
     public void setUp() throws RemoteException {
         MockitoAnnotations.initMocks(this);
-        mContext = RuntimeEnvironment.application;
-        mController = spy(new DataUsageController(mContext));
+        when(mContext.getSystemService(Context.TELEPHONY_SERVICE)).thenReturn(mTelephonyManager);
+        when(mContext.getSystemService(NetworkStatsManager.class)).thenReturn(mNetworkStatsManager);
+        mController = new DataUsageController(mContext);
         mNetworkStatsHistory = spy(
                 new NetworkStatsHistory(DateUtils.DAY_IN_MILLIS /* bucketDuration */));
         doReturn(mNetworkStatsHistory)
                 .when(mSession).getHistoryForNetwork(any(NetworkTemplate.class), anyInt());
-        doReturn(SUB_ID).when(mTelephonyManager).getSubscriberId(anyInt());
+        final int defaultSubscriptionId = 1234;
+        ShadowSubscriptionManager.setDefaultDataSubscriptionId(defaultSubscriptionId);
+        doReturn(SUB_ID).when(mTelephonyManager).getSubscriberId(eq(defaultSubscriptionId));
     }
 
     @Test
-    public void getHistoricalUsageLevel_noNetworkSession_shouldReturnNegative1() {
-        doReturn(null).when(mController).getSession();
+    public void getHistoricalUsageLevel_shouldQuerySummaryForDevice() throws Exception {
 
-        assertThat(mController.getHistoricalUsageLevel(null /* template */)).isEqualTo(-1L);
-
-    }
-
-    @Test
-    public void getHistoriclUsageLevel_noUsageData_shouldReturn0() {
-        doReturn(mSession).when(mController).getSession();
-
-        assertThat(mController.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard()))
-                .isEqualTo(0L);
-
-    }
-
-    @Test
-    public void getHistoricalUsageLevel_hasUsageData_shouldReturnTotalUsage() {
-        doReturn(mSession).when(mController).getSession();
-        final long receivedBytes = 743823454L;
-        final long transmittedBytes = 16574289L;
-        final Entry entry = new Entry();
-        entry.bucketStart = 1521583200000L;
-        entry.rxBytes = receivedBytes;
-        entry.txBytes = transmittedBytes;
-        when(mNetworkStatsHistory.getValues(eq(0L), anyLong(), anyLong(), nullable(Entry.class)))
-                .thenReturn(entry);
-
-        assertThat(mController.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard()))
-                .isEqualTo(receivedBytes + transmittedBytes);
-
-    }
-
-    @Test
-    public void getHistoricalUsageLevel_v2_shouldQuerySummaryForDevice() throws Exception {
-        final Context context = mock(Context.class);
-        FeatureFlagUtils.setEnabled(context, DataUsageController.DATA_USAGE_V2, true);
-        when(context.getSystemService(Context.TELEPHONY_SERVICE)).thenReturn(mTelephonyManager);
-        when(context.getSystemService(NetworkStatsManager.class)).thenReturn(mNetworkStatsManager);
-        final DataUsageController controller = new DataUsageController(context);
-
-        controller.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard());
+        mController.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard());
 
         verify(mNetworkStatsManager).querySummaryForDevice(eq(ConnectivityManager.TYPE_WIFI),
                 eq(SUB_ID), eq(0L) /* startTime */, anyLong() /* endTime */);
     }
 
     @Test
-    public void getHistoricalUsageLevel_v2NoUsageData_shouldReturn0() throws Exception {
-        final Context context = mock(Context.class);
-        FeatureFlagUtils.setEnabled(context, DataUsageController.DATA_USAGE_V2, true);
-        when(context.getSystemService(Context.TELEPHONY_SERVICE)).thenReturn(mTelephonyManager);
-        when(context.getSystemService(NetworkStatsManager.class)).thenReturn(mNetworkStatsManager);
+    public void getHistoricalUsageLevel_noUsageData_shouldReturn0() throws Exception {
         when(mNetworkStatsManager.querySummaryForDevice(eq(ConnectivityManager.TYPE_WIFI),
                 eq(SUB_ID), eq(0L) /* startTime */, anyLong() /* endTime */))
                 .thenReturn(mock(NetworkStats.Bucket.class));
-        final DataUsageController controller = new DataUsageController(context);
-
-        assertThat(controller.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard()))
+        assertThat(mController.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard()))
             .isEqualTo(0L);
     }
 
     @Test
-    public void getHistoricalUsageLevel_v2HasUsageData_shouldReturnTotalUsage()
-            throws Exception {
-        final Context context = mock(Context.class);
-        FeatureFlagUtils.setEnabled(context, DataUsageController.DATA_USAGE_V2, true);
-        when(context.getSystemService(Context.TELEPHONY_SERVICE)).thenReturn(mTelephonyManager);
-        when(context.getSystemService(NetworkStatsManager.class)).thenReturn(mNetworkStatsManager);
+    public void getHistoricalUsageLevel_hasUsageData_shouldReturnTotalUsage() throws Exception {
         final long receivedBytes = 743823454L;
         final long transmittedBytes = 16574289L;
         final NetworkStats.Bucket bucket = mock(NetworkStats.Bucket.class);
@@ -156,9 +106,43 @@ public class DataUsageControllerTest {
         when(bucket.getTxBytes()).thenReturn(transmittedBytes);
         when(mNetworkStatsManager.querySummaryForDevice(eq(ConnectivityManager.TYPE_WIFI),
                 eq(SUB_ID), eq(0L) /* startTime */, anyLong() /* endTime */)).thenReturn(bucket);
-        final DataUsageController controller = new DataUsageController(context);
 
-        assertThat(controller.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard()))
+        assertThat(mController.getHistoricalUsageLevel(NetworkTemplate.buildTemplateWifiWildcard()))
                 .isEqualTo(receivedBytes + transmittedBytes);
+    }
+
+    @Test
+    public void getDataUsageInfo_hasUsageData_shouldReturnCorrectUsageForExplicitSubId()
+            throws Exception {
+        // First setup a stats bucket for the default subscription / subscriber ID.
+        final long defaultSubRx = 1234567L;
+        final long defaultSubTx = 123456L;
+        final NetworkStats.Bucket defaultSubscriberBucket = mock(NetworkStats.Bucket.class);
+        when(defaultSubscriberBucket.getRxBytes()).thenReturn(defaultSubRx);
+        when(defaultSubscriberBucket.getTxBytes()).thenReturn(defaultSubTx);
+        when(mNetworkStatsManager.querySummaryForDevice(eq(ConnectivityManager.TYPE_MOBILE),
+                eq(SUB_ID), eq(0L)/* startTime */, anyLong() /* endTime */)).thenReturn(
+                defaultSubscriberBucket);
+
+        // Now setup a stats bucket for a different, non-default subscription / subscriber ID.
+        final long nonDefaultSubRx = 7654321L;
+        final long nonDefaultSubTx = 654321L;
+        final NetworkStats.Bucket nonDefaultSubscriberBucket = mock(NetworkStats.Bucket.class);
+        when(nonDefaultSubscriberBucket.getRxBytes()).thenReturn(nonDefaultSubRx);
+        when(nonDefaultSubscriberBucket.getTxBytes()).thenReturn(nonDefaultSubTx);
+        final int explictSubscriptionId = 55;
+        final String subscriberId2 = "Test Subscriber 2";
+        when(mNetworkStatsManager.querySummaryForDevice(eq(ConnectivityManager.TYPE_MOBILE),
+                eq(subscriberId2), eq(0L)/* startTime */, anyLong() /* endTime */)).thenReturn(
+                nonDefaultSubscriberBucket);
+        doReturn(subscriberId2).when(mTelephonyManager).getSubscriberId(explictSubscriptionId);
+
+        // Now verify that when we're asking for stats on the non-default subscription, we get
+        // the data back for that subscription and *not* the default one.
+        mController.setSubscriptionId(explictSubscriptionId);
+
+        assertThat(mController.getHistoricalUsageLevel(
+                NetworkTemplate.buildTemplateMobileAll(subscriberId2))).isEqualTo(
+                nonDefaultSubRx + nonDefaultSubTx);
     }
 }

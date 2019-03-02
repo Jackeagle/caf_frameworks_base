@@ -1,26 +1,21 @@
 package com.android.server.wm;
 
+import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
-import android.app.ActivityManager;
 import android.os.Debug;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.util.Slog;
 import android.view.KeyEvent;
 import android.view.WindowManager;
 
-import android.view.InputApplicationHandle;
 import com.android.server.input.InputManagerService;
-import android.view.InputWindowHandle;
-import android.view.InputChannel;
 
 import java.io.PrintWriter;
-import java.util.HashMap;
 
 final class InputManagerCallback implements InputManagerService.WindowManagerCallbacks {
     private final WindowManagerService mService;
@@ -72,8 +67,7 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
      * Called by the InputManager.
      */
     @Override
-    public long notifyANR(InputApplicationHandle inputApplicationHandle,
-            IBinder token, String reason) {
+    public long notifyANR(IBinder token, String reason) {
         AppWindowToken appWindowToken = null;
         WindowState windowState = null;
         boolean aboveSystem = false;
@@ -83,9 +77,6 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
                 if (windowState != null) {
                     appWindowToken = windowState.mAppToken;
                 }
-            }
-            if (appWindowToken == null && inputApplicationHandle != null) {
-                appWindowToken = (AppWindowToken)inputApplicationHandle.appWindowToken;
             }
 
             if (windowState != null) {
@@ -116,9 +107,7 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
         if (appWindowToken != null && appWindowToken.appToken != null) {
             // Notify the activity manager about the timeout and let it decide whether
             // to abort dispatching or keep waiting.
-            final AppWindowContainerController controller = appWindowToken.getController();
-            final boolean abort = controller != null
-                    && controller.keyDispatchingTimedOut(reason,
+            final boolean abort = appWindowToken.keyDispatchingTimedOut(reason,
                     (windowState != null) ? windowState.mSession.mPid : -1);
             if (!abort) {
                 // The activity manager declined to abort dispatching.
@@ -213,6 +202,37 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
         return mService.mPolicy.getWindowLayerFromTypeLw(WindowManager.LayoutParams.TYPE_POINTER)
                 * WindowManagerService.TYPE_LAYER_MULTIPLIER
                 + WindowManagerService.TYPE_LAYER_OFFSET;
+    }
+
+    /** Callback to get pointer display id. */
+    @Override
+    public int getPointerDisplayId() {
+        synchronized (mService.mGlobalLock) {
+            // If desktop mode is not enabled, show on the default display.
+            if (!mService.mForceDesktopModeOnExternalDisplays) {
+                return DEFAULT_DISPLAY;
+            }
+
+            // Look for the topmost freeform display.
+            int firstExternalDisplayId = DEFAULT_DISPLAY;
+            for (int i = mService.mRoot.mChildren.size() - 1; i >= 0; --i) {
+                final DisplayContent displayContent = mService.mRoot.mChildren.get(i);
+                // Heuristic solution here. Currently when "Freeform windows" developer option is
+                // enabled we automatically put secondary displays in freeform mode and emulating
+                // "desktop mode". It also makes sense to show the pointer on the same display.
+                if (displayContent.getWindowingMode() == WINDOWING_MODE_FREEFORM) {
+                    return displayContent.getDisplayId();
+                }
+
+                if (firstExternalDisplayId == DEFAULT_DISPLAY
+                        && displayContent.getDisplayId() != DEFAULT_DISPLAY) {
+                    firstExternalDisplayId = displayContent.getDisplayId();
+                }
+            }
+
+            // Look for the topmost non-default display
+            return firstExternalDisplayId;
+        }
     }
 
     /** Waits until the built-in input devices have been configured. */

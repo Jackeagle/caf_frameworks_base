@@ -77,16 +77,13 @@ import android.graphics.ImageDecoder;
 import android.hardware.display.DisplayManagerGlobal;
 import android.net.ConnectivityManager;
 import android.net.IConnectivityManager;
-import android.net.Network;
 import android.net.Proxy;
-import android.net.ProxyInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
-import android.os.DropBoxManager;
 import android.os.Environment;
 import android.os.FileUtils;
 import android.os.GraphicsEnvironment;
@@ -133,6 +130,7 @@ import android.util.MergedConfiguration;
 import android.util.Pair;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
+import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.util.SuperNotCalledException;
 import android.util.proto.ProtoOutputStream;
@@ -158,19 +156,15 @@ import com.android.internal.os.RuntimeInit;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FastPrintWriter;
-import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.OpenSSLSocketImpl;
 import com.android.org.conscrypt.TrustedCertificateStore;
 import com.android.server.am.MemInfoDumpProto;
 
-import dalvik.system.BaseDexClassLoader;
 import dalvik.system.CloseGuard;
 import dalvik.system.VMDebug;
 import dalvik.system.VMRuntime;
 
-import libcore.io.DropBox;
-import libcore.io.EventLogger;
 import libcore.io.ForwardingOs;
 import libcore.io.IoUtils;
 import libcore.io.Os;
@@ -185,7 +179,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.text.DateFormat;
@@ -277,6 +270,13 @@ public final class ActivityThread extends ClientTransactionHandler {
     @UnsupportedAppUsage
     final H mH = new H();
     final Executor mExecutor = new HandlerExecutor(mH);
+    /**
+     * Maps from activity token to local record of running activities in this process.
+     *
+     * This variable is readable if the code is running in activity thread or holding {@link
+     * #mResourcesManager}. It's only writable if the code is running in activity thread and holding
+     * {@link #mResourcesManager}.
+     */
     @UnsupportedAppUsage
     final ArrayMap<IBinder, ActivityClientRecord> mActivities = new ArrayMap<>();
     /** The activities to be truly destroyed (not include relaunch). */
@@ -307,8 +307,14 @@ public final class ActivityThread extends ClientTransactionHandler {
     @UnsupportedAppUsage
     final ArrayList<Application> mAllApplications
             = new ArrayList<Application>();
-    // set of instantiated backup agents, keyed by package name
-    final ArrayMap<String, BackupAgent> mBackupAgents = new ArrayMap<String, BackupAgent>();
+    /**
+     * Bookkeeping of instantiated backup agents indexed first by user id, then by package name.
+     * Indexing by user id supports parallel backups across users on system packages as they run in
+     * the same process with the same package name. Indexing by package name supports multiple
+     * distinct applications running in the same process.
+     */
+    private final SparseArray<ArrayMap<String, BackupAgent>> mBackupAgentsByUser =
+            new SparseArray<>();
     /** Reference to singleton {@link ActivityThread} */
     @UnsupportedAppUsage
     private static volatile ActivityThread sCurrentActivityThread;
@@ -440,11 +446,23 @@ public final class ActivityThread extends ClientTransactionHandler {
         Configuration newConfig;
         Configuration createdConfig;
         Configuration overrideConfig;
+        // Used to save the last reported configuration from server side so that activity
+        // configuration transactions can always use the latest configuration.
+        @GuardedBy("this")
+        private Configuration mPendingOverrideConfig;
         // Used for consolidating configs before sending on to Activity.
         private Configuration tmpConfig = new Configuration();
         // Callback used for updating activity override config.
         ViewRootImpl.ActivityConfigCallback configCallback;
         ActivityClientRecord nextIdle;
+
+        // Indicates whether this activity is currently the topmost resumed one in the system.
+        // This holds the last reported value from server.
+        boolean isTopResumedActivity;
+        // This holds the value last sent to the activity. This is needed, because an update from
+        // server may come at random time, but we always need to report changes between ON_RESUME
+        // and ON_PAUSE to the app.
+        boolean lastReportedTopResumedState;
 
         ProfilerInfo profilerInfo;
 
@@ -649,10 +667,11 @@ public final class ActivityThread extends ClientTransactionHandler {
         ApplicationInfo appInfo;
         CompatibilityInfo compatInfo;
         int backupMode;
+        int userId;
         public String toString() {
             return "CreateBackupAgentData{appInfo=" + appInfo
                     + " backupAgent=" + appInfo.backupAgentName
-                    + " mode=" + backupMode + "}";
+                    + " mode=" + backupMode + " userId=" + userId + "}";
         }
     }
 
@@ -867,20 +886,22 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
 
         public final void scheduleCreateBackupAgent(ApplicationInfo app,
-                CompatibilityInfo compatInfo, int backupMode) {
+                CompatibilityInfo compatInfo, int backupMode, int userId) {
             CreateBackupAgentData d = new CreateBackupAgentData();
             d.appInfo = app;
             d.compatInfo = compatInfo;
             d.backupMode = backupMode;
+            d.userId = userId;
 
             sendMessage(H.CREATE_BACKUP_AGENT, d);
         }
 
         public final void scheduleDestroyBackupAgent(ApplicationInfo app,
-                CompatibilityInfo compatInfo) {
+                CompatibilityInfo compatInfo, int userId) {
             CreateBackupAgentData d = new CreateBackupAgentData();
             d.appInfo = app;
             d.compatInfo = compatInfo;
+            d.userId = userId;
 
             sendMessage(H.DESTROY_BACKUP_AGENT, d);
         }
@@ -1028,15 +1049,10 @@ public final class ActivityThread extends ClientTransactionHandler {
             NetworkEventDispatcher.getInstance().onNetworkConfigurationChanged();
         }
 
-        public void setHttpProxy(String host, String port, String exclList, Uri pacFileUrl) {
+        public void updateHttpProxy() {
             final ConnectivityManager cm = ConnectivityManager.from(
                     getApplication() != null ? getApplication() : getSystemContext());
-            final Network network = cm.getBoundNetworkForProcess();
-            if (network != null) {
-                Proxy.setHttpProxySystemProperty(cm.getDefaultProxy());
-            } else {
-                Proxy.setHttpProxySystemProperty(host, port, exclList, pacFileUrl);
-            }
+            Proxy.setHttpProxySystemProperty(cm.getDefaultProxy());
         }
 
         public void processInBackground() {
@@ -2284,6 +2300,15 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
     }
 
+    /**
+     * Create the context instance base on system resources & display information which used for UI.
+     * @param displayId The ID of the display where the UI is shown.
+     * @see ContextImpl#createSystemUiContext(ContextImpl, int)
+     */
+    public ContextImpl createSystemUiContext(int displayId) {
+        return ContextImpl.createSystemUiContext(getSystemUiContext(), displayId);
+    }
+
     public void installSystemApplicationInfo(ApplicationInfo info, ClassLoader classLoader) {
         synchronized (this) {
             getSystemContext().installSystemApplicationInfo(info, classLoader);
@@ -3061,7 +3086,12 @@ public final class ActivityThread extends ClientTransactionHandler {
             }
             r.setState(ON_CREATE);
 
-            mActivities.put(r.token, r);
+            // updatePendingActivityConfiguration() reads from mActivities to update
+            // ActivityClientRecord which runs in a different thread. Protect modifications to
+            // mActivities to avoid race.
+            synchronized (mResourcesManager) {
+                mActivities.put(r.token, r);
+            }
 
         } catch (SuperNotCalledException e) {
             throw e;
@@ -3283,16 +3313,14 @@ public final class ActivityThread extends ClientTransactionHandler {
         final boolean resumed = !r.paused;
         if (resumed) {
             r.activity.mTemporaryPause = true;
-            mInstrumentation.callActivityOnPause(r.activity);
+            performPauseActivityIfNeeded(r, "performNewIntents");
         }
         checkAndBlockForNetworkAccess();
         deliverNewIntents(r, intents);
         if (resumed) {
-            r.activity.performResume(false, "performNewIntents");
+            performResumeActivity(token, false, "performNewIntents");
             r.activity.mTemporaryPause = false;
-        }
-
-        if (r.paused && andPause) {
+        } else if (andPause) {
             // In this case the activity was in the paused state when we delivered the intent,
             // to guarantee onResume gets called after onNewIntent we temporarily resume the
             // activity and pause again as the caller wanted.
@@ -3494,7 +3522,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         return sCurrentBroadcastIntent.get();
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private void handleReceiver(ReceiverData data) {
         // If we are getting ready to gc after going to the background, well
         // we are back active so skip it.
@@ -3599,7 +3627,8 @@ public final class ActivityThread extends ClientTransactionHandler {
 
         try {
             IBinder binder = null;
-            BackupAgent agent = mBackupAgents.get(packageName);
+            ArrayMap<String, BackupAgent> backupAgents = getBackupAgentsForUser(data.userId);
+            BackupAgent agent = backupAgents.get(packageName);
             if (agent != null) {
                 // reusing the existing instance
                 if (DEBUG_BACKUP) {
@@ -3618,9 +3647,9 @@ public final class ActivityThread extends ClientTransactionHandler {
                     context.setOuterContext(agent);
                     agent.attach(context);
 
-                    agent.onCreate();
+                    agent.onCreate(UserHandle.of(data.userId));
                     binder = agent.onBind();
-                    mBackupAgents.put(packageName, agent);
+                    backupAgents.put(packageName, agent);
                 } catch (Exception e) {
                     // If this is during restore, fail silently; otherwise go
                     // ahead and let the user see the crash.
@@ -3636,7 +3665,7 @@ public final class ActivityThread extends ClientTransactionHandler {
 
             // tell the OS that we're live now
             try {
-                ActivityManager.getService().backupAgentCreated(packageName, binder);
+                ActivityManager.getService().backupAgentCreated(packageName, binder, data.userId);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -3652,7 +3681,8 @@ public final class ActivityThread extends ClientTransactionHandler {
 
         LoadedApk packageInfo = getPackageInfoNoCheck(data.appInfo, data.compatInfo);
         String packageName = packageInfo.mPackageName;
-        BackupAgent agent = mBackupAgents.get(packageName);
+        ArrayMap<String, BackupAgent> backupAgents = getBackupAgentsForUser(data.userId);
+        BackupAgent agent = backupAgents.get(packageName);
         if (agent != null) {
             try {
                 agent.onDestroy();
@@ -3660,10 +3690,19 @@ public final class ActivityThread extends ClientTransactionHandler {
                 Slog.w(TAG, "Exception thrown in onDestroy by backup agent of " + data.appInfo);
                 e.printStackTrace();
             }
-            mBackupAgents.remove(packageName);
+            backupAgents.remove(packageName);
         } else {
             Slog.w(TAG, "Attempt to destroy unknown backup agent " + data);
         }
+    }
+
+    private ArrayMap<String, BackupAgent> getBackupAgentsForUser(int userId) {
+        ArrayMap<String, BackupAgent> backupAgents = mBackupAgentsByUser.get(userId);
+        if (backupAgents == null) {
+            backupAgents = new ArrayMap<>();
+            mBackupAgentsByUser.put(userId, backupAgents);
+        }
+        return backupAgents;
     }
 
     @UnsupportedAppUsage
@@ -3945,6 +3984,8 @@ public final class ActivityThread extends ClientTransactionHandler {
             r.state = null;
             r.persistentState = null;
             r.setState(ON_RESUME);
+
+            reportTopResumedActivityChanged(r, r.isTopResumedActivity);
         } catch (Exception e) {
             if (!mInstrumentation.onException(r.activity, e)) {
                 throw new RuntimeException("Unable to resume activity "
@@ -4099,6 +4140,45 @@ public final class ActivityThread extends ClientTransactionHandler {
         Looper.myQueue().addIdleHandler(new Idler());
     }
 
+
+    @Override
+    public void handleTopResumedActivityChanged(IBinder token, boolean onTop, String reason) {
+        ActivityClientRecord r = mActivities.get(token);
+        if (r == null || r.activity == null) {
+            Slog.w(TAG, "Not found target activity to report position change for token: " + token);
+            return;
+        }
+
+        if (DEBUG_ORDER) {
+            Slog.d(TAG, "Received position change to top: " + onTop + " for activity: " + r);
+        }
+
+        if (r.isTopResumedActivity == onTop) {
+            throw new IllegalStateException("Activity top position already set to onTop=" + onTop);
+        }
+
+        r.isTopResumedActivity = onTop;
+
+        if (r.getLifecycleState() == ON_RESUME) {
+            reportTopResumedActivityChanged(r, onTop);
+        } else {
+            if (DEBUG_ORDER) {
+                Slog.d(TAG, "Won't deliver top position change in state=" + r.getLifecycleState());
+            }
+        }
+    }
+
+    /**
+     * Call {@link Activity#onTopResumedActivityChanged(boolean)} if its top resumed state changed
+     * since the last report.
+     */
+    private void reportTopResumedActivityChanged(ActivityClientRecord r, boolean onTop) {
+        if (r.lastReportedTopResumedState != onTop) {
+            r.lastReportedTopResumedState = onTop;
+            r.activity.onTopResumedActivityChanged(onTop);
+        }
+    }
+
     @Override
     public void handlePauseActivity(IBinder token, boolean finished, boolean userLeaving,
             int configChanges, PendingTransactionActions pendingActions, String reason) {
@@ -4189,6 +4269,10 @@ public final class ActivityThread extends ClientTransactionHandler {
             // You are already paused silly...
             return;
         }
+
+        // Always reporting top resumed position loss when pausing an activity. If necessary, it
+        // will be restored in performResumeActivity().
+        reportTopResumedActivityChanged(r, false /* onTop */);
 
         try {
             r.activity.mCalled = false;
@@ -4636,7 +4720,12 @@ public final class ActivityThread extends ClientTransactionHandler {
             r.setState(ON_DESTROY);
         }
         schedulePurgeIdler();
-        mActivities.remove(token);
+        // updatePendingActivityConfiguration() reads from mActivities to update
+        // ActivityClientRecord which runs in a different thread. Protect modifications to
+        // mActivities to avoid race.
+        synchronized (mResourcesManager) {
+            mActivities.remove(token);
+        }
         StrictMode.decrementExpectedActivityCount(activityClass);
         return r;
     }
@@ -5325,16 +5414,6 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
     }
 
-    /**
-     * Updates the application info.
-     *
-     * This only works in the system process. Must be called on the main thread.
-     */
-    public void handleSystemApplicationInfoChanged(@NonNull ApplicationInfo ai) {
-        Preconditions.checkState(mSystemThread, "Must only be called in the system process");
-        handleApplicationInfoChanged(ai);
-    }
-
     void handleApplicationInfoChanged(@NonNull final ApplicationInfo ai) {
         // Updates triggered by package installation go through a package update
         // receiver. Here we try to capture ApplicationInfo changes that are
@@ -5389,6 +5468,26 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
     }
 
+    @Override
+    public void updatePendingActivityConfiguration(IBinder activityToken,
+            Configuration overrideConfig) {
+        final ActivityClientRecord r;
+        synchronized (mResourcesManager) {
+            r = mActivities.get(activityToken);
+        }
+
+        if (r == null) {
+            if (DEBUG_CONFIGURATION) {
+                Slog.w(TAG, "Not found target activity to update its pending config.");
+            }
+            return;
+        }
+
+        synchronized (r) {
+            r.mPendingOverrideConfig = overrideConfig;
+        }
+    }
+
     /**
      * Handle new activity configuration and/or move to a different display.
      * @param activityToken Target activity token.
@@ -5407,6 +5506,24 @@ public final class ActivityThread extends ClientTransactionHandler {
         }
         final boolean movedToDifferentDisplay = displayId != INVALID_DISPLAY
                 && displayId != r.activity.getDisplayId();
+
+        synchronized (r) {
+            if (r.mPendingOverrideConfig != null
+                    && !r.mPendingOverrideConfig.isOtherSeqNewer(overrideConfig)) {
+                overrideConfig = r.mPendingOverrideConfig;
+            }
+            r.mPendingOverrideConfig = null;
+        }
+
+        if (r.overrideConfig != null && !r.overrideConfig.isOtherSeqNewer(overrideConfig)
+                && !movedToDifferentDisplay) {
+            if (DEBUG_CONFIGURATION) {
+                Slog.v(TAG, "Activity already handled newer configuration so drop this"
+                        + " transaction. overrideConfig=" + overrideConfig + " r.overrideConfig="
+                        + r.overrideConfig);
+            }
+            return;
+        }
 
         // Perform updates.
         r.overrideConfig = overrideConfig;
@@ -5849,18 +5966,6 @@ public final class ActivityThread extends ClientTransactionHandler {
         StrictMode.initThreadDefaults(data.appInfo);
         StrictMode.initVmDefaults(data.appInfo);
 
-        // We deprecated Build.SERIAL and only apps that target pre NMR1
-        // SDK can see it. Since access to the serial is now behind a
-        // permission we push down the value and here we fix it up
-        // before any app code has been loaded.
-        try {
-            Field field = Build.class.getDeclaredField("SERIAL");
-            field.setAccessible(true);
-            field.set(Build.class, data.buildSerial);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            /* ignore */
-        }
-
         if (data.debugMode != ApplicationThreadConstants.DEBUG_OFF) {
             // XXX should have option to change the port.
             Debug.changeDebugPort(8100);
@@ -5896,6 +6001,11 @@ public final class ActivityThread extends ClientTransactionHandler {
             Binder.enableTracing();
         }
 
+        // Initialize heap profiling.
+        if (isAppProfileable || Build.IS_DEBUGGABLE) {
+            nInitZygoteChildHeapProfiling();
+        }
+
         // Allow renderer debugging features if we're debuggable.
         boolean isAppDebuggable = (data.appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         HardwareRenderer.setDebuggingEnabled(isAppDebuggable || Build.IS_DEBUGGABLE);
@@ -5912,8 +6022,7 @@ public final class ActivityThread extends ClientTransactionHandler {
             // crash if we can't get it.
             final IConnectivityManager service = IConnectivityManager.Stub.asInterface(b);
             try {
-                final ProxyInfo proxyInfo = service.getProxyForNetwork(null);
-                Proxy.setHttpProxySystemProperty(proxyInfo);
+                Proxy.setHttpProxySystemProperty(service.getProxyForNetwork(null));
             } catch (RemoteException e) {
                 Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
                 throw e.rethrowFromSystemServer();
@@ -5978,16 +6087,6 @@ public final class ActivityThread extends ClientTransactionHandler {
             HardwareRenderer.setIsolatedProcess(true);
         }
 
-        // If we use profiles, setup the dex reporter to notify package manager
-        // of any relevant dex loads. The idle maintenance job will use the information
-        // reported to optimize the loaded dex files.
-        // Note that we only need one global reporter per app.
-        // Make sure we do this before calling onCreate so that we can capture the
-        // complete application startup.
-        if (SystemProperties.getBoolean("dalvik.vm.usejitprofiles", false)) {
-            BaseDexClassLoader.setReporter(DexLoadReporter.getInstance());
-        }
-
         // Install the Network Security Config Provider. This must happen before the application
         // code is loaded to prevent issues with instances of TLS objects being created before
         // the provider is installed.
@@ -6011,7 +6110,12 @@ public final class ActivityThread extends ClientTransactionHandler {
             instrApp.initForUser(UserHandle.myUserId());
             final LoadedApk pi = getPackageInfo(instrApp, data.compatInfo,
                     appContext.getClassLoader(), false, true, false);
-            final ContextImpl instrContext = ContextImpl.createAppContext(this, pi);
+
+            // The test context's op package name == the target app's op package name, because
+            // the app ops manager checks the op package name against the real calling UID,
+            // which is what the target package name is associated with.
+            final ContextImpl instrContext = ContextImpl.createAppContext(this, pi,
+                    appContext.getOpPackageName());
 
             try {
                 final ClassLoader cl = instrContext.getClassLoader();
@@ -6196,7 +6300,7 @@ public final class ActivityThread extends ClientTransactionHandler {
         try {
             synchronized (getGetProviderLock(auth, userId)) {
                 holder = ActivityManager.getService().getContentProvider(
-                        getApplicationThread(), auth, userId, stable);
+                        getApplicationThread(), c.getOpPackageName(), auth, userId, stable);
             }
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
@@ -6767,9 +6871,6 @@ public final class ActivityThread extends ClientTransactionHandler {
             }
         }
 
-        // add dropbox logging to libcore
-        DropBox.setReporter(new DropBoxReporter());
-
         ViewRootImpl.ConfigChangedCallback configChangedCallback
                 = (Configuration globalConfig) -> {
             synchronized (mResourcesManager) {
@@ -6820,39 +6921,6 @@ public final class ActivityThread extends ClientTransactionHandler {
                 return mCoreSettings.getInt(key, defaultValue);
             }
             return defaultValue;
-        }
-    }
-
-    private static class EventLoggingReporter implements EventLogger.Reporter {
-        @Override
-        public void report (int code, Object... list) {
-            EventLog.writeEvent(code, list);
-        }
-    }
-
-    private static class DropBoxReporter implements DropBox.Reporter {
-
-        private DropBoxManager dropBox;
-
-        public DropBoxReporter() {}
-
-        @Override
-        public void addData(String tag, byte[] data, int flags) {
-            ensureInitialized();
-            dropBox.addData(tag, data, flags);
-        }
-
-        @Override
-        public void addText(String tag, String data) {
-            ensureInitialized();
-            dropBox.addText(tag, data);
-        }
-
-        private synchronized void ensureInitialized() {
-            if (dropBox == null) {
-                dropBox = currentActivityThread().getApplication()
-                        .getSystemService(DropBoxManager.class);
-            }
         }
     }
 
@@ -6945,9 +7013,6 @@ public final class ActivityThread extends ClientTransactionHandler {
 
         Environment.initForCurrentUser();
 
-        // Set the reporter for event logging in libcore
-        EventLogger.setReporter(new EventLoggingReporter());
-
         // Make sure TrustedCertificateStore looks in the right place for CA certificates
         final File configDir = Environment.getUserConfigDirectory(UserHandle.myUserId());
         TrustedCertificateStore.setDefaultUserDirectory(configDir);
@@ -6989,4 +7054,5 @@ public final class ActivityThread extends ClientTransactionHandler {
     // ------------------ Regular JNI ------------------------
     private native void nPurgePendingResources();
     private native void nDumpGraphicsInfo(FileDescriptor fd);
+    private native void nInitZygoteChildHeapProfiling();
 }

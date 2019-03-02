@@ -24,9 +24,10 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.os.FileUtils;
 import android.os.SystemClock;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.After;
 import org.junit.Before;
@@ -37,6 +38,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.CharBuffer;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -149,7 +151,7 @@ public class KernelCpuProcStringReaderTest {
                             + "0 0 1 1 1 0 2 0 221",
                     iter.nextLine().toString());
             long[] actual = new long[43];
-            iter.nextLineAsArray(actual);
+            KernelCpuProcStringReader.asLongs(iter.nextLine(), actual);
             assertArrayEquals(
                     new long[]{50227, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 196, 0, 0,
                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 721},
@@ -183,7 +185,7 @@ public class KernelCpuProcStringReaderTest {
         }
     }
 
-    /** Tests nextLineToArray functionality. */
+    /** Tests reading lines, then converting to long[]. */
     @Test
     public void testReadLineToArray() throws Exception {
         final long[][] data = getTestArray(800, 50);
@@ -193,10 +195,30 @@ public class KernelCpuProcStringReaderTest {
         long[] actual = new long[50];
         try (KernelCpuProcStringReader.ProcFileIterator iter = mReader.open()) {
             for (long[] expected : data) {
-                assertEquals(50, iter.nextLineAsArray(actual));
+                CharBuffer cb = iter.nextLine();
+                String before = cb.toString();
+                assertEquals(50, KernelCpuProcStringReader.asLongs(cb, actual));
                 assertArrayEquals(expected, actual);
+                assertEquals("Buffer not reset to the pos before reading", before, cb.toString());
             }
         }
+    }
+
+    /** Tests error handling of converting to long[]. */
+    @Test
+    public void testLineToArrayErrorHandling() {
+        long[] actual = new long[100];
+        String invalidChar = "123: -1234 456";
+        String overflow = "123: 999999999999999999999999999999999999999999999999999999999 123";
+        CharBuffer cb = CharBuffer.wrap("----" + invalidChar + "+++", 4, 4 + invalidChar.length());
+        assertEquals("Failed to report err for: " + invalidChar, -2,
+                KernelCpuProcStringReader.asLongs(cb, actual));
+        assertEquals("Buffer not reset to the same pos before reading", invalidChar, cb.toString());
+
+        cb = CharBuffer.wrap("----" + overflow + "+++", 4, 4 + overflow.length());
+        assertEquals("Failed to report err for: " + overflow, -3,
+                KernelCpuProcStringReader.asLongs(cb, actual));
+        assertEquals("Buffer not reset to the pos before reading", overflow, cb.toString());
     }
 
     /**
@@ -277,9 +299,10 @@ public class KernelCpuProcStringReaderTest {
             assertTrue(mTestFile.delete());
             try (BufferedWriter w = Files.newBufferedWriter(mTestFile.toPath())) {
                 w.write(data1);
-                modify.countDown();
             } catch (Throwable e) {
                 errs.add(e);
+            } finally {
+                modify.countDown();
             }
         }, 600, TimeUnit.MILLISECONDS);
 

@@ -433,7 +433,7 @@ static bool CompileXml(IAaptContext* context, const CompileOptions& options,
     }
 
     Printer r_txt_printer(&fout_text);
-    for (const auto res : xmlres->file.exported_symbols) {
+    for (const auto& res : xmlres->file.exported_symbols) {
       r_txt_printer.Print("default int id ");
       r_txt_printer.Println(res.name.entry);
     }
@@ -469,16 +469,12 @@ static bool CompilePng(IAaptContext* context, const CompileOptions& options,
       return false;
     }
 
-    // Read the file as a string
-    char buffer_2[data->size()];
-    memcpy(&buffer_2, data->data(), data->size());
-    StringPiece content(buffer_2, data->size());
-
     BigBuffer crunched_png_buffer(4096);
     io::BigBufferOutputStream crunched_png_buffer_out(&crunched_png_buffer);
 
     // Ensure that we only keep the chunks we care about if we end up
     // using the original PNG instead of the crunched one.
+    const StringPiece content(reinterpret_cast<const char*>(data->data()), data->size());
     PngChunkFilter png_chunk_filter(content);
     std::unique_ptr<Image> image = ReadPng(context, path_data.source, &png_chunk_filter);
     if (!image) {
@@ -584,7 +580,7 @@ static bool CompileFile(IAaptContext* context, const CompileOptions& options,
 
 class CompileContext : public IAaptContext {
  public:
-  CompileContext(IDiagnostics* diagnostics) : diagnostics_(diagnostics) {
+  explicit CompileContext(IDiagnostics* diagnostics) : diagnostics_(diagnostics) {
   }
 
   PackageType GetPackageType() override {
@@ -701,7 +697,10 @@ int Compile(IAaptContext* context, io::IFileCollection* inputs, IArchiveWriter* 
     }
 
     const std::string out_path = BuildIntermediateContainerFilename(path_data);
-    error |= !compile_func(context, options, path_data, file, output_writer, out_path);
+    if (!compile_func(context, options, path_data, file, output_writer, out_path)) {
+      context->GetDiagnostics()->Error(DiagMessage(file->GetSource()) << "file failed to compile");
+      error = true;
+    }
   }
 
   return error ? 1 : 0;

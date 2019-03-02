@@ -42,6 +42,19 @@ namespace aapt {
 
 namespace {
 
+static std::u16string strcpy16_dtoh(const char16_t* src, size_t len) {
+  size_t utf16_len = strnlen16(src, len);
+  if (utf16_len == 0) {
+    return {};
+  }
+  std::u16string dst;
+  dst.resize(utf16_len);
+  for (size_t i = 0; i < utf16_len; i++) {
+    dst[i] = util::DeviceToHost16(src[i]);
+  }
+  return dst;
+}
+
 // Visitor that converts a reference's resource ID to a resource name, given a mapping from
 // resource ID to resource name.
 class ReferenceIdToNameVisitor : public DescendingValueVisitor {
@@ -176,12 +189,8 @@ bool BinaryResourceParser::ParsePackage(const ResChunk_header* chunk) {
   }
 
   // Extract the package name.
-  size_t len = strnlen16((const char16_t*)package_header->name, arraysize(package_header->name));
-  std::u16string package_name;
-  package_name.resize(len);
-  for (size_t i = 0; i < len; i++) {
-    package_name[i] = util::DeviceToHost16(package_header->name[i]);
-  }
+  std::u16string package_name = strcpy16_dtoh((const char16_t*)package_header->name,
+                                              arraysize(package_header->name));
 
   ResourceTablePackage* package =
       table_->CreatePackage(util::Utf16ToUtf8(package_name), static_cast<uint8_t>(package_id));
@@ -236,6 +245,12 @@ bool BinaryResourceParser::ParsePackage(const ResChunk_header* chunk) {
 
       case android::RES_TABLE_LIBRARY_TYPE:
         if (!ParseLibrary(parser.chunk())) {
+          return false;
+        }
+        break;
+
+      case android::RES_TABLE_OVERLAYABLE_TYPE:
+        if (!ParseOverlayable(parser.chunk())) {
           return false;
         }
         break;
@@ -383,24 +398,12 @@ bool BinaryResourceParser::ParseType(const ResourceTablePackage* package,
       return false;
     }
 
-    const uint32_t type_spec_flags = entry_type_spec_flags_[res_id];
-    if ((entry->flags & ResTable_entry::FLAG_PUBLIC) != 0 ||
-        (type_spec_flags & ResTable_typeSpec::SPEC_OVERLAYABLE) != 0) {
-      if (entry->flags & ResTable_entry::FLAG_PUBLIC) {
-        Visibility visibility;
-        visibility.level = Visibility::Level::kPublic;
-        visibility.source = source_.WithLine(0);
-        if (!table_->SetVisibilityWithIdMangled(name, visibility, res_id, diag_)) {
-          return false;
-        }
-      }
-
-      if (type_spec_flags & ResTable_typeSpec::SPEC_OVERLAYABLE) {
-        Overlayable overlayable;
-        overlayable.source = source_.WithLine(0);
-        if (!table_->AddOverlayableMangled(name, overlayable, diag_)) {
-          return false;
-        }
+    if (entry->flags & ResTable_entry::FLAG_PUBLIC) {
+      Visibility visibility;
+      visibility.level = Visibility::Level::kPublic;
+      visibility.source = source_.WithLine(0);
+      if (!table_->SetVisibilityWithIdMangled(name, visibility, res_id, diag_)) {
+        return false;
       }
 
       // Erase the ID from the map once processed, so that we don't mark the same symbol more than
@@ -430,6 +433,73 @@ bool BinaryResourceParser::ParseLibrary(const ResChunk_header* chunk) {
     table_->included_packages_[entries.valueAt(i)] =
         util::Utf16ToUtf8(StringPiece16(entries.keyAt(i).string()));
   }
+  return true;
+}
+
+bool BinaryResourceParser::ParseOverlayable(const ResChunk_header* chunk) {
+  const ResTable_overlayable_header* header = ConvertTo<ResTable_overlayable_header>(chunk);
+  if (!header) {
+    diag_->Error(DiagMessage(source_) << "corrupt ResTable_category_header chunk");
+    return false;
+  }
+
+  auto overlayable = std::make_shared<Overlayable>();
+  overlayable->name = util::Utf16ToUtf8(strcpy16_dtoh((const char16_t*)header->name,
+                                                      arraysize(header->name)));
+  overlayable->actor = util::Utf16ToUtf8(strcpy16_dtoh((const char16_t*)header->actor,
+                                                       arraysize(header->name)));
+  overlayable->source = source_.WithLine(0);
+
+  ResChunkPullParser parser(GetChunkData(chunk),
+                            GetChunkDataLen(chunk));
+  while (ResChunkPullParser::IsGoodEvent(parser.Next())) {
+    if (util::DeviceToHost16(parser.chunk()->type) == android::RES_TABLE_OVERLAYABLE_POLICY_TYPE) {
+      const ResTable_overlayable_policy_header* policy_header =
+          ConvertTo<ResTable_overlayable_policy_header>(parser.chunk());
+
+      OverlayableItem::PolicyFlags policies = OverlayableItem::Policy::kNone;
+      if (policy_header->policy_flags & ResTable_overlayable_policy_header::POLICY_PUBLIC) {
+        policies |= OverlayableItem::Policy::kPublic;
+      }
+      if (policy_header->policy_flags
+          & ResTable_overlayable_policy_header::POLICY_SYSTEM_PARTITION) {
+        policies |= OverlayableItem::Policy::kSystem;
+      }
+      if (policy_header->policy_flags
+          & ResTable_overlayable_policy_header::POLICY_VENDOR_PARTITION) {
+        policies |= OverlayableItem::Policy::kVendor;
+      }
+      if (policy_header->policy_flags
+          & ResTable_overlayable_policy_header::POLICY_PRODUCT_PARTITION) {
+        policies |= OverlayableItem::Policy::kProduct;
+      }
+
+      const ResTable_ref* const ref_begin = reinterpret_cast<const ResTable_ref*>(
+          ((uint8_t *)policy_header) + util::DeviceToHost32(policy_header->header.headerSize));
+      const ResTable_ref* const ref_end = ref_begin
+          + util::DeviceToHost32(policy_header->entry_count);
+      for (auto ref_iter = ref_begin; ref_iter != ref_end; ++ref_iter) {
+        ResourceId res_id(util::DeviceToHost32(ref_iter->ident));
+        const auto iter = id_index_.find(res_id);
+
+        // If the overlayable chunk comes before the type chunks, the resource ids and resource name
+        // pairing will not exist at this point.
+        if (iter == id_index_.cend()) {
+          diag_->Error(DiagMessage(source_) << "failed to find resource name for overlayable"
+                                            << " resource " << res_id);
+          return false;
+        }
+
+        OverlayableItem overlayable_item(overlayable);
+        overlayable_item.source = source_.WithLine(0);
+        overlayable_item.policies = policies;
+        if (!table_->SetOverlayable(iter->second, overlayable_item, diag_)) {
+          return false;
+        }
+      }
+    }
+  }
+
   return true;
 }
 

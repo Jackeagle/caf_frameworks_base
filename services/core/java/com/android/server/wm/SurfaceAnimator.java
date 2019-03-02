@@ -199,7 +199,7 @@ class SurfaceAnimator {
      * @see #setLayer
      */
     void reparent(Transaction t, SurfaceControl newParent) {
-        t.reparent(mLeash != null ? mLeash : mAnimatable.getSurfaceControl(), newParent.getHandle());
+        t.reparent(mLeash != null ? mLeash : mAnimatable.getSurfaceControl(), newParent);
     }
 
     /**
@@ -228,8 +228,8 @@ class SurfaceAnimator {
 
         // Cancel source animation, but don't let animation runner cancel the animation.
         from.cancelAnimation(t, false /* restarting */, false /* forwardCancel */);
-        t.reparent(surface, mLeash.getHandle());
-        t.reparent(mLeash, parent.getHandle());
+        t.reparent(surface, mLeash);
+        t.reparent(mLeash, parent);
         mAnimatable.onAnimationLeashCreated(t, mLeash);
         mService.mAnimationTransferMap.put(mAnimation, this);
     }
@@ -275,12 +275,12 @@ class SurfaceAnimator {
         final boolean destroy = mLeash != null && surface != null && parent != null;
         if (destroy) {
             if (DEBUG_ANIM) Slog.i(TAG, "Reparenting to original parent");
-            t.reparent(surface, parent.getHandle());
+            t.reparent(surface, parent);
             scheduleAnim = true;
         }
         mService.mAnimationTransferMap.remove(mAnimation);
         if (mLeash != null && destroyLeash) {
-            t.destroy(mLeash);
+            t.reparent(mLeash, null);
             scheduleAnim = true;
         }
         mLeash = null;
@@ -302,14 +302,13 @@ class SurfaceAnimator {
         if (DEBUG_ANIM) Slog.i(TAG, "Reparenting to leash");
         final SurfaceControl.Builder builder = mAnimatable.makeAnimationLeash()
                 .setParent(mAnimatable.getAnimationLeashParent())
-                .setName(surface + " - animation-leash")
-                .setSize(width, height);
+                .setName(surface + " - animation-leash");
         final SurfaceControl leash = builder.build();
-        t.setWindowCrop(surface, width, height);
+        t.setWindowCrop(leash, width, height);
         if (!hidden) {
             t.show(leash);
         }
-        t.reparent(surface, leash.getHandle());
+        t.reparent(surface, leash);
         return leash;
     }
 
@@ -326,7 +325,7 @@ class SurfaceAnimator {
         if (mAnimation != null) {
             mAnimation.writeToProto(proto, ANIMATION_ADAPTER);
         }
-        if (mLeash != null){
+        if (mLeash != null) {
             mLeash.writeToProto(proto, LEASH);
         }
         proto.write(ANIMATION_START_DELAYED, mAnimationStartDelayed);

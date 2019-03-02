@@ -20,6 +20,7 @@ import static android.net.NetworkStats.SET_ALL;
 import static android.net.NetworkStats.TAG_ALL;
 import static android.net.NetworkStats.TAG_NONE;
 import static android.net.NetworkStats.UID_ALL;
+
 import static com.android.server.NetworkManagementSocketTagger.kernelToTag;
 
 import android.annotation.Nullable;
@@ -33,10 +34,8 @@ import com.android.internal.util.ProcFileReader;
 
 import libcore.io.IoUtils;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.ProtocolException;
 import java.util.Arrays;
@@ -64,6 +63,9 @@ public class NetworkStatsFactory {
     private final File mStatsXtUid;
 
     private boolean mUseBpfStats;
+
+    // A persistent Snapshot since device start for eBPF stats
+    private final NetworkStats mPersistSnapshot;
 
     // TODO: only do adjustments in NetworkStatsService and remove this.
     /**
@@ -127,7 +129,7 @@ public class NetworkStatsFactory {
     }
 
     public NetworkStatsFactory() {
-        this(new File("/proc/"), new File("/sys/fs/bpf/traffic_uid_stats_map").exists());
+        this(new File("/proc/"), new File("/sys/fs/bpf/map_netd_app_uid_stats_map").exists());
     }
 
     @VisibleForTesting
@@ -136,6 +138,7 @@ public class NetworkStatsFactory {
         mStatsXtIfaceFmt = new File(procRoot, "net/xt_qtaguid/iface_stat_fmt");
         mStatsXtUid = new File(procRoot, "net/xt_qtaguid/stats");
         mUseBpfStats = useBpfStats;
+        mPersistSnapshot = new NetworkStats(SystemClock.elapsedRealtime(), -1);
     }
 
     public NetworkStats readBpfNetworkStatsDev() throws IOException {
@@ -269,6 +272,7 @@ public class NetworkStatsFactory {
         return stats;
     }
 
+    // TODO: delete the lastStats parameter
     private NetworkStats readNetworkStatsDetailInternal(int limitUid, String[] limitIfaces,
             int limitTag, NetworkStats lastStats) throws IOException {
         if (USE_NATIVE_PARSING) {
@@ -279,16 +283,28 @@ public class NetworkStatsFactory {
             } else {
                 stats = new NetworkStats(SystemClock.elapsedRealtime(), -1);
             }
-            if (nativeReadNetworkStatsDetail(stats, mStatsXtUid.getAbsolutePath(), limitUid,
-                    limitIfaces, limitTag, mUseBpfStats) != 0) {
-                throw new IOException("Failed to parse network stats");
+            if (mUseBpfStats) {
+                if (nativeReadNetworkStatsDetail(stats, mStatsXtUid.getAbsolutePath(), UID_ALL,
+                        null, TAG_ALL, mUseBpfStats) != 0) {
+                    throw new IOException("Failed to parse network stats");
+                }
+                mPersistSnapshot.setElapsedRealtime(stats.getElapsedRealtime());
+                mPersistSnapshot.combineAllValues(stats);
+                NetworkStats result = mPersistSnapshot.clone();
+                result.filter(limitUid, limitIfaces, limitTag);
+                return result;
+            } else {
+                if (nativeReadNetworkStatsDetail(stats, mStatsXtUid.getAbsolutePath(), limitUid,
+                        limitIfaces, limitTag, mUseBpfStats) != 0) {
+                    throw new IOException("Failed to parse network stats");
+                }
+                if (SANITY_CHECK_NATIVE) {
+                    final NetworkStats javaStats = javaReadNetworkStatsDetail(mStatsXtUid, limitUid,
+                            limitIfaces, limitTag);
+                    assertEquals(javaStats, stats);
+                }
+                return stats;
             }
-            if (SANITY_CHECK_NATIVE) {
-                final NetworkStats javaStats = javaReadNetworkStatsDetail(mStatsXtUid, limitUid,
-                        limitIfaces, limitTag);
-                assertEquals(javaStats, stats);
-            }
-            return stats;
         } else {
             return javaReadNetworkStatsDetail(mStatsXtUid, limitUid, limitIfaces, limitTag);
         }

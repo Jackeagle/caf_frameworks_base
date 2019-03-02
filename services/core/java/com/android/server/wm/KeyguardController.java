@@ -72,6 +72,7 @@ class KeyguardController {
     private int mVisibilityTransactionDepth;
     private final SparseArray<KeyguardDisplayState> mDisplayStates = new SparseArray<>();
     private final ActivityTaskManagerService mService;
+    private RootActivityContainer mRootActivityContainer;
 
     KeyguardController(ActivityTaskManagerService service,
             ActivityStackSupervisor stackSupervisor) {
@@ -81,6 +82,7 @@ class KeyguardController {
 
     void setWindowManager(WindowManagerService windowManager) {
         mWindowManager = windowManager;
+        mRootActivityContainer = mService.mRootActivityContainer;
     }
 
     /**
@@ -89,9 +91,7 @@ class KeyguardController {
      */
     boolean isKeyguardOrAodShowing(int displayId) {
         return (mKeyguardShowing || mAodShowing) && !mKeyguardGoingAway
-                && (displayId == DEFAULT_DISPLAY
-                        ? !isDisplayOccluded(DEFAULT_DISPLAY)
-                        : isShowingOnSecondaryDisplay(displayId));
+                && !isDisplayOccluded(displayId);
     }
 
     /**
@@ -99,10 +99,7 @@ class KeyguardController {
      *         display, false otherwise
      */
     boolean isKeyguardShowing(int displayId) {
-        return mKeyguardShowing && !mKeyguardGoingAway
-                && (displayId == DEFAULT_DISPLAY
-                        ? !isDisplayOccluded(DEFAULT_DISPLAY)
-                        : isShowingOnSecondaryDisplay(displayId));
+        return mKeyguardShowing && !mKeyguardGoingAway && !isDisplayOccluded(displayId);
     }
 
     /**
@@ -146,16 +143,8 @@ class KeyguardController {
                 mDismissalRequested = false;
             }
         }
-        mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
+        mRootActivityContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
         updateKeyguardSleepToken();
-    }
-
-    private boolean isShowingOnSecondaryDisplay(int displayId) {
-        if (mSecondaryDisplayIdsShowing == null) return false;
-        for (int showingId : mSecondaryDisplayIdsShowing) {
-            if (displayId == showingId) return true;
-        }
-        return false;
     }
 
     /**
@@ -172,16 +161,17 @@ class KeyguardController {
         mWindowManager.deferSurfaceLayout();
         try {
             setKeyguardGoingAway(true);
-            mStackSupervisor.getDefaultDisplay().getWindowContainerController()
+            mRootActivityContainer.getDefaultDisplay().mDisplayContent
                     .prepareAppTransition(TRANSIT_KEYGUARD_GOING_AWAY,
                             false /* alwaysKeepCurrent */, convertTransitFlags(flags),
                             false /* forceOverride */);
             updateKeyguardSleepToken();
 
             // Some stack visibility might change (e.g. docked stack)
-            mStackSupervisor.resumeFocusedStacksTopActivitiesLocked();
-            mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
-            mStackSupervisor.addStartingWindowsForVisibleActivities(true /* taskSwitch */);
+            mRootActivityContainer.resumeFocusedStacksTopActivities();
+            mRootActivityContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
+            mRootActivityContainer.addStartingWindowsForVisibleActivities(
+                    true /* taskSwitch */);
             mWindowManager.executeAppTransition();
         } finally {
             Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "keyguardGoingAway: surfaceLayout");
@@ -277,8 +267,9 @@ class KeyguardController {
 
     private void visibilitiesUpdated() {
         boolean requestDismissKeyguard = false;
-        for (int displayNdx = mStackSupervisor.getChildCount() - 1; displayNdx >= 0; displayNdx--) {
-            final ActivityDisplay display = mStackSupervisor.getChildAt(displayNdx);
+        for (int displayNdx = mRootActivityContainer.getChildCount() - 1;
+             displayNdx >= 0; displayNdx--) {
+            final ActivityDisplay display = mRootActivityContainer.getChildAt(displayNdx);
             final KeyguardDisplayState state = getDisplay(display.mDisplayId);
             state.visibilitiesUpdated(this, display);
             requestDismissKeyguard |= state.mRequestDismissKeyguard;
@@ -298,12 +289,12 @@ class KeyguardController {
         if (isKeyguardLocked()) {
             mWindowManager.deferSurfaceLayout();
             try {
-                mStackSupervisor.getDefaultDisplay().getWindowContainerController()
+                mRootActivityContainer.getDefaultDisplay().mDisplayContent
                         .prepareAppTransition(resolveOccludeTransit(),
                                 false /* alwaysKeepCurrent */, 0 /* flags */,
                                 true /* forceOverride */);
                 updateKeyguardSleepToken();
-                mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
+                mRootActivityContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
                 mWindowManager.executeAppTransition();
             } finally {
                 mWindowManager.continueSurfaceLayout();
@@ -319,21 +310,23 @@ class KeyguardController {
         // We only allow dismissing Keyguard via the flag when Keyguard is secure for legacy
         // reasons, because that's how apps used to dismiss Keyguard in the secure case. In the
         // insecure case, we actually show it on top of the lockscreen. See #canShowWhileOccluded.
-        if (mWindowManager.isKeyguardSecure()) {
-            mWindowManager.dismissKeyguard(null /* callback */, null /* message */);
-            mDismissalRequested = true;
+        if (!mWindowManager.isKeyguardSecure()) {
+            return;
+        }
 
-            // If we are about to unocclude the Keyguard, but we can dismiss it without security,
-            // we immediately dismiss the Keyguard so the activity gets shown without a flicker.
-            final DisplayWindowController dwc =
-                    mStackSupervisor.getDefaultDisplay().getWindowContainerController();
-            if (mKeyguardShowing && canDismissKeyguard()
-                    && dwc.getPendingAppTransition() == TRANSIT_KEYGUARD_UNOCCLUDE) {
-                dwc.prepareAppTransition(mBeforeUnoccludeTransit, false /* alwaysKeepCurrent */,
-                        0 /* flags */, true /* forceOverride */);
-                mStackSupervisor.ensureActivitiesVisibleLocked(null, 0, !PRESERVE_WINDOWS);
-                mWindowManager.executeAppTransition();
-            }
+        mWindowManager.dismissKeyguard(null /* callback */, null /* message */);
+        mDismissalRequested = true;
+
+        // If we are about to unocclude the Keyguard, but we can dismiss it without security,
+        // we immediately dismiss the Keyguard so the activity gets shown without a flicker.
+        final DisplayContent dc =
+                mRootActivityContainer.getDefaultDisplay().mDisplayContent;
+        if (mKeyguardShowing && canDismissKeyguard()
+                && dc.mAppTransition.getAppTransition() == TRANSIT_KEYGUARD_UNOCCLUDE) {
+            dc.prepareAppTransition(mBeforeUnoccludeTransit, false /* alwaysKeepCurrent */,
+                    0 /* flags */, true /* forceOverride */);
+            mRootActivityContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
+            mWindowManager.executeAppTransition();
         }
     }
 
@@ -349,10 +342,10 @@ class KeyguardController {
     }
 
     private int resolveOccludeTransit() {
-        final DisplayWindowController dwc =
-                mStackSupervisor.getDefaultDisplay().getWindowContainerController();
+        final DisplayContent dc =
+                mService.mRootActivityContainer.getDefaultDisplay().mDisplayContent;
         if (mBeforeUnoccludeTransit != TRANSIT_UNSET
-                && dwc.getPendingAppTransition() == TRANSIT_KEYGUARD_UNOCCLUDE
+                && dc.mAppTransition.getAppTransition() == TRANSIT_KEYGUARD_UNOCCLUDE
                 // TODO(b/113840485): Handle app transition for individual display.
                 && isDisplayOccluded(DEFAULT_DISPLAY)) {
 
@@ -363,7 +356,7 @@ class KeyguardController {
         } else if (!isDisplayOccluded(DEFAULT_DISPLAY)) {
 
             // Save transit in case we dismiss/occlude Keyguard shortly after.
-            mBeforeUnoccludeTransit = dwc.getPendingAppTransition();
+            mBeforeUnoccludeTransit = dc.mAppTransition.getAppTransition();
             return TRANSIT_KEYGUARD_UNOCCLUDE;
         } else {
             return TRANSIT_KEYGUARD_OCCLUDE;
@@ -377,7 +370,8 @@ class KeyguardController {
             // show on top of the lock screen. In this can we want to dismiss the docked
             // stack since it will be complicated/risky to try to put the activity on top
             // of the lock screen in the right fullscreen configuration.
-            final ActivityStack stack = mStackSupervisor.getDefaultDisplay().getSplitScreenPrimaryStack();
+            final ActivityStack stack =
+                    mRootActivityContainer.getDefaultDisplay().getSplitScreenPrimaryStack();
             if (stack == null) {
                 return;
             }
@@ -387,8 +381,9 @@ class KeyguardController {
     }
 
     private void updateKeyguardSleepToken() {
-        for (int displayNdx = mStackSupervisor.getChildCount() - 1; displayNdx >= 0; displayNdx--) {
-            final ActivityDisplay display = mStackSupervisor.getChildAt(displayNdx);
+        for (int displayNdx = mRootActivityContainer.getChildCount() - 1;
+             displayNdx >= 0; displayNdx--) {
+            final ActivityDisplay display = mRootActivityContainer.getChildAt(displayNdx);
             final KeyguardDisplayState state = getDisplay(display.mDisplayId);
             if (isKeyguardOrAodShowing(display.mDisplayId) && state.mSleepToken == null) {
                 state.acquiredSleepToken();
@@ -454,20 +449,25 @@ class KeyguardController {
             mOccluded = false;
             mDismissingKeyguardActivity = null;
 
-            // Only the top activity of the focused stack on each display may control it's
-            // occluded state.
-            final ActivityStack focusedStack = display.getFocusedStack();
-            if (focusedStack != null) {
-                final ActivityRecord topDismissing =
-                        focusedStack.getTopDismissingKeyguardActivity();
-                mOccluded = focusedStack.topActivityOccludesKeyguard() || (topDismissing != null
-                                && focusedStack.topRunningActivityLocked() == topDismissing
-                                && controller.canShowWhileOccluded(
+            final ActivityStack stack = getStackForControllingOccluding(display);
+            if (stack != null) {
+                final ActivityRecord topDismissing = stack.getTopDismissingKeyguardActivity();
+                mOccluded = stack.topActivityOccludesKeyguard() || (topDismissing != null
+                        && stack.topRunningActivityLocked() == topDismissing
+                        && controller.canShowWhileOccluded(
                                 true /* dismissKeyguard */,
                                 false /* showWhenLocked */));
-                if (focusedStack.getTopDismissingKeyguardActivity() != null) {
-                    mDismissingKeyguardActivity = focusedStack.getTopDismissingKeyguardActivity();
+                if (stack.getTopDismissingKeyguardActivity() != null) {
+                    mDismissingKeyguardActivity = stack.getTopDismissingKeyguardActivity();
                 }
+                // FLAG_CAN_SHOW_WITH_INSECURE_KEYGUARD only apply for secondary display.
+                if (mDisplayId != DEFAULT_DISPLAY) {
+                    mOccluded |= stack.canShowWithInsecureKeyguard()
+                            && controller.canDismissKeyguard();
+                }
+            }
+            // TODO(b/123372519): isShowingDream can only works on default display.
+            if (mDisplayId == DEFAULT_DISPLAY) {
                 mOccluded |= controller.mWindowManager.isShowingDream();
             }
 
@@ -482,6 +482,23 @@ class KeyguardController {
                     && controller.mWindowManager.isKeyguardSecure()) {
                 mRequestDismissKeyguard = true;
             }
+        }
+
+        /**
+         * Gets the stack used to check the occluded state.
+         * <p>
+         * Only the top non-pinned activity of the focusable stack on each display can control its
+         * occlusion state.
+         */
+        private ActivityStack getStackForControllingOccluding(ActivityDisplay display) {
+            for (int stackNdx = display.getChildCount() - 1; stackNdx >= 0; --stackNdx) {
+                final ActivityStack stack = display.getChildAt(stackNdx);
+                if (stack != null && stack.isFocusableAndVisible()
+                        && !stack.inPinnedWindowingMode()) {
+                    return stack;
+                }
+            }
+            return null;
         }
 
         void dumpStatus(PrintWriter pw, String prefix) {

@@ -98,7 +98,7 @@ import java.util.List;
  */
 public abstract class NotificationListenerService extends Service {
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private final String TAG = getClass().getSimpleName();
 
     /**
@@ -294,7 +294,7 @@ public abstract class NotificationListenerService extends Service {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     protected INotificationManager mNoMan;
 
     /**
@@ -469,6 +469,17 @@ public abstract class NotificationListenerService extends Service {
     }
 
     /**
+     * Implement this method to be notified when the behavior of silent notifications in the status
+     * bar changes. See {@link NotificationManager#shouldHideSilentStatusBarIcons()}.
+     *
+     * @param hideSilentStatusIcons whether or not status bar icons should be hidden for silent
+     *                              notifications
+     */
+    public void onStatusBarIconsBehaviorChanged(boolean hideSilentStatusIcons) {
+        // optional
+    }
+
+    /**
      * Implement this method to learn about notification channel modifications.
      *
      * <p>The caller must have {@link CompanionDeviceManager#getAssociations() an associated
@@ -516,7 +527,7 @@ public abstract class NotificationListenerService extends Service {
     }
 
     /** @hide */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     protected final INotificationManager getNotificationInterface() {
         if (mNoMan == null) {
             mNoMan = INotificationManager.Stub.asInterface(
@@ -1366,6 +1377,27 @@ public abstract class NotificationListenerService extends Service {
         }
 
         @Override
+        public void onNotificationExpansionChanged(
+                String key, boolean isUserAction, boolean isExpanded) {
+            // no-op in the listener
+        }
+
+        @Override
+        public void onNotificationDirectReply(String key) {
+            // no-op in the listener
+        }
+
+        @Override
+        public void onSuggestedReplySent(String key, CharSequence reply, int source) {
+            // no-op in the listener
+        }
+
+        @Override
+        public void onActionClicked(String key, Notification.Action action, int source) {
+            // no-op in the listener
+        }
+
+        @Override
         public void onNotificationChannelModification(String pkgName, UserHandle user,
                 NotificationChannel channel,
                 @ChannelOrGroupModificationTypes int modificationType) {
@@ -1389,6 +1421,12 @@ public abstract class NotificationListenerService extends Service {
             args.arg4 = modificationType;
             mHandler.obtainMessage(
                     MyHandler.MSG_ON_NOTIFICATION_CHANNEL_GROUP_MODIFIED, args).sendToTarget();
+        }
+
+        @Override
+        public void onStatusBarIconsBehaviorChanged(boolean hideSilentStatusIcons) {
+            mHandler.obtainMessage(MyHandler.MSG_ON_STATUS_BAR_ICON_BEHAVIOR_CHANGED,
+                    hideSilentStatusIcons).sendToTarget();
         }
     }
 
@@ -1461,7 +1499,7 @@ public abstract class NotificationListenerService extends Service {
         private boolean mShowBadge;
         private @UserSentiment int mUserSentiment = USER_SENTIMENT_NEUTRAL;
         private boolean mHidden;
-        private boolean mAudiblyAlerted;
+        private long mLastAudiblyAlertedMs;
         private boolean mNoisy;
         private ArrayList<Notification.Action> mSmartActions;
         private ArrayList<CharSequence> mSmartReplies;
@@ -1596,14 +1634,16 @@ public abstract class NotificationListenerService extends Service {
         }
 
         /**
-         * @hide
+         * Returns a list of smart {@link Notification.Action} that can be added by the
+         * {@link NotificationAssistantService}
          */
         public List<Notification.Action> getSmartActions() {
             return mSmartActions;
         }
 
         /**
-         * @hide
+         * Returns a list of smart replies that can be added by the
+         * {@link NotificationAssistantService}
          */
         public List<CharSequence> getSmartReplies() {
             return mSmartReplies;
@@ -1629,12 +1669,12 @@ public abstract class NotificationListenerService extends Service {
         }
 
         /**
-         * Returns whether this notification alerted the user via sound or vibration.
+         * Returns the last time this notification alerted the user via sound or vibration.
          *
-         * @return true if the notification alerted the user, false otherwise.
+         * @return the time of the last alerting behavior, in milliseconds.
          */
-        public boolean audiblyAlerted() {
-            return mAudiblyAlerted;
+        public long getLastAudiblyAlertedMillis() {
+            return mLastAudiblyAlertedMs;
         }
 
         /** @hide */
@@ -1651,7 +1691,7 @@ public abstract class NotificationListenerService extends Service {
                 CharSequence explanation, String overrideGroupKey,
                 NotificationChannel channel, ArrayList<String> overridePeople,
                 ArrayList<SnoozeCriterion> snoozeCriteria, boolean showBadge,
-                int userSentiment, boolean hidden, boolean audiblyAlerted,
+                int userSentiment, boolean hidden, long lastAudiblyAlertedMs,
                 boolean noisy, ArrayList<Notification.Action> smartActions,
                 ArrayList<CharSequence> smartReplies) {
             mKey = key;
@@ -1669,7 +1709,7 @@ public abstract class NotificationListenerService extends Service {
             mShowBadge = showBadge;
             mUserSentiment = userSentiment;
             mHidden = hidden;
-            mAudiblyAlerted = audiblyAlerted;
+            mLastAudiblyAlertedMs = lastAudiblyAlertedMs;
             mNoisy = noisy;
             mSmartActions = smartActions;
             mSmartReplies = smartReplies;
@@ -1722,7 +1762,7 @@ public abstract class NotificationListenerService extends Service {
         private ArrayMap<String, Boolean> mShowBadge;
         private ArrayMap<String, Integer> mUserSentiment;
         private ArrayMap<String, Boolean> mHidden;
-        private ArrayMap<String, Boolean> mAudiblyAlerted;
+        private ArrayMap<String, Long> mLastAudiblyAlerted;
         private ArrayMap<String, Boolean> mNoisy;
         private ArrayMap<String, ArrayList<Notification.Action>> mSmartActions;
         private ArrayMap<String, ArrayList<CharSequence>> mSmartReplies;
@@ -1755,7 +1795,7 @@ public abstract class NotificationListenerService extends Service {
                     getImportance(key), getImportanceExplanation(key), getOverrideGroupKey(key),
                     getChannel(key), getOverridePeople(key), getSnoozeCriteria(key),
                     getShowBadge(key), getUserSentiment(key), getHidden(key),
-                    getAudiblyAlerted(key), getNoisy(key), getSmartActions(key),
+                    getLastAudiblyAlerted(key), getNoisy(key), getSmartActions(key),
                     getSmartReplies(key));
             return rank >= 0;
         }
@@ -1894,14 +1934,14 @@ public abstract class NotificationListenerService extends Service {
             return hidden == null ? false : hidden.booleanValue();
         }
 
-        private boolean getAudiblyAlerted(String key) {
+        private long getLastAudiblyAlerted(String key) {
             synchronized (this) {
-                if (mAudiblyAlerted == null) {
-                    buildAudiblyAlertedLocked();
+                if (mLastAudiblyAlerted == null) {
+                    buildLastAudiblyAlertedLocked();
                 }
             }
-            Boolean audiblyAlerted = mAudiblyAlerted.get(key);
-            return audiblyAlerted == null ? false : audiblyAlerted.booleanValue();
+            Long lastAudibleAlerted = mLastAudiblyAlerted.get(key);
+            return lastAudibleAlerted == null ? -1 : lastAudibleAlerted.longValue();
         }
 
         private boolean getNoisy(String key) {
@@ -1969,6 +2009,14 @@ public abstract class NotificationListenerService extends Service {
             ArrayMap<String, Boolean> newMap = new ArrayMap<>(bundle.size());
             for (String key : bundle.keySet()) {
                 newMap.put(key, bundle.getBoolean(key));
+            }
+            return newMap;
+        }
+
+        private ArrayMap<String, Long> buildLongMapFromBundle(Bundle bundle) {
+            ArrayMap<String, Long> newMap = new ArrayMap<>(bundle.size());
+            for (String key : bundle.keySet()) {
+                newMap.put(key, bundle.getLong(key));
             }
             return newMap;
         }
@@ -2049,8 +2097,8 @@ public abstract class NotificationListenerService extends Service {
         }
 
         // Locked by 'this'
-        private void buildAudiblyAlertedLocked() {
-            mAudiblyAlerted = buildBooleanMapFromBundle(mRankingUpdate.getAudiblyAlerted());
+        private void buildLastAudiblyAlertedLocked() {
+            mLastAudiblyAlerted = buildLongMapFromBundle(mRankingUpdate.getLastAudiblyAlerted());
         }
 
         // Locked by 'this'
@@ -2111,6 +2159,7 @@ public abstract class NotificationListenerService extends Service {
         public static final int MSG_ON_INTERRUPTION_FILTER_CHANGED = 6;
         public static final int MSG_ON_NOTIFICATION_CHANNEL_MODIFIED = 7;
         public static final int MSG_ON_NOTIFICATION_CHANNEL_GROUP_MODIFIED = 8;
+        public static final int MSG_ON_STATUS_BAR_ICON_BEHAVIOR_CHANGED = 9;
 
         public MyHandler(Looper looper) {
             super(looper, null, false);
@@ -2175,6 +2224,10 @@ public abstract class NotificationListenerService extends Service {
                     NotificationChannelGroup group = (NotificationChannelGroup) args.arg3;
                     int modificationType = (int) args.arg4;
                     onNotificationChannelGroupModified(pkgName, user, group, modificationType);
+                } break;
+
+                case MSG_ON_STATUS_BAR_ICON_BEHAVIOR_CHANGED: {
+                    onStatusBarIconsBehaviorChanged((Boolean) msg.obj);
                 } break;
             }
         }

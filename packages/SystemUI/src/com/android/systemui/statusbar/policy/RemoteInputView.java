@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.policy;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.RemoteInput;
@@ -28,6 +29,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.os.UserHandle;
 import android.text.Editable;
 import android.text.SpannedString;
 import android.text.TextWatcher;
@@ -56,7 +58,7 @@ import com.android.systemui.Dependency;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.RemoteInputController;
-import com.android.systemui.statusbar.notification.NotificationData;
+import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper;
 import com.android.systemui.statusbar.notification.stack.StackStateAnimator;
 
@@ -83,7 +85,7 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
     private RemoteInputController mController;
     private RemoteInputQuickSettingsDisabler mRemoteInputQuickSettingsDisabler;
 
-    private NotificationData.Entry mEntry;
+    private NotificationEntry mEntry;
 
     private boolean mRemoved;
 
@@ -180,12 +182,13 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
     }
 
     public static RemoteInputView inflate(Context context, ViewGroup root,
-            NotificationData.Entry entry,
+            NotificationEntry entry,
             RemoteInputController controller) {
         RemoteInputView v = (RemoteInputView)
                 LayoutInflater.from(context).inflate(R.layout.remote_input, root, false);
         v.mController = controller;
         v.mEntry = entry;
+        v.mEditText.setTextOperationUser(computeTextOperationUser(entry.notification.getUser()));
         v.setTag(VIEW_TAG);
 
         return v;
@@ -245,7 +248,7 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (mEntry.row.isChangingPosition()) {
+        if (mEntry.getRow().isChangingPosition()) {
             if (getVisibility() == VISIBLE && mEditText.isFocusable()) {
                 mEditText.requestFocus();
             }
@@ -255,7 +258,7 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        if (mEntry.row.isChangingPosition() || isTemporarilyDetached()) {
+        if (mEntry.getRow().isChangingPosition() || isTemporarilyDetached()) {
             return;
         }
         mController.removeRemoteInput(mEntry, mToken);
@@ -281,6 +284,11 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
             animator.start();
         }
         focus();
+    }
+
+    private static UserHandle computeTextOperationUser(UserHandle notificationUser) {
+        return UserHandle.ALL.equals(notificationUser)
+                ? UserHandle.of(ActivityManager.getCurrentUser()) : notificationUser;
     }
 
     public void focus() {
@@ -495,7 +503,7 @@ public class RemoteInputView extends LinearLayout implements View.OnClickListene
         }
 
         private void defocusIfNeeded(boolean animate) {
-            if (mRemoteInputView != null && mRemoteInputView.mEntry.row.isChangingPosition()
+            if (mRemoteInputView != null && mRemoteInputView.mEntry.getRow().isChangingPosition()
                     || isTemporarilyDetached()) {
                 if (isTemporarilyDetached()) {
                     // We might get reattached but then the other one of HUN / expanded might steal

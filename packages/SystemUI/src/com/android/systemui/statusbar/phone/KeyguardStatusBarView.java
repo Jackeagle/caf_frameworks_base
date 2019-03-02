@@ -45,13 +45,13 @@ import com.android.systemui.BatteryMeterView;
 import com.android.systemui.Dependency;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
+import com.android.systemui.plugins.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.qs.QSPanel;
 import com.android.systemui.statusbar.phone.StatusBarIconController.TintedIconManager;
 import com.android.systemui.statusbar.policy.BatteryController;
 import com.android.systemui.statusbar.policy.BatteryController.BatteryStateChangeCallback;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
-import com.android.systemui.statusbar.policy.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.statusbar.policy.KeyguardUserSwitcher;
 import com.android.systemui.statusbar.policy.UserInfoController;
 import com.android.systemui.statusbar.policy.UserInfoController.OnUserInfoChangedListener;
@@ -113,6 +113,7 @@ public class KeyguardStatusBarView extends RelativeLayout
      * Ratio representing being in ambient mode or not.
      */
     private float mDarkAmount;
+    private boolean mDozing;
 
     public KeyguardStatusBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -210,7 +211,7 @@ public class KeyguardStatusBarView extends RelativeLayout
                 mMultiUserSwitch.setVisibility(View.GONE);
             }
         }
-        mBatteryView.setForceShowPercent(mBatteryCharging && mShowPercentAvailable);
+        mBatteryView.setForceShowPercent(mBatteryCharging && mShowPercentAvailable || mDozing);
     }
 
     private void updateSystemIconsLayoutParams() {
@@ -347,7 +348,7 @@ public class KeyguardStatusBarView extends RelativeLayout
         mIconManager = new TintedIconManager(findViewById(R.id.statusIcons));
         Dependency.get(StatusBarIconController.class).addIconGroup(mIconManager);
         onThemeChanged();
-        updateDozeState();
+        updateDarkState();
     }
 
     @Override
@@ -466,6 +467,14 @@ public class KeyguardStatusBarView extends RelativeLayout
                 .onDensityOrFontScaleChanged();
     }
 
+    @Override
+    public void onOverlayChanged() {
+        mCarrierLabel.setTextAppearance(
+                Utils.getThemeAttr(mContext, com.android.internal.R.attr.textAppearanceSmall));
+        onThemeChanged();
+        mBatteryView.updatePercentView();
+    }
+
     private void updateIconsAndTextColors() {
         @ColorInt int textColor = Utils.getColorAttrDefaultColor(mContext,
                 R.attr.wallpaperTextColor);
@@ -498,21 +507,29 @@ public class KeyguardStatusBarView extends RelativeLayout
         }
     }
 
+    public void setDozing(boolean dozing) {
+        if (mDozing == dozing) {
+            return;
+        }
+        mDozing = dozing;
+        updateVisibilities();
+    }
+
     public void setDarkAmount(float darkAmount) {
         mDarkAmount = darkAmount;
         if (darkAmount == 0) {
             dozeTimeTick();
         }
-        updateDozeState();
+        updateDarkState();
     }
 
     public void dozeTimeTick() {
         mCurrentBurnInOffsetX = getBurnInOffset(mBurnInOffset, true /* xAxis */);
         mCurrentBurnInOffsetY = getBurnInOffset(mBurnInOffset, false /* xAxis */);
-        updateDozeState();
+        updateDarkState();
     }
 
-    private void updateDozeState() {
+    private void updateDarkState() {
         float alpha = 1f - mDarkAmount;
         int visibility = alpha != 0f ? VISIBLE : INVISIBLE;
         mCarrierLabel.setAlpha(alpha * alpha);

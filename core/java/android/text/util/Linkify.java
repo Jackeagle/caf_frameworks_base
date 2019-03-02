@@ -29,6 +29,7 @@ import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
 import android.text.method.MovementMethod;
 import android.text.style.URLSpan;
+import android.util.Log;
 import android.util.Patterns;
 import android.webkit.WebView;
 import android.widget.TextView;
@@ -36,7 +37,6 @@ import android.widget.TextView;
 import com.android.i18n.phonenumbers.PhoneNumberMatch;
 import com.android.i18n.phonenumbers.PhoneNumberUtil;
 import com.android.i18n.phonenumbers.PhoneNumberUtil.Leniency;
-import com.android.internal.annotations.GuardedBy;
 
 import libcore.util.EmptyArray;
 
@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Locale;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,10 +69,12 @@ import java.util.regex.Pattern;
  *
  * @see MatchFilter
  * @see TransformFilter
- * @see UrlSpanFactory
  */
 
 public class Linkify {
+
+    private static final String LOG_TAG = "Linkify";
+
     /**
      *  Bit field indicating that web URLs should be matched in methods that
      *  take an options mask
@@ -224,44 +227,6 @@ public class Linkify {
     }
 
     /**
-     * Factory class to create {@link URLSpan}s. While adding spans to a {@link Spannable},
-     * {@link Linkify} will call {@link UrlSpanFactory#create(String)} function to create a
-     * {@link URLSpan}.
-     *
-     * @see #addLinks(Spannable, int, UrlSpanFactory)
-     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter,
-     * UrlSpanFactory)
-     */
-    public static class UrlSpanFactory {
-        private static final Object sInstanceLock = new Object();
-
-        @GuardedBy("sInstanceLock")
-        private static volatile UrlSpanFactory sInstance = null;
-
-        private static synchronized UrlSpanFactory getInstance() {
-            if (sInstance == null) {
-                synchronized (sInstanceLock) {
-                    if (sInstance == null) {
-                        sInstance = new UrlSpanFactory();
-                    }
-                }
-            }
-            return sInstance;
-        }
-
-        /**
-         * Factory function that will called by {@link Linkify} in order to create a
-         * {@link URLSpan}.
-         *
-         * @param url URL found
-         * @return a URLSpan instance
-         */
-        public URLSpan create(final String url) {
-            return new URLSpan(url);
-        }
-    }
-
-    /**
      *  Scans the text of the provided Spannable and turns all occurrences
      *  of the link types indicated in the mask into clickable links.
      *  If the mask is nonzero, it also removes any existing URLSpans
@@ -273,7 +238,7 @@ public class Linkify {
      *
      *  @return True if at least one link is found and applied.
      *
-     * @see #addLinks(Spannable, int, UrlSpanFactory)
+     * @see #addLinks(Spannable, int, Function)
      */
     public static final boolean addLinks(@NonNull Spannable text, @LinkifyMask int mask) {
         return addLinks(text, mask, null, null);
@@ -288,11 +253,11 @@ public class Linkify {
      *
      *  @param text Spannable whose text is to be marked-up with links
      *  @param mask mask to define which kinds of links will be searched
-     *  @param urlSpanFactory factory class used to create {@link URLSpan}s
+     *  @param urlSpanFactory function used to create {@link URLSpan}s
      *  @return True if at least one link is found and applied.
      */
     public static final boolean addLinks(@NonNull Spannable text, @LinkifyMask int mask,
-            @Nullable UrlSpanFactory urlSpanFactory) {
+            @Nullable Function<String, URLSpan> urlSpanFactory) {
         return addLinks(text, mask, null, urlSpanFactory);
     }
 
@@ -305,11 +270,16 @@ public class Linkify {
      * @param text Spannable whose text is to be marked-up with links
      * @param mask mask to define which kinds of links will be searched
      * @param context Context to be used while identifying phone numbers
-     * @param urlSpanFactory factory class used to create {@link URLSpan}s
+     * @param urlSpanFactory function used to create {@link URLSpan}s
      * @return true if at least one link is found and applied.
      */
     private static boolean addLinks(@NonNull Spannable text, @LinkifyMask int mask,
-            @Nullable Context context, @Nullable UrlSpanFactory urlSpanFactory) {
+            @Nullable Context context, @Nullable Function<String, URLSpan> urlSpanFactory) {
+        if (text != null && containsUnsupportedCharacters(text.toString())) {
+            android.util.EventLog.writeEvent(0x534e4554, "116321860", -1, "");
+            return false;
+        }
+
         if (mask == 0) {
             return false;
         }
@@ -356,6 +326,29 @@ public class Linkify {
     }
 
     /**
+     * Returns true if the specified text contains at least one unsupported character for applying
+     * links. Also logs the error.
+     *
+     * @param text the text to apply links to
+     * @hide
+     */
+    public static boolean containsUnsupportedCharacters(String text) {
+        if (text.contains("\u202C")) {
+            Log.e(LOG_TAG, "Unsupported character for applying links: u202C");
+            return true;
+        }
+        if (text.contains("\u202D")) {
+            Log.e(LOG_TAG, "Unsupported character for applying links: u202D");
+            return true;
+        }
+        if (text.contains("\u202E")) {
+            Log.e(LOG_TAG, "Unsupported character for applying links: u202E");
+            return true;
+        }
+        return false;
+    }
+
+    /**
      *  Scans the text of the provided TextView and turns all occurrences of
      *  the link types indicated in the mask into clickable links.  If matches
      *  are found the movement method for the TextView is set to
@@ -366,7 +359,7 @@ public class Linkify {
      *
      *  @return True if at least one link is found and applied.
      *
-     *  @see #addLinks(Spannable, int, UrlSpanFactory)
+     *  @see #addLinks(Spannable, int, Function)
      */
     public static final boolean addLinks(@NonNull TextView text, @LinkifyMask int mask) {
         if (mask == 0) {
@@ -480,8 +473,7 @@ public class Linkify {
      *  @param pattern      Regex pattern to be used for finding links
      *  @param scheme       URL scheme string (eg <code>http://</code>) to be
      *                      prepended to the links that do not start with this scheme.
-     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter,
-     * UrlSpanFactory)
+     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter, Function)
      */
     public static final boolean addLinks(@NonNull Spannable text, @NonNull Pattern pattern,
             @Nullable String scheme) {
@@ -502,8 +494,7 @@ public class Linkify {
      * @param transformFilter Filter to allow the client code to update the link found.
      *
      * @return True if at least one link is found and applied.
-     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter,
-     * UrlSpanFactory)
+     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter, Function)
      */
     public static final boolean addLinks(@NonNull Spannable spannable, @NonNull Pattern pattern,
             @Nullable String scheme, @Nullable MatchFilter matchFilter,
@@ -528,8 +519,7 @@ public class Linkify {
      *
      * @return True if at least one link is found and applied.
      *
-     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter,
-     * UrlSpanFactory)
+     * @see #addLinks(Spannable, Pattern, String, String[], MatchFilter, TransformFilter, Function)
      */
     public static final boolean addLinks(@NonNull Spannable spannable, @NonNull Pattern pattern,
             @Nullable String defaultScheme, @Nullable String[] schemes,
@@ -552,14 +542,19 @@ public class Linkify {
      * @param matchFilter     the filter that is used to allow the client code additional control
      *                        over which pattern matches are to be converted into links.
      * @param transformFilter filter to allow the client code to update the link found.
-     * @param urlSpanFactory  factory class used to create {@link URLSpan}s
+     * @param urlSpanFactory  function used to create {@link URLSpan}s
      *
      * @return True if at least one link is found and applied.
      */
     public static final boolean addLinks(@NonNull Spannable spannable, @NonNull Pattern pattern,
             @Nullable String defaultScheme, @Nullable String[] schemes,
             @Nullable MatchFilter matchFilter, @Nullable TransformFilter transformFilter,
-            @Nullable UrlSpanFactory urlSpanFactory) {
+            @Nullable Function<String, URLSpan> urlSpanFactory) {
+        if (spannable != null && containsUnsupportedCharacters(spannable.toString())) {
+            android.util.EventLog.writeEvent(0x534e4554, "116321860", -1, "");
+            return false;
+        }
+
         final String[] schemesCopy;
         if (defaultScheme == null) defaultScheme = "";
         if (schemes == null || schemes.length < 1) {
@@ -597,11 +592,11 @@ public class Linkify {
     }
 
     private static void applyLink(String url, int start, int end, Spannable text,
-            @Nullable UrlSpanFactory urlSpanFactory) {
+            @Nullable Function<String, URLSpan> urlSpanFactory) {
         if (urlSpanFactory == null) {
-            urlSpanFactory = UrlSpanFactory.getInstance();
+            urlSpanFactory = DEFAULT_SPAN_FACTORY;
         }
-        final URLSpan span = urlSpanFactory.create(url);
+        final URLSpan span = urlSpanFactory.apply(url);
         text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
@@ -768,6 +763,13 @@ public class Linkify {
             i++;
         }
     }
+
+    /**
+     * Default factory function to create {@link URLSpan}s. While adding spans to a
+     * {@link Spannable}, {@link Linkify} will call this function to create a {@link URLSpan}.
+     */
+    private static final Function<String, URLSpan> DEFAULT_SPAN_FACTORY =
+            (String string) -> new URLSpan(string);
 }
 
 class LinkSpec {

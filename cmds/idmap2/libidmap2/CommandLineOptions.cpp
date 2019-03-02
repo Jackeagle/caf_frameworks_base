@@ -26,13 +26,11 @@
 
 #include "idmap2/CommandLineOptions.h"
 
-namespace android {
-namespace idmap2 {
+namespace android::idmap2 {
 
 std::unique_ptr<std::vector<std::string>> CommandLineOptions::ConvertArgvToVector(
     int argc, const char** argv) {
-  return std::unique_ptr<std::vector<std::string>>(
-      new std::vector<std::string>(argv + 1, argv + argc));
+  return std::make_unique<std::vector<std::string>>(argv + 1, argv + argc);
 }
 
 CommandLineOptions& CommandLineOptions::OptionalFlag(const std::string& name,
@@ -70,9 +68,18 @@ CommandLineOptions& CommandLineOptions::OptionalOption(const std::string& name,
   return *this;
 }
 
+CommandLineOptions& CommandLineOptions::OptionalOption(const std::string& name,
+                                                       const std::string& description,
+                                                       std::vector<std::string>* value) {
+  assert(value != nullptr);
+  auto func = [value](const std::string& arg) -> void { value->push_back(arg); };
+  options_.push_back(Option{name, description, func, Option::COUNT_OPTIONAL_ONCE_OR_MORE, true});
+  return *this;
+}
+
 bool CommandLineOptions::Parse(const std::vector<std::string>& argv, std::ostream& outError) const {
   const auto pivot = std::partition(options_.begin(), options_.end(), [](const Option& opt) {
-    return opt.count != Option::COUNT_OPTIONAL;
+    return opt.count != Option::COUNT_OPTIONAL && opt.count != Option::COUNT_OPTIONAL_ONCE_OR_MORE;
   });
   std::set<std::string> mandatory_opts;
   std::transform(options_.begin(), pivot, std::inserter(mandatory_opts, mandatory_opts.end()),
@@ -111,8 +118,8 @@ bool CommandLineOptions::Parse(const std::vector<std::string>& argv, std::ostrea
   }
 
   if (!mandatory_opts.empty()) {
-    for (auto iter = mandatory_opts.cbegin(); iter != mandatory_opts.cend(); ++iter) {
-      outError << "error: " << *iter << ": missing mandatory option" << std::endl;
+    for (const auto& opt : mandatory_opts) {
+      outError << "error: " << opt << ": missing mandatory option" << std::endl;
     }
     Usage(outError);
     return false;
@@ -124,7 +131,8 @@ void CommandLineOptions::Usage(std::ostream& out) const {
   size_t maxLength = 0;
   out << "usage: " << name_;
   for (const Option& opt : options_) {
-    const bool mandatory = opt.count != Option::COUNT_OPTIONAL;
+    const bool mandatory =
+        opt.count != Option::COUNT_OPTIONAL && opt.count != Option::COUNT_OPTIONAL_ONCE_OR_MORE;
     out << " ";
     if (!mandatory) {
       out << "[";
@@ -136,9 +144,15 @@ void CommandLineOptions::Usage(std::ostream& out) const {
       out << opt.name;
       maxLength = std::max(maxLength, opt.name.size());
     }
+
+    if (opt.count == Option::COUNT_OPTIONAL_ONCE_OR_MORE) {
+      out << " [..]";
+    }
+
     if (!mandatory) {
       out << "]";
     }
+
     if (opt.count == Option::COUNT_ONCE_OR_MORE) {
       out << " [" << opt.name << " arg [..]]";
     }
@@ -152,12 +166,12 @@ void CommandLineOptions::Usage(std::ostream& out) const {
       out << opt.name;
     }
     out << "    " << opt.description;
-    if (opt.count == Option::COUNT_ONCE_OR_MORE) {
+    if (opt.count == Option::COUNT_ONCE_OR_MORE ||
+        opt.count == Option::COUNT_OPTIONAL_ONCE_OR_MORE) {
       out << " (can be provided multiple times)";
     }
     out << std::endl;
   }
 }
 
-}  // namespace idmap2
-}  // namespace android
+}  // namespace android::idmap2

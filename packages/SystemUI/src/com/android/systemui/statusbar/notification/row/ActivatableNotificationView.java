@@ -105,7 +105,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     private final DoubleTapHelper mDoubleTapHelper;
 
     private boolean mDimmed;
-    private boolean mDark;
+    protected boolean mDark;
 
     protected int mBgTint = NO_COLOR;
     private float mBgAlpha = 1f;
@@ -140,7 +140,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     private FalsingManager mFalsingManager;
 
     private float mNormalBackgroundVisibilityAmount;
-    private ValueAnimator mFadeInFromDarkAnimator;
     private float mDimmedBackgroundFadeInAmount = -1;
     private ValueAnimator.AnimatorUpdateListener mBackgroundVisibilityUpdater
             = new ValueAnimator.AnimatorUpdateListener() {
@@ -150,23 +149,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
             mDimmedBackgroundFadeInAmount = mBackgroundDimmed.getAlpha();
         }
     };
-    private AnimatorListenerAdapter mFadeInEndListener = new AnimatorListenerAdapter() {
-        @Override
-        public void onAnimationEnd(Animator animation) {
-            super.onAnimationEnd(animation);
-            mFadeInFromDarkAnimator = null;
-            mDimmedBackgroundFadeInAmount = -1;
-            updateBackground();
-        }
-    };
-    private ValueAnimator.AnimatorUpdateListener mUpdateOutlineListener
-            = new ValueAnimator.AnimatorUpdateListener() {
-        @Override
-        public void onAnimationUpdate(ValueAnimator animation) {
-            updateOutlineAlpha();
-        }
-    };
-    private float mShadowAlpha = 1.0f;
     private FakeShadowView mFakeShadow;
     private int mCurrentBackgroundTint;
     private int mTargetTint;
@@ -226,7 +208,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
         initDimens();
     }
 
-    public void onUiModeChanged() {
+    protected void updateBackgroundColors() {
         updateColors();
         initBackground();
         updateBackgroundTint();
@@ -466,23 +448,11 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
         mDark = dark;
         updateBackground();
         updateBackgroundTint(false);
-        if (!dark && fade && !shouldHideBackground()) {
-            fadeInFromDark(delay);
-        }
-        updateOutlineAlpha();
     }
 
     private void updateOutlineAlpha() {
-        if (mDark) {
-            setOutlineAlpha(0f);
-            return;
-        }
         float alpha = NotificationStackScrollLayout.BACKGROUND_ALPHA_DIMMED;
         alpha = (alpha + (1.0f - alpha) * mNormalBackgroundVisibilityAmount);
-        alpha *= mShadowAlpha;
-        if (mFadeInFromDarkAnimator != null) {
-            alpha *= mFadeInFromDarkAnimator.getAnimatedFraction();
-        }
         setOutlineAlpha(alpha);
     }
 
@@ -640,36 +610,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     }
 
     /**
-     * Fades in the background when exiting dark mode.
-     */
-    private void fadeInFromDark(long delay) {
-        final View background = mDimmed ? mBackgroundDimmed : mBackgroundNormal;
-        background.setAlpha(0f);
-        mBackgroundVisibilityUpdater.onAnimationUpdate(null);
-        background.animate()
-                .alpha(1f)
-                .setDuration(DARK_ANIMATION_LENGTH)
-                .setStartDelay(delay)
-                .setInterpolator(Interpolators.ALPHA_IN)
-                .setListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationCancel(Animator animation) {
-                        // Jump state if we are cancelled
-                        background.setAlpha(1f);
-                    }
-                })
-                .setUpdateListener(mBackgroundVisibilityUpdater)
-                .start();
-        mFadeInFromDarkAnimator = TimeAnimator.ofFloat(0.0f, 1.0f);
-        mFadeInFromDarkAnimator.setDuration(DARK_ANIMATION_LENGTH);
-        mFadeInFromDarkAnimator.setStartDelay(delay);
-        mFadeInFromDarkAnimator.setInterpolator(Interpolators.LINEAR_OUT_SLOW_IN);
-        mFadeInFromDarkAnimator.addListener(mFadeInEndListener);
-        mFadeInFromDarkAnimator.addUpdateListener(mUpdateOutlineListener);
-        mFadeInFromDarkAnimator.start();
-    }
-
-    /**
      * Fades the background when the dimmed state changes.
      */
     private void fadeDimmedBackground() {
@@ -710,9 +650,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
             public void onAnimationEnd(Animator animation) {
                 updateBackground();
                 mBackgroundAnimator = null;
-                if (mFadeInFromDarkAnimator == null) {
-                    mDimmedBackgroundFadeInAmount = -1;
-                }
+                mDimmedBackgroundFadeInAmount = -1;
             }
         });
         mBackgroundAnimator.addUpdateListener(mBackgroundVisibilityUpdater);
@@ -738,7 +676,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
             mBackgroundNormal.setVisibility(mActivated ? VISIBLE : INVISIBLE);
         } else if (mDimmed) {
             // When groups are animating to the expanded state from the lockscreen, show the
-            // normal background instead of the dimmed background
+            // normal background instead of the dimmed background.
             final boolean dontShowDimmed = isGroupExpansionChanging() && isChildInGroup();
             mBackgroundDimmed.setVisibility(dontShowDimmed ? View.INVISIBLE : View.VISIBLE);
             mBackgroundNormal.setVisibility((mActivated || dontShowDimmed)
@@ -762,7 +700,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     }
 
     protected boolean shouldHideBackground() {
-        return mDark;
+        return false;
     }
 
     private void cancelFadeAnimations() {
@@ -802,7 +740,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     }
 
     @Override
-    public void performRemoveAnimation(long duration, long delay,
+    public long performRemoveAnimation(long duration, long delay,
             float translationDirection, boolean isHeadsUpAnimation, float endLocation,
             Runnable onFinishedRunnable, AnimatorListenerAdapter animationListener) {
         enableAppearDrawing(true);
@@ -814,6 +752,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
         } else if (onFinishedRunnable != null) {
             onFinishedRunnable.run();
         }
+        return 0;
     }
 
     @Override
@@ -1024,14 +963,11 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
 
     /**
      * @param withTint should a possible tint be factored in?
-     * @param withOverRide should the value be interpolated with {@link #mOverrideTint}
+     * @param withOverride should the value be interpolated with {@link #mOverrideTint}
      * @return the calculated background color
      */
-    private int calculateBgColor(boolean withTint, boolean withOverRide) {
-        if (withTint && mDark) {
-            return getContext().getColor(R.color.notification_material_background_dark_color);
-        }
-        if (withOverRide && mOverrideTint != NO_COLOR) {
+    private int calculateBgColor(boolean withTint, boolean withOverride) {
+        if (withOverride && mOverrideTint != NO_COLOR) {
             int defaultTint = calculateBgColor(withTint, false);
             return NotificationUtils.interpolateColors(defaultTint, mOverrideTint, mOverrideAmount);
         }
@@ -1091,19 +1027,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
 
     public boolean hasSameBgColor(ActivatableNotificationView otherView) {
         return calculateBgColor() == otherView.calculateBgColor();
-    }
-
-    @Override
-    public float getShadowAlpha() {
-        return mShadowAlpha;
-    }
-
-    @Override
-    public void setShadowAlpha(float shadowAlpha) {
-        if (shadowAlpha != mShadowAlpha) {
-            mShadowAlpha = shadowAlpha;
-            updateOutlineAlpha();
-        }
     }
 
     @Override

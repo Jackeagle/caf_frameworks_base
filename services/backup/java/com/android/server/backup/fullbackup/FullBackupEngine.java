@@ -16,14 +16,15 @@
 
 package com.android.server.backup.fullbackup;
 
-import static com.android.server.backup.BackupManagerService.BACKUP_MANIFEST_FILENAME;
-import static com.android.server.backup.BackupManagerService.BACKUP_METADATA_FILENAME;
 import static com.android.server.backup.BackupManagerService.DEBUG;
 import static com.android.server.backup.BackupManagerService.MORE_DEBUG;
-import static com.android.server.backup.BackupManagerService.OP_TYPE_BACKUP_WAIT;
-import static com.android.server.backup.BackupManagerService.SHARED_BACKUP_AGENT_PACKAGE;
 import static com.android.server.backup.BackupManagerService.TAG;
+import static com.android.server.backup.UserBackupManagerService.BACKUP_MANIFEST_FILENAME;
+import static com.android.server.backup.UserBackupManagerService.BACKUP_METADATA_FILENAME;
+import static com.android.server.backup.UserBackupManagerService.OP_TYPE_BACKUP_WAIT;
+import static com.android.server.backup.UserBackupManagerService.SHARED_BACKUP_AGENT_PACKAGE;
 
+import android.annotation.UserIdInt;
 import android.app.ApplicationThreadConstants;
 import android.app.IBackupAgent;
 import android.app.backup.BackupTransport;
@@ -33,14 +34,13 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
-import android.os.UserHandle;
 import android.util.Slog;
 
 import com.android.internal.util.Preconditions;
 import com.android.server.AppWidgetBackupBridge;
 import com.android.server.backup.BackupAgentTimeoutParameters;
-import com.android.server.backup.BackupManagerService;
 import com.android.server.backup.BackupRestoreTask;
+import com.android.server.backup.UserBackupManagerService;
 import com.android.server.backup.remote.RemoteCall;
 import com.android.server.backup.utils.FullBackupUtils;
 
@@ -53,19 +53,20 @@ import java.io.OutputStream;
  * and emitting it to the designated OutputStream.
  */
 public class FullBackupEngine {
-    private BackupManagerService backupManagerService;
-    OutputStream mOutput;
-    FullBackupPreflight mPreflightHook;
-    BackupRestoreTask mTimeoutMonitor;
-    IBackupAgent mAgent;
-    boolean mIncludeApks;
-    PackageInfo mPkg;
+    private UserBackupManagerService backupManagerService;
+    private OutputStream mOutput;
+    private FullBackupPreflight mPreflightHook;
+    private BackupRestoreTask mTimeoutMonitor;
+    private IBackupAgent mAgent;
+    private boolean mIncludeApks;
+    private PackageInfo mPkg;
     private final long mQuota;
     private final int mOpToken;
     private final int mTransportFlags;
     private final BackupAgentTimeoutParameters mAgentTimeoutParameters;
 
     class FullBackupRunner implements Runnable {
+        private final @UserIdInt int mUserId;
         private final PackageManager mPackageManager;
         private final PackageInfo mPackage;
         private final IBackupAgent mAgent;
@@ -75,19 +76,21 @@ public class FullBackupEngine {
         private final File mFilesDir;
 
         FullBackupRunner(
+                UserBackupManagerService userBackupManagerService,
                 PackageInfo packageInfo,
                 IBackupAgent agent,
                 ParcelFileDescriptor pipe,
                 int token,
                 boolean includeApks)
                 throws IOException {
+            mUserId = userBackupManagerService.getUserId();
             mPackageManager = backupManagerService.getPackageManager();
             mPackage = packageInfo;
             mAgent = agent;
             mPipe = ParcelFileDescriptor.dup(pipe.getFileDescriptor());
             mToken = token;
             mIncludeApks = includeApks;
-            mFilesDir = new File("/data/system");
+            mFilesDir = userBackupManagerService.getDataDir();
         }
 
         @Override
@@ -114,10 +117,8 @@ public class FullBackupEngine {
                     manifestFile.delete();
 
                     // Write widget data.
-                    // TODO: http://b/22388012
                     byte[] widgetData =
-                            AppWidgetBackupBridge.getWidgetState(
-                                    packageName, UserHandle.USER_SYSTEM);
+                            AppWidgetBackupBridge.getWidgetState(packageName, mUserId);
                     if (widgetData != null && widgetData.length > 0) {
                         File metadataFile = new File(mFilesDir, BACKUP_METADATA_FILENAME);
                         appMetadataBackupWriter.backupWidget(
@@ -129,7 +130,7 @@ public class FullBackupEngine {
                 // TODO(b/113807190): Look into removing, only used for 'adb backup'.
                 if (writeApk) {
                     appMetadataBackupWriter.backupApk(mPackage);
-                    appMetadataBackupWriter.backupObb(mPackage);
+                    appMetadataBackupWriter.backupObb(mUserId, mPackage);
                 }
 
                 if (DEBUG) {
@@ -152,9 +153,12 @@ public class FullBackupEngine {
                         backupManagerService.getBackupManagerBinder(),
                         mTransportFlags);
             } catch (IOException e) {
-                Slog.e(TAG, "Error running full backup for " + mPackage.packageName);
+                Slog.e(TAG, "Error running full backup for " + mPackage.packageName, e);
             } catch (RemoteException e) {
-                Slog.e(TAG, "Remote agent vanished during full backup of " + mPackage.packageName);
+                Slog.e(
+                        TAG,
+                        "Remote agent vanished during full backup of " + mPackage.packageName,
+                        e);
             } finally {
                 try {
                     mPipe.close();
@@ -164,24 +168,21 @@ public class FullBackupEngine {
         }
 
         /**
-         * Don't write apks for forward-locked apps or system-bundled apps that are not upgraded.
+         * Don't write apks for system-bundled apps that are not upgraded.
          */
         private boolean shouldWriteApk(
                 ApplicationInfo applicationInfo, boolean includeApks, boolean isSharedStorage) {
-            boolean isForwardLocked =
-                    (applicationInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_FORWARD_LOCK) != 0;
             boolean isSystemApp = (applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
             boolean isUpdatedSystemApp =
                     (applicationInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
             return includeApks
                     && !isSharedStorage
-                    && !isForwardLocked
                     && (!isSystemApp || isUpdatedSystemApp);
         }
     }
 
     public FullBackupEngine(
-            BackupManagerService backupManagerService,
+            UserBackupManagerService backupManagerService,
             OutputStream output,
             FullBackupPreflight preflightHook,
             PackageInfo pkg,
@@ -233,7 +234,13 @@ public class FullBackupEngine {
                 pipes = ParcelFileDescriptor.createPipe();
 
                 FullBackupRunner runner =
-                        new FullBackupRunner(mPkg, mAgent, pipes[1], mOpToken, mIncludeApks);
+                        new FullBackupRunner(
+                                backupManagerService,
+                                mPkg,
+                                mAgent,
+                                pipes[1],
+                                mOpToken,
+                                mIncludeApks);
                 pipes[1].close(); // the runner has dup'd it
                 pipes[1] = null;
                 Thread t = new Thread(runner, "app-data-runner");

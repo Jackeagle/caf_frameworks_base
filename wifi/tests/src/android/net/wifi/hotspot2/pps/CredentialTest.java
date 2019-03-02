@@ -16,13 +16,15 @@
 
 package android.net.wifi.hotspot2.pps;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.net.wifi.EAPConstants;
 import android.net.wifi.FakeKeys;
 import android.os.Parcel;
-import android.support.test.filters.SmallTest;
+
+import androidx.test.filters.SmallTest;
 
 import org.junit.Test;
 
@@ -43,17 +45,16 @@ public class CredentialTest {
      * @param userCred Instance of UserCredential
      * @param certCred Instance of CertificateCredential
      * @param simCred Instance of SimCredential
-     * @param caCert CA certificate
      * @param clientCertificateChain Chain of client certificates
      * @param clientPrivateKey Client private key
+     * @param caCerts CA certificates
      * @return {@link Credential}
      */
     private static Credential createCredential(Credential.UserCredential userCred,
-                                               Credential.CertificateCredential certCred,
-                                               Credential.SimCredential simCred,
-                                               X509Certificate caCert,
-                                               X509Certificate[] clientCertificateChain,
-                                               PrivateKey clientPrivateKey) {
+            Credential.CertificateCredential certCred,
+            Credential.SimCredential simCred,
+            X509Certificate[] clientCertificateChain, PrivateKey clientPrivateKey,
+            X509Certificate... caCerts) {
         Credential cred = new Credential();
         cred.setCreationTimeInMillis(123455L);
         cred.setExpirationTimeInMillis(2310093L);
@@ -62,7 +63,11 @@ public class CredentialTest {
         cred.setUserCredential(userCred);
         cred.setCertCredential(certCred);
         cred.setSimCredential(simCred);
-        cred.setCaCertificate(caCert);
+        if (caCerts != null && caCerts.length == 1) {
+            cred.setCaCertificate(caCerts[0]);
+        } else {
+            cred.setCaCertificates(caCerts);
+        }
         cred.setClientCertificateChain(clientCertificateChain);
         cred.setClientPrivateKey(clientPrivateKey);
         return cred;
@@ -79,8 +84,8 @@ public class CredentialTest {
         certCred.setCertType("x509v3");
         certCred.setCertSha256Fingerprint(
                 MessageDigest.getInstance("SHA-256").digest(FakeKeys.CLIENT_CERT.getEncoded()));
-        return createCredential(null, certCred, null, FakeKeys.CA_CERT0,
-                new X509Certificate[] {FakeKeys.CLIENT_CERT}, FakeKeys.RSA_KEY1);
+        return createCredential(null, certCred, null, new X509Certificate[] {FakeKeys.CLIENT_CERT},
+                FakeKeys.RSA_KEY1, FakeKeys.CA_CERT0, FakeKeys.CA_CERT1);
     }
 
     /**
@@ -92,7 +97,7 @@ public class CredentialTest {
         Credential.SimCredential simCred = new Credential.SimCredential();
         simCred.setImsi("1234*");
         simCred.setEapType(EAPConstants.EAP_SIM);
-        return createCredential(null, null, simCred, null, null, null);
+        return createCredential(null, null, simCred, null, null, (X509Certificate[]) null);
     }
 
     /**
@@ -109,7 +114,7 @@ public class CredentialTest {
         userCred.setSoftTokenApp("TestApp");
         userCred.setEapType(EAPConstants.EAP_TTLS);
         userCred.setNonEapInnerMethod("MS-CHAP");
-        return createCredential(userCred, null, null, FakeKeys.CA_CERT0, null, null);
+        return createCredential(userCred, null, null, null, null, FakeKeys.CA_CERT0);
     }
 
     private static void verifyParcel(Credential writeCred) {
@@ -119,6 +124,7 @@ public class CredentialTest {
         parcel.setDataPosition(0);    // Rewind data position back to the beginning for read.
         Credential readCred = Credential.CREATOR.createFromParcel(parcel);
         assertTrue(readCred.equals(writeCred));
+        assertEquals(writeCred.hashCode(), readCred.hashCode());
     }
 
     /**
@@ -534,5 +540,21 @@ public class CredentialTest {
         Credential sourceCred = createCredentialWithSimCredential();
         Credential copyCred = new Credential(sourceCred);
         assertTrue(copyCred.equals(sourceCred));
+    }
+
+    /**
+     * Verify that two certificates are identical.
+     */
+    @Test
+    public void validateTwoCertificateIdentical() {
+        assertTrue(Credential.isX509CertificateEquals(FakeKeys.CA_CERT1, FakeKeys.CA_CERT1));
+    }
+
+    /**
+     * Verify that two certificates are different.
+     */
+    @Test
+    public void validateTwoCertificateDifferent() {
+        assertFalse(Credential.isX509CertificateEquals(FakeKeys.CA_CERT0, FakeKeys.CA_CERT1));
     }
 }

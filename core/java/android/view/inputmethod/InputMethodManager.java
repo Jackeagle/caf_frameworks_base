@@ -26,6 +26,9 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
+import android.app.ActivityThread;
+import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
@@ -37,11 +40,13 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.ServiceManager;
 import android.os.ServiceManager.ServiceNotFoundException;
 import android.os.Trace;
+import android.provider.Settings;
 import android.text.style.SuggestionSpan;
 import android.util.Log;
 import android.util.Pools.Pool;
@@ -50,6 +55,7 @@ import android.util.PrintWriterPrinter;
 import android.util.Printer;
 import android.util.SparseArray;
 import android.view.Display;
+import android.view.ImeInsetsSourceConsumer;
 import android.view.InputChannel;
 import android.view.InputEvent;
 import android.view.InputEventSender;
@@ -76,9 +82,9 @@ import com.android.internal.view.InputBindResult;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.lang.reflect.Proxy;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -231,6 +237,15 @@ public final class InputMethodManager {
     static final String TAG = "InputMethodManager";
 
     static final String PENDING_EVENT_COUNTER = "aq:imm";
+
+    private static final int NOT_A_SUBTYPE_ID = -1;
+
+    /**
+     * A constant that represents Voice IME.
+     *
+     * @see InputMethodSubtype#getMode()
+     */
+    private static final String SUBTYPE_MODE_VOICE = "voice";
 
     /**
      * Ensures that {@link #sInstance} becomes non-{@code null} for application that have directly
@@ -427,6 +442,13 @@ public final class InputMethodManager {
      */
     private int mRequestUpdateCursorAnchorInfoMonitorMode = REQUEST_UPDATE_CURSOR_ANCHOR_INFO_NONE;
 
+    /**
+     * When {@link ViewRootImpl#sNewInsetsMode} is set to
+     * >= {@link ViewRootImpl#NEW_INSETS_MODE_IME}, {@link ImeInsetsSourceConsumer} applies the
+     * IME visibility and listens for other state changes.
+     */
+    private ImeInsetsSourceConsumer mImeInsetsConsumer;
+
     final Pool<PendingEvent> mPendingEventPool = new SimplePool<>(20);
     final SparseArray<PendingEvent> mPendingEvents = new SparseArray<>(20);
 
@@ -440,6 +462,8 @@ public final class InputMethodManager {
     static final int MSG_TIMEOUT_INPUT_EVENT = 6;
     static final int MSG_FLUSH_INPUT_EVENT = 7;
     static final int MSG_REPORT_FULLSCREEN_MODE = 10;
+    static final int MSG_REPORT_PRE_RENDERED = 15;
+    static final int MSG_APPLY_IME_VISIBILITY = 20;
 
     private static boolean isAutofillUIShowing(View servedView) {
         AutofillManager afm = servedView.getContext().getSystemService(AutofillManager.class);
@@ -636,6 +660,23 @@ public final class InputMethodManager {
                     }
                     return;
                 }
+                case MSG_REPORT_PRE_RENDERED: {
+                    synchronized (mH) {
+                        if (mImeInsetsConsumer != null) {
+                            mImeInsetsConsumer.onPreRendered((EditorInfo) msg.obj);
+                        }
+                    }
+                    return;
+
+                }
+                case MSG_APPLY_IME_VISIBILITY: {
+                    synchronized (mH) {
+                        if (mImeInsetsConsumer != null) {
+                            mImeInsetsConsumer.applyImeVisibility(msg.arg1 != 0);
+                        }
+                    }
+                    return;
+                }
             }
         }
     }
@@ -712,6 +753,18 @@ public final class InputMethodManager {
         @Override
         public void reportFullscreenMode(boolean fullscreen) {
             mH.obtainMessage(MSG_REPORT_FULLSCREEN_MODE, fullscreen ? 1 : 0, 0)
+                    .sendToTarget();
+        }
+
+        @Override
+        public void reportPreRendered(EditorInfo info) {
+            mH.obtainMessage(MSG_REPORT_PRE_RENDERED, 0, 0, info)
+                    .sendToTarget();
+        }
+
+        @Override
+        public void applyImeVisibility(boolean setVisible) {
+            mH.obtainMessage(MSG_APPLY_IME_VISIBILITY, setVisible ? 1 : 0, 0)
                     .sendToTarget();
         }
 
@@ -909,19 +962,6 @@ public final class InputMethodManager {
         }
     }
 
-    /**
-     * Returns a list of VR InputMethod currently installed.
-     * @hide
-     */
-    @RequiresPermission(android.Manifest.permission.RESTRICTED_VR_ACCESS)
-    public List<InputMethodInfo> getVrInputMethodList() {
-        try {
-            return mService.getVrInputMethodList();
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
     public List<InputMethodInfo> getEnabledInputMethodList() {
         try {
             return mService.getEnabledInputMethodList();
@@ -967,24 +1007,30 @@ public final class InputMethodManager {
         InputMethodPrivilegedOperationsRegistry.get(imeToken).updateStatusIcon(null, 0);
     }
 
-    /** @hide */
+    /**
+     * This hidden API is deprecated in {@link android.os.Build.VERSION_CODES#Q}. Does nothing.
+     *
+     * @param spans will be ignored.
+     *
+     * @deprecated Do not use.
+     * @hide
+     */
+    @Deprecated
     @UnsupportedAppUsage
     public void registerSuggestionSpansForNotification(SuggestionSpan[] spans) {
-        try {
-            mService.registerSuggestionSpansForNotification(spans);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        Log.w(TAG, "registerSuggestionSpansForNotification() is deprecated.  Does nothing.");
     }
 
-    /** @hide */
+    /**
+     * This hidden API is deprecated in {@link android.os.Build.VERSION_CODES#Q}. Does nothing.
+     *
+     * @deprecated Do not use.
+     * @hide
+     */
+    @Deprecated
     @UnsupportedAppUsage
     public void notifySuggestionPicked(SuggestionSpan span, String originalString, int index) {
-        try {
-            mService.notifySuggestionPicked(span, originalString, index);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        Log.w(TAG, "notifySuggestionPicked() is deprecated.  Does nothing.");
     }
 
     /**
@@ -1508,6 +1554,7 @@ public final class InputMethodManager {
 
             // Hook 'em up and let 'er rip.
             mCurrentTextBoxAttribute = tba;
+            maybeCallServedViewChangedLocked(tba);
             mServedConnecting = false;
             if (mServedInputConnectionWrapper != null) {
                 mServedInputConnectionWrapper.deactivate();
@@ -1723,6 +1770,10 @@ public final class InputMethodManager {
             mCurrentTextBoxAttribute = null;
             mCompletions = null;
             mServedConnecting = true;
+            // servedView has changed and it's not editable.
+            if (!mServedView.onCheckIsTextEditor()) {
+                maybeCallServedViewChangedLocked(null);
+            }
         }
 
         if (ic != null) {
@@ -1821,6 +1872,21 @@ public final class InputMethodManager {
     }
 
     /**
+     * Register for IME state callbacks and applying visibility in
+     * {@link android.view.ImeInsetsSourceConsumer}.
+     * @hide
+     */
+    public void registerImeConsumer(@NonNull ImeInsetsSourceConsumer imeInsetsConsumer) {
+        if (imeInsetsConsumer == null) {
+            throw new IllegalStateException("ImeInsetsSourceConsumer cannot be null.");
+        }
+
+        synchronized (mH) {
+            mImeInsetsConsumer = imeInsetsConsumer;
+        }
+    }
+
+    /**
      * Report the current selection range.
      *
      * <p><strong>Editor authors</strong>, you need to call this method whenever
@@ -1875,7 +1941,15 @@ public final class InputMethodManager {
 
     /**
      * Notify the event when the user tapped or clicked the text view.
+     *
+     * @param view {@link View} which is being clicked.
+     * @see InputMethodService#onViewClicked(boolean)
+     * @deprecated The semantics of this method can never be defined well for composite {@link View}
+     *             that works as a giant "Canvas", which can host its own UI hierarchy and sub focus
+     *             state. {@link android.webkit.WebView} is a good example. Application / IME
+     *             developers should not rely on this method.
      */
+    @Deprecated
     public void viewClicked(View view) {
         // Re-dispatch if there is a context mismatch.
         final InputMethodManager fallbackImm = getFallbackInputMethodManagerIfNecessary(view);
@@ -2064,6 +2138,13 @@ public final class InputMethodManager {
     /**
      * Force switch to a new input method component. This can only be called
      * from an application or a service which has a token of the currently active input method.
+     *
+     * <p>On Android {@link Build.VERSION_CODES#Q} and later devices, the undocumented behavior that
+     * token can be {@code null} when the caller has
+     * {@link android.Manifest.permission#WRITE_SECURE_SETTINGS} is deprecated. Instead, update
+     * {@link android.provider.Settings.Secure#DEFAULT_INPUT_METHOD} and
+     * {@link android.provider.Settings.Secure#SELECTED_INPUT_METHOD_SUBTYPE} directly.</p>
+     *
      * @param token Supplies the identifying token given to an input method
      * when it was started, which allows it to perform this operation on
      * itself.
@@ -2075,14 +2156,50 @@ public final class InputMethodManager {
     @Deprecated
     public void setInputMethod(IBinder token, String id) {
         if (token == null) {
-            // Note: null token is allowed for callers that have WRITE_SECURE_SETTINGS permission.
-            // Thus we cannot always rely on InputMethodPrivilegedOperationsRegistry unfortunately.
-            // TODO(Bug 114488811): Consider deprecating null token rule.
-            try {
-                mService.setInputMethod(token, id);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
+            // There are still some system components that rely on this undocumented behavior
+            // regarding null IME token with WRITE_SECURE_SETTINGS.  Provide a fallback logic as a
+            // temporary remedy.
+            if (id == null) {
+                return;
             }
+            if (Process.myUid() == Process.SYSTEM_UID) {
+                Log.w(TAG, "System process should not be calling setInputMethod() because almost "
+                        + "always it is a bug under multi-user / multi-profile environment. "
+                        + "Consider interacting with InputMethodManagerService directly via "
+                        + "LocalServices.");
+                return;
+            }
+            final Context fallbackContext = ActivityThread.currentApplication();
+            if (fallbackContext == null) {
+                return;
+            }
+            if (fallbackContext.checkSelfPermission(WRITE_SECURE_SETTINGS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
+            final List<InputMethodInfo> imis = getEnabledInputMethodList();
+            final int numImis = imis.size();
+            boolean found = false;
+            for (int i = 0; i < numImis; ++i) {
+                final InputMethodInfo imi = imis.get(i);
+                if (id.equals(imi.getId())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Log.e(TAG, "Ignoring setInputMethod(null, " + id + ") because the specified "
+                        + "id not found in enabled IMEs.");
+                return;
+            }
+            Log.w(TAG, "The undocumented behavior that setInputMethod() accepts null token "
+                    + "when the caller has WRITE_SECURE_SETTINGS is deprecated. This behavior may "
+                    + "be completely removed in a future version.  Update secure settings directly "
+                    + "instead.");
+            final ContentResolver resolver = fallbackContext.getContentResolver();
+            Settings.Secure.putInt(resolver, Settings.Secure.SELECTED_INPUT_METHOD_SUBTYPE,
+                    NOT_A_SUBTYPE_ID);
+            Settings.Secure.putString(resolver, Settings.Secure.DEFAULT_INPUT_METHOD, id);
             return;
         }
         InputMethodPrivilegedOperationsRegistry.get(token).setInputMethod(id);
@@ -2091,6 +2208,12 @@ public final class InputMethodManager {
     /**
      * Force switch to a new input method and subtype. This can only be called
      * from an application or a service which has a token of the currently active input method.
+     *
+     * <p>On Android {@link Build.VERSION_CODES#Q} and later devices, {@code token} cannot be
+     * {@code null} even with {@link android.Manifest.permission#WRITE_SECURE_SETTINGS}. Instead,
+     * update {@link android.provider.Settings.Secure#DEFAULT_INPUT_METHOD} and
+     * {@link android.provider.Settings.Secure#SELECTED_INPUT_METHOD_SUBTYPE} directly.</p>
+     *
      * @param token Supplies the identifying token given to an input method
      * when it was started, which allows it to perform this operation on
      * itself.
@@ -2102,16 +2225,11 @@ public final class InputMethodManager {
      * the service. APIs in this class are intended for app developers interacting with the IME.
      */
     @Deprecated
-    public void setInputMethodAndSubtype(IBinder token, String id, InputMethodSubtype subtype) {
+    public void setInputMethodAndSubtype(@NonNull IBinder token, String id,
+            InputMethodSubtype subtype) {
         if (token == null) {
-            // Note: null token is allowed for callers that have WRITE_SECURE_SETTINGS permission.
-            // Thus we cannot always rely on InputMethodPrivilegedOperationsRegistry unfortunately.
-            // TODO(Bug 114488811): Consider deprecating null token rule.
-            try {
-                mService.setInputMethodAndSubtype(token, id, subtype);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
+            Log.e(TAG, "setInputMethodAndSubtype() does not accept null token on Android Q "
+                    + "and later.");
             return;
         }
         InputMethodPrivilegedOperationsRegistry.get(token).setInputMethodAndSubtype(id, subtype);
@@ -2354,17 +2472,19 @@ public final class InputMethodManager {
     }
 
     /**
-     * Shows the input method chooser dialog.
+     * Shows the input method chooser dialog from system.
      *
      * @param showAuxiliarySubtypes Set true to show auxiliary input methods.
+     * @param displayId The ID of the display where the chooser dialog should be shown.
      * @hide
      */
-    public void showInputMethodPicker(boolean showAuxiliarySubtypes) {
+    @RequiresPermission(WRITE_SECURE_SETTINGS)
+    public void showInputMethodPickerFromSystem(boolean showAuxiliarySubtypes, int displayId) {
         final int mode = showAuxiliarySubtypes
                 ? SHOW_IM_PICKER_MODE_INCLUDE_AUXILIARY_SUBTYPES
                 : SHOW_IM_PICKER_MODE_EXCLUDE_AUXILIARY_SUBTYPES;
         try {
-            mService.showInputMethodPickerFromClient(mClient, mode);
+            mService.showInputMethodPickerFromSystem(mClient, mode, displayId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -2429,14 +2549,58 @@ public final class InputMethodManager {
      * @param subtype A new input method subtype to switch.
      * @return true if the current subtype was successfully switched. When the specified subtype is
      * null, this method returns false.
+     * @deprecated If the calling process is an IME, use
+     *             {@link InputMethodService#switchInputMethod(String, InputMethodSubtype)}, which
+     *             does not require any permission as long as the caller is the current IME.
+     *             If the calling process is some privileged app that already has
+     *             {@link android.Manifest.permission#WRITE_SECURE_SETTINGS} permission, just
+     *             directly update {@link Settings.Secure#SELECTED_INPUT_METHOD_SUBTYPE}.
      */
+    @Deprecated
     @RequiresPermission(WRITE_SECURE_SETTINGS)
     public boolean setCurrentInputMethodSubtype(InputMethodSubtype subtype) {
-        try {
-            return mService.setCurrentInputMethodSubtype(subtype);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
+        if (Process.myUid() == Process.SYSTEM_UID) {
+            Log.w(TAG, "System process should not call setCurrentInputMethodSubtype() because "
+                    + "almost always it is a bug under multi-user / multi-profile environment. "
+                    + "Consider directly interacting with InputMethodManagerService "
+                    + "via LocalServices.");
+            return false;
         }
+        if (subtype == null) {
+            // See the JavaDoc. This is how this method has worked.
+            return false;
+        }
+        final Context fallbackContext = ActivityThread.currentApplication();
+        if (fallbackContext == null) {
+            return false;
+        }
+        if (fallbackContext.checkSelfPermission(WRITE_SECURE_SETTINGS)
+                != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        final ContentResolver contentResolver = fallbackContext.getContentResolver();
+        final String imeId = Settings.Secure.getString(contentResolver,
+                Settings.Secure.DEFAULT_INPUT_METHOD);
+        if (ComponentName.unflattenFromString(imeId) == null) {
+            // Null or invalid IME ID format.
+            return false;
+        }
+        final List<InputMethodSubtype> enabledSubtypes;
+        try {
+            enabledSubtypes = mService.getEnabledInputMethodSubtypeList(imeId, true);
+        } catch (RemoteException e) {
+            return false;
+        }
+        final int numSubtypes = enabledSubtypes.size();
+        for (int i = 0; i < numSubtypes; ++i) {
+            final InputMethodSubtype enabledSubtype = enabledSubtypes.get(i);
+            if (enabledSubtype.equals(subtype)) {
+                Settings.Secure.putInt(contentResolver,
+                        Settings.Secure.SELECTED_INPUT_METHOD_SUBTYPE, enabledSubtype.hashCode());
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -2457,34 +2621,25 @@ public final class InputMethodManager {
      * Returns a map of all shortcut input method info and their subtypes.
      */
     public Map<InputMethodInfo, List<InputMethodSubtype>> getShortcutInputMethodsAndSubtypes() {
-        synchronized (mH) {
-            HashMap<InputMethodInfo, List<InputMethodSubtype>> ret = new HashMap<>();
-            try {
-                // TODO: We should change the return type from List<Object> to List<Parcelable>
-                List<Object> info = mService.getShortcutInputMethodsAndSubtypes();
-                // "info" has imi1, subtype1, subtype2, imi2, subtype2, imi3, subtype3..in the list
-                ArrayList<InputMethodSubtype> subtypes = null;
-                if (info != null && !info.isEmpty()) {
-                    final int N = info.size();
-                    for (int i = 0; i < N; ++i) {
-                        Object o = info.get(i);
-                        if (o instanceof InputMethodInfo) {
-                            if (ret.containsKey(o)) {
-                                Log.e(TAG, "IMI list already contains the same InputMethod.");
-                                break;
-                            }
-                            subtypes = new ArrayList<>();
-                            ret.put((InputMethodInfo)o, subtypes);
-                        } else if (subtypes != null && o instanceof InputMethodSubtype) {
-                            subtypes.add((InputMethodSubtype)o);
-                        }
-                    }
+        final List<InputMethodInfo> enabledImes = getEnabledInputMethodList();
+
+        // Ensure we check system IMEs first.
+        enabledImes.sort(Comparator.comparingInt(imi -> imi.isSystem() ? 0 : 1));
+
+        final int numEnabledImes = enabledImes.size();
+        for (int imiIndex = 0; imiIndex < numEnabledImes; ++imiIndex) {
+            final InputMethodInfo imi = enabledImes.get(imiIndex);
+            final List<InputMethodSubtype> subtypes = getEnabledInputMethodSubtypeList(
+                    imi, true);
+            final int subtypeCount = subtypes.size();
+            for (int subtypeIndex = 0; subtypeIndex < subtypeCount; ++subtypeIndex) {
+                final InputMethodSubtype subtype = imi.getSubtypeAt(subtypeIndex);
+                if (SUBTYPE_MODE_VOICE.equals(subtype.getMode())) {
+                    return Collections.singletonMap(imi, Collections.singletonList(subtype));
                 }
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
             }
-            return ret;
         }
+        return Collections.emptyMap();
     }
 
     /**
@@ -2520,16 +2675,6 @@ public final class InputMethodManager {
      */
     @Deprecated
     public boolean switchToLastInputMethod(IBinder imeToken) {
-        if (imeToken == null) {
-            // Note: null token is allowed for callers that have WRITE_SECURE_SETTINGS permission.
-            // Thus we cannot always rely on InputMethodPrivilegedOperationsRegistry unfortunately.
-            // TODO(Bug 114488811): Consider deprecating null token rule.
-            try {
-                return mService.switchToPreviousInputMethod(imeToken);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        }
         return InputMethodPrivilegedOperationsRegistry.get(imeToken).switchToPreviousInputMethod();
     }
 
@@ -2548,16 +2693,6 @@ public final class InputMethodManager {
      */
     @Deprecated
     public boolean switchToNextInputMethod(IBinder imeToken, boolean onlyCurrentIme) {
-        if (imeToken == null) {
-            // Note: null token is allowed for callers that have WRITE_SECURE_SETTINGS permission.
-            // Thus we cannot always rely on InputMethodPrivilegedOperationsRegistry unfortunately.
-            // TODO(Bug 114488811): Consider deprecating null token rule.
-            try {
-                return mService.switchToNextInputMethod(imeToken, onlyCurrentIme);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        }
         return InputMethodPrivilegedOperationsRegistry.get(imeToken)
                 .switchToNextInputMethod(onlyCurrentIme);
     }
@@ -2606,7 +2741,13 @@ public final class InputMethodManager {
      *
      * @param imiId Id of InputMethodInfo which additional input method subtypes will be added to.
      * @param subtypes subtypes will be added as additional subtypes of the current input method.
+     * @deprecated For IMEs that have already implemented features like customizable/downloadable
+     *             keyboard layouts/languages, please start migration to other approaches. One idea
+     *             would be exposing only one unified {@link InputMethodSubtype} then implement
+     *             IME's own language switching mechanism within that unified subtype. The support
+     *             of "Additional Subtype" may be completely dropped in a future version of Android.
      */
+    @Deprecated
     public void setAdditionalInputMethodSubtypes(String imiId, InputMethodSubtype[] subtypes) {
         try {
             mService.setAdditionalInputMethodSubtypes(imiId, subtypes);
@@ -2620,6 +2761,12 @@ public final class InputMethodManager {
             return mService.getLastInputMethodSubtype();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    private void maybeCallServedViewChangedLocked(EditorInfo tba) {
+        if (mImeInsetsConsumer != null) {
+            mImeInsetsConsumer.onServedEditorChanged(tba);
         }
     }
 

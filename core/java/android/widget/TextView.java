@@ -16,6 +16,7 @@
 
 package android.widget;
 
+import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY;
@@ -31,6 +32,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.Px;
+import android.annotation.RequiresPermission;
 import android.annotation.Size;
 import android.annotation.StringRes;
 import android.annotation.StyleRes;
@@ -45,10 +47,10 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.UndoManager;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
-import android.content.res.ResourceId;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
@@ -74,7 +76,9 @@ import android.os.LocaleList;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.ParcelableParcel;
+import android.os.Process;
 import android.os.SystemClock;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.BoringLayout;
 import android.text.DynamicLayout;
@@ -157,6 +161,8 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.AnimationUtils;
 import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillValue;
+import android.view.contentcapture.ContentCaptureManager;
+import android.view.contentcapture.ContentCaptureSession;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.CorrectionInfo;
@@ -166,7 +172,6 @@ import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
-import android.view.intelligence.IntelligenceManager;
 import android.view.textclassifier.TextClassification;
 import android.view.textclassifier.TextClassificationContext;
 import android.view.textclassifier.TextClassificationManager;
@@ -194,6 +199,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -428,7 +434,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     @ViewDebug.ExportedProperty(category = "text")
     @UnsupportedAppUsage
     private int mCurTextColor;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mCurHintTextColor;
     private boolean mFreezesText;
 
@@ -450,6 +456,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     private TextClassifier mTextClassifier;
     private TextClassifier mTextClassificationSession;
+    private TextClassificationContext mTextClassificationContext;
 
     // A flag to prevent repeated movements from escaping the enclosing text view. The idea here is
     // that if a user is holding down a movement key to traverse text, we shouldn't also traverse
@@ -719,7 +726,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     @ViewDebug.ExportedProperty(category = "text")
     @UnsupportedAppUsage
     private int mGravity = Gravity.TOP | Gravity.START;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     private boolean mHorizontallyScrolling;
 
     private int mAutoLinkMask;
@@ -785,6 +792,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     private InputFilter[] mFilters = NO_FILTERS;
 
+    /**
+     * {@link UserHandle} that represents the logical owner of the text. {@code null} when it is
+     * the same as {@link Process#myUserHandle()}.
+     *
+     * <p>Most of applications should not worry about this. Some privileged apps that host UI for
+     * other apps may need to set this so that the system can use right user's resources and
+     * services such as input methods and spell checkers.</p>
+     *
+     * @see #setTextOperationUser(UserHandle)
+     */
+    @Nullable
+    private UserHandle mTextOperationUser;
+
     private volatile Locale mCurrentSpellCheckerLocaleCache;
 
     // It is possible to have a selection even when mEditor is null (programmatically set, like when
@@ -799,8 +819,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     // Although these fields are specific to editable text, they are not added to Editor because
     // they are defined by the TextView's style and are theme-dependent.
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     int mCursorDrawableRes;
+    private Drawable mCursorDrawable;
     // Note: this might be stale if setTextSelectHandleLeft is used. We could simplify the code
     // by removing it, but we would break apps targeting <= P that use it by reflection.
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
@@ -887,7 +908,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     // sanitize autofill requests.
     private boolean mTextSetFromXmlOrResourceId = false;
     // Resource id used to set the text.
-    private @StringRes int mTextId = ResourceId.ID_NULL;
+    private @StringRes int mTextId = Resources.ID_NULL;
     //
     // End of autofill-related attributes
 
@@ -1178,7 +1199,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
                 case com.android.internal.R.styleable.TextView_text:
                     textIsSetFromXml = true;
-                    mTextId = a.getResourceId(attr, ResourceId.ID_NULL);
+                    mTextId = a.getResourceId(attr, Resources.ID_NULL);
                     text = a.getText(attr);
                     break;
 
@@ -3518,7 +3539,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      */
     @android.view.RemotableViewMethod
     public void setTextSelectHandle(@DrawableRes int textSelectHandle) {
-        Preconditions.checkArgumentPositive(textSelectHandle,
+        Preconditions.checkArgument(textSelectHandle != 0,
                 "The text select handle should be a valid drawable resource id.");
         setTextSelectHandle(mContext.getDrawable(textSelectHandle));
     }
@@ -3575,7 +3596,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      */
     @android.view.RemotableViewMethod
     public void setTextSelectHandleLeft(@DrawableRes int textSelectHandleLeft) {
-        Preconditions.checkArgumentPositive(textSelectHandleLeft,
+        Preconditions.checkArgument(textSelectHandleLeft != 0,
                 "The text select left handle should be a valid drawable resource id.");
         setTextSelectHandleLeft(mContext.getDrawable(textSelectHandleLeft));
     }
@@ -3632,7 +3653,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      */
     @android.view.RemotableViewMethod
     public void setTextSelectHandleRight(@DrawableRes int textSelectHandleRight) {
-        Preconditions.checkArgumentPositive(textSelectHandleRight,
+        Preconditions.checkArgument(textSelectHandleRight != 0,
                 "The text select right handle should be a valid drawable resource id.");
         setTextSelectHandleRight(mContext.getDrawable(textSelectHandleRight));
     }
@@ -3640,6 +3661,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     /**
      * Returns the Drawable corresponding to the right handle used
      * for selecting text.
+     * Note that any change applied to the handle Drawable will not be visible
+     * until the handle is hidden and then drawn again.
      *
      * @return the right text selection handle drawable
      *
@@ -3652,6 +3675,55 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             mTextSelectHandleRight = mContext.getDrawable(mTextSelectHandleRightRes);
         }
         return mTextSelectHandleRight;
+    }
+
+    /**
+     * Sets the Drawable corresponding to the text cursor. The Drawable defaults to the
+     * value of the textCursorDrawable attribute.
+     * Note that any change applied to the cursor Drawable will not be visible
+     * until the cursor is hidden and then drawn again.
+     *
+     * @see #setTextCursorDrawable(int)
+     * @attr ref android.R.styleable#TextView_textCursorDrawable
+     */
+    public void setTextCursorDrawable(@Nullable Drawable textCursorDrawable) {
+        mCursorDrawable = textCursorDrawable;
+        mCursorDrawableRes = 0;
+        if (mEditor != null) {
+            mEditor.loadCursorDrawable();
+        }
+    }
+
+    /**
+     * Sets the Drawable corresponding to the text cursor. The Drawable defaults to the
+     * value of the textCursorDrawable attribute.
+     * Note that any change applied to the cursor Drawable will not be visible
+     * until the cursor is hidden and then drawn again.
+     *
+     * @see #setTextCursorDrawable(Drawable)
+     * @attr ref android.R.styleable#TextView_textCursorDrawable
+     */
+    public void setTextCursorDrawable(@DrawableRes int textCursorDrawable) {
+        setTextCursorDrawable(
+                textCursorDrawable != 0 ? mContext.getDrawable(textCursorDrawable) : null);
+    }
+
+    /**
+     * Returns the Drawable corresponding to the text cursor.
+     * Note that any change applied to the cursor Drawable will not be visible
+     * until the cursor is hidden and then drawn again.
+     *
+     * @return the text cursor drawable
+     *
+     * @see #setTextCursorDrawable(Drawable)
+     * @see #setTextCursorDrawable(int)
+     * @attr ref android.R.styleable#TextView_textCursorDrawable
+     */
+    @Nullable public Drawable getTextCursorDrawable() {
+        if (mCursorDrawable == null && mCursorDrawableRes != 0) {
+            mCursorDrawable = mContext.getDrawable(mCursorDrawableRes);
+        }
+        return mCursorDrawable;
     }
 
     /**
@@ -5040,13 +5112,24 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Returns whether the text is allowed to be wider than the View is.
+     * Returns whether the text is allowed to be wider than the View.
+     * If false, the text will be wrapped to the width of the View.
+     *
+     * @attr ref android.R.styleable#TextView_scrollHorizontally
+     * @see #setHorizontallyScrolling(boolean)
+     */
+    public final boolean isHorizontallyScrollable() {
+        return mHorizontallyScrolling;
+    }
+
+    /**
+     * Returns whether the text is allowed to be wider than the View.
      * If false, the text will be wrapped to the width of the View.
      *
      * @attr ref android.R.styleable#TextView_scrollHorizontally
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public boolean getHorizontallyScrolling() {
         return mHorizontallyScrolling;
     }
@@ -5973,14 +6056,22 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             if (mTextDir == null) {
                 mTextDir = getTextDirectionHeuristic();
             }
-            if (!precomputed.getParams().isSameTextMetricsInternal(
-                    getPaint(), mTextDir, mBreakStrategy, mHyphenationFrequency)) {
-                throw new IllegalArgumentException(
+            final @PrecomputedText.Params.CheckResultUsableResult int checkResult =
+                    precomputed.getParams().checkResultUsable(getPaint(), mTextDir, mBreakStrategy,
+                            mHyphenationFrequency);
+            switch (checkResult) {
+                case PrecomputedText.Params.UNUSABLE:
+                    throw new IllegalArgumentException(
                         "PrecomputedText's Parameters don't match the parameters of this TextView."
                         + "Consider using setTextMetricsParams(precomputedText.getParams()) "
                         + "to override the settings of this TextView: "
                         + "PrecomputedText: " + precomputed.getParams()
                         + "TextView: " + getTextMetricsParams());
+                case PrecomputedText.Params.NEED_RECOMPUTE:
+                    precomputed = PrecomputedText.create(precomputed, getTextMetricsParams());
+                    break;
+                case PrecomputedText.Params.USABLE:
+                    // pass through
             }
         } else if (type == BufferType.SPANNABLE || mMovement != null) {
             text = mSpannableFactory.newSpannable(text);
@@ -6254,8 +6345,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return mHint;
     }
 
-    @UnsupportedAppUsage
-    boolean isSingleLine() {
+    /**
+     * Returns if the text is constrained to a single horizontally scrolling line ignoring new
+     * line characters instead of letting it wrap onto multiple lines.
+     *
+     * @attr ref android.R.styleable#TextView_singleLine
+     */
+    public boolean isSingleLine() {
         return mSingleLine;
     }
 
@@ -7981,6 +8077,26 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     }
                 }
                 break;
+
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+                if (event.hasModifiers(KeyEvent.META_SHIFT_ON) && canCut()) {
+                    if (onTextContextMenuItem(ID_CUT)) {
+                        return KEY_EVENT_HANDLED;
+                    }
+                }
+                break;
+
+            case KeyEvent.KEYCODE_INSERT:
+                if (event.hasModifiers(KeyEvent.META_CTRL_ON) && canCopy()) {
+                    if (onTextContextMenuItem(ID_COPY)) {
+                        return KEY_EVENT_HANDLED;
+                    }
+                } else if (event.hasModifiers(KeyEvent.META_SHIFT_ON) && canPaste()) {
+                    if (onTextContextMenuItem(ID_PASTE)) {
+                        return KEY_EVENT_HANDLED;
+                    }
+                }
+                break;
         }
 
         if (mEditor != null && mEditor.mKeyListener != null) {
@@ -8228,6 +8344,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 outAttrs.imeOptions |= EditorInfo.IME_FLAG_NO_ENTER_ACTION;
             }
             outAttrs.hintText = mHint;
+            outAttrs.targetInputMethodUser = mTextOperationUser;
             if (mText instanceof Editable) {
                 InputConnection ic = new EditableInputConnection(this);
                 outAttrs.initialSelStart = getSelectionStart();
@@ -9933,7 +10050,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         && mSavedMarqueeModeLayout.getLineWidth(0) > width));
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private void startMarquee() {
         // Do not ellipsize EditText
         if (getKeyListener() != null) return;
@@ -9976,7 +10093,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private void startStopMarquee(boolean start) {
         if (mEllipsize == TextUtils.TruncateAt.MARQUEE) {
             if (start) {
@@ -10130,7 +10247,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Notify managers (such as {@link AutofillManager} and {@link IntelligenceManager}) that are
+     * Notify managers (such as {@link AutofillManager} and {@link ContentCaptureManager}) that are
      * interested on text changes.
      */
     private void notifyListeningManagersAfterTextChanged() {
@@ -10148,12 +10265,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
         }
 
+        // TODO(b/121045053): should use a flag / boolean to keep status of SHOWN / HIDDEN instead
+        // of using isLaidout(), so it's not called in cases where it's laid out but a
+        // notifyAppeared was not sent.
+
         // ContentCapture
-        if (isImportantForContentCapture() && isTextEditable()) {
-            final IntelligenceManager im = mContext.getSystemService(IntelligenceManager.class);
-            if (im != null && im.isContentCaptureEnabled()) {
-                // TODO(b/111276913): pass flags when edited by user / add CTS test
-                im.notifyViewTextChanged(getAutofillId(), getText(), /* flags= */ 0);
+        if (isLaidOut() && isImportantForContentCapture() && isTextEditable()) {
+            final ContentCaptureManager cm = mContext.getSystemService(ContentCaptureManager.class);
+            if (cm != null && cm.isContentCaptureEnabled()) {
+                final ContentCaptureSession session = getContentCaptureSession();
+                if (session != null) {
+                    // TODO(b/111276913): pass flags when edited by user / add CTS test
+                    session.notifyViewTextChanged(getAutofillId(), getText());
+                }
             }
         }
     }
@@ -10798,6 +10922,55 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
+     * Associate {@link UserHandle} who is considered to be the logical owner of the text shown in
+     * this {@link TextView}.
+     *
+     * <p>Most of applications should not worry about this.  Some privileged apps that host UI for
+     * other apps may need to set this so that the system can user right user's resources and
+     * services such as input methods and spell checkers.</p>
+     *
+     * @param user {@link UserHandle} who is considered to be the owner of the text shown in this
+     *        {@link TextView}. {@code null} to reset {@link #mTextOperationUser}.
+     * @hide
+     */
+    @RequiresPermission(INTERACT_ACROSS_USERS_FULL)
+    public final void setTextOperationUser(@Nullable UserHandle user) {
+        if (Objects.equals(mTextOperationUser, user)) {
+            return;
+        }
+        if (user != null && !Process.myUserHandle().equals(user)) {
+            // Just for preventing people from accidentally using this hidden API without
+            // the required permission.  The same permission is also checked in the system server.
+            if (getContext().checkSelfPermission(INTERACT_ACROSS_USERS_FULL)
+                    != PackageManager.PERMISSION_GRANTED) {
+                throw new SecurityException("INTERACT_ACROSS_USERS_FULL is required."
+                        + " userId=" + user.getIdentifier()
+                        + " callingUserId" + UserHandle.myUserId());
+            }
+        }
+        mTextOperationUser = user;
+        // Invalidate some resources
+        mCurrentSpellCheckerLocaleCache = null;
+        if (mEditor != null) {
+            mEditor.onTextOperationUserChanged();
+        }
+    }
+
+    @Nullable
+    final TextServicesManager getTextServicesManagerForUser() {
+        if (mTextOperationUser == null) {
+            return getContext().getSystemService(TextServicesManager.class);
+        }
+        try {
+            return getContext().createPackageContextAsUser(
+                    "android", 0 /* flags */, mTextOperationUser)
+                    .getSystemService(TextServicesManager.class);
+        } catch (PackageManager.NameNotFoundException e) {
+            return null;
+        }
+    }
+
+    /**
      * This is a temporary method. Future versions may support multi-locale text.
      * Caveat: This method may not return the latest text services locale, but this should be
      * acceptable and it's more important to make this method asynchronous.
@@ -10869,8 +11042,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     @UnsupportedAppUsage
     private void updateTextServicesLocaleLocked() {
-        final TextServicesManager textServicesManager = (TextServicesManager)
-                mContext.getSystemService(Context.TEXT_SERVICES_MANAGER_SERVICE);
+        final TextServicesManager textServicesManager = getTextServicesManagerForUser();
+        if (textServicesManager == null) {
+            return;
+        }
         final SpellCheckerSubtype subtype = textServicesManager.getCurrentSpellCheckerSubtype(true);
         final Locale locale;
         if (subtype != null) {
@@ -10927,7 +11102,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             if (viewFor == VIEW_STRUCTURE_FOR_AUTOFILL) {
                 structure.setDataIsSensitive(!mTextSetFromXmlOrResourceId);
             }
-            if (mTextId != ResourceId.ID_NULL) {
+            if (mTextId != Resources.ID_NULL) {
                 try {
                     structure.setTextIdEntry(getResources().getResourceEntryName(mTextId));
                 } catch (Resources.NotFoundException e) {
@@ -10942,6 +11117,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (!isPassword || viewFor == VIEW_STRUCTURE_FOR_AUTOFILL
                 || viewFor == VIEW_STRUCTURE_FOR_CONTENT_CAPTURE) {
             if (mLayout == null) {
+                if (viewFor == VIEW_STRUCTURE_FOR_CONTENT_CAPTURE) {
+                    Log.w(LOG_TAG, "onProvideContentCaptureStructure(): calling assumeLayout()");
+                }
                 assumeLayout();
             }
             Layout layout = mLayout;
@@ -11891,22 +12069,30 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 } else {
                     widgetType = TextClassifier.WIDGET_TYPE_UNSELECTABLE_TEXTVIEW;
                 }
-                final TextClassificationContext textClassificationContext =
-                        new TextClassificationContext.Builder(
-                                mContext.getPackageName(), widgetType)
-                                .build();
+                mTextClassificationContext = new TextClassificationContext.Builder(
+                        mContext.getPackageName(), widgetType)
+                        .build();
                 if (mTextClassifier != null) {
                     mTextClassificationSession = tcm.createTextClassificationSession(
-                            textClassificationContext, mTextClassifier);
+                            mTextClassificationContext, mTextClassifier);
                 } else {
                     mTextClassificationSession = tcm.createTextClassificationSession(
-                            textClassificationContext);
+                            mTextClassificationContext);
                 }
             } else {
                 mTextClassificationSession = TextClassifier.NO_OP;
             }
         }
         return mTextClassificationSession;
+    }
+
+    /**
+     * Returns the {@link TextClassificationContext} for the current TextClassifier session.
+     * @see #getTextClassificationSession()
+     */
+    @Nullable
+    TextClassificationContext getTextClassificationContext() {
+        return mTextClassificationContext;
     }
 
     /**
@@ -12265,13 +12451,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Returns the current {@link TextDirectionHeuristic}.
-     *
-     * @return the current {@link TextDirectionHeuristic}.
-     * @hide
+     * Returns resolved {@link TextDirectionHeuristic} that will be used for text layout.
+     * The {@link TextDirectionHeuristic} that is used by TextView is only available after
+     * {@link #getTextDirection()} and {@link #getLayoutDirection()} is resolved. Therefore the
+     * return value may not be the same as the one TextView uses if the View's layout direction is
+     * not resolved or detached from parent root view.
      */
-    @UnsupportedAppUsage
-    protected TextDirectionHeuristic getTextDirectionHeuristic() {
+    public TextDirectionHeuristic getTextDirectionHeuristic() {
         if (hasPasswordTransformationMethod()) {
             // passwords fields should be LTR
             return TextDirectionHeuristics.LTR;

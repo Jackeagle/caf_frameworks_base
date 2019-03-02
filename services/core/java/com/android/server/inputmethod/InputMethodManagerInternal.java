@@ -16,7 +16,14 @@
 
 package com.android.server.inputmethod;
 
-import android.content.ComponentName;
+import android.annotation.NonNull;
+import android.annotation.UserIdInt;
+import android.view.inputmethod.InputMethodInfo;
+
+import com.android.server.LocalServices;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Input method manager local system service interface.
@@ -34,14 +41,25 @@ public abstract class InputMethodManagerInternal {
     public abstract void hideCurrentInputMethod();
 
     /**
-     * Switches to VR InputMethod defined in the packageName of {@param componentName}.
+     * Returns the list of installed input methods for the specified user.
+     *
+     * @param userId The user ID to be queried.
+     * @return A list of {@link InputMethodInfo}.  VR-only IMEs are already excluded.
      */
-    public abstract void startVrInputMethodNoCheck(ComponentName componentName);
+    public abstract List<InputMethodInfo> getInputMethodListAsUser(@UserIdInt int userId);
+
+    /**
+     * Returns the list of installed input methods that are enabled for the specified user.
+     *
+     * @param userId The user ID to be queried.
+     * @return A list of {@link InputMethodInfo} that are enabled for {@code userId}.
+     */
+    public abstract List<InputMethodInfo> getEnabledInputMethodListAsUser(@UserIdInt int userId);
 
     /**
      * Fake implementation of {@link InputMethodManagerInternal}.  All the methods do nothing.
      */
-    public static final InputMethodManagerInternal NOP =
+    private static final InputMethodManagerInternal NOP =
             new InputMethodManagerInternal() {
                 @Override
                 public void setInteractive(boolean interactive) {
@@ -52,7 +70,23 @@ public abstract class InputMethodManagerInternal {
                 }
 
                 @Override
-                public void startVrInputMethodNoCheck(ComponentName componentName) {
+                public List<InputMethodInfo> getInputMethodListAsUser(int userId) {
+                    return Collections.emptyList();
+                }
+
+                @Override
+                public List<InputMethodInfo> getEnabledInputMethodListAsUser(int userId) {
+                    return Collections.emptyList();
                 }
             };
+
+    /**
+     * @return Global instance if exists.  Otherwise, a dummy no-op instance.
+     */
+    @NonNull
+    public static InputMethodManagerInternal get() {
+        final InputMethodManagerInternal instance =
+                LocalServices.getService(InputMethodManagerInternal.class);
+        return instance != null ? instance : NOP;
+    }
 }

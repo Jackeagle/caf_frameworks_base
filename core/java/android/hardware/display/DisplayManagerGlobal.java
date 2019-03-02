@@ -20,6 +20,7 @@ import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.content.pm.ParceledListSlice;
 import android.content.res.Resources;
+import android.graphics.ColorSpace;
 import android.graphics.Point;
 import android.hardware.display.DisplayManager.DisplayListener;
 import android.media.projection.IMediaProjection;
@@ -80,12 +81,20 @@ public final class DisplayManagerGlobal {
             new ArrayList<DisplayListenerDelegate>();
 
     private final SparseArray<DisplayInfo> mDisplayInfoCache = new SparseArray<DisplayInfo>();
+    private final ColorSpace mWideColorSpace;
     private int[] mDisplayIdCache;
 
     private int mWifiDisplayScanNestCount;
 
     private DisplayManagerGlobal(IDisplayManager dm) {
         mDm = dm;
+        try {
+            mWideColorSpace =
+                    ColorSpace.get(
+                            ColorSpace.Named.values()[mDm.getPreferredWideGamutColorSpaceId()]);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
     }
 
     /**
@@ -394,17 +403,6 @@ public final class DisplayManagerGlobal {
         }
     }
 
-    /**
-     * Set the level of color saturation to apply to the display.
-     */
-    public void setSaturationLevel(float level) {
-        try {
-            mDm.setSaturationLevel(level);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
-    }
-
     public VirtualDisplay createVirtualDisplay(Context context, MediaProjection projection,
             String name, int width, int height, int densityDpi, Surface surface, int flags,
             VirtualDisplay.Callback callback, Handler handler, String uniqueId) {
@@ -447,6 +445,7 @@ public final class DisplayManagerGlobal {
     public void setVirtualDisplaySurface(IVirtualDisplayCallback token, Surface surface) {
         try {
             mDm.setVirtualDisplaySurface(token, surface);
+            setVirtualDisplayState(token, surface != null);
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }
@@ -464,6 +463,14 @@ public final class DisplayManagerGlobal {
     public void releaseVirtualDisplay(IVirtualDisplayCallback token) {
         try {
             mDm.releaseVirtualDisplay(token);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    void setVirtualDisplayState(IVirtualDisplayCallback token, boolean isOn) {
+        try {
+            mDm.setVirtualDisplayState(token, isOn);
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }
@@ -494,6 +501,17 @@ public final class DisplayManagerGlobal {
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Gets the preferred wide gamut color space for all displays.
+     * The wide gamut color space is returned from composition pipeline
+     * based on hardware capability.
+     *
+     * @hide
+     */
+    public ColorSpace getPreferredWideGamutColorSpace() {
+        return mWideColorSpace;
     }
 
     /**

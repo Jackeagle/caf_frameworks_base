@@ -8,7 +8,6 @@
 #include "SkImageInfo.h"
 #include "SkColor.h"
 #include "SkColorSpace.h"
-#include "SkMatrix44.h"
 #include "GraphicsJNI.h"
 #include "SkStream.h"
 
@@ -20,6 +19,7 @@
 #include <hwui/Paint.h>
 #include <hwui/Bitmap.h>
 #include <renderthread/RenderProxy.h>
+#include <utils/Color.h>
 
 #include <android_runtime/android_hardware_HardwareBuffer.h>
 
@@ -45,7 +45,7 @@ namespace android {
 
 class BitmapWrapper {
 public:
-    BitmapWrapper(Bitmap* bitmap)
+    explicit BitmapWrapper(Bitmap* bitmap)
         : mBitmap(bitmap) { }
 
     void freePixels() {
@@ -91,6 +91,11 @@ public:
     void setAlphaType(SkAlphaType alphaType) {
         assertValid();
         mBitmap->setAlphaType(alphaType);
+    }
+
+    void setColorSpace(sk_sp<SkColorSpace> colorSpace) {
+        assertValid();
+        mBitmap->setColorSpace(colorSpace);
     }
 
     const SkImageInfo& info() {
@@ -335,7 +340,7 @@ static int getPremulBitmapCreateFlags(bool isMutable) {
 static jobject Bitmap_creator(JNIEnv* env, jobject, jintArray jColors,
                               jint offset, jint stride, jint width, jint height,
                               jint configHandle, jboolean isMutable,
-                              jfloatArray xyzD50, jobject transferParameters) {
+                              jlong colorSpacePtr) {
     SkColorType colorType = GraphicsJNI::legacyBitmapConfigToColorType(configHandle);
     if (NULL != jColors) {
         size_t n = env->GetArrayLength(jColors);
@@ -351,17 +356,8 @@ static jobject Bitmap_creator(JNIEnv* env, jobject, jintArray jColors,
     }
 
     SkBitmap bitmap;
-    sk_sp<SkColorSpace> colorSpace;
-
-    if (xyzD50 == nullptr || transferParameters == nullptr) {
-        colorSpace = SkColorSpace::MakeSRGB();
-    } else {
-        SkColorSpaceTransferFn p = GraphicsJNI::getNativeTransferParameters(env, transferParameters);
-        SkMatrix44 xyzMatrix = GraphicsJNI::getNativeXYZMatrix(env, xyzD50);
-        colorSpace = SkColorSpace::MakeRGB(p, xyzMatrix);
-    }
-
-    bitmap.setInfo(SkImageInfo::Make(width, height, colorType, kPremul_SkAlphaType, colorSpace));
+    bitmap.setInfo(SkImageInfo::Make(width, height, colorType, kPremul_SkAlphaType,
+                GraphicsJNI::getNativeColorSpace(colorSpacePtr)));
 
     sk_sp<Bitmap> nativeBitmap = Bitmap::allocateHeapBitmap(&bitmap);
     if (!nativeBitmap) {
@@ -549,8 +545,7 @@ static jboolean Bitmap_compress(JNIEnv* env, jobject clazz, jlong bitmapHandle,
     if (skbitmap.colorType() == kRGBA_F16_SkColorType) {
         // Convert to P3 before encoding. This matches SkAndroidCodec::computeOutputColorSpace
         // for wide gamuts.
-        auto cs = SkColorSpace::MakeRGB(SkColorSpace::kSRGB_RenderTargetGamma,
-                                        SkColorSpace::kDCIP3_D65_Gamut);
+        auto cs = SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB, SkNamedGamut::kDCIP3);
         auto info = skbitmap.info().makeColorType(kRGBA_8888_SkColorType)
                                    .makeColorSpace(std::move(cs));
         SkBitmap p3;
@@ -568,11 +563,31 @@ static jboolean Bitmap_compress(JNIEnv* env, jobject clazz, jlong bitmapHandle,
     return SkEncodeImage(strm.get(), skbitmap, fm, quality) ? JNI_TRUE : JNI_FALSE;
 }
 
+static inline void bitmapErase(SkBitmap bitmap, const SkColor4f& color,
+        const sk_sp<SkColorSpace>& colorSpace) {
+    SkPaint p;
+    p.setColor4f(color, colorSpace.get());
+    p.setBlendMode(SkBlendMode::kSrc);
+    SkCanvas canvas(bitmap);
+    canvas.drawPaint(p);
+}
+
 static void Bitmap_erase(JNIEnv* env, jobject, jlong bitmapHandle, jint color) {
     LocalScopedBitmap bitmap(bitmapHandle);
     SkBitmap skBitmap;
     bitmap->getSkBitmap(&skBitmap);
-    skBitmap.eraseColor(color);
+    bitmapErase(skBitmap, SkColor4f::FromColor(color), SkColorSpace::MakeSRGB());
+}
+
+static void Bitmap_eraseLong(JNIEnv* env, jobject, jlong bitmapHandle,
+        jlong colorSpaceHandle, jlong colorLong) {
+    LocalScopedBitmap bitmap(bitmapHandle);
+    SkBitmap skBitmap;
+    bitmap->getSkBitmap(&skBitmap);
+
+    SkColor4f color = GraphicsJNI::convertColorLong(colorLong);
+    sk_sp<SkColorSpace> cs = GraphicsJNI::getNativeColorSpace(colorSpaceHandle);
+    bitmapErase(skBitmap, color, cs);
 }
 
 static jint Bitmap_rowBytes(JNIEnv* env, jobject, jlong bitmapHandle) {
@@ -591,6 +606,14 @@ static jint Bitmap_config(JNIEnv* env, jobject, jlong bitmapHandle) {
 static jint Bitmap_getGenerationId(JNIEnv* env, jobject, jlong bitmapHandle) {
     LocalScopedBitmap bitmap(bitmapHandle);
     return static_cast<jint>(bitmap->getGenerationID());
+}
+
+static jboolean Bitmap_isConfigF16(JNIEnv* env, jobject, jlong bitmapHandle) {
+    LocalScopedBitmap bitmap(bitmapHandle);
+    if (bitmap->info().colorType() == kRGBA_F16_SkColorType) {
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
 }
 
 static jboolean Bitmap_isPremultiplied(JNIEnv* env, jobject, jlong bitmapHandle) {
@@ -717,7 +740,7 @@ static jobject Bitmap_createFromParcel(JNIEnv* env, jobject, jobject parcel) {
 #endif
         // Dup the file descriptor so we can keep a reference to it after the Parcel
         // is disposed.
-        int dupFd = dup(blob.fd());
+        int dupFd = fcntl(blob.fd(), F_DUPFD_CLOEXEC, 0);
         if (dupFd < 0) {
             ALOGE("Error allocating dup fd. Error:%d", errno);
             blob.release();
@@ -725,9 +748,10 @@ static jobject Bitmap_createFromParcel(JNIEnv* env, jobject, jobject parcel) {
             return NULL;
         }
 
-        // Map the pixels in place and take ownership of the ashmem region.
-        nativeBitmap = sk_sp<Bitmap>(GraphicsJNI::mapAshmemBitmap(env, bitmap.get(),
-                dupFd, const_cast<void*>(blob.data()), size, !isMutable));
+        // Map the pixels in place and take ownership of the ashmem region. We must also respect the
+        // rowBytes value already set on the bitmap instead of attempting to compute our own.
+        nativeBitmap = Bitmap::createFrom(bitmap->info(), bitmap->rowBytes(), dupFd,
+                                          const_cast<void*>(blob.data()), size, !isMutable);
         if (!nativeBitmap) {
             close(dupFd);
             blob.release();
@@ -909,35 +933,41 @@ static jboolean Bitmap_getColorSpace(JNIEnv* env, jobject, jlong bitmapHandle,
     SkColorSpace* colorSpace = bitmapHolder->info().colorSpace();
     if (colorSpace == nullptr) return JNI_FALSE;
 
-    SkMatrix44 xyzMatrix(SkMatrix44::kUninitialized_Constructor);
+    skcms_Matrix3x3 xyzMatrix;
     if (!colorSpace->toXYZD50(&xyzMatrix)) return JNI_FALSE;
 
     jfloat* xyz = env->GetFloatArrayElements(xyzArray, NULL);
-    xyz[0] = xyzMatrix.getFloat(0, 0);
-    xyz[1] = xyzMatrix.getFloat(1, 0);
-    xyz[2] = xyzMatrix.getFloat(2, 0);
-    xyz[3] = xyzMatrix.getFloat(0, 1);
-    xyz[4] = xyzMatrix.getFloat(1, 1);
-    xyz[5] = xyzMatrix.getFloat(2, 1);
-    xyz[6] = xyzMatrix.getFloat(0, 2);
-    xyz[7] = xyzMatrix.getFloat(1, 2);
-    xyz[8] = xyzMatrix.getFloat(2, 2);
+    xyz[0] = xyzMatrix.vals[0][0];
+    xyz[1] = xyzMatrix.vals[1][0];
+    xyz[2] = xyzMatrix.vals[2][0];
+    xyz[3] = xyzMatrix.vals[0][1];
+    xyz[4] = xyzMatrix.vals[1][1];
+    xyz[5] = xyzMatrix.vals[2][1];
+    xyz[6] = xyzMatrix.vals[0][2];
+    xyz[7] = xyzMatrix.vals[1][2];
+    xyz[8] = xyzMatrix.vals[2][2];
     env->ReleaseFloatArrayElements(xyzArray, xyz, 0);
 
-    SkColorSpaceTransferFn transferParams;
+    skcms_TransferFunction transferParams;
     if (!colorSpace->isNumericalTransferFn(&transferParams)) return JNI_FALSE;
 
     jfloat* params = env->GetFloatArrayElements(paramsArray, NULL);
-    params[0] = transferParams.fA;
-    params[1] = transferParams.fB;
-    params[2] = transferParams.fC;
-    params[3] = transferParams.fD;
-    params[4] = transferParams.fE;
-    params[5] = transferParams.fF;
-    params[6] = transferParams.fG;
+    params[0] = transferParams.a;
+    params[1] = transferParams.b;
+    params[2] = transferParams.c;
+    params[3] = transferParams.d;
+    params[4] = transferParams.e;
+    params[5] = transferParams.f;
+    params[6] = transferParams.g;
     env->ReleaseFloatArrayElements(paramsArray, params, 0);
 
     return JNI_TRUE;
+}
+
+static void Bitmap_setColorSpace(JNIEnv* env, jobject, jlong bitmapHandle, jlong colorSpacePtr) {
+    LocalScopedBitmap bitmapHolder(bitmapHandle);
+    sk_sp<SkColorSpace> cs = GraphicsJNI::getNativeColorSpace(colorSpacePtr);
+    bitmapHolder->setColorSpace(cs);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -954,6 +984,19 @@ static jint Bitmap_getPixel(JNIEnv* env, jobject, jlong bitmapHandle,
     SkColor dst;
     bitmap.readPixels(dstInfo, &dst, dstInfo.minRowBytes(), x, y);
     return static_cast<jint>(dst);
+}
+
+static jlong Bitmap_getColor(JNIEnv* env, jobject, jlong bitmapHandle,
+        jint x, jint y) {
+    SkBitmap bitmap;
+    reinterpret_cast<BitmapWrapper*>(bitmapHandle)->getSkBitmap(&bitmap);
+
+    SkImageInfo dstInfo = SkImageInfo::Make(
+            1, 1, kRGBA_F16_SkColorType, kUnpremul_SkAlphaType, bitmap.refColorSpace());
+
+    uint64_t dst;
+    bitmap.readPixels(dstInfo, &dst, dstInfo.minRowBytes(), x, y);
+    return static_cast<jlong>(dst);
 }
 
 static void Bitmap_getPixels(JNIEnv* env, jobject, jlong bitmapHandle,
@@ -1097,37 +1140,23 @@ static jobject Bitmap_copyPreserveInternalConfig(JNIEnv* env, jobject, jlong bit
     SkBitmap src;
     hwuiBitmap.getSkBitmap(&src);
 
-    SkBitmap result;
-    HeapAllocator allocator;
-    if (!bitmapCopyTo(&result, hwuiBitmap.info().colorType(), src, &allocator)) {
+    if (src.pixelRef() == nullptr) {
         doThrowRE(env, "Could not copy a hardware bitmap.");
         return NULL;
     }
-    return createBitmap(env, allocator.getStorageObjAndReset(), getPremulBitmapCreateFlags(false));
-}
 
-static jobject Bitmap_createHardwareBitmap(JNIEnv* env, jobject, jobject graphicBuffer) {
-    sp<GraphicBuffer> buffer(graphicBufferForJavaObject(env, graphicBuffer));
-    // Bitmap::createFrom currently assumes SRGB color space for RGBA images.
-    // To support any color space, we need to pass an additional ColorSpace argument to
-    // java Bitmap.createHardwareBitmap.
-    sk_sp<Bitmap> bitmap = Bitmap::createFrom(buffer);
-    if (!bitmap.get()) {
-        ALOGW("failed to create hardware bitmap from graphic buffer");
-        return NULL;
-    }
-    return bitmap::createBitmap(env, bitmap.release(), getPremulBitmapCreateFlags(false));
+    sk_sp<Bitmap> bitmap = Bitmap::createFrom(src.info(), *src.pixelRef());
+    return createBitmap(env, bitmap.release(), getPremulBitmapCreateFlags(false));
 }
 
 static jobject Bitmap_wrapHardwareBufferBitmap(JNIEnv* env, jobject, jobject hardwareBuffer,
-                                               jfloatArray xyzD50, jobject transferParameters) {
-    SkColorSpaceTransferFn p = GraphicsJNI::getNativeTransferParameters(env, transferParameters);
-    SkMatrix44 xyzMatrix = GraphicsJNI::getNativeXYZMatrix(env, xyzD50);
-    sk_sp<SkColorSpace> colorSpace = SkColorSpace::MakeRGB(p, xyzMatrix);
+                                               jlong colorSpacePtr) {
     AHardwareBuffer* hwBuf = android_hardware_HardwareBuffer_getNativeHardwareBuffer(env,
         hardwareBuffer);
     sp<GraphicBuffer> buffer(AHardwareBuffer_to_GraphicBuffer(hwBuf));
-    sk_sp<Bitmap> bitmap = Bitmap::createFrom(buffer, colorSpace);
+    SkColorType ct = uirenderer::PixelFormatToColorType(buffer->getPixelFormat());
+    sk_sp<Bitmap> bitmap = Bitmap::createFrom(buffer, ct,
+            GraphicsJNI::getNativeColorSpace(colorSpacePtr));
     if (!bitmap.get()) {
         ALOGW("failed to create hardware bitmap from hardware buffer");
         return NULL;
@@ -1169,7 +1198,7 @@ static void Bitmap_setImmutable(JNIEnv* env, jobject, jlong bitmapHandle) {
 ///////////////////////////////////////////////////////////////////////////////
 
 static const JNINativeMethod gBitmapMethods[] = {
-    {   "nativeCreate",             "([IIIIIIZ[FLandroid/graphics/ColorSpace$Rgb$TransferParameters;)Landroid/graphics/Bitmap;",
+    {   "nativeCreate",             "([IIIIIIZJ)Landroid/graphics/Bitmap;",
         (void*)Bitmap_creator },
     {   "nativeCopy",               "(JIZ)Landroid/graphics/Bitmap;",
         (void*)Bitmap_copy },
@@ -1183,8 +1212,10 @@ static const JNINativeMethod gBitmapMethods[] = {
     {   "nativeCompress",           "(JIILjava/io/OutputStream;[B)Z",
         (void*)Bitmap_compress },
     {   "nativeErase",              "(JI)V", (void*)Bitmap_erase },
+    {   "nativeErase",              "(JJJ)V", (void*)Bitmap_eraseLong },
     {   "nativeRowBytes",           "(J)I", (void*)Bitmap_rowBytes },
     {   "nativeConfig",             "(J)I", (void*)Bitmap_config },
+    {   "nativeIsConfigF16",        "(J)Z", (void*)Bitmap_isConfigF16 },
     {   "nativeHasAlpha",           "(J)Z", (void*)Bitmap_hasAlpha },
     {   "nativeIsPremultiplied",    "(J)Z", (void*)Bitmap_isPremultiplied},
     {   "nativeSetHasAlpha",        "(JZZ)V", (void*)Bitmap_setHasAlpha},
@@ -1200,6 +1231,7 @@ static const JNINativeMethod gBitmapMethods[] = {
         (void*)Bitmap_extractAlpha },
     {   "nativeGenerationId",       "(J)I", (void*)Bitmap_getGenerationId },
     {   "nativeGetPixel",           "(JII)I", (void*)Bitmap_getPixel },
+    {   "nativeGetColor",           "(JII)J", (void*)Bitmap_getColor },
     {   "nativeGetPixels",          "(J[IIIIIII)V", (void*)Bitmap_getPixels },
     {   "nativeSetPixel",           "(JIII)V", (void*)Bitmap_setPixel },
     {   "nativeSetPixels",          "(J[IIIIIII)V", (void*)Bitmap_setPixels },
@@ -1212,13 +1244,12 @@ static const JNINativeMethod gBitmapMethods[] = {
     {   "nativeGetAllocationByteCount", "(J)I", (void*)Bitmap_getAllocationByteCount },
     {   "nativeCopyPreserveInternalConfig", "(J)Landroid/graphics/Bitmap;",
         (void*)Bitmap_copyPreserveInternalConfig },
-    {   "nativeCreateHardwareBitmap", "(Landroid/graphics/GraphicBuffer;)Landroid/graphics/Bitmap;",
-        (void*) Bitmap_createHardwareBitmap },
-    {   "nativeWrapHardwareBufferBitmap", "(Landroid/hardware/HardwareBuffer;[FLandroid/graphics/ColorSpace$Rgb$TransferParameters;)Landroid/graphics/Bitmap;",
+    {   "nativeWrapHardwareBufferBitmap", "(Landroid/hardware/HardwareBuffer;J)Landroid/graphics/Bitmap;",
         (void*) Bitmap_wrapHardwareBufferBitmap },
     {   "nativeCreateGraphicBufferHandle", "(J)Landroid/graphics/GraphicBuffer;",
         (void*) Bitmap_createGraphicBufferHandle },
     {   "nativeGetColorSpace",      "(J[F[F)Z", (void*)Bitmap_getColorSpace },
+    {   "nativeSetColorSpace",      "(JJ)V", (void*)Bitmap_setColorSpace },
     {   "nativeIsSRGB",             "(J)Z", (void*)Bitmap_isSRGB },
     {   "nativeIsSRGBLinear",       "(J)Z", (void*)Bitmap_isSRGBLinear},
     {   "nativeCopyColorSpace",     "(JJ)V",

@@ -17,6 +17,9 @@
 package android.app.role;
 
 import android.annotation.SystemApi;
+import android.annotation.TestApi;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Callback for a {@link RoleManager} request.
@@ -24,6 +27,7 @@ import android.annotation.SystemApi;
  * @hide
  */
 @SystemApi
+@TestApi
 public interface RoleManagerCallback {
 
     /**
@@ -35,4 +39,18 @@ public interface RoleManagerCallback {
      * Signals a failure.
      */
     void onFailure();
+
+    /** @hide */
+    class Future extends CompletableFuture<Void> implements RoleManagerCallback {
+
+        @Override
+        public void onSuccess() {
+            complete(null);
+        }
+
+        @Override
+        public void onFailure() {
+            completeExceptionally(new RuntimeException());
+        }
+    }
 }

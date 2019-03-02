@@ -17,6 +17,7 @@
 package android.app;
 
 import static android.Manifest.permission.CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS;
+import static android.os.Process.myUid;
 
 import static java.lang.Character.MIN_VALUE;
 
@@ -73,6 +74,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager.ServiceNotFoundException;
 import android.os.StrictMode;
 import android.os.SystemProperties;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
@@ -121,8 +123,9 @@ import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillManager.AutofillClient;
 import android.view.autofill.AutofillPopupWindow;
 import android.view.autofill.IAutofillWindowPresenter;
-import android.view.intelligence.ContentCaptureEvent;
-import android.view.intelligence.IntelligenceManager;
+import android.view.contentcapture.ContentCaptureContext;
+import android.view.contentcapture.ContentCaptureManager;
+import android.view.contentcapture.ContentCaptureSession;
 import android.widget.AdapterView;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -824,9 +827,11 @@ public class Activity extends ContextThemeWrapper
     /** The autofill manager. Always access via {@link #getAutofillManager()}. */
     @Nullable private AutofillManager mAutofillManager;
 
-    /** The screen observation manager. Always access via {@link #getIntelligenceManager()}. */
-    @Nullable private IntelligenceManager mIntelligenceManager;
+    /** The content capture manager. Always access via {@link #getContentCaptureManager()}. */
+    @Nullable private ContentCaptureManager mContentCaptureManager;
 
+    private final ArrayList<Application.ActivityLifecycleCallbacks> mActivityLifecycleCallbacks =
+            new ArrayList<Application.ActivityLifecycleCallbacks>();
 
     static final class NonConfigurationInstances {
         Object activity;
@@ -847,7 +852,7 @@ public class Activity extends ContextThemeWrapper
     @UnsupportedAppUsage
     /*package*/ boolean mWindowAdded = false;
     /*package*/ boolean mVisibleFromServer = false;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     /*package*/ boolean mVisibleFromClient = true;
     /*package*/ ActionBar mActionBar = null;
     private boolean mEnableDefaultActionBarUp;
@@ -922,6 +927,9 @@ public class Activity extends ContextThemeWrapper
     private int mLastAutofillId = View.LAST_APP_AUTOFILL_ID;
 
     private AutofillPopupWindow mAutofillPopupWindow;
+
+    /** @hide */
+    boolean mEnterAnimationComplete;
 
     private static native String getDlWarning();
 
@@ -1014,39 +1022,84 @@ public class Activity extends ContextThemeWrapper
     }
 
     /**
-     * (Creates, sets, and ) returns the intelligence manager
+     * (Creates, sets, and ) returns the content capture manager
      *
-     * @return The intelligence manager
+     * @return The content capture manager
      */
-    @NonNull private IntelligenceManager getIntelligenceManager() {
-        if (mIntelligenceManager == null) {
-            mIntelligenceManager = getSystemService(IntelligenceManager.class);
+    @Nullable private ContentCaptureManager getContentCaptureManager() {
+        // ContextCapture disabled for system apps
+        if (!UserHandle.isApp(myUid())) return null;
+        if (mContentCaptureManager == null) {
+            mContentCaptureManager = getSystemService(ContentCaptureManager.class);
         }
-        return mIntelligenceManager;
+        return mContentCaptureManager;
     }
 
-    private void notifyIntelligenceManagerIfNeeded(@ContentCaptureEvent.EventType int event) {
-        final IntelligenceManager im = getIntelligenceManager();
-        if (im == null || !im.isContentCaptureEnabled()) {
-            return;
-        }
-        switch (event) {
-            case ContentCaptureEvent.TYPE_ACTIVITY_CREATED:
-                //TODO(b/111276913): decide whether the InteractionSessionId should be
-                // saved / restored in the activity bundle.
-                im.onActivityCreated(mToken, getComponentName());
-                break;
-            case ContentCaptureEvent.TYPE_ACTIVITY_DESTROYED:
-                im.onActivityDestroyed();
-                break;
-            case ContentCaptureEvent.TYPE_ACTIVITY_STARTED:
-            case ContentCaptureEvent.TYPE_ACTIVITY_RESUMED:
-            case ContentCaptureEvent.TYPE_ACTIVITY_PAUSED:
-            case ContentCaptureEvent.TYPE_ACTIVITY_STOPPED:
-                im.onActivityLifecycleEvent(event);
-                break;
+    /** @hide */ private static final int CONTENT_CAPTURE_START = 1;
+    /** @hide */ private static final int CONTENT_CAPTURE_PAUSE = 2;
+    /** @hide */ private static final int CONTENT_CAPTURE_RESUME = 3;
+    /** @hide */ private static final int CONTENT_CAPTURE_STOP = 4;
+
+    /** @hide */
+    @IntDef(prefix = { "CONTENT_CAPTURE_" }, value = {
+            CONTENT_CAPTURE_START,
+            CONTENT_CAPTURE_PAUSE,
+            CONTENT_CAPTURE_RESUME,
+            CONTENT_CAPTURE_STOP
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    @interface ContentCaptureNotificationType{}
+
+    private String getContentCaptureTypeAsString(@ContentCaptureNotificationType int type) {
+        switch (type) {
+            case CONTENT_CAPTURE_START:
+                return "START";
+            case CONTENT_CAPTURE_PAUSE:
+                return "PAUSE";
+            case CONTENT_CAPTURE_RESUME:
+                return "RESUME";
+            case CONTENT_CAPTURE_STOP:
+                return "STOP";
             default:
-                Log.w(TAG, "notifyIntelligenceManagerIfNeeded(): invalid type " + event);
+                return "UNKNOW-" + type;
+        }
+    }
+
+    private void notifyContentCaptureManagerIfNeeded(@ContentCaptureNotificationType int type) {
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                    "notifyContentCapture(" + getContentCaptureTypeAsString(type) + ") for "
+                            + mComponent.toShortString());
+        }
+        try {
+            final ContentCaptureManager cm = getContentCaptureManager();
+            if (cm == null) return;
+
+            switch (type) {
+                case CONTENT_CAPTURE_START:
+                    //TODO(b/111276913): decide whether the InteractionSessionId should be
+                    // saved / restored in the activity bundle - probably not
+                    int flags = 0;
+                    if ((getWindow().getAttributes().flags
+                            & WindowManager.LayoutParams.FLAG_SECURE) != 0) {
+                        flags |= ContentCaptureContext.FLAG_DISABLED_BY_FLAG_SECURE;
+                    }
+                    cm.onActivityStarted(mToken, getComponentName(), flags);
+                    break;
+                case CONTENT_CAPTURE_PAUSE:
+                    cm.flush(ContentCaptureSession.FLUSH_REASON_ACTIVITY_PAUSED);
+                    break;
+                case CONTENT_CAPTURE_RESUME:
+                    cm.flush(ContentCaptureSession.FLUSH_REASON_ACTIVITY_RESUMED);
+                    break;
+                case CONTENT_CAPTURE_STOP:
+                    cm.onActivityStopped();
+                    break;
+                default:
+                    Log.wtf(TAG, "Invalid @ContentCaptureNotificationType: " + type);
+            }
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
     }
 
@@ -1055,6 +1108,7 @@ public class Activity extends ContextThemeWrapper
         super.attachBaseContext(newBase);
         if (newBase != null) {
             newBase.setAutofillClient(this);
+            newBase.setContentCaptureSupported(true);
         }
     }
 
@@ -1062,6 +1116,294 @@ public class Activity extends ContextThemeWrapper
     @Override
     public final AutofillClient getAutofillClient() {
         return this;
+    }
+
+    /** @hide */
+    @Override
+    public boolean isContentCaptureSupported() {
+        return true;
+    }
+
+    /**
+     * Register an {@link Application.ActivityLifecycleCallbacks} instance that receives
+     * lifecycle callbacks for only this Activity.
+     * <p>
+     * In relation to any
+     * {@link Application#registerActivityLifecycleCallbacks Application registered callbacks},
+     * the callbacks registered here will always occur nested within those callbacks. This means:
+     * <ul>
+     *     <li>Pre events will first be sent to Application registered callbacks, then to callbacks
+     *     registered here.</li>
+     *     <li>{@link Application.ActivityLifecycleCallbacks#onActivityCreated(Activity, Bundle)},
+     *     {@link Application.ActivityLifecycleCallbacks#onActivityStarted(Activity)}, and
+     *     {@link Application.ActivityLifecycleCallbacks#onActivityResumed(Activity)} will
+     *     be sent first to Application registered callbacks, then to callbacks registered here.
+     *     For all other events, callbacks registered here will be sent first.</li>
+     *     <li>Post events will first be sent to callbacks registered here, then to
+     *     Application registered callbacks.</li>
+     * </ul>
+     * <p>
+     * If multiple callbacks are registered here, they receive events in a first in (up through
+     * {@link Application.ActivityLifecycleCallbacks#onActivityPostResumed}, last out
+     * ordering.
+     * <p>
+     * It is strongly recommended to register this in the constructor of your Activity to ensure
+     * you get all available callbacks. As this callback is associated with only this Activity,
+     * it is not usually necessary to {@link #unregisterActivityLifecycleCallbacks unregister} it
+     * unless you specifically do not want to receive further lifecycle callbacks.
+     *
+     * @param callback The callback instance to register
+     */
+    public void registerActivityLifecycleCallbacks(
+            @NonNull Application.ActivityLifecycleCallbacks callback) {
+        synchronized (mActivityLifecycleCallbacks) {
+            mActivityLifecycleCallbacks.add(callback);
+        }
+    }
+
+    /**
+     * Unregister an {@link Application.ActivityLifecycleCallbacks} previously registered
+     * with {@link #registerActivityLifecycleCallbacks}. It will not receive any further
+     * callbacks.
+     *
+     * @param callback The callback instance to unregister
+     * @see #registerActivityLifecycleCallbacks
+     */
+    public void unregisterActivityLifecycleCallbacks(
+            @NonNull Application.ActivityLifecycleCallbacks callback) {
+        synchronized (mActivityLifecycleCallbacks) {
+            mActivityLifecycleCallbacks.remove(callback);
+        }
+    }
+
+    private void dispatchActivityPreCreated(@Nullable Bundle savedInstanceState) {
+        getApplication().dispatchActivityPreCreated(this, savedInstanceState);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreCreated(this,
+                        savedInstanceState);
+            }
+        }
+    }
+
+    private void dispatchActivityCreated(@Nullable Bundle savedInstanceState) {
+        getApplication().dispatchActivityCreated(this, savedInstanceState);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityCreated(this,
+                        savedInstanceState);
+            }
+        }
+    }
+
+    private void dispatchActivityPostCreated(@Nullable Bundle savedInstanceState) {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPostCreated(this,
+                        savedInstanceState);
+            }
+        }
+        getApplication().dispatchActivityPostCreated(this, savedInstanceState);
+    }
+
+    private void dispatchActivityPreStarted() {
+        getApplication().dispatchActivityPreStarted(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreStarted(this);
+            }
+        }
+    }
+
+    private void dispatchActivityStarted() {
+        getApplication().dispatchActivityStarted(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityStarted(this);
+            }
+        }
+    }
+
+    private void dispatchActivityPostStarted() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivityPostStarted(this);
+            }
+        }
+        getApplication().dispatchActivityPostStarted(this);
+    }
+
+    private void dispatchActivityPreResumed() {
+        getApplication().dispatchActivityPreResumed(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreResumed(this);
+            }
+        }
+    }
+
+    private void dispatchActivityResumed() {
+        getApplication().dispatchActivityResumed(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityResumed(this);
+            }
+        }
+    }
+
+    private void dispatchActivityPostResumed() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = 0; i < callbacks.length; i++) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPostResumed(this);
+            }
+        }
+        getApplication().dispatchActivityPostResumed(this);
+    }
+
+    private void dispatchActivityPrePaused() {
+        getApplication().dispatchActivityPrePaused(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPrePaused(this);
+            }
+        }
+    }
+
+    private void dispatchActivityPaused() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPaused(this);
+            }
+        }
+        getApplication().dispatchActivityPaused(this);
+    }
+
+    private void dispatchActivityPostPaused() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPostPaused(this);
+            }
+        }
+        getApplication().dispatchActivityPostPaused(this);
+    }
+
+    private void dispatchActivityPreStopped() {
+        getApplication().dispatchActivityPreStopped(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreStopped(this);
+            }
+        }
+    }
+
+    private void dispatchActivityStopped() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityStopped(this);
+            }
+        }
+        getApplication().dispatchActivityStopped(this);
+    }
+
+    private void dispatchActivityPostStopped() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivityPostStopped(this);
+            }
+        }
+        getApplication().dispatchActivityPostStopped(this);
+    }
+
+    private void dispatchActivityPreSaveInstanceState(@NonNull Bundle outState) {
+        getApplication().dispatchActivityPreSaveInstanceState(this, outState);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivityPreSaveInstanceState(this, outState);
+            }
+        }
+    }
+
+    private void dispatchActivitySaveInstanceState(@NonNull Bundle outState) {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivitySaveInstanceState(this, outState);
+            }
+        }
+        getApplication().dispatchActivitySaveInstanceState(this, outState);
+    }
+
+    private void dispatchActivityPostSaveInstanceState(@NonNull Bundle outState) {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivityPostSaveInstanceState(this, outState);
+            }
+        }
+        getApplication().dispatchActivityPostSaveInstanceState(this, outState);
+    }
+
+    private void dispatchActivityPreDestroyed() {
+        getApplication().dispatchActivityPreDestroyed(this);
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivityPreDestroyed(this);
+            }
+        }
+    }
+
+    private void dispatchActivityDestroyed() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityDestroyed(this);
+            }
+        }
+        getApplication().dispatchActivityDestroyed(this);
+    }
+
+    private void dispatchActivityPostDestroyed() {
+        Object[] callbacks = collectActivityLifecycleCallbacks();
+        if (callbacks != null) {
+            for (int i = callbacks.length - 1; i >= 0; i--) {
+                ((Application.ActivityLifecycleCallbacks) callbacks[i])
+                        .onActivityPostDestroyed(this);
+            }
+        }
+        getApplication().dispatchActivityPostDestroyed(this);
+    }
+
+    private Object[] collectActivityLifecycleCallbacks() {
+        Object[] callbacks = null;
+        synchronized (mActivityLifecycleCallbacks) {
+            if (mActivityLifecycleCallbacks.size() > 0) {
+                callbacks = mActivityLifecycleCallbacks.toArray();
+            }
+        }
+        return callbacks;
     }
 
     /**
@@ -1119,14 +1461,13 @@ public class Activity extends ContextThemeWrapper
                     ? mLastNonConfigurationInstances.fragments : null);
         }
         mFragments.dispatchCreate();
-        getApplication().dispatchActivityCreated(this, savedInstanceState);
+        dispatchActivityCreated(savedInstanceState);
         if (mVoiceInteractor != null) {
             mVoiceInteractor.attachActivity(this);
         }
         mRestoredFromBundle = savedInstanceState != null;
         mCalled = true;
 
-        notifyIntelligenceManagerIfNeeded(ContentCaptureEvent.TYPE_ACTIVITY_CREATED);
     }
 
     /**
@@ -1355,12 +1696,12 @@ public class Activity extends ContextThemeWrapper
 
         mFragments.doLoaderStart();
 
-        getApplication().dispatchActivityStarted(this);
+        dispatchActivityStarted();
 
         if (mAutoFillResetNeeded) {
             getAutofillManager().onVisibleForAutofill();
         }
-        notifyIntelligenceManagerIfNeeded(ContentCaptureEvent.TYPE_ACTIVITY_STARTED);
+        notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_START);
     }
 
     /**
@@ -1426,8 +1767,8 @@ public class Activity extends ContextThemeWrapper
     @CallSuper
     protected void onResume() {
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onResume " + this);
-        getApplication().dispatchActivityResumed(this);
-        mActivityTransitionState.onResume(this, isTopOfTask());
+        dispatchActivityResumed();
+        mActivityTransitionState.onResume(this);
         enableAutofillCompatibilityIfNeeded();
         if (mAutoFillResetNeeded) {
             if (!mAutoFillIgnoreFirstResumePause) {
@@ -1443,8 +1784,8 @@ public class Activity extends ContextThemeWrapper
                 }
             }
         }
-        notifyIntelligenceManagerIfNeeded(ContentCaptureEvent.TYPE_ACTIVITY_RESUMED);
         mCalled = true;
+        notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_RESUME);
     }
 
     /**
@@ -1465,6 +1806,29 @@ public class Activity extends ContextThemeWrapper
         if (win != null) win.makeActive();
         if (mActionBar != null) mActionBar.setShowHideAnimationEnabled(true);
         mCalled = true;
+    }
+
+    /**
+     * Called when activity gets or looses the top resumed position in the system.
+     *
+     * <p>Starting with {@link android.os.Build.VERSION_CODES#Q} multiple activities can be resumed
+     * at the same time in multi-window and multi-display modes. This callback should be used
+     * instead of {@link #onResume()} as an indication that the activity can try to open
+     * exclusive-access devices like camera.</p>
+     *
+     * <p>It will always be delivered after the activity was resumed and before it is paused. In
+     * some cases it might be skipped and activity can go straight from {@link #onResume()} to
+     * {@link #onPause()} without receiving the top resumed state.</p>
+     *
+     * @param isTopResumedActivity {@code true} if it's the topmost resumed activity in the system,
+     *                             {@code false} otherwise. A call with this as {@code true} will
+     *                             always be followed by another one with {@code false}.
+     *
+     * @see #onResume()
+     * @see #onPause()
+     * @see #onWindowFocusChanged(boolean)
+     */
+    public void onTopResumedActivityChanged(boolean isTopResumedActivity) {
     }
 
     void setVoiceInteractor(IVoiceInteractor voiceInteractor) {
@@ -1634,13 +1998,13 @@ public class Activity extends ContextThemeWrapper
      * @param outState The bundle to save the state to.
      */
     final void performSaveInstanceState(@NonNull Bundle outState) {
-        getApplication().dispatchActivityPreSaveInstanceState(this, outState);
+        dispatchActivityPreSaveInstanceState(outState);
         onSaveInstanceState(outState);
         saveManagedDialogs(outState);
         mActivityTransitionState.saveState(outState);
         storeHasCurrentPermissionRequest(outState);
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onSaveInstanceState " + this + ": " + outState);
-        getApplication().dispatchActivityPostSaveInstanceState(this, outState);
+        dispatchActivityPostSaveInstanceState(outState);
     }
 
     /**
@@ -1654,13 +2018,13 @@ public class Activity extends ContextThemeWrapper
      */
     final void performSaveInstanceState(@NonNull Bundle outState,
             @NonNull PersistableBundle outPersistentState) {
-        getApplication().dispatchActivityPreSaveInstanceState(this, outState);
+        dispatchActivityPreSaveInstanceState(outState);
         onSaveInstanceState(outState, outPersistentState);
         saveManagedDialogs(outState);
         storeHasCurrentPermissionRequest(outState);
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onSaveInstanceState " + this + ": " + outState +
                 ", " + outPersistentState);
-        getApplication().dispatchActivityPostSaveInstanceState(this, outState);
+        dispatchActivityPostSaveInstanceState(outState);
     }
 
     /**
@@ -1723,7 +2087,7 @@ public class Activity extends ContextThemeWrapper
             outState.putBoolean(AUTOFILL_RESET_NEEDED, true);
             getAutofillManager().onSaveInstanceState(outState);
         }
-        getApplication().dispatchActivitySaveInstanceState(this, outState);
+        dispatchActivitySaveInstanceState(outState);
     }
 
     /**
@@ -1823,7 +2187,7 @@ public class Activity extends ContextThemeWrapper
     @CallSuper
     protected void onPause() {
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onPause " + this);
-        getApplication().dispatchActivityPaused(this);
+        dispatchActivityPaused();
         if (mAutoFillResetNeeded) {
             if (!mAutoFillIgnoreFirstResumePause) {
                 if (DEBUG_LIFECYCLE) Slog.v(TAG, "autofill notifyViewExited " + this);
@@ -1837,8 +2201,8 @@ public class Activity extends ContextThemeWrapper
                 mAutoFillIgnoreFirstResumePause = false;
             }
         }
-        notifyIntelligenceManagerIfNeeded(ContentCaptureEvent.TYPE_ACTIVITY_PAUSED);
         mCalled = true;
+        notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_PAUSE);
     }
 
     /**
@@ -1855,6 +2219,7 @@ public class Activity extends ContextThemeWrapper
      * for helping activities determine the proper time to cancel a notification.
      *
      * @see #onUserInteraction()
+     * @see android.content.Intent#FLAG_ACTIVITY_NO_USER_ACTION
      */
     protected void onUserLeaveHint() {
     }
@@ -2007,7 +2372,7 @@ public class Activity extends ContextThemeWrapper
         if (DEBUG_LIFECYCLE) Slog.v(TAG, "onStop " + this);
         if (mActionBar != null) mActionBar.setShowHideAnimationEnabled(false);
         mActivityTransitionState.onStop();
-        getApplication().dispatchActivityStopped(this);
+        dispatchActivityStopped();
         mTranslucentCallback = null;
         mCalled = true;
 
@@ -2026,8 +2391,9 @@ public class Activity extends ContextThemeWrapper
                 getAutofillManager().onPendingSaveUi(AutofillManager.PENDING_UI_OPERATION_CANCEL,
                         mIntent.getIBinderExtra(AutofillManager.EXTRA_RESTORE_SESSION_TOKEN));
             }
-            notifyIntelligenceManagerIfNeeded(ContentCaptureEvent.TYPE_ACTIVITY_STOPPED);
+            notifyContentCaptureManagerIfNeeded(CONTENT_CAPTURE_STOP);
         }
+        mEnterAnimationComplete = false;
     }
 
     /**
@@ -2096,10 +2462,7 @@ public class Activity extends ContextThemeWrapper
             mActionBar.onDestroy();
         }
 
-        getApplication().dispatchActivityDestroyed(this);
-
-        notifyIntelligenceManagerIfNeeded(ContentCaptureEvent.TYPE_ACTIVITY_DESTROYED);
-
+        dispatchActivityDestroyed();
     }
 
     /**
@@ -2254,7 +2617,7 @@ public class Activity extends ContextThemeWrapper
      * picture-in-picture.
      *
      * @return true if the system successfully put this activity into picture-in-picture mode or was
-     * already in picture-in-picture mode (@see {@link #isInPictureInPictureMode()). If the device
+     * already in picture-in-picture mode (see {@link #isInPictureInPictureMode()}). If the device
      * does not support picture-in-picture, return false.
      */
     public boolean enterPictureInPictureMode(@NonNull PictureInPictureParams params) {
@@ -6464,8 +6827,8 @@ public class Activity extends ContextThemeWrapper
                 case "--autofill":
                     dumpAutofillManager(prefix, writer);
                     return;
-                case "--intelligence":
-                    dumpIntelligenceManager(prefix, writer);
+                case "--contentcapture":
+                    dumpContentCaptureManager(prefix, writer);
                     return;
             }
         }
@@ -6497,7 +6860,7 @@ public class Activity extends ContextThemeWrapper
         mHandler.getLooper().dump(new PrintWriterPrinter(writer), prefix);
 
         dumpAutofillManager(prefix, writer);
-        dumpIntelligenceManager(prefix, writer);
+        dumpContentCaptureManager(prefix, writer);
 
         ResourcesManager.getInstance().dump(prefix, writer);
     }
@@ -6513,12 +6876,12 @@ public class Activity extends ContextThemeWrapper
         }
     }
 
-    void dumpIntelligenceManager(String prefix, PrintWriter writer) {
-        final IntelligenceManager im = getIntelligenceManager();
-        if (im != null) {
-            im.dump(prefix, writer);
+    void dumpContentCaptureManager(String prefix, PrintWriter writer) {
+        final ContentCaptureManager cm = getContentCaptureManager();
+        if (cm != null) {
+            cm.dump(prefix, writer);
         } else {
-            writer.print(prefix); writer.println("No IntelligenceManager");
+            writer.print(prefix); writer.println("No ContentCaptureManager");
         }
     }
 
@@ -6788,6 +7151,8 @@ public class Activity extends ContextThemeWrapper
      * @hide
      */
     public void dispatchEnterAnimationComplete() {
+        mEnterAnimationComplete = true;
+        mInstrumentation.onEnterAnimationComplete();
         onEnterAnimationComplete();
         if (getWindow() != null && getWindow().getDecorView() != null) {
             getWindow().getDecorView().getViewTreeObserver().dispatchOnEnterAnimationComplete();
@@ -7276,7 +7641,7 @@ public class Activity extends ContextThemeWrapper
 
     @UnsupportedAppUsage
     final void performCreate(Bundle icicle, PersistableBundle persistentState) {
-        getApplication().dispatchActivityPreCreated(this, icicle);
+        dispatchActivityPreCreated(icicle);
         mCanEnterPictureInPicture = true;
         restoreHasCurrentPermissionRequest(icicle);
         if (persistentState != null) {
@@ -7291,7 +7656,7 @@ public class Activity extends ContextThemeWrapper
                 com.android.internal.R.styleable.Window_windowNoDisplay, false);
         mFragments.dispatchActivityCreated();
         mActivityTransitionState.setEnterActivityOptions(this, getActivityOptions());
-        getApplication().dispatchActivityPostCreated(this, icicle);
+        dispatchActivityPostCreated(icicle);
     }
 
     final void performNewIntent(@NonNull Intent intent) {
@@ -7300,7 +7665,7 @@ public class Activity extends ContextThemeWrapper
     }
 
     final void performStart(String reason) {
-        getApplication().dispatchActivityPreStarted(this);
+        dispatchActivityPreStarted();
         mActivityTransitionState.setEnterActivityOptions(this, getActivityOptions());
         mFragments.noteStateNotSaved();
         mCalled = false;
@@ -7343,7 +7708,7 @@ public class Activity extends ContextThemeWrapper
         }
 
         mActivityTransitionState.enterReady(this);
-        getApplication().dispatchActivityPostStarted(this);
+        dispatchActivityPostStarted();
     }
 
     /**
@@ -7398,7 +7763,7 @@ public class Activity extends ContextThemeWrapper
     }
 
     final void performResume(boolean followedByPause, String reason) {
-        getApplication().dispatchActivityPreResumed(this);
+        dispatchActivityPreResumed();
         performRestart(true /* start */, reason);
 
         mFragments.execPendingActions();
@@ -7448,11 +7813,11 @@ public class Activity extends ContextThemeWrapper
                 "Activity " + mComponent.toShortString() +
                 " did not call through to super.onPostResume()");
         }
-        getApplication().dispatchActivityPostResumed(this);
+        dispatchActivityPostResumed();
     }
 
     final void performPause() {
-        getApplication().dispatchActivityPrePaused(this);
+        dispatchActivityPrePaused();
         mDoReportFullyDrawn = false;
         mFragments.dispatchPause();
         mCalled = false;
@@ -7465,7 +7830,7 @@ public class Activity extends ContextThemeWrapper
                     "Activity " + mComponent.toShortString() +
                     " did not call through to super.onPause()");
         }
-        getApplication().dispatchActivityPostPaused(this);
+        dispatchActivityPostPaused();
     }
 
     final void performUserLeaving() {
@@ -7481,7 +7846,7 @@ public class Activity extends ContextThemeWrapper
         mCanEnterPictureInPicture = false;
 
         if (!mStopped) {
-            getApplication().dispatchActivityPreStopped(this);
+            dispatchActivityPreStopped();
             if (mWindow != null) {
                 mWindow.closeAllPanels();
             }
@@ -7516,13 +7881,13 @@ public class Activity extends ContextThemeWrapper
             }
 
             mStopped = true;
-            getApplication().dispatchActivityPostStopped(this);
+            dispatchActivityPostStopped();
         }
         mResumed = false;
     }
 
     final void performDestroy() {
-        getApplication().dispatchActivityPreDestroyed(this);
+        dispatchActivityPreDestroyed();
         mDestroyed = true;
         mWindow.destroy();
         mFragments.dispatchDestroy();
@@ -7532,7 +7897,7 @@ public class Activity extends ContextThemeWrapper
         if (mVoiceInteractor != null) {
             mVoiceInteractor.detachActivity();
         }
-        getApplication().dispatchActivityPostDestroyed(this);
+        dispatchActivityPostDestroyed();
     }
 
     final void dispatchMultiWindowModeChanged(boolean isInMultiWindowMode,
@@ -7876,10 +8241,10 @@ public class Activity extends ContextThemeWrapper
             final AutofillId autofillId = autofillIds[i];
             final View view = autofillClientFindViewByAutofillIdTraversal(autofillId);
             if (view != null) {
-                if (!autofillId.isVirtual()) {
+                if (!autofillId.isVirtualInt()) {
                     visible[i] = view.isVisibleToUser();
                 } else {
-                    visible[i] = view.isVisibleToUserForAutofill(autofillId.getVirtualChildId());
+                    visible[i] = view.isVisibleToUserForAutofill(autofillId.getVirtualChildIntId());
                 }
             }
         }
@@ -7975,6 +8340,33 @@ public class Activity extends ContextThemeWrapper
             ActivityTaskManager.getService().setShowWhenLocked(mToken, showWhenLocked);
         } catch (RemoteException e) {
             Log.e(TAG, "Failed to call setShowWhenLocked", e);
+        }
+    }
+
+    /**
+     * Specifies whether this {@link Activity} should be shown on top of the lock screen whenever
+     * the lockscreen is up and this activity has another activity behind it with the showWhenLock
+     * attribute set. That is, this activity is only visible on the lock screen if there is another
+     * activity with the showWhenLock attribute visible at the same time on the lock screen. A use
+     * case for this is permission dialogs, that should only be visible on the lock screen if their
+     * requesting activity is also visible. This value can be set as a manifest attribute using
+     * android.R.attr#inheritShowWhenLocked.
+     *
+     * @param inheritShowWhenLocked {@code true} to show the {@link Activity} on top of the lock
+     *                              screen when this activity has another activity behind it with
+     *                              the showWhenLock attribute set; {@code false} otherwise.
+     * @see #setShowWhenLocked(boolean)
+     * See android.R.attr#inheritShowWhenLocked
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public void setInheritShowWhenLocked(boolean inheritShowWhenLocked) {
+        try {
+            ActivityTaskManager.getService().setInheritShowWhenLocked(
+                    mToken, inheritShowWhenLocked);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to call setInheritShowWhenLocked", e);
         }
     }
 

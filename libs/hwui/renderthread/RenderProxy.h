@@ -49,7 +49,7 @@ enum {
     Reset = 1 << 1,
     JankStats = 1 << 2,
 };
-};
+}
 
 /*
  * RenderProxy is strictly single threaded. All methods must be invoked on the owning
@@ -82,6 +82,7 @@ public:
     ANDROID_API void destroy();
 
     ANDROID_API static void invokeFunctor(Functor* functor, bool waitForCompletion);
+    static void destroyFunctor(int functor);
 
     ANDROID_API DeferredLayerUpdater* createTextureLayer();
     ANDROID_API void buildLayer(RenderNode* node);
@@ -113,6 +114,8 @@ public:
     ANDROID_API void removeRenderNode(RenderNode* node);
     ANDROID_API void drawRenderNode(RenderNode* node);
     ANDROID_API void setContentDrawBounds(int left, int top, int right, int bottom);
+    ANDROID_API void setPictureCapturedCallback(
+            const std::function<void(sk_sp<SkPicture>&&)>& callback);
     ANDROID_API void setFrameCallback(std::function<void(int64_t)>&& callback);
     ANDROID_API void setFrameCompleteCallback(std::function<void(int64_t)>&& callback);
 

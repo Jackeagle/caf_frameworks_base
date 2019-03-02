@@ -136,14 +136,10 @@
     <string name="wfcSpnFormat_spn_wifi" msgid="6546481665561961938">"Wi-Fi via <xliff:g id="SPN">%s</xliff:g>"</string>
     <string name="wfcSpnFormat_wifi_calling_bar_spn" msgid="1726178784338466265">"Wi-Fi-opkald | <xliff:g id="SPN">%s</xliff:g>"</string>
     <string name="wfcSpnFormat_spn_vowifi" msgid="4444638298656953681">"VoWifi via <xliff:g id="SPN">%s</xliff:g>"</string>
-    <!-- no translation found for wfcSpnFormat_wifi_calling (4990486735013125329) -->
-    <skip />
-    <!-- no translation found for wfcSpnFormat_wifi (1892673884655959773) -->
-    <skip />
-    <!-- no translation found for wfcSpnFormat_wifi_calling_wo_hyphen (1336669776254502831) -->
-    <skip />
-    <!-- no translation found for wfcSpnFormat_vowifi (1765176406171272629) -->
-    <skip />
+    <string name="wfcSpnFormat_wifi_calling" msgid="4990486735013125329">"Wi-Fi-opkald"</string>
+    <string name="wfcSpnFormat_wifi" msgid="1892673884655959773">"Wi-Fi"</string>
+    <string name="wfcSpnFormat_wifi_calling_wo_hyphen" msgid="1336669776254502831">"Wi-Fi-opkald"</string>
+    <string name="wfcSpnFormat_vowifi" msgid="1765176406171272629">"VoWifi"</string>
     <string name="wifi_calling_off_summary" msgid="8720659586041656098">"Fra"</string>
     <string name="wfc_mode_wifi_preferred_summary" msgid="1994113411286935263">"WiFi-netværk er foretrukket"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="1988279625335345908">"Mobildata foretrækkes"</string>
@@ -191,7 +187,7 @@
     <string name="work_profile_deleted_description_dpm_wipe" msgid="8823792115612348820">"Din arbejdsprofil er ikke længere tilgængelig på denne enhed"</string>
     <string name="work_profile_deleted_reason_maximum_password_failure" msgid="8986903510053359694">"For mange mislykkede adgangskodeforsøg"</string>
     <string name="network_logging_notification_title" msgid="6399790108123704477">"Dette er en administreret enhed"</string>
-    <string name="network_logging_notification_text" msgid="7930089249949354026">"Din organisation administrerer denne enhed og kan overvåge netværkstrafik. Tryk for at se oplysninger."</string>
+    <string name="network_logging_notification_text" msgid="7930089249949354026">"Din organisation administrerer denne enhed og kan overvåge netværkstrafik. Tryk for at se info."</string>
     <string name="factory_reset_warning" msgid="5423253125642394387">"Enheden slettes"</string>
     <string name="factory_reset_message" msgid="9024647691106150160">"Administrationsappen kan ikke bruges. Enheden vil nu blive ryddet. \n\nKontakt din organisations administrator, hvis du har spørgsmål."</string>
     <string name="printing_disabled_by" msgid="8936832919072486965">"Udskrivning er deaktiveret af <xliff:g id="OWNER_APP">%s</xliff:g>."</string>
@@ -253,7 +249,7 @@
     <string name="global_action_voice_assist" msgid="7751191495200504480">"Taleassistent"</string>
     <string name="global_action_lockdown" msgid="1099326950891078929">"Lukning"</string>
     <string name="status_bar_notification_info_overflow" msgid="5301981741705354993">"999+"</string>
-    <string name="notification_hidden_text" msgid="6351207030447943784">"Ny underretning"</string>
+    <string name="notification_hidden_text" msgid="6351207030447943784">"Ny notifikation"</string>
     <string name="notification_channel_virtual_keyboard" msgid="6969925135507955575">"Virtuelt tastatur"</string>
     <string name="notification_channel_physical_keyboard" msgid="7297661826966861459">"Fysisk tastatur"</string>
     <string name="notification_channel_security" msgid="7345516133431326347">"Sikkerhed"</string>
@@ -273,15 +269,15 @@
     <string name="notification_channel_foreground_service" msgid="3931987440602669158">"Apps, der bruger batteri"</string>
     <string name="foreground_service_app_in_background" msgid="1060198778219731292">"<xliff:g id="APP_NAME">%1$s</xliff:g> bruger batteri"</string>
     <string name="foreground_service_apps_in_background" msgid="7175032677643332242">"<xliff:g id="NUMBER">%1$d</xliff:g> apps bruger batteri"</string>
-    <string name="foreground_service_tap_for_details" msgid="372046743534354644">"Tryk for at se oplysninger om batteri- og dataforbrug"</string>
+    <string name="foreground_service_tap_for_details" msgid="372046743534354644">"Tryk for at se info om batteri- og dataforbrug"</string>
     <string name="foreground_service_multiple_separator" msgid="4021901567939866542">"<xliff:g id="LEFT_SIDE">%1$s</xliff:g>, <xliff:g id="RIGHT_SIDE">%2$s</xliff:g>"</string>
     <string name="safeMode" msgid="2788228061547930246">"Sikker tilstand"</string>
     <string name="android_system_label" msgid="6577375335728551336">"Android-system"</string>
     <string name="user_owner_label" msgid="8836124313744349203">"Skift til personlig profil"</string>
     <string name="managed_profile_label" msgid="8947929265267690522">"Skift til arbejdsprofil"</string>
     <string name="permgrouplab_contacts" msgid="3657758145679177612">"Kontakter"</string>
-    <string name="permgroupdesc_contacts" msgid="6951499528303668046">"have adgang til dine kontaktpersoner"</string>
-    <string name="permgrouprequest_contacts" msgid="6032805601881764300">"Vil du give &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; adgang til dine kontaktpersoner?"</string>
+    <string name="permgroupdesc_contacts" msgid="6951499528303668046">"have adgang til dine kontakter"</string>
+    <string name="permgrouprequest_contacts" msgid="6032805601881764300">"Vil du give &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; adgang til dine kontakter?"</string>
     <string name="permgrouplab_location" msgid="7275582855722310164">"Placering"</string>
     <string name="permgroupdesc_location" msgid="1346617465127855033">"få adgang til enhedens placering"</string>
     <string name="permgrouprequest_location" msgid="3788275734953323491">"Vil du give &lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; adgang til enhedens placering?"</string>
@@ -352,7 +348,7 @@
     <string name="permlab_receiveMms" msgid="1821317344668257098">"modtage tekstbeskeder (mms)"</string>
     <string name="permdesc_receiveMms" msgid="533019437263212260">"Tillader, at appen kan modtage og behandle mms-beskeder. Det betyder, at appen kan overvåge eller slette de beskeder, der sendes til din enhed, uden at vise dem til dig."</string>
     <string name="permlab_readCellBroadcasts" msgid="1598328843619646166">"læse Cell Broadcast-meddelelser"</string>
-    <string name="permdesc_readCellBroadcasts" msgid="6361972776080458979">"Tillader, at appen læser Cell Broadcast-meddelelser, der modtages af din enhed. I nogle områder sendes der Cell Broadcast-meddelelser for at advare om nødsituationer. Ondsindede apps kan forstyrre ydelsen eller driften af ​din ​enhed, når der modtages en Cell Broadcast-meddelelse om en nødsituation."</string>
+    <string name="permdesc_readCellBroadcasts" msgid="6361972776080458979">"Tillader, at appen læser Cell Broadcast-underretninger, der modtages af din enhed. I nogle områder sendes der Cell Broadcast-underretninger for at advare om nødsituationer. Ondsindede apps kan forstyrre ydelsen eller driften af ​din ​enhed, når der modtages en Cell Broadcast-meddelelse om en nødsituation."</string>
     <string name="permlab_subscribedFeedsRead" msgid="4756609637053353318">"læse feeds, jeg abonnerer på"</string>
     <string name="permdesc_subscribedFeedsRead" msgid="5557058907906144505">"Tillader, at appen kan hente oplysninger om de feeds, der synkroniseres."</string>
     <string name="permlab_sendSms" msgid="7544599214260982981">"Send og se sms-beskeder"</string>
@@ -397,11 +393,11 @@
     <string name="permdesc_broadcastSticky" product="tablet" msgid="7749760494399915651">"Tillader, at appen kan sende klæbende udsendelser, der forbliver tilbage, når udsendelsen er slut. Overdreven brug kan gøre din tablet langsom eller ustabil ved at tvinge den til at bruge for meget hukommelse."</string>
     <string name="permdesc_broadcastSticky" product="tv" msgid="6839285697565389467">"Giver appen lov til at sende klæbende udsendelser, som ikke forsvinder, når udsendelsen er slut. Overdreven brug kan gøre fjernsynet langsomt eller ustabilt ved at få det til at bruge for meget hukommelse."</string>
     <string name="permdesc_broadcastSticky" product="default" msgid="2825803764232445091">"Tillader, at appen kan sende klæbende udsendelser, der forbliver tilbage, når udsendelsen er slut. Overdreven brug kan gøre din telefon langsom eller ustabil ved at tvinge den til at bruge for meget hukommelse."</string>
-    <string name="permlab_readContacts" msgid="8348481131899886131">"læse dine kontaktpersoner"</string>
+    <string name="permlab_readContacts" msgid="8348481131899886131">"læse dine kontakter"</string>
     <string name="permdesc_readContacts" product="tablet" msgid="5294866856941149639">"Tillader, at appen kan læse data om de kontakter, der er gemt på din tablet, f.eks. hvor ofte du har ringet til, sendt mail til eller på anden måde kommunikeret med bestemte personer. Med denne tilladelse kan apps gemme dine kontaktdata, og skadelige apps kan dele kontaktdata uden din viden."</string>
     <string name="permdesc_readContacts" product="tv" msgid="1839238344654834087">"Giver appen lov til at læse data om dine kontakter, der er gemt på dit tv, herunder hvor ofte du har ringet, mailet eller på andre måder kommunikeret med bestemte personer. Denne tilladelse gør det muligt for apps at gemme dine kontaktoplysninger, og ondsindede apps kan dele kontaktoplysninger uden din viden."</string>
     <string name="permdesc_readContacts" product="default" msgid="8440654152457300662">"Tillader, at appen kan læse data om de kontakter, der er gemt på din telefon, f.eks. hvor ofte du har ringet til, sendt mail til eller på anden måde kommunikeret med bestemte personer. Med denne tilladelse kan apps gemme dine kontaktdata, og skadelige apps kan dele kontaktdata uden din viden."</string>
-    <string name="permlab_writeContacts" msgid="5107492086416793544">"ændre dine kontaktpersoner"</string>
+    <string name="permlab_writeContacts" msgid="5107492086416793544">"ændre dine kontakter"</string>
     <string name="permdesc_writeContacts" product="tablet" msgid="897243932521953602">"Tillader, at appen kan ændre data om de kontakter, der er gemt på din tablet, f.eks. hvor ofte du har ringet til dem, sendt dem en mail eller på anden måde kommunikeret med bestemte kontakter. Med denne tilladelse kan apps slette kontaktoplysninger."</string>
     <string name="permdesc_writeContacts" product="tv" msgid="5438230957000018959">"Giver appen lov til at ændre data om dine kontakter, der er gemt på dit tv, herunder hvor ofte du har ringet, mailet eller på anden måde kommunikeret med bestemte kontakter. Denne tilladelse gør det muligt for apps at slette kontaktoplysninger."</string>
     <string name="permdesc_writeContacts" product="default" msgid="589869224625163558">"Tillader, at appen kan ændre data om de kontakter, der er gemt på din telefon, f.eks. hvor ofte du har ringet til dem, sendt en mail til dem eller på anden måde kommunikeret med bestemte kontakter. Med denne tilladelse kan apps slette kontaktoplysninger."</string>
@@ -451,6 +447,8 @@
     <string name="permdesc_readPhoneState" msgid="1639212771826125528">"Tillader, at appen kan få adgang til telefonfunktionerne på enheden. Med denne tilladelse kan appen fastslå telefonnummeret og enheds-id\'erne, hvorvidt et opkald er aktivt samt det eksterne nummer, der oprettes forbindelse til via et opkald."</string>
     <string name="permlab_manageOwnCalls" msgid="1503034913274622244">"dirigere opkald gennem systemet"</string>
     <string name="permdesc_manageOwnCalls" msgid="6552974537554717418">"Tillader appen at dirigere sine opkald gennem systemet for at forbedre opkaldsoplevelsen."</string>
+    <string name="permlab_callCompanionApp" msgid="3599252979411970473">"se og styre opkald via systemet."</string>
+    <string name="permdesc_callCompanionApp" msgid="4567344683275099090">"Tillader, at appen kan se og styre igangværende opkald på enheden. Dette omfatter oplysninger såsom telefonnumre og status for opkaldene."</string>
     <string name="permlab_acceptHandover" msgid="2661534649736022409">"fortsætte et opkald fra en anden app"</string>
     <string name="permdesc_acceptHandovers" msgid="4570660484220539698">"Tillader, at appen fortsætter et opkald, der blev startet i en anden app."</string>
     <string name="permlab_readPhoneNumbers" msgid="6108163940932852440">"læse telefonnumre"</string>
@@ -511,6 +509,8 @@
     <string name="permdesc_nfc" msgid="7120611819401789907">"Tillader, at appen kan kommunikere med NFC-tags (Near Field Communication), -kort og -læsere."</string>
     <string name="permlab_disableKeyguard" msgid="3598496301486439258">"deaktivere din skærmlås"</string>
     <string name="permdesc_disableKeyguard" msgid="6034203065077122992">"Tillader, at appen kan deaktivere tastaturlåsen og anden form for tilknyttet adgangskodesikkerhed. Telefonen deaktiverer f.eks. tastaturlåsen ved indgående telefonopkald og aktiverer tastaturlåsen igen, når opkaldet er afsluttet."</string>
+    <string name="permlab_getAndRequestScreenLockComplexity" msgid="3911592334192005424">"få og anmode om skærmlåsens kompleksitet"</string>
+    <string name="permdesc_getAndRequestScreenLockComplexity" msgid="9045202063228854873">"Giver appen tilladelse til at kende skærmlåsens kompleksitet (høj, medium, lav eller ingen), hvilket indikerer skærmlåsens mulige længde og type. Appen kan også foreslå brugerne at opdatere deres skærmlås til et bestemt niveau, men brugerne kan frit ignorere det og gå videre. Bemærk! Skærmlåsen gemmes ikke som almindelig tekst, så appen kender ikke adgangskoden."</string>
     <string name="permlab_useBiometric" msgid="8837753668509919318">"brug biometrisk hardware"</string>
     <string name="permdesc_useBiometric" msgid="8389855232721612926">"Tillader, at appen kan bruge biometrisk hardware til godkendelse"</string>
     <string name="permlab_manageFingerprint" msgid="5640858826254575638">"administrer fingeraftrykhardware"</string>
@@ -533,6 +533,9 @@
     <string name="permdesc_mediaLocation" msgid="2237023389178865130">"Tillader, at appen kan læse placeringer fra din mediesamling."</string>
     <string name="biometric_dialog_default_title" msgid="4229778503907743328">"<xliff:g id="APP">%s</xliff:g>-appen kræver din godkendelse."</string>
     <string name="biometric_error_hw_unavailable" msgid="645781226537551036">"Biometrisk hardware er ikke tilgængelig"</string>
+    <string name="biometric_error_user_canceled" msgid="2260175018114348727">"Godkendelsen blev annulleret"</string>
+    <string name="biometric_not_recognized" msgid="5770511773560736082">"Ikke genkendt"</string>
+    <string name="biometric_error_canceled" msgid="349665227864885880">"Godkendelsen blev annulleret"</string>
     <string name="fingerprint_acquired_partial" msgid="735082772341716043">"Der blev registreret et delvist fingeraftryk. Prøv igen."</string>
     <string name="fingerprint_acquired_insufficient" msgid="4596546021310923214">"Fingeraftrykket kunne ikke behandles. Prøv igen."</string>
     <string name="fingerprint_acquired_imager_dirty" msgid="1087209702421076105">"Sensoren til registrering af fingeraftryk er beskidt. Tør den af, og prøv igen."</string>
@@ -540,7 +543,6 @@
     <string name="fingerprint_acquired_too_slow" msgid="59250885689661653">"Du bevægede fingeren for langsomt. Prøv igen."</string>
   <string-array name="fingerprint_acquired_vendor">
   </string-array>
-    <string name="biometric_not_recognized" msgid="5770511773560736082">"Ikke genkendt"</string>
     <string name="fingerprint_authenticated" msgid="5309333983002526448">"Fingeraftrykket blev godkendt"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="4018680978348659031">"Ansigtet er godkendt"</string>
     <string name="face_authenticated_confirmation_required" msgid="8778347003507633610">"Ansigtet er godkendt. Tryk på Bekræft."</string>
@@ -596,14 +598,10 @@
     <string name="permdesc_writeSyncSettings" msgid="8956262591306369868">"Tillader, at en app kan ændre synkroniseringsindstillingerne for en konto. Denne tilladelse kan f.eks. anvendes til at aktivere synkronisering af appen Personer med en konto."</string>
     <string name="permlab_readSyncStats" msgid="7396577451360202448">"læse synkroniseringsstatistikker"</string>
     <string name="permdesc_readSyncStats" msgid="1510143761757606156">"Tillader, at en app kan læse synkroniseringsstatistikkerne for en konto, f.eks. historikken for synkroniserede begivenheder og hvor meget data der synkroniseres."</string>
-    <string name="permlab_sdcardRead" product="nosdcard" msgid="367275095159405468">"læse USB-lagerets indhold"</string>
-    <string name="permlab_sdcardRead" product="default" msgid="2188156462934977940">"læse indholdet af dit SD-kort"</string>
-    <string name="permdesc_sdcardRead" product="nosdcard" msgid="3446988712598386079">"Tillader, at appen læser indholdet på dit USB-lager."</string>
-    <string name="permdesc_sdcardRead" product="default" msgid="2607362473654975411">"Tillader, at appen læser indholdet af dit SD-kort."</string>
-    <string name="permlab_sdcardWrite" product="nosdcard" msgid="8485979062254666748">"ændre eller slette indhold på USB-lager"</string>
-    <string name="permlab_sdcardWrite" product="default" msgid="8805693630050458763">"ændre eller slette indholdet på dit SD-kort"</string>
-    <string name="permdesc_sdcardWrite" product="nosdcard" msgid="6175406299445710888">"Lader appen skrive til USB."</string>
-    <string name="permdesc_sdcardWrite" product="default" msgid="4337417790936632090">"Tillader, at appen kan skrive til SD-kortet."</string>
+    <string name="permlab_sdcardRead" msgid="1438933556581438863">"læse indholdet af din delte lagerplads"</string>
+    <string name="permdesc_sdcardRead" msgid="1804941689051236391">"Tillader, at appen kan læse indholdet af din delte lagerplads."</string>
+    <string name="permlab_sdcardWrite" msgid="9220937740184960897">"ændre eller slette indholdet af din delte lagerplads"</string>
+    <string name="permdesc_sdcardWrite" msgid="2834431057338203959">"Tillader, at appen kan skrive indholdet af din delte lagerplads."</string>
     <string name="permlab_use_sip" msgid="2052499390128979920">"foretage/modtage SIP-opkald"</string>
     <string name="permdesc_use_sip" msgid="2297804849860225257">"Tillader, at appen foretager og modtager SIP-opkald."</string>
     <string name="permlab_register_sim_subscription" msgid="3166535485877549177">"registrere nye telefon-SIM-forbindelser"</string>
@@ -624,10 +622,10 @@
     <string name="permdesc_manageNetworkPolicy" msgid="7537586771559370668">"Tillader, at appen kan administrere netværkspolitikker og definere appspecifikke regler."</string>
     <string name="permlab_modifyNetworkAccounting" msgid="5088217309088729650">"skift afregning af netværksbrug"</string>
     <string name="permdesc_modifyNetworkAccounting" msgid="5443412866746198123">"Tillader, at appen kan ændre den måde, som netværksforbrug udregnes på i forhold til apps. Anvendes ikke af normale apps."</string>
-    <string name="permlab_accessNotifications" msgid="7673416487873432268">"adgang til underretninger"</string>
-    <string name="permdesc_accessNotifications" msgid="458457742683431387">"Tillader, at appen kan hente, undersøge og rydde underretninger, f.eks. dem, der er sendt af andre apps."</string>
-    <string name="permlab_bindNotificationListenerService" msgid="7057764742211656654">"forpligte sig til en underretningslyttertjeneste"</string>
-    <string name="permdesc_bindNotificationListenerService" msgid="985697918576902986">"Tillader brugeren at forpligte sig til en underretningslyttertjenestes grænseflade på øverste niveau. Bør aldrig være nødvendigt til almindelige apps."</string>
+    <string name="permlab_accessNotifications" msgid="7673416487873432268">"adgang til notifikationer"</string>
+    <string name="permdesc_accessNotifications" msgid="458457742683431387">"Tillader, at appen kan hente, undersøge og rydde notifikationer, f.eks. dem, der er sendt af andre apps."</string>
+    <string name="permlab_bindNotificationListenerService" msgid="7057764742211656654">"forpligte sig til en notifikationslyttertjeneste"</string>
+    <string name="permdesc_bindNotificationListenerService" msgid="985697918576902986">"Tillader brugeren at forpligte sig til en notifikationslyttertjenestes grænseflade på øverste niveau. Bør aldrig være nødvendigt til almindelige apps."</string>
     <string name="permlab_bindConditionProviderService" msgid="1180107672332704641">"oprette binding til en tjeneste til formidling af betingelser"</string>
     <string name="permdesc_bindConditionProviderService" msgid="1680513931165058425">"Tillader, at brugeren opretter en binding til det øverste niveau af grænsefladen i en tjeneste til formidling af betingelser. Dette bør aldrig være nødvendigt for almindelige apps."</string>
     <string name="permlab_bindDreamService" msgid="4153646965978563462">"fastlås til en drømmetjeneste"</string>
@@ -949,6 +947,8 @@
     <string name="save_password_never" msgid="8274330296785855105">"Aldrig"</string>
     <string name="open_permission_deny" msgid="7374036708316629800">"Du har ikke tilladelse til at åbne denne side."</string>
     <string name="text_copied" msgid="4985729524670131385">"Teksten er kopieret til udklipsholderen."</string>
+    <!-- no translation found for copied (8564151838171791598) -->
+    <skip />
     <string name="more_item_label" msgid="4650918923083320495">"Mere"</string>
     <string name="prepend_shortcut_label" msgid="2572214461676015642">"Menu+"</string>
     <string name="menu_meta_shortcut_label" msgid="4647153495550313570">"Meta+"</string>
@@ -1087,24 +1087,28 @@
     <string name="deleteText" msgid="6979668428458199034">"Slet"</string>
     <string name="inputMethod" msgid="1653630062304567879">"Inputmetode"</string>
     <string name="editTextMenuTitle" msgid="4909135564941815494">"Teksthandlinger"</string>
-    <string name="email" msgid="4560673117055050403">"E-mail"</string>
+    <string name="email" msgid="4560673117055050403">"Send mail"</string>
     <string name="email_desc" msgid="3638665569546416795">"Send en mail til den valgte adresse"</string>
     <string name="dial" msgid="1253998302767701559">"Ring op"</string>
     <string name="dial_desc" msgid="6573723404985517250">"Ring til det valgte telefonnummer"</string>
-    <string name="map" msgid="5441053548030107189">"Kort"</string>
+    <string name="map" msgid="5441053548030107189">"Åbn kort"</string>
     <string name="map_desc" msgid="1836995341943772348">"Find den valgte adresse"</string>
     <string name="browse" msgid="1245903488306147205">"Åbn"</string>
     <string name="browse_desc" msgid="8220976549618935044">"Åbn den valgte webadresse"</string>
-    <string name="sms" msgid="4560537514610063430">"Besked"</string>
+    <string name="sms" msgid="4560537514610063430">"Send besked"</string>
     <string name="sms_desc" msgid="7526588350969638809">"Send en besked til det valgte telefonnummer"</string>
     <string name="add_contact" msgid="7867066569670597203">"Tilføj"</string>
-    <string name="add_contact_desc" msgid="4830217847004590345">"Føj til kontaktpersoner"</string>
+    <string name="add_contact_desc" msgid="4830217847004590345">"Føj til kontakter"</string>
     <string name="view_calendar" msgid="979609872939597838">"Se"</string>
     <string name="view_calendar_desc" msgid="5828320291870344584">"Se det valgte tidspunkt i kalenderen"</string>
     <string name="add_calendar_event" msgid="1953664627192056206">"Planlæg"</string>
     <string name="add_calendar_event_desc" msgid="4326891793260687388">"Planlæg begivenhed på det valgte tidspunkt"</string>
     <string name="view_flight" msgid="7691640491425680214">"Spor"</string>
     <string name="view_flight_desc" msgid="3876322502674253506">"Følg det valgte fly"</string>
+    <string name="translate" msgid="9218619809342576858">"Oversæt"</string>
+    <string name="translate_desc" msgid="4502367770068777202">"Oversæt den markerede tekst"</string>
+    <string name="define" msgid="7394820043869954211">"Definer"</string>
+    <string name="define_desc" msgid="7910883642444919726">"Definer den markerede tekst"</string>
     <string name="low_internal_storage_view_title" msgid="5576272496365684834">"Der er snart ikke mere lagerplads"</string>
     <string name="low_internal_storage_view_text" msgid="6640505817617414371">"Nogle systemfunktioner virker måske ikke"</string>
     <string name="low_internal_storage_view_text_no_boot" msgid="6935190099204693424">"Der er ikke nok ledig lagerplads til systemet. Sørg for, at du har 250 MB ledig plads, og genstart."</string>
@@ -1124,10 +1128,13 @@
     <string name="whichViewApplication" msgid="3272778576700572102">"Åbn med"</string>
     <string name="whichViewApplicationNamed" msgid="2286418824011249620">"Åbn med %1$s"</string>
     <string name="whichViewApplicationLabel" msgid="2666774233008808473">"Åbn"</string>
+    <string name="whichGiveAccessToApplication" msgid="8279395245414707442">"Giv adgang til at åbne <xliff:g id="HOST">%1$s</xliff:g>-link med"</string>
+    <string name="whichGiveAccessToApplicationNamed" msgid="7992388824107710849">"Giv adgang til at åbne <xliff:g id="HOST">%1$s</xliff:g>-links med <xliff:g id="APPLICATION">%2$s</xliff:g>"</string>
+    <string name="whichGiveAccessToApplicationLabel" msgid="6142688895536868827">"Giv adgang"</string>
     <string name="whichEditApplication" msgid="144727838241402655">"Rediger med"</string>
     <string name="whichEditApplicationNamed" msgid="1775815530156447790">"Rediger med %1$s"</string>
     <string name="whichEditApplicationLabel" msgid="7183524181625290300">"Rediger"</string>
-    <string name="whichSendApplication" msgid="6902512414057341668">"Del med"</string>
+    <string name="whichSendApplication" msgid="5803792421724377602">"Del"</string>
     <string name="whichSendApplicationNamed" msgid="2799370240005424391">"Del med %1$s"</string>
     <string name="whichSendApplicationLabel" msgid="4579076294675975354">"Del"</string>
     <string name="whichSendToApplication" msgid="8272422260066642057">"Send via"</string>
@@ -1181,6 +1188,7 @@
     <string name="android_upgrading_title" product="tablet" msgid="4503169817302593560">"Denne tablet opdaterer…"</string>
     <string name="android_upgrading_title" product="device" msgid="7009520271220804517">"Enheden opdaterer…"</string>
     <string name="android_start_title" product="default" msgid="4536778526365907780">"Telefonen starter…"</string>
+    <string name="android_start_title" product="automotive" msgid="8418054686415318207">"Android starter..."</string>
     <string name="android_start_title" product="tablet" msgid="4929837533850340472">"Denne tablet starter…"</string>
     <string name="android_start_title" product="device" msgid="7467484093260449437">"Enheden starter…"</string>
     <string name="android_upgrading_fstrim" msgid="8036718871534640010">"Lageret optimeres."</string>
@@ -1209,19 +1217,19 @@
     <string name="volume_call" msgid="3941680041282788711">"Lydstyrke for opkald"</string>
     <string name="volume_bluetooth_call" msgid="2002891926351151534">"Lydstyrke for Bluetooth under opkald"</string>
     <string name="volume_alarm" msgid="1985191616042689100">"Lydstyrke for alarm"</string>
-    <string name="volume_notification" msgid="2422265656744276715">"Lydstyrke for underretninger"</string>
+    <string name="volume_notification" msgid="2422265656744276715">"Lydstyrke for notifikationer"</string>
     <string name="volume_unknown" msgid="1400219669770445902">"Lydstyrke"</string>
     <string name="volume_icon_description_bluetooth" msgid="6538894177255964340">"Lydstyrke for bluetooth"</string>
     <string name="volume_icon_description_ringer" msgid="3326003847006162496">"Lydstyrke for ringetone"</string>
     <string name="volume_icon_description_incall" msgid="8890073218154543397">"Lydstyrke for opkald"</string>
     <string name="volume_icon_description_media" msgid="4217311719665194215">"Lydstyrke for medier"</string>
-    <string name="volume_icon_description_notification" msgid="7044986546477282274">"Lydstyrke for underretninger"</string>
+    <string name="volume_icon_description_notification" msgid="7044986546477282274">"Lydstyrke for notifikationer"</string>
     <string name="ringtone_default" msgid="3789758980357696936">"Standardringetone"</string>
     <string name="ringtone_default_with_actual" msgid="1767304850491060581">"Standard (<xliff:g id="ACTUAL_RINGTONE">%1$s</xliff:g>)"</string>
     <string name="ringtone_silent" msgid="7937634392408977062">"Ingen"</string>
     <string name="ringtone_picker_title" msgid="3515143939175119094">"Ringetoner"</string>
     <string name="ringtone_picker_title_alarm" msgid="6473325356070549702">"Alarmlyde"</string>
-    <string name="ringtone_picker_title_notification" msgid="4837740874822788802">"Underretningslyde"</string>
+    <string name="ringtone_picker_title_notification" msgid="4837740874822788802">"Notifikationslyde"</string>
     <string name="ringtone_unknown" msgid="3914515995813061520">"Ukendt"</string>
     <plurals name="wifi_available" formatted="false" msgid="7900333017752027322">
       <item quantity="one">Tilgængelige Wi-Fi-netværk</item>
@@ -1239,6 +1247,10 @@
     <string name="wifi_available_content_failed_to_connect" msgid="3377406637062802645">"Tryk for at se alle netværk"</string>
     <string name="wifi_available_action_connect" msgid="2635699628459488788">"Opret forbindelse"</string>
     <string name="wifi_available_action_all_networks" msgid="4368435796357931006">"Alle netværk"</string>
+    <string name="wifi_suggestion_title" msgid="8951405130379148709">"<xliff:g id="NAME">%s</xliff:g> har foreslået et tilgængeligt Wi-Fi-netværk"</string>
+    <string name="wifi_suggestion_content" msgid="2658317015552324848">"Vil du oprette forbindelse til netværk, som <xliff:g id="NAME">%s</xliff:g> foreslår?"</string>
+    <string name="wifi_suggestion_action_allow_app" msgid="3689946344485394085">"Ja"</string>
+    <string name="wifi_suggestion_action_disallow_app" msgid="7977918905605931385">"Nej"</string>
     <string name="wifi_wakeup_onboarding_title" msgid="228772560195634292">"Wi‑Fi aktiveres automatisk"</string>
     <string name="wifi_wakeup_onboarding_subtext" msgid="3989697580301186973">"Når du er i nærheden af et gemt netværk af høj kvalitet"</string>
     <string name="wifi_wakeup_onboarding_action_disable" msgid="838648204200836028">"Aktivér ikke igen"</string>
@@ -1250,6 +1262,7 @@
     <skip />
     <string name="wifi_no_internet" msgid="8938267198124654938">"Wi-Fi-netværket har ikke internetadgang"</string>
     <string name="wifi_no_internet_detailed" msgid="8083079241212301741">"Tryk for at se valgmuligheder"</string>
+    <string name="captive_portal_logged_in_detailed" msgid="8489345381637456021">"Der er oprettet forbindelse"</string>
     <string name="wifi_softap_config_change" msgid="8475911871165857607">"Ændringer af dine indstillinger for hotspot"</string>
     <string name="wifi_softap_config_change_summary" msgid="7601233252456548891">"Dit hotspotbånd er ændret."</string>
     <string name="wifi_softap_config_change_detailed" msgid="8022936822860678033">"Denne enhed understøtter ikke din præference om kun 5 GHz. Denne enhed vil i stedet bruge 5 GHz-båndet, når det er muligt."</string>
@@ -1334,6 +1347,10 @@
     <string name="adb_active_notification_title" msgid="6729044778949189918">"USB-fejlretning er tilsluttet"</string>
     <string name="adb_active_notification_message" msgid="7463062450474107752">"Tryk for at deaktivere USB-fejlretning"</string>
     <string name="adb_active_notification_message" product="tv" msgid="8470296818270110396">"Vælg for at deaktivere USB-fejlretning."</string>
+    <string name="usb_contaminant_detected_title" msgid="7136400633704058349">"Væske eller snavs i USB-porten"</string>
+    <string name="usb_contaminant_detected_message" msgid="832337061059487250">"USB-porten deaktiveres automatisk. Tryk for at få flere oplysninger."</string>
+    <string name="usb_contaminant_not_detected_title" msgid="4202417484434906086">"Det er sikkert at bruge USB-porten"</string>
+    <string name="usb_contaminant_not_detected_message" msgid="2415791798244545292">"Telefonen registrerer ikke længere væske og snavs."</string>
     <string name="taking_remote_bugreport_notification_title" msgid="6742483073875060934">"Opretter fejlrapport…"</string>
     <string name="share_remote_bugreport_notification_title" msgid="4987095013583691873">"Vil du dele fejlrapporten?"</string>
     <string name="sharing_remote_bugreport_notification_title" msgid="7572089031496651372">"Deler fejlrapport…"</string>
@@ -1372,6 +1389,8 @@
     <string name="ext_media_init_action" msgid="7952885510091978278">"Konfigurer"</string>
     <string name="ext_media_unmount_action" msgid="1121883233103278199">"Skub ud"</string>
     <string name="ext_media_browse_action" msgid="8322172381028546087">"Udforsk"</string>
+    <!-- no translation found for ext_media_seamless_action (5356508985817068711) -->
+    <skip />
     <string name="ext_media_missing_title" msgid="620980315821543904">"<xliff:g id="NAME">%s</xliff:g> er ikke til stede"</string>
     <string name="ext_media_missing_message" msgid="4012389235250987930">"Indsæt enheden igen"</string>
     <string name="ext_media_move_specific_title" msgid="1471100343872375842">"Flytter <xliff:g id="NAME">%s</xliff:g>"</string>
@@ -1427,10 +1446,10 @@
     <string name="accessibility_binding_label" msgid="4148120742096474641">"Hjælpefunktioner"</string>
     <string name="wallpaper_binding_label" msgid="1240087844304687662">"Baggrund"</string>
     <string name="chooser_wallpaper" msgid="7873476199295190279">"Skift baggrund"</string>
-    <string name="notification_listener_binding_label" msgid="2014162835481906429">"Underretningslytter"</string>
+    <string name="notification_listener_binding_label" msgid="2014162835481906429">"Notifikationslytter"</string>
     <string name="vr_listener_binding_label" msgid="4316591939343607306">"VR-lyttefunktion"</string>
     <string name="condition_provider_service_binding_label" msgid="1321343352906524564">"Tjeneste til formidling af betingelser"</string>
-    <string name="notification_ranker_binding_label" msgid="774540592299064747">"Tjeneste til rangering af underretninger"</string>
+    <string name="notification_ranker_binding_label" msgid="774540592299064747">"Tjeneste til rangering af notifikationer"</string>
     <string name="vpn_title" msgid="19615213552042827">"VPN er aktiveret."</string>
     <string name="vpn_title_long" msgid="6400714798049252294">"VPN aktiveres af <xliff:g id="APP">%s</xliff:g>"</string>
     <string name="vpn_text" msgid="1610714069627824309">"Tryk for at administrere netværket."</string>
@@ -1460,8 +1479,7 @@
       <item quantity="other"><xliff:g id="INDEX">%d</xliff:g> af <xliff:g id="TOTAL">%d</xliff:g></item>
     </plurals>
     <string name="action_mode_done" msgid="7217581640461922289">"Udfør"</string>
-    <string name="progress_erasing" product="nosdcard" msgid="4521573321524340058">"Sletter USB-lageret..."</string>
-    <string name="progress_erasing" product="default" msgid="6596988875507043042">"Sletter SD-kortet..."</string>
+    <string name="progress_erasing" msgid="2569962663843586562">"Sletter delt lagerplads…"</string>
     <string name="share" msgid="1778686618230011964">"Del"</string>
     <string name="find" msgid="4808270900322985960">"Find"</string>
     <string name="websearch" msgid="4337157977400211589">"Websøgning"</string>
@@ -1558,6 +1576,7 @@
     <string name="SetupCallDefault" msgid="5834948469253758575">"Vil du besvare opkaldet?"</string>
     <string name="activity_resolver_use_always" msgid="8017770747801494933">"Altid"</string>
     <string name="activity_resolver_use_once" msgid="2404644797149173758">"Kun én gang"</string>
+    <string name="activity_resolver_app_settings" msgid="8965806928986509855">"Indstillinger"</string>
     <string name="activity_resolver_work_profiles_support" msgid="185598180676883455">"%1$s understøtter ikke arbejdsprofil"</string>
     <string name="default_audio_route_name" product="tablet" msgid="4617053898167127471">"Tablet"</string>
     <string name="default_audio_route_name" product="tv" msgid="9158088547603019321">"Tv"</string>
@@ -1637,7 +1656,7 @@
     <string name="color_correction_feature_name" msgid="6779391426096954933">"Korriger farve"</string>
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"Genvejen til hjælpefunktioner aktiverede <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"Genvejen til hjælpefunktioner deaktiverede <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="accessibility_shortcut_spoken_feedback" msgid="6143872712930414829">"Brug Genvej til hjælpefunktioner for at starte den aktuelle hjælpefunktion"</string>
+    <string name="accessibility_shortcut_spoken_feedback" msgid="8376923232350078434">"Hold begge lydstyrkeknapper nede i tre sekunder for at bruge <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
     <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"Vælg, hvilken funktion du vil bruge, når du trykker på knappen Hjælpefunktioner:"</string>
     <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"Tryk på knappen Hjælpefunktioner, og hold fingeren nede for at skifte funktioner."</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"Forstørrelse"</string>
@@ -1833,8 +1852,7 @@
     <string name="stk_cc_ss_to_ussd" msgid="5614626512855868785">"SS-anmodningen blev ændret til en USSD-anmodning"</string>
     <string name="stk_cc_ss_to_ss" msgid="7716729801537709054">"Ændret til en SS-anmodning"</string>
     <string name="notification_work_profile_content_description" msgid="4600554564103770764">"Arbejdsprofil"</string>
-    <!-- no translation found for notification_alerted_content_description (1296617716556420585) -->
-    <skip />
+    <string name="notification_alerted_content_description" msgid="1296617716556420585">"Underrettet"</string>
     <string name="expand_button_content_description_collapsed" msgid="3609784019345534652">"Udvid"</string>
     <string name="expand_button_content_description_expanded" msgid="8520652707158554895">"Skjul"</string>
     <string name="expand_action_accessibility" msgid="5307730695723718254">"Slå udvidelse til eller fra"</string>
@@ -1851,7 +1869,7 @@
       <item quantity="other"><xliff:g id="COUNT_1">%1$d</xliff:g> valgt</item>
     </plurals>
     <string name="default_notification_channel_label" msgid="5929663562028088222">"Uden kategori"</string>
-    <string name="importance_from_user" msgid="7318955817386549931">"Du angiver, hvor vigtige disse underretninger er."</string>
+    <string name="importance_from_user" msgid="7318955817386549931">"Du angiver, hvor vigtige disse notifikationer er."</string>
     <string name="importance_from_person" msgid="9160133597262938296">"Dette er vigtigt på grund af de personer, det handler om."</string>
     <string name="user_creation_account_exists" msgid="1942606193570143289">"Vil du give <xliff:g id="APP">%1$s</xliff:g> tilladelse til at oprette en ny bruger med <xliff:g id="ACCOUNT">%2$s</xliff:g>?"</string>
     <string name="user_creation_adding" msgid="4482658054622099197">"Vil du give <xliff:g id="APP">%1$s</xliff:g> tilladelse til at oprette en ny bruger med <xliff:g id="ACCOUNT">%2$s</xliff:g> (der findes allerede en bruger med denne konto)?"</string>
@@ -1866,7 +1884,7 @@
     <string name="app_suspended_default_message" msgid="123166680425711887">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> er ikke tilgængelig lige nu. Dette administreres af <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="1131804827776778187">"Få flere oplysninger"</string>
     <string name="work_mode_off_title" msgid="1118691887588435530">"Skal arbejdsprofilen slås til?"</string>
-    <string name="work_mode_off_message" msgid="5130856710614337649">"Dine arbejdsapps, underretninger, data og andre funktioner til din arbejdsprofil deaktiveres"</string>
+    <string name="work_mode_off_message" msgid="5130856710614337649">"Dine arbejdsapps, notifikationer, data og andre funktioner til din arbejdsprofil deaktiveres"</string>
     <string name="work_mode_turn_on" msgid="2062544985670564875">"Slå til"</string>
     <string name="deprecated_target_sdk_message" msgid="1449696506742572767">"Denne app er lavet til en ældre version af Android og fungerer muligvis ikke korrekt. Prøv at søge efter opdateringer, eller kontakt udvikleren."</string>
     <string name="deprecated_target_sdk_app_store" msgid="5032340500368495077">"Søg efter opdatering"</string>
@@ -1955,11 +1973,11 @@
     <string name="harmful_app_warning_title" msgid="8982527462829423432">"Der er registreret en skadelig app"</string>
     <string name="slices_permission_request" msgid="8484943441501672932">"<xliff:g id="APP_0">%1$s</xliff:g> anmoder om tilladelse til at vise eksempler fra <xliff:g id="APP_2">%2$s</xliff:g>"</string>
     <string name="screenshot_edit" msgid="7867478911006447565">"Rediger"</string>
-    <string name="volume_dialog_ringer_guidance_vibrate" msgid="8902050240801159042">"Telefonen vil vibrere ved opkald og underretninger"</string>
-    <string name="volume_dialog_ringer_guidance_silent" msgid="2128975224280276122">"Der afspilles ikke lyd ved opkald og underretninger"</string>
+    <string name="volume_dialog_ringer_guidance_vibrate" msgid="8902050240801159042">"Telefonen vil vibrere ved opkald og notifikationer"</string>
+    <string name="volume_dialog_ringer_guidance_silent" msgid="2128975224280276122">"Der afspilles ikke lyd ved opkald og notifikationer"</string>
     <string name="notification_channel_system_changes" msgid="5072715579030948646">"Systemændringer"</string>
     <string name="notification_channel_do_not_disturb" msgid="6766940333105743037">"Forstyr ikke"</string>
-    <string name="zen_upgrade_notification_visd_title" msgid="3288313883409759733">"Nyhed! Forstyr ikke skjuler underretninger"</string>
+    <string name="zen_upgrade_notification_visd_title" msgid="3288313883409759733">"Nyhed! Forstyr ikke skjuler notifikationer"</string>
     <string name="zen_upgrade_notification_visd_content" msgid="5533674060311631165">"Tryk for at få flere oplysninger og foretage ændringer."</string>
     <string name="zen_upgrade_notification_title" msgid="3799603322910377294">"Tilstanden Forstyr ikke blev ændret"</string>
     <string name="zen_upgrade_notification_content" msgid="1794994264692424562">"Tryk for at se, hvad der er blokeret."</string>
@@ -1968,5 +1986,8 @@
     <string name="notification_appops_camera_active" msgid="5050283058419699771">"Kamera"</string>
     <string name="notification_appops_microphone_active" msgid="4335305527588191730">"Mikrofon"</string>
     <string name="notification_appops_overlay_active" msgid="633813008357934729">"vises over andre apps på din skærm"</string>
+    <string name="dynamic_mode_notification_channel_name" msgid="2348803891571320452">"Notifikation med oplysninger om rutinetilstand"</string>
+    <string name="dynamic_mode_notification_title" msgid="508815255807182035">"Enheden løber muligvis tør for batteri, inden du normalt oplader den"</string>
+    <string name="dynamic_mode_notification_summary" msgid="2541166298550402690">"Batterisparefunktion er aktiveret for at forlænge batteritiden"</string>
     <string name="car_loading_profile" msgid="3545132581795684027">"Indlæser"</string>
 </resources>

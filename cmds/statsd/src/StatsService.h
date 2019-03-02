@@ -132,6 +132,17 @@ public:
                                             const String16& packageName) override;
 
     /**
+     * Binder call to let clients register the active configs changed operation.
+     */
+    virtual Status setActiveConfigsChangedOperation(const sp<android::IBinder>& intentSender,
+                                                    const String16& packageName,
+                                                    vector<int64_t>* output) override;
+
+    /**
+     * Binder call to remove the active configs changed operation for the specified package..
+     */
+    virtual Status removeActiveConfigsChangedOperation(const String16& packageName) override;
+    /**
      * Binder call to allow clients to remove the specified configuration.
      */
     virtual Status removeConfiguration(int64_t key,
@@ -198,6 +209,23 @@ public:
      */
     virtual Return<void> reportBatteryCausedShutdown(
             const BatteryCausedShutdown& batteryCausedShutdown) override;
+
+    /**
+     * Binder call to get UsbPortOverheatEvent atom.
+     */
+    virtual Return<void> reportUsbPortOverheatEvent(
+            const UsbPortOverheatEvent& usbPortOverheatEvent) override;
+
+    /**
+     * Binder call to get Speech DSP state atom.
+     */
+    virtual Return<void> reportSpeechDspStat(
+            const SpeechDspStat& speechDspStat) override;
+
+    /**
+     * Binder call to get vendor atom.
+     */
+    virtual Return<void> reportVendorAtom(const VendorAtom& vendorAtom) override;
 
     /** IBinder::DeathRecipient */
     virtual void binderDied(const wp<IBinder>& who) override;
@@ -291,6 +319,15 @@ private:
     status_t cmd_print_logs(int outFd, const Vector<String8>& args);
 
     /**
+     * Writes the value of args[uidArgIndex] into uid.
+     * Returns whether the uid is reasonable (type uid_t) and whether
+     * 1. it is equal to the calling uid, or
+     * 2. the device is mEngBuild, or
+     * 3. the caller is AID_ROOT and the uid is AID_SHELL (i.e. ROOT can impersonate SHELL).
+     */
+    bool getUidFromArgs(const Vector<String8>& args, size_t uidArgIndex, int32_t& uid);
+
+    /**
      * Adds a configuration after checking permissions and obtaining UID from binder call.
      */
     bool addConfigurationChecked(int uid, int64_t key, const vector<uint8_t>& config);
@@ -340,6 +377,7 @@ private:
     FRIEND_TEST(StatsServiceTest, TestAddConfig_simple);
     FRIEND_TEST(StatsServiceTest, TestAddConfig_empty);
     FRIEND_TEST(StatsServiceTest, TestAddConfig_invalid);
+    FRIEND_TEST(StatsServiceTest, TestGetUidFromArgs);
     FRIEND_TEST(PartialBucketE2eTest, TestCountMetricNoSplitOnNewApp);
     FRIEND_TEST(PartialBucketE2eTest, TestCountMetricSplitOnUpgrade);
     FRIEND_TEST(PartialBucketE2eTest, TestCountMetricSplitOnRemoval);

@@ -21,10 +21,8 @@ import static android.app.NotificationManager.IMPORTANCE_HIGH;
 import static android.app.NotificationManager.IMPORTANCE_LOW;
 import static android.app.NotificationManager.IMPORTANCE_MIN;
 import static android.app.NotificationManager.IMPORTANCE_UNSPECIFIED;
-import static android.service.notification.NotificationListenerService.Ranking
-        .USER_SENTIMENT_NEUTRAL;
-import static android.service.notification.NotificationListenerService.Ranking
-        .USER_SENTIMENT_POSITIVE;
+import static android.service.notification.NotificationListenerService.Ranking.USER_SENTIMENT_NEUTRAL;
+import static android.service.notification.NotificationListenerService.Ranking.USER_SENTIMENT_POSITIVE;
 
 import android.annotation.Nullable;
 import android.app.ActivityManager;
@@ -93,7 +91,8 @@ import java.util.Objects;
 public final class NotificationRecord {
     static final String TAG = "NotificationRecord";
     static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
-    private static final int MAX_LOGTAG_LENGTH = 35;
+    // the period after which a notification is updated where it can make sound
+    private static final int MAX_SOUND_DELAY_MS = 2000;
     final StatusBarNotification sbn;
     IActivityManager mAm;
     UriGrantsManagerInternal mUgmInternal;
@@ -127,12 +126,16 @@ public final class NotificationRecord {
     private long mVisibleSinceMs;
 
     // The most recent update time, or the creation time if no updates.
-    private long mUpdateTimeMs;
+    @VisibleForTesting
+    final long mUpdateTimeMs;
 
     // The most recent interruption time, or the creation time if no updates. Differs from the
     // above value because updates are filtered based on whether they actually interrupted the
     // user
     private long mInterruptionTimeMs;
+
+    // The most recent time the notification made noise or buzzed the device, or -1 if it did not.
+    private long mLastAudiblyAlertedMs;
 
     // Is this record an update of an old record?
     public boolean isUpdate;
@@ -150,7 +153,6 @@ public final class NotificationRecord {
 
     private int mSuppressedVisualEffects = 0;
     private String mUserExplanation;
-    private String mPeopleExplanation;
     private boolean mPreChannelsNotification = true;
     private Uri mSound;
     private long[] mVibration;
@@ -159,13 +161,10 @@ public final class NotificationRecord {
     private ArrayList<String> mPeopleOverride;
     private ArrayList<SnoozeCriterion> mSnoozeCriteria;
     private boolean mShowBadge;
-    private LogMaker mLogMaker;
     private Light mLight;
-    private String mGroupLogTag;
-    private String mChannelIdLogTag;
     /**
      * This list contains system generated smart actions from NAS, app-generated smart actions are
-     * stored in Notification.actions marked as SEMANTIC_ACTION_CONTEXTUAL_SUGGESTION.
+     * stored in Notification.actions with isContextual() set to true.
      */
     private ArrayList<Notification.Action> mSystemGeneratedSmartActions;
     private ArrayList<CharSequence> mSmartReplies;
@@ -174,10 +173,11 @@ public final class NotificationRecord {
     private final NotificationStats mStats;
     private int mUserSentiment;
     private boolean mIsInterruptive;
-    private boolean mAudiblyAlerted;
     private boolean mTextChanged;
     private boolean mRecordedInterruption;
     private int mNumberOfSmartRepliesAdded;
+    private int mNumberOfSmartActionsAdded;
+    private boolean mSuggestionsGeneratedByAssistant;
     private boolean mHasSeenSmartReplies;
     /**
      * Whether this notification (and its channels) should be considered user locked. Used in
@@ -609,6 +609,17 @@ public final class NotificationRecord {
                 mIsAppImportanceLocked, this.sbn.getNotification());
     }
 
+    public boolean hasAdjustment(String key) {
+        synchronized (mAdjustments) {
+            for (Adjustment adjustment : mAdjustments) {
+                if (adjustment.getSignals().containsKey(key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public void addAdjustment(Adjustment adjustment) {
         synchronized (mAdjustments) {
             mAdjustments.add(adjustment);
@@ -656,31 +667,19 @@ public final class NotificationRecord {
                                         getUserSentiment()));
                     }
                 }
-                if (signals.containsKey(Adjustment.KEY_SMART_ACTIONS)) {
+                if (signals.containsKey(Adjustment.KEY_CONTEXTUAL_ACTIONS)) {
                     setSystemGeneratedSmartActions(
-                            signals.getParcelableArrayList(Adjustment.KEY_SMART_ACTIONS));
+                            signals.getParcelableArrayList(Adjustment.KEY_CONTEXTUAL_ACTIONS));
                     MetricsLogger.action(getAdjustmentLogMaker()
                             .addTaggedData(MetricsEvent.ADJUSTMENT_KEY_SMART_ACTIONS,
                                     getSystemGeneratedSmartActions().size()));
                 }
-                if (signals.containsKey(Adjustment.KEY_SMART_REPLIES)) {
-                    setSmartReplies(signals.getCharSequenceArrayList(Adjustment.KEY_SMART_REPLIES));
+                if (signals.containsKey(Adjustment.KEY_TEXT_REPLIES)) {
+                    setSmartReplies(signals.getCharSequenceArrayList(Adjustment.KEY_TEXT_REPLIES));
                     MetricsLogger.action(getAdjustmentLogMaker()
                             .addTaggedData(MetricsEvent.ADJUSTMENT_KEY_SMART_REPLIES,
                                     getSmartReplies().size()));
                 }
-            }
-            applyImportanceFromAdjustments();
-        }
-    }
-
-    /**
-     * Update importance from the adjustment.
-     */
-    public void applyImportanceFromAdjustments() {
-        synchronized (mAdjustments) {
-            for (Adjustment adjustment : mAdjustments) {
-                Bundle signals = adjustment.getSignals();
                 if (signals.containsKey(Adjustment.KEY_IMPORTANCE)) {
                     int importance = signals.getInt(Adjustment.KEY_IMPORTANCE);
                     importance = Math.max(IMPORTANCE_UNSPECIFIED, importance);
@@ -691,6 +690,8 @@ public final class NotificationRecord {
                                     importance));
                 }
             }
+            // We have now gotten all the information out of the adjustments and can forget them.
+            mAdjustments.clear();
         }
     }
 
@@ -752,6 +753,8 @@ public final class NotificationRecord {
      */
     public void setSystemImportance(int importance) {
         mSystemImportance = importance;
+        // System importance is only changed in enqueue, so it's ok for us to calculate the
+        // importance directly instead of waiting for signal extractor.
         calculateImportance();
     }
 
@@ -762,7 +765,16 @@ public final class NotificationRecord {
      */
     public void setAssistantImportance(int importance) {
         mAssistantImportance = importance;
-        calculateImportance();
+        // Unlike the system importance, the assistant importance can change on posted
+        // notifications, so don't calculateImportance() here, but wait for the signal extractors.
+    }
+
+    /**
+     * Returns the importance set by the assistant, or IMPORTANCE_UNSPECIFIED if the assistant
+     * hasn't set it.
+     */
+    public int getAssistantImportance() {
+        return mAssistantImportance;
     }
 
     /**
@@ -774,7 +786,9 @@ public final class NotificationRecord {
         if (getChannel().hasUserSetImportance()) {
             mImportanceExplanation = "user";
         }
-        if (!getChannel().hasUserSetImportance() && mAssistantImportance != IMPORTANCE_UNSPECIFIED) {
+        if (!getChannel().hasUserSetImportance()
+                && mAssistantImportance != IMPORTANCE_UNSPECIFIED
+                && !getChannel().isImportanceLockedByOEM()) {
             mImportance = mAssistantImportance;
             mImportanceExplanation = "asst";
         }
@@ -812,6 +826,10 @@ public final class NotificationRecord {
 
     public boolean isIntercepted() {
         return mIntercept;
+    }
+
+    public boolean isNewEnoughForAlerting(long now) {
+        return getFreshnessMs(now) <= MAX_SOUND_DELAY_MS;
     }
 
     public void setHidden(boolean hidden) {
@@ -950,33 +968,6 @@ public final class NotificationRecord {
 
     public void setOverrideGroupKey(String overrideGroupKey) {
         sbn.setOverrideGroupKey(overrideGroupKey);
-        mGroupLogTag = null;
-    }
-
-    private String getGroupLogTag() {
-        if (mGroupLogTag == null) {
-            mGroupLogTag = shortenTag(sbn.getGroup());
-        }
-        return mGroupLogTag;
-    }
-
-    private String getChannelIdLogTag() {
-        if (mChannelIdLogTag == null) {
-            mChannelIdLogTag = shortenTag(mChannel.getId());
-        }
-        return mChannelIdLogTag;
-    }
-
-    private String shortenTag(String longTag) {
-        if (longTag == null) {
-            return null;
-        }
-        if (longTag.length() < MAX_LOGTAG_LENGTH) {
-            return longTag;
-        } else {
-            return longTag.substring(0, MAX_LOGTAG_LENGTH - 8) + "-" +
-                    Integer.toHexString(longTag.hashCode());
-        }
     }
 
     public NotificationChannel getChannel() {
@@ -1042,7 +1033,7 @@ public final class NotificationRecord {
     }
 
     public void setAudiblyAlerted(boolean audiblyAlerted) {
-        mAudiblyAlerted = audiblyAlerted;
+        mLastAudiblyAlertedMs = audiblyAlerted ? System.currentTimeMillis() : -1;
     }
 
     public void setTextChanged(boolean textChanged) {
@@ -1061,9 +1052,9 @@ public final class NotificationRecord {
         return mIsInterruptive;
     }
 
-    /** Returns true if the notification audibly alerted the user. */
-    public boolean getAudiblyAlerted() {
-        return mAudiblyAlerted;
+    /** Returns the time the notification audibly alerted the user. */
+    public long getLastAudiblyAlertedMs() {
+        return mLastAudiblyAlertedMs;
     }
 
     protected void setPeopleOverride(ArrayList<String> people) {
@@ -1129,12 +1120,35 @@ public final class NotificationRecord {
         return mNumberOfSmartRepliesAdded;
     }
 
+    public void setNumSmartActionsAdded(int noActions) {
+        mNumberOfSmartActionsAdded = noActions;
+    }
+
+    public int getNumSmartActionsAdded() {
+        return mNumberOfSmartActionsAdded;
+    }
+
+    public void setSuggestionsGeneratedByAssistant(boolean generatedByAssistant) {
+        mSuggestionsGeneratedByAssistant = generatedByAssistant;
+    }
+
+    public boolean getSuggestionsGeneratedByAssistant() {
+        return mSuggestionsGeneratedByAssistant;
+    }
+
     public boolean hasSeenSmartReplies() {
         return mHasSeenSmartReplies;
     }
 
     public void setSeenSmartReplies(boolean hasSeenSmartReplies) {
         mHasSeenSmartReplies = hasSeenSmartReplies;
+    }
+
+    /**
+     * Returns whether this notification has been visible and expanded at the same time.
+     */
+    public boolean hasBeenVisiblyExpanded() {
+        return stats.hasBeenVisiblyExpanded();
     }
 
     public void setSystemGeneratedSmartActions(
@@ -1152,6 +1166,13 @@ public final class NotificationRecord {
 
     public ArrayList<CharSequence> getSmartReplies() {
         return mSmartReplies;
+    }
+
+    /**
+     * Returns whether this notification was posted by a secondary app
+     */
+    public boolean isProxied() {
+        return !Objects.equals(sbn.getPackageName(), sbn.getOpPkg());
     }
 
     /**
@@ -1223,24 +1244,9 @@ public final class NotificationRecord {
     }
 
     public LogMaker getLogMaker(long now) {
-        if (mLogMaker == null) {
-            // initialize fields that only change on update (so a new record)
-            mLogMaker = new LogMaker(MetricsEvent.VIEW_UNKNOWN)
-                    .setPackageName(sbn.getPackageName())
-                    .addTaggedData(MetricsEvent.NOTIFICATION_ID, sbn.getId())
-                    .addTaggedData(MetricsEvent.NOTIFICATION_TAG, sbn.getTag())
-                    .addTaggedData(MetricsEvent.FIELD_NOTIFICATION_CHANNEL_ID, getChannelIdLogTag());
-        }
-        // reset fields that can change between updates, or are used by multiple logs
-        return mLogMaker
-                .clearCategory()
-                .clearType()
-                .clearSubtype()
+        return sbn.getLogMaker()
                 .clearTaggedData(MetricsEvent.NOTIFICATION_SHADE_INDEX)
                 .addTaggedData(MetricsEvent.FIELD_NOTIFICATION_CHANNEL_IMPORTANCE, mImportance)
-                .addTaggedData(MetricsEvent.FIELD_NOTIFICATION_GROUP_ID, getGroupLogTag())
-                .addTaggedData(MetricsEvent.FIELD_NOTIFICATION_GROUP_SUMMARY,
-                        sbn.getNotification().isGroupSummary() ? 1 : 0)
                 .addTaggedData(MetricsEvent.NOTIFICATION_SINCE_CREATE_MILLIS, getLifespanMs(now))
                 .addTaggedData(MetricsEvent.NOTIFICATION_SINCE_UPDATE_MILLIS, getFreshnessMs(now))
                 .addTaggedData(MetricsEvent.NOTIFICATION_SINCE_VISIBLE_MILLIS, getExposureMs(now))
@@ -1259,7 +1265,7 @@ public final class NotificationRecord {
     public LogMaker getAdjustmentLogMaker() {
         return getLogMaker()
                 .setCategory(MetricsEvent.NOTIFICATION_ITEM)
-                .setType(MetricsEvent.NOTIFICATION_ASSISTANT_ADJUSTMENT);
+                .setType(MetricsEvent.TYPE_NOTIFICATION_ASSISTANT_ADJUSTMENT);
     }
 
     @VisibleForTesting

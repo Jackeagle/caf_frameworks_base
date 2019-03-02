@@ -17,13 +17,11 @@
 package android.os;
 
 import static android.system.OsConstants.AF_UNIX;
-import static android.system.OsConstants.O_APPEND;
-import static android.system.OsConstants.O_CREAT;
-import static android.system.OsConstants.O_RDONLY;
-import static android.system.OsConstants.O_RDWR;
-import static android.system.OsConstants.O_TRUNC;
-import static android.system.OsConstants.O_WRONLY;
+import static android.system.OsConstants.F_DUPFD;
+import static android.system.OsConstants.F_DUPFD_CLOEXEC;
+import static android.system.OsConstants.O_CLOEXEC;
 import static android.system.OsConstants.SEEK_SET;
+import static android.system.OsConstants.SOCK_CLOEXEC;
 import static android.system.OsConstants.SOCK_SEQPACKET;
 import static android.system.OsConstants.SOCK_STREAM;
 import static android.system.OsConstants.S_IROTH;
@@ -33,6 +31,7 @@ import static android.system.OsConstants.S_ISLNK;
 import static android.system.OsConstants.S_ISREG;
 import static android.system.OsConstants.S_IWOTH;
 
+import android.annotation.TestApi;
 import android.content.BroadcastReceiver;
 import android.content.ContentProvider;
 import android.os.MessageQueue.OnFileDescriptorEventListener;
@@ -43,6 +42,7 @@ import android.system.StructStat;
 import android.util.Log;
 
 import dalvik.system.CloseGuard;
+import dalvik.system.VMRuntime;
 
 import libcore.io.IoUtils;
 import libcore.io.Memory;
@@ -55,6 +55,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.io.UncheckedIOException;
 import java.net.DatagramSocket;
 import java.net.Socket;
 import java.nio.ByteOrder;
@@ -254,8 +255,16 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
     }
 
     /** {@hide} */
-    public static ParcelFileDescriptor fromFd(
-            FileDescriptor fd, Handler handler, final OnCloseListener listener) throws IOException {
+    public static ParcelFileDescriptor fromPfd(ParcelFileDescriptor pfd, Handler handler,
+            final OnCloseListener listener) throws IOException {
+        final FileDescriptor original = new FileDescriptor();
+        original.setInt$(pfd.detachFd());
+        return fromFd(original, handler, listener);
+    }
+
+    /** {@hide} */
+    public static ParcelFileDescriptor fromFd(FileDescriptor fd, Handler handler,
+            final OnCloseListener listener) throws IOException {
         if (handler == null) {
             throw new IllegalArgumentException("Handler must not be null");
         }
@@ -291,7 +300,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
     }
 
     private static FileDescriptor openInternal(File file, int mode) throws FileNotFoundException {
-        final int flags = FileUtils.translateModePfdToPosix(mode);
+        final int flags = FileUtils.translateModePfdToPosix(mode) | ifAtLeastQ(O_CLOEXEC);
 
         int realMode = S_IRWXU | S_IRWXG;
         if ((mode & MODE_WORLD_READABLE) != 0) realMode |= S_IROTH;
@@ -313,7 +322,9 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
      */
     public static ParcelFileDescriptor dup(FileDescriptor orig) throws IOException {
         try {
-            final FileDescriptor fd = Os.dup(orig);
+            final FileDescriptor fd = new FileDescriptor();
+            int intfd = Os.fcntlInt(orig, (isAtLeastQ() ? F_DUPFD_CLOEXEC : F_DUPFD), 0);
+            fd.setInt$(intfd);
             return new ParcelFileDescriptor(fd);
         } catch (ErrnoException e) {
             throw e.rethrowAsIOException();
@@ -349,7 +360,9 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
         original.setInt$(fd);
 
         try {
-            final FileDescriptor dup = Os.dup(original);
+            final FileDescriptor dup = new FileDescriptor();
+            int intfd = Os.fcntlInt(original, (isAtLeastQ() ? F_DUPFD_CLOEXEC : F_DUPFD), 0);
+            dup.setInt$(intfd);
             return new ParcelFileDescriptor(dup);
         } catch (ErrnoException e) {
             throw e.rethrowAsIOException();
@@ -382,26 +395,41 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
      * @param socket The Socket whose FileDescriptor is used to create
      *               a new ParcelFileDescriptor.
      *
-     * @return A new ParcelFileDescriptor with the FileDescriptor of the
-     *         specified Socket.
+     * @return A new ParcelFileDescriptor with a duped copy of the
+     * FileDescriptor of the specified Socket.
+     *
+     * @throws UncheckedIOException if {@link #dup(FileDescriptor)} throws IOException.
      */
     public static ParcelFileDescriptor fromSocket(Socket socket) {
         FileDescriptor fd = socket.getFileDescriptor$();
-        return fd != null ? new ParcelFileDescriptor(fd) : null;
+        try {
+            return fd != null ? ParcelFileDescriptor.dup(fd) : null;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
-     * Create a new ParcelFileDescriptor from the specified DatagramSocket.
+     * Create a new ParcelFileDescriptor from the specified DatagramSocket. The
+     * new ParcelFileDescriptor holds a dup of the original FileDescriptor in
+     * the DatagramSocket, so you must still close the DatagramSocket as well
+     * as the new ParcelFileDescriptor.
      *
      * @param datagramSocket The DatagramSocket whose FileDescriptor is used
      *               to create a new ParcelFileDescriptor.
      *
-     * @return A new ParcelFileDescriptor with the FileDescriptor of the
-     *         specified DatagramSocket.
+     * @return A new ParcelFileDescriptor with a duped copy of the
+     * FileDescriptor of the specified Socket.
+     *
+     * @throws UncheckedIOException if {@link #dup(FileDescriptor)} throws IOException.
      */
     public static ParcelFileDescriptor fromDatagramSocket(DatagramSocket datagramSocket) {
         FileDescriptor fd = datagramSocket.getFileDescriptor$();
-        return fd != null ? new ParcelFileDescriptor(fd) : null;
+        try {
+            return fd != null ? ParcelFileDescriptor.dup(fd) : null;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
@@ -411,7 +439,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
      */
     public static ParcelFileDescriptor[] createPipe() throws IOException {
         try {
-            final FileDescriptor[] fds = Os.pipe();
+            final FileDescriptor[] fds = Os.pipe2(ifAtLeastQ(O_CLOEXEC));
             return new ParcelFileDescriptor[] {
                     new ParcelFileDescriptor(fds[0]),
                     new ParcelFileDescriptor(fds[1]) };
@@ -433,7 +461,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
     public static ParcelFileDescriptor[] createReliablePipe() throws IOException {
         try {
             final FileDescriptor[] comm = createCommSocketPair();
-            final FileDescriptor[] fds = Os.pipe();
+            final FileDescriptor[] fds = Os.pipe2(ifAtLeastQ(O_CLOEXEC));
             return new ParcelFileDescriptor[] {
                     new ParcelFileDescriptor(fds[0], comm[0]),
                     new ParcelFileDescriptor(fds[1], comm[1]) };
@@ -457,7 +485,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
         try {
             final FileDescriptor fd0 = new FileDescriptor();
             final FileDescriptor fd1 = new FileDescriptor();
-            Os.socketpair(AF_UNIX, type, 0, fd0, fd1);
+            Os.socketpair(AF_UNIX, type | ifAtLeastQ(SOCK_CLOEXEC), 0, fd0, fd1);
             return new ParcelFileDescriptor[] {
                     new ParcelFileDescriptor(fd0),
                     new ParcelFileDescriptor(fd1) };
@@ -487,7 +515,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
             final FileDescriptor[] comm = createCommSocketPair();
             final FileDescriptor fd0 = new FileDescriptor();
             final FileDescriptor fd1 = new FileDescriptor();
-            Os.socketpair(AF_UNIX, type, 0, fd0, fd1);
+            Os.socketpair(AF_UNIX, type | ifAtLeastQ(SOCK_CLOEXEC), 0, fd0, fd1);
             return new ParcelFileDescriptor[] {
                     new ParcelFileDescriptor(fd0, comm[0]),
                     new ParcelFileDescriptor(fd1, comm[1]) };
@@ -503,7 +531,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
             // across multiple IO operations.
             final FileDescriptor comm1 = new FileDescriptor();
             final FileDescriptor comm2 = new FileDescriptor();
-            Os.socketpair(AF_UNIX, SOCK_SEQPACKET, 0, comm1, comm2);
+            Os.socketpair(AF_UNIX, SOCK_SEQPACKET | ifAtLeastQ(SOCK_CLOEXEC), 0, comm1, comm2);
             IoUtils.setBlocking(comm1, false);
             IoUtils.setBlocking(comm2, false);
             return new FileDescriptor[] { comm1, comm2 };
@@ -531,7 +559,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
         }
         file.deactivate();
         FileDescriptor fd = file.getFileDescriptor();
-        return fd != null ? new ParcelFileDescriptor(fd) : null;
+        return fd != null ? ParcelFileDescriptor.dup(fd) : null;
     }
 
     /**
@@ -553,6 +581,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
      *
      * @hide
      */
+    @TestApi
     public static File getFile(FileDescriptor fd) throws IOException {
         try {
             final String path = Os.readlink("/proc/self/fd/" + fd.getInt$());
@@ -1108,5 +1137,13 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
         public String toString() {
             return "{" + status + ": " + msg + "}";
         }
+    }
+
+    private static boolean isAtLeastQ() {
+        return (VMRuntime.getRuntime().getTargetSdkVersion() >= Build.VERSION_CODES.Q);
+    }
+
+    private static int ifAtLeastQ(int value) {
+        return isAtLeastQ() ? value : 0;
     }
 }

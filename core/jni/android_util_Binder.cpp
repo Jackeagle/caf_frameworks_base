@@ -875,6 +875,11 @@ static jint android_os_Binder_getCallingUid()
     return IPCThreadState::self()->getCallingUid();
 }
 
+static jboolean android_os_Binder_isHandlingTransaction()
+{
+    return IPCThreadState::self()->isServingCall();
+}
+
 static jlong android_os_Binder_clearCallingIdentity()
 {
     return IPCThreadState::self()->clearCallingIdentity();
@@ -904,19 +909,24 @@ static jint android_os_Binder_getThreadStrictModePolicy()
     return IPCThreadState::self()->getStrictModePolicy();
 }
 
-static jint android_os_Binder_setThreadWorkSource(jint workSource)
+static jlong android_os_Binder_setCallingWorkSourceUid(jint workSource)
 {
-    return IPCThreadState::self()->setWorkSource(workSource);
+    return IPCThreadState::self()->setCallingWorkSourceUid(workSource);
 }
 
-static jint android_os_Binder_getThreadWorkSource()
+static jlong android_os_Binder_getCallingWorkSourceUid()
 {
-    return IPCThreadState::self()->getWorkSource();
+    return IPCThreadState::self()->getCallingWorkSourceUid();
 }
 
-static jint android_os_Binder_clearThreadWorkSource()
+static jlong android_os_Binder_clearCallingWorkSource()
 {
-    return IPCThreadState::self()->clearWorkSource();
+    return IPCThreadState::self()->clearCallingWorkSource();
+}
+
+static void android_os_Binder_restoreCallingWorkSource(jlong token)
+{
+    IPCThreadState::self()->restoreCallingWorkSource(token);
 }
 
 static void android_os_Binder_flushPendingCommands(JNIEnv* env, jobject clazz)
@@ -955,6 +965,8 @@ static const JNINativeMethod gBinderMethods[] = {
     // @CriticalNative
     { "getCallingUid", "()I", (void*)android_os_Binder_getCallingUid },
     // @CriticalNative
+    { "isHandlingTransaction", "()Z", (void*)android_os_Binder_isHandlingTransaction },
+    // @CriticalNative
     { "clearCallingIdentity", "()J", (void*)android_os_Binder_clearCallingIdentity },
     { "restoreCallingIdentity", "(J)V", (void*)android_os_Binder_restoreCallingIdentity },
     // @CriticalNative
@@ -962,11 +974,12 @@ static const JNINativeMethod gBinderMethods[] = {
     // @CriticalNative
     { "getThreadStrictModePolicy", "()I", (void*)android_os_Binder_getThreadStrictModePolicy },
     // @CriticalNative
-    { "setThreadWorkSource", "(I)I", (void*)android_os_Binder_setThreadWorkSource },
+    { "setCallingWorkSourceUid", "(I)J", (void*)android_os_Binder_setCallingWorkSourceUid },
     // @CriticalNative
-    { "getThreadWorkSource", "()I", (void*)android_os_Binder_getThreadWorkSource },
+    { "getCallingWorkSourceUid", "()I", (void*)android_os_Binder_getCallingWorkSourceUid },
     // @CriticalNative
-    { "clearThreadWorkSource", "()I", (void*)android_os_Binder_clearThreadWorkSource },
+    { "clearCallingWorkSource", "()J", (void*)android_os_Binder_clearCallingWorkSource },
+    { "restoreCallingWorkSource", "(J)V", (void*)android_os_Binder_restoreCallingWorkSource },
     { "flushPendingCommands", "()V", (void*)android_os_Binder_flushPendingCommands },
     { "getNativeBBinderHolder", "()J", (void*)android_os_Binder_getNativeBBinderHolder },
     { "getNativeFinalizer", "()J", (void*)android_os_Binder_getNativeFinalizer },
@@ -1171,7 +1184,7 @@ static int getprocname(pid_t pid, char *buf, size_t len) {
     FILE *f;
 
     snprintf(filename, sizeof(filename), "/proc/%d/cmdline", pid);
-    f = fopen(filename, "r");
+    f = fopen(filename, "re");
     if (!f) {
         *buf = '\0';
         return 1;

@@ -25,38 +25,6 @@
 namespace android {
 namespace uirenderer {
 
-static inline bool almostEqual(float a, float b) {
-    return std::abs(a - b) < 1e-2f;
-}
-
-bool transferFunctionCloseToSRGB(const SkColorSpace* colorSpace) {
-    if (colorSpace == nullptr) return true;
-    if (colorSpace->isSRGB()) return true;
-
-    SkColorSpaceTransferFn transferFunction;
-    if (colorSpace->isNumericalTransferFn(&transferFunction)) {
-        // sRGB transfer function params:
-        const float sRGBParamA = 1 / 1.055f;
-        const float sRGBParamB = 0.055f / 1.055f;
-        const float sRGBParamC = 1 / 12.92f;
-        const float sRGBParamD = 0.04045f;
-        const float sRGBParamE = 0.0f;
-        const float sRGBParamF = 0.0f;
-        const float sRGBParamG = 2.4f;
-
-        // This comparison will catch Display P3
-        return almostEqual(sRGBParamA, transferFunction.fA) &&
-               almostEqual(sRGBParamB, transferFunction.fB) &&
-               almostEqual(sRGBParamC, transferFunction.fC) &&
-               almostEqual(sRGBParamD, transferFunction.fD) &&
-               almostEqual(sRGBParamE, transferFunction.fE) &&
-               almostEqual(sRGBParamF, transferFunction.fF) &&
-               almostEqual(sRGBParamG, transferFunction.fG);
-    }
-
-    return false;
-}
-
 android::PixelFormat ColorTypeToPixelFormat(SkColorType colorType) {
     switch (colorType) {
         case kRGBA_8888_SkColorType:
@@ -77,21 +45,35 @@ android::PixelFormat ColorTypeToPixelFormat(SkColorType colorType) {
     }
 }
 
+SkColorType PixelFormatToColorType(android::PixelFormat format) {
+    switch (format) {
+        case PIXEL_FORMAT_RGBX_8888:    return kRGB_888x_SkColorType;
+        case PIXEL_FORMAT_RGBA_8888:    return kRGBA_8888_SkColorType;
+        case PIXEL_FORMAT_RGBA_FP16:    return kRGBA_F16_SkColorType;
+        case PIXEL_FORMAT_RGB_565:      return kRGB_565_SkColorType;
+        case PIXEL_FORMAT_RGBA_1010102: return kRGBA_1010102_SkColorType;
+        case PIXEL_FORMAT_RGBA_4444:    return kARGB_4444_SkColorType;
+        default:
+            ALOGW("Unsupported PixelFormat: %d, return kUnknown_SkColorType by default", format);
+            return kUnknown_SkColorType;
+    }
+}
+
 sk_sp<SkColorSpace> DataSpaceToColorSpace(android_dataspace dataspace) {
 
-    SkColorSpace::Gamut gamut;
+    skcms_Matrix3x3 gamut;
     switch (dataspace & HAL_DATASPACE_STANDARD_MASK) {
         case HAL_DATASPACE_STANDARD_BT709:
-            gamut = SkColorSpace::kSRGB_Gamut;
+            gamut = SkNamedGamut::kSRGB;
             break;
         case HAL_DATASPACE_STANDARD_BT2020:
-            gamut = SkColorSpace::kRec2020_Gamut;
+            gamut = SkNamedGamut::kRec2020;
             break;
         case HAL_DATASPACE_STANDARD_DCI_P3:
-            gamut = SkColorSpace::kDCIP3_D65_Gamut;
+            gamut = SkNamedGamut::kDCIP3;
             break;
         case HAL_DATASPACE_STANDARD_ADOBE_RGB:
-            gamut = SkColorSpace::kAdobeRGB_Gamut;
+            gamut = SkNamedGamut::kAdobeRGB;
             break;
         case HAL_DATASPACE_STANDARD_UNSPECIFIED:
             return nullptr;
@@ -109,9 +91,9 @@ sk_sp<SkColorSpace> DataSpaceToColorSpace(android_dataspace dataspace) {
 
     switch (dataspace & HAL_DATASPACE_TRANSFER_MASK) {
         case HAL_DATASPACE_TRANSFER_LINEAR:
-            return SkColorSpace::MakeRGB(SkColorSpace::kLinear_RenderTargetGamma, gamut);
+            return SkColorSpace::MakeRGB(SkNamedTransferFn::kLinear, gamut);
         case HAL_DATASPACE_TRANSFER_SRGB:
-            return SkColorSpace::MakeRGB(SkColorSpace::kSRGB_RenderTargetGamma, gamut);
+            return SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB, gamut);
         case HAL_DATASPACE_TRANSFER_GAMMA2_2:
             return SkColorSpace::MakeRGB({2.2f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, gamut);
         case HAL_DATASPACE_TRANSFER_GAMMA2_6:
@@ -221,5 +203,5 @@ SkColor LabToSRGB(const Lab& lab, SkAlpha alpha) {
             static_cast<uint8_t>(rgb.b * 255));
 }
 
-};  // namespace uirenderer
-};  // namespace android
+}  // namespace uirenderer
+}  // namespace android

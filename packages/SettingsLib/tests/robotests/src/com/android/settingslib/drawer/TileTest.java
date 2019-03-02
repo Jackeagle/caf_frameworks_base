@@ -12,16 +12,13 @@ import static com.google.common.truth.Truth.assertThat;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 
-import com.android.settingslib.R;
-import com.android.settingslib.SettingsLibRobolectricTestRunner;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 
-
-@RunWith(SettingsLibRobolectricTestRunner.class)
+@RunWith(RobolectricTestRunner.class)
 public class TileTest {
 
     private ActivityInfo mActivityInfo;
@@ -32,7 +29,7 @@ public class TileTest {
         mActivityInfo = new ActivityInfo();
         mActivityInfo.packageName = RuntimeEnvironment.application.getPackageName();
         mActivityInfo.name = "abc";
-        mActivityInfo.icon = R.drawable.ic_plus;
+        mActivityInfo.icon = com.android.internal.R.drawable.ic_plus;
         mActivityInfo.metaData = new Bundle();
         mTile = new Tile(mActivityInfo, "category");
     }

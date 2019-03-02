@@ -21,8 +21,9 @@ import static org.junit.Assert.assertEquals;
 import android.os.Bundle;
 import android.os.LocaleList;
 import android.os.Parcel;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -75,11 +76,13 @@ public class TextSelectionTest {
     @Test
     public void testParcelRequest() {
         final String text = "text";
+        final String packageName = "packageName";
         final TextSelection.Request reference =
                 new TextSelection.Request.Builder(text, 0, text.length())
                         .setDefaultLocales(new LocaleList(Locale.US, Locale.GERMANY))
                         .setExtras(BUNDLE)
                         .build();
+        reference.setCallingPackageName(packageName);
 
         // Parcel and unparcel.
         final Parcel parcel = Parcel.obtain();
@@ -87,10 +90,11 @@ public class TextSelectionTest {
         parcel.setDataPosition(0);
         final TextSelection.Request result = TextSelection.Request.CREATOR.createFromParcel(parcel);
 
-        assertEquals(text, result.getText());
+        assertEquals(text, result.getText().toString());
         assertEquals(0, result.getStartIndex());
         assertEquals(text.length(), result.getEndIndex());
         assertEquals("en-US,de-DE", result.getDefaultLocales().toLanguageTags());
         assertEquals(BUNDLE_VALUE, result.getExtras().getString(BUNDLE_KEY));
+        assertEquals(packageName, result.getCallingPackageName());
     }
 }

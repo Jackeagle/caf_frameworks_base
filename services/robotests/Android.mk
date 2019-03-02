@@ -26,7 +26,6 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_PRIVILEGED_MODULE := true
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
-    services.backup \
     services.core \
     services.net
 
@@ -79,4 +78,12 @@ LOCAL_JAVA_LIBRARIES := \
 
 LOCAL_TEST_PACKAGE := FrameworksServicesLib
 
+LOCAL_ROBOTEST_FILES := $(call find-files-in-subdirs,$(LOCAL_PATH)/src,*Test.java,.)
+
 include external/robolectric-shadows/run_robotests.mk
+
+###################################################################
+# include subdir Android.mk files
+###################################################################
+include $(CLEAR_VARS)
+include $(call all-makefiles-under,$(LOCAL_PATH))

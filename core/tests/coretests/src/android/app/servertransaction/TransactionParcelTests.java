@@ -38,7 +38,6 @@ import android.content.pm.ProviderInfo;
 import android.content.pm.ServiceInfo;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
-import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Debug;
@@ -50,8 +49,9 @@ import android.os.PersistableBundle;
 import android.os.RemoteCallback;
 import android.os.RemoteException;
 import android.platform.test.annotations.Presubmit;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.app.IVoiceInteractor;
 
@@ -465,12 +465,12 @@ public class TransactionParcelTests {
 
         @Override
         public void scheduleCreateBackupAgent(ApplicationInfo applicationInfo,
-                CompatibilityInfo compatibilityInfo, int i) throws RemoteException {
+                CompatibilityInfo compatibilityInfo, int i, int userId) throws RemoteException {
         }
 
         @Override
         public void scheduleDestroyBackupAgent(ApplicationInfo applicationInfo,
-                CompatibilityInfo compatibilityInfo) throws RemoteException {
+                CompatibilityInfo compatibilityInfo, int userId) throws RemoteException {
         }
 
         @Override
@@ -500,7 +500,7 @@ public class TransactionParcelTests {
         }
 
         @Override
-        public void setHttpProxy(String s, String s1, String s2, Uri uri) throws RemoteException {
+        public void updateHttpProxy() throws RemoteException {
         }
 
         @Override

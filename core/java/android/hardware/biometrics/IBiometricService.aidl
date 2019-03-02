@@ -18,7 +18,6 @@ package android.hardware.biometrics;
 
 import android.os.Bundle;
 import android.hardware.biometrics.IBiometricEnabledOnKeyguardCallback;
-import android.hardware.biometrics.IBiometricPromptReceiver;
 import android.hardware.biometrics.IBiometricServiceReceiver;
 
 /**
@@ -32,8 +31,7 @@ interface IBiometricService {
     // Requests authentication. The service choose the appropriate biometric to use, and show
     // the corresponding BiometricDialog.
     void authenticate(IBinder token, long sessionId, int userId,
-            IBiometricServiceReceiver receiver, int flags, String opPackageName,
-            in Bundle bundle, IBiometricPromptReceiver dialogReceiver);
+            IBiometricServiceReceiver receiver, String opPackageName, in Bundle bundle);
 
     // Cancel authentication for the given sessionId
     void cancelAuthentication(IBinder token, String opPackageName);
@@ -46,4 +44,19 @@ interface IBiometricService {
 
     // Explicitly set the active user.
     void setActiveUser(int userId);
+
+    // Notify BiometricService when <Biometric>Service is ready to start the prepared client.
+    // Client lifecycle is still managed in <Biometric>Service.
+    void onReadyForAuthentication(int cookie, boolean requireConfirmation, int userId);
+
+    // Reset the timeout when user authenticates with strong auth (e.g. PIN, pattern or password)
+    void resetTimeout(in byte [] token);
+
+    // TODO(b/123378871): Remove when moved.
+    // CDCA needs to send results to BiometricService if it was invoked using BiometricPrompt's
+    // setEnableFallback method, since there's no way for us to intercept onActivityResult.
+    // CDCA is launched from BiometricService (startActivityAsUser) instead of *ForResult.
+    void onConfirmDeviceCredentialSuccess();
+    // TODO(b/123378871): Remove when moved.
+    void onConfirmDeviceCredentialError(int error, String message);
 }

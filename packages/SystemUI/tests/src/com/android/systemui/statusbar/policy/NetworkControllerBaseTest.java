@@ -182,6 +182,7 @@ public class NetworkControllerBaseTest extends SysuiTestCase {
             subs.add(subscription);
         }
         when(mMockSm.getActiveSubscriptionInfoList()).thenReturn(subs);
+        when(mMockSm.getActiveSubscriptionInfoList(anyBoolean())).thenReturn(subs);
         mNetworkController.doUpdateMobileControllers();
     }
 
@@ -210,6 +211,11 @@ public class NetworkControllerBaseTest extends SysuiTestCase {
                 TelephonyManager.NETWORK_TYPE_UMTS);
         setConnectivityViaBroadcast(
             NetworkCapabilities.TRANSPORT_CELLULAR, true, true);
+    }
+
+    public void setupDefaultNr5GIconConfiguration() {
+        NetworkControllerImpl.Config.add5GIconMapping("connected_mmwave:5g_plus", mConfig);
+        NetworkControllerImpl.Config.add5GIconMapping("connected:5g", mConfig);
     }
 
     public void setConnectivityViaBroadcast(
@@ -335,10 +341,7 @@ public class NetworkControllerBaseTest extends SysuiTestCase {
                     anyInt(),
                     typeIconArg.capture(), dataInArg.capture(), dataOutArg.capture(),
                     ArgumentCaptor.forClass(Integer.class).capture(),
-                    ArgumentCaptor.forClass(Integer.class).capture(),
-                    ArgumentCaptor.forClass(Integer.class).capture(),
-                    anyString(), anyString(), anyBoolean(), anyInt(), anyBoolean(),
-                    anyBoolean(), anyInt(), anyBoolean());
+                    anyString(), anyString(), anyBoolean(), anyInt(), anyBoolean());
         IconState iconState = iconArg.getValue();
         int state = SignalDrawable.getState(icon, SignalStrength.NUM_SIGNAL_STRENGTH_BINS,
                 false);
@@ -372,11 +375,8 @@ public class NetworkControllerBaseTest extends SysuiTestCase {
                 typeIconArg.capture(),
                 anyInt(), anyBoolean(), anyBoolean(),
                 ArgumentCaptor.forClass(Integer.class).capture(),
-                ArgumentCaptor.forClass(Integer.class).capture(),
-                ArgumentCaptor.forClass(Integer.class).capture(),
                 anyString(), anyString(), anyBoolean(),
-                anyInt(), eq(roaming),
-                anyBoolean(), anyInt(), anyBoolean());
+                anyInt(), eq(roaming));
         IconState iconState = iconArg.getValue();
 
         int state = icon == -1 ? 0
@@ -410,10 +410,7 @@ public class NetworkControllerBaseTest extends SysuiTestCase {
                 dataInArg.capture(),
                 dataOutArg.capture(),
                 ArgumentCaptor.forClass(Integer.class).capture(),
-                ArgumentCaptor.forClass(Integer.class).capture(),
-                ArgumentCaptor.forClass(Integer.class).capture(),
-                anyString(), anyString(), anyBoolean(), anyInt(), anyBoolean(),
-                anyBoolean(), anyInt(), anyBoolean());
+                anyString(), anyString(), anyBoolean(), anyInt(), anyBoolean());
 
         IconState iconState = iconArg.getValue();
 

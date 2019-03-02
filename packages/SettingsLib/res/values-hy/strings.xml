@@ -21,6 +21,7 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="wifi_fail_to_scan" msgid="1265540342578081461">"Հնարավոր չէ սկանավորել ցանցերը"</string>
+    <string name="wifi_security_none" msgid="7985461072596594400">"Ոչ մեկը"</string>
     <string name="wifi_remembered" msgid="4955746899347821096">"Պահված է"</string>
     <string name="wifi_disabled_generic" msgid="4259794910584943386">"Անջատված"</string>
     <string name="wifi_disabled_network_failure" msgid="2364951338436007124">"IP կարգավորման ձախողում"</string>
@@ -37,13 +38,50 @@
     <string name="connected_via_network_scorer" msgid="5713793306870815341">"Ավտոմատ կերպով կապակցվել է %1$s-ի միջոցով"</string>
     <string name="connected_via_network_scorer_default" msgid="7867260222020343104">"Ավտոմատ կերպով միացել է ցանցի վարկանիշի ծառայության մատակարարի միջոցով"</string>
     <string name="connected_via_passpoint" msgid="2826205693803088747">"Կապակցված է %1$s-ի միջոցով"</string>
+    <string name="ssid_by_passpoint_provider" msgid="7898171424140673315">"«<xliff:g id="SSID">%1$s</xliff:g>», <xliff:g id="PASSPOINTPROVIDER">%2$s</xliff:g>"</string>
     <string name="available_via_passpoint" msgid="1617440946846329613">"Հասանելի է %1$s-ի միջոցով"</string>
+    <string name="tap_to_set_up" msgid="2468970825530423314">"Հպեք՝ կարգավորելու համար"</string>
     <string name="wifi_connected_no_internet" msgid="8202906332837777829">"Միացված է, սակայն ինտերնետ կապ չկա"</string>
     <string name="wifi_status_no_internet" msgid="5784710974669608361">"Ինտերնետ կապ չկա"</string>
     <string name="wifi_status_sign_in_required" msgid="123517180404752756">"Անհրաժեշտ է մուտք գործել"</string>
     <string name="wifi_ap_unable_to_handle_new_sta" msgid="5348824313514404541">"Հասանելիության կետը ժամանակավորապես լիքն է"</string>
     <string name="connected_via_carrier" msgid="7583780074526041912">"Միացված է %1$s-ի միջոցով"</string>
     <string name="available_via_carrier" msgid="1469036129740799053">"Հասանելի է %1$s-ի միջոցով"</string>
+    <string name="osu_failure_ap_connection" msgid="598977488344424542">"Չհաջողվեց միանալ"</string>
+    <string name="osu_failure_server_url_invalid" msgid="2237477219243136714">"OSU սերվերի անվավեր URL"</string>
+    <string name="osu_failure_server_connection" msgid="8192988165059982174">"Չհաջողվեց միանալ OSU սերվերին"</string>
+    <string name="osu_failure_server_validation" msgid="4631649978129606823">"Չհաջողվեց ստուգել OSU սերվերը"</string>
+    <string name="osu_failure_service_provider_verification" msgid="4854091521439785597">"OSU սերվերի անվավեր հավաստագիր"</string>
+    <string name="osu_failure_provisioning_aborted" msgid="424627208135320329">"Համաժամեցումն ընդհատվեց"</string>
+    <string name="osu_failure_provisioning_not_available" msgid="3021783729256985432">"Համաժամեցումն անհասանելի է"</string>
+    <string name="osu_failure_invalid_server_url" msgid="8548886196179435758">"OSU սերվերի անվավեր URL"</string>
+    <string name="osu_failure_unexpected_command_type" msgid="8245921319866603904">"Հրահանգի անհայտ տեսակ"</string>
+    <string name="osu_failure_unexpected_soap_message_type" msgid="2255897608510053065">"SOAP հաղորդագրության անհայտ տեսակ"</string>
+    <string name="osu_failure_soap_message_exchange" msgid="4357358438685987192">"Չհաջողվեց փոխանակել SOAP հաղորդագրությունները"</string>
+    <string name="osu_failure_start_redirect_listener" msgid="4292769407279548482">"Չհաջողվեց գործարկել վերահասցեավորվող զանգերի ընդունիչը"</string>
+    <string name="osu_failure_timed_out_redirect_listener" msgid="3168657820278807508">"Սպասման ժամանակը լրացել է"</string>
+    <string name="osu_failure_no_osu_activity_found" msgid="4593038891437878675">"OSU գործողություններ չեն հայտնաբերվել"</string>
+    <string name="osu_failure_unexpected_soap_message_status" msgid="6568467710235256675">"SOAP հաղորդագրության անհայտ կարգավիճակ"</string>
+    <string name="osu_failure_no_pps_mo" msgid="850567403039076835">"Չհաջողվեց գտնել PPS-MO"</string>
+    <string name="osu_failure_no_aaa_server_trust_root_node" msgid="8961455873459838456">"Չհաջողվեց գտնել AAA սերվերի վստահված արմատային հանգույցը"</string>
+    <string name="osu_failure_no_remediation_server_trust_root_node" msgid="5041179688081545244">"Չհաջողվեց գտնել ուղղումների սերվերի վստահված արմատային հանգույցը"</string>
+    <string name="osu_failure_no_policy_server_trust_root_node" msgid="6617290380940513539">"Չհաջողվեց գտնել կանոնների սերվերի վստահված արմատային հանգույցը"</string>
+    <string name="osu_failure_retrieve_trust_root_certificates" msgid="1499136256195528265">"Չհաջողվեց բեռնել վստահված արմատային հավաստագրերը"</string>
+    <string name="osu_failure_no_aaa_trust_root_certificate" msgid="1904322497042226984">"Չհաջողվեց գտնել AAA սերվերի վստահված արմատային հավաստագիրը"</string>
+    <string name="osu_failure_add_passpoint_configuration" msgid="2173557755811446047">"Չհաջողվեց ավելացնել PassPoint-ի կարգավորումները"</string>
+    <string name="osu_failure_osu_provider_not_found" msgid="6616172862116673082">"Չհաջողվեց գտնել OSU-ի մատակարարին"</string>
+    <string name="osu_status_ap_connecting" msgid="5296821043003441437">"Միացում"</string>
+    <string name="osu_status_ap_connected" msgid="3777289375683170728">"Միացած է"</string>
+    <string name="osu_status_server_connecting" msgid="8499785407540355867">"Միացում OSU սերվերին"</string>
+    <string name="osu_status_server_validated" msgid="3158727184762596355">"OSU սերվերը ստուգված է"</string>
+    <string name="osu_status_server_connected" msgid="8382024481520158168">"Միացած է OSU սերվերին"</string>
+    <string name="osu_status_init_soap_exchange" msgid="8628063888912101981">"Առաջին փոխանակումը SOAP-ով"</string>
+    <string name="osu_status_waiting_for_redirect_response" msgid="2343016207837053197">"Վերահասցեավորվող պատասխանի սպասում"</string>
+    <string name="osu_status_redirect_response_received" msgid="5323368411922609405">"Պատասխանը ստացված է"</string>
+    <string name="osu_status_second_soap_exchange" msgid="7115332266758483909">"Երկրորդ փոխանակում SOAP-ով"</string>
+    <string name="osu_status_third_soap_exchange" msgid="8460901783597440766">"Երրորդ փոխանակում SOAP-ով"</string>
+    <string name="osu_status_retrieving_trust_root_certs" msgid="1563445892926269689">"Վստահված արմատային հավաստագրերը բեռնվում են"</string>
+    <string name="osu_provisioning_complete" msgid="5120178802493970149">"Համաժամեցումն ավարտված է"</string>
     <string name="speed_label_very_slow" msgid="1867055264243608530">"Շատ դանդաղ"</string>
     <string name="speed_label_slow" msgid="813109590815810235">"Դանդաղ"</string>
     <string name="speed_label_okay" msgid="2331665440671174858">"Հաստատել"</string>
@@ -196,7 +234,8 @@
     <string name="keep_screen_on" msgid="1146389631208760344">"Մնալ արթուն"</string>
     <string name="keep_screen_on_summary" msgid="2173114350754293009">"Էկրանը երբեք չի քնի լիցքավորման ընթացքում"</string>
     <string name="bt_hci_snoop_log" msgid="3340699311158865670">"Միացնել Bluetooth HCI snoop log-ը"</string>
-    <string name="bt_hci_snoop_log_summary" msgid="366083475849911315">"Բոլոր Bluetooth HCI փաթեթները պահել մեկ ֆայլում (այս կարգավորումը փոխելուց հետո անհրաժեշտ է վերագործարկել Bluetooth-ը)"</string>
+    <!-- no translation found for bt_hci_snoop_log_summary (8857606786588106495) -->
+    <skip />
     <string name="oem_unlock_enable" msgid="6040763321967327691">"OEM ապակողպում"</string>
     <string name="oem_unlock_enable_summary" msgid="4720281828891618376">"Թույլ տալ սկզբնաբեռնման բեռնիչի ապակողպումը"</string>
     <string name="confirm_enable_oem_unlock_title" msgid="4802157344812385674">"Թույլատրե՞լ OEM ապակողպումը:"</string>
@@ -329,6 +368,7 @@
     <string name="local_backup_password_toast_success" msgid="582016086228434290">"Պահուստավորման նոր գաղտնաբառը սահմանված է"</string>
     <string name="local_backup_password_toast_confirmation_mismatch" msgid="7805892532752708288">"Նոր գաղտնաբառը և հաստատումը չեն համընկնում"</string>
     <string name="local_backup_password_toast_validation_failure" msgid="5646377234895626531">"Ձախողում գաղտնաբառի պահուստավորման կարգավորման ընթացքում"</string>
+    <string name="loading_injected_setting_summary" msgid="4095178591461231376">"Բեռնում…"</string>
   <string-array name="color_mode_names">
     <item msgid="2425514299220523812">"Պայծառ (կանխադրված)"</item>
     <item msgid="8446070607501413455">"Բնական"</item>
@@ -374,6 +414,7 @@
     <string name="power_discharge_by_only_enhanced" msgid="2175151772952365149">"Լիցքը պետք է, որ բավականացնի մոտ <xliff:g id="TIME">%1$s</xliff:g>՝ կախված օգտագործման եղանակից"</string>
     <string name="power_discharge_by" msgid="6453537733650125582">"Լիցքը (<xliff:g id="LEVEL">%2$s</xliff:g>) պետք է, որ բավականացնի մոտ <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="power_discharge_by_only" msgid="107616694963545745">"Լիցքը պետք է, որ բավականացնի մոտ <xliff:g id="TIME">%1$s</xliff:g>"</string>
+    <string name="power_discharge_by_only_short" msgid="1372817269546888804">"Մինչև <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="power_remaining_less_than_duration_only" msgid="5996752448813295329">"Մնացել է <xliff:g id="THRESHOLD">%1$s</xliff:g>-ից պակաս"</string>
     <string name="power_remaining_less_than_duration" msgid="5751885147712659423">"Մնացել է <xliff:g id="THRESHOLD">%1$s</xliff:g>-ից պակաս (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
     <string name="power_remaining_more_than_subtext" msgid="3176771815132876675">"Մնացել է ավելի քան <xliff:g id="TIME_REMAINING">%1$s</xliff:g> (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
@@ -447,4 +488,5 @@
     <string name="zen_mode_duration_always_prompt_title" msgid="6478923750878945501">"Հարցնել ամեն անգամ"</string>
     <string name="zen_mode_forever" msgid="2704305038191592967">"Մինչև չանջատեք"</string>
     <string name="time_unit_just_now" msgid="6363336622778342422">"Հենց նոր"</string>
+    <string name="media_transfer_phone_device_name" msgid="1003823744105758574">"Հեռախոսի բարձրախոս"</string>
 </resources>

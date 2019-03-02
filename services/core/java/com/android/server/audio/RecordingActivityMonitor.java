@@ -20,11 +20,11 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioManager;
-import android.media.AudioPlaybackConfiguration;
 import android.media.AudioRecordingConfiguration;
 import android.media.AudioSystem;
 import android.media.IRecordingConfigDispatcher;
 import android.media.MediaRecorder;
+import android.media.audiofx.AudioEffect;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
@@ -64,31 +64,41 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
      * Implementation of android.media.AudioSystem.AudioRecordingCallback
      */
     public void onRecordingConfigurationChanged(int event, int uid, int session, int source,
-            int[] recordingInfo, String packName) {
+                                                int portId, boolean silenced, int[] recordingInfo,
+                                                AudioEffect.Descriptor[] clientEffects,
+                                                AudioEffect.Descriptor[] effects,
+                                                int activeSource, String packName) {
         if (MediaRecorder.isSystemOnlyAudioSource(source)) {
             return;
         }
+        String clientEffectName =  clientEffects.length == 0 ? "None" : clientEffects[0].name;
+        String effectName =  effects.length == 0 ? "None" : effects[0].name;
+
         final List<AudioRecordingConfiguration> configsSystem =
-                updateSnapshot(event, uid, session, source, recordingInfo);
+                updateSnapshot(event, uid, session, source, recordingInfo,
+                portId, silenced, activeSource, clientEffects, effects);
         if (configsSystem != null){
-            synchronized (mClients) {
-                // list of recording configurations for "public consumption". It is only computed if
-                // there are non-system recording activity listeners.
-                final List<AudioRecordingConfiguration> configsPublic = mHasPublicClients ?
-                        anonymizeForPublicConsumption(configsSystem) :
-                            new ArrayList<AudioRecordingConfiguration>();
-                final Iterator<RecMonitorClient> clientIterator = mClients.iterator();
-                while (clientIterator.hasNext()) {
-                    final RecMonitorClient rmc = clientIterator.next();
-                    try {
-                        if (rmc.mIsPrivileged) {
-                            rmc.mDispatcherCb.dispatchRecordingConfigChange(configsSystem);
-                        } else {
-                            rmc.mDispatcherCb.dispatchRecordingConfigChange(configsPublic);
-                        }
-                    } catch (RemoteException e) {
-                        Log.w(TAG, "Could not call dispatchRecordingConfigChange() on client", e);
+            dispatchCallbacks(configsSystem);
+        }
+    }
+    private void dispatchCallbacks(List<AudioRecordingConfiguration> configs) {
+        synchronized (mClients) {
+            // list of recording configurations for "public consumption". It is only computed if
+            // there are non-system recording activity listeners.
+            final List<AudioRecordingConfiguration> configsPublic = mHasPublicClients
+                    ? anonymizeForPublicConsumption(configs) :
+                      new ArrayList<AudioRecordingConfiguration>();
+            final Iterator<RecMonitorClient> clientIterator = mClients.iterator();
+            while (clientIterator.hasNext()) {
+                final RecMonitorClient rmc = clientIterator.next();
+                try {
+                    if (rmc.mIsPrivileged) {
+                        rmc.mDispatcherCb.dispatchRecordingConfigChange(configs);
+                    } else {
+                        rmc.mDispatcherCb.dispatchRecordingConfigChange(configsPublic);
                     }
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Could not call dispatchRecordingConfigChange() on client", e);
                 }
             }
         }
@@ -121,6 +131,13 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
 
     void initMonitor() {
         AudioSystem.setRecordingCallback(this);
+    }
+
+    void clear() {
+        synchronized (mRecordConfigs) {
+            mRecordConfigs.clear();
+        }
+        dispatchCallbacks(new ArrayList<AudioRecordingConfiguration>());
     }
 
     void registerRecordingCallback(IRecordingConfigDispatcher rcdb, boolean isPrivileged) {
@@ -179,20 +196,27 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
      * @param session
      * @param source
      * @param recordingFormat see
-     *     {@link AudioSystem.AudioRecordingCallback#onRecordingConfigurationChanged(int, int, int, int[])}
+     *     {@link AudioSystem.AudioRecordingCallback#onRecordingConfigurationChanged(int, int, int,\
+     int, int, boolean, int[], AudioEffect.Descriptor[], AudioEffect.Descriptor[], int, String)}
      *     for the definition of the contents of the array
+     * @param portId
+     * @param silenced
+     * @param activeSource
+     * @param clientEffects
+     * @param effects
      * @return null if the list of active recording sessions has not been modified, a list
      *     with the current active configurations otherwise.
      */
     private List<AudioRecordingConfiguration> updateSnapshot(int event, int uid, int session,
-            int source, int[] recordingInfo) {
+            int source, int[] recordingInfo, int portId, boolean silenced, int activeSource,
+            AudioEffect.Descriptor[] clientEffects, AudioEffect.Descriptor[] effects) {
         final boolean configChanged;
         final ArrayList<AudioRecordingConfiguration> configs;
         synchronized(mRecordConfigs) {
             switch (event) {
             case AudioManager.RECORD_CONFIG_EVENT_STOP:
                 // return failure if an unknown recording session stopped
-                configChanged = (mRecordConfigs.remove(new Integer(session)) != null);
+                configChanged = (mRecordConfigs.remove(new Integer(portId)) != null);
                 if (configChanged) {
                     sEventLogger.log(new RecordingEvent(event, uid, session, source, null));
                 }
@@ -211,7 +235,7 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
                         .setSampleRate(recordingInfo[5])
                         .build();
                 final int patchHandle = recordingInfo[6];
-                final Integer sessionKey = new Integer(session);
+                final Integer portIdKey = new Integer(portId);
 
                 final String[] packages = mPackMan.getPackagesForUid(uid);
                 final String packageName;
@@ -222,19 +246,20 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
                 }
                 final AudioRecordingConfiguration updatedConfig =
                         new AudioRecordingConfiguration(uid, session, source,
-                                clientFormat, deviceFormat, patchHandle, packageName);
+                                clientFormat, deviceFormat, patchHandle, packageName,
+                                portId, silenced, activeSource, clientEffects, effects);
 
-                if (mRecordConfigs.containsKey(sessionKey)) {
-                    if (updatedConfig.equals(mRecordConfigs.get(sessionKey))) {
+                if (mRecordConfigs.containsKey(portIdKey)) {
+                    if (updatedConfig.equals(mRecordConfigs.get(portIdKey))) {
                         configChanged = false;
                     } else {
                         // config exists but has been modified
-                        mRecordConfigs.remove(sessionKey);
-                        mRecordConfigs.put(sessionKey, updatedConfig);
+                        mRecordConfigs.remove(portIdKey);
+                        mRecordConfigs.put(portIdKey, updatedConfig);
                         configChanged = true;
                     }
                 } else {
-                    mRecordConfigs.put(sessionKey, updatedConfig);
+                    mRecordConfigs.put(portIdKey, updatedConfig);
                     configChanged = true;
                 }
                 if (configChanged) {

@@ -31,6 +31,7 @@ import android.content.pm.ProviderInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.SharedLibraryInfo;
 import android.content.pm.Signature;
+import android.content.pm.UsesPermissionInfo;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.platform.test.annotations.Presubmit;
@@ -275,6 +276,7 @@ public class PackageParserTest {
         assertEquals(a.mRestrictedAccountType, b.mRestrictedAccountType);
         assertEquals(a.mRequiredAccountType, b.mRequiredAccountType);
         assertEquals(a.mOverlayTarget, b.mOverlayTarget);
+        assertEquals(a.mOverlayTargetName, b.mOverlayTargetName);
         assertEquals(a.mOverlayCategory, b.mOverlayCategory);
         assertEquals(a.mOverlayPriority, b.mOverlayPriority);
         assertEquals(a.mOverlayIsStatic, b.mOverlayIsStatic);
@@ -464,6 +466,7 @@ public class PackageParserTest {
         pkg.services.add(new PackageParser.Service(dummy, new ServiceInfo()));
         pkg.instrumentation.add(new PackageParser.Instrumentation(dummy, new InstrumentationInfo()));
         pkg.requestedPermissions.add("foo7");
+        pkg.usesPermissionInfos.add(new UsesPermissionInfo("foo7"));
         pkg.implicitPermissions.add("foo25");
 
         pkg.protectedBroadcasts = new ArrayList<>();
@@ -494,7 +497,8 @@ public class PackageParserTest {
         pkg.usesLibraryFiles = new String[] { "foo13"};
 
         pkg.usesLibraryInfos = new ArrayList<>();
-        pkg.usesLibraryInfos.add(new SharedLibraryInfo(null, null, null, 0L, 0, null, null, null));
+        pkg.usesLibraryInfos.add(
+                new SharedLibraryInfo(null, null, null, null, 0L, 0, null, null, null));
 
         pkg.mOriginalPackages = new ArrayList<>();
         pkg.mOriginalPackages.add("foo14");
@@ -542,6 +546,7 @@ public class PackageParserTest {
 
         pkg.mOverlayCategory = "foo24";
         pkg.mOverlayIsStatic = true;
+        pkg.mOverlayTargetName = "foo26";
 
         pkg.baseHardwareAccelerated = true;
         pkg.coreApp = true;

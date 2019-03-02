@@ -34,6 +34,7 @@ import android.graphics.fonts.FontFamily;
 import android.graphics.fonts.FontStyle;
 import android.graphics.fonts.FontVariationAxis;
 import android.net.Uri;
+import android.os.Build.VERSION_CODES;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -651,7 +652,16 @@ public class FontsContract {
                 if (familyBuilder == null) {
                     familyBuilder = new FontFamily.Builder(font);
                 } else {
-                    familyBuilder.addFont(font);
+                    try {
+                        familyBuilder.addFont(font);
+                    } catch (IllegalArgumentException e) {
+                        if (context.getApplicationInfo().targetSdkVersion <= VERSION_CODES.P) {
+                            // Surpress the IllegalArgumentException for keeping the backward
+                            // compatibility.
+                            continue;
+                        }
+                        throw e;
+                    }
                 }
             } catch (IOException e) {
                 continue;
@@ -660,7 +670,22 @@ public class FontsContract {
         if (familyBuilder == null) {
             return null;
         }
-        return new Typeface.CustomFallbackBuilder(familyBuilder.build()).build();
+
+        final FontFamily family = familyBuilder.build();
+
+        final FontStyle normal = new FontStyle(FontStyle.FONT_WEIGHT_NORMAL,
+                FontStyle.FONT_SLANT_UPRIGHT);
+        Font bestFont = family.getFont(0);
+        int bestScore = normal.getMatchScore(bestFont.getStyle());
+        for (int i = 1; i < family.getSize(); ++i) {
+            final Font candidate = family.getFont(i);
+            final int score = normal.getMatchScore(candidate.getStyle());
+            if (score < bestScore) {
+                bestFont = candidate;
+                bestScore = score;
+            }
+        }
+        return new Typeface.CustomFallbackBuilder(family).setStyle(bestFont.getStyle()).build();
     }
 
     /**

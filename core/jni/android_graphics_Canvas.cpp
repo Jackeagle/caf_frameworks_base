@@ -102,6 +102,10 @@ static jint saveLayerAlpha(jlong canvasHandle, jfloat l, jfloat t,
     return static_cast<jint>(get_canvas(canvasHandle)->saveLayerAlpha(l, t, r, b, alpha, flags));
 }
 
+static jint saveUnclippedLayer(jlong canvasHandle, jint l, jint t, jint r, jint b) {
+    return reinterpret_cast<jint>(get_canvas(canvasHandle)->saveUnclippedLayer(l, t, r, b));
+}
+
 static bool restore(jlong canvasHandle) {
     Canvas* canvas = get_canvas(canvasHandle);
     if (canvas->getSaveCount() <= 1) {
@@ -216,6 +220,18 @@ static jboolean clipPath(jlong canvasHandle, jlong pathHandle,
 static void drawColor(JNIEnv* env, jobject, jlong canvasHandle, jint color, jint modeHandle) {
     SkBlendMode mode = static_cast<SkBlendMode>(modeHandle);
     get_canvas(canvasHandle)->drawColor(color, mode);
+}
+
+static void drawColorLong(JNIEnv* env, jobject, jlong canvasHandle, jlong colorSpaceHandle,
+        jlong colorLong, jint modeHandle) {
+    SkColor4f color = GraphicsJNI::convertColorLong(colorLong);
+    sk_sp<SkColorSpace> cs = GraphicsJNI::getNativeColorSpace(colorSpaceHandle);
+    SkPaint p;
+    p.setColor4f(color, cs.get());
+
+    SkBlendMode mode = static_cast<SkBlendMode>(modeHandle);
+    p.setBlendMode(mode);
+    get_canvas(canvasHandle)->drawPaint(p);
 }
 
 static void drawPaint(JNIEnv* env, jobject, jlong canvasHandle, jlong paintHandle) {
@@ -651,6 +667,7 @@ static const JNINativeMethod gMethods[] = {
     {"nSave","(JI)I", (void*) CanvasJNI::save},
     {"nSaveLayer","(JFFFFJI)I", (void*) CanvasJNI::saveLayer},
     {"nSaveLayerAlpha","(JFFFFII)I", (void*) CanvasJNI::saveLayerAlpha},
+    {"nSaveUnclippedLayer","(JIIII)I", (void*) CanvasJNI::saveUnclippedLayer},
     {"nGetSaveCount","(J)I", (void*) CanvasJNI::getSaveCount},
     {"nRestore","(J)Z", (void*) CanvasJNI::restore},
     {"nRestoreToCount","(JI)V", (void*) CanvasJNI::restoreToCount},
@@ -672,6 +689,7 @@ static const JNINativeMethod gMethods[] = {
 // If called from DisplayListCanvas they are @FastNative
 static const JNINativeMethod gDrawMethods[] = {
     {"nDrawColor","(JII)V", (void*) CanvasJNI::drawColor},
+    {"nDrawColor","(JJJI)V", (void*) CanvasJNI::drawColorLong},
     {"nDrawPaint","(JJ)V", (void*) CanvasJNI::drawPaint},
     {"nDrawPoint", "(JFFJ)V", (void*) CanvasJNI::drawPoint},
     {"nDrawPoints", "(J[FIIJ)V", (void*) CanvasJNI::drawPoints},

@@ -18,7 +18,10 @@ package android.net;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SystemApi;
+import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
@@ -49,10 +52,12 @@ import java.util.StringJoiner;
  */
 public final class LinkProperties implements Parcelable {
     // The interface described by the network link.
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private String mIfaceName;
     private ArrayList<LinkAddress> mLinkAddresses = new ArrayList<>();
     private ArrayList<InetAddress> mDnses = new ArrayList<>();
+    // PCSCF addresses are addresses of SIP proxies that only exist for the IMS core service.
+    private ArrayList<InetAddress> mPcscfs = new ArrayList<InetAddress>();
     private ArrayList<InetAddress> mValidatedPrivateDnses = new ArrayList<>();
     private boolean mUsePrivateDns;
     private String mPrivateDnsServerName;
@@ -62,6 +67,7 @@ public final class LinkProperties implements Parcelable {
     private int mMtu;
     // in the format "rmem_min,rmem_def,rmem_max,wmem_min,wmem_def,wmem_max"
     private String mTcpBufferSizes;
+    private IpPrefix mNat64Prefix;
 
     private static final int MIN_MTU    = 68;
     private static final int MIN_MTU_V6 = 1280;
@@ -161,14 +167,15 @@ public final class LinkProperties implements Parcelable {
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public LinkProperties() {
     }
 
     /**
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
+    @TestApi
     public LinkProperties(LinkProperties source) {
         if (source != null) {
             mIfaceName = source.mIfaceName;
@@ -177,6 +184,7 @@ public final class LinkProperties implements Parcelable {
             mValidatedPrivateDnses.addAll(source.mValidatedPrivateDnses);
             mUsePrivateDns = source.mUsePrivateDns;
             mPrivateDnsServerName = source.mPrivateDnsServerName;
+            mPcscfs.addAll(source.mPcscfs);
             mDomains = source.mDomains;
             mRoutes.addAll(source.mRoutes);
             mHttpProxy = (source.mHttpProxy == null) ? null : new ProxyInfo(source.mHttpProxy);
@@ -185,6 +193,7 @@ public final class LinkProperties implements Parcelable {
             }
             setMtu(source.mMtu);
             mTcpBufferSizes = source.mTcpBufferSizes;
+            mNat64Prefix = source.mNat64Prefix;
         }
     }
 
@@ -195,7 +204,7 @@ public final class LinkProperties implements Parcelable {
      * @param iface The name of the network interface used for this link.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void setInterfaceName(String iface) {
         mIfaceName = iface;
         ArrayList<RouteInfo> newRoutes = new ArrayList<>(mRoutes.size());
@@ -278,7 +287,8 @@ public final class LinkProperties implements Parcelable {
      * @return true if {@code address} was added or updated, false otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
+    @TestApi
     public boolean addLinkAddress(LinkAddress address) {
         if (address == null) {
             return false;
@@ -306,6 +316,8 @@ public final class LinkProperties implements Parcelable {
      * @return true if the address was removed, false if it did not exist.
      * @hide
      */
+    @SystemApi
+    @TestApi
     public boolean removeLinkAddress(LinkAddress toRemove) {
         int i = findLinkAddressIndex(toRemove);
         if (i >= 0) {
@@ -346,7 +358,7 @@ public final class LinkProperties implements Parcelable {
      *                  object.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void setLinkAddresses(Collection<LinkAddress> addresses) {
         mLinkAddresses.clear();
         for (LinkAddress address: addresses) {
@@ -361,7 +373,8 @@ public final class LinkProperties implements Parcelable {
      * @return true if the DNS server was added, false if it was already present.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean addDnsServer(InetAddress dnsServer) {
         if (dnsServer != null && !mDnses.contains(dnsServer)) {
             mDnses.add(dnsServer);
@@ -377,7 +390,8 @@ public final class LinkProperties implements Parcelable {
      * @return true if the DNS server was removed, false if it did not exist.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean removeDnsServer(InetAddress dnsServer) {
         if (dnsServer != null) {
             return mDnses.remove(dnsServer);
@@ -392,7 +406,7 @@ public final class LinkProperties implements Parcelable {
      * @param dnsServers The {@link Collection} of DNS servers to set in this object.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void setDnsServers(Collection<InetAddress> dnsServers) {
         mDnses.clear();
         for (InetAddress dnsServer: dnsServers) {
@@ -416,6 +430,8 @@ public final class LinkProperties implements Parcelable {
      * @param usePrivateDns The private DNS state.
      * @hide
      */
+    @TestApi
+    @SystemApi
     public void setUsePrivateDns(boolean usePrivateDns) {
         mUsePrivateDns = usePrivateDns;
     }
@@ -441,6 +457,8 @@ public final class LinkProperties implements Parcelable {
      * @param privateDnsServerName The private DNS server name.
      * @hide
      */
+    @TestApi
+    @SystemApi
     public void setPrivateDnsServerName(@Nullable String privateDnsServerName) {
         mPrivateDnsServerName = privateDnsServerName;
     }
@@ -503,6 +521,8 @@ public final class LinkProperties implements Parcelable {
      *        object.
      * @hide
      */
+    @TestApi
+    @SystemApi
     public void setValidatedPrivateDnsServers(Collection<InetAddress> dnsServers) {
         mValidatedPrivateDnses.clear();
         for (InetAddress dnsServer: dnsServers) {
@@ -518,8 +538,68 @@ public final class LinkProperties implements Parcelable {
      *         DNS servers on this link.
      * @hide
      */
+    @TestApi
+    @SystemApi
     public List<InetAddress> getValidatedPrivateDnsServers() {
         return Collections.unmodifiableList(mValidatedPrivateDnses);
+    }
+
+    /**
+     * Adds the given {@link InetAddress} to the list of PCSCF servers, if not present.
+     *
+     * @param pcscfServer The {@link InetAddress} to add to the list of PCSCF servers.
+     * @return true if the PCSCF server was added, false otherwise.
+     * @hide
+     */
+    public boolean addPcscfServer(InetAddress pcscfServer) {
+        if (pcscfServer != null && !mPcscfs.contains(pcscfServer)) {
+            mPcscfs.add(pcscfServer);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Removes the given {@link InetAddress} from the list of PCSCF servers.
+     *
+     * @param pcscf Server The {@link InetAddress} to remove from the list of PCSCF servers.
+     * @return true if the PCSCF server was removed, false otherwise.
+     * @hide
+     */
+    public boolean removePcscfServer(InetAddress pcscfServer) {
+        if (pcscfServer != null) {
+            return mPcscfs.remove(pcscfServer);
+        }
+        return false;
+    }
+
+    /**
+     * Replaces the PCSCF servers in this {@code LinkProperties} with
+     * the given {@link Collection} of {@link InetAddress} objects.
+     *
+     * @param addresses The {@link Collection} of PCSCF servers to set in this object.
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public void setPcscfServers(Collection<InetAddress> pcscfServers) {
+        mPcscfs.clear();
+        for (InetAddress pcscfServer: pcscfServers) {
+            addPcscfServer(pcscfServer);
+        }
+    }
+
+    /**
+     * Returns all the {@link InetAddress} for PCSCF servers on this link.
+     *
+     * @return An unmodifiable {@link List} of {@link InetAddress} for PCSCF servers on
+     *         this link.
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public List<InetAddress> getPcscfServers() {
+        return Collections.unmodifiableList(mPcscfs);
     }
 
     /**
@@ -529,7 +609,7 @@ public final class LinkProperties implements Parcelable {
      *                domains to search when resolving host names on this link.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void setDomains(String domains) {
         mDomains = domains;
     }
@@ -552,7 +632,7 @@ public final class LinkProperties implements Parcelable {
      * @param mtu The MTU to use for this link.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void setMtu(int mtu) {
         mMtu = mtu;
     }
@@ -562,9 +642,7 @@ public final class LinkProperties implements Parcelable {
      * this will return 0.
      *
      * @return The mtu value set for this link.
-     * @hide
      */
-    @UnsupportedAppUsage
     public int getMtu() {
         return mMtu;
     }
@@ -577,7 +655,8 @@ public final class LinkProperties implements Parcelable {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public void setTcpBufferSizes(String tcpBufferSizes) {
         mTcpBufferSizes = tcpBufferSizes;
     }
@@ -589,7 +668,8 @@ public final class LinkProperties implements Parcelable {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public String getTcpBufferSizes() {
         return mTcpBufferSizes;
     }
@@ -613,7 +693,7 @@ public final class LinkProperties implements Parcelable {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public boolean addRoute(RouteInfo route) {
         if (route != null) {
             String routeIface = route.getInterface();
@@ -640,7 +720,8 @@ public final class LinkProperties implements Parcelable {
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean removeRoute(RouteInfo route) {
         return route != null &&
                 Objects.equals(mIfaceName, route.getInterface()) &&
@@ -688,7 +769,7 @@ public final class LinkProperties implements Parcelable {
      * @param proxy A {@link ProxyInfo} defining the HTTP Proxy to use on this link.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void setHttpProxy(ProxyInfo proxy) {
         mHttpProxy = proxy;
     }
@@ -700,6 +781,36 @@ public final class LinkProperties implements Parcelable {
      */
     public ProxyInfo getHttpProxy() {
         return mHttpProxy;
+    }
+
+    /**
+     * Returns the NAT64 prefix in use on this link, if any.
+     *
+     * @return the NAT64 prefix.
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public @Nullable IpPrefix getNat64Prefix() {
+        return mNat64Prefix;
+    }
+
+    /**
+     * Sets the NAT64 prefix in use on this link.
+     *
+     * Currently, only 96-bit prefixes (i.e., where the 32-bit IPv4 address is at the end of the
+     * 128-bit IPv6 address) are supported.
+     *
+     * @param prefix the NAT64 prefix.
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public void setNat64Prefix(IpPrefix prefix) {
+        if (prefix != null && prefix.getPrefixLength() != 96) {
+            throw new IllegalArgumentException("Only 96-bit prefixes are supported: " + prefix);
+        }
+        mNat64Prefix = prefix;  // IpPrefix objects are immutable.
     }
 
     /**
@@ -760,19 +871,21 @@ public final class LinkProperties implements Parcelable {
      * Clears this object to its initial state.
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void clear() {
         mIfaceName = null;
         mLinkAddresses.clear();
         mDnses.clear();
         mUsePrivateDns = false;
         mPrivateDnsServerName = null;
+        mPcscfs.clear();
         mDomains = null;
         mRoutes.clear();
         mHttpProxy = null;
         mStackedLinks.clear();
         mMtu = 0;
         mTcpBufferSizes = null;
+        mNat64Prefix = null;
     }
 
     /**
@@ -813,6 +926,12 @@ public final class LinkProperties implements Parcelable {
             resultJoiner.add(mPrivateDnsServerName);
         }
 
+        if (!mPcscfs.isEmpty()) {
+            resultJoiner.add("PcscfAddresses: [");
+            resultJoiner.add(TextUtils.join(",", mPcscfs));
+            resultJoiner.add("]");
+        }
+
         if (!mValidatedPrivateDnses.isEmpty()) {
             final StringJoiner validatedPrivateDnsesJoiner =
                     new StringJoiner(",", "ValidatedPrivateDnsAddresses: [", "]");
@@ -844,6 +963,11 @@ public final class LinkProperties implements Parcelable {
             resultJoiner.add(mHttpProxy.toString());
         }
 
+        if (mNat64Prefix != null) {
+            resultJoiner.add("Nat64Prefix:");
+            resultJoiner.add(mNat64Prefix.toString());
+        }
+
         final Collection<LinkProperties> stackedLinksValues = mStackedLinks.values();
         if (!stackedLinksValues.isEmpty()) {
             final StringJoiner stackedLinksJoiner = new StringJoiner(",", "Stacked: [", "]");
@@ -862,7 +986,8 @@ public final class LinkProperties implements Parcelable {
      * @return {@code true} if there is an IPv4 address, {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean hasIPv4Address() {
         for (LinkAddress address : mLinkAddresses) {
             if (address.getAddress() instanceof Inet4Address) {
@@ -890,7 +1015,8 @@ public final class LinkProperties implements Parcelable {
      * @return {@code true} if there is a global preferred IPv6 address, {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean hasGlobalIPv6Address() {
         for (LinkAddress address : mLinkAddresses) {
           if (address.getAddress() instanceof Inet6Address && address.isGlobalPreferred()) {
@@ -922,7 +1048,8 @@ public final class LinkProperties implements Parcelable {
      * @return {@code true} if there is an IPv6 default route, {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean hasIPv6DefaultRoute() {
         for (RouteInfo r : mRoutes) {
             if (r.isIPv6Default()) {
@@ -965,12 +1092,44 @@ public final class LinkProperties implements Parcelable {
     }
 
     /**
+     * Returns true if this link has an IPv4 PCSCF server.
+     *
+     * @return {@code true} if there is an IPv4 PCSCF server, {@code false} otherwise.
+     * @hide
+     */
+    public boolean hasIPv4PcscfServer() {
+        for (InetAddress ia : mPcscfs) {
+          if (ia instanceof Inet4Address) {
+            return true;
+          }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if this link has an IPv6 PCSCF server.
+     *
+     * @return {@code true} if there is an IPv6 PCSCF server, {@code false} otherwise.
+     * @hide
+     */
+    public boolean hasIPv6PcscfServer() {
+        for (InetAddress ia : mPcscfs) {
+          if (ia instanceof Inet6Address) {
+            return true;
+          }
+        }
+        return false;
+    }
+
+    /**
      * Returns true if this link is provisioned for global IPv4 connectivity.
      * This requires an IP address, default route, and DNS server.
      *
      * @return {@code true} if the link is provisioned, {@code false} otherwise.
      * @hide
      */
+    @TestApi
+    @SystemApi
     public boolean isIPv4Provisioned() {
         return (hasIPv4Address() &&
                 hasIPv4DefaultRoute() &&
@@ -984,7 +1143,8 @@ public final class LinkProperties implements Parcelable {
      * @return {@code true} if the link is provisioned, {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean isIPv6Provisioned() {
         return (hasGlobalIPv6Address() &&
                 hasIPv6DefaultRoute() &&
@@ -998,7 +1158,8 @@ public final class LinkProperties implements Parcelable {
      * @return {@code true} if the link is provisioned, {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean isProvisioned() {
         return (isIPv4Provisioned() || isIPv6Provisioned());
     }
@@ -1010,7 +1171,8 @@ public final class LinkProperties implements Parcelable {
      *         {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @TestApi
+    @SystemApi
     public boolean isReachable(InetAddress ip) {
         final List<RouteInfo> allRoutes = getAllRoutes();
         // If we don't have a route to this IP address, it's not reachable.
@@ -1117,6 +1279,19 @@ public final class LinkProperties implements Parcelable {
     }
 
     /**
+     * Compares this {@code LinkProperties} PCSCF addresses against the target
+     *
+     * @param target LinkProperties to compare.
+     * @return {@code true} if both are identical, {@code false} otherwise.
+     * @hide
+     */
+    public boolean isIdenticalPcscfs(LinkProperties target) {
+        Collection<InetAddress> targetPcscfs = target.getPcscfServers();
+        return (mPcscfs.size() == targetPcscfs.size()) ?
+                    mPcscfs.containsAll(targetPcscfs) : false;
+    }
+
+    /**
      * Compares this {@code LinkProperties} Routes against the target
      *
      * @param target LinkProperties to compare.
@@ -1137,7 +1312,7 @@ public final class LinkProperties implements Parcelable {
      * @return {@code true} if both are identical, {@code false} otherwise.
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public boolean isIdenticalHttpProxy(LinkProperties target) {
         return getHttpProxy() == null ? target.getHttpProxy() == null :
                 getHttpProxy().equals(target.getHttpProxy());
@@ -1188,6 +1363,17 @@ public final class LinkProperties implements Parcelable {
     }
 
     /**
+     * Compares this {@code LinkProperties} NAT64 prefix against the target.
+     *
+     * @param target LinkProperties to compare.
+     * @return {@code true} if both are identical, {@code false} otherwise.
+     * @hide
+     */
+    public boolean isIdenticalNat64Prefix(LinkProperties target) {
+        return Objects.equals(mNat64Prefix, target.mNat64Prefix);
+    }
+
+    /**
      * Compares this {@code LinkProperties} instance against the target
      * LinkProperties in {@code obj}. Two LinkPropertieses are equal if
      * all their fields are equal in values.
@@ -1218,11 +1404,13 @@ public final class LinkProperties implements Parcelable {
                 && isIdenticalDnses(target)
                 && isIdenticalPrivateDns(target)
                 && isIdenticalValidatedPrivateDnses(target)
+                && isIdenticalPcscfs(target)
                 && isIdenticalRoutes(target)
                 && isIdenticalHttpProxy(target)
                 && isIdenticalStackedLinks(target)
                 && isIdenticalMtu(target)
-                && isIdenticalTcpBufferSizes(target);
+                && isIdenticalTcpBufferSizes(target)
+                && isIdenticalNat64Prefix(target);
     }
 
     /**
@@ -1334,7 +1522,9 @@ public final class LinkProperties implements Parcelable {
                 + mMtu * 51
                 + ((null == mTcpBufferSizes) ? 0 : mTcpBufferSizes.hashCode())
                 + (mUsePrivateDns ? 57 : 0)
-                + ((null == mPrivateDnsServerName) ? 0 : mPrivateDnsServerName.hashCode());
+                + mPcscfs.size() * 67
+                + ((null == mPrivateDnsServerName) ? 0 : mPrivateDnsServerName.hashCode())
+                + Objects.hash(mNat64Prefix);
     }
 
     /**
@@ -1357,6 +1547,10 @@ public final class LinkProperties implements Parcelable {
         }
         dest.writeBoolean(mUsePrivateDns);
         dest.writeString(mPrivateDnsServerName);
+        dest.writeInt(mPcscfs.size());
+        for (InetAddress d : mPcscfs) {
+            dest.writeByteArray(d.getAddress());
+        }
         dest.writeString(mDomains);
         dest.writeInt(mMtu);
         dest.writeString(mTcpBufferSizes);
@@ -1371,6 +1565,8 @@ public final class LinkProperties implements Parcelable {
         } else {
             dest.writeByte((byte)0);
         }
+        dest.writeParcelable(mNat64Prefix, 0);
+
         ArrayList<LinkProperties> stackedLinks = new ArrayList<>(mStackedLinks.values());
         dest.writeList(stackedLinks);
     }
@@ -1406,6 +1602,12 @@ public final class LinkProperties implements Parcelable {
                 }
                 netProp.setUsePrivateDns(in.readBoolean());
                 netProp.setPrivateDnsServerName(in.readString());
+                addressCount = in.readInt();
+                for (int i = 0; i < addressCount; i++) {
+                    try {
+                        netProp.addPcscfServer(InetAddress.getByAddress(in.createByteArray()));
+                    } catch (UnknownHostException e) { }
+                }
                 netProp.setDomains(in.readString());
                 netProp.setMtu(in.readInt());
                 netProp.setTcpBufferSizes(in.readString());
@@ -1416,6 +1618,7 @@ public final class LinkProperties implements Parcelable {
                 if (in.readByte() == 1) {
                     netProp.setHttpProxy(in.readParcelable(null));
                 }
+                netProp.setNat64Prefix(in.readParcelable(null));
                 ArrayList<LinkProperties> stackedLinks = new ArrayList<LinkProperties>();
                 in.readList(stackedLinks, LinkProperties.class.getClassLoader());
                 for (LinkProperties stackedLink: stackedLinks) {

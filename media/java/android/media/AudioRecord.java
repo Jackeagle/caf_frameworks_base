@@ -16,18 +16,10 @@
 
 package android.media;
 
-import java.io.IOException;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.ArrayList;
-import java.util.List;
-
+import android.annotation.CallbackExecutor;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.annotation.UnsupportedAppUsage;
 import android.app.ActivityThread;
@@ -39,12 +31,21 @@ import android.os.Message;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Pair;
 
 import com.android.internal.annotations.GuardedBy;
+
+import java.io.IOException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * The AudioRecord class manages the audio resources for Java applications
@@ -60,7 +61,8 @@ import com.android.internal.annotations.GuardedBy;
  * been read yet. Data should be read from the audio hardware in chunks of sizes inferior to
  * the total recording buffer size.
  */
-public class AudioRecord implements AudioRouting
+public class AudioRecord implements AudioRouting, MicrophoneDirection,
+        AudioRecordingMonitor, AudioRecordingMonitorClient
 {
     //---------------------------------------------------------
     // Constants
@@ -1667,6 +1669,82 @@ public class AudioRecord implements AudioRouting
         return activeMicrophones;
     }
 
+    //--------------------------------------------------------------------------
+    // Implementation of AudioRecordingMonitor interface
+    //--------------------
+
+    AudioRecordingMonitorImpl mRecordingInfoImpl =
+            new AudioRecordingMonitorImpl((AudioRecordingMonitorClient) this);
+
+    /**
+     * Register a callback to be notified of audio capture changes via a
+     * {@link AudioManager.AudioRecordingCallback}. A callback is received when the capture path
+     * configuration changes (pre-processing, format, sampling rate...) or capture is
+     * silenced/unsilenced by the system.
+     * @param executor {@link Executor} to handle the callbacks.
+     * @param cb non-null callback to register
+     */
+    public void registerAudioRecordingCallback(@NonNull @CallbackExecutor Executor executor,
+            @NonNull AudioManager.AudioRecordingCallback cb) {
+        mRecordingInfoImpl.registerAudioRecordingCallback(executor, cb);
+    }
+
+    /**
+     * Unregister an audio recording callback previously registered with
+     * {@link #registerAudioRecordingCallback(Executor, AudioManager.AudioRecordingCallback)}.
+     * @param cb non-null callback to unregister
+     */
+    public void unregisterAudioRecordingCallback(@NonNull AudioManager.AudioRecordingCallback cb) {
+        mRecordingInfoImpl.unregisterAudioRecordingCallback(cb);
+    }
+
+    /**
+     * Returns the current active audio recording for this audio recorder.
+     * @return a valid {@link AudioRecordingConfiguration} if this recorder is active
+     * or null otherwise.
+     * @see AudioRecordingConfiguration
+     */
+    public @Nullable AudioRecordingConfiguration getActiveRecordingConfiguration() {
+        return mRecordingInfoImpl.getActiveRecordingConfiguration();
+    }
+
+    //---------------------------------------------------------
+    // Implementation of AudioRecordingMonitorClient interface
+    //--------------------
+    /**
+     * @hide
+     */
+    public int getPortId() {
+        return native_getPortId();
+    }
+
+    //--------------------------------------------------------------------------
+    // MicrophoneDirection
+    //--------------------
+    /**
+     * Specifies the logical microphone (for processing).
+     *
+     * @param direction Direction constant (MicrophoneDirection.MIC_DIRECTION_*)
+     * @return retval OK if the call is successful, an error code otherwise.
+     * @hide
+     */
+    public int setMicrophoneDirection(int direction) {
+        return native_set_microphone_direction(direction);
+    }
+
+    /**
+     * Specifies the zoom factor (i.e. the field dimension) for the selected microphone
+     * (for processing). The selected microphone is determined by the use-case for the stream.
+     *
+     * @param zoom the desired field dimension of microphone capture. Range is from -1 (wide angle),
+     * though 0 (no zoom) to 1 (maximum zoom).
+     * @return retval OK if the call is successful, an error code otherwise.
+     * @hide
+     */
+    public int setMicrophoneFieldDimension(float zoom) {
+        return native_set_microphone_field_dimension(zoom);
+    }
+
     //---------------------------------------------------------
     // Interface definitions
     //--------------------
@@ -1817,6 +1895,11 @@ public class AudioRecord implements AudioRouting
 
     private native final int native_get_active_microphones(
             ArrayList<MicrophoneInfo> activeMicrophones);
+
+    private native int native_getPortId();
+
+    private native int native_set_microphone_direction(int direction);
+    private native int native_set_microphone_field_dimension(float zoom);
 
     //---------------------------------------------------------
     // Utility methods

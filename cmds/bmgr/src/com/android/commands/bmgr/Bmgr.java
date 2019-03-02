@@ -17,6 +17,7 @@
 package com.android.commands.bmgr;
 
 import android.annotation.IntDef;
+import android.annotation.UserIdInt;
 import android.app.backup.BackupManager;
 import android.app.backup.BackupManagerMonitor;
 import android.app.backup.BackupProgress;
@@ -29,6 +30,7 @@ import android.app.backup.IRestoreSession;
 import android.app.backup.ISelectBackupTransportCallback;
 import android.app.backup.RestoreSet;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageInfo;
 import android.os.Bundle;
@@ -37,8 +39,10 @@ import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.ArraySet;
+import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -49,19 +53,33 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
-public final class Bmgr {
-    IBackupManager mBmgr;
-    IRestoreSession mRestore;
+/**
+ * Adb shell command for {@link android.app.backup.IBackupManager}.
+ */
+public class Bmgr {
+    public static final String TAG = "Bmgr";
 
-    static final String BMGR_NOT_RUNNING_ERR =
+    private final IBackupManager mBmgr;
+    private IRestoreSession mRestore;
+
+    private static final String BMGR_NOT_RUNNING_ERR =
             "Error: Could not access the Backup Manager.  Is the system running?";
-    static final String TRANSPORT_NOT_RUNNING_ERR =
+    private static final String TRANSPORT_NOT_RUNNING_ERR =
             "Error: Could not access the backup transport.  Is the system running?";
-    static final String PM_NOT_RUNNING_ERR =
+    private static final String PM_NOT_RUNNING_ERR =
             "Error: Could not access the Package Manager.  Is the system running?";
 
     private String[] mArgs;
     private int mNextArg;
+
+    @VisibleForTesting
+    Bmgr(IBackupManager bmgr) {
+        mBmgr = bmgr;
+    }
+
+    Bmgr() {
+        mBmgr = IBackupManager.Stub.asInterface(ServiceManager.getService(Context.BACKUP_SERVICE));
+    }
 
     public static void main(String[] args) {
         try {
@@ -78,71 +96,83 @@ public final class Bmgr {
             return;
         }
 
-        if (!isBmgrActive()) {
+        mArgs = args;
+        mNextArg = 0;
+        int userId = parseUserId();
+        String op = nextArg();
+        Slog.v(TAG, "Running " + op + " for user:" + userId);
+
+        if (mBmgr == null) {
+            System.err.println(BMGR_NOT_RUNNING_ERR);
             return;
         }
 
-        mArgs = args;
-        String op = args[0];
-        mNextArg = 1;
+        if ("activate".equals(op)) {
+            doActivateService(userId);
+            return;
+        }
+
+        if (!isBackupActive(userId)) {
+            return;
+        }
 
         if ("enabled".equals(op)) {
-            doEnabled();
+            doEnabled(userId);
             return;
         }
 
         if ("enable".equals(op)) {
-            doEnable();
+            doEnable(userId);
             return;
         }
 
         if ("run".equals(op)) {
-            doRun();
+            doRun(userId);
             return;
         }
 
         if ("backup".equals(op)) {
-            doBackup();
+            doBackup(userId);
             return;
         }
 
         if ("init".equals(op)) {
-            doInit();
+            doInit(userId);
             return;
         }
 
         if ("list".equals(op)) {
-            doList();
+            doList(userId);
             return;
         }
 
         if ("restore".equals(op)) {
-            doRestore();
+            doRestore(userId);
             return;
         }
 
         if ("transport".equals(op)) {
-            doTransport();
+            doTransport(userId);
             return;
         }
 
         if ("wipe".equals(op)) {
-            doWipe();
+            doWipe(userId);
             return;
         }
 
         if ("fullbackup".equals(op)) {
-            doFullTransportBackup();
+            doFullTransportBackup(userId);
             return;
         }
 
         if ("backupnow".equals(op)) {
-            doBackupNow();
+            doBackupNow(userId);
             return;
         }
 
         if ("cancel".equals(op)) {
-            doCancel();
+            doCancel(userId);
             return;
         }
 
@@ -155,15 +185,9 @@ public final class Bmgr {
         showUsage();
     }
 
-    private boolean isBmgrActive() {
-        mBmgr = IBackupManager.Stub.asInterface(ServiceManager.getService("backup"));
-        if (mBmgr == null) {
-            System.err.println(BMGR_NOT_RUNNING_ERR);
-            return false;
-        }
-
+    boolean isBackupActive(@UserIdInt int userId) {
         try {
-            if (!mBmgr.isBackupServiceActive(UserHandle.USER_SYSTEM)) {
+            if (!mBmgr.isBackupServiceActive(userId)) {
                 System.err.println(BMGR_NOT_RUNNING_ERR);
                 return false;
             }
@@ -180,9 +204,9 @@ public final class Bmgr {
         return enabled ? "enabled" : "disabled";
     }
 
-    private void doEnabled() {
+    private void doEnabled(@UserIdInt int userId) {
         try {
-            boolean isEnabled = mBmgr.isBackupEnabled();
+            boolean isEnabled = mBmgr.isBackupEnabledForUser(userId);
             System.out.println("Backup Manager currently "
                     + enableToString(isEnabled));
         } catch (RemoteException e) {
@@ -191,7 +215,7 @@ public final class Bmgr {
         }
     }
 
-    private void doEnable() {
+    private void doEnable(@UserIdInt int userId) {
         String arg = nextArg();
         if (arg == null) {
             showUsage();
@@ -200,7 +224,7 @@ public final class Bmgr {
 
         try {
             boolean enable = Boolean.parseBoolean(arg);
-            mBmgr.setBackupEnabled(enable);
+            mBmgr.setBackupEnabledForUser(userId, enable);
             System.out.println("Backup Manager now " + enableToString(enable));
         } catch (NumberFormatException e) {
             showUsage();
@@ -211,16 +235,16 @@ public final class Bmgr {
         }
     }
 
-    private void doRun() {
+    void doRun(@UserIdInt int userId) {
         try {
-            mBmgr.backupNow();
+            mBmgr.backupNowForUser(userId);
         } catch (RemoteException e) {
             System.err.println(e.toString());
             System.err.println(BMGR_NOT_RUNNING_ERR);
         }
     }
 
-    private void doBackup() {
+    private void doBackup(@UserIdInt int userId) {
         String pkg = nextArg();
         if (pkg == null) {
             showUsage();
@@ -228,14 +252,14 @@ public final class Bmgr {
         }
 
         try {
-            mBmgr.dataChanged(pkg);
+            mBmgr.dataChangedForUser(userId, pkg);
         } catch (RemoteException e) {
             System.err.println(e.toString());
             System.err.println(BMGR_NOT_RUNNING_ERR);
         }
     }
 
-    private void doFullTransportBackup() {
+    private void doFullTransportBackup(@UserIdInt int userId) {
         System.out.println("Performing full transport backup");
 
         String pkg;
@@ -245,7 +269,8 @@ public final class Bmgr {
         }
         if (allPkgs.size() > 0) {
             try {
-                mBmgr.fullTransportBackup(allPkgs.toArray(new String[allPkgs.size()]));
+                mBmgr.fullTransportBackupForUser(
+                        userId, allPkgs.toArray(new String[allPkgs.size()]));
             } catch (RemoteException e) {
                 System.err.println(e.toString());
                 System.err.println(BMGR_NOT_RUNNING_ERR);
@@ -354,8 +379,8 @@ public final class Bmgr {
         }
     }
 
-    private void backupNowAllPackages(boolean nonIncrementalBackup, @Monitor int monitorState) {
-        int userId = UserHandle.USER_SYSTEM;
+    private void backupNowAllPackages(@UserIdInt int userId, boolean nonIncrementalBackup,
+            @Monitor int monitorState) {
         IPackageManager mPm =
                 IPackageManager.Stub.asInterface(ServiceManager.getService("package"));
         if (mPm == null) {
@@ -374,16 +399,18 @@ public final class Bmgr {
                     installedPackages.stream().map(p -> p.packageName).toArray(String[]::new);
             String[] filteredPackages = {};
             try {
-                filteredPackages = mBmgr.filterAppsEligibleForBackup(packages);
+                filteredPackages = mBmgr.filterAppsEligibleForBackupForUser(userId, packages);
             } catch (RemoteException e) {
                 System.err.println(e.toString());
                 System.err.println(BMGR_NOT_RUNNING_ERR);
             }
-            backupNowPackages(Arrays.asList(filteredPackages), nonIncrementalBackup, monitorState);
+            backupNowPackages(userId, Arrays.asList(filteredPackages), nonIncrementalBackup,
+                    monitorState);
         }
     }
 
     private void backupNowPackages(
+            @UserIdInt int userId,
             List<String> packages, boolean nonIncrementalBackup, @Monitor int monitorState) {
         int flags = 0;
         if (nonIncrementalBackup) {
@@ -395,7 +422,8 @@ public final class Bmgr {
                     (monitorState != Monitor.OFF)
                             ? new BackupMonitor(monitorState == Monitor.VERBOSE)
                             : null;
-            int err = mBmgr.requestBackup(
+            int err = mBmgr.requestBackupForUser(
+                    userId,
                     packages.toArray(new String[packages.size()]),
                     observer,
                     monitor,
@@ -412,7 +440,7 @@ public final class Bmgr {
         }
     }
 
-    private void doBackupNow() {
+    private void doBackupNow(@UserIdInt int userId) {
         String pkg;
         boolean backupAll = false;
         boolean nonIncrementalBackup = false;
@@ -439,24 +467,24 @@ public final class Bmgr {
             if (allPkgs.size() == 0) {
                 System.out.println("Running " + (nonIncrementalBackup ? "non-" : "") +
                         "incremental backup for all packages.");
-                backupNowAllPackages(nonIncrementalBackup, monitor);
+                backupNowAllPackages(userId, nonIncrementalBackup, monitor);
             } else {
                 System.err.println("Provide only '--all' flag or list of packages.");
             }
         } else if (allPkgs.size() > 0) {
             System.out.println("Running " + (nonIncrementalBackup ? "non-" : "") +
                     "incremental backup for " + allPkgs.size() +" requested packages.");
-            backupNowPackages(allPkgs, nonIncrementalBackup, monitor);
+            backupNowPackages(userId, allPkgs, nonIncrementalBackup, monitor);
         } else {
             System.err.println("Provide '--all' flag or list of packages.");
         }
     }
 
-    private void doCancel() {
+    private void doCancel(@UserIdInt int userId) {
         String arg = nextArg();
         if ("backups".equals(arg)) {
             try {
-                mBmgr.cancelBackups();
+                mBmgr.cancelBackupsForUser(userId);
             } catch (RemoteException e) {
                 System.err.println(e.toString());
                 System.err.println(BMGR_NOT_RUNNING_ERR);
@@ -467,7 +495,7 @@ public final class Bmgr {
         System.err.println("Unknown command.");
     }
 
-    private void doTransport() {
+    private void doTransport(@UserIdInt int userId) {
         try {
             String which = nextArg();
             if (which == null) {
@@ -476,11 +504,11 @@ public final class Bmgr {
             }
 
             if ("-c".equals(which)) {
-                doTransportByComponent();
+                doTransportByComponent(userId);
                 return;
             }
 
-            String old = mBmgr.selectBackupTransport(which);
+            String old = mBmgr.selectBackupTransportForUser(userId, which);
             if (old == null) {
                 System.out.println("Unknown transport '" + which
                         + "' specified; no changes made.");
@@ -494,7 +522,7 @@ public final class Bmgr {
         }
     }
 
-    private void doTransportByComponent() {
+    private void doTransportByComponent(@UserIdInt int userId) {
         String which = nextArg();
         if (which == null) {
             showUsage();
@@ -504,7 +532,9 @@ public final class Bmgr {
         final CountDownLatch latch = new CountDownLatch(1);
 
         try {
-            mBmgr.selectBackupTransportAsync(ComponentName.unflattenFromString(which),
+            mBmgr.selectBackupTransportAsyncForUser(
+                    userId,
+                    ComponentName.unflattenFromString(which),
                     new ISelectBackupTransportCallback.Stub() {
                         @Override
                         public void onSuccess(String transportName) {
@@ -531,7 +561,7 @@ public final class Bmgr {
         }
     }
 
-    private void doWipe() {
+    private void doWipe(@UserIdInt int userId) {
         String transport = nextArg();
         if (transport == null) {
             showUsage();
@@ -545,7 +575,7 @@ public final class Bmgr {
         }
 
         try {
-            mBmgr.clearBackupData(transport, pkg);
+            mBmgr.clearBackupDataForUser(userId, transport, pkg);
             System.out.println("Wiped backup data for " + pkg + " on " + transport);
         } catch (RemoteException e) {
             System.err.println(e.toString());
@@ -563,7 +593,7 @@ public final class Bmgr {
         }
     }
 
-    private void doInit() {
+    private void doInit(@UserIdInt int userId) {
         ArraySet<String> transports = new ArraySet<>();
         String transport;
         while ((transport = nextArg()) != null) {
@@ -577,7 +607,8 @@ public final class Bmgr {
         InitObserver observer = new InitObserver();
         try {
             System.out.println("Initializing transports: " + transports);
-            mBmgr.initializeTransports(transports.toArray(new String[transports.size()]), observer);
+            mBmgr.initializeTransportsForUser(
+                    userId, transports.toArray(new String[transports.size()]), observer);
             observer.waitForCompletion(30*1000L);
             System.out.println("Initialization result: " + observer.result);
         } catch (RemoteException e) {
@@ -586,16 +617,16 @@ public final class Bmgr {
         }
     }
 
-    private void doList() {
+    private void doList(@UserIdInt int userId) {
         String arg = nextArg();     // sets, transports, packages set#
         if ("transports".equals(arg)) {
-            doListTransports();
+            doListTransports(userId);
             return;
         }
 
         // The rest of the 'list' options work with a restore session on the current transport
         try {
-            mRestore = mBmgr.beginRestoreSession(null, null);
+            mRestore = mBmgr.beginRestoreSessionForUser(userId, null, null);
             if (mRestore == null) {
                 System.err.println(BMGR_NOT_RUNNING_ERR);
                 return;
@@ -603,8 +634,6 @@ public final class Bmgr {
 
             if ("sets".equals(arg)) {
                 doListRestoreSets();
-            } else if ("transports".equals(arg)) {
-                doListTransports();
             }
 
             mRestore.endRestoreSession();
@@ -614,19 +643,19 @@ public final class Bmgr {
         }
     }
 
-    private void doListTransports() {
+    private void doListTransports(@UserIdInt int userId) {
         String arg = nextArg();
 
         try {
             if ("-c".equals(arg)) {
-                for (ComponentName transport : mBmgr.listAllTransportComponents()) {
+                for (ComponentName transport : mBmgr.listAllTransportComponentsForUser(userId)) {
                     System.out.println(transport.flattenToShortString());
                 }
                 return;
             }
 
-            String current = mBmgr.getCurrentTransport();
-            String[] transports = mBmgr.listAllTransports();
+            String current = mBmgr.getCurrentTransportForUser(userId);
+            String[] transports = mBmgr.listAllTransportsForUser(userId);
             if (transports == null || transports.length == 0) {
                 System.out.println("No transports available.");
                 return;
@@ -717,7 +746,7 @@ public final class Bmgr {
         }
     }
 
-    private void doRestore() {
+    private void doRestore(@UserIdInt int userId) {
         String arg = nextArg();
         if (arg == null) {
             showUsage();
@@ -736,7 +765,7 @@ public final class Bmgr {
                     filter.add(arg);
                 }
 
-                doRestoreAll(token, filter);
+                doRestoreAll(userId, token, filter);
             } catch (NumberFormatException e) {
                 showUsage();
                 return;
@@ -749,12 +778,12 @@ public final class Bmgr {
         System.err.println("'restore <token> <package>'.");
     }
 
-    private void doRestoreAll(long token, HashSet<String> filter) {
+    private void doRestoreAll(@UserIdInt int userId, long token, HashSet<String> filter) {
         RestoreObserver observer = new RestoreObserver();
 
         try {
             boolean didRestore = false;
-            mRestore = mBmgr.beginRestoreSession(null, null);
+            mRestore = mBmgr.beginRestoreSessionForUser(userId, null, null);
             if (mRestore == null) {
                 System.err.println(BMGR_NOT_RUNNING_ERR);
                 return;
@@ -821,6 +850,27 @@ public final class Bmgr {
         }
     }
 
+    private void doActivateService(int userId) {
+        String arg = nextArg();
+        if (arg == null) {
+            showUsage();
+            return;
+        }
+
+        try {
+            boolean activate = Boolean.parseBoolean(arg);
+            mBmgr.setBackupServiceActive(userId, activate);
+            System.out.println(
+                    "Backup service now "
+                            + (activate ? "activated" : "deactivated")
+                            + " for user "
+                            + userId);
+        } catch (RemoteException e) {
+            System.err.println(e.toString());
+            System.err.println(BMGR_NOT_RUNNING_ERR);
+        }
+    }
+
     private String nextArg() {
         if (mNextArg >= mArgs.length) {
             return null;
@@ -830,8 +880,18 @@ public final class Bmgr {
         return arg;
     }
 
+    private int parseUserId() {
+        String arg = nextArg();
+        if ("--user".equals(arg)) {
+            return UserHandle.parseUserArg(nextArg());
+        } else {
+            mNextArg--;
+            return UserHandle.USER_SYSTEM;
+        }
+    }
+
     private static void showUsage() {
-        System.err.println("usage: bmgr [backup|restore|list|transport|run]");
+        System.err.println("usage: bmgr [--user <userId>] [backup|restore|list|transport|run]");
         System.err.println("       bmgr backup PACKAGE");
         System.err.println("       bmgr enable BOOL");
         System.err.println("       bmgr enabled");
@@ -846,6 +906,11 @@ public final class Bmgr {
         System.err.println("       bmgr backupnow [--monitor|--monitor-verbose] --all|PACKAGE...");
         System.err.println("       bmgr cancel backups");
         System.err.println("       bmgr init TRANSPORT...");
+        System.err.println("       bmgr activate BOOL");
+        System.err.println("");
+        System.err.println("The '--user' option specifies the user on which the operation is run.");
+        System.err.println("It must be the first argument before the operation.");
+        System.err.println("The default value is 0 which is the system user.");
         System.err.println("");
         System.err.println("The 'backup' command schedules a backup pass for the named package.");
         System.err.println("Note that the backup pass will effectively be a no-op if the package");
@@ -908,6 +973,11 @@ public final class Bmgr {
         System.err.println("");
         System.err.println("The 'init' command initializes the given transports, wiping all data");
         System.err.println("from their backing data stores.");
+        System.err.println("");
+        System.err.println("The 'activate' command activates or deactivates the backup service.");
+        System.err.println("If the argument is 'true' it will be activated, otherwise it will be");
+        System.err.println("deactivated. When deactivated, the service will not be running and no");
+        System.err.println("operations can be performed until activation.");
     }
 
     private static class BackupMonitor extends IBackupManagerMonitor.Stub {

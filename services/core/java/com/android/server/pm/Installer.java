@@ -611,6 +611,31 @@ public class Installer extends SystemService {
         }
     }
 
+    public boolean snapshotAppData(String pkg, @UserIdInt int userId, int storageFlags)
+            throws InstallerException {
+        if (!checkBeforeRemote()) return false;
+
+        try {
+            mInstalld.snapshotAppData(null, pkg, userId, storageFlags);
+            return true;
+        } catch (Exception e) {
+            throw InstallerException.from(e);
+        }
+    }
+
+    public boolean restoreAppDataSnapshot(String pkg, @AppIdInt  int appId, long ceDataInode,
+            String seInfo, @UserIdInt int userId, int storageFlags) throws InstallerException {
+        if (!checkBeforeRemote()) return false;
+
+        try {
+            mInstalld.restoreAppDataSnapshot(null, pkg, appId, ceDataInode, seInfo, userId,
+                    storageFlags);
+            return true;
+        } catch (Exception e) {
+            throw InstallerException.from(e);
+        }
+    }
+
     private static void assertValidInstructionSet(String instructionSet)
             throws InstallerException {
         for (String abi : Build.SUPPORTED_ABIS) {
@@ -619,6 +644,14 @@ public class Installer extends SystemService {
             }
         }
         throw new InstallerException("Invalid instruction set: " + instructionSet);
+    }
+
+    public boolean compileLayouts(String apkPath, String packageName, String outDexFile, int uid) {
+        try {
+            return mInstalld.compileLayouts(apkPath, packageName, outDexFile, uid);
+        } catch (RemoteException e) {
+            return false;
+        }
     }
 
     public static class InstallerException extends Exception {

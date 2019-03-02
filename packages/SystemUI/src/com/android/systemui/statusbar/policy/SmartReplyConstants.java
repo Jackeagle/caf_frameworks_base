@@ -16,6 +16,9 @@
 
 package com.android.systemui.statusbar.policy;
 
+import static com.android.systemui.Dependency.MAIN_HANDLER_NAME;
+
+import android.app.RemoteInput;
 import android.content.Context;
 import android.content.res.Resources;
 import android.database.ContentObserver;
@@ -27,6 +30,11 @@ import android.util.Log;
 
 import com.android.systemui.R;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+@Singleton
 public final class SmartReplyConstants extends ContentObserver {
 
     private static final String TAG = "SmartReplyConstants";
@@ -35,19 +43,33 @@ public final class SmartReplyConstants extends ContentObserver {
     private static final String KEY_REQUIRES_TARGETING_P = "requires_targeting_p";
     private static final String KEY_MAX_SQUEEZE_REMEASURE_ATTEMPTS =
             "max_squeeze_remeasure_attempts";
+    private static final String KEY_EDIT_CHOICES_BEFORE_SENDING =
+            "edit_choices_before_sending";
+    private static final String KEY_SHOW_IN_HEADS_UP = "show_in_heads_up";
+    private static final String KEY_MIN_NUM_REPLIES = "min_num_system_generated_replies";
+    private static final String KEY_MAX_NUM_ACTIONS = "max_num_actions";
 
     private final boolean mDefaultEnabled;
     private final boolean mDefaultRequiresP;
     private final int mDefaultMaxSqueezeRemeasureAttempts;
+    private final boolean mDefaultEditChoicesBeforeSending;
+    private final boolean mDefaultShowInHeadsUp;
+    private final int mDefaultMinNumSystemGeneratedReplies;
+    private final int mDefaultMaxNumActions;
 
     private boolean mEnabled;
     private boolean mRequiresTargetingP;
     private int mMaxSqueezeRemeasureAttempts;
+    private boolean mEditChoicesBeforeSending;
+    private boolean mShowInHeadsUp;
+    private int mMinNumSystemGeneratedReplies;
+    private int mMaxNumActions;
 
     private final Context mContext;
     private final KeyValueListParser mParser = new KeyValueListParser(',');
 
-    public SmartReplyConstants(Handler handler, Context context) {
+    @Inject
+    public SmartReplyConstants(@Named(MAIN_HANDLER_NAME) Handler handler, Context context) {
         super(handler);
 
         mContext = context;
@@ -58,6 +80,14 @@ public final class SmartReplyConstants extends ContentObserver {
                 R.bool.config_smart_replies_in_notifications_requires_targeting_p);
         mDefaultMaxSqueezeRemeasureAttempts = resources.getInteger(
                 R.integer.config_smart_replies_in_notifications_max_squeeze_remeasure_attempts);
+        mDefaultEditChoicesBeforeSending = resources.getBoolean(
+                R.bool.config_smart_replies_in_notifications_edit_choices_before_sending);
+        mDefaultShowInHeadsUp = resources.getBoolean(
+                R.bool.config_smart_replies_in_notifications_show_in_heads_up);
+        mDefaultMinNumSystemGeneratedReplies = resources.getInteger(
+                R.integer.config_smart_replies_in_notifications_min_num_system_generated_replies);
+        mDefaultMaxNumActions = resources.getInteger(
+                R.integer.config_smart_replies_in_notifications_max_num_actions);
 
         mContext.getContentResolver().registerContentObserver(
                 Settings.Global.getUriFor(Settings.Global.SMART_REPLIES_IN_NOTIFICATIONS_FLAGS),
@@ -82,6 +112,12 @@ public final class SmartReplyConstants extends ContentObserver {
             mRequiresTargetingP = mParser.getBoolean(KEY_REQUIRES_TARGETING_P, mDefaultRequiresP);
             mMaxSqueezeRemeasureAttempts = mParser.getInt(
                     KEY_MAX_SQUEEZE_REMEASURE_ATTEMPTS, mDefaultMaxSqueezeRemeasureAttempts);
+            mEditChoicesBeforeSending = mParser.getBoolean(
+                    KEY_EDIT_CHOICES_BEFORE_SENDING, mDefaultEditChoicesBeforeSending);
+            mShowInHeadsUp = mParser.getBoolean(KEY_SHOW_IN_HEADS_UP, mDefaultShowInHeadsUp);
+            mMinNumSystemGeneratedReplies =
+                    mParser.getInt(KEY_MIN_NUM_REPLIES, mDefaultMinNumSystemGeneratedReplies);
+            mMaxNumActions = mParser.getInt(KEY_MAX_NUM_ACTIONS, mDefaultMaxNumActions);
         }
     }
 
@@ -104,5 +140,48 @@ public final class SmartReplyConstants extends ContentObserver {
      */
     public int getMaxSqueezeRemeasureAttempts() {
         return mMaxSqueezeRemeasureAttempts;
+    }
+
+    /**
+     * Returns whether by tapping on a choice should let the user edit the input before it
+     * is sent to the app.
+     *
+     * @param remoteInputEditChoicesBeforeSending The value from
+     *         {@link RemoteInput#getEditChoicesBeforeSending()}
+     */
+    public boolean getEffectiveEditChoicesBeforeSending(
+            @RemoteInput.EditChoicesBeforeSending int remoteInputEditChoicesBeforeSending) {
+        switch (remoteInputEditChoicesBeforeSending) {
+            case RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED:
+                return false;
+            case RemoteInput.EDIT_CHOICES_BEFORE_SENDING_ENABLED:
+                return true;
+            case RemoteInput.EDIT_CHOICES_BEFORE_SENDING_AUTO:
+            default:
+                return mEditChoicesBeforeSending;
+        }
+    }
+
+    /**
+     * Returns whether smart suggestions should be enabled in heads-up notifications.
+     */
+    public boolean getShowInHeadsUp() {
+        return mShowInHeadsUp;
+    }
+
+    /**
+     * Returns the minimum number of system generated replies to show in a notification.
+     * If we cannot show at least this many system generated replies we should show none.
+     */
+    public int getMinNumSystemGeneratedReplies() {
+        return mMinNumSystemGeneratedReplies;
+    }
+
+    /**
+     * Returns the maximum number smart actions to show in a notification, or -1 if there shouldn't
+     * be a limit.
+     */
+    public int getMaxNumActions() {
+        return mMaxNumActions;
     }
 }

@@ -58,6 +58,7 @@ cc_defaults {
         "libprotobuf-cpp-lite",
         "libz",
     ],
+    stl: "libc++_static",
     group_static_libs: true,
 }
 
@@ -107,6 +108,7 @@ cc_library_host_static {
         "link/ProductFilter.cpp",
         "link/PrivateAttributeMover.cpp",
         "link/ReferenceLinker.cpp",
+        "link/ResourceExcluder.cpp",
         "link/TableMerger.cpp",
         "link/XmlCompatVersioner.cpp",
         "link/XmlNamespaceRemover.cpp",
@@ -114,6 +116,7 @@ cc_library_host_static {
         "optimize/MultiApkGenerator.cpp",
         "optimize/ResourceDeduper.cpp",
         "optimize/ResourceFilter.cpp",
+        "optimize/ResourcePathShortener.cpp",
         "optimize/VersionCollapser.cpp",
         "process/SymbolTable.cpp",
         "split/TableSplitter.cpp",
@@ -170,6 +173,7 @@ cc_test_host {
     srcs: [
         "test/Builders.cpp",
         "test/Common.cpp",
+        "test/Fixture.cpp",
         "**/*_test.cpp",
     ] + toolSources,
     static_libs: [
@@ -177,7 +181,11 @@ cc_test_host {
         "libgmock",
     ],
     defaults: ["aapt2_defaults"],
-    data: ["integration-tests/CompileTest/**/*"],
+    data: [
+         "integration-tests/CompileTest/**/*",
+         "integration-tests/CommandTests/**/*",
+         "integration-tests/ConvertTest/**/*"
+    ],
 }
 
 // ==========================================================

@@ -21,7 +21,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import android.os.Parcel;
-import android.support.test.filters.SmallTest;
+
+import androidx.test.filters.SmallTest;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -61,6 +62,7 @@ public class WifiAwareAgentNetworkSpecifierTest {
                 WifiAwareAgentNetworkSpecifier.CREATOR.createFromParcel(parcelR);
 
         assertEquals(dut, rereadDut);
+        assertEquals(dut.hashCode(), rereadDut.hashCode());
 
         // Ensure that individual network specifiers are satisfied by both the original & marshaled
         // |WifiAwareNetworkAgentSpecifier instances.
@@ -180,6 +182,6 @@ public class WifiAwareAgentNetworkSpecifierTest {
     WifiAwareNetworkSpecifier getDummyNetworkSpecifier(int clientId) {
         return new WifiAwareNetworkSpecifier(WifiAwareNetworkSpecifier.NETWORK_SPECIFIER_TYPE_OOB,
                 WifiAwareManager.WIFI_AWARE_DATA_PATH_ROLE_INITIATOR, clientId, 0, 0, new byte[6],
-                null, null, 0);
+                null, null, 10, 5, 0);
     }
 }

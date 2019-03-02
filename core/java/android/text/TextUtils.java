@@ -33,8 +33,7 @@ import android.icu.text.Edits;
 import android.icu.util.ULocale;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.os.SystemProperties;
-import android.provider.Settings;
+import android.sysprop.DisplayProperties;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.AccessibilityClickableSpan;
 import android.text.style.AccessibilityURLSpan;
@@ -46,6 +45,7 @@ import android.text.style.EasyEditSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.LeadingMarginSpan;
 import android.text.style.LineBackgroundSpan;
+import android.text.style.LineHeightSpan;
 import android.text.style.LocaleSpan;
 import android.text.style.ParagraphStyle;
 import android.text.style.QuoteSpan;
@@ -733,7 +733,9 @@ public class TextUtils {
     /** @hide */
     public static final int LINE_BACKGROUND_SPAN = 27;
     /** @hide */
-    public static final int LAST_SPAN = LINE_BACKGROUND_SPAN;
+    public static final int LINE_HEIGHT_SPAN = 28;
+    /** @hide */
+    public static final int LAST_SPAN = LINE_HEIGHT_SPAN;
 
     /**
      * Flatten a CharSequence and whatever styles can be copied across processes
@@ -928,6 +930,10 @@ public class TextUtils {
                     readSpan(p, sp, new LineBackgroundSpan.Standard(p));
                     break;
 
+                case LINE_HEIGHT_SPAN:
+                    readSpan(p, sp, new LineHeightSpan.Standard(p));
+                    break;
+                    
                 default:
                     throw new RuntimeException("bogus span encoding " + kind);
                 }
@@ -2052,7 +2058,7 @@ public class TextUtils {
         return ((locale != null && !locale.equals(Locale.ROOT)
                         && ULocale.forLocale(locale).isRightToLeft())
                 // If forcing into RTL layout mode, return RTL as default
-                || SystemProperties.getBoolean(Settings.Global.DEVELOPMENT_FORCE_RTL, false))
+                || DisplayProperties.debug_force_rtl().orElse(false))
             ? View.LAYOUT_DIRECTION_RTL
             : View.LAYOUT_DIRECTION_LTR;
     }

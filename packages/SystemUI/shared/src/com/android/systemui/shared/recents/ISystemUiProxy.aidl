@@ -71,4 +71,15 @@ interface ISystemUiProxy {
      */
     void onStatusBarMotionEvent(in MotionEvent event) = 9;
 
+    /**
+     * Get the corner radius of windows in pixels.
+     */
+    float getWindowCornerRadius() = 10;
+
+    /**
+     * If device supports live rounded corners on windows.
+     * This might be turned off for performance reasons
+     */
+    boolean supportsRoundedCornersOnWindows() = 11;
+
 }

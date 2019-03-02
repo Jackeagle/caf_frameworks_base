@@ -21,6 +21,9 @@ import static android.app.admin.DevicePolicyManager.ID_TYPE_BASE_INFO;
 import static android.app.admin.DevicePolicyManager.ID_TYPE_IMEI;
 import static android.app.admin.DevicePolicyManager.ID_TYPE_MEID;
 import static android.app.admin.DevicePolicyManager.ID_TYPE_SERIAL;
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_HIGH;
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_MEDIUM;
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_NONE;
 import static android.app.admin.DevicePolicyManager.WIPE_EUICC;
 import static android.os.UserManagerInternal.CAMERA_DISABLED_GLOBALLY;
 import static android.os.UserManagerInternal.CAMERA_DISABLED_LOCALLY;
@@ -48,6 +51,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.hamcrest.MockitoHamcrest.argThat;
+import static org.testng.Assert.assertThrows;
 
 import android.Manifest.permission;
 import android.annotation.RawRes;
@@ -68,7 +72,6 @@ import android.content.pm.StringParceledListSlice;
 import android.content.pm.UserInfo;
 import android.graphics.Color;
 import android.net.Uri;
-import android.net.wifi.WifiInfo;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.Process;
@@ -203,6 +206,8 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         mAdmin1Context.binder.callingUid = DpmMockContext.CALLER_UID;
 
         setUpUserManager();
+
+        when(getServices().lockPatternUtils.hasSecureLockScreen()).thenReturn(true);
     }
 
     private TransferOwnershipMetadataManager getMockTransferMetadataManager() {
@@ -833,6 +838,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
                 MockUtils.checkIntent(intent),
                 MockUtils.checkUserHandle(MANAGED_PROFILE_USER_ID));
     }
+
     /**
      * Test for: {@link DevicePolicyManager#setDeviceOwner} DO on system user installs successfully.
      */
@@ -1985,17 +1991,16 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         // Test 4, Caller is DO now.
         assertTrue(dpm.setDeviceOwner(admin1, null, UserHandle.USER_SYSTEM));
 
-        // 4-1.  But no WifiInfo.
+        // 4-1.  But WifiManager is not ready.
         assertNull(dpm.getWifiMacAddress(admin1));
 
-        // 4-2.  Returns WifiInfo, but with the default MAC.
-        when(getServices().wifiManager.getConnectionInfo()).thenReturn(new WifiInfo());
+        // 4-2.  When WifiManager returns an empty array, dpm should also output null.
+        when(getServices().wifiManager.getFactoryMacAddresses()).thenReturn(new String[0]);
         assertNull(dpm.getWifiMacAddress(admin1));
 
         // 4-3. With a real MAC address.
-        final WifiInfo wi = new WifiInfo();
-        wi.setMacAddress("11:22:33:44:55:66");
-        when(getServices().wifiManager.getConnectionInfo()).thenReturn(wi);
+        final String[] macAddresses = new String[]{"11:22:33:44:55:66"};
+        when(getServices().wifiManager.getFactoryMacAddresses()).thenReturn(macAddresses);
         assertEquals("11:22:33:44:55:66", dpm.getWifiMacAddress(admin1));
     }
 
@@ -2616,6 +2621,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         when(getServices().lockPatternUtils
                 .isSeparateProfileChallengeEnabled(eq(PROFILE_USER))).thenReturn(false);
         dpmi.reportSeparateProfileChallengeChanged(PROFILE_USER);
+        when(getServices().lockPatternUtils.hasSecureLockScreen()).thenReturn(true);
 
         verifyScreenTimeoutCall(Long.MAX_VALUE, PROFILE_USER);
         verifyScreenTimeoutCall(10L , UserHandle.USER_SYSTEM);
@@ -4163,7 +4169,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         // test reset password with token
         when(getServices().lockPatternUtils.setLockCredentialWithToken(eq(password),
                 eq(LockPatternUtils.CREDENTIAL_TYPE_PASSWORD),
-                eq(DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED), eq(handle), eq(token),
+                eq(DevicePolicyManager.PASSWORD_QUALITY_ALPHABETIC), eq(handle), eq(token),
                 eq(UserHandle.USER_SYSTEM)))
                 .thenReturn(true);
         assertTrue(dpm.resetPasswordWithToken(admin1, password, token, 0));
@@ -4229,6 +4235,41 @@ public class DevicePolicyManagerTest extends DpmTestBase {
 
         setActivePasswordState(passwordMetricsWithSymbols);
         assertTrue(dpm.isActivePasswordSufficient());
+    }
+
+    public void testIsActivePasswordSufficient_noLockScreen() throws Exception {
+        // If there is no lock screen, the password is considered empty no matter what, because
+        // it provides no security.
+        when(getServices().lockPatternUtils.hasSecureLockScreen()).thenReturn(false);
+
+        mContext.binder.callingUid = DpmMockContext.CALLER_SYSTEM_USER_UID;
+        mContext.packageName = admin1.getPackageName();
+        setupDeviceOwner();
+
+        // If no password requirements are set, isActivePasswordSufficient should succeed.
+        assertTrue(dpm.isActivePasswordSufficient());
+
+        // Now set some password quality requirements.
+        dpm.setPasswordQuality(admin1, DevicePolicyManager.PASSWORD_QUALITY_SOMETHING);
+
+        reset(mContext.spiedContext);
+        final int userHandle = UserHandle.getUserId(mContext.binder.callingUid);
+        PasswordMetrics passwordMetricsNoSymbols = new PasswordMetrics(
+                DevicePolicyManager.PASSWORD_QUALITY_COMPLEX, 9,
+                8, 2,
+                6, 1,
+                0, 1);
+        // This should be ignored, as there is no lock screen.
+        dpm.setActivePasswordState(passwordMetricsNoSymbols, userHandle);
+        dpm.reportPasswordChanged(userHandle);
+
+        // No broadcast should be sent.
+        verify(mContext.spiedContext, times(0)).sendBroadcastAsUser(
+                MockUtils.checkIntentAction(DeviceAdminReceiver.ACTION_PASSWORD_CHANGED),
+                MockUtils.checkUserHandle(userHandle));
+
+        // The active (nonexistent) password doesn't comply with the requirements.
+        assertFalse(dpm.isActivePasswordSufficient());
     }
 
     private void setActivePasswordState(PasswordMetrics passwordMetrics)
@@ -4971,6 +5012,309 @@ public class DevicePolicyManagerTest extends DpmTestBase {
                 getRawStream(com.android.frameworks.servicestests.R.raw.profile_owner_not_migrated),
                 getProfileOwnerFile());
         assertProfileOwnershipRevertedWithFakeTransferMetadata();
+    }
+
+    public void testGrantDeviceIdsAccess_notToProfileOwner() throws Exception {
+        setupProfileOwner();
+        configureContextForAccess(mContext, false);
+
+        assertExpectException(SecurityException.class, /* messageRegex= */ null,
+                () -> dpm.setProfileOwnerCanAccessDeviceIdsForUser(admin2,
+                        UserHandle.of(DpmMockContext.CALLER_UID)));
+    }
+
+    public void testGrantDeviceIdsAccess_notByAuthorizedCaller() throws Exception {
+        setupProfileOwner();
+        configureContextForAccess(mContext, false);
+
+        assertExpectException(SecurityException.class, /* messageRegex= */ null,
+                () -> dpm.setProfileOwnerCanAccessDeviceIdsForUser(admin1,
+                        UserHandle.of(DpmMockContext.CALLER_UID)));
+    }
+
+    public void testGrantDeviceIdsAccess_byAuthorizedSystemCaller() throws Exception {
+        setupProfileOwner();
+
+        // This method will throw if the system context could not call
+        // setProfileOwnerCanAccessDeviceIds successfully.
+        configureProfileOwnerForDeviceIdAccess(admin1, DpmMockContext.CALLER_USER_HANDLE);
+    }
+
+    private static void configureContextForAccess(DpmMockContext context, boolean granted) {
+        when(context.spiedContext.checkCallingPermission(
+                android.Manifest.permission.GRANT_PROFILE_OWNER_DEVICE_IDS_ACCESS))
+                .thenReturn(granted ? PackageManager.PERMISSION_GRANTED
+                        : PackageManager.PERMISSION_DENIED);
+    }
+
+    public void testGrantDeviceIdsAccess_byAuthorizedManagedProvisioning() throws Exception {
+        setupProfileOwner();
+
+        final long ident = mServiceContext.binder.clearCallingIdentity();
+        configureContextForAccess(mServiceContext, true);
+
+        mServiceContext.binder.callingUid =
+                UserHandle.getUid(DpmMockContext.CALLER_USER_HANDLE,
+                        DpmMockContext.CALLER_MANAGED_PROVISIONING_UID);
+        try {
+            runAsCaller(mServiceContext, dpms, dpm -> {
+                dpm.setProfileOwnerCanAccessDeviceIdsForUser(admin1,
+                        UserHandle.of(DpmMockContext.CALLER_USER_HANDLE));
+            });
+        } finally {
+            mServiceContext.binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    public void testEnforceCallerCanRequestDeviceIdAttestation_deviceOwnerCaller()
+            throws Exception {
+        mContext.binder.callingUid = DpmMockContext.CALLER_SYSTEM_USER_UID;
+        setupDeviceOwner();
+        configureContextForAccess(mContext, false);
+
+        // Device owner should be allowed to request Device ID attestation.
+        dpms.enforceCallerCanRequestDeviceIdAttestation(admin1, admin1.getPackageName(),
+                DpmMockContext.CALLER_SYSTEM_USER_UID);
+
+        // Another package must not be allowed to request Device ID attestation.
+        assertExpectException(SecurityException.class, null,
+                () -> dpms.enforceCallerCanRequestDeviceIdAttestation(null,
+                        admin2.getPackageName(), DpmMockContext.CALLER_UID));
+        // Another component that is not the admin must not be allowed to request Device ID
+        // attestation.
+        assertExpectException(SecurityException.class, null,
+                () -> dpms.enforceCallerCanRequestDeviceIdAttestation(admin2,
+                        admin1.getPackageName(), DpmMockContext.CALLER_UID));
+    }
+
+    public void testEnforceCallerCanRequestDeviceIdAttestation_profileOwnerCaller()
+            throws Exception {
+        configureContextForAccess(mContext, false);
+
+        // Make sure a security exception is thrown if the device has no profile owner.
+        assertExpectException(SecurityException.class, null,
+                () -> dpms.enforceCallerCanRequestDeviceIdAttestation(admin1,
+                        admin1.getPackageName(), DpmMockContext.CALLER_SYSTEM_USER_UID));
+
+        setupProfileOwner();
+        configureProfileOwnerForDeviceIdAccess(admin1, DpmMockContext.CALLER_USER_HANDLE);
+
+        // The profile owner is allowed to request Device ID attestation.
+        mServiceContext.binder.callingUid = DpmMockContext.CALLER_UID;
+        dpms.enforceCallerCanRequestDeviceIdAttestation(admin1, admin1.getPackageName(),
+                DpmMockContext.CALLER_UID);
+        // But not another package.
+        assertExpectException(SecurityException.class, null,
+                () -> dpms.enforceCallerCanRequestDeviceIdAttestation(null,
+                        admin2.getPackageName(), DpmMockContext.CALLER_UID));
+        // Or another component which is not the admin.
+        assertExpectException(SecurityException.class, null,
+                () -> dpms.enforceCallerCanRequestDeviceIdAttestation(admin2,
+                        admin2.getPackageName(), DpmMockContext.CALLER_UID));
+    }
+
+    public void runAsDelegatedCertInstaller(DpmRunnable action) throws Exception {
+        final long ident = mServiceContext.binder.clearCallingIdentity();
+
+        mServiceContext.binder.callingUid = UserHandle.getUid(DpmMockContext.CALLER_USER_HANDLE,
+                DpmMockContext.DELEGATE_CERT_INSTALLER_UID);
+        try {
+            runAsCaller(mServiceContext, dpms, action);
+        } finally {
+            mServiceContext.binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    public void testEnforceCallerCanRequestDeviceIdAttestation_delegateCaller() throws Exception {
+        setupProfileOwner();
+        markDelegatedCertInstallerAsInstalled();
+
+        // Configure a delegated cert installer.
+        runAsCaller(mServiceContext, dpms,
+                dpm -> dpm.setDelegatedScopes(admin1, DpmMockContext.DELEGATE_PACKAGE_NAME,
+                        Arrays.asList(DELEGATION_CERT_INSTALL)));
+
+        configureProfileOwnerForDeviceIdAccess(admin1, DpmMockContext.CALLER_USER_HANDLE);
+
+        // Make sure that the profile owner can still request Device ID attestation.
+        mServiceContext.binder.callingUid = DpmMockContext.CALLER_UID;
+        dpms.enforceCallerCanRequestDeviceIdAttestation(admin1, admin1.getPackageName(),
+                DpmMockContext.CALLER_UID);
+
+        runAsDelegatedCertInstaller(dpm -> {
+            dpms.enforceCallerCanRequestDeviceIdAttestation(null,
+                    DpmMockContext.DELEGATE_PACKAGE_NAME,
+                    UserHandle.getUid(DpmMockContext.CALLER_USER_HANDLE,
+                            DpmMockContext.DELEGATE_CERT_INSTALLER_UID));
+        });
+    }
+
+    public void testEnforceCallerCanRequestDeviceIdAttestation_delegateCallerWithoutPermissions()
+            throws Exception {
+        setupProfileOwner();
+        markDelegatedCertInstallerAsInstalled();
+
+        // Configure a delegated cert installer.
+        runAsCaller(mServiceContext, dpms,
+                dpm -> dpm.setDelegatedScopes(admin1, DpmMockContext.DELEGATE_PACKAGE_NAME,
+                        Arrays.asList(DELEGATION_CERT_INSTALL)));
+
+
+        assertExpectException(SecurityException.class, null,
+                () -> dpms.enforceCallerCanRequestDeviceIdAttestation(admin1,
+                        admin1.getPackageName(),
+                        DpmMockContext.CALLER_UID));
+
+        runAsDelegatedCertInstaller(dpm -> {
+            assertExpectException(SecurityException.class, /* messageRegex= */ null,
+                    () -> dpms.enforceCallerCanRequestDeviceIdAttestation(null,
+                            DpmMockContext.DELEGATE_PACKAGE_NAME,
+                            UserHandle.getUid(DpmMockContext.CALLER_USER_HANDLE,
+                                    DpmMockContext.DELEGATE_CERT_INSTALLER_UID)));
+        });
+    }
+
+    public void testGetPasswordComplexity_securityExceptionIfParentInstance() {
+        assertThrows(SecurityException.class,
+                () -> new DevicePolicyManagerTestable(
+                        mServiceContext,
+                        dpms,
+                        /* parentInstance= */ true)
+                        .getPasswordComplexity());
+    }
+
+    public void testGetPasswordComplexity_illegalStateExceptionIfLocked() {
+        when(getServices().userManager.isUserUnlocked(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(false);
+        assertThrows(IllegalStateException.class, () -> dpm.getPasswordComplexity());
+    }
+
+    public void testGetPasswordComplexity_securityExceptionWithoutPermissions() {
+        when(getServices().userManager.isUserUnlocked(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(true);
+        assertThrows(SecurityException.class, () -> dpm.getPasswordComplexity());
+    }
+
+
+    public void testGetPasswordComplexity_currentUserNoPassword() {
+        when(getServices().userManager.isUserUnlocked(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(true);
+        mServiceContext.permissions.add(permission.GET_AND_REQUEST_SCREEN_LOCK_COMPLEXITY);
+        when(getServices().userManager.getCredentialOwnerProfile(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(DpmMockContext.CALLER_USER_HANDLE);
+
+        assertEquals(PASSWORD_COMPLEXITY_NONE, dpm.getPasswordComplexity());
+    }
+
+    public void testGetPasswordComplexity_currentUserHasPassword() {
+        when(getServices().userManager.isUserUnlocked(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(true);
+        mServiceContext.permissions.add(permission.GET_AND_REQUEST_SCREEN_LOCK_COMPLEXITY);
+        when(getServices().userManager.getCredentialOwnerProfile(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(DpmMockContext.CALLER_USER_HANDLE);
+        dpms.mUserPasswordMetrics.put(
+                DpmMockContext.CALLER_USER_HANDLE,
+                PasswordMetrics.computeForPassword("asdf"));
+
+        assertEquals(PASSWORD_COMPLEXITY_MEDIUM, dpm.getPasswordComplexity());
+    }
+
+    public void testGetPasswordComplexity_unifiedChallengeReturnsParentUserPassword() {
+        when(getServices().userManager.isUserUnlocked(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(true);
+        mServiceContext.permissions.add(permission.GET_AND_REQUEST_SCREEN_LOCK_COMPLEXITY);
+
+        UserInfo parentUser = new UserInfo();
+        parentUser.id = DpmMockContext.CALLER_USER_HANDLE + 10;
+        when(getServices().userManager.getCredentialOwnerProfile(DpmMockContext.CALLER_USER_HANDLE))
+                .thenReturn(parentUser.id);
+
+        dpms.mUserPasswordMetrics.put(
+                DpmMockContext.CALLER_USER_HANDLE,
+                PasswordMetrics.computeForPassword("asdf"));
+        dpms.mUserPasswordMetrics.put(
+                parentUser.id,
+                PasswordMetrics.computeForPassword("parentUser"));
+
+        assertEquals(PASSWORD_COMPLEXITY_HIGH, dpm.getPasswordComplexity());
+    }
+
+    public void testCrossProfileCalendarPackages_initiallyEmpty() {
+        setAsProfileOwner(admin1);
+        final Set<String> packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertCrossProfileCalendarPackagesEqual(packages, Collections.emptySet());
+    }
+
+    public void testCrossProfileCalendarPackages_reopenDpms() {
+        setAsProfileOwner(admin1);
+        dpm.setCrossProfileCalendarPackages(admin1, null);
+        Set<String> packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertTrue(packages == null);
+        initializeDpms();
+        packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertTrue(packages == null);
+
+        dpm.setCrossProfileCalendarPackages(admin1, Collections.emptySet());
+        packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertCrossProfileCalendarPackagesEqual(packages, Collections.emptySet());
+        initializeDpms();
+        packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertCrossProfileCalendarPackagesEqual(packages, Collections.emptySet());
+
+        final String dummyPackageName = "test";
+        final Set<String> testPackages = new ArraySet<String>(Arrays.asList(dummyPackageName));
+        dpm.setCrossProfileCalendarPackages(admin1, testPackages);
+        packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertCrossProfileCalendarPackagesEqual(packages, testPackages);
+        initializeDpms();
+        packages = dpm.getCrossProfileCalendarPackages(admin1);
+        assertCrossProfileCalendarPackagesEqual(packages, testPackages);
+    }
+
+    private void assertCrossProfileCalendarPackagesEqual(Set<String> expected, Set<String> actual) {
+        assertTrue(expected != null);
+        assertTrue(actual != null);
+        assertTrue(expected.containsAll(actual));
+        assertTrue(actual.containsAll(expected));
+    }
+
+    public void testIsPackageAllowedToAccessCalendar_adminNotAllowed() {
+        setAsProfileOwner(admin1);
+        dpm.setCrossProfileCalendarPackages(admin1, Collections.emptySet());
+        when(getServices().settings.settingsSecureGetIntForUser(
+                Settings.Secure.CROSS_PROFILE_CALENDAR_ENABLED,
+                0, DpmMockContext.CALLER_USER_HANDLE)).thenReturn(1);
+        assertFalse(dpm.isPackageAllowedToAccessCalendar("TEST_PACKAGE"));
+    }
+
+    public void testIsPackageAllowedToAccessCalendar_settingOff() {
+        final String testPackage = "TEST_PACKAGE";
+        setAsProfileOwner(admin1);
+        dpm.setCrossProfileCalendarPackages(admin1, Collections.singleton(testPackage));
+        when(getServices().settings.settingsSecureGetIntForUser(
+                Settings.Secure.CROSS_PROFILE_CALENDAR_ENABLED,
+                0, DpmMockContext.CALLER_USER_HANDLE)).thenReturn(0);
+        assertFalse(dpm.isPackageAllowedToAccessCalendar(testPackage));
+    }
+
+    public void testIsPackageAllowedToAccessCalendar_bothAllowed() {
+        final String testPackage = "TEST_PACKAGE";
+        setAsProfileOwner(admin1);
+        dpm.setCrossProfileCalendarPackages(admin1, null);
+        when(getServices().settings.settingsSecureGetIntForUser(
+                Settings.Secure.CROSS_PROFILE_CALENDAR_ENABLED,
+                0, DpmMockContext.CALLER_USER_HANDLE)).thenReturn(1);
+        assertTrue(dpm.isPackageAllowedToAccessCalendar(testPackage));
+    }
+
+    private void configureProfileOwnerForDeviceIdAccess(ComponentName who, int userId) {
+        final long ident = mServiceContext.binder.clearCallingIdentity();
+        mServiceContext.binder.callingUid =
+                UserHandle.getUid(DpmMockContext.CALLER_USER_HANDLE, DpmMockContext.SYSTEM_UID);
+        runAsCaller(mServiceContext, dpms, dpm -> {
+            dpm.setProfileOwnerCanAccessDeviceIdsForUser(who, UserHandle.of(userId));
+        });
+        mServiceContext.binder.restoreCallingIdentity(ident);
     }
 
     // admin1 is the outgoing DPC, adminAnotherPakcage is the incoming one.

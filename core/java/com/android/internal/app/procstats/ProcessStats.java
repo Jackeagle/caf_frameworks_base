@@ -23,6 +23,7 @@ import android.os.Parcelable;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.service.procstats.ProcessStatsAvailablePagesProto;
 import android.service.procstats.ProcessStatsPackageProto;
 import android.service.procstats.ProcessStatsSectionProto;
 import android.text.format.DateFormat;
@@ -178,7 +179,7 @@ public final class ProcessStats implements Parcelable {
             {"proc", "pkg-proc", "pkg-svc", "pkg-asc", "pkg-all", "all"};
 
     // Current version of the parcel format.
-    private static final int PARCEL_VERSION = 34;
+    private static final int PARCEL_VERSION = 36;
     // In-memory Parcel magic number, used to detect attempts to unmarshall bad data
     private static final int MAGIC = 0x50535454;
 
@@ -237,10 +238,11 @@ public final class ProcessStats implements Parcelable {
     ArrayList<String> mIndexToCommonString;
 
     private static final Pattern sPageTypeRegex = Pattern.compile(
-            "^Node\\s+(\\d+),.*. type\\s+(\\w+)\\s+([\\s\\d]+?)\\s*$");
-    private final ArrayList<Integer> mPageTypeZones = new ArrayList<Integer>();
-    private final ArrayList<String> mPageTypeLabels = new ArrayList<String>();
-    private final ArrayList<int[]> mPageTypeSizes = new ArrayList<int[]>();
+            "^Node\\s+(\\d+),.* zone\\s+(\\w+),.* type\\s+(\\w+)\\s+([\\s\\d]+?)\\s*$");
+    private final ArrayList<Integer> mPageTypeNodes = new ArrayList<>();
+    private final ArrayList<String> mPageTypeZones = new ArrayList<>();
+    private final ArrayList<String> mPageTypeLabels = new ArrayList<>();
+    private final ArrayList<int[]> mPageTypeSizes = new ArrayList<>();
 
     public ProcessStats(boolean running) {
         mRunning = running;
@@ -621,6 +623,7 @@ public final class ProcessStats implements Parcelable {
         try {
             reader = new BufferedReader(new FileReader("/proc/pagetypeinfo"));
             final Matcher matcher = sPageTypeRegex.matcher("");
+            mPageTypeNodes.clear();
             mPageTypeZones.clear();
             mPageTypeLabels.clear();
             mPageTypeSizes.clear();
@@ -631,16 +634,18 @@ public final class ProcessStats implements Parcelable {
                 }
                 matcher.reset(line);
                 if (matcher.matches()) {
-                    final Integer zone = Integer.valueOf(matcher.group(1), 10);
-                    if (zone == null) {
+                    final Integer node = Integer.valueOf(matcher.group(1), 10);
+                    if (node == null) {
                         continue;
                     }
-                    mPageTypeZones.add(zone);
-                    mPageTypeLabels.add(matcher.group(2));
-                    mPageTypeSizes.add(splitAndParseNumbers(matcher.group(3)));
+                    mPageTypeNodes.add(node);
+                    mPageTypeZones.add(matcher.group(2));
+                    mPageTypeLabels.add(matcher.group(3));
+                    mPageTypeSizes.add(splitAndParseNumbers(matcher.group(4)));
                 }
             }
         } catch (IOException ex) {
+            mPageTypeNodes.clear();
             mPageTypeZones.clear();
             mPageTypeLabels.clear();
             mPageTypeSizes.clear();
@@ -935,7 +940,8 @@ public final class ProcessStats implements Parcelable {
         final int NPAGETYPES = mPageTypeLabels.size();
         out.writeInt(NPAGETYPES);
         for (int i=0; i<NPAGETYPES; i++) {
-            out.writeInt(mPageTypeZones.get(i));
+            out.writeInt(mPageTypeNodes.get(i));
+            out.writeString(mPageTypeZones.get(i));
             out.writeString(mPageTypeLabels.get(i));
             out.writeIntArray(mPageTypeSizes.get(i));
         }
@@ -1244,6 +1250,8 @@ public final class ProcessStats implements Parcelable {
 
         // Fragmentation info
         final int NPAGETYPES = in.readInt();
+        mPageTypeNodes.clear();
+        mPageTypeNodes.ensureCapacity(NPAGETYPES);
         mPageTypeZones.clear();
         mPageTypeZones.ensureCapacity(NPAGETYPES);
         mPageTypeLabels.clear();
@@ -1251,7 +1259,8 @@ public final class ProcessStats implements Parcelable {
         mPageTypeSizes.clear();
         mPageTypeSizes.ensureCapacity(NPAGETYPES);
         for (int i=0; i<NPAGETYPES; i++) {
-            mPageTypeZones.add(in.readInt());
+            mPageTypeNodes.add(in.readInt());
+            mPageTypeZones.add(in.readString());
             mPageTypeLabels.add(in.readString());
             mPageTypeSizes.add(in.createIntArray());
         }
@@ -1396,10 +1405,10 @@ public final class ProcessStats implements Parcelable {
         return as;
     }
 
-    // See b/118826162 -- to avoid logspaming, we rate limit the WTF.
-    private static final long INVERSE_PROC_STATE_WTF_MIN_INTERVAL_MS = 10_000L;
-    private long mNextInverseProcStateWtfUptime;
-    private int mSkippedInverseProcStateWtfCount;
+    // See b/118826162 -- to avoid logspaming, we rate limit the warnings.
+    private static final long INVERSE_PROC_STATE_WARNING_MIN_INTERVAL_MS = 10_000L;
+    private long mNextInverseProcStateWarningUptime;
+    private int mSkippedInverseProcStateWarningCount;
 
     public void updateTrackingAssociationsLocked(int curSeq, long now) {
         final int NUM = mTrackingAssociations.size();
@@ -1423,18 +1432,19 @@ public final class ProcessStats implements Parcelable {
                         act.stopActive(now);
                         if (act.mProcState < procState) {
                             final long nowUptime = SystemClock.uptimeMillis();
-                            if (mNextInverseProcStateWtfUptime > nowUptime) {
-                                mSkippedInverseProcStateWtfCount++;
+                            if (mNextInverseProcStateWarningUptime > nowUptime) {
+                                mSkippedInverseProcStateWarningCount++;
                             } else {
                                 // TODO We still see it during boot related to GMS-core.
                                 // b/118826162
-                                Slog.wtf(TAG, "Tracking association " + act + " whose proc state "
+                                Slog.w(TAG, "Tracking association " + act + " whose proc state "
                                         + act.mProcState + " is better than process " + proc
                                         + " proc state " + procState
-                                        + " (" +  mSkippedInverseProcStateWtfCount + " skipped)");
-                                mSkippedInverseProcStateWtfCount = 0;
-                                mNextInverseProcStateWtfUptime =
-                                        nowUptime + INVERSE_PROC_STATE_WTF_MIN_INTERVAL_MS;
+                                        + " (" +  mSkippedInverseProcStateWarningCount
+                                        + " skipped)");
+                                mSkippedInverseProcStateWarningCount = 0;
+                                mNextInverseProcStateWarningUptime =
+                                        nowUptime + INVERSE_PROC_STATE_WARNING_MIN_INTERVAL_MS;
                             }
                         }
                     }
@@ -1474,6 +1484,7 @@ public final class ProcessStats implements Parcelable {
                         final int NSRVS = pkgState.mServices.size();
                         final int NASCS = pkgState.mAssociations.size();
                         final boolean pkgMatch = reqPackage == null || reqPackage.equals(pkgName);
+                        boolean onlyAssociations = false;
                         if (!pkgMatch) {
                             boolean procMatch = false;
                             for (int iproc = 0; iproc < NPROCS; iproc++) {
@@ -1484,7 +1495,18 @@ public final class ProcessStats implements Parcelable {
                                 }
                             }
                             if (!procMatch) {
-                                continue;
+                                // Check if this app has any associations with the requested
+                                // package, so that if so we print those.
+                                for (int iasc = 0; iasc < NASCS; iasc++) {
+                                    AssociationState asc = pkgState.mAssociations.valueAt(iasc);
+                                    if (asc.hasProcessOrPackage(reqPackage)) {
+                                        onlyAssociations = true;
+                                        break;
+                                    }
+                                }
+                                if (!onlyAssociations) {
+                                    continue;
+                                }
                             }
                         }
                         if (NPROCS > 0 || NSRVS > 0 || NASCS > 0) {
@@ -1502,7 +1524,7 @@ public final class ProcessStats implements Parcelable {
                             pw.print(vers);
                             pw.println(":");
                         }
-                        if ((section & REPORT_PKG_PROC_STATS) != 0) {
+                        if ((section & REPORT_PKG_PROC_STATS) != 0 && !onlyAssociations) {
                             if (!dumpSummary || dumpAll) {
                                 for (int iproc = 0; iproc < NPROCS; iproc++) {
                                     ProcessState proc = pkgState.mProcesses.valueAt(iproc);
@@ -1549,7 +1571,7 @@ public final class ProcessStats implements Parcelable {
                                         now, totalTime);
                             }
                         }
-                        if ((section & REPORT_PKG_SVC_STATS) != 0) {
+                        if ((section & REPORT_PKG_SVC_STATS) != 0 && !onlyAssociations) {
                             for (int isvc = 0; isvc < NSRVS; isvc++) {
                                 ServiceState svc = pkgState.mServices.valueAt(isvc);
                                 if (!pkgMatch && !reqPackage.equals(svc.getProcessName())) {
@@ -1578,7 +1600,9 @@ public final class ProcessStats implements Parcelable {
                             for (int iasc = 0; iasc < NASCS; iasc++) {
                                 AssociationState asc = pkgState.mAssociations.valueAt(iasc);
                                 if (!pkgMatch && !reqPackage.equals(asc.getProcessName())) {
-                                    continue;
+                                    if (!onlyAssociations || !asc.hasProcessOrPackage(reqPackage)) {
+                                        continue;
+                                    }
                                 }
                                 if (activeOnly && !asc.isInUse()) {
                                     pw.print("      (Not active association: ");
@@ -1596,7 +1620,8 @@ public final class ProcessStats implements Parcelable {
                                 pw.print("        Process: ");
                                 pw.println(asc.getProcessName());
                                 asc.dumpStats(pw, "        ", "          ", "    ",
-                                        now, totalTime, dumpDetails, dumpAll);
+                                        now, totalTime, onlyAssociations ? reqPackage : null,
+                                        dumpDetails, dumpAll);
                             }
                         }
                     }
@@ -1748,7 +1773,8 @@ public final class ProcessStats implements Parcelable {
         pw.println("Available pages by page size:");
         final int NPAGETYPES = mPageTypeLabels.size();
         for (int i=0; i<NPAGETYPES; i++) {
-            pw.format("Zone %3d  %14s ", mPageTypeZones.get(i), mPageTypeLabels.get(i));
+            pw.format("Node %3d Zone %7s  %14s ", mPageTypeNodes.get(i), mPageTypeZones.get(i),
+                    mPageTypeLabels.get(i));
             final int[] sizes = mPageTypeSizes.get(i);
             final int N = sizes == null ? 0 : sizes.length;
             for (int j=0; j<N; j++) {
@@ -2079,6 +2105,9 @@ public final class ProcessStats implements Parcelable {
             pw.print(",");
             pw.print(mPageTypeZones.get(i));
             pw.print(",");
+            // Wasn't included in original output.
+            //pw.print(mPageTypeNodes.get(i));
+            //pw.print(",");
             final int[] sizes = mPageTypeSizes.get(i);
             final int N = sizes == null ? 0 : sizes.length;
             for (int j=0; j<N; j++) {
@@ -2117,6 +2146,20 @@ public final class ProcessStats implements Parcelable {
         }
         if (partial) {
             proto.write(ProcessStatsSectionProto.STATUS, ProcessStatsSectionProto.STATUS_PARTIAL);
+        }
+
+        final int NPAGETYPES = mPageTypeLabels.size();
+        for (int i = 0; i < NPAGETYPES; i++) {
+            final long token = proto.start(ProcessStatsSectionProto.AVAILABLE_PAGES);
+            proto.write(ProcessStatsAvailablePagesProto.NODE, mPageTypeNodes.get(i));
+            proto.write(ProcessStatsAvailablePagesProto.ZONE, mPageTypeZones.get(i));
+            proto.write(ProcessStatsAvailablePagesProto.LABEL, mPageTypeLabels.get(i));
+            final int[] sizes = mPageTypeSizes.get(i);
+            final int N = sizes == null ? 0 : sizes.length;
+            for (int j = 0; j < N; j++) {
+                proto.write(ProcessStatsAvailablePagesProto.PAGES_PER_ORDER, sizes[j]);
+            }
+            proto.end(token);
         }
 
         final ArrayMap<String, SparseArray<ProcessState>> procMap = mProcesses.getMap();

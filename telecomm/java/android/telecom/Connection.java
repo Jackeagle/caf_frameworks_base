@@ -525,6 +525,13 @@ public abstract class Connection extends Conferenceable {
      */
     public static final String EXTRA_CALL_PROPERTY =
             "android.telecom.extra.EXTRA_CALL_PROPERTY";
+    /**
+     * Boolean connection extra key set on the extras passed to
+     * {@link Connection#sendConnectionEvent} which indicates that audio is present
+     * on the RTT call when the extra value is true.
+     */
+    public static final String EXTRA_IS_RTT_AUDIO_PRESENT =
+            "android.telecom.extra.IS_RTT_AUDIO_PRESENT";
 
     /**
      * Connection event used to inform Telecom that it should play the on hold tone.  This is used
@@ -637,12 +644,23 @@ public abstract class Connection extends Conferenceable {
             "android.telecom.event.HANDOVER_FAILED";
 
     /**
+     * Connection extra key used to store SIP invite fields for an incoming call for IMS calls
+     */
+    public static final String EXTRA_SIP_INVITE = "android.telecom.extra.SIP_INVITE";
+
+    /**
      * Connection event used to inform an {@link InCallService} that the call session property
      * has changed
      * @hide
      */
     public static final String EVENT_CALL_PROPERTY_CHANGED =
             "android.telecom.event.EVENT_CALL_PROPERTY_CHANGED";
+    /**
+     * Connection event used to inform an {@link InCallService} that the RTT audio indication
+     * has changed.
+     */
+    public static final String EVENT_RTT_AUDIO_INDICATION_CHANGED =
+            "android.telecom.event.RTT_AUDIO_INDICATION_CHANGED";
 
     // Flag controlling whether PII is emitted into the logs
     private static final boolean PII_DEBUG = Log.isLoggable(android.util.Log.DEBUG);

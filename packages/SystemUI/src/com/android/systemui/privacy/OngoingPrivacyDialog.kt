@@ -19,7 +19,12 @@ import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.os.UserHandle
+import android.provider.Settings
+import android.util.IconDrawableFactory
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageView
@@ -28,34 +33,56 @@ import android.widget.TextView
 import com.android.systemui.Dependency
 import com.android.systemui.R
 import com.android.systemui.plugins.ActivityStarter
+import java.util.concurrent.TimeUnit
 
 class OngoingPrivacyDialog constructor(
     val context: Context,
     val dialogBuilder: PrivacyDialogBuilder
 ) {
 
-    val iconSize = context.resources.getDimensionPixelSize(
-            R.dimen.ongoing_appops_dialog_icon_height)
-    val iconColor = context.resources.getColor(
+    private val iconSize = context.resources.getDimensionPixelSize(
+            R.dimen.ongoing_appops_dialog_icon_size)
+    private val plusSize = context.resources.getDimensionPixelSize(
+            R.dimen.ongoing_appops_dialog_app_plus_size)
+    private val iconColor = context.resources.getColor(
             com.android.internal.R.color.text_color_primary, context.theme)
-    companion object {
-        private const val MAX_ITEMS = 10
+    private val plusColor: Int
+    private val iconMargin = context.resources.getDimensionPixelSize(
+            R.dimen.ongoing_appops_dialog_icon_margin)
+    private val MAX_ITEMS = context.resources.getInteger(R.integer.ongoing_appops_dialog_max_apps)
+    private val iconFactory = IconDrawableFactory.newInstance(context, true)
+    private var dismissDialog: (() -> Unit)? = null
+    private val appsAndTypes = dialogBuilder.appsAndTypes
+            .sortedWith(compareBy({ -it.second.size }, // Sort by number of AppOps
+            { it.second.min() },
+            { it.first }))
+
+    init {
+        val a = context.theme.obtainStyledAttributes(
+                intArrayOf(com.android.internal.R.attr.colorAccent))
+        plusColor = a.getColor(0, 0)
+        a.recycle()
     }
 
     fun createDialog(): Dialog {
         val builder = AlertDialog.Builder(context).apply {
-            setNegativeButton(R.string.ongoing_privacy_dialog_cancel, null)
-            setPositiveButton(R.string.ongoing_privacy_dialog_open_settings,
+            setPositiveButton(R.string.ongoing_privacy_dialog_ok, null)
+            setNeutralButton(R.string.ongoing_privacy_dialog_open_settings,
                     object : DialogInterface.OnClickListener {
-                        val intent = Intent(Intent.ACTION_REVIEW_PERMISSION_USAGE)
+                        val intent = Intent(Settings.ACTION_ENTERPRISE_PRIVACY_SETTINGS).putExtra(
+                                Intent.EXTRA_DURATION_MILLIS, TimeUnit.MINUTES.toMillis(1))
 
+                        @Suppress("DEPRECATION")
                         override fun onClick(dialog: DialogInterface?, which: Int) {
-                            Dependency.get(ActivityStarter::class.java).startActivity(intent, false)
+                            Dependency.get(ActivityStarter::class.java)
+                                    .postStartActivityDismissingKeyguard(intent, 0)
                         }
                     })
         }
         builder.setView(getContentView())
-        return builder.create()
+        val dialog = builder.create()
+        dismissDialog = dialog::dismiss
+        return dialog
     }
 
     fun getContentView(): View {
@@ -67,10 +94,10 @@ class OngoingPrivacyDialog constructor(
 
         title.setText(dialogBuilder.getDialogTitle())
 
-        val numItems = dialogBuilder.appsAndTypes.size
+        val numItems = appsAndTypes.size
         for (i in 0..(numItems - 1)) {
             if (i >= MAX_ITEMS) break
-            val item = dialogBuilder.appsAndTypes[i]
+            val item = appsAndTypes[i]
             addAppItem(appsList, item.first, item.second, dialogBuilder.types.size > 1)
         }
 
@@ -84,15 +111,22 @@ class OngoingPrivacyDialog constructor(
                     numItems - MAX_ITEMS
             )
             val overflowPlus = overflow.findViewById(R.id.app_icon) as ImageView
+            val lp = overflowPlus.layoutParams.apply {
+                height = plusSize
+                width = plusSize
+            }
+            overflowPlus.layoutParams = lp
             overflowPlus.apply {
-                imageTintList = ColorStateList.valueOf(iconColor)
-                setImageDrawable(context.getDrawable(R.drawable.plus))
+                val plus = context.getDrawable(R.drawable.plus)
+                imageTintList = ColorStateList.valueOf(plusColor)
+                setImageDrawable(plus)
             }
         }
 
         return contentView
     }
 
+    @Suppress("DEPRECATION")
     private fun addAppItem(
         itemList: LinearLayout,
         app: PrivacyApplication,
@@ -105,24 +139,45 @@ class OngoingPrivacyDialog constructor(
         val appName = item.findViewById(R.id.app_name) as TextView
         val icons = item.findViewById(R.id.icons) as LinearLayout
 
-        app.icon?.let {
-            appIcon.setImageDrawable(it)
+        val lp = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            marginStart = iconMargin
+        }
+
+        app.icon.let {
+            appIcon.setImageDrawable(iconFactory.getShadowedIcon(it))
         }
 
         appName.text = app.applicationName
         if (showIcons) {
-            dialogBuilder.generateIconsForApp(types).forEach {
+            dialogBuilder.generateIconsForApp(types).forEachIndexed { index, it ->
                 it.setBounds(0, 0, iconSize, iconSize)
                 val image = ImageView(context).apply {
                     imageTintList = ColorStateList.valueOf(iconColor)
                     setImageDrawable(it)
                 }
-                icons.addView(image, iconSize, LinearLayout.LayoutParams.WRAP_CONTENT)
+                image.contentDescription = types[index].getName(context)
+                icons.addView(image, lp)
             }
             icons.visibility = View.VISIBLE
         } else {
             icons.visibility = View.GONE
         }
+        try {
+            // Check if package exists
+            context.packageManager.getPackageInfo(app.packageName, 0)
+            item.setOnClickListener(object : View.OnClickListener {
+                val intent = Intent(Intent.ACTION_REVIEW_APP_PERMISSION_USAGE)
+                        .putExtra(Intent.EXTRA_PACKAGE_NAME, app.packageName)
+                        .putExtra(Intent.EXTRA_USER, UserHandle.getUserHandleForUid(app.uid))
+                override fun onClick(v: View?) {
+                    Dependency.get(ActivityStarter::class.java)
+                            .postStartActivityDismissingKeyguard(intent, 0)
+                    dismissDialog?.invoke()
+                }
+            })
+        } catch (e: PackageManager.NameNotFoundException) {}
+
         itemList.addView(item)
     }
 }

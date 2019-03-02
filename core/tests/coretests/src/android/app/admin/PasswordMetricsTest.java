@@ -16,12 +16,31 @@
 
 package android.app.admin;
 
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_HIGH;
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_LOW;
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_MEDIUM;
+import static android.app.admin.DevicePolicyManager.PASSWORD_COMPLEXITY_NONE;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_ALPHABETIC;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_ALPHANUMERIC;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_COMPLEX;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_NUMERIC;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
+import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED;
+import static android.app.admin.PasswordMetrics.complexityLevelToMinQuality;
+import static android.app.admin.PasswordMetrics.getActualRequiredQuality;
+import static android.app.admin.PasswordMetrics.getMinimumMetrics;
+import static android.app.admin.PasswordMetrics.getTargetQualityMetrics;
+import static android.app.admin.PasswordMetrics.sanitizeComplexityLevel;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
 import android.os.Parcel;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -101,7 +120,7 @@ public class PasswordMetricsTest {
         assertEquals(DevicePolicyManager.PASSWORD_QUALITY_NUMERIC_COMPLEX,
                 PasswordMetrics.computeForPassword("1").quality);
         // contains a long sequence so isn't complex
-        assertEquals(DevicePolicyManager.PASSWORD_QUALITY_NUMERIC,
+        assertEquals(PASSWORD_QUALITY_NUMERIC,
                 PasswordMetrics.computeForPassword("1234").quality);
         assertEquals(DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED,
                 PasswordMetrics.computeForPassword("").quality);
@@ -137,7 +156,7 @@ public class PasswordMetricsTest {
                 new PasswordMetrics(DevicePolicyManager.PASSWORD_QUALITY_SOMETHING, 5));
 
         assertNotEquals(new PasswordMetrics(DevicePolicyManager.PASSWORD_QUALITY_SOMETHING, 4),
-                new PasswordMetrics(DevicePolicyManager.PASSWORD_QUALITY_COMPLEX, 4));
+                new PasswordMetrics(PASSWORD_QUALITY_COMPLEX, 4));
 
         metrics0 = PasswordMetrics.computeForPassword("1234abcd,./");
         metrics1 = PasswordMetrics.computeForPassword("1234abcd,./");
@@ -163,5 +182,263 @@ public class PasswordMetricsTest {
         assertEquals(metrics0, metrics1);
 
 
+    }
+
+    @Test
+    public void testConstructQuality() {
+        PasswordMetrics expected = new PasswordMetrics();
+        expected.quality = PASSWORD_QUALITY_COMPLEX;
+
+        PasswordMetrics actual = new PasswordMetrics(PASSWORD_QUALITY_COMPLEX);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testDetermineComplexity_none() {
+        assertEquals(PASSWORD_COMPLEXITY_NONE,
+                PasswordMetrics.computeForPassword("").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_lowSomething() {
+        assertEquals(PASSWORD_COMPLEXITY_LOW,
+                new PasswordMetrics(PASSWORD_QUALITY_SOMETHING).determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_lowNumeric() {
+        assertEquals(PASSWORD_COMPLEXITY_LOW,
+                PasswordMetrics.computeForPassword("1234").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_lowNumericComplex() {
+        assertEquals(PASSWORD_COMPLEXITY_LOW,
+                PasswordMetrics.computeForPassword("124").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_lowAlphabetic() {
+        assertEquals(PASSWORD_COMPLEXITY_LOW,
+                PasswordMetrics.computeForPassword("a!").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_lowAlphanumeric() {
+        assertEquals(PASSWORD_COMPLEXITY_LOW,
+                PasswordMetrics.computeForPassword("a!1").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_mediumNumericComplex() {
+        assertEquals(PASSWORD_COMPLEXITY_MEDIUM,
+                PasswordMetrics.computeForPassword("1238").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_mediumAlphabetic() {
+        assertEquals(PASSWORD_COMPLEXITY_MEDIUM,
+                PasswordMetrics.computeForPassword("ab!c").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_mediumAlphanumeric() {
+        assertEquals(PASSWORD_COMPLEXITY_MEDIUM,
+                PasswordMetrics.computeForPassword("ab!1").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_highNumericComplex() {
+        assertEquals(PASSWORD_COMPLEXITY_HIGH,
+                PasswordMetrics.computeForPassword("12389647!").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_highAlphabetic() {
+        assertEquals(PASSWORD_COMPLEXITY_HIGH,
+                PasswordMetrics.computeForPassword("alphabetic!").determineComplexity());
+    }
+
+    @Test
+    public void testDetermineComplexity_highAlphanumeric() {
+        assertEquals(PASSWORD_COMPLEXITY_HIGH,
+                PasswordMetrics.computeForPassword("alphanumeric123!").determineComplexity());
+    }
+
+    @Test
+    public void testSanitizeComplexityLevel_none() {
+        assertEquals(PASSWORD_COMPLEXITY_NONE, sanitizeComplexityLevel(PASSWORD_COMPLEXITY_NONE));
+
+    }
+
+    @Test
+    public void testSanitizeComplexityLevel_low() {
+        assertEquals(PASSWORD_COMPLEXITY_LOW, sanitizeComplexityLevel(PASSWORD_COMPLEXITY_LOW));
+    }
+
+    @Test
+    public void testSanitizeComplexityLevel_medium() {
+        assertEquals(
+                PASSWORD_COMPLEXITY_MEDIUM, sanitizeComplexityLevel(PASSWORD_COMPLEXITY_MEDIUM));
+    }
+
+    @Test
+    public void testSanitizeComplexityLevel_high() {
+        assertEquals(PASSWORD_COMPLEXITY_HIGH, sanitizeComplexityLevel(PASSWORD_COMPLEXITY_HIGH));
+    }
+
+    @Test
+    public void testSanitizeComplexityLevel_invalid() {
+        assertEquals(PASSWORD_COMPLEXITY_NONE, sanitizeComplexityLevel(-1));
+    }
+
+    @Test
+    public void testComplexityLevelToMinQuality_none() {
+        assertEquals(PASSWORD_QUALITY_UNSPECIFIED,
+                complexityLevelToMinQuality(PASSWORD_COMPLEXITY_NONE));
+    }
+
+    @Test
+    public void testComplexityLevelToMinQuality_low() {
+        assertEquals(PASSWORD_QUALITY_SOMETHING,
+                complexityLevelToMinQuality(PASSWORD_COMPLEXITY_LOW));
+    }
+
+    @Test
+    public void testComplexityLevelToMinQuality_medium() {
+        assertEquals(PASSWORD_QUALITY_NUMERIC_COMPLEX,
+                complexityLevelToMinQuality(PASSWORD_COMPLEXITY_MEDIUM));
+    }
+
+    @Test
+    public void testComplexityLevelToMinQuality_high() {
+        assertEquals(PASSWORD_QUALITY_NUMERIC_COMPLEX,
+                complexityLevelToMinQuality(PASSWORD_COMPLEXITY_HIGH));
+    }
+
+    @Test
+    public void testComplexityLevelToMinQuality_invalid() {
+        assertEquals(PASSWORD_QUALITY_UNSPECIFIED, complexityLevelToMinQuality(-1));
+    }
+
+    @Test
+    public void testGetTargetQualityMetrics_noneComplexityReturnsDefaultMetrics() {
+        PasswordMetrics metrics =
+                getTargetQualityMetrics(PASSWORD_COMPLEXITY_NONE, PASSWORD_QUALITY_ALPHANUMERIC);
+
+        assertTrue(metrics.isDefault());
+    }
+
+    @Test
+    public void testGetTargetQualityMetrics_qualityNotAllowedReturnsMinQualityMetrics() {
+        PasswordMetrics metrics =
+                getTargetQualityMetrics(PASSWORD_COMPLEXITY_MEDIUM, PASSWORD_QUALITY_NUMERIC);
+
+        assertEquals(PASSWORD_QUALITY_NUMERIC_COMPLEX, metrics.quality);
+        assertEquals(/* expected= */ 4, metrics.length);
+    }
+
+    @Test
+    public void testGetTargetQualityMetrics_highComplexityNumericComplex() {
+        PasswordMetrics metrics = getTargetQualityMetrics(
+                PASSWORD_COMPLEXITY_HIGH, PASSWORD_QUALITY_NUMERIC_COMPLEX);
+
+        assertEquals(PASSWORD_QUALITY_NUMERIC_COMPLEX, metrics.quality);
+        assertEquals(/* expected= */ 8, metrics.length);
+    }
+
+    @Test
+    public void testGetTargetQualityMetrics_mediumComplexityAlphabetic() {
+        PasswordMetrics metrics = getTargetQualityMetrics(
+                PASSWORD_COMPLEXITY_MEDIUM, PASSWORD_QUALITY_ALPHABETIC);
+
+        assertEquals(PASSWORD_QUALITY_ALPHABETIC, metrics.quality);
+        assertEquals(/* expected= */ 4, metrics.length);
+    }
+
+    @Test
+    public void testGetTargetQualityMetrics_lowComplexityAlphanumeric() {
+        PasswordMetrics metrics = getTargetQualityMetrics(
+                PASSWORD_COMPLEXITY_MEDIUM, PASSWORD_QUALITY_ALPHANUMERIC);
+
+        assertEquals(PASSWORD_QUALITY_ALPHANUMERIC, metrics.quality);
+        assertEquals(/* expected= */ 4, metrics.length);
+    }
+
+    @Test
+    public void testGetActualRequiredQuality_nonComplex() {
+        int actual = getActualRequiredQuality(
+                PASSWORD_QUALITY_NUMERIC_COMPLEX,
+                /* requiresNumeric= */ false,
+                /* requiresLettersOrSymbols= */ false);
+
+        assertEquals(PASSWORD_QUALITY_NUMERIC_COMPLEX, actual);
+    }
+
+    @Test
+    public void testGetActualRequiredQuality_complexRequiresNone() {
+        int actual = getActualRequiredQuality(
+                PASSWORD_QUALITY_COMPLEX,
+                /* requiresNumeric= */ false,
+                /* requiresLettersOrSymbols= */ false);
+
+        assertEquals(PASSWORD_QUALITY_UNSPECIFIED, actual);
+    }
+
+    @Test
+    public void testGetActualRequiredQuality_complexRequiresNumeric() {
+        int actual = getActualRequiredQuality(
+                PASSWORD_QUALITY_COMPLEX,
+                /* requiresNumeric= */ true,
+                /* requiresLettersOrSymbols= */ false);
+
+        assertEquals(PASSWORD_QUALITY_NUMERIC, actual);
+    }
+
+    @Test
+    public void testGetActualRequiredQuality_complexRequiresLetters() {
+        int actual = getActualRequiredQuality(
+                PASSWORD_QUALITY_COMPLEX,
+                /* requiresNumeric= */ false,
+                /* requiresLettersOrSymbols= */ true);
+
+        assertEquals(PASSWORD_QUALITY_ALPHABETIC, actual);
+    }
+
+    @Test
+    public void testGetActualRequiredQuality_complexRequiresNumericAndLetters() {
+        int actual = getActualRequiredQuality(
+                PASSWORD_QUALITY_COMPLEX,
+                /* requiresNumeric= */ true,
+                /* requiresLettersOrSymbols= */ true);
+
+        assertEquals(PASSWORD_QUALITY_ALPHANUMERIC, actual);
+    }
+
+    @Test
+    public void testGetMinimumMetrics_userInputStricter() {
+        PasswordMetrics metrics = getMinimumMetrics(
+                PASSWORD_COMPLEXITY_HIGH,
+                PASSWORD_QUALITY_ALPHANUMERIC,
+                PASSWORD_QUALITY_NUMERIC,
+                /* requiresNumeric= */ false,
+                /* requiresLettersOrSymbols= */ false);
+
+        assertEquals(PASSWORD_QUALITY_ALPHANUMERIC, metrics.quality);
+        assertEquals(/* expected= */ 6, metrics.length);
+    }
+
+    @Test
+    public void testGetMinimumMetrics_actualRequiredQualityStricter() {
+        PasswordMetrics metrics = getMinimumMetrics(
+                PASSWORD_COMPLEXITY_HIGH,
+                PASSWORD_QUALITY_UNSPECIFIED,
+                PASSWORD_QUALITY_NUMERIC,
+                /* requiresNumeric= */ false,
+                /* requiresLettersOrSymbols= */ false);
+
+        assertEquals(PASSWORD_QUALITY_NUMERIC_COMPLEX, metrics.quality);
+        assertEquals(/* expected= */ 8, metrics.length);
     }
 }

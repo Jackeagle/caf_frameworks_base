@@ -15,38 +15,74 @@
  */
 package com.android.systemui.statusbar;
 
+import android.app.Notification;
 import android.os.RemoteException;
 import android.util.ArraySet;
 
 import com.android.internal.statusbar.IStatusBarService;
-import com.android.systemui.Dependency;
-import com.android.systemui.statusbar.notification.NotificationData;
+import com.android.internal.statusbar.NotificationVisibility;
+import com.android.systemui.statusbar.notification.NotificationEntryManager;
+import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.logging.NotificationLogger;
 
 import java.util.Set;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
 
 /**
  * Handles when smart replies are added to a notification
  * and clicked upon.
  */
+@Singleton
 public class SmartReplyController {
-    private IStatusBarService mBarService;
+    private final IStatusBarService mBarService;
+    private final NotificationEntryManager mEntryManager;
     private Set<String> mSendingKeys = new ArraySet<>();
     private Callback mCallback;
 
-    public SmartReplyController() {
-        mBarService = Dependency.get(IStatusBarService.class);
+    @Inject
+    public SmartReplyController(NotificationEntryManager entryManager,
+            IStatusBarService statusBarService) {
+        mBarService = statusBarService;
+        mEntryManager = entryManager;
     }
 
     public void setCallback(Callback callback) {
         mCallback = callback;
     }
 
-    public void smartReplySent(NotificationData.Entry entry, int replyIndex, CharSequence reply) {
+    /**
+     * Notifies StatusBarService a smart reply is sent.
+     */
+    public void smartReplySent(NotificationEntry entry, int replyIndex, CharSequence reply,
+            boolean generatedByAssistant, int notificationLocation) {
         mCallback.onSmartReplySent(entry, reply);
         mSendingKeys.add(entry.key);
         try {
-            mBarService.onNotificationSmartReplySent(entry.notification.getKey(),
-                    replyIndex);
+            mBarService.onNotificationSmartReplySent(
+                    entry.notification.getKey(), replyIndex, reply, generatedByAssistant,
+                    notificationLocation);
+        } catch (RemoteException e) {
+            // Nothing to do, system going down
+        }
+    }
+
+    /**
+     * Notifies StatusBarService a smart action is clicked.
+     */
+    public void smartActionClicked(
+            NotificationEntry entry, int actionIndex, Notification.Action action,
+            boolean generatedByAssistant) {
+        final int count = mEntryManager.getNotificationData().getActiveNotifications().size();
+        final int rank = mEntryManager.getNotificationData().getRank(entry.key);
+        NotificationVisibility.NotificationLocation location =
+                NotificationLogger.getNotificationLocation(entry);
+        final NotificationVisibility nv = NotificationVisibility.obtain(
+                entry.key, rank, count, true, location);
+        try {
+            mBarService.onNotificationActionClick(
+                    entry.key, actionIndex, action, nv, generatedByAssistant);
         } catch (RemoteException e) {
             // Nothing to do, system going down
         }
@@ -60,16 +96,20 @@ public class SmartReplyController {
         return mSendingKeys.contains(key);
     }
 
-    public void smartRepliesAdded(final NotificationData.Entry entry, int replyCount) {
+    /**
+     * Smart Replies and Actions have been added to the UI.
+     */
+    public void smartSuggestionsAdded(final NotificationEntry entry, int replyCount,
+            int actionCount, boolean generatedByAssistant) {
         try {
-            mBarService.onNotificationSmartRepliesAdded(entry.notification.getKey(),
-                    replyCount);
+            mBarService.onNotificationSmartSuggestionsAdded(
+                    entry.notification.getKey(), replyCount, actionCount, generatedByAssistant);
         } catch (RemoteException e) {
             // Nothing to do, system going down
         }
     }
 
-    public void stopSending(final NotificationData.Entry entry) {
+    public void stopSending(final NotificationEntry entry) {
         if (entry != null) {
             mSendingKeys.remove(entry.notification.getKey());
         }
@@ -85,6 +125,6 @@ public class SmartReplyController {
          * @param entry the entry for the notification
          * @param reply the reply that was sent
          */
-        void onSmartReplySent(NotificationData.Entry entry, CharSequence reply);
+        void onSmartReplySent(NotificationEntry entry, CharSequence reply);
     }
 }

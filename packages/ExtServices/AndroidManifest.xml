@@ -22,6 +22,9 @@
     coreApp="true">
 
     <uses-permission android:name="android.permission.PROVIDE_RESOLVER_RANKER_SERVICE" />
+    <uses-permission android:name="android.permission.READ_DEVICE_CONFIG" />
+
+    <uses-permission android:name="android.permission.MONITOR_DEFAULT_SMS_PACKAGE" />
 
     <application android:label="@string/app_name"
         android:defaultToDeviceProtectedStorage="true"
@@ -61,6 +64,13 @@
             <meta-data
                 android:name="android.autofill.field_classification.available_algorithms"
                 android:resource="@array/autofill_field_classification_available_algorithms" />
+        </service>
+
+        <service android:name=".sms.FinancialSmsServiceImpl"
+                 android:permission="android.permission.BIND_FINANCIAL_SMS_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.sms.action.FINANCIAL_SERVICE_INTENT" />
+            </intent-filter>
         </service>
 
         <library android:name="android.ext.services"/>

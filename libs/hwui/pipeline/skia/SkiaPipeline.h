@@ -30,7 +30,7 @@ namespace skiapipeline {
 
 class SkiaPipeline : public renderthread::IRenderPipeline {
 public:
-    SkiaPipeline(renderthread::RenderThread& thread);
+    explicit SkiaPipeline(renderthread::RenderThread& thread);
     virtual ~SkiaPipeline();
 
     TaskManager* getTaskManager() override;
@@ -48,12 +48,13 @@ public:
     bool createOrUpdateLayer(RenderNode* node, const DamageAccumulator& damageAccumulator,
                              ErrorHandler* errorHandler) override;
 
-    SkColorType getSurfaceColorType() const { return mSurfaceColorType; }
+    SkColorType getSurfaceColorType() const override { return mSurfaceColorType; }
     sk_sp<SkColorSpace> getSurfaceColorSpace() override { return mSurfaceColorSpace; }
 
     void renderFrame(const LayerUpdateQueue& layers, const SkRect& clip,
                      const std::vector<sp<RenderNode>>& nodes, bool opaque,
-                     const Rect& contentDrawBounds, sk_sp<SkSurface> surface);
+                     const Rect& contentDrawBounds, sk_sp<SkSurface> surface,
+                     const SkMatrix& preTransform);
 
     std::vector<VectorDrawableRoot*>* getVectorDrawables() { return &mVectorDrawables; }
 
@@ -97,16 +98,21 @@ public:
         return mLightCenter;
     }
 
-    static void updateLighting(const LightGeometry& lightGeometry,
-                               const LightInfo& lightInfo) {
+    static void updateLighting(const LightGeometry& lightGeometry, const LightInfo& lightInfo) {
         mLightRadius = lightGeometry.radius;
         mAmbientShadowAlpha = lightInfo.ambientShadowAlpha;
         mSpotShadowAlpha = lightInfo.spotShadowAlpha;
         mLightCenter = lightGeometry.center;
     }
 
+    void setPictureCapturedCallback(
+            const std::function<void(sk_sp<SkPicture>&&)>& callback) override {
+        mPictureCapturedCallback = callback;
+    }
+
 protected:
     void dumpResourceCacheUsage() const;
+    void setSurfaceColorProperties(renderthread::ColorMode colorMode);
 
     renderthread::RenderThread& mRenderThread;
     SkColorType mSurfaceColorType;
@@ -115,7 +121,8 @@ protected:
 private:
     void renderFrameImpl(const LayerUpdateQueue& layers, const SkRect& clip,
                          const std::vector<sp<RenderNode>>& nodes, bool opaque,
-                         const Rect& contentDrawBounds, SkCanvas* canvas);
+                         const Rect& contentDrawBounds, SkCanvas* canvas,
+                         const SkMatrix& preTransform);
 
     /**
      *  Debugging feature.  Draws a semi-transparent overlay on each pixel, indicating
@@ -123,7 +130,7 @@ private:
      */
     void renderOverdraw(const LayerUpdateQueue& layers, const SkRect& clip,
                         const std::vector<sp<RenderNode>>& nodes, const Rect& contentDrawBounds,
-                        sk_sp<SkSurface>);
+                        sk_sp<SkSurface> surface, const SkMatrix& preTransform);
 
     /**
      *  Render mVectorDrawables into offscreen buffers.
@@ -160,6 +167,8 @@ private:
      *  parallel tryCapture calls (not really needed).
      */
     std::unique_ptr<SkPictureRecorder> mRecorder;
+    std::unique_ptr<SkNWayCanvas> mNwayCanvas;
+    std::function<void(sk_sp<SkPicture>&&)> mPictureCapturedCallback;
 
     static float mLightRadius;
     static uint8_t mAmbientShadowAlpha;

@@ -19,13 +19,21 @@ import android.content.Intent;
 
 import com.android.systemui.plugins.ActivityStarter;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 /**
  * Single common instance of ActivityStarter that can be gotten and referenced from anywhere, but
  * delegates to an actual implementation such as StatusBar, assuming it exists.
  */
+@Singleton
 public class ActivityStarterDelegate implements ActivityStarter {
 
     private ActivityStarter mActualStarter;
+
+    @Inject
+    public ActivityStarterDelegate() {
+    }
 
     @Override
     public void startPendingIntentDismissingKeyguard(PendingIntent intent) {
@@ -33,6 +41,24 @@ public class ActivityStarterDelegate implements ActivityStarter {
             return;
         }
         mActualStarter.startPendingIntentDismissingKeyguard(intent);
+    }
+
+    @Override
+    public void startPendingIntentDismissingKeyguard(PendingIntent intent,
+            Runnable intentSentCallback) {
+        if (mActualStarter == null) {
+            return;
+        }
+        mActualStarter.startPendingIntentDismissingKeyguard(intent, intentSentCallback);
+    }
+
+    @Override
+    public void startActivity(Intent intent, boolean onlyProvisioned, boolean dismissShade,
+            int flags) {
+        if (mActualStarter == null) {
+            return;
+        }
+        mActualStarter.startActivity(intent, onlyProvisioned, dismissShade, flags);
     }
 
     @Override

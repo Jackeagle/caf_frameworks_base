@@ -38,6 +38,8 @@
 #include "gtest/gtest.h"
 
 #include "androidfw/PosixUtils.h"
+#include "private/android_filesystem_config.h"
+
 #include "idmap2/FileUtils.h"
 #include "idmap2/Idmap.h"
 
@@ -46,20 +48,21 @@
 using ::android::util::ExecuteBinary;
 using ::testing::NotNull;
 
-namespace android {
-namespace idmap2 {
+namespace android::idmap2 {
 
 class Idmap2BinaryTests : public Idmap2Tests {};
 
-static void AssertIdmap(const Idmap& idmap, const std::string& target_apk_path,
-                        const std::string& overlay_apk_path) {
+namespace {
+
+void AssertIdmap(const Idmap& idmap, const std::string& target_apk_path,
+                 const std::string& overlay_apk_path) {
   // check that the idmap file looks reasonable (IdmapTests is responsible for
   // more in-depth verification)
   ASSERT_EQ(idmap.GetHeader()->GetMagic(), kIdmapMagic);
   ASSERT_EQ(idmap.GetHeader()->GetVersion(), kIdmapCurrentVersion);
   ASSERT_EQ(idmap.GetHeader()->GetTargetPath(), target_apk_path);
   ASSERT_EQ(idmap.GetHeader()->GetOverlayPath(), overlay_apk_path);
-  ASSERT_EQ(idmap.GetData().size(), 1u);
+  ASSERT_EQ(idmap.GetData().size(), 1U);
 }
 
 #define ASSERT_IDMAP(idmap_ref, target_apk_path, overlay_apk_path)                      \
@@ -67,7 +70,23 @@ static void AssertIdmap(const Idmap& idmap, const std::string& target_apk_path,
     ASSERT_NO_FATAL_FAILURE(AssertIdmap(idmap_ref, target_apk_path, overlay_apk_path)); \
   } while (0)
 
+#ifdef __ANDROID__
+#define SKIP_TEST_IF_CANT_EXEC_IDMAP2           \
+  do {                                          \
+    const uid_t uid = getuid();                 \
+    if (uid != AID_ROOT && uid != AID_SYSTEM) { \
+      GTEST_SKIP();                             \
+    }                                           \
+  } while (0)
+#else
+#define SKIP_TEST_IF_CANT_EXEC_IDMAP2
+#endif
+
+}  // namespace
+
 TEST_F(Idmap2BinaryTests, Create) {
+  SKIP_TEST_IF_CANT_EXEC_IDMAP2;
+
   // clang-format off
   auto result = ExecuteBinary({"idmap2",
                                "create",
@@ -93,6 +112,8 @@ TEST_F(Idmap2BinaryTests, Create) {
 }
 
 TEST_F(Idmap2BinaryTests, Dump) {
+  SKIP_TEST_IF_CANT_EXEC_IDMAP2;
+
   // clang-format off
   auto result = ExecuteBinary({"idmap2",
                                "create",
@@ -111,8 +132,9 @@ TEST_F(Idmap2BinaryTests, Dump) {
   ASSERT_THAT(result, NotNull());
   ASSERT_EQ(result->status, EXIT_SUCCESS) << result->stderr;
   ASSERT_NE(result->stdout.find("0x7f010000 -> 0x7f010000 integer/int1"), std::string::npos);
-  ASSERT_NE(result->stdout.find("0x7f020003 -> 0x7f020000 string/str1"), std::string::npos);
-  ASSERT_NE(result->stdout.find("0x7f020005 -> 0x7f020001 string/str3"), std::string::npos);
+  ASSERT_NE(result->stdout.find("0x7f020009 -> 0x7f020000 string/str1"), std::string::npos);
+  ASSERT_NE(result->stdout.find("0x7f02000b -> 0x7f020001 string/str3"), std::string::npos);
+  ASSERT_NE(result->stdout.find("0x7f02000c -> 0x7f020002 string/str4"), std::string::npos);
   ASSERT_EQ(result->stdout.find("00000210:     007f  target package id"), std::string::npos);
 
   // clang-format off
@@ -139,6 +161,8 @@ TEST_F(Idmap2BinaryTests, Dump) {
 }
 
 TEST_F(Idmap2BinaryTests, Scan) {
+  SKIP_TEST_IF_CANT_EXEC_IDMAP2;
+
   const std::string overlay_static_1_apk_path = GetTestDataPath() + "/overlay/overlay-static-1.apk";
   const std::string overlay_static_2_apk_path = GetTestDataPath() + "/overlay/overlay-static-2.apk";
   const std::string idmap_static_1_path =
@@ -154,7 +178,8 @@ TEST_F(Idmap2BinaryTests, Scan) {
                                "--recursive",
                                "--target-package-name", "test.target",
                                "--target-apk-path", GetTargetApkPath(),
-                               "--output-directory", GetTempDirPath()});
+                               "--output-directory", GetTempDirPath(),
+                               "--override-policy", "public"});
   // clang-format on
   ASSERT_THAT(result, NotNull());
   ASSERT_EQ(result->status, EXIT_SUCCESS) << result->stderr;
@@ -187,7 +212,8 @@ TEST_F(Idmap2BinaryTests, Scan) {
                           "--input-directory", GetTestDataPath() + "/overlay",
                           "--target-package-name", "test.target",
                           "--target-apk-path", GetTargetApkPath(),
-                          "--output-directory", GetTempDirPath()});
+                          "--output-directory", GetTempDirPath(),
+                          "--override-policy", "public"});
   // clang-format on
   ASSERT_THAT(result, NotNull());
   ASSERT_EQ(result->status, EXIT_SUCCESS) << result->stderr;
@@ -204,7 +230,8 @@ TEST_F(Idmap2BinaryTests, Scan) {
                           "--recursive",
                           "--target-package-name", "test.target",
                           "--target-apk-path", GetTargetApkPath(),
-                          "--output-directory", GetTempDirPath()});
+                          "--output-directory", GetTempDirPath(),
+                          "--override-policy", "public"});
   // clang-format on
   ASSERT_THAT(result, NotNull());
   ASSERT_EQ(result->status, EXIT_SUCCESS) << result->stderr;
@@ -219,7 +246,8 @@ TEST_F(Idmap2BinaryTests, Scan) {
                           "--input-directory", GetTempDirPath(),
                           "--target-package-name", "test.target",
                           "--target-apk-path", GetTargetApkPath(),
-                          "--output-directory", GetTempDirPath()});
+                          "--output-directory", GetTempDirPath(),
+                          "--override-policy", "public"});
   // clang-format on
   ASSERT_THAT(result, NotNull());
   ASSERT_EQ(result->status, EXIT_SUCCESS) << result->stderr;
@@ -227,6 +255,8 @@ TEST_F(Idmap2BinaryTests, Scan) {
 }
 
 TEST_F(Idmap2BinaryTests, Lookup) {
+  SKIP_TEST_IF_CANT_EXEC_IDMAP2;
+
   // clang-format off
   auto result = ExecuteBinary({"idmap2",
                                "create",
@@ -242,7 +272,7 @@ TEST_F(Idmap2BinaryTests, Lookup) {
                           "lookup",
                           "--idmap-path", GetIdmapPath(),
                           "--config", "",
-                          "--resid", "0x7f020003"});  // string/str1
+                          "--resid", "0x7f020009"});  // string/str1
   // clang-format on
   ASSERT_THAT(result, NotNull());
   ASSERT_EQ(result->status, EXIT_SUCCESS) << result->stderr;
@@ -276,6 +306,8 @@ TEST_F(Idmap2BinaryTests, Lookup) {
 }
 
 TEST_F(Idmap2BinaryTests, InvalidCommandLineOptions) {
+  SKIP_TEST_IF_CANT_EXEC_IDMAP2;
+
   const std::string invalid_target_apk_path = GetTestDataPath() + "/DOES-NOT-EXIST";
 
   // missing mandatory options
@@ -307,7 +339,18 @@ TEST_F(Idmap2BinaryTests, InvalidCommandLineOptions) {
   // clang-format on
   ASSERT_THAT(result, NotNull());
   ASSERT_NE(result->status, EXIT_SUCCESS);
+
+  // unknown policy
+  // clang-format off
+  result = ExecuteBinary({"idmap2",
+                          "create",
+                          "--target-apk-path", GetTargetApkPath(),
+                          "--overlay-apk-path", GetOverlayApkPath(),
+                          "--idmap-path", GetIdmapPath(),
+                          "--policy", "this-does-not-exist"});
+  // clang-format on
+  ASSERT_THAT(result, NotNull());
+  ASSERT_NE(result->status, EXIT_SUCCESS);
 }
 
-}  // namespace idmap2
-}  // namespace android
+}  // namespace android::idmap2

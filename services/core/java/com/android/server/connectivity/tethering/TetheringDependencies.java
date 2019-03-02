@@ -17,19 +17,13 @@
 package com.android.server.connectivity.tethering;
 
 import android.content.Context;
-import android.net.INetd;
 import android.net.NetworkRequest;
-import android.net.dhcp.DhcpServer;
-import android.net.dhcp.DhcpServingParams;
 import android.net.ip.IpServer;
-import android.net.ip.RouterAdvertisementDaemon;
-import android.net.util.InterfaceParams;
-import android.net.util.NetdService;
-import android.os.Handler;
 import android.net.util.SharedLog;
-import android.os.Looper;
+import android.os.Handler;
 
 import com.android.internal.util.StateMachine;
+import com.android.server.connectivity.MockableSystemProperties;
 
 import java.util.ArrayList;
 
@@ -40,29 +34,55 @@ import java.util.ArrayList;
  * @hide
  */
 public class TetheringDependencies {
+    /**
+     * Get a reference to the offload hardware interface to be used by tethering.
+     */
     public OffloadHardwareInterface getOffloadHardwareInterface(Handler h, SharedLog log) {
         return new OffloadHardwareInterface(h, log);
     }
 
+    /**
+     * Get a reference to the UpstreamNetworkMonitor to be used by tethering.
+     */
     public UpstreamNetworkMonitor getUpstreamNetworkMonitor(Context ctx, StateMachine target,
             SharedLog log, int what) {
         return new UpstreamNetworkMonitor(ctx, target, log, what);
     }
 
+    /**
+     * Get a reference to the IPv6TetheringCoordinator to be used by tethering.
+     */
     public IPv6TetheringCoordinator getIPv6TetheringCoordinator(
             ArrayList<IpServer> notifyList, SharedLog log) {
         return new IPv6TetheringCoordinator(notifyList, log);
     }
 
-    public IpServer.Dependencies getIpServerDependencies() {
-        return new IpServer.Dependencies();
+    /**
+     * Get dependencies to be used by IpServer.
+     */
+    public IpServer.Dependencies getIpServerDependencies(Context context) {
+        return new IpServer.Dependencies(context);
     }
 
+    /**
+     * Indicates whether tethering is supported on the device.
+     */
     public boolean isTetheringSupported() {
         return true;
     }
 
+    /**
+     * Get the NetworkRequest that should be fulfilled by the default network.
+     */
     public NetworkRequest getDefaultNetworkRequest() {
         return null;
+    }
+
+    /**
+     * Get a reference to the EntitlementManager to be used by tethering.
+     */
+    public EntitlementManager getEntitlementManager(Context ctx, StateMachine target,
+            SharedLog log, MockableSystemProperties systemProperties) {
+        return new EntitlementManager(ctx, target, log, systemProperties);
     }
 }

@@ -17,7 +17,9 @@
 package android.os;
 
 import android.Manifest.permission;
+import android.annotation.CallbackExecutor;
 import android.annotation.IntDef;
+import android.annotation.NonNull;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
@@ -25,11 +27,15 @@ import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.content.Context;
 import android.service.dreams.Sandman;
+import android.util.ArrayMap;
 import android.util.Log;
 import android.util.proto.ProtoOutputStream;
 
+import com.android.internal.util.Preconditions;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.concurrent.Executor;
 
 /**
  * This class gives you control of the power state of the device.
@@ -330,6 +336,13 @@ public final class PowerManager {
     public static final int USER_ACTIVITY_EVENT_ACCESSIBILITY = 3;
 
     /**
+     * User activity event type: {@link android.service.attention.AttentionService} taking action
+     * on behalf of user.
+     * @hide
+     */
+    public static final int USER_ACTIVITY_EVENT_ATTENTION = 4;
+
+    /**
      * User activity flag: If already dimmed, extend the dim timeout
      * but do not brighten.  This flag is useful for keeping the screen on
      * a little longer without causing a visible change such as when
@@ -627,6 +640,9 @@ public final class PowerManager {
      */
     public static final int LOCATION_MODE_FOREGROUND_ONLY = 3;
 
+    static final int MIN_LOCATION_MODE = LOCATION_MODE_NO_CHANGE;
+    static final int MAX_LOCATION_MODE = LOCATION_MODE_FOREGROUND_ONLY;
+
     /**
      * @hide
      */
@@ -642,6 +658,9 @@ public final class PowerManager {
     final Context mContext;
     final IPowerManager mService;
     final Handler mHandler;
+
+    IThermalService mThermalService;
+    private ArrayMap<ThermalStatusCallback, IThermalStatusListener> mCallbackMap = new ArrayMap<>();
 
     IDeviceIdleController mIDeviceIdleController;
 
@@ -1008,7 +1027,8 @@ public final class PowerManager {
      * progress, does nothing. Unlike {@link #nap(long)}, this does not put device to sleep when
      * dream ends.
      * </p><p>
-     * Requires the {@link android.Manifest.permission#WRITE_DREAM_STATE} permission.
+     * Requires the {@link android.Manifest.permission#READ_DREAM_STATE} and
+     * {@link android.Manifest.permission#WRITE_DREAM_STATE} permissions.
      * </p>
      *
      * @param time The time when the request to nap was issued, in the
@@ -1019,7 +1039,9 @@ public final class PowerManager {
      * @hide
      */
     @SystemApi
-    @RequiresPermission(android.Manifest.permission.WRITE_DREAM_STATE)
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.READ_DREAM_STATE,
+            android.Manifest.permission.WRITE_DREAM_STATE })
     public void dream(long time) {
         Sandman.startDreamByUserRequest(mContext);
     }
@@ -1253,6 +1275,48 @@ public final class PowerManager {
     }
 
     /**
+     * Sets the policy for adaptive power save.
+     *
+     * @return true if there was an effectual change. If full battery saver is enabled or the
+     * adaptive policy is not enabled, then this will return false.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.DEVICE_POWER,
+            android.Manifest.permission.POWER_SAVER
+    })
+    public boolean setAdaptivePowerSavePolicy(@NonNull BatterySaverPolicyConfig config) {
+        try {
+            return mService.setAdaptivePowerSavePolicy(config);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Enables or disables adaptive power save.
+     *
+     * @return true if there was an effectual change. If full battery saver is enabled, then this
+     * will return false.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.DEVICE_POWER,
+            android.Manifest.permission.POWER_SAVER
+    })
+    public boolean setAdaptivePowerSaveEnabled(boolean enabled) {
+        try {
+            return mService.setAdaptivePowerSaveEnabled(enabled);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Indicates automatic battery saver toggling by the system will be based on percentage.
      *
      * @see PowerManager#getPowerSaveMode()
@@ -1314,7 +1378,7 @@ public final class PowerManager {
      * @return Battery saver state data.
      *
      * @hide
-     * @see com.android.server.power.BatterySaverPolicy
+     * @see com.android.server.power.batterysaver.BatterySaverPolicy
      * @see PowerSaveState
      */
     public PowerSaveState getPowerSaveState(@ServiceType int serviceType) {
@@ -1440,6 +1504,159 @@ public final class PowerManager {
     }
 
     /**
+     * Thermal status code: Not under throttling.
+     */
+    public static final int THERMAL_STATUS_NONE = Temperature.THROTTLING_NONE;
+
+    /**
+     * Thermal status code: Light throttling where UX is not impacted.
+     */
+    public static final int THERMAL_STATUS_LIGHT = Temperature.THROTTLING_LIGHT;
+
+    /**
+     * Thermal status code: Moderate throttling where UX is not largely impacted.
+     */
+    public static final int THERMAL_STATUS_MODERATE = Temperature.THROTTLING_MODERATE;
+
+    /**
+     * Thermal status code: Severe throttling where UX is largely impacted.
+     */
+    public static final int THERMAL_STATUS_SEVERE = Temperature.THROTTLING_SEVERE;
+
+    /**
+     * Thermal status code: Platform has done everything to reduce power.
+     */
+    public static final int THERMAL_STATUS_CRITICAL = Temperature.THROTTLING_CRITICAL;
+
+    /**
+     * Thermal status code: Key components in platform are shutting down due to thermal condition.
+     * Device functionalities will be limited.
+     */
+    public static final int THERMAL_STATUS_EMERGENCY = Temperature.THROTTLING_EMERGENCY;
+
+    /**
+     * Thermal status code: Need shutdown immediately.
+     */
+    public static final int THERMAL_STATUS_SHUTDOWN = Temperature.THROTTLING_SHUTDOWN;
+
+    /** @hide */
+    @IntDef(prefix = { "THERMAL_STATUS_" }, value = {
+            THERMAL_STATUS_NONE,
+            THERMAL_STATUS_LIGHT,
+            THERMAL_STATUS_MODERATE,
+            THERMAL_STATUS_SEVERE,
+            THERMAL_STATUS_CRITICAL,
+            THERMAL_STATUS_EMERGENCY,
+            THERMAL_STATUS_SHUTDOWN,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ThermalStatus {}
+
+    /**
+     * This function returns the current thermal status of the device.
+     *
+     * @return thermal status as int, {@link #THERMAL_STATUS_NONE} if device in not under
+     * thermal throttling.
+     */
+    public @ThermalStatus int getCurrentThermalStatus() {
+        synchronized (this) {
+            if (mThermalService == null) {
+                mThermalService = IThermalService.Stub.asInterface(
+                        ServiceManager.getService(Context.THERMAL_SERVICE));
+            }
+            try {
+                return mThermalService.getCurrentThermalStatus();
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+    }
+
+    /**
+     * Callback passed to
+     * {@link PowerManager#registerThermalStatusCallback} and
+     * {@link PowerManager#unregisterThermalStatusCallback}
+     * to notify caller of thermal status.
+     */
+    public abstract static class ThermalStatusCallback {
+
+        /**
+         * Called when overall thermal throttling status changed.
+         * @param status defined in {@link android.os.Temperature}.
+         */
+        public void onStatusChange(@ThermalStatus int status) {}
+    }
+
+    /**
+     * This function registers a callback for thermal status change.
+     *
+     * @param callback callback to be registered.
+     * @param executor {@link Executor} to handle the callbacks.
+     */
+    public void registerThermalStatusCallback(
+            @NonNull ThermalStatusCallback callback, @NonNull @CallbackExecutor Executor executor) {
+        Preconditions.checkNotNull(callback, "callback cannnot be null");
+        Preconditions.checkNotNull(executor, "executor cannnot be null");
+        synchronized (this) {
+            if (mThermalService == null) {
+                mThermalService = IThermalService.Stub.asInterface(
+                        ServiceManager.getService(Context.THERMAL_SERVICE));
+            }
+            try {
+                if (mCallbackMap.containsKey(callback)) {
+                    throw new IllegalArgumentException("ThermalStatusCallback already registered");
+                }
+                IThermalStatusListener listener = new IThermalStatusListener.Stub() {
+                    @Override
+                    public void onStatusChange(int status) {
+                        executor.execute(() -> {
+                            callback.onStatusChange(status);
+                        });
+                    }
+                };
+                if (mThermalService.registerThermalStatusListener(listener)) {
+                    mCallbackMap.put(callback, listener);
+                } else {
+                    throw new RuntimeException("ThermalStatusCallback failed to register");
+                }
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * This function unregisters a callback for thermal status change.
+     *
+     * @param callback to be unregistered.
+     *
+     * see {@link #registerThermalStatusCallback}
+     */
+    public void unregisterThermalStatusCallback(ThermalStatusCallback callback) {
+        Preconditions.checkNotNull(callback, "callback cannnot be null");
+        synchronized (this) {
+            if (mThermalService == null) {
+                mThermalService = IThermalService.Stub.asInterface(
+                        ServiceManager.getService(Context.THERMAL_SERVICE));
+            }
+            try {
+                IThermalStatusListener listener = mCallbackMap.get(callback);
+                if (listener == null) {
+                    throw new IllegalArgumentException("ThermalStatusCallback not registered");
+                }
+                if (mThermalService.unregisterThermalStatusListener(listener)) {
+                    mCallbackMap.remove(callback);
+                } else {
+                    throw new RuntimeException("ThermalStatusCallback failed to unregister");
+                }
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
      * If true, the doze component is not started until after the screen has been
      * turned off and the screen off animation has been performed.
      * @hide
@@ -1557,6 +1774,25 @@ public final class PowerManager {
     @SystemApi @Deprecated
     public static final String ACTION_SCREEN_BRIGHTNESS_BOOST_CHANGED
             = "android.os.action.SCREEN_BRIGHTNESS_BOOST_CHANGED";
+
+    /**
+     * Constant for PreIdleTimeout normal mode (default mode, not short nor extend timeout) .
+     * @hide
+     */
+    public static final int PRE_IDLE_TIMEOUT_MODE_NORMAL = 0;
+
+    /**
+     * Constant for PreIdleTimeout long mode (extend timeout to keep in inactive mode
+     * longer).
+     * @hide
+     */
+    public static final int PRE_IDLE_TIMEOUT_MODE_LONG = 1;
+
+    /**
+     * Constant for PreIdleTimeout short mode (short timeout to go to doze mode quickly)
+     * @hide
+     */
+    public static final int PRE_IDLE_TIMEOUT_MODE_SHORT = 2;
 
     /**
      * A wake lock is a mechanism to indicate that your application needs

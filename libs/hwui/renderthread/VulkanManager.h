@@ -38,10 +38,20 @@ class RenderThread;
 
 class VulkanSurface {
 public:
-    VulkanSurface(ColorMode colorMode, ANativeWindow* window)
-            : mColorMode(colorMode), mNativeWindow(window) {}
+    VulkanSurface(ColorMode colorMode, ANativeWindow* window, sk_sp<SkColorSpace> colorSpace,
+                  SkColorType colorType)
+            : mColorMode(colorMode), mNativeWindow(window), mColorSpace(colorSpace),
+              mColorType(colorType) {}
 
     sk_sp<SkSurface> getBackBufferSurface() { return mBackbuffer; }
+
+    // The width and height are are the logical width and height for when submitting draws to the
+    // surface. In reality if the window is rotated the underlying VkImage may have the width and
+    // height swapped.
+    int windowWidth() const { return mWindowWidth; }
+    int windowHeight() const { return mWindowHeight; }
+
+    SkMatrix& preTransform() { return mPreTransform; }
 
 private:
     friend class VulkanManager;
@@ -79,6 +89,10 @@ private:
     ANativeWindow* mNativeWindow;
     int mWindowWidth = 0;
     int mWindowHeight = 0;
+    sk_sp<SkColorSpace> mColorSpace;
+    SkColorType mColorType;
+    VkSurfaceTransformFlagBitsKHR mTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    SkMatrix mPreTransform;
 };
 
 // This class contains the shared global Vulkan objects, such as VkInstance, VkDevice and VkQueue,
@@ -96,7 +110,9 @@ public:
 
     // Given a window this creates a new VkSurfaceKHR and VkSwapchain and stores them inside a new
     // VulkanSurface object which is returned.
-    VulkanSurface* createSurface(ANativeWindow* window, ColorMode colorMode);
+    VulkanSurface* createSurface(ANativeWindow* window, ColorMode colorMode,
+                                 sk_sp<SkColorSpace> surfaceColorSpace,
+                                 SkColorType surfaceColorType);
 
     // Destroy the VulkanSurface and all associated vulkan objects.
     void destroySurface(VulkanSurface* surface);
@@ -124,6 +140,9 @@ public:
     // Creates a fence that is signaled, when all the pending Vulkan commands are flushed.
     status_t createReleaseFence(sp<Fence>& nativeFence);
 
+    // Returned pointers are owned by VulkanManager.
+    VkFunctorInitParams getVkFunctorInitParams() const;
+
 private:
     friend class RenderThread;
 
@@ -132,7 +151,7 @@ private:
 
     // Sets up the VkInstance and VkDevice objects. Also fills out the passed in
     // VkPhysicalDeviceFeatures struct.
-    bool setupDevice(GrVkExtensions&, VkPhysicalDeviceFeatures2&);
+    void setupDevice(GrVkExtensions&, VkPhysicalDeviceFeatures2&);
 
     void destroyBuffers(VulkanSurface* surface);
 
@@ -152,6 +171,7 @@ private:
             fPtr = ptr;
             return *this;
         }
+        // NOLINTNEXTLINE(google-explicit-constructor)
         operator FNPTR_TYPE() const { return fPtr; }
 
     private:
@@ -224,6 +244,12 @@ private:
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
 
     VkCommandBuffer mDummyCB = VK_NULL_HANDLE;
+
+    // Variables saved to populate VkFunctorInitParams.
+    static const uint32_t mAPIVersion = VK_MAKE_VERSION(1, 1, 0);
+    std::vector<const char*> mInstanceExtensions;
+    std::vector<const char*> mDeviceExtensions;
+    VkPhysicalDeviceFeatures2 mPhysicalDeviceFeatures2{};
 
     enum class SwapBehavior {
         Discard,

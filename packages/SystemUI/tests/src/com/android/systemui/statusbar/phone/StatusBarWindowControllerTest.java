@@ -28,7 +28,7 @@ import android.app.IActivityManager;
 import android.support.test.filters.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper.RunWithLooper;
-import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 
 import com.android.systemui.SysuiTestCase;
@@ -37,7 +37,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -51,7 +50,7 @@ public class StatusBarWindowControllerTest extends SysuiTestCase {
     @Mock
     private DozeParameters mDozeParameters;
     @Mock
-    private View mStatusBarView;
+    private ViewGroup mStatusBarView;
     @Mock
     private IActivityManager mActivityManager;
 
@@ -95,5 +94,12 @@ public class StatusBarWindowControllerTest extends SysuiTestCase {
     @Test
     public void testAdd_updatesVisibilityFlags() {
         verify(mStatusBarView).setSystemUiVisibility(anyInt());
+    }
+
+    @Test
+    public void testSetForcePluginOpen_beforeStatusBarInitialization() {
+        mStatusBarWindowController = new StatusBarWindowController(mContext, mWindowManager,
+                mActivityManager, mDozeParameters);
+        mStatusBarWindowController.setForcePluginOpen(true);
     }
 }

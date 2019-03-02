@@ -37,6 +37,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @hide Only for use within the system server.
  */
 public class LooperStats implements Looper.Observer {
+    public static final String DEBUG_ENTRY_PREFIX = "__DEBUG_";
     private static final int SESSION_POOL_SIZE = 50;
 
     @GuardedBy("mLock")
@@ -49,7 +50,10 @@ public class LooperStats implements Looper.Observer {
     private final int mEntriesSizeCap;
     private int mSamplingInterval;
     private CachedDeviceState.Readonly mDeviceState;
-    private long mStartTime = System.currentTimeMillis();
+    private CachedDeviceState.TimeInStateStopwatch mBatteryStopwatch;
+    private long mStartCurrentTime = System.currentTimeMillis();
+    private long mStartElapsedTime = SystemClock.elapsedRealtime();
+    private boolean mAddDebugEntries = false;
 
     public LooperStats(int samplingInterval, int entriesSizeCap) {
         this.mSamplingInterval = samplingInterval;
@@ -57,7 +61,16 @@ public class LooperStats implements Looper.Observer {
     }
 
     public void setDeviceState(@NonNull CachedDeviceState.Readonly deviceState) {
+        if (mBatteryStopwatch != null) {
+            mBatteryStopwatch.close();
+        }
+
         mDeviceState = deviceState;
+        mBatteryStopwatch = deviceState.createTimeOnBatteryStopwatch();
+    }
+
+    public void setAddDebugEntries(boolean addDebugEntries) {
+        mAddDebugEntries = addDebugEntries;
     }
 
     @Override
@@ -113,9 +126,11 @@ public class LooperStats implements Looper.Observer {
         }
 
         DispatchSession session = (DispatchSession) token;
-        Entry entry = findEntry(msg, /* allowCreateNew= */true);
-        synchronized (entry) {
-            entry.exceptionCount++;
+        Entry entry = findEntry(msg, /* allowCreateNew= */session != DispatchSession.NOT_SAMPLED);
+        if (entry != null) {
+            synchronized (entry) {
+                entry.exceptionCount++;
+            }
         }
 
         recycleSession(session);
@@ -142,12 +157,35 @@ public class LooperStats implements Looper.Observer {
         // Add the overflow and collision entries only if they have any data.
         maybeAddSpecialEntry(exportedEntries, mOverflowEntry);
         maybeAddSpecialEntry(exportedEntries, mHashCollisionEntry);
+        // Debug entries added to help validate the data.
+        if (mAddDebugEntries && mBatteryStopwatch != null) {
+            exportedEntries.add(createDebugEntry("start_time_millis", mStartElapsedTime));
+            exportedEntries.add(createDebugEntry("end_time_millis", SystemClock.elapsedRealtime()));
+            exportedEntries.add(
+                    createDebugEntry("battery_time_millis", mBatteryStopwatch.getMillis()));
+        }
         return exportedEntries;
+    }
+
+    private ExportedEntry createDebugEntry(String variableName, long value) {
+        final Entry entry = new Entry(DEBUG_ENTRY_PREFIX + variableName);
+        entry.messageCount = 1;
+        entry.recordedMessageCount = 1;
+        entry.totalLatencyMicro = value;
+        return new ExportedEntry(entry);
     }
 
     /** Returns a timestamp indicating when the statistics were last reset. */
     public long getStartTimeMillis() {
-        return mStartTime;
+        return mStartCurrentTime;
+    }
+
+    public long getStartElapsedTimeMillis() {
+        return mStartElapsedTime;
+    }
+
+    public long getBatteryTimeMillis() {
+        return mBatteryStopwatch != null ? mBatteryStopwatch.getMillis() : 0;
     }
 
     private void maybeAddSpecialEntry(List<ExportedEntry> exportedEntries, Entry specialEntry) {
@@ -169,7 +207,11 @@ public class LooperStats implements Looper.Observer {
         synchronized (mOverflowEntry) {
             mOverflowEntry.reset();
         }
-        mStartTime = System.currentTimeMillis();
+        mStartCurrentTime = System.currentTimeMillis();
+        mStartElapsedTime = SystemClock.elapsedRealtime();
+        if (mBatteryStopwatch != null) {
+            mBatteryStopwatch.reset();
+        }
     }
 
     public void setSamplingInterval(int samplingInterval) {

@@ -543,14 +543,31 @@ public class PackageManagerServiceUtils {
         }
     }
 
-    /** Returns true if APK Verity is enabled. */
+    /** Default is to not use fs-verity since it depends on kernel support. */
+    private static final int FSVERITY_DISABLED = 0;
+
+    /**
+     * Experimental implementation targeting priv apps, with Android specific kernel patches to
+     * extend fs-verity.
+     */
+    private static final int FSVERITY_LEGACY = 1;
+
+    /** Standard fs-verity. */
+    private static final int FSVERITY_ENABLED = 2;
+
+    /** Returns true if standard APK Verity is enabled. */
     static boolean isApkVerityEnabled() {
-        return SystemProperties.getInt("ro.apk_verity.mode", 0) != 0;
+        return SystemProperties.getInt("ro.apk_verity.mode", FSVERITY_DISABLED) == FSVERITY_ENABLED;
+    }
+
+    static boolean isLegacyApkVerityEnabled() {
+        return SystemProperties.getInt("ro.apk_verity.mode", FSVERITY_DISABLED) == FSVERITY_LEGACY;
     }
 
     /** Returns true to force apk verification if the updated package (in /data) is a priv app. */
     static boolean isApkVerificationForced(@Nullable PackageSetting disabledPs) {
-        return disabledPs != null && disabledPs.isPrivileged() && isApkVerityEnabled();
+        return disabledPs != null && disabledPs.isPrivileged() && (
+                isApkVerityEnabled() || isLegacyApkVerityEnabled());
     }
 
     /**

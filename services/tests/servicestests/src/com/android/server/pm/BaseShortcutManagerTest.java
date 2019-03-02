@@ -42,6 +42,8 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
 import android.app.IUidObserver;
+import android.app.Person;
+import android.app.admin.DevicePolicyManager;
 import android.app.usage.UsageStatsManagerInternal;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -91,8 +93,8 @@ import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.pm.LauncherAppsService.LauncherAppsImpl;
 import com.android.server.pm.ShortcutUser.PackageWithUser;
-
 import com.android.server.wm.ActivityTaskManagerInternal;
+
 import org.junit.Assert;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
@@ -105,8 +107,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -144,8 +144,10 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
             switch (name) {
                 case Context.USER_SERVICE:
                     return mMockUserManager;
+                case Context.DEVICE_POLICY_SERVICE:
+                    return mMockDevicePolicyManager;
             }
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("Couldn't find system service: " + name);
         }
 
         @Override
@@ -611,6 +613,7 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
     protected PackageManager mMockPackageManager;
     protected PackageManagerInternal mMockPackageManagerInternal;
     protected UserManager mMockUserManager;
+    protected DevicePolicyManager mMockDevicePolicyManager;
     protected UserManagerInternal mMockUserManagerInternal;
     protected UsageStatsManagerInternal mMockUsageStatsManagerInternal;
     protected ActivityManagerInternal mMockActivityManagerInternal;
@@ -751,6 +754,7 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
         mMockPackageManager = mock(PackageManager.class);
         mMockPackageManagerInternal = mock(PackageManagerInternal.class);
         mMockUserManager = mock(UserManager.class);
+        mMockDevicePolicyManager = mock(DevicePolicyManager.class);
         mMockUserManagerInternal = mock(UserManagerInternal.class);
         mMockUsageStatsManagerInternal = mock(UsageStatsManagerInternal.class);
         mMockActivityManagerInternal = mock(ActivityManagerInternal.class);
@@ -762,6 +766,7 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
         LocalServices.addService(UsageStatsManagerInternal.class, mMockUsageStatsManagerInternal);
         LocalServices.removeServiceForTest(ActivityManagerInternal.class);
         LocalServices.addService(ActivityManagerInternal.class, mMockActivityManagerInternal);
+        LocalServices.removeServiceForTest(ActivityTaskManagerInternal.class);
         LocalServices.addService(ActivityTaskManagerInternal.class, mMockActivityTaskManagerInternal);
         LocalServices.removeServiceForTest(UserManagerInternal.class);
         LocalServices.addService(UserManagerInternal.class, mMockUserManagerInternal);
@@ -961,6 +966,10 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
 
     protected Context getTestContext() {
         return getInstrumentation().getContext();
+    }
+
+    protected Context getClientContext() {
+        return mClientContext;
     }
 
     protected ShortcutManager getManager() {
@@ -1585,6 +1594,14 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
     }
 
     /**
+     * Make a Person.
+     */
+    protected Person makePerson(CharSequence name, String key, String uri) {
+        final Person.Builder builder = new Person.Builder();
+        return builder.setName(name).setKey(key).setUri(uri).build();
+    }
+
+    /**
      * Make an component name, with the client context.
      */
     @NonNull
@@ -1789,6 +1806,15 @@ public abstract class BaseShortcutManagerTest extends InstrumentationTestCase {
         final ShortcutPackage p = mService.getPackageShortcutForTest(
                 getCallingPackage(), getCallingUserId());
         return p == null ? null : p.getAllShortcutsForTest();
+    }
+
+    /**
+     * @return all share targets stored internally for the caller.
+     */
+    protected List<ShareTargetInfo> getCallerShareTargets() {
+        final ShortcutPackage p = mService.getPackageShortcutForTest(
+                getCallingPackage(), getCallingUserId());
+        return p == null ? null : p.getAllShareTargetsForTest();
     }
 
     /**

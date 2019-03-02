@@ -16,19 +16,25 @@
 
 package com.android.server.am;
 
+import static android.provider.DeviceConfig.ActivityManager.KEY_MAX_CACHED_PROCESSES;
+
+import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_POWER_QUICK;
+
+import android.app.ActivityThread;
 import android.content.ContentResolver;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.SystemProperties;
 import android.os.Process;
+import android.provider.DeviceConfig;
+import android.provider.DeviceConfig.OnPropertyChangedListener;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.KeyValueListParser;
 import android.util.Slog;
 
 import java.io.PrintWriter;
-
-import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_POWER_QUICK;
 
 /**
  * Settings constants that can modify the activity manager's behavior.
@@ -36,7 +42,6 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_POWER_QUICK
 final class ActivityManagerConstants extends ContentObserver {
 
     // Key names stored in the settings value.
-    private static final String KEY_MAX_CACHED_PROCESSES = "max_cached_processes";
     private static final String KEY_BACKGROUND_SETTLE_TIME = "background_settle_time";
     private static final String KEY_FGSERVICE_MIN_SHOWN_TIME
             = "fgservice_min_shown_time";
@@ -225,6 +230,10 @@ final class ActivityManagerConstants extends ContentObserver {
     // Controlled by Settings.Global.ACTIVITY_STARTS_LOGGING_ENABLED
     volatile boolean mFlagActivityStartsLoggingEnabled;
 
+    // Indicates whether the background activity starts is enabled.
+    // Controlled by Settings.Global.BACKGROUND_ACTIVITY_STARTS_ENABLED
+    volatile boolean mFlagBackgroundActivityStartsEnabled;
+
     private final ActivityManagerService mService;
     private ContentResolver mResolver;
     private final KeyValueListParser mParser = new KeyValueListParser(',');
@@ -270,18 +279,38 @@ final class ActivityManagerConstants extends ContentObserver {
     private static final Uri ACTIVITY_STARTS_LOGGING_ENABLED_URI = Settings.Global.getUriFor(
                 Settings.Global.ACTIVITY_STARTS_LOGGING_ENABLED);
 
+    private static final Uri BACKGROUND_ACTIVITY_STARTS_ENABLED_URI =
+                Settings.Global.getUriFor(
+                        Settings.Global.BACKGROUND_ACTIVITY_STARTS_ENABLED);
+
+    private final OnPropertyChangedListener mOnDeviceConfigChangedListener =
+            new OnPropertyChangedListener() {
+                @Override
+                public void onPropertyChanged(String namespace, String name, String value) {
+                    if (KEY_MAX_CACHED_PROCESSES.equals(name)) {
+                        updateMaxCachedProcesses();
+                    }
+                }
+            };
+
     public ActivityManagerConstants(ActivityManagerService service, Handler handler) {
         super(handler);
         mService = service;
-        updateMaxCachedProcesses();
     }
 
     public void start(ContentResolver resolver) {
         mResolver = resolver;
         mResolver.registerContentObserver(ACTIVITY_MANAGER_CONSTANTS_URI, false, this);
         mResolver.registerContentObserver(ACTIVITY_STARTS_LOGGING_ENABLED_URI, false, this);
+        mResolver.registerContentObserver(BACKGROUND_ACTIVITY_STARTS_ENABLED_URI, false, this);
         updateConstants();
         updateActivityStartsLoggingEnabled();
+        updateBackgroundActivityStartsEnabled();
+        DeviceConfig.addOnPropertyChangedListener(DeviceConfig.ActivityManager.NAMESPACE,
+                ActivityThread.currentApplication().getMainExecutor(),
+                mOnDeviceConfigChangedListener);
+        updateMaxCachedProcesses();
+
     }
 
     public void setOverrideMaxCachedProcesses(int value) {
@@ -324,6 +353,8 @@ final class ActivityManagerConstants extends ContentObserver {
             updateConstants();
         } else if (ACTIVITY_STARTS_LOGGING_ENABLED_URI.equals(uri)) {
             updateActivityStartsLoggingEnabled();
+        } else if (BACKGROUND_ACTIVITY_STARTS_ENABLED_URI.equals(uri)) {
+            updateBackgroundActivityStartsEnabled();
         }
     }
 
@@ -338,8 +369,6 @@ final class ActivityManagerConstants extends ContentObserver {
                 // with defaults.
                 Slog.e("ActivityManagerConstants", "Bad activity manager config settings", e);
             }
-            MAX_CACHED_PROCESSES = mParser.getInt(KEY_MAX_CACHED_PROCESSES,
-                    DEFAULT_MAX_CACHED_PROCESSES);
             BACKGROUND_SETTLE_TIME = mParser.getLong(KEY_BACKGROUND_SETTLE_TIME,
                     DEFAULT_BACKGROUND_SETTLE_TIME);
             FGSERVICE_MIN_SHOWN_TIME = mParser.getLong(KEY_FGSERVICE_MIN_SHOWN_TIME,
@@ -398,6 +427,9 @@ final class ActivityManagerConstants extends ContentObserver {
             TOP_TO_FGS_GRACE_DURATION = mParser.getDurationMillis(KEY_TOP_TO_FGS_GRACE_DURATION,
                     DEFAULT_TOP_TO_FGS_GRACE_DURATION);
 
+            // For new flags that are intended for server-side experiments, please use the new
+            // DeviceConfig package.
+
             updateMaxCachedProcesses();
         }
     }
@@ -407,9 +439,25 @@ final class ActivityManagerConstants extends ContentObserver {
                 Settings.Global.ACTIVITY_STARTS_LOGGING_ENABLED, 0) == 1;
     }
 
+    private void updateBackgroundActivityStartsEnabled() {
+        mFlagBackgroundActivityStartsEnabled = Settings.Global.getInt(mResolver,
+                Settings.Global.BACKGROUND_ACTIVITY_STARTS_ENABLED, 1) == 1;
+    }
+
     private void updateMaxCachedProcesses() {
-        CUR_MAX_CACHED_PROCESSES = mOverrideMaxCachedProcesses < 0
-                ? MAX_CACHED_PROCESSES : mOverrideMaxCachedProcesses;
+        String maxCachedProcessesFlag = DeviceConfig.getProperty(
+                DeviceConfig.ActivityManager.NAMESPACE, KEY_MAX_CACHED_PROCESSES);
+        try {
+            CUR_MAX_CACHED_PROCESSES = mOverrideMaxCachedProcesses < 0
+                    ? (TextUtils.isEmpty(maxCachedProcessesFlag)
+                    ? DEFAULT_MAX_CACHED_PROCESSES : Integer.parseInt(maxCachedProcessesFlag))
+                    : mOverrideMaxCachedProcesses;
+        } catch (NumberFormatException e) {
+            // Bad flag value from Phenotype, revert to default.
+            Slog.e("ActivityManagerConstants",
+                    "Unable to parse flag for max_cached_processes: " + maxCachedProcessesFlag, e);
+            CUR_MAX_CACHED_PROCESSES = DEFAULT_MAX_CACHED_PROCESSES;
+        }
         CUR_MAX_EMPTY_PROCESSES = computeEmptyProcessLimit(CUR_MAX_CACHED_PROCESSES);
 
         // Note the trim levels do NOT depend on the override process limit, we want

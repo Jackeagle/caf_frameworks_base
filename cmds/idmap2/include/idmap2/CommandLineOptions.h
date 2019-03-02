@@ -23,8 +23,7 @@
 #include <string>
 #include <vector>
 
-namespace android {
-namespace idmap2 {
+namespace android::idmap2 {
 
 /*
  * Utility class to convert a command line, including options (--path foo.txt),
@@ -45,6 +44,8 @@ class CommandLineOptions {
                                       std::vector<std::string>* value);
   CommandLineOptions& OptionalOption(const std::string& name, const std::string& description,
                                      std::string* value);
+  CommandLineOptions& OptionalOption(const std::string& name, const std::string& description,
+                                     std::vector<std::string>* value);
   bool Parse(const std::vector<std::string>& argv, std::ostream& outError) const;
   void Usage(std::ostream& out) const;
 
@@ -57,6 +58,7 @@ class CommandLineOptions {
       COUNT_OPTIONAL,
       COUNT_EXACTLY_ONCE,
       COUNT_ONCE_OR_MORE,
+      COUNT_OPTIONAL_ONCE_OR_MORE,
     } count;
     bool argument;
   };
@@ -65,7 +67,6 @@ class CommandLineOptions {
   std::string name_;
 };
 
-}  // namespace idmap2
-}  // namespace android
+}  // namespace android::idmap2
 
 #endif  // IDMAP2_INCLUDE_IDMAP2_COMMANDLINEOPTIONS_H_

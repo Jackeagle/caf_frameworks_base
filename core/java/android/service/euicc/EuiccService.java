@@ -16,17 +16,24 @@
 package android.service.euicc;
 
 import android.annotation.CallSuper;
+import android.annotation.IntDef;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.telephony.TelephonyManager;
 import android.telephony.euicc.DownloadableSubscription;
 import android.telephony.euicc.EuiccInfo;
 import android.telephony.euicc.EuiccManager.OtaStatus;
 import android.util.ArraySet;
+import android.util.Log;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -73,6 +80,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @SystemApi
 public abstract class EuiccService extends Service {
+    private static final String TAG = "EuiccService";
+
     /** Action which must be included in this service's intent filter. */
     public static final String EUICC_SERVICE_INTERFACE = "android.service.euicc.EuiccService";
 
@@ -82,14 +91,34 @@ public abstract class EuiccService extends Service {
     // LUI actions. These are passthroughs of the corresponding EuiccManager actions.
 
     /**
+     * Action used to bind the carrier app and get the activation code from the carrier app. This
+     * activation code will be used to download the eSIM profile during eSIM activation flow.
+     */
+    public static final String ACTION_BIND_CARRIER_PROVISIONING_SERVICE =
+            "android.service.euicc.action.BIND_CARRIER_PROVISIONING_SERVICE";
+
+    /**
      * @see android.telephony.euicc.EuiccManager#ACTION_MANAGE_EMBEDDED_SUBSCRIPTIONS
      * The difference is this one is used by system to bring up the LUI.
      */
     public static final String ACTION_MANAGE_EMBEDDED_SUBSCRIPTIONS =
             "android.service.euicc.action.MANAGE_EMBEDDED_SUBSCRIPTIONS";
+
     /** @see android.telephony.euicc.EuiccManager#ACTION_PROVISION_EMBEDDED_SUBSCRIPTION */
     public static final String ACTION_PROVISION_EMBEDDED_SUBSCRIPTION =
             "android.service.euicc.action.PROVISION_EMBEDDED_SUBSCRIPTION";
+
+    /** @see android.telephony.euicc.EuiccManager#ACTION_TOGGLE_SUBSCRIPTION_PRIVILEGED */
+    public static final String ACTION_TOGGLE_SUBSCRIPTION_PRIVILEGED =
+            "android.service.euicc.action.TOGGLE_SUBSCRIPTION_PRIVILEGED";
+
+    /** @see android.telephony.euicc.EuiccManager#ACTION_DELETE_SUBSCRIPTION_PRIVILEGED */
+    public static final String ACTION_DELETE_SUBSCRIPTION_PRIVILEGED =
+            "android.service.euicc.action.DELETE_SUBSCRIPTION_PRIVILEGED";
+
+    /** @see android.telephony.euicc.EuiccManager#ACTION_RENAME_SUBSCRIPTION_PRIVILEGED */
+    public static final String ACTION_RENAME_SUBSCRIPTION_PRIVILEGED =
+            "android.service.euicc.action.RENAME_SUBSCRIPTION_PRIVILEGED";
 
     // LUI resolution actions. These are called by the platform to resolve errors in situations that
     // require user interaction.
@@ -108,17 +137,58 @@ public abstract class EuiccService extends Service {
     public static final String ACTION_RESOLVE_NO_PRIVILEGES =
             "android.service.euicc.action.RESOLVE_NO_PRIVILEGES";
 
-    /** Ask the user to input carrier confirmation code. */
+    /**
+     * Ask the user to input carrier confirmation code.
+     *
+     * @deprecated From Q, the resolvable errors happened in the download step are presented as
+     * bit map in {@link #EXTRA_RESOLVABLE_ERRORS}. The corresponding action would be
+     * {@link #ACTION_RESOLVE_RESOLVABLE_ERRORS}.
+     */
+    @Deprecated
     public static final String ACTION_RESOLVE_CONFIRMATION_CODE =
             "android.service.euicc.action.RESOLVE_CONFIRMATION_CODE";
+
+    /** Ask the user to resolve all the resolvable errors. */
+    public static final String ACTION_RESOLVE_RESOLVABLE_ERRORS =
+            "android.service.euicc.action.RESOLVE_RESOLVABLE_ERRORS";
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(flag = true, prefix = { "RESOLVABLE_ERROR_" }, value = {
+            RESOLVABLE_ERROR_CONFIRMATION_CODE,
+            RESOLVABLE_ERROR_POLICY_RULES,
+    })
+    public @interface ResolvableError {}
+
+    /**
+     * Possible value for the bit map of resolvable errors indicating the download process needs
+     * the user to input confirmation code.
+     */
+    public static final int RESOLVABLE_ERROR_CONFIRMATION_CODE = 1 << 0;
+    /**
+     * Possible value for the bit map of resolvable errors indicating the download process needs
+     * the user's consent to allow profile policy rules.
+     */
+    public static final int RESOLVABLE_ERROR_POLICY_RULES = 1 << 1;
 
     /**
      * Intent extra set for resolution requests containing the package name of the calling app.
      * This is used by the above actions including ACTION_RESOLVE_DEACTIVATE_SIM,
-     * ACTION_RESOLVE_NO_PRIVILEGES and ACTION_RESOLVE_CONFIRMATION_CODE.
+     * ACTION_RESOLVE_NO_PRIVILEGES and ACTION_RESOLVE_RESOLVABLE_ERRORS.
      */
     public static final String EXTRA_RESOLUTION_CALLING_PACKAGE =
             "android.service.euicc.extra.RESOLUTION_CALLING_PACKAGE";
+
+    /**
+     * Intent extra set for resolution requests containing the list of resolvable errors to be
+     * resolved. Each resolvable error is an integer. Its possible values include:
+     * <UL>
+     * <LI>{@link #RESOLVABLE_ERROR_CONFIRMATION_CODE}
+     * <LI>{@link #RESOLVABLE_ERROR_POLICY_RULES}
+     * </UL>
+     */
+    public static final String EXTRA_RESOLVABLE_ERRORS =
+            "android.service.euicc.extra.RESOLVABLE_ERRORS";
 
     /**
      * Intent extra set for resolution requests containing a boolean indicating whether to ask the
@@ -127,11 +197,37 @@ public abstract class EuiccService extends Service {
     public static final String EXTRA_RESOLUTION_CONFIRMATION_CODE_RETRIED =
             "android.service.euicc.extra.RESOLUTION_CONFIRMATION_CODE_RETRIED";
 
+    /**
+     * Intent extra set for resolution requests containing an int indicating the current card Id.
+     */
+    public static final String EXTRA_RESOLUTION_CARD_ID =
+            "android.service.euicc.extra.RESOLUTION_CARD_ID";
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = { "RESULT_" }, value = {
+            RESULT_OK,
+            RESULT_MUST_DEACTIVATE_SIM,
+            RESULT_RESOLVABLE_ERRORS,
+            RESULT_NEED_CONFIRMATION_CODE,
+            RESULT_FIRST_USER,
+    })
+    public @interface Result {}
+
     /** Result code for a successful operation. */
     public static final int RESULT_OK = 0;
     /** Result code indicating that an active SIM must be deactivated to perform the operation. */
     public static final int RESULT_MUST_DEACTIVATE_SIM = -1;
-    /** Result code indicating that the user must input a carrier confirmation code. */
+    /** Result code indicating that the user must resolve resolvable errors. */
+    public static final int RESULT_RESOLVABLE_ERRORS = -2;
+    /**
+     * Result code indicating that the user must input a carrier confirmation code.
+     *
+     * @deprecated From Q, the resolvable errors happened in the download step are presented as
+     * bit map in {@link #EXTRA_RESOLVABLE_ERRORS}. The corresponding result would be
+     * {@link #RESULT_RESOLVABLE_ERRORS}.
+     */
+    @Deprecated
     public static final int RESULT_NEED_CONFIRMATION_CODE = -2;
     // New predefined codes should have negative values.
 
@@ -147,7 +243,7 @@ public abstract class EuiccService extends Service {
         RESOLUTION_ACTIONS = new ArraySet<>();
         RESOLUTION_ACTIONS.add(EuiccService.ACTION_RESOLVE_DEACTIVATE_SIM);
         RESOLUTION_ACTIONS.add(EuiccService.ACTION_RESOLVE_NO_PRIVILEGES);
-        RESOLUTION_ACTIONS.add(EuiccService.ACTION_RESOLVE_CONFIRMATION_CODE);
+        RESOLUTION_ACTIONS.add(EuiccService.ACTION_RESOLVE_RESOLVABLE_ERRORS);
     }
 
     /**
@@ -162,6 +258,12 @@ public abstract class EuiccService extends Service {
      */
     public static final String EXTRA_RESOLUTION_CONFIRMATION_CODE =
             "android.service.euicc.extra.RESOLUTION_CONFIRMATION_CODE";
+    /**
+     * String extra for resolution actions indicating whether the user allows policy rules.
+     * This is used and set by the implementation and used in {@code EuiccOperation}.
+     */
+    public static final String EXTRA_RESOLUTION_ALLOW_POLICY_RULES =
+            "android.service.euicc.extra.RESOLUTION_ALLOW_POLICY_RULES";
 
     private final IEuiccService.Stub mStubWrapper;
 
@@ -229,8 +331,7 @@ public abstract class EuiccService extends Service {
     /**
      * Return the EID of the eUICC.
      *
-     * @param slotId ID of the SIM slot being queried. This is currently not populated but is here
-     *     to future-proof the APIs.
+     * @param slotId ID of the SIM slot being queried.
      * @return the EID.
      * @see android.telephony.euicc.EuiccManager#getEid
      */
@@ -240,8 +341,7 @@ public abstract class EuiccService extends Service {
     /**
      * Return the status of OTA update.
      *
-     * @param slotId ID of the SIM slot to use for the operation. This is currently not populated
-     *     but is here to future-proof the APIs.
+     * @param slotId ID of the SIM slot to use for the operation.
      * @return The status of Euicc OTA update.
      * @see android.telephony.euicc.EuiccManager#getOtaStatus
      */
@@ -250,8 +350,7 @@ public abstract class EuiccService extends Service {
     /**
      * Perform OTA if current OS is not the latest one.
      *
-     * @param slotId ID of the SIM slot to use for the operation. This is currently not populated
-     *     but is here to future-proof the APIs.
+     * @param slotId ID of the SIM slot to use for the operation.
      * @param statusChangedCallback Function called when OTA status changed.
      */
     public abstract void onStartOtaIfNecessary(
@@ -274,8 +373,7 @@ public abstract class EuiccService extends Service {
     /**
      * Return metadata for subscriptions which are available for download for this device.
      *
-     * @param slotId ID of the SIM slot to use for the operation. This is currently not populated
-     *     but is here to future-proof the APIs.
+     * @param slotId ID of the SIM slot to use for the operation.
      * @param forceDeactivateSim If true, and if an active SIM must be deactivated to access the
      *     eUICC, perform this action automatically. Otherwise, {@link #RESULT_MUST_DEACTIVATE_SIM)}
      *     should be returned to allow the user to consent to this operation first.
@@ -295,13 +393,44 @@ public abstract class EuiccService extends Service {
      * @param forceDeactivateSim If true, and if an active SIM must be deactivated to access the
      *     eUICC, perform this action automatically. Otherwise, {@link #RESULT_MUST_DEACTIVATE_SIM}
      *     should be returned to allow the user to consent to this operation first.
+     * @param resolvedBundle The bundle containing information on resolved errors. It can contain
+     *     a string of confirmation code for the key {@link #EXTRA_RESOLUTION_CONFIRMATION_CODE},
+     *     and a boolean for key {@link #EXTRA_RESOLUTION_ALLOW_POLICY_RULES} indicating whether
+     *     the user allows profile policy rules or not.
+     * @return a DownloadSubscriptionResult instance including a result code, a resolvable errors
+     *     bit map, and original the card Id. The result code may be one of the predefined
+     *     {@code RESULT_} constants or any implementation-specific code starting with
+     *     {@link #RESULT_FIRST_USER}. The resolvable error bit map can be either 0 or values
+     *     defined in {@code RESOLVABLE_ERROR_}.
+     * @see android.telephony.euicc.EuiccManager#downloadSubscription
+     */
+    public abstract DownloadSubscriptionResult onDownloadSubscription(int slotId,
+            @NonNull DownloadableSubscription subscription, boolean switchAfterDownload,
+            boolean forceDeactivateSim, @Nullable Bundle resolvedBundle);
+
+    /**
+     * Download the given subscription.
+     *
+     * @param slotId ID of the SIM slot to use for the operation.
+     * @param subscription The subscription to download.
+     * @param switchAfterDownload If true, the subscription should be enabled upon successful
+     *     download.
+     * @param forceDeactivateSim If true, and if an active SIM must be deactivated to access the
+     *     eUICC, perform this action automatically. Otherwise, {@link #RESULT_MUST_DEACTIVATE_SIM}
+     *     should be returned to allow the user to consent to this operation first.
      * @return the result of the download operation. May be one of the predefined {@code RESULT_}
      *     constants or any implementation-specific code starting with {@link #RESULT_FIRST_USER}.
      * @see android.telephony.euicc.EuiccManager#downloadSubscription
+     *
+     * @deprecated From Q, please use the above
+     * {@link #onDownloadSubscription(int, DownloadableSubscription, boolean, boolean, Bundle)}.
      */
-    public abstract int onDownloadSubscription(int slotId,
-            DownloadableSubscription subscription, boolean switchAfterDownload,
-            boolean forceDeactivateSim);
+    @Deprecated public @Result int onDownloadSubscription(int slotId,
+            @NonNull DownloadableSubscription subscription, boolean switchAfterDownload,
+            boolean forceDeactivateSim) {
+        throw new UnsupportedOperationException("onDownloadSubscription(int, "
+            + "DownloadableSubscription, boolean, boolean) is deprecated.");
+    }
 
     /**
      * Return a list of all @link EuiccProfileInfo}s.
@@ -311,7 +440,7 @@ public abstract class EuiccService extends Service {
      * @see android.telephony.SubscriptionManager#getAvailableSubscriptionInfoList
      * @see android.telephony.SubscriptionManager#getAccessibleSubscriptionInfoList
      */
-    public abstract GetEuiccProfileInfoListResult onGetEuiccProfileInfoList(int slotId);
+    public abstract @NonNull GetEuiccProfileInfoListResult onGetEuiccProfileInfoList(int slotId);
 
     /**
      * Return info about the eUICC chip/device.
@@ -320,7 +449,7 @@ public abstract class EuiccService extends Service {
      * @return the {@link EuiccInfo} for the eUICC chip/device.
      * @see android.telephony.euicc.EuiccManager#getEuiccInfo
      */
-    public abstract EuiccInfo onGetEuiccInfo(int slotId);
+    public abstract @NonNull EuiccInfo onGetEuiccInfo(int slotId);
 
     /**
      * Delete the given subscription.
@@ -334,7 +463,7 @@ public abstract class EuiccService extends Service {
      *     constants or any implementation-specific code starting with {@link #RESULT_FIRST_USER}.
      * @see android.telephony.euicc.EuiccManager#deleteSubscription
      */
-    public abstract int onDeleteSubscription(int slotId, String iccid);
+    public abstract @Result int onDeleteSubscription(int slotId, String iccid);
 
     /**
      * Switch to the given subscription.
@@ -350,7 +479,7 @@ public abstract class EuiccService extends Service {
      *     constants or any implementation-specific code starting with {@link #RESULT_FIRST_USER}.
      * @see android.telephony.euicc.EuiccManager#switchToSubscription
      */
-    public abstract int onSwitchToSubscription(int slotId, @Nullable String iccid,
+    public abstract @Result int onSwitchToSubscription(int slotId, @Nullable String iccid,
             boolean forceDeactivateSim);
 
     /**
@@ -372,8 +501,7 @@ public abstract class EuiccService extends Service {
      * <p>This is intended to be used for device resets. As such, the reset should be performed even
      * if an active SIM must be deactivated in order to access the eUICC.
      *
-     * @param slotId ID of the SIM slot to use for the operation. This is currently not populated
-     *     but is here to future-proof the APIs.
+     * @param slotId ID of the SIM slot to use for the operation.
      * @return the result of the erase operation. May be one of the predefined {@code RESULT_}
      *     constants or any implementation-specific code starting with {@link #RESULT_FIRST_USER}.
      * @see android.telephony.euicc.EuiccManager#eraseSubscriptions
@@ -388,8 +516,7 @@ public abstract class EuiccService extends Service {
      * should persist some bit that will remain accessible after the factory reset to bypass this
      * flow when this method is called.
      *
-     * @param slotId ID of the SIM slot to use for the operation. This is currently not populated
-     *     but is here to future-proof the APIs.
+     * @param slotId ID of the SIM slot to use for the operation.
      * @return the result of the operation. May be one of the predefined {@code RESULT_} constants
      *     or any implementation-specific code starting with {@link #RESULT_FIRST_USER}.
      */
@@ -401,13 +528,26 @@ public abstract class EuiccService extends Service {
     private class IEuiccServiceWrapper extends IEuiccService.Stub {
         @Override
         public void downloadSubscription(int slotId, DownloadableSubscription subscription,
-                boolean switchAfterDownload, boolean forceDeactivateSim,
+                boolean switchAfterDownload, boolean forceDeactivateSim, Bundle resolvedBundle,
                 IDownloadSubscriptionCallback callback) {
             mExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
-                    int result = EuiccService.this.onDownloadSubscription(
-                            slotId, subscription, switchAfterDownload, forceDeactivateSim);
+                    DownloadSubscriptionResult result;
+                    try {
+                        result =
+                            EuiccService.this.onDownloadSubscription(
+                                slotId, subscription, switchAfterDownload, forceDeactivateSim,
+                                resolvedBundle);
+                    } catch (AbstractMethodError e) {
+                        Log.w(TAG, "The new onDownloadSubscription(int, "
+                                + "DownloadableSubscription, boolean, boolean, Bundle) is not "
+                                + "implemented. Fall back to the old one.", e);
+                        int resultCode = EuiccService.this.onDownloadSubscription(
+                                slotId, subscription, switchAfterDownload, forceDeactivateSim);
+                        result = new DownloadSubscriptionResult(resultCode,
+                            0 /* resolvableErrors */, TelephonyManager.INVALID_CARD_ID);
+                    }
                     try {
                         callback.onComplete(result);
                     } catch (RemoteException e) {

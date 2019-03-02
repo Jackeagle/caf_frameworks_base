@@ -20,6 +20,7 @@ import android.annotation.IntDef;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
@@ -157,6 +158,7 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
      * @hide
      */
     @SystemApi
+    @TestApi
     public static final int PROTECTION_FLAG_OEM = 0x4000;
 
     /**
@@ -180,6 +182,59 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
     @TestApi
     public static final int PROTECTION_FLAG_SYSTEM_TEXT_CLASSIFIER = 0x10000;
 
+    /**
+     * Additional flag for {${link #protectionLevel}, corresponding
+     * to the <code>wellbeing</code> value of
+     * {@link android.R.attr#protectionLevel}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public static final int PROTECTION_FLAG_WELLBEING = 0x20000;
+
+    /**
+     * Additional flag for {@link #protectionLevel}, corresponding to the
+     * {@code documenter} value of {@link android.R.attr#protectionLevel}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public static final int PROTECTION_FLAG_DOCUMENTER = 0x40000;
+
+    /**
+     * Additional flag for {@link #protectionLevel}, corresponding to the
+     * {@code configurator} value of {@link android.R.attr#protectionLevel}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public static final int PROTECTION_FLAG_CONFIGURATOR = 0x80000;
+
+    /**
+     * Additional flag for {${link #protectionLevel}, corresponding
+     * to the <code>incident_report_approver</code> value of
+     * {@link android.R.attr#protectionLevel}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public static final int PROTECTION_FLAG_INCIDENT_REPORT_APPROVER = 0x100000;
+
+    /**
+     * Additional flag for {@link #protectionLevel}, corresponding
+     * to the <code>app_predictor</code> value of
+     * {@link android.R.attr#protectionLevel}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @TestApi
+    public static final int PROTECTION_FLAG_APP_PREDICTOR = 0x200000;
+
     /** @hide */
     @IntDef(flag = true, prefix = { "PROTECTION_FLAG_" }, value = {
             PROTECTION_FLAG_PRIVILEGED,
@@ -196,6 +251,11 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
             PROTECTION_FLAG_OEM,
             PROTECTION_FLAG_VENDOR_PRIVILEGED,
             PROTECTION_FLAG_SYSTEM_TEXT_CLASSIFIER,
+            PROTECTION_FLAG_WELLBEING,
+            PROTECTION_FLAG_DOCUMENTER,
+            PROTECTION_FLAG_CONFIGURATOR,
+            PROTECTION_FLAG_INCIDENT_REPORT_APPROVER,
+            PROTECTION_FLAG_APP_PREDICTOR,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ProtectionFlags {}
@@ -308,6 +368,12 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
      */
     public CharSequence nonLocalizedDescription;
 
+    /**
+     * If {@code true} an application targeting {@link Build.VERSION_CODES#Q} <em>must</em>
+     * include permission data usage information in order to be able to be granted this permission.
+     */
+    public boolean usageInfoRequired;
+
     /** @hide */
     public static int fixProtectionLevel(int level) {
         if (level == PROTECTION_SIGNATURE_OR_SYSTEM) {
@@ -379,6 +445,21 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         if ((level & PermissionInfo.PROTECTION_FLAG_SYSTEM_TEXT_CLASSIFIER) != 0) {
             protLevel += "|textClassifier";
         }
+        if ((level & PermissionInfo.PROTECTION_FLAG_WELLBEING) != 0) {
+            protLevel += "|wellbeing";
+        }
+        if ((level & PermissionInfo.PROTECTION_FLAG_DOCUMENTER) != 0) {
+            protLevel += "|documenter";
+        }
+        if ((level & PROTECTION_FLAG_CONFIGURATOR) != 0) {
+            protLevel += "|configurator";
+        }
+        if ((level & PermissionInfo.PROTECTION_FLAG_INCIDENT_REPORT_APPROVER) != 0) {
+            protLevel += "|incidentReportApprover";
+        }
+        if ((level & PermissionInfo.PROTECTION_FLAG_APP_PREDICTOR) != 0) {
+            protLevel += "|appPredictor";
+        }
         return protLevel;
     }
 
@@ -394,6 +475,7 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         descriptionRes = orig.descriptionRes;
         requestRes = orig.requestRes;
         nonLocalizedDescription = orig.nonLocalizedDescription;
+        usageInfoRequired = orig.usageInfoRequired;
     }
 
     /**
@@ -458,6 +540,7 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(descriptionRes);
         dest.writeInt(requestRes);
         TextUtils.writeToParcel(nonLocalizedDescription, dest, parcelableFlags);
+        dest.writeInt(usageInfoRequired ? 1 : 0);
     }
 
     /** @hide */
@@ -498,5 +581,6 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         descriptionRes = source.readInt();
         requestRes = source.readInt();
         nonLocalizedDescription = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+        usageInfoRequired = source.readInt() != 0;
     }
 }

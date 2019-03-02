@@ -37,6 +37,7 @@ import static android.provider.DocumentsContract.isTreeUri;
 
 import android.Manifest;
 import android.annotation.CallSuper;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AuthenticationRequiredException;
 import android.content.ClipDescription;
@@ -62,6 +63,8 @@ import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Path;
 import android.provider.DocumentsContract.Root;
 import android.util.Log;
+
+import com.android.internal.util.Preconditions;
 
 import libcore.io.IoUtils;
 
@@ -677,6 +680,7 @@ public abstract class DocumentsProvider extends ContentProvider {
      *            cursor. If {@code null} all supported columns should be
      *            included.
      * @param queryArgs the query arguments.
+     *            {@link DocumentsContract#QUERY_ARG_EXCLUDE_MEDIA},
      *            {@link DocumentsContract#QUERY_ARG_DISPLAY_NAME},
      *            {@link DocumentsContract#QUERY_ARG_MIME_TYPES},
      *            {@link DocumentsContract#QUERY_ARG_FILE_SIZE_OVER},
@@ -686,15 +690,17 @@ public abstract class DocumentsProvider extends ContentProvider {
      *         extras {@link Bundle} when any QUERY_ARG_* value was honored
      *         during the preparation of the results.
      *
+     * @see Root#COLUMN_QUERY_ARGS
      * @see ContentResolver#EXTRA_HONORED_ARGS
      * @see DocumentsContract#EXTRA_LOADING
      * @see DocumentsContract#EXTRA_INFO
      * @see DocumentsContract#EXTRA_ERROR
-     * {@hide}
      */
     @SuppressWarnings("unused")
-    public Cursor querySearchDocuments(String rootId, String[] projection, Bundle queryArgs)
-            throws FileNotFoundException {
+    public Cursor querySearchDocuments(@NonNull String rootId, @Nullable String[] projection,
+            @NonNull Bundle queryArgs) throws FileNotFoundException {
+        Preconditions.checkNotNull(rootId, "rootId can not be null");
+        Preconditions.checkNotNull(queryArgs, "queryArgs can not be null");
         return querySearchDocuments(rootId, DocumentsContract.getSearchDocumentsQuery(queryArgs),
                 projection);
     }
@@ -710,8 +716,29 @@ public abstract class DocumentsProvider extends ContentProvider {
         throw new UnsupportedOperationException("Eject not supported");
     }
 
-    /** {@hide} */
-    public @Nullable Bundle getDocumentMetadata(String documentId)
+    /**
+     * Returns metadata associated with the document. The type of metadata returned
+     * is specific to the document type. For example the data returned for an image
+     * file will likely consist primarily or solely of EXIF metadata.
+     *
+     * <p>The returned {@link Bundle} will contain zero or more entries depending
+     * on the type of data supported by the document provider.
+     *
+     * <ol>
+     * <li>A {@link DocumentsContract#METADATA_TYPES} containing a {@code String[]} value.
+     *     The string array identifies the type or types of metadata returned. Each
+     *     value in the can be used to access a {@link Bundle} of data
+     *     containing that type of data.
+     * <li>An entry each for each type of returned metadata. Each set of metadata is
+     *     itself represented as a bundle and accessible via a string key naming
+     *     the type of data.
+     * </ol>
+     *
+     * @param documentId get the metadata of the document
+     * @return a Bundle of Bundles.
+     * @see DocumentsContract#getDocumentMetadata(ContentResolver, Uri)
+     */
+    public @Nullable Bundle getDocumentMetadata(@NonNull String documentId)
             throws FileNotFoundException {
         throw new UnsupportedOperationException("Metadata not supported");
     }

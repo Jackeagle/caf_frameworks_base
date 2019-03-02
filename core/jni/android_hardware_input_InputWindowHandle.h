@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _ANDROID_SERVER_INPUT_WINDOW_HANDLE_H
-#define _ANDROID_SERVER_INPUT_WINDOW_HANDLE_H
+#ifndef _ANDROID_VIEW_INPUT_WINDOW_HANDLE_H
+#define _ANDROID_VIEW_INPUT_WINDOW_HANDLE_H
 
 #include <input/InputWindow.h>
 
@@ -26,8 +26,7 @@ namespace android {
 
 class NativeInputWindowHandle : public InputWindowHandle {
 public:
-    NativeInputWindowHandle(const sp<InputApplicationHandle>& inputApplicationHandle,
-            jweak objWeak);
+    NativeInputWindowHandle(jweak objWeak);
     virtual ~NativeInputWindowHandle();
 
     jobject getInputWindowHandleObjLocalRef(JNIEnv* env);
@@ -39,9 +38,9 @@ private:
 };
 
 
-extern sp<NativeInputWindowHandle> android_server_InputWindowHandle_getHandle(
+extern sp<NativeInputWindowHandle> android_view_InputWindowHandle_getHandle(
         JNIEnv* env, jobject inputWindowHandleObj);
 
 } // namespace android
 
-#endif // _ANDROID_SERVER_INPUT_WINDOW_HANDLE_H
+#endif // _ANDROID_VIEW_INPUT_WINDOW_HANDLE_H

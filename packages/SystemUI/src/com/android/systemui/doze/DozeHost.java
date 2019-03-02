@@ -17,7 +17,6 @@
 package com.android.systemui.doze;
 
 import android.annotation.NonNull;
-import android.app.PendingIntent;
 
 /**
  * Interface the doze service uses to communicate with the rest of system UI.
@@ -34,13 +33,18 @@ public interface DozeHost {
     boolean isProvisioned();
     boolean isBlockingDoze();
 
-    void startPendingIntentDismissingKeyguard(PendingIntent intent);
     void extendPulse();
 
     void setAnimateWakeup(boolean animateWakeup);
     void setAnimateScreenOff(boolean animateScreenOff);
 
-    void onDoubleTap(float x, float y);
+    /**
+     * Reports that a tap event happend on the Sensors Low Power Island.
+     *
+     * @param x Touch X, or -1 if sensor doesn't support touch location.
+     * @param y Touch Y, or -1 if sensor doesn't support touch location.
+     */
+    void onSlpiTap(float x, float y);
 
     default void setAodDimmingScrim(float scrimOpacity) {}
     void setDozeScreenBrightness(int value);
@@ -48,10 +52,9 @@ public interface DozeHost {
     void onIgnoreTouchWhilePulsing(boolean ignore);
 
     /**
-     * If the device was waken up by a passive interrupt that will show the lock screen without
-     * expanding the notification panel/shade.
+     * Leaves pulsing state, going back to ambient UI.
      */
-    void setPassiveInterrupt(boolean lightInterrupt);
+    void stopPulsing();
 
     interface Callback {
         /**

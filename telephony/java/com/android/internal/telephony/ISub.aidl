@@ -52,8 +52,8 @@ interface ISub {
     /**
      * Get the active SubscriptionInfo associated with the slotIndex
      * @param slotIndex the slot which the subscription is inserted
-     * @param callingPackage The package maing the call.
-     * @return SubscriptionInfo, maybe null if its not active
+     * @param callingPackage The package making the call.
+     * @return SubscriptionInfo, null for Remote-SIMs or non-active slotIndex.
      */
     SubscriptionInfo getActiveSubscriptionInfoForSimSlotIndex(int slotIndex, String callingPackage);
 
@@ -104,7 +104,7 @@ interface ISub {
     /**
      * @see android.telephony.SubscriptionManager#requestEmbeddedSubscriptionInfoListRefresh
      */
-    oneway void requestEmbeddedSubscriptionInfoListRefresh();
+    oneway void requestEmbeddedSubscriptionInfoListRefresh(int cardId);
 
     /**
      * Add a new SubscriptionInfo to subinfo database if needed
@@ -113,6 +113,26 @@ interface ISub {
      * @return the URL of the newly created row or the updated row
      */
     int addSubInfoRecord(String iccId, int slotIndex);
+
+    /**
+     * Add a new subscription info record, if needed
+     * @param uniqueId This is the unique identifier for the subscription within the specific
+     *                 subscription type.
+     * @param displayName human-readable name of the device the subscription corresponds to.
+     * @param slotIndex the slot assigned to this device
+     * @param subscriptionType the type of subscription to be added.
+     * @return 0 if success, < 0 on error.
+     */
+    int addSubInfo(String uniqueId, String displayName, int slotIndex, int subscriptionType);
+
+    /**
+     * Remove subscription info record for the given device.
+     * @param uniqueId This is the unique identifier for the subscription within the specific
+     *                      subscription type.
+     * @param subscriptionType the type of subscription to be removed
+     * @return 0 if success, < 0 on error.
+     */
+    int removeSubInfo(String uniqueId, int subscriptionType);
 
     /**
      * Set SIM icon tint color by simInfo index
@@ -162,7 +182,7 @@ interface ISub {
      * @param subId the unique SubscriptionInfo index in database
      * @return the number of records updated
      */
-    int setOpportunistic(boolean opportunistic, int subId);
+    int setOpportunistic(boolean opportunistic, int subId, String callingPackage);
 
     /**
      * Inform SubscriptionManager that subscriptions in the list are bundled
@@ -184,6 +204,15 @@ interface ISub {
     String setSubscriptionGroup(in int[] subIdList, String callingPackage);
 
     /**
+     * Set whether a subscription is metered
+     *
+     * @param isMetered whether it’s a metered subscription.
+     * @param subId the unique SubscriptionInfo index in database
+     * @return the number of records updated
+     */
+    int setMetered(boolean isMetered, int subId, String callingPackage);
+
+    /**
      * Set which subscription is preferred for cellular data. It's
      * designed to overwrite default data subscription temporarily.
      *
@@ -191,7 +220,15 @@ interface ISub {
      * @hide
      *
      */
-    int setPreferredData(int subId);
+    void setPreferredDataSubscriptionId(int subId);
+
+    /**
+     * Get which subscription is preferred for cellular data.
+     *
+     * @hide
+     *
+     */
+    int getPreferredDataSubscriptionId();
 
     /**
      * Get User downloaded Profiles.
@@ -200,6 +237,10 @@ interface ISub {
      * @return the list of opportunistic subscription info. If none exists, an empty list.
      */
     List<SubscriptionInfo> getOpportunisticSubscriptions(String callingPackage);
+
+    boolean removeSubscriptionsFromGroup(in int[] subIdList, String callingPackage);
+
+    List<SubscriptionInfo> getSubscriptionsInGroup(int subId, String callingPackage);
 
     int getSlotIndex(int subId);
 
@@ -235,6 +276,11 @@ interface ISub {
 
     String getSubscriptionProperty(int subId, String propKey, String callingPackage);
 
+    boolean setSubscriptionEnabled(boolean enable, int subId);
+
+    boolean isSubscriptionEnabled(int subId);
+
+    int getEnabledSubscriptionId(int slotIndex);
     /**
      * Get the SIM state for the slot index
      * @return SIM state as the ordinal of IccCardConstants.State

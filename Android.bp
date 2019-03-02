@@ -92,6 +92,7 @@ java_defaults {
         "core/java/android/app/IWallpaperManagerCallback.aidl",
         "core/java/android/app/admin/IDeviceAdminService.aidl",
         "core/java/android/app/admin/IDevicePolicyManager.aidl",
+        "core/java/android/app/admin/StartInstallingUpdateCallback.aidl",
         "core/java/android/app/trust/IStrongAuthTracker.aidl",
         "core/java/android/app/trust/ITrustManager.aidl",
         "core/java/android/app/trust/ITrustListener.aidl",
@@ -103,6 +104,12 @@ java_defaults {
         "core/java/android/app/backup/IRestoreObserver.aidl",
         "core/java/android/app/backup/IRestoreSession.aidl",
         "core/java/android/app/backup/ISelectBackupTransportCallback.aidl",
+        "core/java/android/app/contentsuggestions/IClassificationsCallback.aidl",
+        "core/java/android/app/contentsuggestions/IContentSuggestionsManager.aidl",
+        "core/java/android/app/contentsuggestions/ISelectionsCallback.aidl",
+        "core/java/android/app/prediction/IPredictionCallback.aidl",
+        "core/java/android/app/prediction/IPredictionManager.aidl",
+        "core/java/android/app/role/IOnRoleHoldersChangedListener.aidl",
         "core/java/android/app/role/IRoleManager.aidl",
         "core/java/android/app/role/IRoleManagerCallback.aidl",
         "core/java/android/app/slice/ISliceManager.aidl",
@@ -110,7 +117,6 @@ java_defaults {
         "core/java/android/app/timedetector/ITimeDetectorService.aidl",
         "core/java/android/app/timezone/ICallback.aidl",
         "core/java/android/app/timezone/IRulesManager.aidl",
-        "core/java/android/app/timezonedetector/ITimeZoneDetectorService.aidl",
         "core/java/android/app/usage/ICacheQuotaService.aidl",
         "core/java/android/app/usage/IStorageStatsManager.aidl",
         "core/java/android/app/usage/IUsageStatsManager.aidl",
@@ -149,6 +155,7 @@ java_defaults {
         "core/java/android/content/pm/dex/IArtManager.aidl",
         "core/java/android/content/pm/dex/ISnapshotRuntimeProfileCallback.aidl",
         "core/java/android/content/pm/permission/IRuntimePermissionPresenter.aidl",
+        "core/java/android/content/rollback/IRollbackManager.aidl",
         "core/java/android/database/IContentObserver.aidl",
         "core/java/android/debug/IAdbManager.aidl",
         "core/java/android/debug/IAdbTransport.aidl",
@@ -157,10 +164,11 @@ java_defaults {
         "core/java/android/hardware/IConsumerIrService.aidl",
         "core/java/android/hardware/ISerialManager.aidl",
         "core/java/android/hardware/biometrics/IBiometricEnabledOnKeyguardCallback.aidl",
-        "core/java/android/hardware/biometrics/IBiometricPromptReceiver.aidl",
         "core/java/android/hardware/biometrics/IBiometricService.aidl",
         "core/java/android/hardware/biometrics/IBiometricServiceReceiver.aidl",
+        "core/java/android/hardware/biometrics/IBiometricServiceReceiverInternal.aidl",
         "core/java/android/hardware/biometrics/IBiometricServiceLockoutResetCallback.aidl",
+        "core/java/android/hardware/display/IColorDisplayManager.aidl",
         "core/java/android/hardware/display/IDisplayManager.aidl",
         "core/java/android/hardware/display/IDisplayManagerCallback.aidl",
         "core/java/android/hardware/display/IVirtualDisplayCallback.aidl",
@@ -202,8 +210,9 @@ java_defaults {
         "core/java/android/hardware/soundtrigger/IRecognitionStatusCallback.aidl",
         "core/java/android/hardware/usb/IUsbManager.aidl",
         "core/java/android/hardware/usb/IUsbSerialReader.aidl",
-        "core/java/android/net/ICaptivePortal.aidl",
         "core/java/android/net/IConnectivityManager.aidl",
+        "core/java/android/hardware/ISensorPrivacyListener.aidl",
+        "core/java/android/hardware/ISensorPrivacyManager.aidl",
         "core/java/android/net/IIpConnectivityMetrics.aidl",
         "core/java/android/net/IEthernetManager.aidl",
         "core/java/android/net/IEthernetServiceListener.aidl",
@@ -237,6 +246,7 @@ java_defaults {
         "core/java/android/os/ICancellationSignal.aidl",
         "core/java/android/os/IDeviceIdentifiersPolicyService.aidl",
         "core/java/android/os/IDeviceIdleController.aidl",
+        "core/java/android/os/IDynamicAndroidService.aidl",
         "core/java/android/os/IHardwarePropertiesManager.aidl",
         ":libincident_aidl",
         "core/java/android/os/IMaintenanceActivityListener.aidl",
@@ -254,17 +264,23 @@ java_defaults {
         ":statsd_aidl",
         "core/java/android/os/ISystemUpdateManager.aidl",
         "core/java/android/os/IThermalEventListener.aidl",
+        "core/java/android/os/IThermalStatusListener.aidl",
         "core/java/android/os/IThermalService.aidl",
         "core/java/android/os/IUpdateLock.aidl",
         "core/java/android/os/IUserManager.aidl",
+        ":libvibrator_aidl",
         "core/java/android/os/IVibratorService.aidl",
         "core/java/android/os/storage/IStorageManager.aidl",
         "core/java/android/os/storage/IStorageEventListener.aidl",
         "core/java/android/os/storage/IStorageShutdownObserver.aidl",
         "core/java/android/os/storage/IObbActionListener.aidl",
+        "core/java/android/permission/IPermissionController.aidl",
         "core/java/android/rolecontrollerservice/IRoleControllerService.aidl",
         ":keystore_aidl",
         "core/java/android/security/keymaster/IKeyAttestationApplicationIdProvider.aidl",
+        "core/java/android/service/appprediction/IPredictionService.aidl",
+        "core/java/android/service/autofill/augmented/IAugmentedAutofillService.aidl",
+        "core/java/android/service/autofill/augmented/IFillCallback.aidl",
         "core/java/android/service/autofill/IAutoFillService.aidl",
         "core/java/android/service/autofill/IAutofillFieldClassificationService.aidl",
         "core/java/android/service/autofill/IFillCallback.aidl",
@@ -272,6 +288,7 @@ java_defaults {
         "core/java/android/service/carrier/ICarrierService.aidl",
         "core/java/android/service/carrier/ICarrierMessagingCallback.aidl",
         "core/java/android/service/carrier/ICarrierMessagingService.aidl",
+        "core/java/android/service/contentsuggestions/IContentSuggestionsService.aidl",
         "core/java/android/service/euicc/IDeleteSubscriptionCallback.aidl",
         "core/java/android/service/euicc/IDownloadSubscriptionCallback.aidl",
         "core/java/android/service/euicc/IEraseSubscriptionsCallback.aidl",
@@ -287,13 +304,14 @@ java_defaults {
         "core/java/android/service/euicc/ISwitchToSubscriptionCallback.aidl",
         "core/java/android/service/euicc/IUpdateSubscriptionNicknameCallback.aidl",
         "core/java/android/service/gatekeeper/IGateKeeperService.aidl",
-        "core/java/android/service/intelligence/IIntelligenceService.aidl",
-
+        "core/java/android/service/contentcapture/IContentCaptureService.aidl",
+        "core/java/android/service/contentcapture/IContentCaptureServiceCallback.aidl",
         "core/java/android/service/notification/INotificationListener.aidl",
         "core/java/android/service/notification/IStatusBarNotificationHolder.aidl",
         "core/java/android/service/notification/IConditionListener.aidl",
         "core/java/android/service/notification/IConditionProvider.aidl",
         "core/java/android/service/settings/suggestions/ISuggestionService.aidl",
+        "core/java/android/service/sms/IFinancialSmsService.aidl",
         "core/java/android/service/vr/IPersistentVrStateCallbacks.aidl",
         "core/java/android/service/vr/IVrListener.aidl",
         "core/java/android/service/vr/IVrManager.aidl",
@@ -334,21 +352,28 @@ java_defaults {
         "core/java/android/service/chooser/IChooserTargetResult.aidl",
         "core/java/android/service/resolver/IResolverRankerService.aidl",
         "core/java/android/service/resolver/IResolverRankerResult.aidl",
+        "core/java/android/service/textclassifier/IConversationActionsCallback.aidl",
         "core/java/android/service/textclassifier/ITextClassificationCallback.aidl",
         "core/java/android/service/textclassifier/ITextClassifierService.aidl",
+        "core/java/android/service/textclassifier/ITextLanguageCallback.aidl",
         "core/java/android/service/textclassifier/ITextLinksCallback.aidl",
         "core/java/android/service/textclassifier/ITextSelectionCallback.aidl",
+        "core/java/android/service/attention/IAttentionService.aidl",
+        "core/java/android/service/attention/IAttentionCallback.aidl",
         "core/java/android/view/accessibility/IAccessibilityInteractionConnection.aidl",
         "core/java/android/view/accessibility/IAccessibilityInteractionConnectionCallback.aidl",
         "core/java/android/view/accessibility/IAccessibilityManager.aidl",
         "core/java/android/view/accessibility/IAccessibilityManagerClient.aidl",
         "core/java/android/view/autofill/IAutoFillManager.aidl",
         "core/java/android/view/autofill/IAutoFillManagerClient.aidl",
+        "core/java/android/view/autofill/IAugmentedAutofillManagerClient.aidl",
         "core/java/android/view/autofill/IAutofillWindowPresenter.aidl",
-        "core/java/android/view/intelligence/IIntelligenceManager.aidl",
+        "core/java/android/view/contentcapture/IContentCaptureDirectManager.aidl",
+        "core/java/android/view/contentcapture/IContentCaptureManager.aidl",
         "core/java/android/view/IApplicationToken.aidl",
         "core/java/android/view/IAppTransitionAnimationSpecsFuture.aidl",
         "core/java/android/view/IDockedStackListener.aidl",
+        "core/java/android/view/IDisplayFoldListener.aidl",
         "core/java/android/view/IGraphicsStats.aidl",
         "core/java/android/view/IGraphicsStatsCallback.aidl",
         "core/java/android/view/IInputFilter.aidl",
@@ -375,6 +400,7 @@ java_defaults {
         "core/java/android/speech/tts/ITextToSpeechService.aidl",
         "core/java/com/android/internal/app/IAppOpsActiveCallback.aidl",
         "core/java/com/android/internal/app/IAppOpsCallback.aidl",
+        "core/java/com/android/internal/app/IAppOpsNotedCallback.aidl",
         "core/java/com/android/internal/app/IAppOpsService.aidl",
         "core/java/com/android/internal/app/IBatteryStats.aidl",
         "core/java/com/android/internal/app/ISoundTriggerService.aidl",
@@ -405,7 +431,6 @@ java_defaults {
         "core/java/com/android/internal/policy/IShortcutService.aidl",
         "core/java/com/android/internal/os/IDropBoxManagerService.aidl",
         "core/java/com/android/internal/os/IParcelFileDescriptorFactory.aidl",
-        "core/java/com/android/internal/os/IRegionalizationService.aidl",
         "core/java/com/android/internal/os/IResultReceiver.aidl",
         "core/java/com/android/internal/os/IShellCallback.aidl",
         "core/java/com/android/internal/statusbar/IStatusBar.aidl",
@@ -435,7 +460,6 @@ java_defaults {
         "location/java/android/location/IGeocodeProvider.aidl",
         "location/java/android/location/IGeofenceProvider.aidl",
         "location/java/android/location/IGnssStatusListener.aidl",
-        "location/java/android/location/IGnssStatusProvider.aidl",
         "location/java/android/location/IGnssMeasurementsListener.aidl",
         "location/java/android/location/IGnssNavigationMessageListener.aidl",
         "location/java/android/location/ILocationListener.aidl",
@@ -444,6 +468,7 @@ java_defaults {
         "location/java/android/location/IGpsGeofenceHardware.aidl",
         "location/java/android/location/INetInitiatedListener.aidl",
         "location/java/com/android/internal/location/ILocationProvider.aidl",
+        "location/java/com/android/internal/location/ILocationProviderManager.aidl",
         "media/java/android/media/IAudioFocusDispatcher.aidl",
         "media/java/android/media/IAudioRoutesObserver.aidl",
         "media/java/android/media/IAudioService.aidl",
@@ -456,7 +481,6 @@ java_defaults {
         "media/java/android/media/IMediaScannerListener.aidl",
         "media/java/android/media/IMediaScannerService.aidl",
         "media/java/android/media/IPlaybackConfigDispatcher.aidl",
-        "media/java/android/media/ISessionTokensListener.aidl",
         ":libaudioclient_aidl",
         "media/java/android/media/IRecordingConfigDispatcher.aidl",
         "media/java/android/media/IRemoteDisplayCallback.aidl",
@@ -480,6 +504,7 @@ java_defaults {
         "media/java/android/media/session/IOnMediaKeyListener.aidl",
         "media/java/android/media/session/IOnVolumeKeyLongPressListener.aidl",
         "media/java/android/media/session/ISession.aidl",
+        "media/java/android/media/session/ISession2TokensListener.aidl",
         "media/java/android/media/session/ISessionCallback.aidl",
         "media/java/android/media/session/ISessionController.aidl",
         "media/java/android/media/session/ISessionControllerCallback.aidl",
@@ -509,6 +534,8 @@ java_defaults {
         "telecomm/java/com/android/internal/telecom/IConnectionServiceAdapter.aidl",
         "telecomm/java/com/android/internal/telecom/IInCallAdapter.aidl",
         "telecomm/java/com/android/internal/telecom/IInCallService.aidl",
+        "telecomm/java/com/android/internal/telecom/IPhoneAccountSuggestionCallback.aidl",
+        "telecomm/java/com/android/internal/telecom/IPhoneAccountSuggestionService.aidl",
         "telecomm/java/com/android/internal/telecom/ITelecomService.aidl",
         "telecomm/java/com/android/internal/telecom/RemoteServiceCallback.aidl",
         "telephony/java/android/telephony/data/IDataService.aidl",
@@ -527,6 +554,7 @@ java_defaults {
         "telephony/java/android/telephony/ims/aidl/IImsServiceController.aidl",
         "telephony/java/android/telephony/ims/aidl/IImsServiceControllerListener.aidl",
         "telephony/java/android/telephony/ims/aidl/IImsSmsListener.aidl",
+        "telephony/java/android/telephony/ims/aidl/IRcs.aidl",
         "telephony/java/android/telephony/mbms/IMbmsDownloadSessionCallback.aidl",
         "telephony/java/android/telephony/mbms/IMbmsStreamingSessionCallback.aidl",
         "telephony/java/android/telephony/mbms/IMbmsGroupCallSessionCallback.aidl",
@@ -538,6 +566,7 @@ java_defaults {
         "telephony/java/android/telephony/mbms/vendor/IMbmsStreamingService.aidl",
         "telephony/java/android/telephony/mbms/vendor/IMbmsGroupCallService.aidl",
         "telephony/java/android/telephony/ICellInfoCallback.aidl",
+        "telephony/java/android/telephony/IFinancialSmsCallback.aidl",
         "telephony/java/android/telephony/INetworkService.aidl",
         "telephony/java/android/telephony/INetworkServiceCallback.aidl",
         "telephony/java/com/android/ims/internal/IImsCallSession.aidl",
@@ -569,12 +598,13 @@ java_defaults {
         "telephony/java/com/android/internal/telephony/IApnSourceService.aidl",
         "telephony/java/com/android/internal/telephony/ICarrierConfigLoader.aidl",
         "telephony/java/com/android/internal/telephony/IMms.aidl",
+        "telephony/java/com/android/internal/telephony/INumberVerificationCallback.aidl",
         "telephony/java/com/android/internal/telephony/IOnSubscriptionsChangedListener.aidl",
         "telephony/java/com/android/internal/telephony/IPhoneStateListener.aidl",
         "telephony/java/com/android/internal/telephony/IPhoneSubInfo.aidl",
         "telephony/java/com/android/internal/telephony/ISms.aidl",
         "telephony/java/com/android/internal/telephony/ISub.aidl",
-        "telephony/java/com/android/internal/telephony/IAns.aidl",
+        "telephony/java/com/android/internal/telephony/IOns.aidl",
         "telephony/java/com/android/internal/telephony/ITelephony.aidl",
         "telephony/java/com/android/internal/telephony/ITelephonyRegistry.aidl",
         "telephony/java/com/android/internal/telephony/IWapPushManager.aidl",
@@ -602,12 +632,12 @@ java_defaults {
         "telephony/java/com/android/internal/telephony/euicc/ISetDefaultSmdpAddressCallback.aidl",
         "telephony/java/com/android/internal/telephony/euicc/ISetNicknameCallback.aidl",
         "telephony/java/com/android/internal/telephony/euicc/ISwitchToProfileCallback.aidl",
-        "telephony/java/com/android/internal/telephony/rcs/IRcs.aidl",
         "wifi/java/android/net/wifi/INetworkRequestMatchCallback.aidl",
         "wifi/java/android/net/wifi/INetworkRequestUserSelectionCallback.aidl",
         "wifi/java/android/net/wifi/ISoftApCallback.aidl",
         "wifi/java/android/net/wifi/ITrafficStateCallback.aidl",
         "wifi/java/android/net/wifi/IWifiManager.aidl",
+        "wifi/java/android/net/wifi/IWifiUsabilityStatsListener.aidl",
         "wifi/java/android/net/wifi/aware/IWifiAwareDiscoverySessionCallback.aidl",
         "wifi/java/android/net/wifi/aware/IWifiAwareEventCallback.aidl",
         "wifi/java/android/net/wifi/aware/IWifiAwareMacAddressProvider.aidl",
@@ -616,6 +646,7 @@ java_defaults {
         "wifi/java/android/net/wifi/rtt/IRttCallback.aidl",
         "wifi/java/android/net/wifi/rtt/IWifiRttManager.aidl",
         "wifi/java/android/net/wifi/hotspot2/IProvisioningCallback.aidl",
+        "wifi/java/android/net/wifi/IDppCallback.aidl",
         "wifi/java/android/net/wifi/IWifiScanner.aidl",
         "packages/services/PacProcessor/com/android/net/IProxyService.aidl",
         "packages/services/Proxy/com/android/net/IProxyCallback.aidl",
@@ -628,10 +659,11 @@ java_defaults {
         ":libupdate_engine_aidl",
 
         ":storaged_aidl",
-        ":netd_aidl",
         ":vold_aidl",
+        ":gsiservice_aidl",
         ":installd_aidl",
         ":dumpstate_aidl",
+        ":incidentcompanion_aidl",
 
         "lowpan/java/android/net/lowpan/ILowpanEnergyScanCallback.aidl",
         "lowpan/java/android/net/lowpan/ILowpanNetScanCallback.aidl",
@@ -651,6 +683,8 @@ java_defaults {
         "core/java/com/android/server/DropboxLogTags.logtags",
         "core/java/org/chromium/arc/EventLogTags.logtags",
 
+        ":platform-properties",
+
         ":framework-statslog-gen",
     ],
 
@@ -662,6 +696,7 @@ java_defaults {
             "location/java",
             "lowpan/java",
             "media/java",
+            "media/apex/java",
             "media/mca/effect/java",
             "media/mca/filterfw/java",
             "media/mca/filterpacks/java",
@@ -679,12 +714,13 @@ java_defaults {
             "system/update_engine/binder_bindings",
             "frameworks/native/aidl/binder",
             "frameworks/native/cmds/dumpstate/binder",
+            "frameworks/native/libs/incidentcompanion/binder",
             "frameworks/av/camera/aidl",
             "frameworks/av/media/libaudioclient/aidl",
             "frameworks/native/aidl/gui",
             "system/core/storaged/binder",
-            "system/netd/server/binder",
             "system/vold/binder",
+            "system/gsid/aidl",
             "system/bt/binder",
             "system/security/keystore/binder",
         ],
@@ -695,42 +731,58 @@ java_defaults {
     exclude_srcs: [
         // See comment on framework-atb-backward-compatibility module below
         "core/java/android/content/pm/AndroidTestBaseUpdater.java",
-        // See comment on framework-oahl-backward-compatibility module below
-        "core/java/android/content/pm/OrgApacheHttpLegacyUpdater.java",
     ],
 
     no_framework_libs: true,
     libs: [
         "ext",
+        "updatable_media_stubs",
     ],
+
+    jarjar_rules: "jarjar_rules_hidl.txt",
 
     static_libs: [
         "apex_aidl_interface-java",
+        "networkstack-aidl-interfaces-java",
         "framework-protos",
+        "game-driver-protos",
         "mediaplayer2-protos",
         "android.hidl.base-V1.0-java",
+        "android.hardware.cas-V1.1-java",
         "android.hardware.cas-V1.0-java",
         "android.hardware.contexthub-V1.0-java",
         "android.hardware.health-V1.0-java-constants",
+        "android.hardware.radio-V1.0-java",
+        "android.hardware.radio-V1.1-java",
+        "android.hardware.radio-V1.2-java",
+        "android.hardware.radio-V1.3-java",
+        "android.hardware.radio-V1.4-java",
+        "android.hardware.radio.config-V1.0-java",
+        "android.hardware.radio.config-V1.1-java",
+        "android.hardware.radio.config-V1.2-java",
+        "android.hardware.radio.deprecated-V1.0-java",
         "android.hardware.thermal-V1.0-java-constants",
+        "android.hardware.thermal-V1.0-java",
         "android.hardware.thermal-V1.1-java",
         "android.hardware.thermal-V2.0-java",
         "android.hardware.tv.input-V1.0-java-constants",
         "android.hardware.usb-V1.0-java-constants",
         "android.hardware.usb-V1.1-java-constants",
+        "android.hardware.usb-V1.2-java-constants",
+        "android.hardware.usb.gadget-V1.0-java",
         "android.hardware.vibrator-V1.0-java",
         "android.hardware.vibrator-V1.1-java",
         "android.hardware.vibrator-V1.2-java",
+        "android.hardware.vibrator-V1.3-java",
         "android.hardware.wifi-V1.0-java-constants",
-        "android.hardware.radio-V1.0-java",
-        "android.hardware.radio-V1.3-java",
-        "android.hardware.usb.gadget-V1.0-java",
+        "networkstack-aidl-interfaces-java",
         "netd_aidl_interface-java",
+        "devicepolicyprotosnano",
     ],
 
-    // Loaded with System.loadLibrary by android.view.textclassifier
     required: [
-        "libmedia2_jni",
+        // TODO: remove gps_debug when the build system propagates "required" properly.
+        "gps_debug.conf",
     ],
 
     dxflags: [
@@ -738,6 +790,7 @@ java_defaults {
         "--multi-dex",
     ],
 
+    plugins: ["view-inspector-annotation-processor"],
 }
 
 filegroup {
@@ -756,6 +809,14 @@ filegroup {
     ],
 }
 
+filegroup {
+    name: "libvibrator_aidl",
+    srcs: [
+        "core/java/android/os/IExternalVibrationController.aidl",
+        "core/java/android/os/IExternalVibratorService.aidl",
+    ],
+}
+
 java_library {
     name: "framework",
     defaults: ["framework-defaults"],
@@ -766,21 +827,7 @@ java_library {
     name: "framework-annotation-proc",
     defaults: ["framework-defaults"],
     // Use UsedByApps annotation processor
-    annotation_processors: ["unsupportedappusage-annotation-processor"],
-    // b/25860419: annotation processors must be explicitly specified for grok
-    annotation_processor_classes: [
-        "android.processor.unsupportedappusage.UsedByAppsProcessor",
-    ],
-}
-
-// A host library containing the inspector annotations for inspector-annotation-processor.
-java_library_host {
-    name: "inspector-annotation",
-    srcs: [
-        "core/java/android/view/inspector/InspectableChildren.java",
-        "core/java/android/view/inspector/InspectableNodeName.java",
-        "core/java/android/view/inspector/InspectableProperty.java",
-    ],
+    plugins: ["unsupportedappusage-annotation-processor"],
 }
 
 // A host library including just UnsupportedAppUsage.java so that the annotation
@@ -790,19 +837,6 @@ java_library_host {
     srcs: [
         "core/java/android/annotation/IntDef.java",
         "core/java/android/annotation/UnsupportedAppUsage.java",
-    ],
-}
-
-// A temporary build target that is conditionally included on the bootclasspath if
-// org.apache.http.legacy library has been removed and which provides support for
-// maintaining backwards compatibility for APKs that target pre-P and depend on
-// org.apache.http.legacy classes. This is used iff REMOVE_OAHL_FROM_BCP=true is
-// specified on the build command line.
-java_library {
-    name: "framework-oahl-backward-compatibility",
-    installable: true,
-    srcs: [
-        "core/java/android/content/pm/OrgApacheHttpLegacyUpdater.java",
     ],
 }
 
@@ -854,12 +888,71 @@ gensrcs {
     output_extension: "srcjar",
 }
 
+// AIDL interfaces between the core system and the networking mainline module.
+aidl_interface {
+    name: "networkstack-aidl-interfaces",
+    local_include_dir: "core/java",
+    srcs: [
+        "core/java/android/net/ApfCapabilitiesParcelable.aidl",
+        "core/java/android/net/DhcpResultsParcelable.aidl",
+        "core/java/android/net/ICaptivePortal.aidl",
+        "core/java/android/net/INetworkMonitor.aidl",
+        "core/java/android/net/INetworkMonitorCallbacks.aidl",
+        "core/java/android/net/IIpMemoryStore.aidl",
+        "core/java/android/net/INetworkStackConnector.aidl",
+        "core/java/android/net/INetworkStackStatusCallback.aidl",
+        "core/java/android/net/InitialConfigurationParcelable.aidl",
+        "core/java/android/net/IpPrefixParcelable.aidl",
+        "core/java/android/net/LinkAddressParcelable.aidl",
+        "core/java/android/net/LinkPropertiesParcelable.aidl",
+        "core/java/android/net/NetworkParcelable.aidl",
+        "core/java/android/net/PrivateDnsConfigParcel.aidl",
+        "core/java/android/net/ProvisioningConfigurationParcelable.aidl",
+        "core/java/android/net/ProxyInfoParcelable.aidl",
+        "core/java/android/net/RouteInfoParcelable.aidl",
+        "core/java/android/net/StaticIpConfigurationParcelable.aidl",
+        "core/java/android/net/dhcp/DhcpServingParamsParcel.aidl",
+        "core/java/android/net/dhcp/IDhcpServer.aidl",
+        "core/java/android/net/dhcp/IDhcpServerCallbacks.aidl",
+        "core/java/android/net/ip/IIpClient.aidl",
+        "core/java/android/net/ip/IIpClientCallbacks.aidl",
+        "core/java/android/net/ipmemorystore/**/*.aidl",
+    ],
+    api_dir: "aidl/networkstack",
+}
+
+filegroup {
+    name: "framework-networkstack-shared-srcs",
+    srcs: [
+        // TODO: remove these annotations as soon as we can use andoid.support.annotations.*
+        "core/java/android/annotation/NonNull.java",
+        "core/java/android/annotation/Nullable.java",
+        "core/java/android/annotation/IntDef.java",
+        "core/java/android/annotation/IntRange.java",
+        "core/java/android/annotation/UnsupportedAppUsage.java",
+        "core/java/android/net/DhcpResults.java",
+        "core/java/android/util/LocalLog.java",
+        "core/java/com/android/internal/annotations/GuardedBy.java",
+        "core/java/com/android/internal/annotations/VisibleForTesting.java",
+        "core/java/com/android/internal/util/HexDump.java",
+        "core/java/com/android/internal/util/IndentingPrintWriter.java",
+        "core/java/com/android/internal/util/IState.java",
+        "core/java/com/android/internal/util/MessageUtils.java",
+        "core/java/com/android/internal/util/Preconditions.java",
+        "core/java/com/android/internal/util/RingBufferIndices.java",
+        "core/java/com/android/internal/util/State.java",
+        "core/java/com/android/internal/util/StateMachine.java",
+        "core/java/com/android/internal/util/WakeupMessage.java",
+        "core/java/android/net/shared/*.java",
+    ]
+}
+
 // Build ext.jar
 // ============================================================
 java_library {
     name: "ext",
     installable: true,
-    sdk_version: "core_current",
+    no_framework_libs: true,
     static_libs: [
         "libphonenumber-platform",
         "nist-sip",
@@ -1025,6 +1118,7 @@ java_library {
         "core/java/android/annotation/IntDef.java",
         "core/java/android/annotation/NonNull.java",
         "core/java/android/annotation/SystemApi.java",
+        "core/java/android/annotation/TestApi.java",
         "core/java/android/os/HwBinder.java",
         "core/java/android/os/HwBlob.java",
         "core/java/android/os/HwParcel.java",
@@ -1189,6 +1283,7 @@ framework_docs_only_libs = [
 metalava_framework_docs_args = "--manifest $(location core/res/AndroidManifest.xml) " +
     "--hide-package com.android.okhttp " +
     "--hide-package com.android.org.conscrypt --hide-package com.android.server " +
+    "--error UnhiddenSystemApi " +
     "--hide RequiresPermission " +
     "--hide MissingPermission --hide BroadcastBehavior " +
     "--hide HiddenSuperclass --hide DeprecationMismatch --hide UnavailableSymbol " +
@@ -1204,6 +1299,7 @@ stubs_defaults {
         ":non_openjdk_javadoc_files",
         ":android_icu4j_src_files_for_docs",
         ":conscrypt_public_api_files",
+        ":updatable-media-srcs-without-aidls",
         "test-mock/src/**/*.java",
         "test-runner/src/**/*.java",
     ],
@@ -1265,6 +1361,7 @@ stubs_defaults {
         ":non_openjdk_javadoc_files",
         ":android_icu4j_src_files_for_docs",
         ":conscrypt_public_api_files",
+        ":updatable-media-srcs-without-aidls",
     ],
     srcs_lib: "framework",
     srcs_lib_whitelist_dirs: frameworks_base_subdirs,
@@ -1273,7 +1370,6 @@ stubs_defaults {
         "ext",
         "framework",
         "voip-common",
-        "android.test.mock.impl",
     ],
     local_sourcepaths: frameworks_base_subdirs,
     installable: false,
@@ -1604,6 +1700,8 @@ droidstubs {
     ],
     dex_mapping_filename: "dex-mapping.txt",
     args: metalava_framework_docs_args +
+        " --hide ReferencesHidden " +
+        " --hide UnhiddenSystemApi " +
         " --show-unannotated " +
         " --show-annotation android.annotation.SystemApi " +
         " --show-annotation android.annotation.TestApi "
@@ -1704,3 +1802,24 @@ filegroup {
         "core/java/android/annotation/NonNull.java",
     ],
 }
+
+filegroup {
+    name: "framework-media-annotation-srcs",
+    srcs: [
+        "core/java/android/annotation/CallbackExecutor.java",
+        "core/java/android/annotation/CallSuper.java",
+        "core/java/android/annotation/DrawableRes.java",
+        "core/java/android/annotation/IntDef.java",
+        "core/java/android/annotation/LongDef.java",
+        "core/java/android/annotation/NonNull.java",
+        "core/java/android/annotation/Nullable.java",
+        "core/java/android/annotation/RequiresPermission.java",
+        "core/java/android/annotation/SdkConstant.java",
+        "core/java/android/annotation/StringDef.java",
+        "core/java/android/annotation/SystemApi.java",
+        "core/java/android/annotation/TestApi.java",
+        "core/java/android/annotation/UnsupportedAppUsage.java",
+        "core/java/com/android/internal/annotations/GuardedBy.java",
+    ],
+}
+

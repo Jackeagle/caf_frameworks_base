@@ -20,7 +20,7 @@
     xmlns:systemui="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black"
+    android:background="@drawable/system_bar_background"
     android:orientation="vertical">
     <LinearLayout
         android:id="@id/nav_buttons"
@@ -65,8 +65,9 @@
         <com.android.systemui.statusbar.car.CarFacetButton
             android:id="@+id/music_nav"
             style="@style/NavigationBarButton"
+            systemui:categories="android.intent.category.APP_MUSIC"
             systemui:icon="@drawable/car_ic_music"
-            systemui:intent="intent:#Intent;component=com.android.car.media/.MediaActivity;launchFlags=0x14000000;end"
+            systemui:intent="intent:#Intent;action=android.car.intent.action.MEDIA_TEMPLATE;launchFlags=0x10000000;end"
             systemui:packages="com.android.car.media"
             systemui:selectedIcon="@drawable/car_ic_music_selected"
             systemui:useMoreIcon="false"

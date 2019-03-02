@@ -1,5 +1,7 @@
 package com.android.settingslib;
 
+import static android.telephony.ServiceState.RIL_RADIO_TECHNOLOGY_IWLAN;
+
 import android.annotation.ColorInt;
 import android.content.Context;
 import android.content.Intent;
@@ -36,8 +38,8 @@ public class Utils {
     private static final String CURRENT_MODE_KEY = "CURRENT_MODE";
     private static final String NEW_MODE_KEY = "NEW_MODE";
     @VisibleForTesting
-    static final String STORAGE_MANAGER_SHOW_OPT_IN_PROPERTY =
-            "ro.storage_manager.show_opt_in";
+    static final String STORAGE_MANAGER_ENABLED_PROPERTY =
+            "ro.storage_manager.enabled";
 
     private static Signature[] sSystemSignature;
     private static String sPermissionControllerPackageName;
@@ -54,37 +56,25 @@ public class Utils {
 
     public static void updateLocationEnabled(Context context, boolean enabled, int userId,
             int source) {
+        LocationManager locationManager = context.getSystemService(LocationManager.class);
+
         Settings.Secure.putIntForUser(
                 context.getContentResolver(), Settings.Secure.LOCATION_CHANGER, source,
                 userId);
-        Intent intent = new Intent(LocationManager.MODE_CHANGING_ACTION);
 
-        final int oldMode = Settings.Secure.getIntForUser(context.getContentResolver(),
-                Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF, userId);
+        Intent intent = new Intent(LocationManager.MODE_CHANGING_ACTION);
+        final int oldMode = locationManager.isLocationEnabled()
+                ? Settings.Secure.LOCATION_MODE_ON
+                : Settings.Secure.LOCATION_MODE_OFF;
         final int newMode = enabled
-                ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY
+                ? Settings.Secure.LOCATION_MODE_ON
                 : Settings.Secure.LOCATION_MODE_OFF;
         intent.putExtra(CURRENT_MODE_KEY, oldMode);
         intent.putExtra(NEW_MODE_KEY, newMode);
         context.sendBroadcastAsUser(
                 intent, UserHandle.of(userId), android.Manifest.permission.WRITE_SECURE_SETTINGS);
-        LocationManager locationManager =
-                (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        locationManager.setLocationEnabledForUser(enabled, UserHandle.of(userId));
-    }
 
-    public static boolean updateLocationMode(Context context, int oldMode, int newMode, int userId,
-            int source) {
-        Settings.Secure.putIntForUser(
-                context.getContentResolver(), Settings.Secure.LOCATION_CHANGER, source,
-                userId);
-        Intent intent = new Intent(LocationManager.MODE_CHANGING_ACTION);
-        intent.putExtra(CURRENT_MODE_KEY, oldMode);
-        intent.putExtra(NEW_MODE_KEY, newMode);
-        context.sendBroadcastAsUser(
-                intent, UserHandle.of(userId), android.Manifest.permission.WRITE_SECURE_SETTINGS);
-        return Settings.Secure.putIntForUser(
-                context.getContentResolver(), Settings.Secure.LOCATION_MODE, newMode, userId);
+        locationManager.setLocationEnabledForUser(enabled, UserHandle.of(userId));
     }
 
     /**
@@ -371,8 +361,7 @@ public class Utils {
     public static boolean isStorageManagerEnabled(Context context) {
         boolean isDefaultOn;
         try {
-            // Turn off by default if the opt-in was shown.
-            isDefaultOn = !SystemProperties.getBoolean(STORAGE_MANAGER_SHOW_OPT_IN_PROPERTY, true);
+            isDefaultOn = SystemProperties.getBoolean(STORAGE_MANAGER_ENABLED_PROPERTY, false);
         } catch (Resources.NotFoundException e) {
             isDefaultOn = false;
         }
@@ -429,12 +418,14 @@ public class Utils {
         // and do not support voice service, and on these SIM cards, we
         // want to show signal bars for data service as well as the "no
         // service" or "emergency calls only" text that indicates that voice
-        // is not available.
+        // is not available. Note that we ignore the IWLAN service state
+        // because that state indicates the use of VoWIFI and not cell service
         int state = serviceState.getState();
         int dataState = serviceState.getDataRegState();
         if (state == ServiceState.STATE_OUT_OF_SERVICE
                 || state == ServiceState.STATE_EMERGENCY_ONLY) {
-            if (dataState == ServiceState.STATE_IN_SERVICE) {
+            if (dataState == ServiceState.STATE_IN_SERVICE
+                    && serviceState.getDataNetworkType() != RIL_RADIO_TECHNOLOGY_IWLAN) {
                 return ServiceState.STATE_IN_SERVICE;
             }
         }

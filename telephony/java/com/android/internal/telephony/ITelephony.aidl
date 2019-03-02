@@ -28,6 +28,7 @@ import android.net.Uri;
 import android.service.carrier.CarrierIdentifier;
 import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
+import android.telephony.CarrierRestrictionRules;
 import android.telephony.CellInfo;
 import android.telephony.ClientRequestStats;
 import android.telephony.IccOpenLogicalChannelResponse;
@@ -35,11 +36,13 @@ import android.telephony.ICellInfoCallback;
 import android.telephony.ModemActivityInfo;
 import android.telephony.NeighboringCellInfo;
 import android.telephony.NetworkScanRequest;
+import android.telephony.PhoneNumberRange;
 import android.telephony.RadioAccessFamily;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyHistogram;
 import android.telephony.VisualVoicemailSmsFilterSettings;
+import android.telephony.emergency.EmergencyNumber;
 import android.telephony.ims.aidl.IImsCapabilityCallback;
 import android.telephony.ims.aidl.IImsConfig;
 import android.telephony.ims.aidl.IImsConfigCallback;
@@ -49,11 +52,13 @@ import android.telephony.ims.aidl.IImsRegistration;
 import android.telephony.ims.aidl.IImsRegistrationCallback;
 import com.android.ims.internal.IImsServiceFeatureCallback;
 import com.android.internal.telephony.CellNetworkScanResult;
+import com.android.internal.telephony.INumberVerificationCallback;
 import com.android.internal.telephony.OperatorInfo;
 
 import java.util.List;
 import java.util.Map;
 
+import android.telephony.UiccCardInfo;
 import android.telephony.UiccSlotInfo;
 
 /**
@@ -393,16 +398,11 @@ interface ITelephony {
     int getDataActivationState(int subId, String callingPackage);
 
     /**
-      * Returns the unread count of voicemails
-      */
-    int getVoiceMessageCount();
-
-    /**
      * Returns the unread count of voicemails for a subId.
      * @param subId user preferred subId.
      * Returns the unread count of voicemails
      */
-    int getVoiceMessageCountForSubscriber(int subId);
+    int getVoiceMessageCountForSubscriber(int subId, String callingPackage);
 
     /**
       * Returns true if current state supports both voice and data
@@ -876,6 +876,17 @@ interface ITelephony {
     String getCdmaMin(int subId);
 
     /**
+     * Request that the next incoming call from a number matching {@code range} be intercepted.
+     * @param range The range of phone numbers the caller expects a phone call from.
+     * @param timeoutMillis The amount of time to wait for such a call, or
+     *                      {@link #MAX_NUMBER_VERIFICATION_TIMEOUT_MILLIS}, whichever is lesser.
+     * @param callback the callback aidl
+     * @param callingPackage the calling package name.
+     */
+    void requestNumberVerification(in PhoneNumberRange range, long timeoutMillis,
+            in INumberVerificationCallback callback, String callingPackage);
+
+    /**
      * Has the calling application been granted special privileges by the carrier.
      *
      * If any of the packages in the calling UID has carrier privileges, the
@@ -1167,12 +1178,12 @@ interface ITelephony {
     void factoryReset(int subId);
 
     /**
-     * An estimate of the users's current locale based on the default SIM.
+     * Returns users's current locale based on the SIM.
      *
      * The returned string will be a well formed BCP-47 language tag, or {@code null}
      * if no locale could be derived.
      */
-    String getLocaleFromDefaultSim();
+    String getSimLocaleForSubscriber(int subId);
 
     /**
      * Requests the modem activity info asynchronously.
@@ -1283,22 +1294,27 @@ interface ITelephony {
     List<TelephonyHistogram> getTelephonyHistograms();
 
     /**
-     * Set the allowed carrier list for slotIndex
-     * Require system privileges. In the future we may add this to carrier APIs.
+     * Set the allowed carrier list and the excluded carrier list, indicating the priority between
+     * the two lists.
      *
-     * @return The number of carriers set successfully. Should match length of
-     * carriers on success.
+     * <p>Requires system privileges. In the future we may add this to carrier APIs.
+     *
+     * @return {@link #SET_CARRIER_RESTRICTION_SUCCESS} in case of success.
+     * {@link #SET_CARRIER_RESTRICTION_NOT_SUPPORTED} if the modem does not support the
+     * configuration. {@link #SET_CARRIER_RESTRICTION_ERROR} in all other error cases.
      */
-    int setAllowedCarriers(int slotIndex, in List<CarrierIdentifier> carriers);
+    int setAllowedCarriers(in CarrierRestrictionRules carrierRestrictionRules);
 
     /**
-     * Get the allowed carrier list for slotIndex.
-     * Require system privileges. In the future we may add this to carrier APIs.
+     * Get the allowed carrier list and the excluded carrier list indicating the priority between
+     * the two lists.
      *
-     * @return List of {@link android.service.carrier.CarrierIdentifier}; empty list
-     * means all carriers are allowed.
+     * <p>Requires system privileges. In the future we may add this to carrier APIs.
+     *
+     * @return {@link CarrierRestrictionRules}; empty lists mean all carriers are allowed. It
+     * returns null in case of error.
      */
-    List<CarrierIdentifier> getAllowedCarriers(int slotIndex);
+    CarrierRestrictionRules getAllowedCarriers();
 
    /**
      * Returns carrier id of the given subscription.
@@ -1327,18 +1343,6 @@ interface ITelephony {
      * @hide
      */
     String getSubscriptionCarrierName(int subId);
-
-    /**
-     * Returns MNO carrier id of the current subscription’s MCCMNC.
-     * <p>MNO carrier id can be solely identified by subscription mccmnc. This is mainly used
-     * for MNO fallback when exact carrier id {@link #getSimCarrierId()}
-     * configurations are not found.
-     *
-     * @return MNO carrier id of the current subscription. Return the value same as carrier id
-     * {@link #getSimCarrierId()}, if MNO carrier id cannot be identified.
-     * @hide
-     */
-    int getSubscriptionMNOCarrierId(int subId);
 
     /**
      * Returns fine-grained carrier id of the current subscription.
@@ -1372,6 +1376,18 @@ interface ITelephony {
     String getSubscriptionPreciseCarrierName(int subId);
 
     /**
+     * Returns carrier id based on MCCMNC only. This will return a MNO carrier id used for fallback
+     * check when exact carrier id {@link #getSimCarrierId()} configurations are not found
+     *
+     * @param isSubscriptionMccMnc. If {@true} it means this is a query for subscription mccmnc
+     * {@false} otherwise.
+     *
+     * @return carrier id from passing mccmnc.
+     * @hide
+     */
+    int getCarrierIdFromMccMnc(int slotIndex, String mccmnc, boolean isSubscriptionMccMnc);
+
+    /**
      * Action set from carrier signalling broadcast receivers to enable/disable metered apns
      * Permissions android.Manifest.permission.MODIFY_PHONE_STATE is required
      * @param subId the subscription ID that this action applies to.
@@ -1398,6 +1414,14 @@ interface ITelephony {
      * @hide
      */
     void carrierActionReportDefaultNetworkStatus(int subId, boolean report);
+
+    /**
+     * Action set from carrier signalling broadcast receivers to reset all carrier actions.
+     * Permissions android.Manifest.permission.MODIFY_PHONE_STATE is required
+     * @param subId the subscription ID that this action applies to.
+     * @hide
+     */
+    void carrierActionResetAll(int subId);
 
     /**
      * Get aggregated video call data usage since boot.
@@ -1463,6 +1487,39 @@ interface ITelephony {
      * @hide
      */
     SignalStrength getSignalStrength(int subId);
+
+    /**
+     * Get the card ID of the default eUICC card. If there is no eUICC, returns
+     * {@link #INVALID_CARD_ID}.
+     *
+     * @param subId subscription ID used for authentication
+     * @param callingPackage package making the call
+     * @return card ID of the default eUICC card.
+     */
+    int getCardIdForDefaultEuicc(int subId, String callingPackage);
+
+    /**
+     * Gets information about currently inserted UICCs and enabled eUICCs.
+     * <p>
+     * Requires that the calling app has carrier privileges (see {@link #hasCarrierPrivileges}).
+     * <p>
+     * If the caller has carrier priviliges on any active subscription, then they have permission to
+     * get simple information like the card ID ({@link UiccCardInfo#getCardId()}), whether the card
+     * is an eUICC ({@link UiccCardInfo#isEuicc()}), and the slot index where the card is inserted
+     * ({@link UiccCardInfo#getSlotIndex()}).
+     * <p>
+     * To get private information such as the EID ({@link UiccCardInfo#getEid()}) or ICCID
+     * ({@link UiccCardInfo#getIccId()}), the caller must have carrier priviliges on that specific
+     * UICC or eUICC card.
+     * <p>
+     * See {@link UiccCardInfo} for more details on the kind of information available.
+     *
+     * @param callingPackage package making the call, used to evaluate carrier privileges 
+     * @return a list of UiccCardInfo objects, representing information on the currently inserted
+     * UICCs and eUICCs. Each UiccCardInfo in the list will have private information filtered out if
+     * the caller does not have adequate permissions for that card.
+     */
+    List<UiccCardInfo> getUiccCardsInfo(String callingPackage);
 
     /**
      * Get slot info for all the UICC slots.
@@ -1587,35 +1644,31 @@ interface ITelephony {
     /**
      * Adds an IMS registration status callback for the subscription id specified.
      */
-    void addImsRegistrationCallback(int subId, IImsRegistrationCallback c,
-            String callingPackage);
+    void registerImsRegistrationCallback(int subId, IImsRegistrationCallback c);
      /**
       * Removes an existing IMS registration status callback for the subscription specified.
       */
-    void removeImsRegistrationCallback(int subId, IImsRegistrationCallback c,
-            String callingPackage);
+    void unregisterImsRegistrationCallback(int subId, IImsRegistrationCallback c);
 
     /**
      * Adds an IMS MmTel capabilities callback for the subscription specified.
      */
-    void addMmTelCapabilityCallback(int subId, IImsCapabilityCallback c,
-            String callingPackage);
+    void registerMmTelCapabilityCallback(int subId, IImsCapabilityCallback c);
 
     /**
      * Removes an existing IMS MmTel capabilities callback for the subscription specified.
      */
-    void removeMmTelCapabilityCallback(int subId, IImsCapabilityCallback c,
-            String callingPackage);
+    void unregisterMmTelCapabilityCallback(int subId, IImsCapabilityCallback c);
 
     /**
      * return true if the IMS MmTel capability for the given registration tech is capable.
      */
-    boolean isCapable(int subId, int capability, int regTech, String callingPackage);
+    boolean isCapable(int subId, int capability, int regTech);
 
     /**
      * return true if the IMS MmTel capability for the given registration tech is available.
      */
-    boolean isAvailable(int subId, int capability, int regTech, String callingPackage);
+    boolean isAvailable(int subId, int capability, int regTech);
 
     /**
      * Returns true if the user's setting for 4G LTE is enabled, for the subscription specified.
@@ -1630,7 +1683,7 @@ interface ITelephony {
     /**
      * return true if the user's setting for VT is enabled for the subscription.
      */
-    boolean isVtSettingEnabled(int subId, String callingPackage);
+    boolean isVtSettingEnabled(int subId);
 
     /**
      * Modify the user's setting for whether or not VT is available for the subscrption specified.
@@ -1703,8 +1756,8 @@ interface ITelephony {
     /**
      * Identify if the number is emergency number, based on all the active subscriptions.
      */
-    boolean isCurrentEmergencyNumber(String number);
-    
+    boolean isCurrentEmergencyNumber(String number, boolean exactMatch);
+
     /**
      * Return a list of certs in hex string from loaded carrier privileges access rules.
      */
@@ -1719,6 +1772,24 @@ interface ITelephony {
      * unregister an existing IMS provisioning change callback.
      */
     void unregisterImsProvisioningChangedCallback(int subId, IImsConfigCallback callback);
+
+    /**
+     * Set the provisioning status for the IMS MmTel capability using the specified subscription.
+     */
+    void setImsProvisioningStatusForCapability(int subId, int capability, int tech,
+            boolean isProvisioned);
+
+    /**
+     * Get the provisioning status for the IMS MmTel capability specified.
+     */
+    boolean getImsProvisioningStatusForCapability(int subId, int capability, int tech);
+
+    /** Is the capability and tech flagged as provisioned in the cache */
+    boolean isMmTelCapabilityProvisionedInCache(int subId, int capability, int tech);
+
+    /** Set the provisioning for the capability and tech in the cache */
+    void cacheMmTelCapabilityProvisioning(int subId, int capability, int tech,
+            boolean isProvisioned);
 
     /**
      * Return an integer containing the provisioning value for the specified provisioning key.
@@ -1739,4 +1810,47 @@ interface ITelephony {
      * Set the String provisioning value for the provisioning key specified.
      */
     int setImsProvisioningString(int subId, int key, String value);
+
+    /**
+     * Update Emergency Number List for Test Mode.
+     */
+    void updateEmergencyNumberListTestMode(int action, in EmergencyNumber num);
+
+    /**
+     * Get the full emergency number list for Test Mode.
+     */
+    List<String> getEmergencyNumberListTestMode();
+
+    /**
+     * Enable or disable a logical modem stack associated with the slotIndex.
+     */
+    boolean enableModemForSlot(int slotIndex, boolean enable);
+
+    /**
+     * Indicate if the enablement of multi SIM functionality is restricted.
+     * @hide
+     */
+    void setMultisimCarrierRestriction(boolean isMultisimCarrierRestricted);
+
+    /**
+     * Returns if the usage of multiple SIM cards at the same time is restricted.
+     * @hide
+     */
+    boolean isMultisimCarrierRestricted();
+    
+    /**
+     * Switch configs to enable multi-sim or switch back to single-sim
+     * @hide
+     */
+    void switchMultiSimConfig(int numOfSims);
+
+    /**
+     * Get if reboot is required upon altering modems configurations
+     */
+    boolean isRebootRequiredForModemConfigChange();
+
+    /**
+     * Get the mapping from logical slots to physical slots.
+     */
+    int[] getSlotsMapping();
 }

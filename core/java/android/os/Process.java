@@ -32,23 +32,12 @@ public class Process {
     private static final String LOG_TAG = "Process";
 
     /**
-     * @hide for internal use only.
-     */
-    public static final String ZYGOTE_SOCKET = "zygote";
-
-    /**
-     * @hide for internal use only.
-     */
-    public static final String SECONDARY_ZYGOTE_SOCKET = "zygote_secondary";
-
-    /**
      * An invalid UID value.
      */
     public static final int INVALID_UID = -1;
 
     /**
      * Defines the root UID.
-     * @hide
      */
     public static final int ROOT_UID = 0;
 
@@ -64,7 +53,6 @@ public class Process {
 
     /**
      * Defines the UID/GID for the user shell.
-     * @hide
      */
     public static final int SHELL_UID = 2000;
 
@@ -111,8 +99,13 @@ public class Process {
     public static final int NFC_UID = 1027;
 
     /**
-     * Defines the UID/GID for the Bluetooth service process.
+     * Defines the UID/GID for the clatd process.
      * @hide
+     * */
+    public static final int CLAT_UID = 1029;
+
+    /**
+     * Defines the UID/GID for the Bluetooth service process.
      */
     public static final int BLUETOOTH_UID = 1002;
 
@@ -176,6 +169,12 @@ public class Process {
      */
     public static final int SE_UID = 1068;
 
+    /**
+     * Defines the UID/GID for the NetworkStack app.
+     * @hide
+     */
+    public static final int NETWORK_STACK_UID = 1073;
+
     /** {@hide} */
     public static final int NOBODY_UID = 9999;
 
@@ -193,15 +192,38 @@ public class Process {
     public static final int LAST_APPLICATION_UID = 19999;
 
     /**
+     * First uid used for fully isolated sandboxed processes spawned from an app zygote
+     * @hide
+     */
+    @TestApi
+    public static final int FIRST_APP_ZYGOTE_ISOLATED_UID = 90000;
+
+    /**
+     * Number of UIDs we allocate per application zygote
+     * @hide
+     */
+    @TestApi
+    public static final int NUM_UIDS_PER_APP_ZYGOTE = 100;
+
+    /**
+     * Last uid used for fully isolated sandboxed processes spawned from an app zygote
+     * @hide
+     */
+    @TestApi
+    public static final int LAST_APP_ZYGOTE_ISOLATED_UID = 98999;
+
+    /**
      * First uid used for fully isolated sandboxed processes (with no permissions of their own)
      * @hide
      */
+    @TestApi
     public static final int FIRST_ISOLATED_UID = 99000;
 
     /**
      * Last uid used for fully isolated sandboxed processes (with no permissions of their own)
      * @hide
      */
+    @TestApi
     public static final int LAST_ISOLATED_UID = 99999;
 
     /**
@@ -447,8 +469,7 @@ public class Process {
      * State associated with the zygote process.
      * @hide
      */
-    public static final ZygoteProcess zygoteProcess =
-            new ZygoteProcess(ZYGOTE_SOCKET, SECONDARY_ZYGOTE_SOCKET);
+    public static final ZygoteProcess ZYGOTE_PROCESS = new ZygoteProcess();
 
     /**
      * Start a new process.
@@ -506,10 +527,10 @@ public class Process {
                                   @Nullable String[] packagesForUid,
                                   @Nullable String[] visibleVols,
                                   @Nullable String[] zygoteArgs) {
-        return zygoteProcess.start(processClass, niceName, uid, gid, gids,
+        return ZYGOTE_PROCESS.start(processClass, niceName, uid, gid, gids,
                     runtimeFlags, mountExternal, targetSdkVersion, seInfo,
                     abi, instructionSet, appDataDir, invokeWith, packageName,
-                    packagesForUid, visibleVols, zygoteArgs);
+                    packagesForUid, visibleVols, /*useBlastulaPool=*/ true, zygoteArgs);
     }
 
     /** @hide */
@@ -530,7 +551,7 @@ public class Process {
         return WebViewZygote.getProcess().start(processClass, niceName, uid, gid, gids,
                     runtimeFlags, mountExternal, targetSdkVersion, seInfo,
                     abi, instructionSet, appDataDir, invokeWith, packageName,
-                    packagesForUid, visibleVols, zygoteArgs);
+                    packagesForUid, visibleVols, /*useBlastulaPool=*/ false, zygoteArgs);
     }
 
     /**
@@ -638,7 +659,8 @@ public class Process {
     /** {@hide} */
     public static final boolean isIsolated(int uid) {
         uid = UserHandle.getAppId(uid);
-        return uid >= FIRST_ISOLATED_UID && uid <= LAST_ISOLATED_UID;
+        return (uid >= FIRST_ISOLATED_UID && uid <= LAST_ISOLATED_UID)
+                || (uid >= FIRST_APP_ZYGOTE_ISOLATED_UID && uid <= LAST_APP_ZYGOTE_ISOLATED_UID);
     }
 
     /**
@@ -1078,6 +1100,9 @@ public class Process {
      * @hide
      */
     public static final native long getPss(int pid);
+
+    /** @hide */
+    public static final native long[] getRss(int pid);
 
     /**
      * Specifies the outcome of having started a process.

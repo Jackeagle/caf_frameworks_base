@@ -113,7 +113,7 @@ public:
 
     // Max memory allowed for storing metrics per configuration. If this limit is exceeded, statsd
     // drops the metrics data in memory.
-    static const size_t kMaxMetricsBytesPerConfig = 256 * 1024;
+    static const size_t kMaxMetricsBytesPerConfig = 2 * 1024 * 1024;
 
     // Soft memory limit per configuration. Once this limit is exceeded, we begin notifying the
     // data subscriber that it's time to call getData.
@@ -130,7 +130,7 @@ public:
     static const int64_t kMinBroadcastPeriodNs = 60 * NS_PER_SEC;
 
     /* Min period between two checks of byte size per config key in nanoseconds. */
-    static const int64_t kMinByteSizeCheckPeriodNs = 10 * NS_PER_SEC;
+    static const int64_t kMinByteSizeCheckPeriodNs = 60 * NS_PER_SEC;
 
     // Maximum age (30 days) that files on disk can exist in seconds.
     static const int kMaxAgeSecond = 60 * 60 * 24 * 30;
@@ -144,6 +144,8 @@ public:
     // How long to try to clear puller cache from last time
     static const long kPullerCacheClearIntervalSec = 1;
 
+    // Max time to do a pull.
+    static const int64_t kPullMaxDelayNs = 10 * NS_PER_SEC;
     /**
      * Report a new config has been received and report the static stats about the config.
      *
@@ -296,6 +298,16 @@ public:
     void notePullDelay(int pullAtomId, int64_t pullDelayNs);
 
     /*
+     * Records pull exceeds timeout for the puller.
+     */
+    void notePullTimeout(int pullAtomId);
+
+    /*
+     * Records pull exceeds max delay for a metric.
+     */
+    void notePullExceedMaxDelay(int pullAtomId);
+
+    /*
      * Records when system server restarts.
      */
     void noteSystemServerRestart(int32_t timeSec);
@@ -304,6 +316,53 @@ public:
      * Records statsd skipped an event.
      */
     void noteLogLost(int32_t wallClockTimeSec, int32_t count, int lastError);
+
+    /**
+     * Records that the pull of an atom has failed
+     */
+    void notePullFailed(int atomId);
+
+    /**
+     * Records that the pull of StatsCompanionService atom has failed
+     */
+    void noteStatsCompanionPullFailed(int atomId);
+
+    /**
+     * Records that the pull of a StatsCompanionService atom has failed due to a failed binder
+     * transaction. This can happen when StatsCompanionService returns too
+     * much data (the max Binder parcel size is 1MB)
+     */
+    void noteStatsCompanionPullBinderTransactionFailed(int atomId);
+
+    /**
+     * A pull with no data occurred
+     */
+    void noteEmptyData(int atomId);
+
+    /**
+     * Hard limit was reached in the cardinality of an atom
+     */
+    void noteHardDimensionLimitReached(int atomId);
+
+    /**
+     * A log event was too late, arrived in the wrong bucket and was skipped
+     */
+    void noteLateLogEventSkipped(int atomId);
+
+    /**
+     * Buckets were skipped as time elapsed without any data for them
+     */
+    void noteSkippedForwardBuckets(int atomId);
+
+    /**
+     * An unsupported value type was received
+     */
+    void noteBadValueType(int atomId);
+
+    /**
+     * A condition change was too late, arrived in the wrong bucket and was skipped
+     */
+    void noteConditionChangeInNextBucket(int atomId);
 
     /**
      * Reset the historical stats. Including all stats in icebox, and the tracked stats about
@@ -335,7 +394,21 @@ public:
         int64_t maxPullDelayNs = 0;
         long numPullDelay = 0;
         long dataError = 0;
+        long pullTimeout = 0;
+        long pullExceedMaxDelay = 0;
+        long pullFailed = 0;
+        long statsCompanionPullFailed = 0;
+        long statsCompanionPullBinderTransactionFailed = 0;
+        long emptyData = 0;
     } PulledAtomStats;
+
+    typedef struct {
+        long hardDimensionLimitReached = 0;
+        long lateLogEventSkipped = 0;
+        long skippedForwardBuckets = 0;
+        long badValueType = 0;
+        long conditionChangeInNextBucket = 0;
+    } AtomMetricStats;
 
 private:
     StatsdStats();
@@ -363,6 +436,9 @@ private:
 
     // Maps PullAtomId to its stats. The size is capped by the puller atom counts.
     std::map<int, PulledAtomStats> mPulledAtomStats;
+
+    // Maps metric ID to its stats. The size is capped by the number of metrics.
+    std::map<int, AtomMetricStats> mAtomMetricStats;
 
     struct LogLossStats {
         LogLossStats(int32_t sec, int32_t count, int32_t error)
@@ -399,6 +475,12 @@ private:
     void noteBroadcastSent(const ConfigKey& key, int32_t timeSec);
 
     void addToIceBoxLocked(std::shared_ptr<ConfigStats>& stats);
+
+    /**
+     * Get a reference to AtomMetricStats for a metric. If none exists, create it. The reference
+     * will live as long as `this`.
+     */
+    StatsdStats::AtomMetricStats& getAtomMetricStats(int metricId);
 
     FRIEND_TEST(StatsdStatsTest, TestValidConfigAdd);
     FRIEND_TEST(StatsdStatsTest, TestInvalidConfigAdd);

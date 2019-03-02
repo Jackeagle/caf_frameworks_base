@@ -17,6 +17,7 @@
 package android.graphics;
 
 import android.annotation.ColorInt;
+import android.annotation.ColorLong;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -25,6 +26,7 @@ import android.annotation.Px;
 import android.annotation.Size;
 import android.annotation.UnsupportedAppUsage;
 import android.graphics.fonts.FontVariationAxis;
+import android.os.Build;
 import android.os.LocaleList;
 import android.text.GraphicsOperations;
 import android.text.SpannableString;
@@ -65,26 +67,27 @@ public class Paint {
                 Paint.class.getClassLoader(), nGetNativeFinalizer(), NATIVE_PAINT_SIZE);
     }
 
-    private ColorFilter mColorFilter;
-    private MaskFilter  mMaskFilter;
-    private PathEffect  mPathEffect;
-    private Shader      mShader;
-    @UnsupportedAppUsage
-    private Typeface    mTypeface;
-    private Xfermode    mXfermode;
+    @ColorLong private long mColor;
+    private ColorFilter     mColorFilter;
+    private MaskFilter      mMaskFilter;
+    private PathEffect      mPathEffect;
+    private Shader          mShader;
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
+    private Typeface        mTypeface;
+    private Xfermode        mXfermode;
 
-    private boolean     mHasCompatScaling;
-    private float       mCompatScaling;
-    private float       mInvCompatScaling;
+    private boolean         mHasCompatScaling;
+    private float           mCompatScaling;
+    private float           mInvCompatScaling;
 
-    private LocaleList  mLocales;
-    private String      mFontFeatureSettings;
-    private String      mFontVariationSettings;
+    private LocaleList      mLocales;
+    private String          mFontFeatureSettings;
+    private String          mFontVariationSettings;
 
-    private float mShadowLayerRadius;
-    private float mShadowLayerDx;
-    private float mShadowLayerDy;
-    private int mShadowLayerColor;
+    private float           mShadowLayerRadius;
+    private float           mShadowLayerDx;
+    private float           mShadowLayerDy;
+    @ColorLong private long mShadowLayerColor;
 
     private static final Object sCacheLock = new Object();
 
@@ -502,6 +505,7 @@ public class Paint {
         //        ? HINTING_OFF : HINTING_ON);
         mCompatScaling = mInvCompatScaling = 1;
         setTextLocales(LocaleList.getAdjustedDefault());
+        mColor = Color.pack(Color.BLACK);
     }
 
     /**
@@ -527,6 +531,7 @@ public class Paint {
         // setHinting(DisplayMetrics.DENSITY_DEVICE >= DisplayMetrics.DENSITY_TV
         //        ? HINTING_OFF : HINTING_ON);
 
+        mColor = Color.pack(Color.BLACK);
         mColorFilter = null;
         mMaskFilter = null;
         mPathEffect = null;
@@ -548,7 +553,7 @@ public class Paint {
         mShadowLayerRadius = 0.0f;
         mShadowLayerDx = 0.0f;
         mShadowLayerDy = 0.0f;
-        mShadowLayerColor = 0;
+        mShadowLayerColor = Color.pack(0);
     }
 
     /**
@@ -569,6 +574,7 @@ public class Paint {
      * {@link Paint}.
      */
     private void setClassVariablesFrom(Paint paint) {
+        mColor = paint.mColor;
         mColorFilter = paint.mColorFilter;
         mMaskFilter = paint.mMaskFilter;
         mPathEffect = paint.mPathEffect;
@@ -946,7 +952,7 @@ public class Paint {
     }
 
     /**
-     * Return the paint's color. Note that the color is a 32bit value
+     * Return the paint's color in sRGB. Note that the color is a 32bit value
      * containing alpha as well as r,g,b. This 32bit value is not premultiplied,
      * meaning that its alpha can be any value, regardless of the values of
      * r,g,b. See the Color class for more details.
@@ -955,7 +961,22 @@ public class Paint {
      */
     @ColorInt
     public int getColor() {
-        return nGetColor(mNativePaint);
+        return Color.toArgb(mColor);
+    }
+
+    /**
+     * Return the paint's color. Note that the color is a long with an encoded
+     * {@link ColorSpace} as well as alpha and r,g,b. These values are not
+     * premultiplied, meaning that alpha can be any value, regardless of the
+     * values of r,g,b. See the {@link Color} class for more details.
+     *
+     * @see Color for APIs that help manipulate a color long.
+     *
+     * @return the paint's color (and alpha).
+     */
+    @ColorLong
+    public long getColorLong() {
+        return mColor;
     }
 
     /**
@@ -967,7 +988,30 @@ public class Paint {
      * @param color The new color (including alpha) to set in the paint.
      */
     public void setColor(@ColorInt int color) {
-        nSetColor(mNativePaint, color);
+        setColor(Color.pack(color));
+    }
+
+    /**
+     * Set the paint's color with a {@link ColorLong}. Note that the color is
+     * a long with an encoded {@link ColorSpace} as well as alpha and r,g,b.
+     * These values are not premultiplied, meaning that alpha can be any value,
+     * regardless of the values of r,g,b. See the {@link Color} class for more
+     * details.
+     *
+     * @param color The new color (including alpha and {@link ColorSpace})
+     *      to set in the paint.
+     * @throws IllegalArgumentException if the color space encoded in the long
+     *      is invalid or unknown.
+     */
+    public void setColor(@ColorLong long color) {
+        ColorSpace cs = Color.colorSpace(color);
+        float r = Color.red(color);
+        float g = Color.green(color);
+        float b = Color.blue(color);
+        float a = Color.alpha(color);
+
+        nSetColor(mNativePaint, cs.getNativeInstance(), r, g, b, a);
+        mColor = color;
     }
 
     /**
@@ -978,7 +1022,7 @@ public class Paint {
      * @return the alpha component of the paint's color.
      */
     public int getAlpha() {
-        return nGetAlpha(mNativePaint);
+        return Math.round(Color.alpha(mColor) * 255.0f);
     }
 
     /**
@@ -989,6 +1033,13 @@ public class Paint {
      * @param a set the alpha component [0..255] of the paint's color.
      */
     public void setAlpha(int a) {
+        // FIXME: No need to unpack this. Instead, just update the alpha bits.
+        // b/122959599
+        ColorSpace cs = Color.colorSpace(mColor);
+        float r = Color.red(mColor);
+        float g = Color.green(mColor);
+        float b = Color.blue(mColor);
+        mColor = Color.pack(r, g, b, a * (1.0f / 255), cs);
         nSetAlpha(mNativePaint, a);
     }
 
@@ -1168,9 +1219,26 @@ public class Paint {
      * Get the paint's transfer mode object.
      *
      * @return the paint's transfer mode (or null)
+     *
+     * @deprecated use {@link #getBlendMode()} instead
      */
+    @Deprecated
     public Xfermode getXfermode() {
         return mXfermode;
+    }
+
+    /**
+     * Get the paint's blend mode object.
+     *
+     * @return the paint's blend mode (or null)
+     */
+    @Nullable
+    public BlendMode getBlendMode() {
+        if (mXfermode == null) {
+            return null;
+        } else {
+            return BlendMode.fromValue(mXfermode.porterDuffMode);
+        }
     }
 
     /**
@@ -1185,8 +1253,17 @@ public class Paint {
      *
      * @param xfermode May be null. The xfermode to be installed in the paint
      * @return         xfermode
+     *
+     * @deprecated Use {@link #setBlendMode} to apply a Xfermode directly
+     * through usage of {@link BlendMode}
      */
+    @Deprecated
     public Xfermode setXfermode(Xfermode xfermode) {
+        return installXfermode(xfermode);
+    }
+
+    @Nullable
+    private Xfermode installXfermode(Xfermode xfermode) {
         int newMode = xfermode != null ? xfermode.porterDuffMode : Xfermode.DEFAULT;
         int curMode = mXfermode != null ? mXfermode.porterDuffMode : Xfermode.DEFAULT;
         if (newMode != curMode) {
@@ -1194,6 +1271,23 @@ public class Paint {
         }
         mXfermode = xfermode;
         return xfermode;
+    }
+
+    /**
+     * Set or clear the blend mode. A blend mode defines how source pixels
+     * (generated by a drawing command) are composited with the destination pixels
+     * (content of the render target).
+     * <p />
+     * Pass null to clear any previous blend mode.
+     * As a convenience, the parameter passed is also returned.
+     * <p />
+     *
+     * @see BlendMode
+     *
+     * @param blendmode May be null. The blend mode to be installed in the paint
+     */
+    public void setBlendMode(@Nullable BlendMode blendmode) {
+        installXfermode(blendmode != null ? blendmode.getXfermode() : null);
     }
 
     /**
@@ -1326,12 +1420,37 @@ public class Paint {
      * The alpha of the shadow will be the paint's alpha if the shadow color is
      * opaque, or the alpha from the shadow color if not.
      */
-    public void setShadowLayer(float radius, float dx, float dy, int shadowColor) {
-      mShadowLayerRadius = radius;
-      mShadowLayerDx = dx;
-      mShadowLayerDy = dy;
-      mShadowLayerColor = shadowColor;
-      nSetShadowLayer(mNativePaint, radius, dx, dy, shadowColor);
+    public void setShadowLayer(float radius, float dx, float dy, @ColorInt int shadowColor) {
+        setShadowLayer(radius, dx, dy, Color.pack(shadowColor));
+    }
+
+    /**
+     * This draws a shadow layer below the main layer, with the specified
+     * offset and color, and blur radius. If radius is 0, then the shadow
+     * layer is removed.
+     * <p>
+     * Can be used to create a blurred shadow underneath text. Support for use
+     * with other drawing operations is constrained to the software rendering
+     * pipeline.
+     * <p>
+     * The alpha of the shadow will be the paint's alpha if the shadow color is
+     * opaque, or the alpha from the shadow color if not.
+     *
+     * @throws IllegalArgumentException if the color space encoded in the long
+     *      is invalid or unknown.
+     */
+    public void setShadowLayer(float radius, float dx, float dy, @ColorLong long shadowColor) {
+        ColorSpace cs = Color.colorSpace(shadowColor);
+        float r = Color.red(shadowColor);
+        float g = Color.green(shadowColor);
+        float b = Color.blue(shadowColor);
+        float a = Color.alpha(shadowColor);
+        nSetShadowLayer(mNativePaint, radius, dx, dy, cs.getNativeInstance(), r, g, b, a);
+
+        mShadowLayerRadius = radius;
+        mShadowLayerDx = dx;
+        mShadowLayerDy = dy;
+        mShadowLayerColor = shadowColor;
     }
 
     /**
@@ -1378,8 +1497,18 @@ public class Paint {
     /**
      * Returns the color of the shadow layer.
      * @see #setShadowLayer(float,float,float,int)
+     * @see #setShadowLayer(float,float,float,long)
      */
     public @ColorInt int getShadowLayerColor() {
+        return Color.toArgb(mShadowLayerColor);
+    }
+
+    /**
+     * Returns the color of the shadow layer.
+     * @see #setShadowLayer(float,float,float,int)
+     * @see #setShadowLayer(float,float,float,long)
+     */
+    public @ColorLong long getShadowLayerColorLong() {
         return mShadowLayerColor;
     }
 
@@ -2917,7 +3046,8 @@ public class Paint {
             int mMinikinLocaleListId);
     @CriticalNative
     private static native void nSetShadowLayer(long paintPtr,
-            float radius, float dx, float dy, int color);
+            float radius, float dx, float dy, long colorSpaceHandle,
+            float r, float g, float b, float a);
     @CriticalNative
     private static native boolean nHasShadowLayer(long paintPtr);
     @CriticalNative
@@ -2965,11 +3095,8 @@ public class Paint {
     @CriticalNative
     private static native void nSetFilterBitmap(long paintPtr, boolean filter);
     @CriticalNative
-    private static native int nGetColor(long paintPtr);
-    @CriticalNative
-    private static native void nSetColor(long paintPtr, @ColorInt int color);
-    @CriticalNative
-    private static native int nGetAlpha(long paintPtr);
+    private static native void nSetColor(long paintPtr, long colorSpaceHandle,
+            float r, float g, float b, float a);
     @CriticalNative
     private static native void nSetStrikeThruText(long paintPtr, boolean strikeThruText);
     @CriticalNative

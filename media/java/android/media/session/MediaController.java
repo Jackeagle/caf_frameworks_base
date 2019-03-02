@@ -18,21 +18,23 @@ package android.media.session;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SystemApi;
 import android.annotation.UnsupportedAppUsage;
 import android.app.PendingIntent;
 import android.content.Context;
-import android.content.pm.ParceledListSlice;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.Rating;
 import android.media.VolumeProvider;
+import android.media.session.MediaSession.QueueItem;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.os.RemoteException;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.ResultReceiver;
 import android.text.TextUtils;
 import android.util.Log;
@@ -66,11 +68,11 @@ public final class MediaController {
     private static final int MSG_UPDATE_EXTRAS = 7;
     private static final int MSG_DESTROYED = 8;
 
-    private final ISessionController mSessionBinder;
+    private final ControllerLink mSessionBinder;
 
     private final MediaSession.Token mToken;
     private final Context mContext;
-    private final CallbackStub mCbStub = new CallbackStub(this);
+    private final ControllerCallbackLink mCbStub;
     private final ArrayList<MessageHandler> mCallbacks = new ArrayList<MessageHandler>();
     private final Object mLock = new Object();
 
@@ -81,32 +83,26 @@ public final class MediaController {
     private final TransportControls mTransportControls;
 
     /**
-     * Call for creating a MediaController directly from a binder. Should only
-     * be used by framework code.
-     *
-     * @hide
-     */
-    public MediaController(Context context, ISessionController sessionBinder) {
-        if (sessionBinder == null) {
-            throw new IllegalArgumentException("Session token cannot be null");
-        }
-        if (context == null) {
-            throw new IllegalArgumentException("Context cannot be null");
-        }
-        mSessionBinder = sessionBinder;
-        mTransportControls = new TransportControls();
-        mToken = new MediaSession.Token(sessionBinder);
-        mContext = context;
-    }
-
-    /**
      * Create a new MediaController from a session's token.
      *
      * @param context The caller's context.
      * @param token The token for the session.
      */
     public MediaController(@NonNull Context context, @NonNull MediaSession.Token token) {
-        this(context, token.getBinder());
+        if (context == null) {
+            throw new IllegalArgumentException("context shouldn't be null");
+        }
+        if (token == null) {
+            throw new IllegalArgumentException("token shouldn't be null");
+        }
+        if (token.getControllerLink() == null) {
+            throw new IllegalArgumentException("token.getControllerLink() shouldn't be null");
+        }
+        mSessionBinder = token.getControllerLink();
+        mTransportControls = new TransportControls();
+        mToken = token;
+        mContext = context;
+        mCbStub = new ControllerCallbackLink(context, new CallbackStub(this));
     }
 
     /**
@@ -127,83 +123,18 @@ public final class MediaController {
      * @return true if the event was sent to the session, false otherwise.
      */
     public boolean dispatchMediaButtonEvent(@NonNull KeyEvent keyEvent) {
-        return dispatchMediaButtonEventInternal(false, keyEvent);
-    }
-
-    /**
-     * Dispatches the media button event as system service to the session.
-     * <p>
-     * Should be only called by the {@link com.android.internal.policy.PhoneWindow} when the
-     * foreground activity didn't consume the key from the hardware devices.
-     *
-     * @param keyEvent media key event
-     * @return {@code true} if the event was sent to the session, {@code false} otherwise
-     * @hide
-     */
-    public boolean dispatchMediaButtonEventAsSystemService(@NonNull KeyEvent keyEvent) {
-        return dispatchMediaButtonEventInternal(true, keyEvent);
-    }
-
-    private boolean dispatchMediaButtonEventInternal(boolean asSystemService,
-            @NonNull KeyEvent keyEvent) {
         if (keyEvent == null) {
             throw new IllegalArgumentException("KeyEvent may not be null");
         }
-        if (!KeyEvent.isMediaKey(keyEvent.getKeyCode())) {
+        if (!KeyEvent.isMediaSessionKey(keyEvent.getKeyCode())) {
             return false;
         }
         try {
-            return mSessionBinder.sendMediaButton(mContext.getOpPackageName(), mCbStub,
-                    asSystemService, keyEvent);
-        } catch (RemoteException e) {
+            return mSessionBinder.sendMediaButton(mContext.getPackageName(), mCbStub, keyEvent);
+        } catch (RuntimeException e) {
             // System is dead. =(
         }
         return false;
-    }
-
-    /**
-     * Dispatches the volume button event as system service to the session.
-     * <p>
-     * Should be only called by the {@link com.android.internal.policy.PhoneWindow} when the
-     * foreground activity didn't consume the key from the hardware devices.
-     *
-     * @param keyEvent volume key event
-     * @hide
-     */
-    public void dispatchVolumeButtonEventAsSystemService(@NonNull KeyEvent keyEvent) {
-        switch (keyEvent.getAction()) {
-            case KeyEvent.ACTION_DOWN: {
-                int direction = 0;
-                switch (keyEvent.getKeyCode()) {
-                    case KeyEvent.KEYCODE_VOLUME_UP:
-                        direction = AudioManager.ADJUST_RAISE;
-                        break;
-                    case KeyEvent.KEYCODE_VOLUME_DOWN:
-                        direction = AudioManager.ADJUST_LOWER;
-                        break;
-                    case KeyEvent.KEYCODE_VOLUME_MUTE:
-                        direction = AudioManager.ADJUST_TOGGLE_MUTE;
-                        break;
-                }
-                try {
-                    mSessionBinder.adjustVolume(mContext.getOpPackageName(), mCbStub, true,
-                            direction, AudioManager.FLAG_SHOW_UI);
-                } catch (RemoteException e) {
-                    Log.wtf(TAG, "Error calling adjustVolumeBy", e);
-                }
-            }
-
-            case KeyEvent.ACTION_UP: {
-                final int flags = AudioManager.FLAG_PLAY_SOUND | AudioManager.FLAG_VIBRATE
-                        | AudioManager.FLAG_FROM_KEY;
-                try {
-                    mSessionBinder.adjustVolume(mContext.getOpPackageName(), mCbStub, true, 0,
-                            flags);
-                } catch (RemoteException e) {
-                    Log.wtf(TAG, "Error calling adjustVolumeBy", e);
-                }
-            }
-        }
     }
 
     /**
@@ -214,7 +145,7 @@ public final class MediaController {
     public @Nullable PlaybackState getPlaybackState() {
         try {
             return mSessionBinder.getPlaybackState();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getPlaybackState.", e);
             return null;
         }
@@ -228,7 +159,7 @@ public final class MediaController {
     public @Nullable MediaMetadata getMetadata() {
         try {
             return mSessionBinder.getMetadata();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getMetadata.", e);
             return null;
         }
@@ -242,11 +173,8 @@ public final class MediaController {
      */
     public @Nullable List<MediaSession.QueueItem> getQueue() {
         try {
-            ParceledListSlice queue = mSessionBinder.getQueue();
-            if (queue != null) {
-                return queue.getList();
-            }
-        } catch (RemoteException e) {
+            return mSessionBinder.getQueue();
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getQueue.", e);
         }
         return null;
@@ -258,7 +186,7 @@ public final class MediaController {
     public @Nullable CharSequence getQueueTitle() {
         try {
             return mSessionBinder.getQueueTitle();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getQueueTitle", e);
         }
         return null;
@@ -270,7 +198,7 @@ public final class MediaController {
     public @Nullable Bundle getExtras() {
         try {
             return mSessionBinder.getExtras();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getExtras", e);
         }
         return null;
@@ -293,7 +221,7 @@ public final class MediaController {
     public int getRatingType() {
         try {
             return mSessionBinder.getRatingType();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getRatingType.", e);
             return Rating.RATING_NONE;
         }
@@ -304,10 +232,10 @@ public final class MediaController {
      *
      * @return The current set of flags for the session.
      */
-    public @MediaSession.SessionFlags long getFlags() {
+    public long getFlags() {
         try {
             return mSessionBinder.getFlags();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getFlags.", e);
         }
         return 0;
@@ -320,11 +248,8 @@ public final class MediaController {
      */
     public @Nullable PlaybackInfo getPlaybackInfo() {
         try {
-            ParcelableVolumeInfo result = mSessionBinder.getVolumeAttributes();
-            return new PlaybackInfo(result.volumeType, result.audioAttrs, result.controlType,
-                    result.maxVolume, result.currentVolume);
-
-        } catch (RemoteException e) {
+            return mSessionBinder.getVolumeAttributes();
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getAudioInfo.", e);
         }
         return null;
@@ -339,7 +264,7 @@ public final class MediaController {
     public @Nullable PendingIntent getSessionActivity() {
         try {
             return mSessionBinder.getLaunchPendingIntent();
-        } catch (RemoteException e) {
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling getPendingIntent.", e);
         }
         return null;
@@ -367,8 +292,12 @@ public final class MediaController {
      */
     public void setVolumeTo(int value, int flags) {
         try {
-            mSessionBinder.setVolumeTo(mContext.getOpPackageName(), mCbStub, value, flags);
-        } catch (RemoteException e) {
+            // Note: Need both package name and OP package name. Package name is used for
+            //       RemoteUserInfo, and OP package name is used for AudioService's internal
+            //       AppOpsManager usages.
+            mSessionBinder.setVolumeTo(mContext.getPackageName(), mContext.getOpPackageName(),
+                    mCbStub, value, flags);
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling setVolumeTo.", e);
         }
     }
@@ -388,9 +317,12 @@ public final class MediaController {
      */
     public void adjustVolume(int direction, int flags) {
         try {
-            mSessionBinder.adjustVolume(mContext.getOpPackageName(), mCbStub, false, direction,
-                    flags);
-        } catch (RemoteException e) {
+            // Note: Need both package name and OP package name. Package name is used for
+            //       RemoteUserInfo, and OP package name is used for AudioService's internal
+            //       AppOpsManager usages.
+            mSessionBinder.adjustVolume(mContext.getPackageName(), mContext.getOpPackageName(),
+                    mCbStub, direction, flags);
+        } catch (RuntimeException e) {
             Log.wtf(TAG, "Error calling adjustVolumeBy.", e);
         }
     }
@@ -455,8 +387,8 @@ public final class MediaController {
             throw new IllegalArgumentException("command cannot be null or empty");
         }
         try {
-            mSessionBinder.sendCommand(mContext.getOpPackageName(), mCbStub, command, args, cb);
-        } catch (RemoteException e) {
+            mSessionBinder.sendCommand(mContext.getPackageName(), mCbStub, command, args, cb);
+        } catch (RuntimeException e) {
             Log.d(TAG, "Dead object in sendCommand.", e);
         }
     }
@@ -470,7 +402,7 @@ public final class MediaController {
         if (mPackageName == null) {
             try {
                 mPackageName = mSessionBinder.getPackageName();
-            } catch (RemoteException e) {
+            } catch (RuntimeException e) {
                 Log.d(TAG, "Dead object in getPackageName.", e);
             }
         }
@@ -487,7 +419,7 @@ public final class MediaController {
         if (mTag == null) {
             try {
                 mTag = mSessionBinder.getTag();
-            } catch (RemoteException e) {
+            } catch (RuntimeException e) {
                 Log.d(TAG, "Dead object in getTag.", e);
             }
         }
@@ -497,7 +429,7 @@ public final class MediaController {
     /*
      * @hide
      */
-    ISessionController getSessionBinder() {
+    ControllerLink getSessionBinder() {
         return mSessionBinder;
     }
 
@@ -507,7 +439,7 @@ public final class MediaController {
     @UnsupportedAppUsage
     public boolean controlsSameSession(MediaController other) {
         if (other == null) return false;
-        return mSessionBinder.asBinder() == other.getSessionBinder().asBinder();
+        return mSessionBinder.getBinder() == other.getSessionBinder().getBinder();
     }
 
     private void addCallbackLocked(Callback cb, Handler handler) {
@@ -521,9 +453,9 @@ public final class MediaController {
 
         if (!mCbRegistered) {
             try {
-                mSessionBinder.registerCallbackListener(mContext.getOpPackageName(), mCbStub);
+                mSessionBinder.registerCallback(mContext.getPackageName(), mCbStub);
                 mCbRegistered = true;
-            } catch (RemoteException e) {
+            } catch (RuntimeException e) {
                 Log.e(TAG, "Dead object in registerCallback", e);
             }
         }
@@ -541,8 +473,8 @@ public final class MediaController {
         }
         if (mCbRegistered && mCallbacks.size() == 0) {
             try {
-                mSessionBinder.unregisterCallbackListener(mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.unregisterCallback(mCbStub);
+            } catch (RuntimeException e) {
                 Log.e(TAG, "Dead object in removeCallbackLocked");
             }
             mCbRegistered = false;
@@ -563,7 +495,7 @@ public final class MediaController {
         return null;
     }
 
-    private final void postMessage(int what, Object obj, Bundle data) {
+    private void postMessage(int what, Object obj, Bundle data) {
         synchronized (mLock) {
             for (int i = mCallbacks.size() - 1; i >= 0; i--) {
                 mCallbacks.get(i).post(what, obj, data);
@@ -575,7 +507,7 @@ public final class MediaController {
      * Callback for receiving updates from the session. A Callback can be
      * registered using {@link #registerCallback}.
      */
-    public static abstract class Callback {
+    public abstract static class Callback {
         /**
          * Override to handle the session being destroyed. The session is no
          * longer valid after this call and calls to it will be ignored.
@@ -668,8 +600,8 @@ public final class MediaController {
          */
         public void prepare() {
             try {
-                mSessionBinder.prepare(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.prepare(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling prepare.", e);
             }
         }
@@ -692,9 +624,9 @@ public final class MediaController {
                         "You must specify a non-empty String for prepareFromMediaId.");
             }
             try {
-                mSessionBinder.prepareFromMediaId(mContext.getOpPackageName(), mCbStub, mediaId,
+                mSessionBinder.prepareFromMediaId(mContext.getPackageName(), mCbStub, mediaId,
                         extras);
-            } catch (RemoteException e) {
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling prepare(" + mediaId + ").", e);
             }
         }
@@ -719,9 +651,9 @@ public final class MediaController {
                 query = "";
             }
             try {
-                mSessionBinder.prepareFromSearch(mContext.getOpPackageName(), mCbStub, query,
+                mSessionBinder.prepareFromSearch(mContext.getPackageName(), mCbStub, query,
                         extras);
-            } catch (RemoteException e) {
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling prepare(" + query + ").", e);
             }
         }
@@ -744,8 +676,8 @@ public final class MediaController {
                         "You must specify a non-empty Uri for prepareFromUri.");
             }
             try {
-                mSessionBinder.prepareFromUri(mContext.getOpPackageName(), mCbStub, uri, extras);
-            } catch (RemoteException e) {
+                mSessionBinder.prepareFromUri(mContext.getPackageName(), mCbStub, uri, extras);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling prepare(" + uri + ").", e);
             }
         }
@@ -755,8 +687,8 @@ public final class MediaController {
          */
         public void play() {
             try {
-                mSessionBinder.play(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.play(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling play.", e);
             }
         }
@@ -774,9 +706,9 @@ public final class MediaController {
                         "You must specify a non-empty String for playFromMediaId.");
             }
             try {
-                mSessionBinder.playFromMediaId(mContext.getOpPackageName(), mCbStub, mediaId,
+                mSessionBinder.playFromMediaId(mContext.getPackageName(), mCbStub, mediaId,
                         extras);
-            } catch (RemoteException e) {
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling play(" + mediaId + ").", e);
             }
         }
@@ -797,8 +729,8 @@ public final class MediaController {
                 query = "";
             }
             try {
-                mSessionBinder.playFromSearch(mContext.getOpPackageName(), mCbStub, query, extras);
-            } catch (RemoteException e) {
+                mSessionBinder.playFromSearch(mContext.getPackageName(), mCbStub, query, extras);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling play(" + query + ").", e);
             }
         }
@@ -816,8 +748,8 @@ public final class MediaController {
                         "You must specify a non-empty Uri for playFromUri.");
             }
             try {
-                mSessionBinder.playFromUri(mContext.getOpPackageName(), mCbStub, uri, extras);
-            } catch (RemoteException e) {
+                mSessionBinder.playFromUri(mContext.getPackageName(), mCbStub, uri, extras);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling play(" + uri + ").", e);
             }
         }
@@ -828,8 +760,8 @@ public final class MediaController {
          */
         public void skipToQueueItem(long id) {
             try {
-                mSessionBinder.skipToQueueItem(mContext.getOpPackageName(), mCbStub, id);
-            } catch (RemoteException e) {
+                mSessionBinder.skipToQueueItem(mContext.getPackageName(), mCbStub, id);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling skipToItem(" + id + ").", e);
             }
         }
@@ -840,8 +772,8 @@ public final class MediaController {
          */
         public void pause() {
             try {
-                mSessionBinder.pause(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.pause(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling pause.", e);
             }
         }
@@ -852,8 +784,8 @@ public final class MediaController {
          */
         public void stop() {
             try {
-                mSessionBinder.stop(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.stop(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling stop.", e);
             }
         }
@@ -865,8 +797,8 @@ public final class MediaController {
          */
         public void seekTo(long pos) {
             try {
-                mSessionBinder.seekTo(mContext.getOpPackageName(), mCbStub, pos);
-            } catch (RemoteException e) {
+                mSessionBinder.seekTo(mContext.getPackageName(), mCbStub, pos);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling seekTo.", e);
             }
         }
@@ -877,8 +809,8 @@ public final class MediaController {
          */
         public void fastForward() {
             try {
-                mSessionBinder.fastForward(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.fastForward(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling fastForward.", e);
             }
         }
@@ -888,8 +820,8 @@ public final class MediaController {
          */
         public void skipToNext() {
             try {
-                mSessionBinder.next(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.next(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling next.", e);
             }
         }
@@ -900,8 +832,8 @@ public final class MediaController {
          */
         public void rewind() {
             try {
-                mSessionBinder.rewind(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.rewind(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling rewind.", e);
             }
         }
@@ -911,8 +843,8 @@ public final class MediaController {
          */
         public void skipToPrevious() {
             try {
-                mSessionBinder.previous(mContext.getOpPackageName(), mCbStub);
-            } catch (RemoteException e) {
+                mSessionBinder.previous(mContext.getPackageName(), mCbStub);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling previous.", e);
             }
         }
@@ -926,8 +858,8 @@ public final class MediaController {
          */
         public void setRating(Rating rating) {
             try {
-                mSessionBinder.rate(mContext.getOpPackageName(), mCbStub, rating);
-            } catch (RemoteException e) {
+                mSessionBinder.rate(mContext.getPackageName(), mCbStub, rating);
+            } catch (RuntimeException e) {
                 Log.wtf(TAG, "Error calling rate.", e);
             }
         }
@@ -961,8 +893,8 @@ public final class MediaController {
                 throw new IllegalArgumentException("CustomAction cannot be null.");
             }
             try {
-                mSessionBinder.sendCustomAction(mContext.getOpPackageName(), mCbStub, action, args);
-            } catch (RemoteException e) {
+                mSessionBinder.sendCustomAction(mContext.getPackageName(), mCbStub, action, args);
+            } catch (RuntimeException e) {
                 Log.d(TAG, "Dead object in sendCustomAction.", e);
             }
         }
@@ -972,15 +904,15 @@ public final class MediaController {
      * Holds information about the current playback and how audio is handled for
      * this session.
      */
-    public static final class PlaybackInfo {
-        /**
-         * The session uses remote playback.
-         */
-        public static final int PLAYBACK_TYPE_REMOTE = 2;
+    public static final class PlaybackInfo implements Parcelable {
         /**
          * The session uses local playback.
          */
         public static final int PLAYBACK_TYPE_LOCAL = 1;
+        /**
+         * The session uses remote playback.
+         */
+        public static final int PLAYBACK_TYPE_REMOTE = 2;
 
         private final int mVolumeType;
         private final int mVolumeControl;
@@ -991,12 +923,21 @@ public final class MediaController {
         /**
          * @hide
          */
-        public PlaybackInfo(int type, AudioAttributes attrs, int control, int max, int current) {
+        @SystemApi
+        public PlaybackInfo(int type, int control, int max, int current, AudioAttributes attrs) {
             mVolumeType = type;
-            mAudioAttrs = attrs;
             mVolumeControl = control;
             mMaxVolume = max;
             mCurrentVolume = current;
+            mAudioAttrs = attrs;
+        }
+
+        PlaybackInfo(Parcel in) {
+            mVolumeType = in.readInt();
+            mVolumeControl = in.readInt();
+            mMaxVolume = in.readInt();
+            mCurrentVolume = in.readInt();
+            mAudioAttrs = in.readParcelable(null);
         }
 
         /**
@@ -1010,18 +951,6 @@ public final class MediaController {
          */
         public int getPlaybackType() {
             return mVolumeType;
-        }
-
-        /**
-         * Get the audio attributes for this session. The attributes will affect
-         * volume handling for the session. When the volume type is
-         * {@link PlaybackInfo#PLAYBACK_TYPE_REMOTE} these may be ignored by the
-         * remote volume handler.
-         *
-         * @return The attributes for this session.
-         */
-        public AudioAttributes getAudioAttributes() {
-            return mAudioAttrs;
         }
 
         /**
@@ -1056,12 +985,58 @@ public final class MediaController {
         public int getCurrentVolume() {
             return mCurrentVolume;
         }
+
+        /**
+         * Get the audio attributes for this session. The attributes will affect
+         * volume handling for the session. When the volume type is
+         * {@link PlaybackInfo#PLAYBACK_TYPE_REMOTE} these may be ignored by the
+         * remote volume handler.
+         *
+         * @return The attributes for this session.
+         */
+        public AudioAttributes getAudioAttributes() {
+            return mAudioAttrs;
+        }
+
+        @Override
+        public String toString() {
+            return "volumeType=" + mVolumeType + ", volumeControl=" + mVolumeControl
+                    + ", maxVolume=" + mMaxVolume + ", currentVolume=" + mCurrentVolume
+                    + ", audioAttrs=" + mAudioAttrs;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeInt(mVolumeType);
+            dest.writeInt(mVolumeControl);
+            dest.writeInt(mMaxVolume);
+            dest.writeInt(mCurrentVolume);
+            dest.writeParcelable(mAudioAttrs, flags);
+        }
+
+        public static final Parcelable.Creator<PlaybackInfo> CREATOR =
+                new Parcelable.Creator<PlaybackInfo>() {
+            @Override
+            public PlaybackInfo createFromParcel(Parcel in) {
+                return new PlaybackInfo(in);
+            }
+
+            @Override
+            public PlaybackInfo[] newArray(int size) {
+                return new PlaybackInfo[size];
+            }
+        };
     }
 
-    private final static class CallbackStub extends ISessionControllerCallback.Stub {
+    private static final class CallbackStub extends ControllerCallbackLink.CallbackStub {
         private final WeakReference<MediaController> mController;
 
-        public CallbackStub(MediaController controller) {
+        CallbackStub(MediaController controller) {
             mController = new WeakReference<MediaController>(controller);
         }
 
@@ -1098,9 +1073,7 @@ public final class MediaController {
         }
 
         @Override
-        public void onQueueChanged(ParceledListSlice parceledQueue) {
-            List<MediaSession.QueueItem> queue = parceledQueue == null ? null : parceledQueue
-                    .getList();
+        public void onQueueChanged(List<QueueItem> queue) {
             MediaController controller = mController.get();
             if (controller != null) {
                 controller.postMessage(MSG_UPDATE_QUEUE, queue, null);
@@ -1124,23 +1097,20 @@ public final class MediaController {
         }
 
         @Override
-        public void onVolumeInfoChanged(ParcelableVolumeInfo pvi) {
+        public void onVolumeInfoChanged(PlaybackInfo info) {
             MediaController controller = mController.get();
             if (controller != null) {
-                PlaybackInfo info = new PlaybackInfo(pvi.volumeType, pvi.audioAttrs,
-                        pvi.controlType, pvi.maxVolume, pvi.currentVolume);
                 controller.postMessage(MSG_UPDATE_VOLUME, info, null);
             }
         }
-
     }
 
-    private final static class MessageHandler extends Handler {
+    private static final class MessageHandler extends Handler {
         private final MediaController.Callback mCallback;
         private boolean mRegistered = false;
 
-        public MessageHandler(Looper looper, MediaController.Callback cb) {
-            super(looper, null, true);
+        MessageHandler(Looper looper, MediaController.Callback cb) {
+            super(looper);
             mCallback = cb;
         }
 
@@ -1179,6 +1149,7 @@ public final class MediaController {
 
         public void post(int what, Object obj, Bundle data) {
             Message msg = obtainMessage(what, obj);
+            msg.setAsynchronous(true);
             msg.setData(data);
             msg.sendToTarget();
         }

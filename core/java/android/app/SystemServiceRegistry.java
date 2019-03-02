@@ -21,13 +21,15 @@ import android.accounts.IAccountManager;
 import android.app.ContextImpl.ServiceInitializationState;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.IDevicePolicyManager;
+import android.app.contentsuggestions.ContentSuggestionsManager;
+import android.app.contentsuggestions.IContentSuggestionsManager;
 import android.app.job.IJobScheduler;
 import android.app.job.JobScheduler;
+import android.app.prediction.AppPredictionManager;
 import android.app.role.RoleManager;
 import android.app.slice.SliceManager;
 import android.app.timedetector.TimeDetector;
 import android.app.timezone.RulesManager;
-import android.app.timezonedetector.TimeZoneDetector;
 import android.app.trust.TrustManager;
 import android.app.usage.IStorageStatsManager;
 import android.app.usage.IUsageStatsManager;
@@ -42,6 +44,8 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.IRestrictionsManager;
 import android.content.RestrictionsManager;
+import android.content.om.IOverlayManager;
+import android.content.om.OverlayManager;
 import android.content.pm.CrossProfileApps;
 import android.content.pm.ICrossProfileApps;
 import android.content.pm.IShortcutService;
@@ -49,16 +53,20 @@ import android.content.pm.LauncherApps;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutManager;
 import android.content.res.Resources;
+import android.content.rollback.IRollbackManager;
+import android.content.rollback.RollbackManager;
 import android.debug.AdbManager;
 import android.debug.IAdbManager;
 import android.hardware.ConsumerIrManager;
 import android.hardware.ISerialManager;
 import android.hardware.SensorManager;
+import android.hardware.SensorPrivacyManager;
 import android.hardware.SerialManager;
 import android.hardware.SystemSensorManager;
 import android.hardware.biometrics.BiometricManager;
 import android.hardware.biometrics.IBiometricService;
 import android.hardware.camera2.CameraManager;
+import android.hardware.display.ColorDisplayManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.face.FaceManager;
 import android.hardware.face.IFaceService;
@@ -91,11 +99,15 @@ import android.net.ConnectivityThread;
 import android.net.EthernetManager;
 import android.net.IConnectivityManager;
 import android.net.IEthernetManager;
+import android.net.IIpMemoryStore;
 import android.net.IIpSecService;
+import android.net.INetd;
 import android.net.INetworkPolicyManager;
+import android.net.IpMemoryStore;
 import android.net.IpSecManager;
 import android.net.NetworkPolicyManager;
 import android.net.NetworkScoreManager;
+import android.net.NetworkStack;
 import android.net.NetworkWatchlistManager;
 import android.net.lowpan.ILowpanManager;
 import android.net.lowpan.LowpanManager;
@@ -115,13 +127,17 @@ import android.net.wifi.rtt.WifiRttManager;
 import android.nfc.NfcManager;
 import android.os.BatteryManager;
 import android.os.BatteryStats;
+import android.os.BugreportManager;
 import android.os.Build;
 import android.os.DeviceIdleManager;
 import android.os.DropBoxManager;
+import android.os.DynamicAndroidManager;
 import android.os.HardwarePropertiesManager;
 import android.os.IBatteryPropertiesRegistrar;
 import android.os.IBinder;
 import android.os.IDeviceIdleController;
+import android.os.IDumpstate;
+import android.os.IDynamicAndroidService;
 import android.os.IHardwarePropertiesManager;
 import android.os.IPowerManager;
 import android.os.IRecoverySystem;
@@ -139,6 +155,7 @@ import android.os.UserManager;
 import android.os.Vibrator;
 import android.os.health.SystemHealthManager;
 import android.os.storage.StorageManager;
+import android.permission.PermissionControllerManager;
 import android.permission.PermissionManager;
 import android.print.IPrintManager;
 import android.print.PrintManager;
@@ -153,7 +170,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.telephony.euicc.EuiccCardManager;
 import android.telephony.euicc.EuiccManager;
-import android.telephony.rcs.RcsManager;
+import android.telephony.ims.RcsManager;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
@@ -164,9 +181,9 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.CaptioningManager;
 import android.view.autofill.AutofillManager;
 import android.view.autofill.IAutoFillManager;
+import android.view.contentcapture.ContentCaptureManager;
+import android.view.contentcapture.IContentCaptureManager;
 import android.view.inputmethod.InputMethodManager;
-import android.view.intelligence.IIntelligenceManager;
-import android.view.intelligence.IntelligenceManager;
 import android.view.textclassifier.TextClassificationManager;
 import android.view.textservice.TextServicesManager;
 
@@ -199,6 +216,7 @@ final class SystemServiceRegistry {
     private SystemServiceRegistry() { }
 
     static {
+        //CHECKSTYLE:OFF IndentationCheck
         registerService(Context.ACCESSIBILITY_SERVICE, AccessibilityManager.class,
                 new CachedServiceFetcher<AccessibilityManager>() {
             @Override
@@ -312,6 +330,32 @@ final class SystemServiceRegistry {
                 return new ConnectivityManager(context, service);
             }});
 
+        registerService(Context.NETD_SERVICE, INetd.class, new StaticServiceFetcher<INetd>() {
+            @Override
+            public INetd createService() throws ServiceNotFoundException {
+                return INetd.Stub.asInterface(
+                        ServiceManager.getServiceOrThrow(Context.NETD_SERVICE));
+            }
+        });
+
+        registerService(Context.NETWORK_STACK_SERVICE, NetworkStack.class,
+                new StaticServiceFetcher<NetworkStack>() {
+                    @Override
+                    public NetworkStack createService() {
+                        return new NetworkStack();
+                    }});
+
+        registerService(Context.IP_MEMORY_STORE_SERVICE, IpMemoryStore.class,
+                new CachedServiceFetcher<IpMemoryStore>() {
+                    @Override
+                    public IpMemoryStore createService(final ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        IBinder b = ServiceManager.getServiceOrThrow(
+                                Context.IP_MEMORY_STORE_SERVICE);
+                        IIpMemoryStore service = IIpMemoryStore.Stub.asInterface(b);
+                        return new IpMemoryStore(ctx, service);
+                    }});
+
         registerService(Context.IPSEC_SERVICE, IpSecManager.class,
                 new CachedServiceFetcher<IpSecManager>() {
             @Override
@@ -385,6 +429,14 @@ final class SystemServiceRegistry {
                 return new DisplayManager(ctx.getOuterContext());
             }});
 
+        registerService(Context.COLOR_DISPLAY_SERVICE, ColorDisplayManager.class,
+                new CachedServiceFetcher<ColorDisplayManager>() {
+                    @Override
+                    public ColorDisplayManager createService(ContextImpl ctx) {
+                        return new ColorDisplayManager();
+                    }
+                });
+
         // InputMethodManager has its own cache strategy based on display id to support apps that
         // still assume InputMethodManager is a per-process singleton and it's safe to directly
         // access internal fields via reflection.  Hence directly use ServiceFetcher instead of
@@ -397,10 +449,11 @@ final class SystemServiceRegistry {
             }});
 
         registerService(Context.TEXT_SERVICES_MANAGER_SERVICE, TextServicesManager.class,
-                new StaticServiceFetcher<TextServicesManager>() {
+                new CachedServiceFetcher<TextServicesManager>() {
             @Override
-            public TextServicesManager createService() {
-                return TextServicesManager.getInstance();
+            public TextServicesManager createService(ContextImpl ctx)
+                    throws ServiceNotFoundException {
+                return TextServicesManager.createInstance(ctx);
             }});
 
         registerService(Context.KEYGUARD_SERVICE, KeyguardManager.class,
@@ -492,6 +545,13 @@ final class SystemServiceRegistry {
                 return new SystemSensorManager(ctx.getOuterContext(),
                   ctx.mMainThread.getHandler().getLooper());
             }});
+
+        registerService(Context.SENSOR_PRIVACY_SERVICE, SensorPrivacyManager.class,
+                new CachedServiceFetcher<SensorPrivacyManager>() {
+                    @Override
+                    public SensorPrivacyManager createService(ContextImpl ctx) {
+                        return SensorPrivacyManager.getInstance(ctx);
+                    }});
 
         registerService(Context.STATS_MANAGER, StatsManager.class,
                 new CachedServiceFetcher<StatsManager>() {
@@ -1006,6 +1066,14 @@ final class SystemServiceRegistry {
                 return new ShortcutManager(ctx, IShortcutService.Stub.asInterface(b));
             }});
 
+        registerService(Context.OVERLAY_SERVICE, OverlayManager.class,
+                new CachedServiceFetcher<OverlayManager>() {
+            @Override
+            public OverlayManager createService(ContextImpl ctx) throws ServiceNotFoundException {
+                IBinder b = ServiceManager.getServiceOrThrow(Context.OVERLAY_SERVICE);
+                return new OverlayManager(ctx, IOverlayManager.Stub.asInterface(b));
+            }});
+
         registerService(Context.NETWORK_WATCHLIST_SERVICE, NetworkWatchlistManager.class,
                 new CachedServiceFetcher<NetworkWatchlistManager>() {
                     @Override
@@ -1040,6 +1108,16 @@ final class SystemServiceRegistry {
                 return new IncidentManager(ctx);
             }});
 
+        registerService(Context.BUGREPORT_SERVICE, BugreportManager.class,
+                new CachedServiceFetcher<BugreportManager>() {
+                    @Override
+                    public BugreportManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        IBinder b = ServiceManager.getServiceOrThrow(Context.BUGREPORT_SERVICE);
+                        return new BugreportManager(ctx.getOuterContext(),
+                                IDumpstate.Stub.asInterface(b));
+                    }});
+
         registerService(Context.AUTOFILL_MANAGER_SERVICE, AutofillManager.class,
                 new CachedServiceFetcher<AutofillManager>() {
             @Override
@@ -1050,16 +1128,44 @@ final class SystemServiceRegistry {
                 return new AutofillManager(ctx.getOuterContext(), service);
             }});
 
-        registerService(Context.INTELLIGENCE_MANAGER_SERVICE, IntelligenceManager.class,
-                new CachedServiceFetcher<IntelligenceManager>() {
+        registerService(Context.CONTENT_CAPTURE_MANAGER_SERVICE, ContentCaptureManager.class,
+                new CachedServiceFetcher<ContentCaptureManager>() {
             @Override
-            public IntelligenceManager createService(ContextImpl ctx)
+            public ContentCaptureManager createService(ContextImpl ctx)
                     throws ServiceNotFoundException {
                 // Get the services without throwing as this is an optional feature
-                IBinder b = ServiceManager.getService(Context.INTELLIGENCE_MANAGER_SERVICE);
-                IIntelligenceManager service = IIntelligenceManager.Stub.asInterface(b);
-                return new IntelligenceManager(ctx.getOuterContext(), service);
+                Context outerContext = ctx.getOuterContext();
+                if (outerContext.isContentCaptureSupported()) {
+                    IBinder b = ServiceManager
+                            .getService(Context.CONTENT_CAPTURE_MANAGER_SERVICE);
+                    IContentCaptureManager service = IContentCaptureManager.Stub.asInterface(b);
+                    return new ContentCaptureManager(outerContext, service);
+                }
+                return null;
             }});
+
+        registerService(Context.APP_PREDICTION_SERVICE, AppPredictionManager.class,
+                new CachedServiceFetcher<AppPredictionManager>() {
+            @Override
+            public AppPredictionManager createService(ContextImpl ctx)
+                    throws ServiceNotFoundException {
+                return new AppPredictionManager(ctx);
+            }
+        });
+
+        registerService(Context.CONTENT_SUGGESTIONS_SERVICE,
+                ContentSuggestionsManager.class,
+                new CachedServiceFetcher<ContentSuggestionsManager>() {
+                    @Override
+                    public ContentSuggestionsManager createService(ContextImpl ctx) {
+                        // No throw as this is an optional service
+                        IBinder b = ServiceManager.getService(
+                                Context.CONTENT_SUGGESTIONS_SERVICE);
+                        IContentSuggestionsManager service =
+                                IContentSuggestionsManager.Stub.asInterface(b);
+                        return new ContentSuggestionsManager(service);
+                    }
+                });
 
         registerService(Context.VR_SERVICE, VrManager.class, new CachedServiceFetcher<VrManager>() {
             @Override
@@ -1116,19 +1222,19 @@ final class SystemServiceRegistry {
                             throws ServiceNotFoundException {
                         return new TimeDetector();
                     }});
-        registerService(Context.TIME_ZONE_DETECTOR_SERVICE, TimeZoneDetector.class,
-                new CachedServiceFetcher<TimeZoneDetector>() {
-                    @Override
-                    public TimeZoneDetector createService(ContextImpl ctx)
-                            throws ServiceNotFoundException {
-                        return new TimeZoneDetector();
-                    }});
 
         registerService(Context.PERMISSION_SERVICE, PermissionManager.class,
                 new CachedServiceFetcher<PermissionManager>() {
                     @Override
                     public PermissionManager createService(ContextImpl ctx) {
                         return new PermissionManager(ctx.getOuterContext());
+                    }});
+
+        registerService(Context.PERMISSION_CONTROLLER_SERVICE, PermissionControllerManager.class,
+                new CachedServiceFetcher<PermissionControllerManager>() {
+                    @Override
+                    public PermissionControllerManager createService(ContextImpl ctx) {
+                        return new PermissionControllerManager(ctx.getOuterContext());
                     }});
 
         registerService(Context.ROLE_SERVICE, RoleManager.class,
@@ -1138,6 +1244,28 @@ final class SystemServiceRegistry {
                             throws ServiceNotFoundException {
                         return new RoleManager(ctx.getOuterContext());
                     }});
+
+        registerService(Context.ROLLBACK_SERVICE, RollbackManager.class,
+                new CachedServiceFetcher<RollbackManager>() {
+                    @Override
+                    public RollbackManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        IBinder b = ServiceManager.getServiceOrThrow(Context.ROLLBACK_SERVICE);
+                        return new RollbackManager(ctx.getOuterContext(),
+                                IRollbackManager.Stub.asInterface(b));
+                    }});
+
+        registerService(Context.DYNAMIC_ANDROID_SERVICE, DynamicAndroidManager.class,
+                new CachedServiceFetcher<DynamicAndroidManager>() {
+                    @Override
+                    public DynamicAndroidManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        IBinder b = ServiceManager.getServiceOrThrow(
+                                Context.DYNAMIC_ANDROID_SERVICE);
+                        return new DynamicAndroidManager(
+                                IDynamicAndroidService.Stub.asInterface(b));
+                    }});
+        //CHECKSTYLE:ON IndentationCheck
     }
 
     /**

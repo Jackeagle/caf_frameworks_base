@@ -36,6 +36,7 @@ import android.content.pm.IOnPermissionsChangeListener;
 import android.content.pm.IntentFilterVerificationInfo;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.KeySet;
+import android.content.pm.ModuleInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.ParceledListSlice;
 import android.content.pm.ProviderInfo;
@@ -272,11 +273,14 @@ interface IPackageManager {
 
     void clearCrossProfileIntentFilters(int sourceUserId, String ownerPackage);
 
+    String[] setDistractingPackageRestrictionsAsUser(in String[] packageNames, int restrictionFlags,
+            int userId);
+
     String[] setPackagesSuspendedAsUser(in String[] packageNames, boolean suspended,
             in PersistableBundle appExtras, in PersistableBundle launcherExtras,
             in SuspendDialogInfo dialogInfo, String callingPackage, int userId);
 
-    boolean canSuspendPackageForUser(String packageName, int userId);
+    String[] getUnsuspendablePackagesForUser(in String[] packageNames, int userId);
 
     boolean isPackageSuspendedForUser(String packageName, int userId);
 
@@ -536,6 +540,11 @@ interface IPackageManager {
             String targetCompilerFilter, boolean force);
 
     /**
+    * Ask the package manager to compile layouts in the given package.
+    */
+    boolean compileLayouts(String packageName);
+
+    /**
      * Ask the package manager to dump profiles associated with a package.
      */
     void dumpProfiles(String packageName);
@@ -675,5 +684,19 @@ interface IPackageManager {
 
     String getSystemTextClassifierPackageName();
 
+    String getWellbeingPackageName();
+
+    String getAppPredictionServicePackageName();
+
+    String getContentCaptureServicePackageName();
+
+    String getIncidentReportApproverPackageName();
+
     boolean isPackageStateProtected(String packageName, int userId);
+
+    void sendDeviceCustomizationReadyBroadcast();
+
+    List<ModuleInfo> getInstalledModules(int flags);
+
+    ModuleInfo getModuleInfo(String packageName, int flags);
 }

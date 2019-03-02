@@ -24,7 +24,7 @@ import android.text.TextUtils;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.systemui.statusbar.notification.NotificationData;
+import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,9 +52,9 @@ public class NotificationUiAdjustment {
     }
 
     public static NotificationUiAdjustment extractFromNotificationEntry(
-            NotificationData.Entry entry) {
+            NotificationEntry entry) {
         return new NotificationUiAdjustment(
-                entry.key, entry.systemGeneratedSmartActions, entry.smartReplies);
+                entry.key, entry.systemGeneratedSmartActions, entry.systemGeneratedSmartReplies);
     }
 
     public static boolean needReinflate(

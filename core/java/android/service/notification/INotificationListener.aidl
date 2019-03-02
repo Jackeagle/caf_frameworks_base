@@ -16,6 +16,7 @@
 
 package android.service.notification;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
 import android.content.pm.ParceledListSlice;
@@ -32,6 +33,7 @@ oneway interface INotificationListener
     void onListenerConnected(in NotificationRankingUpdate update);
     void onNotificationPosted(in IStatusBarNotificationHolder notificationHolder,
             in NotificationRankingUpdate update);
+    void onStatusBarIconsBehaviorChanged(boolean hideSilentStatusIcons);
     // stats only for assistant
     void onNotificationRemoved(in IStatusBarNotificationHolder notificationHolder,
             in NotificationRankingUpdate update, in NotificationStats stats, int reason);
@@ -47,4 +49,8 @@ oneway interface INotificationListener
     void onNotificationEnqueuedWithChannel(in IStatusBarNotificationHolder notificationHolder, in NotificationChannel channel);
     void onNotificationSnoozedUntilContext(in IStatusBarNotificationHolder notificationHolder, String snoozeCriterionId);
     void onNotificationsSeen(in List<String> keys);
+    void onNotificationExpansionChanged(String key, boolean userAction, boolean expanded);
+    void onNotificationDirectReply(String key);
+    void onSuggestedReplySent(String key, in CharSequence reply, int source);
+    void onActionClicked(String key, in Notification.Action action, int source);
 }

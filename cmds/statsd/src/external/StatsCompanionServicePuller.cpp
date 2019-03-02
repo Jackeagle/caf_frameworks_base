@@ -55,11 +55,15 @@ bool StatsCompanionServicePuller::PullInternal(vector<shared_ptr<LogEvent> >* da
         Status status = statsCompanionServiceCopy->pullData(mTagId, &returned_value);
         if (!status.isOk()) {
             ALOGW("StatsCompanionServicePuller::pull failed for %d", mTagId);
+            StatsdStats::getInstance().noteStatsCompanionPullFailed(mTagId);
+            if (status.exceptionCode() == Status::Exception::EX_TRANSACTION_FAILED) {
+                StatsdStats::getInstance().noteStatsCompanionPullBinderTransactionFailed(mTagId);
+            }
             return false;
         }
         data->clear();
         for (const StatsLogEventWrapper& it : returned_value) {
-            data->push_back(make_shared<LogEvent>(it));
+            LogEvent::createLogEvents(it, *data);
         }
         VLOG("StatsCompanionServicePuller::pull succeeded for %d", mTagId);
         return true;

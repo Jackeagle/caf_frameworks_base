@@ -59,7 +59,6 @@ final class HfpClientProfile implements LocalBluetoothProfile {
 
         @Override
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            Log.d(TAG, "Bluetooth service connected");
             mService = (BluetoothHeadsetClient) proxy;
             // We just bound to the service, so refresh the UI for any connected HFP devices.
             List<BluetoothDevice> deviceList = mService.getConnectedDevices();
@@ -80,7 +79,6 @@ final class HfpClientProfile implements LocalBluetoothProfile {
 
         @Override
         public void onServiceDisconnected(int profile) {
-            Log.d(TAG, "Bluetooth service disconnected");
             mIsProfileReady=false;
         }
     }
@@ -213,7 +211,7 @@ final class HfpClientProfile implements LocalBluetoothProfile {
 
     @Override
     public int getDrawableResource(BluetoothClass btClass) {
-        return R.drawable.ic_bt_headset_hfp;
+        return com.android.internal.R.drawable.ic_bt_headset_hfp;
     }
 
     protected void finalize() {

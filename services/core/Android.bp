@@ -7,20 +7,18 @@ java_library_static {
             "frameworks/native/aidl/binder",
             "frameworks/native/cmds/dumpstate/binder",
             "system/core/storaged/binder",
-            "system/netd/server/binder",
             "system/vold/binder",
+            "system/gsid/aidl",
         ],
     },
     srcs: [
         "java/**/*.java",
         ":dumpstate_aidl",
         ":idmap2_aidl",
-        ":netd_aidl",
-        ":netd_metrics_aidl",
         ":installd_aidl",
         ":storaged_aidl",
         ":vold_aidl",
-        ":mediaupdateservice_aidl",
+        ":gsiservice_aidl",
         "java/com/android/server/EventLogTags.logtags",
         "java/com/android/server/am/EventLogTags.logtags",
     ],
@@ -30,6 +28,10 @@ java_library_static {
         "android.hardware.light-V2.0-java",
         "android.hardware.power-V1.0-java",
         "android.hardware.tv.cec-V1.0-java",
+    ],
+
+    required: [
+        "gps_debug.conf",
     ],
 
     static_libs: [
@@ -47,8 +49,9 @@ java_library_static {
         "android.hardware.vibrator-V1.0-java",
         "android.hardware.configstore-V1.0-java",
         "android.hardware.contexthub-V1.0-java",
-        "android.hidl.manager-V1.0-java",
+        "android.hidl.manager-V1.2-java",
         "netd_aidl_interface-java",
+        "netd_event_listener_interface-java",
     ],
 }
 
@@ -68,4 +71,10 @@ java_genrule {
 java_library {
     name: "services.core",
     static_libs: ["services.core.priorityboosted"],
+}
+
+
+prebuilt_etc {
+    name: "gps_debug.conf",
+    src: "java/com/android/server/location/gps_debug.conf",
 }

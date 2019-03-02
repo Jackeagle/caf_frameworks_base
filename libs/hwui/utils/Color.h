@@ -17,6 +17,7 @@
 #define COLOR_H
 
 #include <math.h>
+#include <cutils/compiler.h>
 #include <system/graphics.h>
 #include <ui/PixelFormat.h>
 
@@ -81,17 +82,6 @@ static constexpr float OECF_sRGB(float linear) {
     return linear <= 0.0031308f ? linear * 12.92f : (powf(linear, 1.0f / 2.4f) * 1.055f) - 0.055f;
 }
 
-// Opto-electronic conversion function for the sRGB color space
-// Takes a linear sRGB value and converts it to a gamma-encoded sRGB value
-// This function returns the input unmodified if linear blending is not enabled
-static constexpr float OECF(float linear) {
-#ifdef ANDROID_ENABLE_LINEAR_BLENDING
-    return OECF_sRGB(linear);
-#else
-    return linear;
-#endif
-}
-
 // Electro-optical conversion function for the sRGB color space
 // Takes a gamma-encoded sRGB value and converts it to a linear sRGB value
 static constexpr float EOCF_sRGB(float srgb) {
@@ -99,25 +89,10 @@ static constexpr float EOCF_sRGB(float srgb) {
     return srgb <= 0.04045f ? srgb / 12.92f : powf((srgb + 0.055f) / 1.055f, 2.4f);
 }
 
-// Electro-optical conversion function for the sRGB color space
-// Takes a gamma-encoded sRGB value and converts it to a linear sRGB value
-// This function returns the input unmodified if linear blending is not enabled
-static constexpr float EOCF(float srgb) {
-#ifdef ANDROID_ENABLE_LINEAR_BLENDING
-    return EOCF_sRGB(srgb);
-#else
-    return srgb;
-#endif
-}
-
-// Returns whether the specified color space's transfer function can be
-// approximated with the native sRGB transfer function. This method
-// returns true for sRGB, gamma 2.2 and Display P3 for instance
-bool transferFunctionCloseToSRGB(const SkColorSpace* colorSpace);
-
 android::PixelFormat ColorTypeToPixelFormat(SkColorType colorType);
+ANDROID_API SkColorType PixelFormatToColorType(android::PixelFormat format);
 
-sk_sp<SkColorSpace> DataSpaceToColorSpace(android_dataspace dataspace);
+ANDROID_API sk_sp<SkColorSpace> DataSpaceToColorSpace(android_dataspace dataspace);
 
 struct Lab {
     float L;

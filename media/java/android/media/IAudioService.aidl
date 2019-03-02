@@ -151,9 +151,10 @@ interface IAudioService {
     void setWiredDeviceConnectionState(int type, int state, String address, String name,
             String caller);
 
-    int setBluetoothA2dpDeviceConnectionState(in BluetoothDevice device, int state, int profile);
-
     void handleBluetoothA2dpDeviceConfigChange(in BluetoothDevice device);
+
+    int handleBluetoothA2dpActiveDeviceChange(in BluetoothDevice device,
+            int state, int profile, boolean suppressNoisyIntent, int a2dpVolume);
 
     AudioRoutesInfo startWatchingRoutes(in IAudioRoutesObserver observer);
 
@@ -222,6 +223,11 @@ interface IAudioService {
     oneway void unregisterAudioServerStateDispatcher(IAudioServerStateDispatcher asd);
 
     boolean isAudioServerRunning();
+
+    int setUidDeviceAffinity(in IAudioPolicyCallback pcb, in int uid, in int[] deviceTypes,
+             in String[] deviceAddresses);
+
+    int removeUidDeviceAffinity(in IAudioPolicyCallback pcb, in int uid);
 
     // WARNING: read warning at top of file, new methods that need to be used by native
     // code via IAudioManager.h need to be added to the top section.

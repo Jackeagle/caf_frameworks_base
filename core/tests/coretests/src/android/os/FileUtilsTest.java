@@ -51,8 +51,9 @@ import static org.junit.Assert.fail;
 import android.content.Context;
 import android.os.FileUtils.MemoryPipe;
 import android.provider.DocumentsContract.Document;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.runner.AndroidJUnit4;
 
 import libcore.io.Streams;
 
@@ -514,6 +515,28 @@ public class FileUtilsTest {
                 MODE_WRITE_ONLY | MODE_CREATE | MODE_TRUNCATE);
         assertTranslate("wa", O_WRONLY | O_CREAT | O_APPEND,
                 MODE_WRITE_ONLY | MODE_CREATE | MODE_APPEND);
+    }
+
+    @Test
+    public void testMalformedTransate_int() throws Exception {
+        try {
+            // The non-standard Linux access mode 3 should throw
+            // an IllegalArgumentException.
+            translateModePosixToPfd(O_RDWR | O_WRONLY);
+            fail();
+        } catch (IllegalArgumentException expected) {
+        }
+    }
+
+    @Test
+    public void testMalformedTransate_string() throws Exception {
+        try {
+            // The non-standard Linux access mode 3 should throw
+            // an IllegalArgumentException.
+            translateModePosixToString(O_RDWR | O_WRONLY);
+            fail();
+        } catch (IllegalArgumentException expected) {
+        }
     }
 
     @Test

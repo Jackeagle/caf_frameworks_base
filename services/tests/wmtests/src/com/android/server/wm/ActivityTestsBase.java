@@ -26,22 +26,23 @@ import static android.view.DisplayAdjustments.DEFAULT_DISPLAY_ADJUSTMENTS;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.any;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyBoolean;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyInt;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyString;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doCallRealMethod;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.server.wm.ActivityStack.REMOVE_TASK_MODE_DESTROYING;
 import static com.android.server.wm.ActivityStackSupervisor.ON_TOP;
-
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 
 import android.app.ActivityManagerInternal;
 import android.app.ActivityOptions;
 import android.app.IApplicationThread;
+import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -55,6 +56,7 @@ import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.Process;
 import android.os.UserHandle;
 import android.service.voice.IVoiceInteractionSession;
@@ -63,10 +65,12 @@ import android.view.Display;
 import android.view.DisplayInfo;
 
 import com.android.internal.app.IVoiceInteractor;
-import com.android.server.AppOpsService;
 import com.android.server.AttributeCache;
 import com.android.server.ServiceThread;
 import com.android.server.am.ActivityManagerService;
+import com.android.server.am.PendingIntentController;
+import com.android.server.appop.AppOpsService;
+import com.android.server.firewall.IntentFirewall;
 import com.android.server.uri.UriGrantsManagerInternal;
 
 import org.junit.After;
@@ -92,6 +96,7 @@ class ActivityTestsBase {
     final TestInjector mTestInjector = new TestInjector();
 
     ActivityTaskManagerService mService;
+    RootActivityContainer mRootActivityContainer;
     ActivityStackSupervisor mSupervisor;
 
     // Default package name
@@ -108,35 +113,19 @@ class ActivityTestsBase {
     @Before
     public void setUpBase() {
         mTestInjector.setUp();
+
+        mService = new TestActivityTaskManagerService(mContext);
+        mSupervisor = mService.mStackSupervisor;
+        mRootActivityContainer = mService.mRootActivityContainer;
     }
 
     @After
     public void tearDownBase() {
         mTestInjector.tearDown();
-    }
-
-    ActivityTaskManagerService createActivityTaskManagerService() {
-        final TestActivityTaskManagerService atm =
-                spy(new TestActivityTaskManagerService(mContext));
-        setupActivityManagerService(atm);
-        return atm;
-    }
-
-    void setupActivityTaskManagerService() {
-        mService = createActivityTaskManagerService();
-        mSupervisor = mService.mStackSupervisor;
-    }
-
-    ActivityManagerService createActivityManagerService() {
-        final TestActivityTaskManagerService atm =
-                spy(new TestActivityTaskManagerService(mContext));
-        return setupActivityManagerService(atm);
-    }
-
-    ActivityManagerService setupActivityManagerService(TestActivityTaskManagerService atm) {
-        final TestActivityManagerService am = spy(new TestActivityManagerService(mTestInjector));
-        setupActivityManagerService(am, atm);
-        return am;
+        if (mService != null) {
+            mService.setWindowManager(null);
+            mService = null;
+        }
     }
 
     /** Creates a {@link TestActivityDisplay}. */
@@ -151,34 +140,15 @@ class ActivityTestsBase {
     /** Creates and adds a {@link TestActivityDisplay} to supervisor at the given position. */
     TestActivityDisplay addNewActivityDisplayAt(int position) {
         final TestActivityDisplay display = createNewActivityDisplay();
-        mSupervisor.addChild(display, position);
+        mRootActivityContainer.addChild(display, position);
         return display;
     }
 
-    void setupActivityManagerService(
-            TestActivityManagerService am, TestActivityTaskManagerService atm) {
-        atm.setActivityManagerService(am.mIntentFirewall, am.mPendingIntentController);
-        atm.mAmInternal = am.getLocalService();
-        am.mAtmInternal = atm.getLocalService();
-        // Makes sure the supervisor is using with the spy object.
-        atm.mStackSupervisor.setService(atm);
-        doReturn(mock(IPackageManager.class)).when(am).getPackageManager();
-        doReturn(mock(IPackageManager.class)).when(atm).getPackageManager();
-        PackageManagerInternal mockPackageManager = mock(PackageManagerInternal.class);
-        doReturn(mockPackageManager).when(am).getPackageManagerInternalLocked();
-        doReturn(null).when(mockPackageManager).getDefaultHomeActivity(anyInt());
-        doNothing().when(am).grantEphemeralAccessLocked(anyInt(), any(), anyInt(), anyInt());
-        am.mActivityTaskManager = atm;
-        am.mWindowManager = prepareMockWindowManager();
-        atm.setWindowManager(am.mWindowManager);
-
-        // Put a home stack on the default display, so that we'll always have something focusable.
-        final TestActivityStackSupervisor supervisor =
-                (TestActivityStackSupervisor) atm.mStackSupervisor;
-        supervisor.mDisplay.createStack(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, ON_TOP);
-        final TaskRecord task = new TaskBuilder(atm.mStackSupervisor)
-                .setStack(supervisor.getDefaultDisplay().getHomeStack()).build();
-        new ActivityBuilder(atm).setTask(task).build();
+    /** Creates and adds a {@link TestActivityDisplay} to supervisor at the given position. */
+    TestActivityDisplay addNewActivityDisplayAt(DisplayInfo info, int position) {
+        final TestActivityDisplay display = createNewActivityDisplay(info);
+        mRootActivityContainer.addChild(display, position);
+        return display;
     }
 
     /**
@@ -191,6 +161,7 @@ class ActivityTestsBase {
         private final ActivityTaskManagerService mService;
 
         private ComponentName mComponent;
+        private String mTargetActivity;
         private TaskRecord mTaskRecord;
         private int mUid;
         private boolean mCreateTask;
@@ -204,6 +175,11 @@ class ActivityTestsBase {
 
         ActivityBuilder setComponent(ComponentName component) {
             mComponent = component;
+            return this;
+        }
+
+        ActivityBuilder setTargetActivity(String targetActivity) {
+            mTargetActivity = targetActivity;
             return this;
         }
 
@@ -261,6 +237,10 @@ class ActivityTestsBase {
             aInfo.applicationInfo = new ApplicationInfo();
             aInfo.applicationInfo.packageName = mComponent.getPackageName();
             aInfo.applicationInfo.uid = mUid;
+            aInfo.packageName = mComponent.getPackageName();
+            if (mTargetActivity != null) {
+                aInfo.targetActivity = mTargetActivity;
+            }
             aInfo.flags |= mActivityFlags;
             aInfo.launchMode = mLaunchMode;
 
@@ -269,7 +249,15 @@ class ActivityTestsBase {
                     aInfo /*aInfo*/, new Configuration(), null /* resultTo */, null /* resultWho */,
                     0 /* reqCode */, false /*componentSpecified*/, false /* rootVoiceInteraction */,
                     mService.mStackSupervisor, null /* options */, null /* sourceRecord */);
-            activity.mWindowContainerController = mock(AppWindowContainerController.class);
+            spyOn(activity);
+            activity.mAppWindowToken = mock(AppWindowToken.class);
+            doCallRealMethod().when(activity.mAppWindowToken).getOrientationIgnoreVisibility();
+            doCallRealMethod().when(activity.mAppWindowToken)
+                    .setOrientation(anyInt(), any(), any());
+            doCallRealMethod().when(activity.mAppWindowToken).setOrientation(anyInt());
+            doNothing().when(activity).removeWindowContainer();
+            doReturn(mock(Configuration.class)).when(activity.mAppWindowToken)
+                    .getRequestedOverrideConfiguration();
 
             if (mTaskRecord != null) {
                 mTaskRecord.addActivityToTop(activity);
@@ -355,7 +343,7 @@ class ActivityTestsBase {
 
         TaskRecord build() {
             if (mStack == null && mCreateStack) {
-                mStack = mSupervisor.getDefaultDisplay().createStack(
+                mStack = mSupervisor.mRootActivityContainer.getDefaultDisplay().createStack(
                         WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, true /* onTop */);
             }
 
@@ -380,7 +368,8 @@ class ActivityTestsBase {
                 mStack.moveToFront("test");
                 mStack.addTask(task, true, "creating test task");
                 task.setStack(mStack);
-                task.setWindowContainerController();
+                task.setTask();
+                mStack.getTaskStack().addChild(task.mTask, 0);
             }
 
             task.touchActiveTime();
@@ -396,33 +385,89 @@ class ActivityTestsBase {
             }
 
             @Override
-            void createWindowContainer(boolean onTop, boolean showForAllUsers) {
-                setWindowContainerController();
+            void createTask(boolean onTop, boolean showForAllUsers) {
+                setTask();
             }
 
-            private void setWindowContainerController() {
-                setWindowContainerController(mock(TaskWindowContainerController.class));
+            void setTask() {
+                Task mockTask = mock(Task.class);
+                mockTask.mTaskRecord = this;
+                doCallRealMethod().when(mockTask).onDescendantOrientationChanged(any(), any());
+                setTask(mock(Task.class));
             }
         }
     }
 
-    protected static class TestActivityTaskManagerService extends ActivityTaskManagerService {
-        private LockTaskController mLockTaskController;
-        private ActivityTaskManagerInternal mInternal;
+    protected class TestActivityTaskManagerService extends ActivityTaskManagerService {
         private PackageManagerInternal mPmInternal;
 
         // ActivityStackSupervisor may be created more than once while setting up AMS and ATMS.
         // We keep the reference in order to prevent creating it twice.
-        private ActivityStackSupervisor mTestStackSupervisor;
+        ActivityStackSupervisor mTestStackSupervisor;
+
+        ActivityDisplay mDefaultDisplay;
 
         TestActivityTaskManagerService(Context context) {
             super(context);
+            spyOn(this);
+
+            mUgmInternal = mock(UriGrantsManagerInternal.class);
+
             mSupportsMultiWindow = true;
             mSupportsMultiDisplay = true;
             mSupportsSplitScreenMultiWindow = true;
             mSupportsFreeformWindowManagement = true;
             mSupportsPictureInPicture = true;
-            mUgmInternal = mock(UriGrantsManagerInternal.class);
+
+            final TestActivityManagerService am =
+                    new TestActivityManagerService(mTestInjector, this);
+
+            spyOn(getLifecycleManager());
+            spyOn(getLockTaskController());
+            doReturn(mock(IPackageManager.class)).when(this).getPackageManager();
+            doReturn(mock(DevicePolicyManager.class)).when(this).getDevicePolicyManager();
+            // allow background activity starts by default
+            doReturn(true).when(this).isBackgroundActivityStartsEnabled();
+            doNothing().when(this).updateCpuStats();
+        }
+
+        void setup(IntentFirewall intentFirewall, PendingIntentController intentController,
+                ActivityManagerInternal amInternal, WindowManagerService wm, Looper looper) {
+            mAmInternal = amInternal;
+            initialize(intentFirewall, intentController, looper);
+            initRootActivityContainerMocks(wm);
+            setWindowManager(wm);
+            createDefaultDisplay();
+        }
+
+        void initRootActivityContainerMocks(WindowManagerService wm) {
+            spyOn(mRootActivityContainer);
+            mRootActivityContainer.setWindowContainer(mock(RootWindowContainer.class));
+            mRootActivityContainer.mWindowManager = wm;
+            mRootActivityContainer.mDisplayManager =
+                    (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
+            doNothing().when(mRootActivityContainer).setWindowManager(any());
+            // Invoked during {@link ActivityStack} creation.
+            doNothing().when(mRootActivityContainer).updateUIDsPresentOnDisplay();
+            // Always keep things awake.
+            doReturn(true).when(mRootActivityContainer).hasAwakeDisplay();
+            // Called when moving activity to pinned stack.
+            doNothing().when(mRootActivityContainer).ensureActivitiesVisible(any(), anyInt(),
+                    anyBoolean());
+        }
+
+        void createDefaultDisplay() {
+            // Create a default display and put a home stack on it so that we'll always have
+            // something focusable.
+            mDefaultDisplay = TestActivityDisplay.create(mStackSupervisor, DEFAULT_DISPLAY);
+            spyOn(mDefaultDisplay);
+            mRootActivityContainer.addChild(mDefaultDisplay, ActivityDisplay.POSITION_TOP);
+            mDefaultDisplay.createStack(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, ON_TOP);
+            final TaskRecord task = new TaskBuilder(mStackSupervisor)
+                    .setStack(mDefaultDisplay.getHomeStack()).build();
+            new ActivityBuilder(this).setTask(task).build();
+
+            doReturn(mDefaultDisplay).when(mRootActivityContainer).getDefaultDisplay();
         }
 
         @Override
@@ -431,52 +476,23 @@ class ActivityTestsBase {
         }
 
         @Override
-        public LockTaskController getLockTaskController() {
-            if (mLockTaskController == null) {
-                mLockTaskController = spy(super.getLockTaskController());
-            }
-
-            return mLockTaskController;
+        void updateCpuStats() {
         }
 
         @Override
-        void updateUsageStats(ActivityRecord component, boolean resumed) {
+        void updateBatteryStats(ActivityRecord component, boolean resumed) {
         }
 
         @Override
-        protected final ActivityStackSupervisor createStackSupervisor() {
+        void updateActivityUsageStats(ActivityRecord activity, int event) {
+        }
+
+        @Override
+        protected ActivityStackSupervisor createStackSupervisor() {
             if (mTestStackSupervisor == null) {
-                final ActivityStackSupervisor supervisor = spy(createTestSupervisor());
-                final KeyguardController keyguardController = mock(KeyguardController.class);
-
-                // Invoked during {@link ActivityStack} creation.
-                doNothing().when(supervisor).updateUIDsPresentOnDisplay();
-                // Always keep things awake.
-                doReturn(true).when(supervisor).hasAwakeDisplay();
-                // Called when moving activity to pinned stack.
-                doNothing().when(supervisor).ensureActivitiesVisibleLocked(any(), anyInt(),
-                        anyBoolean());
-                // Do not schedule idle timeouts
-                doNothing().when(supervisor).scheduleIdleTimeoutLocked(any());
-                // unit test version does not handle launch wake lock
-                doNothing().when(supervisor).acquireLaunchWakelock();
-                doReturn(keyguardController).when(supervisor).getKeyguardController();
-
-                supervisor.initialize();
-                mTestStackSupervisor = supervisor;
+                mTestStackSupervisor = new TestActivityStackSupervisor(this, mH.getLooper());
             }
             return mTestStackSupervisor;
-        }
-
-        protected ActivityStackSupervisor createTestSupervisor() {
-            return new TestActivityStackSupervisor(this, mH.getLooper());
-        }
-
-        ActivityTaskManagerInternal getLocalService() {
-            if (mInternal == null) {
-                mInternal = new ActivityTaskManagerService.LocalService();
-            }
-            return mInternal;
         }
 
         @Override
@@ -525,24 +541,31 @@ class ActivityTestsBase {
         }
     }
 
+    // TODO: Replace this with a mock object since we are no longer in AMS package.
     /**
      * An {@link ActivityManagerService} subclass which provides a test
      * {@link ActivityStackSupervisor}.
      */
-    static class TestActivityManagerService extends ActivityManagerService {
+    class TestActivityManagerService extends ActivityManagerService {
 
-        private ActivityManagerInternal mInternal;
-
-        TestActivityManagerService(TestInjector testInjector) {
+        TestActivityManagerService(TestInjector testInjector, TestActivityTaskManagerService atm) {
             super(testInjector, testInjector.mHandlerThread);
-            mUgmInternal = mock(UriGrantsManagerInternal.class);
-        }
+            spyOn(this);
 
-        ActivityManagerInternal getLocalService() {
-            if (mInternal == null) {
-                mInternal = new LocalService();
-            }
-            return mInternal;
+            mWindowManager = prepareMockWindowManager();
+            mUgmInternal = mock(UriGrantsManagerInternal.class);
+
+            atm.setup(mIntentFirewall, mPendingIntentController, new LocalService(), mWindowManager,
+                    testInjector.mHandlerThread.getLooper());
+
+            mActivityTaskManager = atm;
+            mAtmInternal = atm.mInternal;
+
+            doReturn(mock(IPackageManager.class)).when(this).getPackageManager();
+            PackageManagerInternal mockPackageManager = mock(PackageManagerInternal.class);
+            doReturn(mockPackageManager).when(this).getPackageManagerInternalLocked();
+            doReturn(null).when(mockPackageManager).getDefaultHomeActivity(anyInt());
+            doNothing().when(this).grantEphemeralAccessLocked(anyInt(), any(), anyInt(), anyInt());
         }
     }
 
@@ -550,34 +573,29 @@ class ActivityTestsBase {
      * An {@link ActivityStackSupervisor} which stubs out certain methods that depend on
      * setup not available in the test environment. Also specifies an injector for
      */
-    protected static class TestActivityStackSupervisor extends ActivityStackSupervisor {
-        private ActivityDisplay mDisplay;
+    protected class TestActivityStackSupervisor extends ActivityStackSupervisor {
         private KeyguardController mKeyguardController;
 
-        public TestActivityStackSupervisor(ActivityTaskManagerService service, Looper looper) {
+        TestActivityStackSupervisor(ActivityTaskManagerService service, Looper looper) {
             super(service, looper);
-            mDisplayManager =
-                    (DisplayManager) mService.mContext.getSystemService(Context.DISPLAY_SERVICE);
+            spyOn(this);
             mWindowManager = prepareMockWindowManager();
             mKeyguardController = mock(KeyguardController.class);
-            setWindowContainerController(mock(RootWindowContainerController.class));
-        }
 
-        @Override
-        public void initialize() {
-            super.initialize();
-            mDisplay = spy(TestActivityDisplay.create(this, DEFAULT_DISPLAY));
-            addChild(mDisplay, ActivityDisplay.POSITION_TOP);
+            // Do not schedule idle timeouts
+            doNothing().when(this).scheduleIdleTimeoutLocked(any());
+            // unit test version does not handle launch wake lock
+            doNothing().when(this).acquireLaunchWakelock();
+            doReturn(mKeyguardController).when(this).getKeyguardController();
+
+            mLaunchingActivity = mock(PowerManager.WakeLock.class);
+
+            initialize();
         }
 
         @Override
         public KeyguardController getKeyguardController() {
             return mKeyguardController;
-        }
-
-        @Override
-        ActivityDisplay getDefaultDisplay() {
-            return mDisplay;
         }
 
         @Override
@@ -597,7 +615,7 @@ class ActivityTestsBase {
                 DisplayInfo info) {
             if (displayId == DEFAULT_DISPLAY) {
                 return new TestActivityDisplay(supervisor,
-                        supervisor.mDisplayManager.getDisplay(displayId));
+                        supervisor.mRootActivityContainer.mDisplayManager.getDisplay(displayId));
             }
             final Display display = new Display(DisplayManagerGlobal.getInstance(), displayId,
                     info, DEFAULT_DISPLAY_ADJUSTMENTS);
@@ -605,7 +623,7 @@ class ActivityTestsBase {
         }
 
         TestActivityDisplay(ActivityStackSupervisor supervisor, Display display) {
-            super(supervisor, display);
+            super(supervisor.mService.mRootActivityContainer, display);
             // Normally this comes from display-properties as exposed by WM. Without that, just
             // hard-code to FULLSCREEN for tests.
             setWindowingMode(WINDOWING_MODE_FULLSCREEN);
@@ -614,16 +632,16 @@ class ActivityTestsBase {
 
         @SuppressWarnings("TypeParameterUnusedInFormals")
         @Override
-        <T extends ActivityStack> T createStackUnchecked(int windowingMode, int activityType,
+        ActivityStack createStackUnchecked(int windowingMode, int activityType,
                 int stackId, boolean onTop) {
-            return new StackBuilder(mSupervisor).setDisplay(this)
+            return new StackBuilder(mSupervisor.mRootActivityContainer).setDisplay(this)
                     .setWindowingMode(windowingMode).setActivityType(activityType)
                     .setStackId(stackId).setOnTop(onTop).setCreateActivity(false).build();
         }
 
         @Override
-        protected DisplayWindowController createWindowContainerController() {
-            return mock(DisplayWindowController.class);
+        protected DisplayContent createDisplayContent() {
+            return WindowTestUtils.createTestDisplayContent();
         }
 
         void removeAllTasks() {
@@ -636,8 +654,15 @@ class ActivityTestsBase {
         }
     }
 
+    private static WindowManagerService sMockWindowManagerService;
+
     private static WindowManagerService prepareMockWindowManager() {
+        if (sMockWindowManagerService != null) {
+            return sMockWindowManagerService;
+        }
+
         final WindowManagerService service = mock(WindowManagerService.class);
+        service.mRoot = mock(RootWindowContainer.class);
 
         doAnswer((InvocationOnMock invocationOnMock) -> {
             final Runnable runnable = invocationOnMock.<Runnable>getArgument(0);
@@ -647,6 +672,7 @@ class ActivityTestsBase {
             return null;
         }).when(service).inSurfaceTransaction(any());
 
+        sMockWindowManagerService = service;
         return service;
     }
 
@@ -655,10 +681,9 @@ class ActivityTestsBase {
      * method is called. Note that its functionality depends on the implementations of the
      * construction arguments.
      */
-    protected static class TestActivityStack<T extends StackWindowController>
-            extends ActivityStack<T> {
+    protected static class TestActivityStack
+            extends ActivityStack {
         private int mOnActivityRemovedFromStackCount = 0;
-        private T mContainerController;
 
         static final int IS_TRANSLUCENT_UNSET = 0;
         static final int IS_TRANSLUCENT_FALSE = 1;
@@ -698,20 +723,20 @@ class ActivityTestsBase {
         }
 
         @Override
-        protected T createStackWindowController(int displayId, boolean onTop, Rect outBounds) {
-            mContainerController = (T) WindowTestUtils.createMockStackWindowContainerController();
+        protected void createTaskStack(int displayId, boolean onTop, Rect outBounds) {
+            mTaskStack = WindowTestUtils.createMockTaskStack();
 
             // Primary pinned stacks require a non-empty out bounds to be set or else all tasks
             // will be moved to the full screen stack.
             if (getWindowingMode() == WINDOWING_MODE_SPLIT_SCREEN_PRIMARY) {
                 outBounds.set(0, 0, 100, 100);
             }
-            return mContainerController;
+
         }
 
         @Override
-        T getWindowContainerController() {
-            return mContainerController;
+        TaskStack getTaskStack() {
+            return mTaskStack;
         }
 
         void setIsTranslucent(boolean isTranslucent) {
@@ -756,8 +781,8 @@ class ActivityTestsBase {
         }
     }
 
-    protected static class StackBuilder {
-        private final ActivityStackSupervisor mSupervisor;
+    static class StackBuilder {
+        private final RootActivityContainer mRootActivityContainer;
         private ActivityDisplay mDisplay;
         private int mStackId = -1;
         private int mWindowingMode = WINDOWING_MODE_FULLSCREEN;
@@ -765,9 +790,9 @@ class ActivityTestsBase {
         private boolean mOnTop = true;
         private boolean mCreateActivity = true;
 
-        StackBuilder(ActivityStackSupervisor supervisor) {
-            mSupervisor = supervisor;
-            mDisplay = mSupervisor.getDefaultDisplay();
+        StackBuilder(RootActivityContainer root) {
+            mRootActivityContainer = root;
+            mDisplay = mRootActivityContainer.getDefaultDisplay();
         }
 
         StackBuilder setWindowingMode(int windowingMode) {
@@ -801,23 +826,24 @@ class ActivityTestsBase {
         }
 
         @SuppressWarnings("TypeParameterUnusedInFormals")
-        <T extends ActivityStack> T build() {
+        ActivityStack build() {
             final int stackId = mStackId >= 0 ? mStackId : mDisplay.getNextStackId();
             if (mWindowingMode == WINDOWING_MODE_PINNED) {
-                return (T) new PinnedActivityStack(mDisplay, stackId, mSupervisor, mOnTop) {
+                return new ActivityStack(mDisplay, stackId, mRootActivityContainer.mStackSupervisor,
+                        mWindowingMode, ACTIVITY_TYPE_STANDARD, mOnTop) {
                     @Override
                     Rect getDefaultPictureInPictureBounds(float aspectRatio) {
                         return new Rect(50, 50, 100, 100);
                     }
 
                     @Override
-                    PinnedStackWindowController createStackWindowController(int displayId,
-                            boolean onTop, Rect outBounds) {
-                        return mock(PinnedStackWindowController.class);
+                    void createTaskStack(int displayId, boolean onTop, Rect outBounds) {
+                        mTaskStack = mock(TaskStack.class);
                     }
                 };
             } else {
-                return (T) new TestActivityStack(mDisplay, stackId, mSupervisor, mWindowingMode,
+                return new TestActivityStack(mDisplay, stackId,
+                        mRootActivityContainer.mStackSupervisor, mWindowingMode,
                         mActivityType, mOnTop, mCreateActivity);
             }
         }

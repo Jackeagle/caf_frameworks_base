@@ -58,7 +58,6 @@ public class MapProfile implements LocalBluetoothProfile {
             implements BluetoothProfile.ServiceListener {
 
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            Log.d(TAG, "Bluetooth service connected");
             mService = (BluetoothMap) proxy;
             // We just bound to the service, so refresh the UI for any connected MAP devices.
             List<BluetoothDevice> deviceList = mService.getConnectedDevices();
@@ -80,7 +79,6 @@ public class MapProfile implements LocalBluetoothProfile {
         }
 
         public void onServiceDisconnected(int profile) {
-            Log.d(TAG, "Bluetooth service disconnected");
             mProfileManager.callServiceDisconnectedListeners();
             mIsProfileReady=false;
         }
@@ -198,7 +196,7 @@ public class MapProfile implements LocalBluetoothProfile {
     }
 
     public int getDrawableResource(BluetoothClass btClass) {
-        return R.drawable.ic_bt_cellphone;
+        return com.android.internal.R.drawable.ic_phone;
     }
 
     protected void finalize() {

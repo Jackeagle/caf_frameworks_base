@@ -37,7 +37,7 @@ import android.util.Slog;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.GridLayout;
-import android.widget.RelativeLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.core.graphics.ColorUtils;
@@ -51,6 +51,7 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.google.android.collect.Sets;
 
 import java.util.Locale;
+import java.util.TimeZone;
 
 public class KeyguardStatusView extends GridLayout implements
         ConfigurationController.ConfigurationListener, View.OnLayoutChangeListener {
@@ -71,7 +72,6 @@ public class KeyguardStatusView extends GridLayout implements
 
     private ArraySet<View> mVisibleInDoze;
     private boolean mPulsing;
-    private boolean mWasPulsing;
     private float mDarkAmount = 0;
     private int mTextColor;
     private int mLastLayoutHeight;
@@ -82,6 +82,11 @@ public class KeyguardStatusView extends GridLayout implements
         @Override
         public void onTimeChanged() {
             refreshTime();
+        }
+
+        @Override
+        public void onTimeZoneChanged(TimeZone timeZone) {
+            updateTimeZone(timeZone);
         }
 
         @Override
@@ -135,6 +140,13 @@ public class KeyguardStatusView extends GridLayout implements
         onDensityOrFontScaleChanged();
     }
 
+    /**
+     * If we're presenting a custom clock of just the default one.
+     */
+    public boolean hasCustomClock() {
+        return mClockView.hasCustomClock();
+    }
+
     private void setEnableMarquee(boolean enabled) {
         if (DEBUG) Log.v(TAG, "Schedule setEnableMarquee: " + (enabled ? "Enable" : "Disable"));
         if (enabled) {
@@ -167,7 +179,7 @@ public class KeyguardStatusView extends GridLayout implements
             mLogoutView.setOnClickListener(this::onLogoutClicked);
         }
 
-        mClockView = findViewById(R.id.clock_view);
+        mClockView = findViewById(R.id.keyguard_clock_container);
         mClockView.setShowCurrentUserTime(true);
         if (KeyguardClockAccessibilityDelegate.isNeeded(mContext)) {
             mClockView.setAccessibilityDelegate(new KeyguardClockAccessibilityDelegate(mContext));
@@ -189,19 +201,15 @@ public class KeyguardStatusView extends GridLayout implements
         updateOwnerInfo();
         updateLogoutView();
         updateDark();
-
-        // Disable elegant text height because our fancy colon makes the ymin value huge for no
-        // reason.
-        mClockView.setElegantTextHeight(false);
     }
 
     /**
      * Moves clock, adjusting margins when slice content changes.
      */
     private void onSliceContentChanged() {
-        RelativeLayout.LayoutParams layoutParams =
-                (RelativeLayout.LayoutParams) mClockView.getLayoutParams();
-        layoutParams.bottomMargin = mPulsing ? mSmallClockPadding : 0;
+        LinearLayout.LayoutParams layoutParams =
+                (LinearLayout.LayoutParams) mClockView.getLayoutParams();
+        layoutParams.bottomMargin = mKeyguardSlice.hasHeader() ? mSmallClockPadding : 0;
         mClockView.setLayoutParams(layoutParams);
     }
 
@@ -211,16 +219,16 @@ public class KeyguardStatusView extends GridLayout implements
     @Override
     public void onLayoutChange(View view, int left, int top, int right, int bottom,
             int oldLeft, int oldTop, int oldRight, int oldBottom) {
-        int heightOffset = mPulsing || mWasPulsing ? 0 : getHeight() - mLastLayoutHeight;
+        boolean smallClock = mKeyguardSlice.hasHeader();
+        int heightOffset = smallClock ? 0 : getHeight() - mLastLayoutHeight;
         long duration = KeyguardSliceView.DEFAULT_ANIM_DURATION;
-        long delay = mPulsing || mWasPulsing ? 0 : duration / 4;
-        mWasPulsing = false;
+        long delay = smallClock ? 0 : duration / 4;
 
         boolean shouldAnimate = mKeyguardSlice.getLayoutTransition() != null
                 && mKeyguardSlice.getLayoutTransition().isRunning();
         if (view == mClockView) {
-            float clockScale = mPulsing ? mSmallClockScale : 1;
-            Paint.Style style = mPulsing ? Paint.Style.FILL_AND_STROKE : Paint.Style.FILL;
+            float clockScale = smallClock ? mSmallClockScale : 1;
+            Paint.Style style = smallClock ? Paint.Style.FILL_AND_STROKE : Paint.Style.FILL;
             mClockView.animate().cancel();
             if (shouldAnimate) {
                 mClockView.setY(oldTop + heightOffset);
@@ -280,6 +288,10 @@ public class KeyguardStatusView extends GridLayout implements
 
     private void refreshTime() {
         mClockView.refresh();
+    }
+
+    private void updateTimeZone(TimeZone timeZone) {
+        mClockView.onTimeZoneChanged(timeZone);
     }
 
     private void refreshFormat() {
@@ -421,15 +433,11 @@ public class KeyguardStatusView extends GridLayout implements
         }
     }
 
-    public void setPulsing(boolean pulsing, boolean animate) {
+    public void setPulsing(boolean pulsing) {
         if (mPulsing == pulsing) {
             return;
         }
-        if (mPulsing) {
-            mWasPulsing = true;
-        }
         mPulsing = pulsing;
-        mKeyguardSlice.setPulsing(pulsing, animate);
         updateDozeVisibleViews();
     }
 

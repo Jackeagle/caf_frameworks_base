@@ -21,29 +21,41 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.service.notification.NotificationListenerService;
+import android.service.notification.NotificationStats;
+import android.service.notification.StatusBarNotification;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
+
+import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.statusbar.NotificationVisibility;
-import com.android.systemui.Dependency;
 import com.android.systemui.UiOffloadThread;
 import com.android.systemui.statusbar.NotificationListener;
 import com.android.systemui.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.StatusBarStateController.StateListener;
-import com.android.systemui.statusbar.notification.NotificationData;
+import com.android.systemui.statusbar.notification.NotificationEntryListener;
 import com.android.systemui.statusbar.notification.NotificationEntryManager;
+import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.stack.ExpandableViewState;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
+import com.android.systemui.statusbar.policy.HeadsUpManager;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
 
 /**
  * Handles notification logging, in particular, logging which notifications are visible and which
  * are not.
  */
+@Singleton
 public class NotificationLogger implements StateListener {
     private static final String TAG = "NotificationLogger";
 
@@ -55,11 +67,11 @@ public class NotificationLogger implements StateListener {
             new ArraySet<>();
 
     // Dependencies:
-    private final NotificationListenerService mNotificationListener =
-            Dependency.get(NotificationListener.class);
-    private final UiOffloadThread mUiOffloadThread = Dependency.get(UiOffloadThread.class);
-    protected NotificationEntryManager mEntryManager
-            = Dependency.get(NotificationEntryManager.class);
+    private final NotificationListenerService mNotificationListener;
+    private final UiOffloadThread mUiOffloadThread;
+    private final NotificationEntryManager mEntryManager;
+    private HeadsUpManager mHeadsUpManager;
+    private final ExpansionStateLogger mExpansionStateLogger;
 
     protected Handler mHandler = new Handler();
     protected IStatusBarService mBarService;
@@ -109,14 +121,15 @@ public class NotificationLogger implements StateListener {
             //    notifications.
             // 3. Report newly visible and no-longer visible notifications.
             // 4. Keep currently visible notifications for next report.
-            ArrayList<NotificationData.Entry> activeNotifications = mEntryManager
+            ArrayList<NotificationEntry> activeNotifications = mEntryManager
                     .getNotificationData().getActiveNotifications();
             int N = activeNotifications.size();
             for (int i = 0; i < N; i++) {
-                NotificationData.Entry entry = activeNotifications.get(i);
+                NotificationEntry entry = activeNotifications.get(i);
                 String key = entry.notification.getKey();
-                boolean isVisible = mListContainer.isInVisibleLocation(entry.row);
-                NotificationVisibility visObj = NotificationVisibility.obtain(key, i, N, isVisible);
+                boolean isVisible = mListContainer.isInVisibleLocation(entry);
+                NotificationVisibility visObj = NotificationVisibility.obtain(key, i, N, isVisible,
+                        getNotificationLocation(entry));
                 boolean previouslyVisible = mCurrentlyVisibleNotifications.contains(visObj);
                 if (isVisible) {
                     // Build new set of visible notifications.
@@ -138,6 +151,9 @@ public class NotificationLogger implements StateListener {
             recycleAllVisibilityObjects(mCurrentlyVisibleNotifications);
             mCurrentlyVisibleNotifications.addAll(mTmpCurrentlyVisibleNotifications);
 
+            mExpansionStateLogger.onVisibilityChanged(
+                    mTmpCurrentlyVisibleNotifications, mTmpCurrentlyVisibleNotifications);
+
             recycleAllVisibilityObjects(mTmpNoLongerVisibleNotifications);
             mTmpCurrentlyVisibleNotifications.clear();
             mTmpNewlyVisibleNotifications.clear();
@@ -145,15 +161,84 @@ public class NotificationLogger implements StateListener {
         }
     };
 
-    public NotificationLogger() {
+    /**
+     * Returns the location of the notification referenced by the given {@link NotificationEntry}.
+     */
+    public static NotificationVisibility.NotificationLocation getNotificationLocation(
+            NotificationEntry entry) {
+        if (entry == null || entry.getRow() == null || entry.getRow().getViewState() == null) {
+            return NotificationVisibility.NotificationLocation.LOCATION_UNKNOWN;
+        }
+        return convertNotificationLocation(entry.getRow().getViewState().location);
+    }
+
+    private static NotificationVisibility.NotificationLocation convertNotificationLocation(
+            int location) {
+        switch (location) {
+            case ExpandableViewState.LOCATION_FIRST_HUN:
+                return NotificationVisibility.NotificationLocation.LOCATION_FIRST_HEADS_UP;
+            case ExpandableViewState.LOCATION_HIDDEN_TOP:
+                return NotificationVisibility.NotificationLocation.LOCATION_HIDDEN_TOP;
+            case ExpandableViewState.LOCATION_MAIN_AREA:
+                return NotificationVisibility.NotificationLocation.LOCATION_MAIN_AREA;
+            case ExpandableViewState.LOCATION_BOTTOM_STACK_PEEKING:
+                return NotificationVisibility.NotificationLocation.LOCATION_BOTTOM_STACK_PEEKING;
+            case ExpandableViewState.LOCATION_BOTTOM_STACK_HIDDEN:
+                return NotificationVisibility.NotificationLocation.LOCATION_BOTTOM_STACK_HIDDEN;
+            case ExpandableViewState.LOCATION_GONE:
+                return NotificationVisibility.NotificationLocation.LOCATION_GONE;
+            default:
+                return NotificationVisibility.NotificationLocation.LOCATION_UNKNOWN;
+        }
+    }
+
+    @Inject
+    public NotificationLogger(NotificationListener notificationListener,
+            UiOffloadThread uiOffloadThread,
+            NotificationEntryManager entryManager,
+            StatusBarStateController statusBarStateController,
+            ExpansionStateLogger expansionStateLogger) {
+        mNotificationListener = notificationListener;
+        mUiOffloadThread = uiOffloadThread;
+        mEntryManager = entryManager;
         mBarService = IStatusBarService.Stub.asInterface(
                 ServiceManager.getService(Context.STATUS_BAR_SERVICE));
+        mExpansionStateLogger = expansionStateLogger;
         // Not expected to be destroyed, don't need to unsubscribe
-        Dependency.get(StatusBarStateController.class).addListener(this);
+        statusBarStateController.addCallback(this);
+
+        entryManager.addNotificationEntryListener(new NotificationEntryListener() {
+            @Override
+            public void onEntryRemoved(
+                    NotificationEntry entry,
+                    NotificationVisibility visibility,
+                    boolean removedByUser) {
+                if (removedByUser && visibility != null) {
+                    logNotificationClear(entry.key, entry.notification, visibility);
+                }
+                mExpansionStateLogger.onEntryRemoved(entry.key);
+            }
+
+            @Override
+            public void onEntryReinflated(NotificationEntry entry) {
+                mExpansionStateLogger.onEntryReinflated(entry.key);
+            }
+
+            @Override
+            public void onInflationError(
+                    StatusBarNotification notification,
+                    Exception exception) {
+                logNotificationError(notification, exception);
+            }
+        });
     }
 
     public void setUpWithContainer(NotificationListContainer listContainer) {
         mListContainer = listContainer;
+    }
+
+    public void setHeadsUpManager(HeadsUpManager headsUpManager) {
+        mHeadsUpManager = headsUpManager;
     }
 
     public void stopNotificationLogging() {
@@ -182,6 +267,45 @@ public class NotificationLogger implements StateListener {
     private void setDozing(boolean dozing) {
         synchronized (mDozingLock) {
             mDozing = dozing;
+        }
+    }
+
+    private void logNotificationClear(String key, StatusBarNotification notification,
+            NotificationVisibility nv) {
+        final String pkg = notification.getPackageName();
+        final String tag = notification.getTag();
+        final int id = notification.getId();
+        final int userId = notification.getUserId();
+        try {
+            int dismissalSurface = NotificationStats.DISMISSAL_SHADE;
+            if (mHeadsUpManager.isAlerting(key)) {
+                dismissalSurface = NotificationStats.DISMISSAL_PEEK;
+            } else if (mListContainer.hasPulsingNotifications()) {
+                dismissalSurface = NotificationStats.DISMISSAL_AOD;
+            }
+            int dismissalSentiment = NotificationStats.DISMISS_SENTIMENT_NEUTRAL;
+            mBarService.onNotificationClear(pkg, tag, id, userId, notification.getKey(),
+                    dismissalSurface,
+                    dismissalSentiment, nv);
+        } catch (RemoteException ex) {
+            // system process is dead if we're here.
+        }
+    }
+
+    private void logNotificationError(
+            StatusBarNotification notification,
+            Exception exception) {
+        try {
+            mBarService.onNotificationError(
+                    notification.getPackageName(),
+                    notification.getTag(),
+                    notification.getId(),
+                    notification.getUid(),
+                    notification.getInitialPid(),
+                    exception.getMessage(),
+                    notification.getUserId());
+        } catch (RemoteException ex) {
+            // The end is nigh.
         }
     }
 
@@ -244,8 +368,8 @@ public class NotificationLogger implements StateListener {
         }
     }
 
-    private NotificationVisibility[] cloneVisibilitiesAsArr(Collection<NotificationVisibility> c) {
-
+    private static NotificationVisibility[] cloneVisibilitiesAsArr(
+            Collection<NotificationVisibility> c) {
         final NotificationVisibility[] array = new NotificationVisibility[c.size()];
         int i = 0;
         for(NotificationVisibility nv: c) {
@@ -273,9 +397,149 @@ public class NotificationLogger implements StateListener {
     }
 
     /**
+     * Called when the notification is expanded / collapsed.
+     */
+    public void onExpansionChanged(String key, boolean isUserAction, boolean isExpanded) {
+        NotificationVisibility.NotificationLocation location =
+                getNotificationLocation(mEntryManager.getNotificationData().get(key));
+        mExpansionStateLogger.onExpansionChanged(key, isUserAction, isExpanded, location);
+    }
+
+    /**
      * A listener that is notified when some child locations might have changed.
      */
     public interface OnChildLocationsChangedListener {
         void onChildLocationsChanged();
+    }
+
+    /**
+     * Logs the expansion state change when the notification is visible.
+     */
+    public static class ExpansionStateLogger {
+        /** Notification key -> state, should be accessed in UI offload thread only. */
+        private final Map<String, State> mExpansionStates = new ArrayMap<>();
+
+        /**
+         * Notification key -> last logged expansion state, should be accessed in UI thread only.
+         */
+        private final Map<String, Boolean> mLoggedExpansionState = new ArrayMap<>();
+        private final UiOffloadThread mUiOffloadThread;
+        @VisibleForTesting
+        IStatusBarService mBarService;
+
+        @Inject
+        public ExpansionStateLogger(UiOffloadThread uiOffloadThread) {
+            mUiOffloadThread = uiOffloadThread;
+            mBarService =
+                    IStatusBarService.Stub.asInterface(
+                            ServiceManager.getService(Context.STATUS_BAR_SERVICE));
+        }
+
+        @VisibleForTesting
+        void onExpansionChanged(String key, boolean isUserAction, boolean isExpanded,
+                NotificationVisibility.NotificationLocation location) {
+            State state = getState(key);
+            state.mIsUserAction = isUserAction;
+            state.mIsExpanded = isExpanded;
+            state.mLocation = location;
+            maybeNotifyOnNotificationExpansionChanged(key, state);
+        }
+
+        @VisibleForTesting
+        void onVisibilityChanged(
+                Collection<NotificationVisibility> newlyVisible,
+                Collection<NotificationVisibility> noLongerVisible) {
+            final NotificationVisibility[] newlyVisibleAr =
+                    cloneVisibilitiesAsArr(newlyVisible);
+            final NotificationVisibility[] noLongerVisibleAr =
+                    cloneVisibilitiesAsArr(noLongerVisible);
+
+            for (NotificationVisibility nv : newlyVisibleAr) {
+                State state = getState(nv.key);
+                state.mIsVisible = true;
+                state.mLocation = nv.location;
+                maybeNotifyOnNotificationExpansionChanged(nv.key, state);
+            }
+            for (NotificationVisibility nv : noLongerVisibleAr) {
+                State state = getState(nv.key);
+                state.mIsVisible = false;
+            }
+        }
+
+        @VisibleForTesting
+        void onEntryRemoved(String key) {
+            mExpansionStates.remove(key);
+            mLoggedExpansionState.remove(key);
+        }
+
+        @VisibleForTesting
+        void onEntryReinflated(String key) {
+            // When the notification is updated, we should consider the notification as not
+            // yet logged.
+            mLoggedExpansionState.remove(key);
+        }
+
+        private State getState(String key) {
+            State state = mExpansionStates.get(key);
+            if (state == null) {
+                state = new State();
+                mExpansionStates.put(key, state);
+            }
+            return state;
+        }
+
+        private void maybeNotifyOnNotificationExpansionChanged(final String key, State state) {
+            if (!state.isFullySet()) {
+                return;
+            }
+            if (!state.mIsVisible) {
+                return;
+            }
+            Boolean loggedExpansionState = mLoggedExpansionState.get(key);
+            // Consider notification is initially collapsed, so only expanded is logged in the
+            // first time.
+            if (loggedExpansionState == null && !state.mIsExpanded) {
+                return;
+            }
+            if (loggedExpansionState != null
+                    && state.mIsExpanded == loggedExpansionState) {
+                return;
+            }
+            mLoggedExpansionState.put(key, state.mIsExpanded);
+            final State stateToBeLogged = new State(state);
+            mUiOffloadThread.submit(() -> {
+                try {
+                    mBarService.onNotificationExpansionChanged(key, stateToBeLogged.mIsUserAction,
+                            stateToBeLogged.mIsExpanded, stateToBeLogged.mLocation.ordinal());
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Failed to call onNotificationExpansionChanged: ", e);
+                }
+            });
+        }
+
+        private static class State {
+            @Nullable
+            Boolean mIsUserAction;
+            @Nullable
+            Boolean mIsExpanded;
+            @Nullable
+            Boolean mIsVisible;
+            @Nullable
+            NotificationVisibility.NotificationLocation mLocation;
+
+            private State() {}
+
+            private State(State state) {
+                this.mIsUserAction = state.mIsUserAction;
+                this.mIsExpanded = state.mIsExpanded;
+                this.mIsVisible = state.mIsVisible;
+                this.mLocation = state.mLocation;
+            }
+
+            private boolean isFullySet() {
+                return mIsUserAction != null && mIsExpanded != null && mIsVisible != null
+                        && mLocation != null;
+            }
+        }
     }
 }

@@ -21,15 +21,20 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.Nullable;
 import android.app.IActivityTaskManager;
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.util.Slog;
+import android.view.Display;
 import android.view.IWindow;
+import android.view.InputWindowHandle;
+import android.view.SurfaceControl;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.input.InputManagerService;
-import android.view.InputWindowHandle;
 
 /**
  * Controller for task positioning by drag.
@@ -39,9 +44,14 @@ class TaskPositioningController {
     private final InputManagerService mInputManager;
     private final IActivityTaskManager mActivityManager;
     private final Handler mHandler;
+    private SurfaceControl mInputSurface;
+    private DisplayContent mPositioningDisplay;
 
     @GuardedBy("WindowManagerSerivce.mWindowMap")
     private @Nullable TaskPositioner mTaskPositioner;
+
+    private final Rect mTmpClipRect = new Rect();
+    private IBinder mTransferTouchFromToken;
 
     boolean isPositioningLocked() {
         return mTaskPositioner != null;
@@ -57,6 +67,45 @@ class TaskPositioningController {
         mInputManager = inputManager;
         mActivityManager = activityManager;
         mHandler = new Handler(looper);
+    }
+
+    void hideInputSurface(SurfaceControl.Transaction t, int displayId) {
+        if (mPositioningDisplay != null && mPositioningDisplay.getDisplayId() == displayId
+                && mInputSurface != null) {
+            t.hide(mInputSurface);
+        }
+    }
+
+    void showInputSurface(SurfaceControl.Transaction t, int displayId) {
+        if (mPositioningDisplay == null || mPositioningDisplay.getDisplayId() != displayId) {
+            return;
+        }
+        final DisplayContent dc = mService.mRoot.getDisplayContent(displayId);
+        if (mInputSurface == null) {
+            mInputSurface = mService.makeSurfaceBuilder(dc.getSession())
+                    .setContainerLayer(true)
+                    .setName("Drag and Drop Input Consumer").build();
+        }
+
+        final InputWindowHandle h = getDragWindowHandleLocked();
+        if (h == null) {
+            Slog.w(TAG_WM, "Drag is in progress but there is no "
+                    + "drag window handle.");
+            return;
+        }
+
+        t.show(mInputSurface);
+        t.setInputWindowInfo(mInputSurface, h);
+        t.setLayer(mInputSurface, Integer.MAX_VALUE);
+
+        final Display display = dc.getDisplay();
+        final Point p = new Point();
+        display.getRealSize(p);
+
+        mTmpClipRect.set(0, 0, p.x, p.y);
+        t.setWindowCrop(mInputSurface, mTmpClipRect);
+        t.transferTouchFocus(mTransferTouchFromToken, h.token);
+        mTransferTouchFromToken = null;
     }
 
     boolean startMovingTask(IWindow window, float startX, float startY) {
@@ -122,9 +171,9 @@ class TaskPositioningController {
             Slog.w(TAG_WM, "startPositioningLocked: Invalid display content " + win);
             return false;
         }
+        mPositioningDisplay = displayContent;
 
         mTaskPositioner = TaskPositioner.create(mService);
-        mTaskPositioner.register(displayContent);
 
         // We need to grab the touch focus so that the touch events during the
         // resizing/scrolling are not sent to the app. 'win' is the main window
@@ -135,14 +184,8 @@ class TaskPositioningController {
                 && displayContent.mCurrentFocus.mAppToken == win.mAppToken) {
             transferFocusFromWin = displayContent.mCurrentFocus;
         }
-        if (!mInputManager.transferTouchFocus(
-                transferFocusFromWin.mInputChannel, mTaskPositioner.mServerChannel)) {
-            Slog.e(TAG_WM, "startPositioningLocked: Unable to transfer touch focus");
-            mTaskPositioner.unregister();
-            mTaskPositioner = null;
-            displayContent.getInputMonitor().updateInputWindowsLw(true /*force*/);
-            return false;
-        }
+        mTransferTouchFromToken = transferFocusFromWin.mInputChannel.getToken();
+        mTaskPositioner.register(displayContent);
 
         mTaskPositioner.startDrag(win, resize, preserveOrientation, startX, startY);
         return true;
@@ -153,11 +196,21 @@ class TaskPositioningController {
             if (DEBUG_TASK_POSITIONING) Slog.d(TAG_WM, "finishPositioning");
 
             synchronized (mService.mGlobalLock) {
-                if (mTaskPositioner != null) {
-                    mTaskPositioner.unregister();
-                    mTaskPositioner = null;
-                }
+                cleanUpTaskPositioner();
+                mPositioningDisplay = null;
             }
         });
+    }
+
+    private void cleanUpTaskPositioner() {
+        final TaskPositioner positioner = mTaskPositioner;
+        if (positioner == null) {
+            return;
+        }
+
+        // We need to assign task positioner to null first to indicate that we're finishing task
+        // positioning.
+        mTaskPositioner = null;
+        positioner.unregister();
     }
 }

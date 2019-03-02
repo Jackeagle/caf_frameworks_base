@@ -20,15 +20,15 @@ import static org.junit.Assert.assertNotNull;
 
 import android.perftests.utils.BenchmarkState;
 import android.perftests.utils.PerfStatusReporter;
-import android.support.test.filters.LargeTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.LargeTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.os.KernelCpuThreadReader;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
 
 /**
  * Performance tests collecting per-thread CPU data.
@@ -39,7 +39,8 @@ public class KernelCpuThreadReaderPerfTest {
     @Rule
     public final PerfStatusReporter mPerfStatusReporter = new PerfStatusReporter();
 
-    private final KernelCpuThreadReader mKernelCpuThreadReader = KernelCpuThreadReader.create();
+    private final KernelCpuThreadReader mKernelCpuThreadReader =
+            KernelCpuThreadReader.create(8, uid -> 1000 <= uid && uid < 2000);
 
     @Test
     public void timeReadCurrentProcessCpuUsage() {

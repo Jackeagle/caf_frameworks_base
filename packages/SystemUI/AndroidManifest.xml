@@ -22,6 +22,11 @@
         android:sharedUserId="android.uid.systemui"
         coreApp="true">
 
+    <!-- Using OpenGL ES 2.0 -->
+    <uses-feature
+        android:glEsVersion="0x00020000"
+        android:required="true" />
+
     <!-- SysUI must be the one to define this permission; its name is
          referenced by the core OS. -->
     <permission android:name="android.permission.systemui.IDENTITY"
@@ -78,6 +83,7 @@
     <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS" />
     <uses-permission android:name="android.permission.MASTER_CLEAR" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.MANAGE_SENSOR_PRIVACY" />
 
     <!-- ActivityManager -->
     <uses-permission android:name="android.permission.REAL_GET_TASKS" />
@@ -87,6 +93,7 @@
     <uses-permission android:name="android.permission.STOP_APP_SWITCHES" />
     <uses-permission android:name="android.permission.SET_SCREEN_COMPATIBILITY" />
     <uses-permission android:name="android.permission.START_ANY_ACTIVITY" />
+    <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
     <uses-permission android:name="android.permission.GET_TOP_ACTIVITY_INFO" />
@@ -126,6 +133,7 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
     <uses-permission android:name="android.permission.RESET_FINGERPRINT_LOCKOUT" />
     <uses-permission android:name="android.permission.MANAGE_SLICE_PERMISSIONS" />
+    <uses-permission android:name="android.permission.CONTROL_KEYGUARD_SECURE_NOTIFICATIONS" />
 
     <!-- Needed for WallpaperManager.clear in ImageWallpaper.updateWallpaperLocked -->
     <uses-permission android:name="android.permission.SET_WALLPAPER"/>
@@ -222,6 +230,9 @@
     <uses-permission android:name="android.permission.MANAGE_DEBUGGING" />
 
     <uses-permission android:name="android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS" />
+
+    <!-- Permission to change the display color -->
+    <uses-permission android:name="android.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS" />
 
     <protected-broadcast android:name="com.android.settingslib.action.REGISTER_SLICE_RECEIVER" />
     <protected-broadcast android:name="com.android.settingslib.action.UNREGISTER_SLICE_RECEIVER" />
@@ -374,6 +385,15 @@
 
         <!-- started from UsbDeviceSettingsManager -->
         <activity android:name=".usb.UsbAccessoryUriActivity"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_USB"
+            android:theme="@style/Theme.SystemUI.Dialog.Alert"
+            android:finishOnCloseSystemDialogs="true"
+            android:excludeFromRecents="true">
+        </activity>
+
+        <!-- started from UsbPortManager -->
+        <activity android:name=".usb.UsbContaminantActivity"
             android:exported="true"
             android:permission="android.permission.MANAGE_USB"
             android:theme="@style/Theme.SystemUI.Dialog.Alert"
@@ -579,11 +599,6 @@
                 android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboard|keyboardHidden"
                 android:process=":ui"
                 android:visibleToInstantApps="true">
-            <intent-filter>
-                <action android:name="android.intent.action.CHOOSER_UI" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.VOICE" />
-            </intent-filter>
         </activity>
 
         <!-- Doze with notifications, run in main sysui process for every user  -->

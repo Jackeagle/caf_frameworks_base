@@ -21,8 +21,9 @@ import android.graphics.RecordingCanvas;
 import android.graphics.RenderNode;
 import android.perftests.utils.BenchmarkState;
 import android.perftests.utils.PerfStatusReporter;
-import android.support.test.filters.LargeTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.LargeTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -164,6 +165,25 @@ public class StaticLayoutPerfTest {
             StaticLayout.Builder.obtain(text, 0, text.length(), PAINT, TEXT_WIDTH)
                     .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
                     .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
+                    .build();
+        }
+    }
+
+    @Test
+    public void testCreate_PrecomputedText_NoStyled_Greedy_NoHyphenation_DirDifferent() {
+        final BenchmarkState state = mPerfStatusReporter.getBenchmarkState();
+        while (state.keepRunning()) {
+            state.pauseTiming();
+            final PrecomputedText text = makeMeasured(
+                    mTextUtil.nextRandomParagraph(WORD_LENGTH, NO_STYLE_TEXT), PAINT,
+                    Layout.BREAK_STRATEGY_SIMPLE, Layout.HYPHENATION_FREQUENCY_NONE);
+            Canvas.freeTextLayoutCaches();
+            state.resumeTiming();
+
+            StaticLayout.Builder.obtain(text, 0, text.length(), PAINT, TEXT_WIDTH)
+                    .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+                    .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
+                    .setTextDirection(TextDirectionHeuristics.RTL)
                     .build();
         }
     }

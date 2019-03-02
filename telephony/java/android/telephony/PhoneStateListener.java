@@ -22,16 +22,20 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.UnsupportedAppUsage;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.Looper;
+import android.telephony.emergency.EmergencyNumber;
+import android.telephony.ims.ImsReasonInfo;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.IPhoneStateListener;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 
 /**
@@ -170,25 +174,28 @@ public class PhoneStateListener {
     public static final int LISTEN_CELL_INFO = 0x00000400;
 
     /**
-     * Listen for precise changes and fails to the device calls (cellular).
+     * Listen for {@link PreciseCallState.State} of ringing, background and foreground calls.
      * {@more}
      * Requires Permission: {@link android.Manifest.permission#READ_PRECISE_PHONE_STATE
      * READ_PRECISE_PHONE_STATE}
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public static final int LISTEN_PRECISE_CALL_STATE                       = 0x00000800;
 
     /**
-     * Listen for precise changes and fails on the data connection (cellular).
+     * Listen for {@link PreciseDataConnectionState} on the data connection (cellular).
+     *
      * {@more}
      * Requires Permission: {@link android.Manifest.permission#READ_PRECISE_PHONE_STATE
      * READ_PRECISE_PHONE_STATE}
      *
      * @see #onPreciseDataConnectionStateChanged
+     *
      * @hide
      */
+    @SystemApi
     public static final int LISTEN_PRECISE_DATA_CONNECTION_STATE            = 0x00001000;
 
     /**
@@ -290,7 +297,7 @@ public class PhoneStateListener {
 
     /**
      *  Listen for changes to preferred data subId.
-     *  See {@link SubscriptionManager#setPreferredData(int)}
+     *  See {@link SubscriptionManager#setPreferredDataSubId(int)}
      *  for more details.
      *
      *  @see #onPreferredDataSubIdChanged
@@ -312,8 +319,48 @@ public class PhoneStateListener {
      *
      * <p>Requires permission {@link android.Manifest.permission#READ_PHONE_STATE} or the calling
      * app has carrier privileges (see {@link TelephonyManager#hasCarrierPrivileges}).
+     *
+     * @see #onEmergencyNumberListChanged
      */
     public static final int LISTEN_EMERGENCY_NUMBER_LIST                   = 0x01000000;
+
+    /**
+     * Listen for call disconnect causes which contains {@link DisconnectCause} and
+     * {@link PreciseDisconnectCause}.
+     * {@more}
+     * Requires Permission: {@link android.Manifest.permission#READ_PRECISE_PHONE_STATE
+     * READ_PRECISE_PHONE_STATE}
+     *
+     * @hide
+     */
+    @SystemApi
+    public static final int LISTEN_CALL_DISCONNECT_CAUSES                  = 0x02000000;
+
+    /**
+     * Listen for changes to the call attributes of a currently active call.
+     * {@more}
+     * Requires Permission: {@link android.Manifest.permission#READ_PRECISE_PHONE_STATE
+     * READ_PRECISE_PHONE_STATE}
+     *
+     * @see #onCallAttributesChanged
+     * @hide
+     */
+    @SystemApi
+    public static final int LISTEN_CALL_ATTRIBUTES_CHANGED                 = 0x04000000;
+
+    /**
+     * Listen for IMS call disconnect causes which contains
+     * {@link android.telephony.ims.ImsReasonInfo}
+     *
+     * {@more}
+     * Requires Permission: {@link android.Manifest.permission#READ_PRECISE_PHONE_STATE
+     * READ_PRECISE_PHONE_STATE}
+     *
+     * @see #onImsCallDisconnectCauseChanged(ImsReasonInfo)
+     * @hide
+     */
+    @SystemApi
+    public static final int LISTEN_IMS_CALL_DISCONNECT_CAUSES              = 0x08000000;
 
     /*
      * Subscription used to listen to the phone state changes
@@ -343,7 +390,7 @@ public class PhoneStateListener {
      * using a particular non-null Looper.
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public PhoneStateListener(Looper looper) {
         this(null, looper);
     }
@@ -354,7 +401,7 @@ public class PhoneStateListener {
      * own non-null Looper use PhoneStateListener(int subId, Looper looper) below.
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public PhoneStateListener(Integer subId) {
         this(subId, Looper.myLooper());
     }
@@ -364,7 +411,7 @@ public class PhoneStateListener {
      * and non-null Looper.
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public PhoneStateListener(Integer subId, Looper looper) {
         this(subId, new HandlerExecutor(new Handler(looper)));
     }
@@ -525,20 +572,44 @@ public class PhoneStateListener {
 
     /**
      * Callback invoked when precise device call state changes.
-     *
+     * @param callState {@link PreciseCallState}
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
     public void onPreciseCallStateChanged(PreciseCallState callState) {
         // default implementation empty
     }
 
     /**
-     * Callback invoked when data connection state changes with precise information.
+     * Callback invoked when call disconnect cause changes.
+     * @param disconnectCause {@link DisconnectCause}.
+     * @param preciseDisconnectCause {@link PreciseDisconnectCause}.
      *
      * @hide
      */
-    @UnsupportedAppUsage
+    @SystemApi
+    public void onCallDisconnectCauseChanged(int disconnectCause, int preciseDisconnectCause) {
+        // default implementation empty
+    }
+
+    /**
+     * Callback invoked when Ims call disconnect cause changes.
+     * @param imsReasonInfo {@link ImsReasonInfo} contains details on why IMS call failed.
+     *
+     * @hide
+     */
+    @SystemApi
+    public void onImsCallDisconnectCauseChanged(@NonNull ImsReasonInfo imsReasonInfo) {
+        // default implementation empty
+    }
+
+    /**
+     * Callback invoked when data connection state changes with precise information.
+     * @param dataConnectionState {@link PreciseDataConnectionState}
+     *
+     * @hide
+     */
+    @SystemApi
     public void onPreciseDataConnectionStateChanged(
             PreciseDataConnectionState dataConnectionState) {
         // default implementation empty
@@ -602,6 +673,21 @@ public class PhoneStateListener {
     }
 
     /**
+     * Callback invoked when the current emergency number list has changed
+     *
+     * @param emergencyNumberList Map including the key as the active subscription ID
+     *                           (Note: if there is no active subscription, the key is
+     *                           {@link SubscriptionManager#getDefaultSubscriptionId})
+     *                           and the value as the list of {@link EmergencyNumber};
+     *                           null if this information is not available.
+     * @hide
+     */
+    public void onEmergencyNumberListChanged(
+            @NonNull Map<Integer, List<EmergencyNumber>> emergencyNumberList) {
+        // default implementation empty
+    }
+
+    /**
      * Callback invoked when OEM hook raw event is received. Requires
      * the READ_PRIVILEGED_PHONE_STATE permission.
      * @param rawData is the byte array of the OEM hook raw data.
@@ -631,6 +717,17 @@ public class PhoneStateListener {
      * @hide
      */
     public void onPreferredDataSubIdChanged(int subId) {
+        // default implementation empty
+    }
+
+    /**
+     * Callback invoked when the call attributes changes. Requires
+     * the READ_PRIVILEGED_PHONE_STATE permission.
+     * @param callAttributes the call attributes
+     * @hide
+     */
+    @SystemApi
+    public void onCallAttributesChanged(@NonNull CallAttributes callAttributes) {
         // default implementation empty
     }
 
@@ -734,9 +831,11 @@ public class PhoneStateListener {
             PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
             if (psl == null) return;
 
-            Binder.withCleanCallingIdentity(
-                    () -> mExecutor.execute(
-                            () -> psl.onDataConnectionStateChanged(state, networkType)));
+            Binder.withCleanCallingIdentity(() -> mExecutor.execute(
+                    () -> {
+                        psl.onDataConnectionStateChanged(state, networkType);
+                        psl.onDataConnectionStateChanged(state);
+                    }));
         }
 
         public void onDataActivity(int direction) {
@@ -777,6 +876,15 @@ public class PhoneStateListener {
 
             Binder.withCleanCallingIdentity(
                     () -> mExecutor.execute(() -> psl.onPreciseCallStateChanged(callState)));
+        }
+
+        public void onCallDisconnectCauseChanged(int disconnectCause, int preciseDisconnectCause) {
+            PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
+            if (psl == null) return;
+
+            Binder.withCleanCallingIdentity(
+                    () -> mExecutor.execute(() -> psl.onCallDisconnectCauseChanged(
+                            disconnectCause, preciseDisconnectCause)));
         }
 
         public void onPreciseDataConnectionStateChanged(
@@ -858,6 +966,16 @@ public class PhoneStateListener {
                             () -> psl.onPhysicalChannelConfigurationChanged(configs)));
         }
 
+        @Override
+        public void onEmergencyNumberListChanged(Map emergencyNumberList) {
+            PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
+            if (psl == null) return;
+
+            Binder.withCleanCallingIdentity(
+                    () -> mExecutor.execute(
+                            () -> psl.onEmergencyNumberListChanged(emergencyNumberList)));
+        }
+
         public void onPhoneCapabilityChanged(PhoneCapability capability) {
             PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
             if (psl == null) return;
@@ -874,12 +992,30 @@ public class PhoneStateListener {
                     () -> mExecutor.execute(() -> psl.onRadioPowerStateChanged(state)));
         }
 
+        public void onCallAttributesChanged(CallAttributes callAttributes) {
+            PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
+            if (psl == null) return;
+
+            Binder.withCleanCallingIdentity(
+                    () -> mExecutor.execute(() -> psl.onCallAttributesChanged(callAttributes)));
+        }
+
         public void onPreferredDataSubIdChanged(int subId) {
             PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
             if (psl == null) return;
 
             Binder.withCleanCallingIdentity(
                     () -> mExecutor.execute(() -> psl.onPreferredDataSubIdChanged(subId)));
+        }
+
+        public void onImsCallDisconnectCauseChanged(ImsReasonInfo disconnectCause) {
+            PhoneStateListener psl = mPhoneStateListenerWeakRef.get();
+            if (psl == null) return;
+
+            Binder.withCleanCallingIdentity(
+                    () -> mExecutor.execute(
+                            () -> psl.onImsCallDisconnectCauseChanged(disconnectCause)));
+
         }
     }
 

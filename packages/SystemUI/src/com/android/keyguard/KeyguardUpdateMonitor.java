@@ -100,6 +100,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.TimeZone;
+import java.util.function.Consumer;
 
 /**
  * Watches for updates that may be interesting to the keyguard, and provides
@@ -153,6 +155,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     private static final int MSG_BIOMETRIC_AUTHENTICATION_CONTINUE = 336;
     private static final int MSG_DEVICE_POLICY_MANAGER_STATE_CHANGED = 337;
     private static final int MSG_TELEPHONY_CAPABLE = 338;
+    private static final int MSG_TIMEZONE_UPDATE = 339;
     private static final int MSG_LOCALE_CHANGED = 500;
 
     /** Biometric authentication state: Not listening. */
@@ -219,7 +222,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     // Battery status
     private BatteryStatus mBatteryStatus;
 
-    private final StrongAuthTracker mStrongAuthTracker;
+    @VisibleForTesting
+    protected StrongAuthTracker mStrongAuthTracker;
 
     private final ArrayList<WeakReference<KeyguardUpdateMonitorCallback>>
             mCallbacks = Lists.newArrayList();
@@ -262,6 +266,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             switch (msg.what) {
                 case MSG_TIME_UPDATE:
                     handleTimeUpdate();
+                    break;
+                case MSG_TIMEZONE_UPDATE:
+                    handleTimeZoneUpdate((String) msg.obj);
                     break;
                 case MSG_BATTERY_UPDATE:
                     handleBatteryUpdate((BatteryStatus) msg.obj);
@@ -342,8 +349,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     handleUserUnlocked();
                     break;
                 case MSG_ASSISTANT_STACK_CHANGED:
-                    mAssistantVisible = (boolean)msg.obj;
-                    updateBiometricListeningState();
+                    setAssistantVisible((boolean) msg.obj);
                     break;
                 case MSG_BIOMETRIC_AUTHENTICATION_CONTINUE:
                     updateBiometricListeningState();
@@ -355,7 +361,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     updateLogoutEnabled();
                     break;
                 case MSG_TELEPHONY_CAPABLE:
-                    updateTelephonyCapable((boolean)msg.obj);
+                    updateTelephonyCapable((boolean) msg.obj);
                     break;
                 default:
                     super.handleMessage(msg);
@@ -549,7 +555,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     }
 
-    private void onFingerprintAuthenticated(int userId) {
+    @VisibleForTesting
+    protected void onFingerprintAuthenticated(int userId) {
         Trace.beginSection("KeyGuardUpdateMonitor#onFingerPrintAuthenticated");
         mUserFingerprintAuthenticated.put(userId, true);
         // Update/refresh trust state only if user can skip bouncer
@@ -704,7 +711,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     }
 
-    private void onFaceAuthenticated(int userId) {
+    @VisibleForTesting
+    protected void onFaceAuthenticated(int userId) {
         Trace.beginSection("KeyGuardUpdateMonitor#onFaceAuthenticated");
         mUserFaceAuthenticated.put(userId, true);
         // Update/refresh trust state only if user can skip bouncer
@@ -909,8 +917,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
 
 
     public boolean getUserCanSkipBouncer(int userId) {
-        return getUserHasTrust(userId) || (mUserFingerprintAuthenticated.get(userId)
-                && isUnlockingWithBiometricAllowed());
+        boolean fingerprintOrFace = mUserFingerprintAuthenticated.get(userId)
+                || mUserFaceAuthenticated.get(userId);
+        return getUserHasTrust(userId) || (fingerprintOrFace && isUnlockingWithBiometricAllowed());
     }
 
     public boolean getUserHasTrust(int userId) {
@@ -961,6 +970,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     }
 
+    @VisibleForTesting
+    void setAssistantVisible(boolean assistantVisible) {
+        mAssistantVisible = assistantVisible;
+        updateBiometricListeningState();
+    }
+
     static class DisplayClientState {
         public int clientGeneration;
         public boolean clearing;
@@ -980,9 +995,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             if (DEBUG) Log.d(TAG, "received broadcast " + action);
 
             if (Intent.ACTION_TIME_TICK.equals(action)
-                    || Intent.ACTION_TIME_CHANGED.equals(action)
-                    || Intent.ACTION_TIMEZONE_CHANGED.equals(action)) {
+                    || Intent.ACTION_TIME_CHANGED.equals(action)) {
                 mHandler.sendEmptyMessage(MSG_TIME_UPDATE);
+            } else if (Intent.ACTION_TIMEZONE_CHANGED.equals(action)) {
+                final Message msg = mHandler.obtainMessage(
+                        MSG_TIMEZONE_UPDATE, intent.getStringExtra("time-zone"));
+                mHandler.sendMessage(msg);
             } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
                 final int status = intent.getIntExtra(EXTRA_STATUS, BATTERY_STATUS_UNKNOWN);
                 final int plugged = intent.getIntExtra(EXTRA_PLUGGED, 0);
@@ -1057,7 +1075,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     };
 
-    private final BroadcastReceiver mBroadcastAllReceiver = new BroadcastReceiver() {
+    @VisibleForTesting
+    protected final BroadcastReceiver mBroadcastAllReceiver = new BroadcastReceiver() {
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -1131,7 +1150,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     };
 
-    private FaceManager.AuthenticationCallback mFaceAuthenticationCallback
+    @VisibleForTesting
+    FaceManager.AuthenticationCallback mFaceAuthenticationCallback
             = new FaceManager.AuthenticationCallback() {
 
         @Override
@@ -1308,9 +1328,13 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     }
 
-    public class StrongAuthTracker extends LockPatternUtils.StrongAuthTracker {
-        public StrongAuthTracker(Context context) {
+    public static class StrongAuthTracker extends LockPatternUtils.StrongAuthTracker {
+        private final Consumer<Integer> mStrongAuthRequiredChangedCallback;
+
+        public StrongAuthTracker(Context context,
+                Consumer<Integer> strongAuthRequiredChangedCallback) {
             super(context);
+            mStrongAuthRequiredChangedCallback = strongAuthRequiredChangedCallback;
         }
 
         public boolean isUnlockingWithBiometricAllowed() {
@@ -1326,7 +1350,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
 
         @Override
         public void onStrongAuthRequiredChanged(int userId) {
-            notifyStrongAuthStateChanged(userId);
+            mStrongAuthRequiredChangedCallback.accept(userId);
         }
     }
 
@@ -1433,7 +1457,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         mContext = context;
         mSubscriptionManager = SubscriptionManager.from(context);
         mDeviceProvisioned = isDeviceProvisionedInSettingsDb();
-        mStrongAuthTracker = new StrongAuthTracker(context);
+        mStrongAuthTracker = new StrongAuthTracker(context, this::notifyStrongAuthStateChanged);
 
         // Since device can't be un-provisioned, we only need to register a content observer
         // to update mDeviceProvisioned when we are...
@@ -1550,12 +1574,21 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
         mHandler.removeCallbacks(mRetryFingerprintAuthentication);
         boolean shouldListenForFingerprint = shouldListenForFingerprint();
-        if (mFingerprintRunningState == BIOMETRIC_STATE_RUNNING && !shouldListenForFingerprint) {
+        boolean runningOrRestarting = mFingerprintRunningState == BIOMETRIC_STATE_RUNNING
+                || mFingerprintRunningState == BIOMETRIC_STATE_CANCELLING_RESTARTING;
+        if (runningOrRestarting && !shouldListenForFingerprint) {
             stopListeningForFingerprint();
-        } else if (mFingerprintRunningState != BIOMETRIC_STATE_RUNNING
-                && shouldListenForFingerprint) {
+        } else if (!runningOrRestarting && shouldListenForFingerprint) {
             startListeningForFingerprint();
         }
+    }
+
+    /**
+     * Request passive authentication, when sensors detect that a user might be present.
+     */
+    public void onAuthInterruptDetected() {
+        if (DEBUG) Log.d(TAG, "onAuthInterruptDetected()");
+        updateFaceListeningState();
     }
 
     private void updateFaceListeningState() {
@@ -1595,17 +1628,23 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     }
 
     private boolean shouldListenForFace() {
-        return (mKeyguardIsVisible || !mDeviceInteractive ||
-                (mBouncer && !mKeyguardGoingAway) || mGoingToSleep ||
-                shouldListenForFaceAssistant() || (mKeyguardOccluded && mIsDreaming))
-                && !mSwitchingUser && !isFaceDisabled(getCurrentUser())
-                && !mKeyguardGoingAway && !mFaceLockedOut && mFaceSettingEnabledForUser;
+        final boolean awakeKeyguard = mKeyguardIsVisible && mDeviceInteractive && !mGoingToSleep;
+        final int user = getCurrentUser();
+
+        return (mBouncer || awakeKeyguard || shouldListenForFaceAssistant())
+                && !mSwitchingUser && !getUserCanSkipBouncer(user) && !isFaceDisabled(user)
+                && !mKeyguardGoingAway && !mFaceLockedOut && mFaceSettingEnabledForUser
+                && mUserManager.isUserUnlocked(user);
     }
 
 
     private void startListeningForFingerprint() {
         if (mFingerprintRunningState == BIOMETRIC_STATE_CANCELLING) {
             setFingerprintRunningState(BIOMETRIC_STATE_CANCELLING_RESTARTING);
+            return;
+        }
+        if (mFingerprintRunningState == BIOMETRIC_STATE_CANCELLING_RESTARTING) {
+            // Waiting for restart via handleFingerprintError().
             return;
         }
         if (DEBUG) Log.v(TAG, "startListeningForFingerprint()");
@@ -1886,6 +1925,21 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     }
 
     /**
+     * Handle (@line #MSG_TIMEZONE_UPDATE}
+     */
+    private void handleTimeZoneUpdate(String timeZone) {
+        if (DEBUG) Log.d(TAG, "handleTimeZoneUpdate");
+        for (int i = 0; i < mCallbacks.size(); i++) {
+            KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
+            if (cb != null) {
+                cb.onTimeZoneChanged(TimeZone.getTimeZone(timeZone));
+                // Also notify callbacks about time change to remain compatible.
+                cb.onTimeChanged();
+            }
+        }
+    }
+
+    /**
      * Handle {@link #MSG_BATTERY_UPDATE}
      */
     private void handleBatteryUpdate(BatteryStatus status) {
@@ -1930,13 +1984,25 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     + slotId + ", state=" + state +")");
         }
 
+        boolean becameAbsent = false;
         if (!SubscriptionManager.isValidSubscriptionId(subId)) {
             Log.w(TAG, "invalid subId in handleSimStateChange()");
             /* Only handle No SIM(ABSENT) due to handleServiceStateChange() handle other case */
             if (state == State.ABSENT) {
                 updateTelephonyCapable(true);
+                // Even though the subscription is not valid anymore, we need to notify that the
+                // SIM card was removed so we can update the UI.
+                becameAbsent = true;
+                for (SimData data : mSimDatas.values()) {
+                    // Set the SIM state of all SimData associated with that slot to ABSENT se we
+                    // do not move back into PIN/PUK locked and not detect the change below.
+                    if (data.slotId == slotId) {
+                        data.simState = State.ABSENT;
+                    }
+                }
+            } else {
+                return;
             }
-            return;
         }
 
         SimData data = mSimDatas.get(subId);
@@ -1951,7 +2017,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             data.subId = subId;
             data.slotId = slotId;
         }
-        if (changed && state != State.UNKNOWN) {
+        if ((changed || becameAbsent) && state != State.UNKNOWN) {
             for (int i = 0; i < mCallbacks.size(); i++) {
                 KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
                 if (cb != null) {
@@ -2480,6 +2546,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     + getStrongAuthTracker().hasUserAuthenticatedSinceBoot());
             pw.println("    disabled(DPM)=" + isFingerprintDisabled(userId));
             pw.println("    possible=" + isUnlockWithFingerprintPossible(userId));
+            pw.println("    listening: actual=" + mFingerprintRunningState
+                    + " expected=" + (shouldListenForFingerprint() ? 1 : 0));
             pw.println("    strongAuthFlags=" + Integer.toHexString(strongAuthFlags));
             pw.println("    trustManaged=" + getUserTrustIsManaged(userId));
         }

@@ -32,6 +32,7 @@
 #include <atomic>
 #include <cinttypes>
 #include <limits.h>
+#include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
 #include <android_runtime/AndroidRuntime.h>
 #include <android_runtime/Log.h>
@@ -71,6 +72,7 @@
 
 #define INDENT "  "
 
+using android::base::ParseUint;
 using android::base::StringPrintf;
 
 namespace android {
@@ -81,11 +83,13 @@ namespace android {
 static const float POINTER_SPEED_EXPONENT = 1.0f / 4;
 
 static struct {
+    jclass clazz;
     jmethodID notifyConfigurationChanged;
     jmethodID notifyInputDevicesChanged;
     jmethodID notifySwitch;
     jmethodID notifyInputChannelBroken;
     jmethodID notifyANR;
+    jmethodID notifyFocusChanged;
     jmethodID filterInputEvent;
     jmethodID interceptKeyBeforeQueueing;
     jmethodID interceptMotionBeforeQueueingNonInteractive;
@@ -94,6 +98,7 @@ static struct {
     jmethodID checkInjectEventsPermission;
     jmethodID getVirtualKeyQuietTimeMillis;
     jmethodID getExcludedDeviceNames;
+    jmethodID getInputPortAssociations;
     jmethodID getKeyRepeatTimeout;
     jmethodID getKeyRepeatDelay;
     jmethodID getHoverTapTimeout;
@@ -102,9 +107,11 @@ static struct {
     jmethodID getLongPressTimeout;
     jmethodID getPointerLayer;
     jmethodID getPointerIcon;
+    jmethodID getPointerDisplayId;
     jmethodID getKeyboardLayoutOverlay;
     jmethodID getDeviceAlias;
     jmethodID getTouchCalibrationForInputDevice;
+    jmethodID getContextForDisplay;
 } gServiceClassInfo;
 
 static struct {
@@ -147,15 +154,6 @@ static inline const char* toString(bool value) {
     return value ? "true" : "false";
 }
 
-static jobject getInputApplicationHandleObjLocalRef(JNIEnv* env,
-        const sp<InputApplicationHandle>& inputApplicationHandle) {
-    if (inputApplicationHandle == nullptr) {
-        return nullptr;
-    }
-    return static_cast<NativeInputApplicationHandle*>(inputApplicationHandle.get())->
-            getInputApplicationHandleObjLocalRef(env);
-}
-
 static void loadSystemIconAsSpriteWithPointerIcon(JNIEnv* env, jobject contextObj, int32_t style,
         PointerIcon* outPointerIcon, SpriteIcon* outSpriteIcon) {
     status_t status = android_view_PointerIcon_loadSystemIcon(env,
@@ -178,18 +176,16 @@ static void loadSystemIconAsSprite(JNIEnv* env, jobject contextObj, int32_t styl
     loadSystemIconAsSpriteWithPointerIcon(env, contextObj, style, &pointerIcon, outSpriteIcon);
 }
 
-static void updatePointerControllerFromViewport(
-        sp<PointerController> controller, const DisplayViewport* const viewport) {
-    if (controller != nullptr && viewport != nullptr) {
-        const int32_t width = viewport->logicalRight - viewport->logicalLeft;
-        const int32_t height = viewport->logicalBottom - viewport->logicalTop;
-        controller->setDisplayViewport(width, height, viewport->orientation);
-    }
-}
-
 enum {
     WM_ACTION_PASS_TO_USER = 1,
 };
+
+static std::string getStringElementFromJavaArray(JNIEnv* env, jobjectArray array, jsize index) {
+    jstring item = jstring(env->GetObjectArrayElement(array, index));
+    ScopedUtfChars chars(env, item);
+    std::string result(chars.c_str());
+    return result;
+}
 
 
 // --- NativeInputManager ---
@@ -249,6 +245,7 @@ public:
             const sp<IBinder>& token,
             const std::string& reason);
     virtual void notifyInputChannelBroken(const sp<IBinder>& token);
+    virtual void notifyFocusChanged(const sp<IBinder>& oldToken, const sp<IBinder>& newToken);
     virtual bool filterInputEvent(const InputEvent* inputEvent, uint32_t policyFlags);
     virtual void getDispatcherConfiguration(InputDispatcherConfiguration* outConfig);
     virtual void interceptKeyBeforeQueueing(const KeyEvent* keyEvent, uint32_t& policyFlags);
@@ -264,17 +261,16 @@ public:
 
     /* --- PointerControllerPolicyInterface implementation --- */
 
-    virtual void loadPointerIcon(SpriteIcon* icon);
-    virtual void loadPointerResources(PointerResources* outResources);
+    virtual void loadPointerIcon(SpriteIcon* icon, int32_t displayId);
+    virtual void loadPointerResources(PointerResources* outResources, int32_t displayId);
     virtual void loadAdditionalMouseResources(std::map<int32_t, SpriteIcon>* outResources,
-            std::map<int32_t, PointerAnimation>* outAnimationResources);
+            std::map<int32_t, PointerAnimation>* outAnimationResources, int32_t displayId);
     virtual int32_t getDefaultPointerIconId();
     virtual int32_t getCustomPointerIconId();
 
 private:
     sp<InputManager> mInputManager;
 
-    jobject mContextObj;
     jobject mServiceObj;
     sp<Looper> mLooper;
 
@@ -306,14 +302,19 @@ private:
 
         // Input devices to be disabled
         SortedVector<int32_t> disabledInputDevices;
+
+        // Associated Pointer controller display.
+        int32_t pointerDisplayId;
     } mLocked GUARDED_BY(mLock);
 
     std::atomic<bool> mInteractive;
 
-    void updateInactivityTimeoutLocked(const sp<PointerController>& controller);
+    void updateInactivityTimeoutLocked();
     void handleInterceptActions(jint wmActions, nsecs_t when, uint32_t& policyFlags);
     void ensureSpriteControllerLocked();
-
+    const DisplayViewport* findDisplayViewportLocked(int32_t displayId);
+    int32_t getPointerDisplayId();
+    void updatePointerDisplayLocked();
     static bool checkAndClearExceptionFromCallback(JNIEnv* env, const char* methodName);
 
     static inline JNIEnv* jniEnv() {
@@ -328,7 +329,6 @@ NativeInputManager::NativeInputManager(jobject contextObj,
         mLooper(looper), mInteractive(true) {
     JNIEnv* env = jniEnv();
 
-    mContextObj = env->NewGlobalRef(contextObj);
     mServiceObj = env->NewGlobalRef(serviceObj);
 
     {
@@ -338,17 +338,18 @@ NativeInputManager::NativeInputManager(jobject contextObj,
         mLocked.pointerGesturesEnabled = true;
         mLocked.showTouches = false;
         mLocked.pointerCapture = false;
+        mLocked.pointerDisplayId = ADISPLAY_ID_DEFAULT;
     }
     mInteractive = true;
 
-    sp<EventHub> eventHub = new EventHub();
-    mInputManager = new InputManager(eventHub, this, this);
+    mInputManager = new InputManager(this, this);
+    defaultServiceManager()->addService(String16("inputflinger"),
+            mInputManager, false);
 }
 
 NativeInputManager::~NativeInputManager() {
     JNIEnv* env = jniEnv();
 
-    env->DeleteGlobalRef(mContextObj);
     env->DeleteGlobalRef(mServiceObj);
 }
 
@@ -386,9 +387,10 @@ bool NativeInputManager::checkAndClearExceptionFromCallback(JNIEnv* env, const c
     return false;
 }
 
-static const DisplayViewport* findInternalViewport(const std::vector<DisplayViewport>& viewports) {
-    for (const DisplayViewport& v : viewports) {
-        if (v.type == ViewportType::VIEWPORT_INTERNAL) {
+const DisplayViewport* NativeInputManager::findDisplayViewportLocked(int32_t displayId)
+        REQUIRES(mLock) {
+    for (const DisplayViewport& v : mLocked.viewports) {
+        if (v.displayId == displayId) {
             return &v;
         }
     }
@@ -415,20 +417,14 @@ void NativeInputManager::setDisplayViewports(JNIEnv* env, jobjectArray viewportO
         }
     }
 
-    const DisplayViewport* newInternalViewport = findInternalViewport(viewports);
-    {
+    // Get the preferred pointer controller displayId.
+    int32_t pointerDisplayId = getPointerDisplayId();
+
+    { // acquire lock
         AutoMutex _l(mLock);
-        const DisplayViewport* oldInternalViewport = findInternalViewport(mLocked.viewports);
-        // Internal viewport has changed if there wasn't one earlier, and there is one now, or,
-        // if they are different.
-        const bool internalViewportChanged = (newInternalViewport != nullptr) &&
-                (oldInternalViewport == nullptr || (*oldInternalViewport != *newInternalViewport));
-        if (internalViewportChanged) {
-            sp<PointerController> controller = mLocked.pointerController.promote();
-            updatePointerControllerFromViewport(controller, newInternalViewport);
-        }
         mLocked.viewports = viewports;
-    }
+        mLocked.pointerDisplayId = pointerDisplayId;
+    } // release lock
 
     mInputManager->getReader()->requestRefreshConfiguration(
             InputReaderConfiguration::CHANGE_DISPLAY_INFO);
@@ -458,18 +454,42 @@ void NativeInputManager::getReaderConfiguration(InputReaderConfiguration* outCon
     }
 
     outConfig->excludedDeviceNames.clear();
-    jobjectArray excludedDeviceNames = jobjectArray(env->CallObjectMethod(mServiceObj,
-            gServiceClassInfo.getExcludedDeviceNames));
+    jobjectArray excludedDeviceNames = jobjectArray(env->CallStaticObjectMethod(
+            gServiceClassInfo.clazz, gServiceClassInfo.getExcludedDeviceNames));
     if (!checkAndClearExceptionFromCallback(env, "getExcludedDeviceNames") && excludedDeviceNames) {
         jsize length = env->GetArrayLength(excludedDeviceNames);
         for (jsize i = 0; i < length; i++) {
-            jstring item = jstring(env->GetObjectArrayElement(excludedDeviceNames, i));
-            const char* deviceNameChars = env->GetStringUTFChars(item, nullptr);
-            outConfig->excludedDeviceNames.push_back(deviceNameChars);
-            env->ReleaseStringUTFChars(item, deviceNameChars);
-            env->DeleteLocalRef(item);
+            std::string deviceName = getStringElementFromJavaArray(env, excludedDeviceNames, i);
+            outConfig->excludedDeviceNames.push_back(deviceName);
         }
         env->DeleteLocalRef(excludedDeviceNames);
+    }
+
+    // Associations between input ports and display ports
+    // The java method packs the information in the following manner:
+    // Original data: [{'inputPort1': '1'}, {'inputPort2': '2'}]
+    // Received data: ['inputPort1', '1', 'inputPort2', '2']
+    // So we unpack accordingly here.
+    outConfig->portAssociations.clear();
+    jobjectArray portAssociations = jobjectArray(env->CallStaticObjectMethod(
+            gServiceClassInfo.clazz, gServiceClassInfo.getInputPortAssociations));
+    if (!checkAndClearExceptionFromCallback(env, "getInputPortAssociations") && portAssociations) {
+        jsize length = env->GetArrayLength(portAssociations);
+        for (jsize i = 0; i < length / 2; i++) {
+            std::string inputPort = getStringElementFromJavaArray(env, portAssociations, 2 * i);
+            std::string displayPortStr =
+                    getStringElementFromJavaArray(env, portAssociations, 2 * i + 1);
+            uint8_t displayPort;
+            // Should already have been validated earlier, but do it here for safety.
+            bool success = ParseUint(displayPortStr, &displayPort);
+            if (!success) {
+                ALOGE("Could not parse entry in port configuration file, received: %s",
+                    displayPortStr.c_str());
+                continue;
+            }
+            outConfig->portAssociations.insert({inputPort, displayPort});
+        }
+        env->DeleteLocalRef(portAssociations);
     }
 
     jint hoverTapTimeout = env->CallIntMethod(mServiceObj,
@@ -527,13 +547,40 @@ sp<PointerControllerInterface> NativeInputManager::obtainPointerController(int32
 
         controller = new PointerController(this, mLooper, mLocked.spriteController);
         mLocked.pointerController = controller;
-
-        const DisplayViewport* internalViewport = findInternalViewport(mLocked.viewports);
-        updatePointerControllerFromViewport(controller, internalViewport);
-
-        updateInactivityTimeoutLocked(controller);
+        updateInactivityTimeoutLocked();
     }
+
+    updatePointerDisplayLocked();
+
     return controller;
+}
+
+int32_t NativeInputManager::getPointerDisplayId() {
+    JNIEnv* env = jniEnv();
+    jint pointerDisplayId = env->CallIntMethod(mServiceObj,
+            gServiceClassInfo.getPointerDisplayId);
+    if (checkAndClearExceptionFromCallback(env, "getPointerDisplayId")) {
+        pointerDisplayId = ADISPLAY_ID_DEFAULT;
+    }
+
+    return pointerDisplayId;
+}
+
+void NativeInputManager::updatePointerDisplayLocked() REQUIRES(mLock) {
+    ATRACE_CALL();
+
+    sp<PointerController> controller = mLocked.pointerController.promote();
+    if (controller != nullptr) {
+        const DisplayViewport* viewport = findDisplayViewportLocked(mLocked.pointerDisplayId);
+        if (viewport == nullptr) {
+            ALOGW("Can't find pointer display viewport, fallback to default display.");
+            viewport = findDisplayViewportLocked(ADISPLAY_ID_DEFAULT);
+        }
+
+        if (viewport != nullptr) {
+            controller->setDisplayViewport(*viewport);
+        }
+    }
 }
 
 void NativeInputManager::ensureSpriteControllerLocked() REQUIRES(mLock) {
@@ -657,13 +704,11 @@ nsecs_t NativeInputManager::notifyANR(const sp<InputApplicationHandle>& inputApp
 
     JNIEnv* env = jniEnv();
 
-    jobject inputApplicationHandleObj =
-            getInputApplicationHandleObjLocalRef(env, inputApplicationHandle);
     jobject tokenObj = javaObjectForIBinder(env, token);
     jstring reasonObj = env->NewStringUTF(reason.c_str());
 
     jlong newTimeout = env->CallLongMethod(mServiceObj,
-                gServiceClassInfo.notifyANR, inputApplicationHandleObj, tokenObj,
+                gServiceClassInfo.notifyANR, tokenObj,
                 reasonObj);
     if (checkAndClearExceptionFromCallback(env, "notifyANR")) {
         newTimeout = 0; // abort dispatch
@@ -672,7 +717,6 @@ nsecs_t NativeInputManager::notifyANR(const sp<InputApplicationHandle>& inputApp
     }
 
     env->DeleteLocalRef(reasonObj);
-    env->DeleteLocalRef(inputApplicationHandleObj);
     return newTimeout;
 }
 
@@ -690,6 +734,22 @@ void NativeInputManager::notifyInputChannelBroken(const sp<IBinder>& token) {
                 tokenObj);
         checkAndClearExceptionFromCallback(env, "notifyInputChannelBroken");
     }
+}
+
+void NativeInputManager::notifyFocusChanged(const sp<IBinder>& oldToken,
+        const sp<IBinder>& newToken) {
+#if DEBUG_INPUT_DISPATCHER_POLICY
+    ALOGD("notifyFocusChanged");
+#endif
+    ATRACE_CALL();
+
+    JNIEnv* env = jniEnv();
+
+    jobject oldTokenObj = javaObjectForIBinder(env, oldToken);
+    jobject newTokenObj = javaObjectForIBinder(env, newToken);
+    env->CallVoidMethod(mServiceObj, gServiceClassInfo.notifyFocusChanged,
+            oldTokenObj, newTokenObj);
+    checkAndClearExceptionFromCallback(env, "notifyFocusChanged");
 }
 
 void NativeInputManager::getDispatcherConfiguration(InputDispatcherConfiguration* outConfig) {
@@ -722,7 +782,7 @@ void NativeInputManager::setInputWindows(JNIEnv* env, jobjectArray windowHandleO
             }
 
             sp<InputWindowHandle> windowHandle =
-                    android_server_InputWindowHandle_getHandle(env, windowHandleObj);
+                    android_view_InputWindowHandle_getHandle(env, windowHandleObj);
             if (windowHandle != nullptr) {
                 windowHandles.push(windowHandle);
             }
@@ -762,7 +822,7 @@ void NativeInputManager::setInputWindows(JNIEnv* env, jobjectArray windowHandleO
 void NativeInputManager::setFocusedApplication(JNIEnv* env, int32_t displayId,
         jobject applicationHandleObj) {
     sp<InputApplicationHandle> applicationHandle =
-            android_server_InputApplicationHandle_getHandle(env, applicationHandleObj);
+            android_view_InputApplicationHandle_getHandle(env, applicationHandleObj);
     mInputManager->getDispatcher()->setFocusedApplication(displayId, applicationHandle);
 }
 
@@ -779,16 +839,16 @@ void NativeInputManager::setSystemUiVisibility(int32_t visibility) {
 
     if (mLocked.systemUiVisibility != visibility) {
         mLocked.systemUiVisibility = visibility;
-
-        sp<PointerController> controller = mLocked.pointerController.promote();
-        if (controller != nullptr) {
-            updateInactivityTimeoutLocked(controller);
-        }
+        updateInactivityTimeoutLocked();
     }
 }
 
-void NativeInputManager::updateInactivityTimeoutLocked(const sp<PointerController>& controller)
-        REQUIRES(mLock) {
+void NativeInputManager::updateInactivityTimeoutLocked() REQUIRES(mLock) {
+    sp<PointerController> controller = mLocked.pointerController.promote();
+    if (controller == nullptr) {
+        return;
+    }
+
     bool lightsOut = mLocked.systemUiVisibility & ASYSTEM_UI_VISIBILITY_STATUS_BAR_HIDDEN;
     controller->setInactivityTimeout(lightsOut
             ? PointerController::INACTIVITY_TIMEOUT_SHORT
@@ -1140,19 +1200,22 @@ bool NativeInputManager::checkInjectEventsPermissionNonReentrant(
     return result;
 }
 
-void NativeInputManager::loadPointerIcon(SpriteIcon* icon) {
+void NativeInputManager::loadPointerIcon(SpriteIcon* icon, int32_t displayId) {
     ATRACE_CALL();
     JNIEnv* env = jniEnv();
 
     ScopedLocalRef<jobject> pointerIconObj(env, env->CallObjectMethod(
-            mServiceObj, gServiceClassInfo.getPointerIcon));
+            mServiceObj, gServiceClassInfo.getPointerIcon, displayId));
     if (checkAndClearExceptionFromCallback(env, "getPointerIcon")) {
         return;
     }
 
+    ScopedLocalRef<jobject> displayContext(env, env->CallObjectMethod(
+            mServiceObj, gServiceClassInfo.getContextForDisplay, displayId));
+
     PointerIcon pointerIcon;
     status_t status = android_view_PointerIcon_load(env, pointerIconObj.get(),
-                                                    mContextObj, &pointerIcon);
+            displayContext.get(), &pointerIcon);
     if (!status && !pointerIcon.isNullIcon()) {
         *icon = SpriteIcon(pointerIcon.bitmap, pointerIcon.hotSpotX, pointerIcon.hotSpotY);
     } else {
@@ -1160,28 +1223,34 @@ void NativeInputManager::loadPointerIcon(SpriteIcon* icon) {
     }
 }
 
-void NativeInputManager::loadPointerResources(PointerResources* outResources) {
+void NativeInputManager::loadPointerResources(PointerResources* outResources, int32_t displayId) {
     ATRACE_CALL();
     JNIEnv* env = jniEnv();
 
-    loadSystemIconAsSprite(env, mContextObj, POINTER_ICON_STYLE_SPOT_HOVER,
+    ScopedLocalRef<jobject> displayContext(env, env->CallObjectMethod(
+            mServiceObj, gServiceClassInfo.getContextForDisplay, displayId));
+
+    loadSystemIconAsSprite(env, displayContext.get(), POINTER_ICON_STYLE_SPOT_HOVER,
             &outResources->spotHover);
-    loadSystemIconAsSprite(env, mContextObj, POINTER_ICON_STYLE_SPOT_TOUCH,
+    loadSystemIconAsSprite(env, displayContext.get(), POINTER_ICON_STYLE_SPOT_TOUCH,
             &outResources->spotTouch);
-    loadSystemIconAsSprite(env, mContextObj, POINTER_ICON_STYLE_SPOT_ANCHOR,
+    loadSystemIconAsSprite(env, displayContext.get(), POINTER_ICON_STYLE_SPOT_ANCHOR,
             &outResources->spotAnchor);
 }
 
 void NativeInputManager::loadAdditionalMouseResources(std::map<int32_t, SpriteIcon>* outResources,
-        std::map<int32_t, PointerAnimation>* outAnimationResources) {
+        std::map<int32_t, PointerAnimation>* outAnimationResources, int32_t displayId) {
     ATRACE_CALL();
     JNIEnv* env = jniEnv();
+
+    ScopedLocalRef<jobject> displayContext(env, env->CallObjectMethod(
+            mServiceObj, gServiceClassInfo.getContextForDisplay, displayId));
 
     for (int iconId = POINTER_ICON_STYLE_CONTEXT_MENU; iconId <= POINTER_ICON_STYLE_GRABBING;
              ++iconId) {
         PointerIcon pointerIcon;
         loadSystemIconAsSpriteWithPointerIcon(
-                env, mContextObj, iconId, &pointerIcon, &((*outResources)[iconId]));
+                env, displayContext.get(), iconId, &pointerIcon, &((*outResources)[iconId]));
         if (!pointerIcon.bitmapFrames.empty()) {
             PointerAnimation& animationData = (*outAnimationResources)[iconId];
             size_t numFrames = pointerIcon.bitmapFrames.size() + 1;
@@ -1196,7 +1265,7 @@ void NativeInputManager::loadAdditionalMouseResources(std::map<int32_t, SpriteIc
             }
         }
     }
-    loadSystemIconAsSprite(env, mContextObj, POINTER_ICON_STYLE_NULL,
+    loadSystemIconAsSprite(env, displayContext.get(), POINTER_ICON_STYLE_NULL,
             &((*outResources)[POINTER_ICON_STYLE_NULL]));
 }
 
@@ -1438,27 +1507,6 @@ static void nativeSetSystemUiVisibility(JNIEnv* /* env */,
     im->setSystemUiVisibility(visibility);
 }
 
-static jboolean nativeTransferTouchFocus(JNIEnv* env,
-        jclass /* clazz */, jlong ptr, jobject fromChannelObj, jobject toChannelObj) {
-    NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
-
-    sp<InputChannel> fromChannel =
-            android_view_InputChannel_getInputChannel(env, fromChannelObj);
-    sp<InputChannel> toChannel =
-            android_view_InputChannel_getInputChannel(env, toChannelObj);
-
-    if (fromChannel == nullptr || toChannel == nullptr) {
-        return JNI_FALSE;
-    }
-
-    if (im->getInputManager()->getDispatcher()->
-            transferTouchFocus(fromChannel, toChannel)) {
-        return JNI_TRUE;
-    } else {
-        return JNI_FALSE;
-    }
-}
-
 static void nativeSetPointerSpeed(JNIEnv* /* env */,
         jclass /* clazz */, jlong ptr, jint speed) {
     NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
@@ -1604,6 +1652,13 @@ static void nativeSetCustomPointerIcon(JNIEnv* env, jclass /* clazz */,
     im->setCustomPointerIcon(spriteIcon);
 }
 
+static jboolean nativeCanDispatchToDisplay(JNIEnv* env, jclass /* clazz */, jlong ptr,
+        jint deviceId, jint displayId) {
+
+    NativeInputManager* im = reinterpret_cast<NativeInputManager*>(ptr);
+    return im->getInputManager()->getReader()->canDispatchToDisplay(deviceId, displayId);
+}
+
 // ----------------------------------------------------------------------------
 
 static const JNINativeMethod gInputManagerMethods[] = {
@@ -1646,8 +1701,6 @@ static const JNINativeMethod gInputManagerMethods[] = {
             (void*) nativeSetInputDispatchMode },
     { "nativeSetSystemUiVisibility", "(JI)V",
             (void*) nativeSetSystemUiVisibility },
-    { "nativeTransferTouchFocus", "(JLandroid/view/InputChannel;Landroid/view/InputChannel;)Z",
-            (void*) nativeTransferTouchFocus },
     { "nativeSetPointerSpeed", "(JI)V",
             (void*) nativeSetPointerSpeed },
     { "nativeSetShowTouches", "(JZ)V",
@@ -1680,6 +1733,8 @@ static const JNINativeMethod gInputManagerMethods[] = {
             (void*) nativeReloadPointerIcons },
     { "nativeSetCustomPointerIcon", "(JLandroid/view/PointerIcon;)V",
             (void*) nativeSetCustomPointerIcon },
+    { "nativeCanDispatchToDisplay", "(JII)Z",
+            (void*) nativeCanDispatchToDisplay },
 };
 
 #define FIND_CLASS(var, className) \
@@ -1689,6 +1744,10 @@ static const JNINativeMethod gInputManagerMethods[] = {
 #define GET_METHOD_ID(var, clazz, methodName, methodDescriptor) \
         var = env->GetMethodID(clazz, methodName, methodDescriptor); \
         LOG_FATAL_IF(! (var), "Unable to find method " methodName);
+
+#define GET_STATIC_METHOD_ID(var, clazz, methodName, methodDescriptor) \
+        var = env->GetStaticMethodID(clazz, methodName, methodDescriptor); \
+        LOG_FATAL_IF(! (var), "Unable to find static method " methodName);
 
 #define GET_FIELD_ID(var, clazz, fieldName, fieldDescriptor) \
         var = env->GetFieldID(clazz, fieldName, fieldDescriptor); \
@@ -1704,6 +1763,7 @@ int register_android_server_InputManager(JNIEnv* env) {
 
     jclass clazz;
     FIND_CLASS(clazz, "com/android/server/input/InputManagerService");
+    gServiceClassInfo.clazz = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
 
     GET_METHOD_ID(gServiceClassInfo.notifyConfigurationChanged, clazz,
             "notifyConfigurationChanged", "(J)V");
@@ -1716,10 +1776,13 @@ int register_android_server_InputManager(JNIEnv* env) {
 
     GET_METHOD_ID(gServiceClassInfo.notifyInputChannelBroken, clazz,
             "notifyInputChannelBroken", "(Landroid/os/IBinder;)V");
+    
+    GET_METHOD_ID(gServiceClassInfo.notifyFocusChanged, clazz,
+            "notifyFocusChanged", "(Landroid/os/IBinder;Landroid/os/IBinder;)V");
 
     GET_METHOD_ID(gServiceClassInfo.notifyANR, clazz,
             "notifyANR",
-            "(Landroid/view/InputApplicationHandle;Landroid/os/IBinder;Ljava/lang/String;)J");
+            "(Landroid/os/IBinder;Ljava/lang/String;)J");
 
     GET_METHOD_ID(gServiceClassInfo.filterInputEvent, clazz,
             "filterInputEvent", "(Landroid/view/InputEvent;I)Z");
@@ -1744,8 +1807,11 @@ int register_android_server_InputManager(JNIEnv* env) {
     GET_METHOD_ID(gServiceClassInfo.getVirtualKeyQuietTimeMillis, clazz,
             "getVirtualKeyQuietTimeMillis", "()I");
 
-    GET_METHOD_ID(gServiceClassInfo.getExcludedDeviceNames, clazz,
+    GET_STATIC_METHOD_ID(gServiceClassInfo.getExcludedDeviceNames, clazz,
             "getExcludedDeviceNames", "()[Ljava/lang/String;");
+
+    GET_STATIC_METHOD_ID(gServiceClassInfo.getInputPortAssociations, clazz,
+            "getInputPortAssociations", "()[Ljava/lang/String;");
 
     GET_METHOD_ID(gServiceClassInfo.getKeyRepeatTimeout, clazz,
             "getKeyRepeatTimeout", "()I");
@@ -1769,7 +1835,10 @@ int register_android_server_InputManager(JNIEnv* env) {
             "getPointerLayer", "()I");
 
     GET_METHOD_ID(gServiceClassInfo.getPointerIcon, clazz,
-            "getPointerIcon", "()Landroid/view/PointerIcon;");
+            "getPointerIcon", "(I)Landroid/view/PointerIcon;");
+
+    GET_METHOD_ID(gServiceClassInfo.getPointerDisplayId, clazz,
+            "getPointerDisplayId", "()I");
 
     GET_METHOD_ID(gServiceClassInfo.getKeyboardLayoutOverlay, clazz,
             "getKeyboardLayoutOverlay",
@@ -1781,6 +1850,10 @@ int register_android_server_InputManager(JNIEnv* env) {
     GET_METHOD_ID(gServiceClassInfo.getTouchCalibrationForInputDevice, clazz,
             "getTouchCalibrationForInputDevice",
             "(Ljava/lang/String;I)Landroid/hardware/input/TouchCalibration;");
+
+    GET_METHOD_ID(gServiceClassInfo.getContextForDisplay, clazz,
+            "getContextForDisplay",
+            "(I)Landroid/content/Context;")
 
     // InputDevice
 

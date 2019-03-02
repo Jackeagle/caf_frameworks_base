@@ -16,26 +16,29 @@
 
 package android.app;
 
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL;
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC;
+
 import android.annotation.NonNull;
 import android.annotation.UnsupportedAppUsage;
 import android.app.ActivityManager.StackInfo;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
-import android.hardware.input.InputManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.IWindowManager;
-import android.view.InputDevice;
-import android.view.InputEvent;
-import android.view.MotionEvent;
-import android.view.Surface;
+import android.view.SurfaceControl;
 import android.view.SurfaceHolder;
+import android.view.SurfaceSession;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
@@ -45,9 +48,7 @@ import dalvik.system.CloseGuard;
 import java.util.List;
 
 /**
- * Activity container that allows launching activities into itself and does input forwarding.
- * <p>Creation of this view is only allowed to callers who have
- * {@link android.Manifest.permission#INJECT_EVENTS} permission.
+ * Activity container that allows launching activities into itself.
  * <p>Activity launching into this container is restricted by the same rules that apply to launching
  * on VirtualDisplays.
  * @hide
@@ -59,21 +60,29 @@ public class ActivityView extends ViewGroup {
 
     private VirtualDisplay mVirtualDisplay;
     private final SurfaceView mSurfaceView;
-    private Surface mSurface;
+
+    /**
+     * This is the root surface for the VirtualDisplay. The VirtualDisplay child surfaces will be
+     * re-parented to this surface. This will also be a child of the SurfaceView's SurfaceControl.
+     */
+    private SurfaceControl mRootSurfaceControl;
 
     private final SurfaceCallback mSurfaceCallback;
     private StateCallback mActivityViewCallback;
 
-    private IActivityManager mActivityManager;
     private IActivityTaskManager mActivityTaskManager;
-    private IInputForwarder mInputForwarder;
-    // Temp container to store view coordinates on screen.
-    private final int[] mLocationOnScreen = new int[2];
+    // Temp container to store view coordinates in window.
+    private final int[] mLocationInWindow = new int[2];
 
     private TaskStackListener mTaskStackListener;
 
     private final CloseGuard mGuard = CloseGuard.get();
     private boolean mOpened; // Protected by mGuard.
+
+    private final SurfaceControl.Transaction mTmpTransaction = new SurfaceControl.Transaction();
+
+    /** The ActivityView is only allowed to contain one task. */
+    private final boolean mSingleTaskInstance;
 
     @UnsupportedAppUsage
     public ActivityView(Context context) {
@@ -85,9 +94,14 @@ public class ActivityView extends ViewGroup {
     }
 
     public ActivityView(Context context, AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
+        this(context, attrs, defStyle, false /*singleTaskInstance*/);
+    }
 
-        mActivityManager = ActivityManager.getService();
+    public ActivityView(
+            Context context, AttributeSet attrs, int defStyle, boolean singleTaskInstance) {
+        super(context, attrs, defStyle);
+        mSingleTaskInstance = singleTaskInstance;
+
         mActivityTaskManager = ActivityTaskManager.getService();
         mSurfaceView = new SurfaceView(context);
         mSurfaceCallback = new SurfaceCallback();
@@ -100,6 +114,7 @@ public class ActivityView extends ViewGroup {
 
     /** Callback that notifies when the container is ready or destroyed. */
     public abstract static class StateCallback {
+
         /**
          * Called when the container is ready for launching activities. Calling
          * {@link #startActivity(Intent)} prior to this callback will result in an
@@ -108,6 +123,7 @@ public class ActivityView extends ViewGroup {
          * @see #startActivity(Intent)
          */
         public abstract void onActivityViewReady(ActivityView view);
+
         /**
          * Called when the container can no longer launch activities. Calling
          * {@link #startActivity(Intent)} after this callback will result in an
@@ -116,11 +132,24 @@ public class ActivityView extends ViewGroup {
          * @see #startActivity(Intent)
          */
         public abstract void onActivityViewDestroyed(ActivityView view);
+
+        /**
+         * Called when a task is created inside the container.
+         * This is a filtered version of {@link TaskStackListener}
+         */
+        public void onTaskCreated(int taskId, ComponentName componentName) { }
+
         /**
          * Called when a task is moved to the front of the stack inside the container.
          * This is a filtered version of {@link TaskStackListener}
          */
         public void onTaskMovedToFront(ActivityManager.StackInfo stackInfo) { }
+
+        /**
+         * Called when a task is about to be removed from the stack inside the container.
+         * This is a filtered version of {@link TaskStackListener}
+         */
+        public void onTaskRemovalStarted(int taskId) { }
     }
 
     /**
@@ -245,7 +274,7 @@ public class ActivityView extends ViewGroup {
     }
 
     /**
-     * Triggers an update of {@link ActivityView}'s location on screen to properly set touch exclude
+     * Triggers an update of {@link ActivityView}'s location in window to properly set touch exclude
      * regions and avoid focus switches by touches on this view.
      */
     public void onLocationChanged() {
@@ -260,52 +289,31 @@ public class ActivityView extends ViewGroup {
     /** Send current location and size to the WM to set tap exclude region for this view. */
     private void updateLocation() {
         try {
-            getLocationOnScreen(mLocationOnScreen);
+            getLocationInWindow(mLocationInWindow);
             WindowManagerGlobal.getWindowSession().updateTapExcludeRegion(getWindow(), hashCode(),
-                    mLocationOnScreen[0], mLocationOnScreen[1], getWidth(), getHeight());
+                    mLocationInWindow[0], mLocationInWindow[1], getWidth(), getHeight());
         } catch (RemoteException e) {
             e.rethrowAsRuntimeException();
         }
     }
 
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        return injectInputEvent(event) || super.onTouchEvent(event);
-    }
-
-    @Override
-    public boolean onGenericMotionEvent(MotionEvent event) {
-        if (event.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
-            if (injectInputEvent(event)) {
-                return true;
-            }
-        }
-        return super.onGenericMotionEvent(event);
-    }
-
-    private boolean injectInputEvent(InputEvent event) {
-        if (mInputForwarder != null) {
-            try {
-                return mInputForwarder.forwardEvent(event);
-            } catch (RemoteException e) {
-                e.rethrowAsRuntimeException();
-            }
-        }
-        return false;
-    }
-
     private class SurfaceCallback implements SurfaceHolder.Callback {
         @Override
         public void surfaceCreated(SurfaceHolder surfaceHolder) {
-            mSurface = mSurfaceView.getHolder().getSurface();
             if (mVirtualDisplay == null) {
-                initVirtualDisplay();
+                initVirtualDisplay(new SurfaceSession());
                 if (mVirtualDisplay != null && mActivityViewCallback != null) {
                     mActivityViewCallback.onActivityViewReady(ActivityView.this);
                 }
             } else {
-                mVirtualDisplay.setSurface(surfaceHolder.getSurface());
+                mTmpTransaction.reparent(mRootSurfaceControl,
+                        mSurfaceView.getSurfaceControl()).apply();
             }
+
+            if (mVirtualDisplay != null) {
+                mVirtualDisplay.setDisplayState(true);
+            }
+
             updateLocation();
         }
 
@@ -319,16 +327,20 @@ public class ActivityView extends ViewGroup {
 
         @Override
         public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
-            mSurface.release();
-            mSurface = null;
             if (mVirtualDisplay != null) {
-                mVirtualDisplay.setSurface(null);
+                mVirtualDisplay.setDisplayState(false);
             }
             cleanTapExcludeRegion();
         }
     }
 
-    private void initVirtualDisplay() {
+    @Override
+    protected void onVisibilityChanged(View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        mSurfaceView.setVisibility(visibility);
+    }
+
+    private void initVirtualDisplay(SurfaceSession surfaceSession) {
         if (mVirtualDisplay != null) {
             throw new IllegalStateException("Trying to initialize for the second time.");
         }
@@ -336,11 +348,12 @@ public class ActivityView extends ViewGroup {
         final int width = mSurfaceView.getWidth();
         final int height = mSurfaceView.getHeight();
         final DisplayManager displayManager = mContext.getSystemService(DisplayManager.class);
+
         mVirtualDisplay = displayManager.createVirtualDisplay(
-                DISPLAY_NAME + "@" + System.identityHashCode(this),
-                width, height, getBaseDisplayDensity(), mSurface,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
-                        | DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY);
+                DISPLAY_NAME + "@" + System.identityHashCode(this), width, height,
+                getBaseDisplayDensity(), null,
+                VIRTUAL_DISPLAY_FLAG_PUBLIC | VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY
+                        | VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL);
         if (mVirtualDisplay == null) {
             Log.e(TAG, "Failed to initialize ActivityView");
             return;
@@ -348,12 +361,24 @@ public class ActivityView extends ViewGroup {
 
         final int displayId = mVirtualDisplay.getDisplay().getDisplayId();
         final IWindowManager wm = WindowManagerGlobal.getWindowManagerService();
+
+        mRootSurfaceControl = new SurfaceControl.Builder(surfaceSession)
+                .setContainerLayer(true)
+                .setParent(mSurfaceView.getSurfaceControl())
+                .setName(DISPLAY_NAME)
+                .build();
+
         try {
+            wm.reparentDisplayContent(displayId, mRootSurfaceControl);
             wm.dontOverrideDisplayInfo(displayId);
+            if (mSingleTaskInstance) {
+                mActivityTaskManager.setDisplayToSingleTaskInstance(displayId);
+            }
         } catch (RemoteException e) {
             e.rethrowAsRuntimeException();
         }
-        mInputForwarder = InputManager.getInstance().createInputForwarder(displayId);
+
+        mTmpTransaction.show(mRootSurfaceControl).apply();
         mTaskStackListener = new TaskStackListenerImpl();
         try {
             mActivityTaskManager.registerTaskStackListener(mTaskStackListener);
@@ -369,9 +394,6 @@ public class ActivityView extends ViewGroup {
 
         mSurfaceView.getHolder().removeCallback(mSurfaceCallback);
 
-        if (mInputForwarder != null) {
-            mInputForwarder = null;
-        }
         cleanTapExcludeRegion();
 
         if (mTaskStackListener != null) {
@@ -390,11 +412,6 @@ public class ActivityView extends ViewGroup {
             displayReleased = true;
         } else {
             displayReleased = false;
-        }
-
-        if (mSurface != null) {
-            mSurface.release();
-            mSurface = null;
         }
 
         if (displayReleased && mActivityViewCallback != null) {
@@ -466,14 +483,45 @@ public class ActivityView extends ViewGroup {
 
         @Override
         public void onTaskMovedToFront(int taskId) throws RemoteException {
-            if (mActivityViewCallback  != null) {
-                StackInfo stackInfo = getTopMostStackInfo();
-                // if StackInfo was null or unrelated to the "move to front" then there's no use
-                // notifying the callback
-                if (stackInfo != null
-                        && taskId == stackInfo.taskIds[stackInfo.taskIds.length - 1]) {
-                    mActivityViewCallback.onTaskMovedToFront(stackInfo);
-                }
+            if (mActivityViewCallback  == null) {
+                return;
+            }
+
+            StackInfo stackInfo = getTopMostStackInfo();
+            // if StackInfo was null or unrelated to the "move to front" then there's no use
+            // notifying the callback
+            if (stackInfo != null
+                    && taskId == stackInfo.taskIds[stackInfo.taskIds.length - 1]) {
+                mActivityViewCallback.onTaskMovedToFront(stackInfo);
+            }
+        }
+
+        @Override
+        public void onTaskCreated(int taskId, ComponentName componentName) throws RemoteException {
+            if (mActivityViewCallback  == null) {
+                return;
+            }
+
+            StackInfo stackInfo = getTopMostStackInfo();
+            // if StackInfo was null or unrelated to the task creation then there's no use
+            // notifying the callback
+            if (stackInfo != null
+                    && taskId == stackInfo.taskIds[stackInfo.taskIds.length - 1]) {
+                mActivityViewCallback.onTaskCreated(taskId, componentName);
+            }
+        }
+
+        @Override
+        public void onTaskRemovalStarted(int taskId) throws RemoteException {
+            if (mActivityViewCallback  == null) {
+                return;
+            }
+            StackInfo stackInfo = getTopMostStackInfo();
+            // if StackInfo was null or task is on a different display then there's no use
+            // notifying the callback
+            if (stackInfo != null
+                    && taskId == stackInfo.taskIds[stackInfo.taskIds.length - 1]) {
+                mActivityViewCallback.onTaskRemovalStarted(taskId);
             }
         }
 

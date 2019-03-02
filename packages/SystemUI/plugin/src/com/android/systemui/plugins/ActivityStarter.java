@@ -27,9 +27,21 @@ import com.android.systemui.plugins.annotations.ProvidesInterface;
  */
 @ProvidesInterface(version = ActivityStarter.VERSION)
 public interface ActivityStarter {
-    int VERSION = 1;
+    int VERSION = 2;
 
     void startPendingIntentDismissingKeyguard(PendingIntent intent);
+
+    /**
+     * Similar to {@link #startPendingIntentDismissingKeyguard(PendingIntent, Runnable)}, but allows
+     * you to specify the callback that is executed on the UI thread after the intent is sent.
+     */
+    void startPendingIntentDismissingKeyguard(PendingIntent intent,
+            Runnable intentSentUiThreadCallback);
+
+    /**
+     * The intent flag can be specified in startActivity().
+     */
+    void startActivity(Intent intent, boolean onlyProvisioned, boolean dismissShade, int flags);
     void startActivity(Intent intent, boolean dismissShade);
     void startActivity(Intent intent, boolean onlyProvisioned, boolean dismissShade);
     void startActivity(Intent intent, boolean dismissShade, Callback callback);

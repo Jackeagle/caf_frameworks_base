@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include <GrContextOptions.h>
 #include <cutils/compiler.h>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
-#include <GrContextOptions.h>
 
 namespace android {
 
@@ -52,7 +52,7 @@ public:
      * the initialized state the load and store methods will return without
      * performing any cache operations.
      */
-    virtual void initShaderDiskCache(const void *identity, ssize_t size);
+    virtual void initShaderDiskCache(const void* identity, ssize_t size);
 
     virtual void initShaderDiskCache() { initShaderDiskCache(nullptr, 0); }
 
@@ -74,6 +74,13 @@ public:
      * This will be called by Skia after it compiled a new SKSL shader
      */
     void store(const SkData& key, const SkData& data) override;
+
+    /**
+     * "onVkFrameFlushed" tries to store Vulkan pipeline cache state.
+     * Pipeline cache is saved on disk only if the size of the data has changed or there was
+     * a new shader compiled.
+     */
+    void onVkFrameFlushed(GrContext* context);
 
 private:
     // Creation and (the lack of) destruction is handled internally.
@@ -153,7 +160,7 @@ private:
     /**
      *  "mObservedBlobValueSize" is the maximum value size observed by the cache reading function.
      */
-    size_t mObservedBlobValueSize = 20*1024;
+    size_t mObservedBlobValueSize = 20 * 1024;
 
     /**
      *  The time in seconds to wait before saving newly inserted cache entries.
@@ -167,6 +174,33 @@ private:
     mutable std::mutex mMutex;
 
     /**
+     *  If set to "true", the next call to onVkFrameFlushed, will invoke
+     * GrCanvas::storeVkPipelineCacheData. This does not guarantee that data will be stored on disk.
+     */
+    bool mTryToStorePipelineCache = true;
+
+    /**
+     * This flag is used by "ShaderCache::store" to distinguish between shader data and
+     * Vulkan pipeline data.
+     */
+    bool mInStoreVkPipelineInProgress = false;
+
+    /**
+     *  "mNewPipelineCacheSize" has the size of the new Vulkan pipeline cache data. It is used
+     *  to prevent unnecessary disk writes, if the pipeline cache size has not changed.
+     */
+    size_t mNewPipelineCacheSize = -1;
+    /**
+     *  "mOldPipelineCacheSize" has the size of the Vulkan pipeline cache data stored on disk.
+     */
+    size_t mOldPipelineCacheSize = -1;
+
+    /**
+     *  "mCacheDirty" is true when there is new shader cache data, which is not saved to disk.
+     */
+    bool mCacheDirty = false;
+
+    /**
      * "sCache" is the singleton ShaderCache object.
      */
     static ShaderCache sCache;
@@ -176,7 +210,7 @@ private:
      */
     static constexpr uint8_t sIDKey = 0;
 
-    friend class ShaderCacheTestUtils; //used for unit testing
+    friend class ShaderCacheTestUtils;  // used for unit testing
 };
 
 } /* namespace skiapipeline */

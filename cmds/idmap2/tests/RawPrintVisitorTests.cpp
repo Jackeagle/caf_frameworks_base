@@ -27,11 +27,9 @@
 
 #include "TestHelpers.h"
 
-using ::testing::IsNull;
 using ::testing::NotNull;
 
-namespace android {
-namespace idmap2 {
+namespace android::idmap2 {
 
 TEST(RawPrintVisitorTests, CreateRawPrintVisitor) {
   const std::string target_apk_path(GetTestDataPath() + "/target/target.apk");
@@ -44,7 +42,8 @@ TEST(RawPrintVisitorTests, CreateRawPrintVisitor) {
 
   std::stringstream error;
   std::unique_ptr<const Idmap> idmap =
-      Idmap::FromApkAssets(target_apk_path, *target_apk, overlay_apk_path, *overlay_apk, error);
+      Idmap::FromApkAssets(target_apk_path, *target_apk, overlay_apk_path, *overlay_apk,
+                           PolicyFlags::POLICY_PUBLIC, /* enforce_overlayable */ true, error);
   ASSERT_THAT(idmap, NotNull());
 
   std::stringstream stream;
@@ -53,7 +52,7 @@ TEST(RawPrintVisitorTests, CreateRawPrintVisitor) {
 
   ASSERT_NE(stream.str().find("00000000: 504d4449  magic\n"), std::string::npos);
   ASSERT_NE(stream.str().find("00000004: 00000001  version\n"), std::string::npos);
-  ASSERT_NE(stream.str().find("00000008: f5ad1d1d  target crc\n"), std::string::npos);
+  ASSERT_NE(stream.str().find("00000008: ab7cf70d  target crc\n"), std::string::npos);
   ASSERT_NE(stream.str().find("0000000c: d470336b  overlay crc\n"), std::string::npos);
   ASSERT_NE(stream.str().find("0000021c: 00000000  0x7f010000 -> 0x7f010000 integer/int1\n"),
             std::string::npos);
@@ -80,5 +79,4 @@ TEST(RawPrintVisitorTests, CreateRawPrintVisitorWithoutAccessToApks) {
   ASSERT_NE(stream.str().find("0000021c: 00000000  0x7f020000 -> 0x7f020000\n"), std::string::npos);
 }
 
-}  // namespace idmap2
-}  // namespace android
+}  // namespace android::idmap2

@@ -50,6 +50,7 @@ public class Environment {
 
     /** {@hide} */
     public static final String DIR_ANDROID = "Android";
+    private static final String DIR_SANDBOX = "sandbox";
     private static final String DIR_DATA = "data";
     private static final String DIR_MEDIA = "media";
     private static final String DIR_OBB = "obb";
@@ -115,6 +116,10 @@ public class Environment {
 
         public File[] buildExternalStoragePublicDirs(String type) {
             return buildPaths(getExternalDirs(), type);
+        }
+
+        public File[] buildExternalStorageAndroidSandboxDirs() {
+            return buildPaths(getExternalDirs(), DIR_ANDROID, DIR_SANDBOX);
         }
 
         public File[] buildExternalStorageAndroidDataDirs() {
@@ -379,6 +384,11 @@ public class Environment {
     /** {@hide} */
     public static File getDataAppDirectory(String volumeUuid) {
         return new File(getDataDirectory(volumeUuid), "app");
+    }
+
+    /** {@hide} */
+    public static File getDataStagingDirectory(String volumeUuid) {
+        return new File(getDataDirectory(volumeUuid), "staging");
     }
 
     /** {@hide} */
@@ -657,6 +667,12 @@ public class Environment {
     public static String DIRECTORY_SCREENSHOTS = "Screenshots";
 
     /**
+     * Standard directory in which to place any audio files which are
+     * audiobooks.
+     */
+    public static String DIRECTORY_AUDIOBOOKS = "Audiobooks";
+
+    /**
      * List of standard storage directories.
      * <p>
      * Each of its values have its own constant:
@@ -671,6 +687,7 @@ public class Environment {
      *   <li>{@link #DIRECTORY_DOWNLOADS}
      *   <li>{@link #DIRECTORY_DCIM}
      *   <li>{@link #DIRECTORY_DOCUMENTS}
+     *   <li>{@link #DIRECTORY_AUDIOBOOKS}
      * </ul>
      * @hide
      */
@@ -684,7 +701,8 @@ public class Environment {
             DIRECTORY_MOVIES,
             DIRECTORY_DOWNLOADS,
             DIRECTORY_DCIM,
-            DIRECTORY_DOCUMENTS
+            DIRECTORY_DOCUMENTS,
+            DIRECTORY_AUDIOBOOKS,
     };
 
     /**
@@ -709,6 +727,7 @@ public class Environment {
     /** {@hide} */ public static final int HAS_DOWNLOADS = 1 << 7;
     /** {@hide} */ public static final int HAS_DCIM = 1 << 8;
     /** {@hide} */ public static final int HAS_DOCUMENTS = 1 << 9;
+    /** {@hide} */ public static final int HAS_AUDIOBOOKS = 1 << 10;
 
     /** {@hide} */ public static final int HAS_ANDROID = 1 << 16;
     /** {@hide} */ public static final int HAS_OTHER = 1 << 17;
@@ -738,6 +757,7 @@ public class Environment {
                 else if (DIRECTORY_DOWNLOADS.equals(name)) res |= HAS_DOWNLOADS;
                 else if (DIRECTORY_DCIM.equals(name)) res |= HAS_DCIM;
                 else if (DIRECTORY_DOCUMENTS.equals(name)) res |= HAS_DOCUMENTS;
+                else if (DIRECTORY_AUDIOBOOKS.equals(name)) res |= HAS_AUDIOBOOKS;
                 else if (DIRECTORY_ANDROID.equals(name)) res |= HAS_ANDROID;
                 else res |= HAS_OTHER;
             }
@@ -803,6 +823,15 @@ public class Environment {
     public static File getExternalStoragePublicDirectory(String type) {
         throwIfUserRequired();
         return sCurrentUser.buildExternalStoragePublicDirs(type)[0];
+    }
+
+    /**
+     * Returns the path for android-specific data on the SD card.
+     * @hide
+     */
+    public static File[] buildExternalStorageAndroidSandboxDirs() {
+        throwIfUserRequired();
+        return sCurrentUser.buildExternalStorageAndroidSandboxDirs();
     }
 
     /**

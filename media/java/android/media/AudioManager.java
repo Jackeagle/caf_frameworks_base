@@ -28,7 +28,9 @@ import android.annotation.SystemService;
 import android.annotation.UnsupportedAppUsage;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.bluetooth.BluetoothCodecConfig;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothProfile;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -54,7 +56,6 @@ import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Pair;
-import android.util.Slog;
 import android.view.KeyEvent;
 
 import com.android.internal.annotations.GuardedBy;
@@ -68,6 +69,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
@@ -540,36 +542,42 @@ public class AudioManager {
 
     /**
      * Adjusting the volume due to a hardware key press.
+     * This flag can be used in the places in order to denote (or check) that a volume adjustment
+     * request is from a hardware key press. (e.g. {@link MediaController}).
      * @hide
      */
-    public static final int FLAG_FROM_KEY = 1 << 12;
+    @SystemApi
+    public static final int FLAG_FROM_KEY = 1 << 16;
 
-    private static final String[] FLAG_NAMES = {
-        "FLAG_SHOW_UI",
-        "FLAG_ALLOW_RINGER_MODES",
-        "FLAG_PLAY_SOUND",
-        "FLAG_REMOVE_SOUND_AND_VIBRATE",
-        "FLAG_VIBRATE",
-        "FLAG_FIXED_VOLUME",
-        "FLAG_BLUETOOTH_ABS_VOLUME",
-        "FLAG_SHOW_SILENT_HINT",
-        "FLAG_HDMI_SYSTEM_AUDIO_VOLUME",
-        "FLAG_ACTIVE_MEDIA_ONLY",
-        "FLAG_SHOW_UI_WARNINGS",
-        "FLAG_SHOW_VIBRATE_HINT",
-        "FLAG_FROM_KEY",
-    };
+    // The iterator of TreeMap#entrySet() returns the entries in ascending key order.
+    private static final TreeMap<Integer, String> FLAG_NAMES = new TreeMap<>();
+
+    static {
+        FLAG_NAMES.put(FLAG_SHOW_UI, "FLAG_SHOW_UI");
+        FLAG_NAMES.put(FLAG_ALLOW_RINGER_MODES, "FLAG_ALLOW_RINGER_MODES");
+        FLAG_NAMES.put(FLAG_PLAY_SOUND, "FLAG_PLAY_SOUND");
+        FLAG_NAMES.put(FLAG_REMOVE_SOUND_AND_VIBRATE, "FLAG_REMOVE_SOUND_AND_VIBRATE");
+        FLAG_NAMES.put(FLAG_VIBRATE, "FLAG_VIBRATE");
+        FLAG_NAMES.put(FLAG_FIXED_VOLUME, "FLAG_FIXED_VOLUME");
+        FLAG_NAMES.put(FLAG_BLUETOOTH_ABS_VOLUME, "FLAG_BLUETOOTH_ABS_VOLUME");
+        FLAG_NAMES.put(FLAG_SHOW_SILENT_HINT, "FLAG_SHOW_SILENT_HINT");
+        FLAG_NAMES.put(FLAG_HDMI_SYSTEM_AUDIO_VOLUME, "FLAG_HDMI_SYSTEM_AUDIO_VOLUME");
+        FLAG_NAMES.put(FLAG_ACTIVE_MEDIA_ONLY, "FLAG_ACTIVE_MEDIA_ONLY");
+        FLAG_NAMES.put(FLAG_SHOW_UI_WARNINGS, "FLAG_SHOW_UI_WARNINGS");
+        FLAG_NAMES.put(FLAG_SHOW_VIBRATE_HINT, "FLAG_SHOW_VIBRATE_HINT");
+        FLAG_NAMES.put(FLAG_FROM_KEY, "FLAG_FROM_KEY");
+    }
 
     /** @hide */
     public static String flagsToString(int flags) {
         final StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < FLAG_NAMES.length; i++) {
-            final int flag = 1 << i;
+        for (Map.Entry<Integer, String> entry : FLAG_NAMES.entrySet()) {
+            final int flag = entry.getKey();
             if ((flags & flag) != 0) {
                 if (sb.length() > 0) {
                     sb.append(',');
                 }
-                sb.append(FLAG_NAMES[i]);
+                sb.append(entry.getValue());
                 flags &= ~flag;
             }
         }
@@ -3814,6 +3822,12 @@ public class AudioManager {
     public static final int DEVICE_IN_HDMI =
                                     AudioSystem.DEVICE_IN_HDMI;
     /** @hide
+     * The audio input device code for HDMI ARC
+     */
+    public static final int DEVICE_IN_HDMI_ARC =
+                                    AudioSystem.DEVICE_IN_HDMI_ARC;
+
+    /** @hide
      * The audio input device code for telephony voice RX path
      */
     public static final int DEVICE_IN_TELEPHONY_RX =
@@ -3994,33 +4008,11 @@ public class AudioManager {
     }
 
      /**
-     * Indicate A2DP source or sink connection state change.
-     * @param device Bluetooth device connected/disconnected
-     * @param state  new connection state (BluetoothProfile.STATE_xxx)
-     * @param profile profile for the A2DP device
-     * (either {@link android.bluetooth.BluetoothProfile.A2DP} or
-     * {@link android.bluetooth.BluetoothProfile.A2DP_SINK})
-     * @return a delay in ms that the caller should wait before broadcasting
-     * BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED intent.
-     * {@hide}
-     */
-    public int setBluetoothA2dpDeviceConnectionState(BluetoothDevice device, int state,
-            int profile) {
-        final IAudioService service = getService();
-        int delay = 0;
-        try {
-            delay = service.setBluetoothA2dpDeviceConnectionState(device, state, profile);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-        return delay;
-    }
-
-     /**
      * Indicate A2DP source or sink connection state change and eventually suppress
      * the {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent.
      * @param device Bluetooth device connected/disconnected
-     * @param state  new connection state (BluetoothProfile.STATE_xxx)
+     * @param state  new connection state, {@link BluetoothProfile#STATE_CONNECTED}
+     *     or {@link BluetoothProfile#STATE_DISCONNECTED}
      * @param profile profile for the A2DP device
      * @param a2dpVolume New volume for the connecting device. Does nothing if disconnecting.
      * (either {@link android.bluetooth.BluetoothProfile.A2DP} or
@@ -4032,8 +4024,8 @@ public class AudioManager {
      * {@hide}
      */
     public int setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(
-                BluetoothDevice device, int state, int profile,
-                boolean suppressNoisyIntent, int a2dpVolume) {
+            BluetoothDevice device, int state,
+            int profile, boolean suppressNoisyIntent, int a2dpVolume) {
         final IAudioService service = getService();
         int delay = 0;
         try {
@@ -4057,6 +4049,36 @@ public class AudioManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+     /**
+     * Indicate A2DP source or sink active device change and eventually suppress
+     * the {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent.
+     * @param device Bluetooth device connected/disconnected
+     * @param state  new connection state (BluetoothProfile.STATE_xxx)
+     * @param profile profile for the A2DP device
+     * (either {@link android.bluetooth.BluetoothProfile.A2DP} or
+     * {@link android.bluetooth.BluetoothProfile.A2DP_SINK})
+     * @param a2dpVolume New volume for the connecting device. Does nothing if
+     * disconnecting. Pass value -1 in case you want this field to be ignored
+     * @param suppressNoisyIntent if true the
+     * {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent will not be sent.
+     * @return a delay in ms that the caller should wait before broadcasting
+     * BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED intent.
+     * {@hide}
+     */
+    public int handleBluetoothA2dpActiveDeviceChange(
+                BluetoothDevice device, int state, int profile,
+                boolean suppressNoisyIntent, int a2dpVolume) {
+        final IAudioService service = getService();
+        int delay = 0;
+        try {
+            delay = service.handleBluetoothA2dpActiveDeviceChange(device,
+                state, profile, suppressNoisyIntent, a2dpVolume);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+        return delay;
     }
 
     /** {@hide} */
@@ -4292,9 +4314,8 @@ public class AudioManager {
      * Return codes for listAudioPorts(), createAudioPatch() ...
      */
 
-    /** @hide
-     * CANDIDATE FOR PUBLIC API
-     */
+    /** @hide */
+    @SystemApi
     public static final int SUCCESS = AudioSystem.SUCCESS;
     /**
      * A default error code.
@@ -4923,6 +4944,34 @@ public class AudioManager {
         return microphones;
     }
 
+    /**
+     * Returns a list of audio formats that corresponds to encoding formats
+     * supported on offload path for A2DP playback.
+     *
+     * @return a list of {@link BluetoothCodecConfig} objects containing encoding formats
+     * supported for offload A2DP playback
+     * @hide
+     */
+    public List<BluetoothCodecConfig> getHwOffloadEncodingFormatsSupportedForA2DP() {
+        ArrayList<Integer> formatsList = new ArrayList<Integer>();
+        ArrayList<BluetoothCodecConfig> codecConfigList = new ArrayList<BluetoothCodecConfig>();
+
+        int status = AudioSystem.getHwOffloadEncodingFormatsSupportedForA2DP(formatsList);
+        if (status != AudioManager.SUCCESS) {
+            Log.e(TAG, "getHwOffloadEncodingFormatsSupportedForA2DP failed:" + status);
+            return codecConfigList;
+        }
+
+        for (Integer format : formatsList) {
+            int btSourceCodec = AudioSystem.audioFormatToBluetoothSourceCodec(format);
+            if (btSourceCodec
+                    != BluetoothCodecConfig.SOURCE_CODEC_TYPE_INVALID) {
+                codecConfigList.add(new BluetoothCodecConfig(btSourceCodec));
+            }
+        }
+        return codecConfigList;
+    }
+
     // Since we need to calculate the changes since THE LAST NOTIFICATION, and not since the
     // (unpredictable) last time updateAudioPortCache() was called by someone, keep a list
     // of the ports that exist at the time of the last notification.
@@ -5168,6 +5217,15 @@ public class AudioManager {
             return new HashMap<Integer, Boolean>(); // Always return a map.
         }
         return reportedSurroundFormats;
+    }
+
+    /**
+     * Return if audio haptic coupled playback is supported or not.
+     *
+     * @return whether audio haptic playback supported.
+     */
+    public static boolean isHapticPlaybackSupported() {
+        return AudioSystem.isHapticPlaybackSupported();
     }
 
 

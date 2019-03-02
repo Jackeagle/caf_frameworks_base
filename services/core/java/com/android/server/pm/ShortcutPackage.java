@@ -20,8 +20,10 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
 import android.content.res.Resources;
 import android.os.PersistableBundle;
 import android.text.format.Formatter;
@@ -109,6 +111,11 @@ class ShortcutPackage extends ShortcutPackageItem {
      * All the shortcuts from the package, keyed on IDs.
      */
     final private ArrayMap<String, ShortcutInfo> mShortcuts = new ArrayMap<>();
+
+    /**
+     * All the share targets from the package
+     */
+    private final ArrayList<ShareTargetInfo> mShareTargets = new ArrayList<>(0);
 
     /**
      * # of times the package has called rate-limited APIs.
@@ -635,6 +642,59 @@ class ShortcutPackage extends ShortcutPackageItem {
     }
 
     /**
+     * Returns a list of ShortcutInfos that match the given intent filter and the category of
+     * available ShareTarget definitions in this package.
+     */
+    public List<ShortcutManager.ShareShortcutInfo> getMatchingShareTargets(
+            @NonNull IntentFilter filter) {
+        final List<ShareTargetInfo> matchedTargets = new ArrayList<>();
+        for (int i = 0; i < mShareTargets.size(); i++) {
+            final ShareTargetInfo target = mShareTargets.get(i);
+            for (ShareTargetInfo.TargetData data : target.mTargetData) {
+                if (filter.hasDataType(data.mMimeType)) {
+                    // Matched at least with one data type
+                    matchedTargets.add(target);
+                    break;
+                }
+            }
+        }
+
+        if (matchedTargets.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Get the list of all dynamic shortcuts in this package
+        final ArrayList<ShortcutInfo> shortcuts = new ArrayList<>();
+        findAll(shortcuts, ShortcutInfo::isDynamicVisible, ShortcutInfo.CLONE_REMOVE_FOR_LAUNCHER);
+
+        final List<ShortcutManager.ShareShortcutInfo> result = new ArrayList<>();
+        for (int i = 0; i < shortcuts.size(); i++) {
+            final ShortcutInfo si = shortcuts.get(i);
+            for (int j = 0; j < matchedTargets.size(); j++) {
+                // Shortcut must have all of share target categories
+                boolean hasAllCategories = true;
+                final ShareTargetInfo target = matchedTargets.get(j);
+                for (int q = 0; q < target.mCategories.length; q++) {
+                    if (!si.getCategories().contains(target.mCategories[q])) {
+                        hasAllCategories = false;
+                        break;
+                    }
+                }
+                if (hasAllCategories) {
+                    result.add(new ShortcutManager.ShareShortcutInfo(si, new ComponentName(
+                            getPackageName(), target.mTargetClass)));
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    public boolean hasShareTargets() {
+        return !mShareTargets.isEmpty();
+    }
+
+    /**
      * Return the filenames (excluding path names) of icon bitmap files from this package.
      */
     public ArraySet<String> getUsedBitmapFiles() {
@@ -739,15 +799,16 @@ class ShortcutPackage extends ShortcutPackageItem {
         List<ShortcutInfo> newManifestShortcutList = null;
         try {
             newManifestShortcutList = ShortcutParser.parseShortcuts(mShortcutUser.mService,
-                    getPackageName(), getPackageUserId());
+                    getPackageName(), getPackageUserId(), mShareTargets);
         } catch (IOException|XmlPullParserException e) {
             Slog.e(TAG, "Failed to load shortcuts from AndroidManifest.xml.", e);
         }
         final int manifestShortcutSize = newManifestShortcutList == null ? 0
                 : newManifestShortcutList.size();
         if (ShortcutService.DEBUG) {
-            Slog.d(TAG, String.format("Package %s has %d manifest shortcut(s)",
-                    getPackageName(), manifestShortcutSize));
+            Slog.d(TAG,
+                    String.format("Package %s has %d manifest shortcut(s), and %d share target(s)",
+                            getPackageName(), manifestShortcutSize, mShareTargets.size()));
         }
         if (isNewApp && (manifestShortcutSize == 0)) {
             // If it's a new app, and it doesn't have manifest shortcuts, then nothing to do.
@@ -1655,6 +1716,11 @@ class ShortcutPackage extends ShortcutPackageItem {
     @VisibleForTesting
     List<ShortcutInfo> getAllShortcutsForTest() {
         return new ArrayList<>(mShortcuts.values());
+    }
+
+    @VisibleForTesting
+    List<ShareTargetInfo> getAllShareTargetsForTest() {
+        return new ArrayList<>(mShareTargets);
     }
 
     @Override

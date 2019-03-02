@@ -16,6 +16,9 @@
 
 package android.hardware.hdmi;
 
+import static com.android.internal.os.RoSystemProperties.PROPERTY_HDMI_IS_DEVICE_HDMI_CEC_SWITCH;
+
+import android.annotation.IntDef;
 import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
 import android.annotation.RequiresPermission;
@@ -27,8 +30,13 @@ import android.annotation.SystemService;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.util.ArrayMap;
 import android.util.Log;
+
+import com.android.internal.util.Preconditions;
+
+import java.util.List;
 
 /**
  * The {@link HdmiControlManager} class is used to send HDMI control messages
@@ -49,6 +57,10 @@ public final class HdmiControlManager {
     private static final String TAG = "HdmiControlManager";
 
     @Nullable private final IHdmiControlService mService;
+
+    private static final int INVALID_PHYSICAL_ADDRESS = 0xFFFF;
+
+    private int mPhysicalAddress = INVALID_PHYSICAL_ADDRESS;
 
     /**
      * Broadcast Action: Display OSD message.
@@ -97,9 +109,24 @@ public final class HdmiControlManager {
     public static final int POWER_STATUS_TRANSIENT_TO_ON = 2;
     public static final int POWER_STATUS_TRANSIENT_TO_STANDBY = 3;
 
+    @IntDef ({
+        RESULT_SUCCESS,
+        RESULT_TIMEOUT,
+        RESULT_SOURCE_NOT_AVAILABLE,
+        RESULT_TARGET_NOT_AVAILABLE,
+        RESULT_ALREADY_IN_PROGRESS,
+        RESULT_EXCEPTION,
+        RESULT_INCORRECT_MODE,
+        RESULT_COMMUNICATION_FAILED,
+    })
+    public @interface ControlCallbackResult {}
+
+    /** Control operation is successfully handled by the framework. */
     public static final int RESULT_SUCCESS = 0;
     public static final int RESULT_TIMEOUT = 1;
+    /** Source device that the application is using is not available. */
     public static final int RESULT_SOURCE_NOT_AVAILABLE = 2;
+    /** Target device that the application is controlling is not available. */
     public static final int RESULT_TARGET_NOT_AVAILABLE = 3;
 
     @Deprecated public static final int RESULT_ALREADY_IN_PROGRESS = 4;
@@ -264,6 +291,10 @@ public final class HdmiControlManager {
     private final boolean mHasTvDevice;
     // True if we have a logical device of type audio system hosted in the system.
     private final boolean mHasAudioSystemDevice;
+    // True if we have a logical device of type audio system hosted in the system.
+    private final boolean mHasSwitchDevice;
+    // True if it's a switch device.
+    private final boolean mIsSwitchDevice;
 
     /**
      * {@hide} - hide this constructor because it has a parameter of type IHdmiControlService,
@@ -283,6 +314,9 @@ public final class HdmiControlManager {
         mHasTvDevice = hasDeviceType(types, HdmiDeviceInfo.DEVICE_TV);
         mHasPlaybackDevice = hasDeviceType(types, HdmiDeviceInfo.DEVICE_PLAYBACK);
         mHasAudioSystemDevice = hasDeviceType(types, HdmiDeviceInfo.DEVICE_AUDIO_SYSTEM);
+        mHasSwitchDevice = hasDeviceType(types, HdmiDeviceInfo.DEVICE_PURE_CEC_SWITCH);
+        mIsSwitchDevice = SystemProperties.getBoolean(
+            PROPERTY_HDMI_IS_DEVICE_HDMI_CEC_SWITCH, false);
     }
 
     private static boolean hasDeviceType(int[] types, int type) {
@@ -319,6 +353,9 @@ public final class HdmiControlManager {
                 return mHasPlaybackDevice ? new HdmiPlaybackClient(mService) : null;
             case HdmiDeviceInfo.DEVICE_AUDIO_SYSTEM:
                 return mHasAudioSystemDevice ? new HdmiAudioSystemClient(mService) : null;
+            case HdmiDeviceInfo.DEVICE_PURE_CEC_SWITCH:
+                return (mHasSwitchDevice || mIsSwitchDevice)
+                    ? new HdmiSwitchClient(mService) : null;
             default:
                 return null;
         }
@@ -373,6 +410,101 @@ public final class HdmiControlManager {
     }
 
     /**
+     * Gets an object that represents an HDMI-CEC logical device of type switch on the system.
+     *
+     * <p>Used to send HDMI control messages to other devices (e.g. TVs) through HDMI bus.
+     * It is also possible to communicate with other logical devices hosted in the same
+     * system if the system is configured to host more than one type of HDMI-CEC logical device.
+     *
+     * @return {@link HdmiSwitchClient} instance. {@code null} on failure.
+     * @hide
+     */
+    @Nullable
+    @SystemApi
+    @SuppressLint("Doclava125")
+    public HdmiSwitchClient getSwitchClient() {
+        return (HdmiSwitchClient) getClient(HdmiDeviceInfo.DEVICE_PURE_CEC_SWITCH);
+    }
+
+    /**
+     * Get a snapshot of the real-time status of the remote devices.
+     *
+     * <p>This only applies to devices with multiple HDMI inputs.
+     *
+     * @return a list of {@link HdmiDeviceInfo} of the connected CEC devices. An empty
+     * list will be returned if there is none.
+     *
+     * @hide
+     */
+    @SystemApi
+    @Nullable
+    public List<HdmiDeviceInfo> getConnectedDevicesList() {
+        try {
+            return mService.getDeviceList();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Power off the target device by sending CEC commands.
+     *
+     * <p>The target device info can be obtained by calling {@link #getConnectedDevicesList()}.
+     *
+     * @param deviceInfo {@link HdmiDeviceInfo} of the device to be powered off.
+     *
+     * @hide
+     */
+    @SystemApi
+    public void powerOffRemoteDevice(HdmiDeviceInfo deviceInfo) {
+        Preconditions.checkNotNull(deviceInfo);
+        try {
+            mService.powerOffRemoteDevice(
+                    deviceInfo.getLogicalAddress(), deviceInfo.getDevicePowerStatus());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Power on the target device by sending CEC commands.
+     *
+     * <p>The target device info can be obtained by calling {@link #getConnectedDevicesList()}.
+     *
+     * @param deviceInfo {@link HdmiDeviceInfo} of the device to be powered on.
+     *
+     * @hide
+     */
+    public void powerOnRemoteDevice(HdmiDeviceInfo deviceInfo) {
+        Preconditions.checkNotNull(deviceInfo);
+        try {
+            mService.powerOnRemoteDevice(
+                    deviceInfo.getLogicalAddress(), deviceInfo.getDevicePowerStatus());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Request the target device to be the new Active Source by sending CEC commands.
+     *
+     * <p>The target device info can be obtained by calling {@link #getConnectedDevicesList()}.
+     *
+     * @param deviceInfo HdmiDeviceInfo of the target device
+     *
+     * @hide
+     */
+    @SystemApi
+    public void requestRemoteDeviceToBecomeActiveSource(HdmiDeviceInfo deviceInfo) {
+        Preconditions.checkNotNull(deviceInfo);
+        try {
+            mService.askRemoteDeviceToBecomeActiveSource(deviceInfo.getPhysicalAddress());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Controls standby mode of the system. It will also try to turn on/off the connected devices if
      * necessary.
      *
@@ -385,6 +517,67 @@ public final class HdmiControlManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Gets whether the system is in system audio mode.
+     *
+     * @hide
+     */
+    public boolean getSystemAudioMode() {
+        try {
+            return mService.getSystemAudioMode();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Get the physical address of the device.
+     *
+     * <p>Physical address needs to be automatically adjusted when devices are phyiscally or
+     * electrically added or removed from the device tree. Please see HDMI Specification Version
+     * 1.4b 8.7 Physical Address for more details on the address discovery proccess.
+     *
+     * @hide
+     */
+    @SystemApi
+    public int getPhysicalAddress() {
+        if (mPhysicalAddress != INVALID_PHYSICAL_ADDRESS) {
+            return mPhysicalAddress;
+        }
+        try {
+            mPhysicalAddress = mService.getPhysicalAddress();
+            return mPhysicalAddress;
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Check if the target remote device is connected to the current device.
+     *
+     * <p>The API also returns true if the current device is the target.
+     *
+     * @param targetDevice {@link HdmiDeviceInfo} of the target device.
+     * @return true if {@code targetDevice} is directly or indirectly
+     * connected to the current device.
+     *
+     * @hide
+     */
+    @SystemApi
+    public boolean isRemoteDeviceConnected(HdmiDeviceInfo targetDevice) {
+        Preconditions.checkNotNull(targetDevice);
+        mPhysicalAddress = getPhysicalAddress();
+        if (mPhysicalAddress == INVALID_PHYSICAL_ADDRESS) {
+            return false;
+        }
+        int targetPhysicalAddress = targetDevice.getPhysicalAddress();
+        if (targetPhysicalAddress == INVALID_PHYSICAL_ADDRESS) {
+            return false;
+        }
+        return HdmiUtils.getLocalPortFromPhysicalAddress(targetPhysicalAddress, mPhysicalAddress)
+            != HdmiUtils.TARGET_NOT_UNDER_LOCAL_DEVICE;
     }
 
     /**

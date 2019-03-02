@@ -19,6 +19,7 @@ package com.android.server.wm;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
+import android.app.ActivityManager;
 import android.app.AppProtoEnums;
 import android.app.IActivityManager;
 import android.app.IApplicationThread;
@@ -191,22 +192,28 @@ public abstract class ActivityTaskManagerInternal {
      * Start intents as a package.
      *
      * @param uid Make a call as if this UID did.
+     * @param realCallingPid PID of the real caller.
+     * @param realCallingUid UID of the real caller.
      * @param callingPackage Make a call as if this package did.
      * @param intents Intents to start.
      * @param userId Start the intents on this user.
      * @param validateIncomingUser Set true to skip checking {@code userId} with the calling UID.
      * @param originatingPendingIntent PendingIntentRecord that originated this activity start or
      *        null if not originated by PendingIntent
+     * @param allowBackgroundActivityStart Whether the background activity start should be allowed
+     *        from originatingPendingIntent
      */
-    public abstract int startActivitiesInPackage(int uid, String callingPackage, Intent[] intents,
-            String[] resolvedTypes, IBinder resultTo, SafeActivityOptions options, int userId,
-            boolean validateIncomingUser, PendingIntentRecord originatingPendingIntent);
+    public abstract int startActivitiesInPackage(int uid, int realCallingPid, int realCallingUid,
+            String callingPackage, Intent[] intents, String[] resolvedTypes, IBinder resultTo,
+            SafeActivityOptions options, int userId, boolean validateIncomingUser,
+            PendingIntentRecord originatingPendingIntent,
+            boolean allowBackgroundActivityStart);
 
     public abstract int startActivityInPackage(int uid, int realCallingPid, int realCallingUid,
             String callingPackage, Intent intent, String resolvedType, IBinder resultTo,
             String resultWho, int requestCode, int startFlags, SafeActivityOptions options,
             int userId, TaskRecord inTask, String reason, boolean validateIncomingUser,
-            PendingIntentRecord originatingPendingIntent);
+            PendingIntentRecord originatingPendingIntent, boolean allowBackgroundActivityStart);
 
     /**
      * Start activity {@code intent} without calling user-id check.
@@ -402,7 +409,8 @@ public abstract class ActivityTaskManagerInternal {
             int wakefulness);
 
     /** Writes the current window process states to the proto stream. */
-    public abstract void writeProcessesToProto(ProtoOutputStream proto, String dumpPackage);
+    public abstract void writeProcessesToProto(ProtoOutputStream proto, String dumpPackage,
+            int wakeFullness, boolean testPssMode);
 
     /** Dump the current activities state. */
     public abstract boolean dumpActivity(FileDescriptor fd, PrintWriter pw, String name,
@@ -473,4 +481,15 @@ public abstract class ActivityTaskManagerInternal {
     public abstract void setProfileApp(String profileApp);
     public abstract void setProfileProc(WindowProcessController wpc);
     public abstract void setProfilerInfo(ProfilerInfo profilerInfo);
+
+    public abstract ActivityMetricsLaunchObserverRegistry getLaunchObserverRegistry();
+
+    /**
+     * Gets bitmap snapshot of the provided task id.
+     */
+    public abstract ActivityManager.TaskSnapshot getTaskSnapshot(int taskId,
+            boolean reducedResolution);
+
+    /** Returns true if uid has a visible window or its process is in a top state. */
+    public abstract boolean isUidForeground(int uid);
 }

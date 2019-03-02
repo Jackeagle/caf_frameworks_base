@@ -622,6 +622,7 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
                     onRecognitionFailureLocked();
                     break;
                 case SoundTrigger.RECOGNITION_STATUS_SUCCESS:
+                case SoundTrigger.RECOGNITION_STATUS_GET_STATE_RESPONSE:
                     if (isKeyphraseRecognitionEvent(event)) {
                         onKeyphraseRecognitionSuccessLocked((KeyphraseRecognitionEvent) event);
                     } else {
@@ -638,7 +639,8 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
 
     private void onGenericRecognitionSuccessLocked(GenericRecognitionEvent event) {
         MetricsLogger.count(mContext, "sth_generic_recognition_event", 1);
-        if (event.status != SoundTrigger.RECOGNITION_STATUS_SUCCESS) {
+        if (event.status != SoundTrigger.RECOGNITION_STATUS_SUCCESS
+                && event.status != SoundTrigger.RECOGNITION_STATUS_GET_STATE_RESPONSE) {
             return;
         }
         ModelData model = getModelDataForLocked(event.soundModelHandle);
@@ -656,6 +658,7 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
         }
 
         model.setStopped();
+
         try {
             callback.onGenericSoundTriggerDetected((GenericRecognitionEvent) event);
         } catch (DeadObjectException e) {
@@ -797,6 +800,7 @@ public class SoundTriggerHelper implements SoundTrigger.StatusListener {
             Slog.w(TAG, "Received onRecognition event without callback for keyphrase model.");
             return;
         }
+
         modelData.setStopped();
 
         try {

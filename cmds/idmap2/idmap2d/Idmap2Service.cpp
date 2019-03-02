@@ -26,23 +26,31 @@
 #include <string>
 
 #include "android-base/macros.h"
+#include "android-base/stringprintf.h"
+#include "binder/IPCThreadState.h"
 #include "utils/String8.h"
 #include "utils/Trace.h"
 
 #include "idmap2/BinaryStreamVisitor.h"
 #include "idmap2/FileUtils.h"
 #include "idmap2/Idmap.h"
+#include "idmap2/Policies.h"
+#include "idmap2/Result.h"
 
 #include "idmap2d/Idmap2Service.h"
 
+using android::IPCThreadState;
 using android::binder::Status;
 using android::idmap2::BinaryStreamVisitor;
 using android::idmap2::Idmap;
 using android::idmap2::IdmapHeader;
+using android::idmap2::PolicyBitmask;
+using android::idmap2::Result;
+using android::idmap2::utils::kIdmapCacheDir;
+using android::idmap2::utils::kIdmapFilePermissionMask;
+using android::idmap2::utils::UidHasWriteAccessToPath;
 
 namespace {
-
-static constexpr const char* kIdmapCacheDir = "/data/resource-cache";
 
 Status ok() {
   return Status::ok();
@@ -53,10 +61,13 @@ Status error(const std::string& msg) {
   return Status::fromExceptionCode(Status::EX_NONE, msg.c_str());
 }
 
+PolicyBitmask ConvertAidlArgToPolicyBitmask(int32_t arg) {
+  return static_cast<PolicyBitmask>(arg);
+}
+
 }  // namespace
 
-namespace android {
-namespace os {
+namespace android::os {
 
 Status Idmap2Service::getIdmapPath(const std::string& overlay_apk_path,
                                    int32_t user_id ATTRIBUTE_UNUSED, std::string* _aidl_return) {
@@ -68,18 +79,41 @@ Status Idmap2Service::getIdmapPath(const std::string& overlay_apk_path,
 Status Idmap2Service::removeIdmap(const std::string& overlay_apk_path,
                                   int32_t user_id ATTRIBUTE_UNUSED, bool* _aidl_return) {
   assert(_aidl_return);
+  const uid_t uid = IPCThreadState::self()->getCallingUid();
   const std::string idmap_path = Idmap::CanonicalIdmapPathFor(kIdmapCacheDir, overlay_apk_path);
-  if (unlink(idmap_path.c_str()) == 0) {
-    *_aidl_return = true;
-    return ok();
-  } else {
+  if (!UidHasWriteAccessToPath(uid, idmap_path)) {
+    *_aidl_return = false;
+    return error(base::StringPrintf("failed to unlink %s: calling uid %d lacks write access",
+                                    idmap_path.c_str(), uid));
+  }
+  if (unlink(idmap_path.c_str()) != 0) {
     *_aidl_return = false;
     return error("failed to unlink " + idmap_path + ": " + strerror(errno));
   }
+  *_aidl_return = true;
+  return ok();
+}
+
+Status Idmap2Service::verifyIdmap(const std::string& overlay_apk_path,
+                                  int32_t fulfilled_policies ATTRIBUTE_UNUSED,
+                                  bool enforce_overlayable ATTRIBUTE_UNUSED,
+                                  int32_t user_id ATTRIBUTE_UNUSED, bool* _aidl_return) {
+  assert(_aidl_return);
+  const std::string idmap_path = Idmap::CanonicalIdmapPathFor(kIdmapCacheDir, overlay_apk_path);
+  std::ifstream fin(idmap_path);
+  const std::unique_ptr<const IdmapHeader> header = IdmapHeader::FromBinaryStream(fin);
+  fin.close();
+  std::stringstream dev_null;
+  *_aidl_return = header && header->IsUpToDate(dev_null);
+
+  // TODO(b/119328308): Check that the set of fulfilled policies of the overlay has not changed
+
+  return ok();
 }
 
 Status Idmap2Service::createIdmap(const std::string& target_apk_path,
-                                  const std::string& overlay_apk_path, int32_t user_id,
+                                  const std::string& overlay_apk_path, int32_t fulfilled_policies,
+                                  bool enforce_overlayable, int32_t user_id,
                                   std::unique_ptr<std::string>* _aidl_return) {
   assert(_aidl_return);
   std::stringstream trace;
@@ -90,15 +124,13 @@ Status Idmap2Service::createIdmap(const std::string& target_apk_path,
 
   _aidl_return->reset(nullptr);
 
+  const PolicyBitmask policy_bitmask = ConvertAidlArgToPolicyBitmask(fulfilled_policies);
+
   const std::string idmap_path = Idmap::CanonicalIdmapPathFor(kIdmapCacheDir, overlay_apk_path);
-  std::ifstream fin(idmap_path);
-  const std::unique_ptr<const IdmapHeader> header = IdmapHeader::FromBinaryStream(fin);
-  fin.close();
-  // do not reuse error stream from IsUpToDate below, or error messages will be
-  // polluted with irrelevant data
-  std::stringstream dev_null;
-  if (header && header->IsUpToDate(dev_null)) {
-    return ok();
+  const uid_t uid = IPCThreadState::self()->getCallingUid();
+  if (!UidHasWriteAccessToPath(uid, idmap_path)) {
+    return error(base::StringPrintf("will not write to %s: calling uid %d lacks write accesss",
+                                    idmap_path.c_str(), uid));
   }
 
   const std::unique_ptr<const ApkAssets> target_apk = ApkAssets::Load(target_apk_path);
@@ -113,12 +145,13 @@ Status Idmap2Service::createIdmap(const std::string& target_apk_path,
 
   std::stringstream err;
   const std::unique_ptr<const Idmap> idmap =
-      Idmap::FromApkAssets(target_apk_path, *target_apk, overlay_apk_path, *overlay_apk, err);
+      Idmap::FromApkAssets(target_apk_path, *target_apk, overlay_apk_path, *overlay_apk,
+                           policy_bitmask, enforce_overlayable, err);
   if (!idmap) {
     return error(err.str());
   }
 
-  umask(0133);  // u=rw,g=r,o=r
+  umask(kIdmapFilePermissionMask);
   std::ofstream fout(idmap_path);
   if (fout.fail()) {
     return error("failed to open idmap path " + idmap_path);
@@ -130,9 +163,8 @@ Status Idmap2Service::createIdmap(const std::string& target_apk_path,
     return error("failed to write to idmap path " + idmap_path);
   }
 
-  _aidl_return->reset(new std::string(idmap_path));
+  *_aidl_return = std::make_unique<std::string>(idmap_path);
   return ok();
 }
 
-}  // namespace os
-}  // namespace android
+}  // namespace android::os

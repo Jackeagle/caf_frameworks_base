@@ -96,11 +96,12 @@ bool SkiaOpenGLPipeline::draw(const Frame& frame, const SkRect& screenDirty, con
 
     SkASSERT(mRenderThread.getGrContext() != nullptr);
     sk_sp<SkSurface> surface(SkSurface::MakeFromBackendRenderTarget(
-            mRenderThread.getGrContext(), backendRT, kBottomLeft_GrSurfaceOrigin, colorType,
-            nullptr, &props));
+            mRenderThread.getGrContext(), backendRT, this->getSurfaceOrigin(), colorType,
+            mSurfaceColorSpace, &props));
 
     SkiaPipeline::updateLighting(lightGeometry, lightInfo);
-    renderFrame(*layerUpdateQueue, dirty, renderNodes, opaque, contentDrawBounds, surface);
+    renderFrame(*layerUpdateQueue, dirty, renderNodes, opaque, contentDrawBounds, surface,
+            SkMatrix::I());
     layerUpdateQueue->clear();
 
     // Draw visual debugging features
@@ -155,26 +156,22 @@ void SkiaOpenGLPipeline::onStop() {
     }
 }
 
-bool SkiaOpenGLPipeline::setSurface(Surface* surface, SwapBehavior swapBehavior,
+bool SkiaOpenGLPipeline::setSurface(ANativeWindow* surface, SwapBehavior swapBehavior,
                                     ColorMode colorMode) {
     if (mEglSurface != EGL_NO_SURFACE) {
         mEglManager.destroySurface(mEglSurface);
         mEglSurface = EGL_NO_SURFACE;
     }
 
+    setSurfaceColorProperties(colorMode);
+
     if (surface) {
         mRenderThread.requireGlContext();
-        auto newSurface = mEglManager.createSurface(surface, colorMode);
+        auto newSurface = mEglManager.createSurface(surface, colorMode, mSurfaceColorSpace);
         if (!newSurface) {
             return false;
         }
         mEglSurface = newSurface.unwrap();
-    }
-
-    if (colorMode == ColorMode::SRGB) {
-        mSurfaceColorType = SkColorType::kN32_SkColorType;
-    } else if (colorMode == ColorMode::WideColorGamut) {
-        mSurfaceColorType = SkColorType::kRGBA_F16_SkColorType;
     }
 
     if (mEglSurface != EGL_NO_SURFACE) {

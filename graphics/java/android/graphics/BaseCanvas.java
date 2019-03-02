@@ -17,11 +17,13 @@
 package android.graphics;
 
 import android.annotation.ColorInt;
+import android.annotation.ColorLong;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.Size;
 import android.annotation.UnsupportedAppUsage;
 import android.graphics.Canvas.VertexMode;
+import android.graphics.text.MeasuredText;
 import android.text.GraphicsOperations;
 import android.text.MeasuredParagraph;
 import android.text.PrecomputedText;
@@ -241,8 +243,30 @@ public abstract class BaseCanvas {
         nDrawColor(mNativeCanvasWrapper, color, PorterDuff.Mode.SRC_OVER.nativeInt);
     }
 
+    /**
+     * @deprecated use {@link Canvas#drawColor(int, BlendMode)}
+     */
+    @Deprecated
     public void drawColor(@ColorInt int color, @NonNull PorterDuff.Mode mode) {
         nDrawColor(mNativeCanvasWrapper, color, mode.nativeInt);
+    }
+
+    /**
+     * Make lint happy.
+     * See {@link Canvas#drawColor(int, BlendMode)}
+     */
+    public void drawColor(@ColorInt int color, @NonNull BlendMode mode) {
+        nDrawColor(mNativeCanvasWrapper, color, mode.getXfermode().porterDuffMode);
+    }
+
+    /**
+     * Make lint happy.
+     * See {@link Canvas#drawColor(long, BlendMode)}
+     */
+    public void drawColor(@ColorLong long color, @NonNull BlendMode mode) {
+        ColorSpace cs = Color.colorSpace(color);
+        nDrawColor(mNativeCanvasWrapper, cs.getNativeInstance(), color,
+                mode.getXfermode().porterDuffMode);
     }
 
     public void drawLine(float startX, float startY, float stopX, float stopY,
@@ -542,14 +566,12 @@ public abstract class BaseCanvas {
                     final int paraStart = pt.getParagraphStart(paraIndex);
                     final MeasuredParagraph mp = pt.getMeasuredParagraph(paraIndex);
                     // Only support the text in the same paragraph.
-                    nDrawTextRun(mNativeCanvasWrapper,
-                            mp.getChars(),
-                            start - paraStart,
-                            end - start,
-                            contextStart - paraStart,
-                            contextEnd - contextStart,
-                            x, y, isRtl, paint.getNativeInstance(),
-                            mp.getMeasuredText().getNativePtr());
+                    drawTextRun(mp.getMeasuredText(),
+                                start - paraStart,
+                                end - paraStart,
+                                contextStart - paraStart,
+                                contextEnd - paraStart,
+                                x, y, isRtl, paint);
                     return;
                 }
             }
@@ -562,6 +584,14 @@ public abstract class BaseCanvas {
                     0 /* measured paragraph pointer */);
             TemporaryBuffer.recycle(buf);
         }
+    }
+
+    public void drawTextRun(@NonNull MeasuredText measuredText, int start, int end,
+            int contextStart, int contextEnd, float x, float y, boolean isRtl,
+            @NonNull Paint paint) {
+        nDrawTextRun(mNativeCanvasWrapper, measuredText.getChars(), start, end - start,
+                contextStart, contextEnd - contextStart, x, y, isRtl, paint.getNativeInstance(),
+                measuredText.getNativePtr());
     }
 
     public void drawVertices(@NonNull VertexMode mode, int vertexCount, @NonNull float[] verts,
@@ -649,6 +679,9 @@ public abstract class BaseCanvas {
             float x, float y, int width, int height, boolean hasAlpha, long nativePaintOrZero);
 
     private static native void nDrawColor(long nativeCanvas, int color, int mode);
+
+    private static native void nDrawColor(long nativeCanvas, long nativeColorSpace,
+            @ColorLong long color, int mode);
 
     private static native void nDrawPaint(long nativeCanvas, long nativePaint);
 

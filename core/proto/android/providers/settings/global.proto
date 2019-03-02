@@ -109,7 +109,15 @@ message GlobalSettingsProto {
     }
     optional Autofill autofill = 140;
 
-    optional SettingProto backup_agent_timeout_parameters = 18;
+    reserved 18; // Used to be backup_agent_timeout_parameters
+
+    message Backup {
+        option (android.msg_privacy).dest = DEST_EXPLICIT;
+
+        optional SettingProto backup_agent_timeout_parameters = 1;
+        optional SettingProto backup_multi_user_enabled = 2;
+    }
+    optional Backup backup = 146;
 
     message Battery {
         option (android.msg_privacy).dest = DEST_EXPLICIT;
@@ -410,16 +418,34 @@ message GlobalSettingsProto {
         // Ordered GPU debug layer list for Vulkan
         // i.e. <layer1>:<layer2>:...:<layerN>
         optional SettingProto debug_layers = 2 [ (android.privacy).dest = DEST_AUTOMATIC ];
-        // App will load ANGLE instead of native GLES drivers.
-        optional SettingProto angle_enabled_app = 3;
+        // ANGLE - Force all PKGs to use ANGLE, regardless of any other settings
+        optional SettingProto angle_gl_driver_all_angle = 3;
+        // ANGLE - List of PKGs that specify an OpenGL driver
+        optional SettingProto angle_gl_driver_selection_pkgs = 4;
+        // ANGLE - Corresponding OpenGL driver selection for the PKG
+        optional SettingProto angle_gl_driver_selection_values = 5;
         // App that can provide layer libraries.
-        optional SettingProto debug_layer_app = 4;
+        optional SettingProto debug_layer_app = 6;
         // Ordered GPU debug layer list for GLES
         // i.e. <layer1>:<layer2>:...:<layerN>
-        optional SettingProto debug_layers_gles = 5;
-        // App opt in to load updated graphics driver instead of
-        // native graphcis driver through developer options.
-        optional SettingProto updated_gfx_driver_dev_opt_in_app = 6;
+        optional SettingProto debug_layers_gles = 7;
+        // Game Driver - global preference for all Apps
+        // 0 = Default
+        // 1 = All Apps use Game Driver
+        // 2 = All Apps use system graphics driver
+        optional SettingProto game_driver_all_apps = 8;
+        // Game Driver - List of Apps selected to use Game Driver
+        // i.e. <pkg1>,<pkg2>,...,<pkgN>
+        optional SettingProto game_driver_opt_in_apps = 9;
+        // Game Driver - List of Apps selected not to use Game Driver
+        // i.e. <pkg1>,<pkg2>,...,<pkgN>
+        optional SettingProto game_driver_opt_out_apps = 10;
+        // Game Driver - List of Apps that are forbidden to use Game Driver
+        optional SettingProto game_driver_blacklist = 11;
+        // Game Driver - List of Apps that are allowed to use Game Driver
+        optional SettingProto game_driver_whitelist = 12;
+        // ANGLE - List of Apps that can check ANGLE rules
+        optional SettingProto angle_whitelist = 13;
     }
     optional Gpu gpu = 59;
 
@@ -489,6 +515,8 @@ message GlobalSettingsProto {
         optional SettingProto global_kill_switch = 5 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto gnss_satellite_blacklist = 6 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto gnss_hal_location_request_duration_millis = 7 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        // Packages that are whitelisted for ignoring location settings (during emergencies)
+        optional SettingProto ignore_settings_package_whitelist = 8 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional Location location = 69;
 
@@ -506,6 +534,16 @@ message GlobalSettingsProto {
         // Whether automatic battery saver mode is controlled via percentage,
         // {@link #DYNAMIC_POWER_SAVINGS_ENABLED} or disabled.
         optional SettingProto automatic_power_saver_mode = 4 [ (android.privacy).dest = DEST_AUTOMATIC];
+        // If 1, battery saver (low_power_mode) will be re-activated after the device is
+        // unplugged from a charger or rebooted.
+        optional SettingProto sticky_enabled = 5;
+        // Whether sticky battery saver should be deactivated once the battery level has reached the
+        // threshold specified by sticky_disable_level.
+        optional SettingProto sticky_auto_disable_enabled = 6;
+        // When a device is unplugged from a changer (or is rebooted), do not re-activate battery
+        // saver even if {@link #LOW_POWER_MODE_STICKY} is 1, if the battery level is equal to or
+        // above this threshold.
+        optional SettingProto sticky_auto_disable_level = 7;
     }
     optional LowPowerMode low_power_mode = 70;
 
@@ -537,6 +575,8 @@ message GlobalSettingsProto {
     // ringer mode.
     optional SettingProto mode_ringer = 75 [ (android.privacy).dest = DEST_AUTOMATIC ];
 
+    optional SettingProto apply_ramping_ringer = 147 [ (android.privacy).dest = DEST_AUTOMATIC ];
+
     message MultiSim {
         option (android.msg_privacy).dest = DEST_EXPLICIT;
 
@@ -549,6 +589,10 @@ message GlobalSettingsProto {
         optional SettingProto sms_prompt = 5 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional MultiSim multi_sim = 76;
+
+    // Whether we've enabled native flags health check on this device. Takes effect on
+    // reboot. The value "1" enables native flags health check; otherwise it's disabled.
+    optional SettingProto native_flags_health_check_enabled = 144 [ (android.privacy).dest = DEST_AUTOMATIC ];
 
     message Netstats {
         option (android.msg_privacy).dest = DEST_EXPLICIT;
@@ -624,6 +668,9 @@ message GlobalSettingsProto {
         // separated by commas.
         optional SettingProto snooze_options = 3 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto smart_replies_in_notifications_flags = 4 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        // Configuration options for smart replies and smart actions in notifications. This is
+        // encoded as a key=value list separated by commas.
+        optional SettingProto smart_suggestions_in_notifications_flags = 5 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional Notification notification = 82;
 
@@ -695,8 +742,7 @@ message GlobalSettingsProto {
     // Defines global runtime overrides to window policy.
     optional SettingProto policy_control = 92;
     optional SettingProto power_manager_constants = 93;
-    // If true, out-of-the-box execution for priv apps is enabled.
-    optional SettingProto priv_app_oob_enabled = 94 [ (android.privacy).dest = DEST_AUTOMATIC ];
+    reserved 94; // Used to be priv_app_oob_enabled
 
     message PrepaidSetup {
         option (android.msg_privacy).dest = DEST_EXPLICIT;
@@ -867,6 +913,8 @@ message GlobalSettingsProto {
         // Temperature at which the high temperature warning notification should
         // be shown.
         optional SettingProto warning_temperature_level = 2 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        // USB temperature at which the high temperature alarm notification should be shown.
+        optional SettingProto usb_alarm_temperature_level = 3 [ (android.privacy).dest = DEST_AUTOMATIC ];
     }
     optional TemperatureWarning temperature_warning = 119;
 
@@ -951,7 +999,7 @@ message GlobalSettingsProto {
         optional SettingProto watchdog_poor_network_test_enabled = 22 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto suspend_optimizations_enabled = 23 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto verbose_logging_enabled = 24 [ (android.privacy).dest = DEST_AUTOMATIC ];
-        optional SettingProto connected_mac_randomization_enabled = 25 [ (android.privacy).dest = DEST_AUTOMATIC ];
+        reserved 25; // connected_mac_randomization_enabled
         optional SettingProto max_dhcp_retry_count = 26 [ (android.privacy).dest = DEST_AUTOMATIC ];
         optional SettingProto mobile_data_transition_wakelock_timeout_ms = 27 [ (android.privacy).dest = DEST_AUTOMATIC ];
         // Controls whether WiFi configurations created by a Device Owner app should
@@ -987,7 +1035,9 @@ message GlobalSettingsProto {
 
     optional SettingProto zram_enabled = 139 [ (android.privacy).dest = DEST_AUTOMATIC ];
 
+    optional SettingProto app_ops_constants = 148 [ (android.privacy).dest = DEST_AUTOMATIC ];
+
     // Please insert fields in alphabetical order and group them into messages
     // if possible (to avoid reaching the method limit).
-    // Next tag = 144;
+    // Next tag = 145 then 149; // (145 was removed)
 }

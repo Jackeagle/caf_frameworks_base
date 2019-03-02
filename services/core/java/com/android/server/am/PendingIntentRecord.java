@@ -34,6 +34,7 @@ import android.os.RemoteException;
 import android.os.TransactionTooLargeException;
 import android.os.UserHandle;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.Slog;
 import android.util.TimeUtils;
 
@@ -48,6 +49,10 @@ import java.util.Objects;
 public final class PendingIntentRecord extends IIntentSender.Stub {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "PendingIntentRecord" : TAG_AM;
 
+    public static final int FLAG_ACTIVITY_SENDER = 1 << 0;
+    public static final int FLAG_BROADCAST_SENDER = 1 << 1;
+    public static final int FLAG_SERVICE_SENDER = 1 << 2;
+
     final PendingIntentController controller;
     final Key key;
     final int uid;
@@ -56,6 +61,9 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
     boolean canceled = false;
     private ArrayMap<IBinder, Long> whitelistDuration;
     private RemoteCallbackList<IResultReceiver> mCancelCallbacks;
+    private ArraySet<IBinder> mAllowBgActivityStartsForActivitySender = new ArraySet<>();
+    private ArraySet<IBinder> mAllowBgActivityStartsForBroadcastSender = new ArraySet<>();
+    private ArraySet<IBinder> mAllowBgActivityStartsForServiceSender = new ArraySet<>();
 
     String stringName;
     String lastTagPrefix;
@@ -214,6 +222,19 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
         this.stringName = null;
     }
 
+    void setAllowBgActivityStarts(IBinder token, int flags) {
+        if (token == null) return;
+        if ((flags & FLAG_ACTIVITY_SENDER) != 0) {
+            mAllowBgActivityStartsForActivitySender.add(token);
+        }
+        if ((flags & FLAG_BROADCAST_SENDER) != 0) {
+            mAllowBgActivityStartsForBroadcastSender.add(token);
+        }
+        if ((flags & FLAG_SERVICE_SENDER) != 0) {
+            mAllowBgActivityStartsForServiceSender.add(token);
+        }
+    }
+
     public void registerCancelListenerLocked(IResultReceiver receiver) {
         if (mCancelCallbacks == null) {
             mCancelCallbacks = new RemoteCallbackList<>();
@@ -358,6 +379,10 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
             if (userId == UserHandle.USER_CURRENT) {
                 userId = controller.mUserController.getCurrentOrTargetUserId();
             }
+            // temporarily allow receivers and services to open activities from background if the
+            // PendingIntent.send() caller was foreground at the time of sendInner() call
+            final boolean allowTrampoline = uid != callingUid
+                    && controller.mAtmInternal.isUidForeground(callingUid);
 
             switch (key.type) {
                 case ActivityManager.INTENT_SENDER_ACTIVITY:
@@ -368,16 +393,19 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
 
                         if (key.allIntents != null && key.allIntents.length > 1) {
                             res = controller.mAtmInternal.startActivitiesInPackage(
-                                    uid, key.packageName, allIntents, allResolvedTypes, resultTo,
-                                    mergedOptions, userId, false /* validateIncomingUser */,
-                                    this /* originatingPendingIntent */);
+                                    uid, callingPid, callingUid, key.packageName, allIntents,
+                                    allResolvedTypes, resultTo, mergedOptions, userId,
+                                    false /* validateIncomingUser */,
+                                    this /* originatingPendingIntent */,
+                                    mAllowBgActivityStartsForActivitySender.contains(whitelistToken));
                         } else {
                             res = controller.mAtmInternal.startActivityInPackage(
                                     uid, callingPid, callingUid, key.packageName, finalIntent,
                                     resolvedType, resultTo, resultWho, requestCode, 0,
                                     mergedOptions, userId, null, "PendingIntentRecord",
                                     false /* validateIncomingUser */,
-                                    this /* originatingPendingIntent */);
+                                    this /* originatingPendingIntent */,
+                                    mAllowBgActivityStartsForActivitySender.contains(whitelistToken));
                         }
                     } catch (RuntimeException e) {
                         Slog.w(TAG, "Unable to send startActivity intent", e);
@@ -394,7 +422,9 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
                         int sent = controller.mAmInternal.broadcastIntentInPackage(key.packageName,
                                 uid, finalIntent, resolvedType, finishedReceiver, code, null, null,
                                 requiredPermission, options, (finishedReceiver != null),
-                                false, userId);
+                                false, userId,
+                                mAllowBgActivityStartsForBroadcastSender.contains(whitelistToken)
+                                || allowTrampoline);
                         if (sent == ActivityManager.BROADCAST_SUCCESS) {
                             sendFinish = false;
                         }
@@ -407,7 +437,9 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
                     try {
                         controller.mAmInternal.startServiceInPackage(uid, finalIntent, resolvedType,
                                 key.type == ActivityManager.INTENT_SENDER_FOREGROUND_SERVICE,
-                                key.packageName, userId);
+                                key.packageName, userId,
+                                mAllowBgActivityStartsForServiceSender.contains(whitelistToken)
+                                || allowTrampoline);
                     } catch (RuntimeException e) {
                         Slog.w(TAG, "Unable to send startService intent", e);
                     } catch (TransactionTooLargeException e) {

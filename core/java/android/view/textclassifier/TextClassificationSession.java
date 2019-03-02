@@ -27,7 +27,6 @@ import com.android.internal.util.Preconditions;
 @WorkerThread
 final class TextClassificationSession implements TextClassifier {
 
-    /* package */ static final boolean DEBUG_LOG_ENABLED = true;
     private static final String LOG_TAG = "TextClassificationSession";
 
     private final TextClassifier mDelegate;
@@ -72,10 +71,23 @@ final class TextClassificationSession implements TextClassifier {
 
     @Override
     public void onSelectionEvent(SelectionEvent event) {
-        checkDestroyed();
-        Preconditions.checkNotNull(event);
-        if (mEventHelper.sanitizeEvent(event)) {
-            mDelegate.onSelectionEvent(event);
+        try {
+            if (mEventHelper.sanitizeEvent(event)) {
+                mDelegate.onSelectionEvent(event);
+            }
+        } catch (Exception e) {
+            // Avoid crashing for event reporting.
+            Log.e(LOG_TAG, "Error reporting text classifier selection event", e);
+        }
+    }
+
+    @Override
+    public void onTextClassifierEvent(TextClassifierEvent event) {
+        try {
+            mDelegate.onTextClassifierEvent(event);
+        } catch (Exception e) {
+            // Avoid crashing for event reporting.
+            Log.e(LOG_TAG, "Error reporting text classifier event", e);
         }
     }
 
@@ -133,9 +145,7 @@ final class TextClassificationSession implements TextClassifier {
 
             if (event.getEventType() != SelectionEvent.EVENT_SELECTION_STARTED
                     && mStartEvent == null) {
-                if (DEBUG_LOG_ENABLED) {
-                    Log.d(LOG_TAG, "Selection session not yet started. Ignoring event");
-                }
+                Log.d(LOG_TAG, "Selection session not yet started. Ignoring event");
                 return false;
             }
 

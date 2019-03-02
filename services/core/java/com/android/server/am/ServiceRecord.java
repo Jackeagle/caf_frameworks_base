@@ -16,10 +16,8 @@
 
 package com.android.server.am;
 
-import com.android.internal.app.procstats.ServiceState;
-import com.android.internal.os.BatteryStatsImpl;
-import com.android.server.LocalServices;
-import com.android.server.notification.NotificationManagerInternal;
+import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
+import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
 
 import android.app.INotificationManager;
 import android.app.Notification;
@@ -44,6 +42,11 @@ import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 import android.util.proto.ProtoUtils;
+
+import com.android.internal.app.procstats.ServiceState;
+import com.android.internal.os.BatteryStatsImpl;
+import com.android.server.LocalServices;
+import com.android.server.notification.NotificationManagerInternal;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriPermissionOwner;
 
@@ -51,9 +54,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
-import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
 
 /**
  * A running application service.
@@ -103,6 +103,7 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
     boolean isForeground;   // is service currently in foreground mode?
     int foregroundId;       // Notification ID of last foreground req.
     Notification foregroundNoti; // Notification record of foreground state.
+    int foregroundServiceType; // foreground service types.
     long lastActivity;      // last time there was some activity on the service.
     long startingBgTimeout;  // time at which we scheduled this for a delayed start.
     boolean startRequested; // someone explicitly called start?
@@ -121,6 +122,8 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
     long nextRestartTime;   // time when restartDelay will expire.
     boolean destroying;     // set when we have started destroying the service
     long destroyTime;       // time at which destory was initiated.
+    int pendingConnectionGroup;        // To be filled in to ProcessRecord once it connects
+    int pendingConnectionImportance;   // To be filled in to ProcessRecord once it connects
 
     String stringName;      // caching of toString
 
@@ -386,6 +389,11 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
                 pw.print(" restartTime=");
                 TimeUtils.formatDuration(restartTime, now, pw);
                 pw.print(" createdFromFg="); pw.println(createdFromFg);
+        if (pendingConnectionGroup != 0) {
+            pw.print(prefix); pw.print(" pendingConnectionGroup=");
+            pw.print(pendingConnectionGroup);
+            pw.print(" Importance="); pw.println(pendingConnectionImportance);
+        }
         if (startRequested || delayedStop || lastStartId != 0) {
             pw.print(prefix); pw.print("startRequested="); pw.print(startRequested);
                     pw.print(" delayedStop="); pw.print(delayedStop);
@@ -461,7 +469,11 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
         serviceInfo = sInfo;
         appInfo = sInfo.applicationInfo;
         packageName = sInfo.applicationInfo.packageName;
-        processName = sInfo.processName;
+        if ((sInfo.flags & ServiceInfo.FLAG_ISOLATED_PROCESS) != 0) {
+            processName = sInfo.processName + ":" + instanceName.getClassName();
+        } else {
+            processName = sInfo.processName;
+        }
         permission = sInfo.permission;
         exported = sInfo.exported;
         this.restarter = restarter;
@@ -507,6 +519,12 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
 
     public void setProcess(ProcessRecord _proc) {
         app = _proc;
+        if (pendingConnectionGroup > 0) {
+            app.connectionService = this;
+            app.connectionGroup = pendingConnectionGroup;
+            app.connectionImportance = pendingConnectionImportance;
+            pendingConnectionGroup = pendingConnectionImportance = 0;
+        }
         if (ActivityManagerService.TRACK_PROCSTATS_ASSOCIATIONS) {
             for (int conni = connections.size() - 1; conni >= 0; conni--) {
                 ArrayList<ConnectionRecord> cr = connections.valueAt(conni);
@@ -705,7 +723,7 @@ final class ServiceRecord extends Binder implements ComponentName.WithComponentN
                         // If it gave us a garbage notification, it doesn't
                         // get to be foreground.
                         ams.setServiceForeground(instanceName, ServiceRecord.this,
-                                0, null, 0);
+                                0, null, 0, 0);
                         ams.crashApplication(appUid, appPid, localPackageName, -1,
                                 "Bad notification for startForeground: " + e);
                     }

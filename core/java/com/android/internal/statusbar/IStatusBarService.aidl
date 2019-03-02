@@ -16,11 +16,12 @@
 
 package com.android.internal.statusbar;
 
+import android.app.Notification;
 import android.content.ComponentName;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
-import android.hardware.biometrics.IBiometricPromptReceiver;
+import android.hardware.biometrics.IBiometricServiceReceiverInternal;
 
 import com.android.internal.statusbar.IStatusBar;
 import com.android.internal.statusbar.StatusBarIcon;
@@ -37,9 +38,11 @@ interface IStatusBarService
     void disableForUser(int what, IBinder token, String pkg, int userId);
     void disable2(int what, IBinder token, String pkg);
     void disable2ForUser(int what, IBinder token, String pkg, int userId);
+    int[] getDisableFlags(IBinder token, int userId);
     void setIcon(String slot, String iconPackage, int iconId, int iconLevel, String contentDescription);
     void setIconVisibility(String slot, boolean visible);
     void removeIcon(String slot);
+    // TODO(b/117478341): support back button change when IME is showing on a external display.
     void setImeWindowStatus(in IBinder token, int vis, int backDisposition,
             boolean showImeSwitcher);
     void expandSettingsPanel(String subPanel);
@@ -55,7 +58,7 @@ interface IStatusBarService
     // Mark current notifications as "seen" and stop ringing, vibrating, blinking.
     void clearNotificationEffects();
     void onNotificationClick(String key, in NotificationVisibility nv);
-    void onNotificationActionClick(String key, int actionIndex, in NotificationVisibility nv);
+    void onNotificationActionClick(String key, int actionIndex, in Notification.Action action, in NotificationVisibility nv, boolean generatedByAssistant);
     void onNotificationError(String pkg, String tag, int id,
             int uid, int initialPid, String message, int userId);
     void onClearAllNotifications(int userId);
@@ -63,12 +66,13 @@ interface IStatusBarService
             int dismissalSurface, int dismissalSentiment, in NotificationVisibility nv);
     void onNotificationVisibilityChanged( in NotificationVisibility[] newlyVisibleKeys,
             in NotificationVisibility[] noLongerVisibleKeys);
-    void onNotificationExpansionChanged(in String key, in boolean userAction, in boolean expanded);
+    void onNotificationExpansionChanged(in String key, in boolean userAction, in boolean expanded, in int notificationLocation);
     void onNotificationDirectReplied(String key);
-    void onNotificationSmartRepliesAdded(in String key, in int replyCount);
-    void onNotificationSmartReplySent(in String key, in int replyIndex);
+    void onNotificationSmartSuggestionsAdded(String key, int smartReplyCount, int smartActionCount,
+            boolean generatedByAsssistant);
+    void onNotificationSmartReplySent(in String key, in int replyIndex, in CharSequence reply, boolean generatedByAssistant, in int notificationLocation);
     void onNotificationSettingsViewed(String key);
-    void setSystemUiVisibility(int vis, int mask, String cause);
+    void setSystemUiVisibility(int displayId, int vis, int mask, String cause);
 
     void onGlobalActionsShown();
     void onGlobalActionsHidden();
@@ -91,10 +95,10 @@ interface IStatusBarService
     void showPinningEscapeToast();
 
     // Used to show the dialog when BiometricService starts authentication
-    void showBiometricDialog(in Bundle bundle, IBiometricPromptReceiver receiver, int type,
+    void showBiometricDialog(in Bundle bundle, IBiometricServiceReceiverInternal receiver, int type,
             boolean requireConfirmation, int userId);
     // Used to hide the dialog when a biometric is authenticated
-    void onBiometricAuthenticated();
+    void onBiometricAuthenticated(boolean authenticated);
     // Used to set a temporary message, e.g. fingerprint not recognized, finger moved too fast, etc
     void onBiometricHelp(String message);
     // Used to set a message - the dialog will dismiss after a certain amount of time

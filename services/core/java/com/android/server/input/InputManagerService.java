@@ -64,18 +64,18 @@ import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
-import android.util.Xml;
 import android.view.Display;
 import android.view.IInputFilter;
 import android.view.IInputFilterHost;
 import android.view.IWindow;
-import android.view.InputChannel;
 import android.view.InputApplicationHandle;
-import android.view.InputWindowHandle;
+import android.view.InputChannel;
 import android.view.InputDevice;
 import android.view.InputEvent;
+import android.view.InputWindowHandle;
 import android.view.KeyEvent;
 import android.view.PointerIcon;
 import android.view.Surface;
@@ -97,14 +97,13 @@ import com.android.server.policy.WindowManagerPolicy;
 import libcore.io.IoUtils;
 import libcore.io.Streams;
 
-import org.xmlpull.v1.XmlPullParser;
-
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -124,6 +123,7 @@ public class InputManagerService extends IInputManager.Stub
     static final boolean DEBUG = false;
 
     private static final String EXCLUDED_DEVICES_PATH = "etc/excluded-input-devices.xml";
+    private static final String PORT_ASSOCIATIONS_PATH = "etc/input-port-associations.xml";
 
     private static final int MSG_DELIVER_INPUT_DEVICES_CHANGED = 1;
     private static final int MSG_SWITCH_KEYBOARD_LAYOUT = 2;
@@ -137,6 +137,9 @@ public class InputManagerService extends IInputManager.Stub
 
     private final Context mContext;
     private final InputManagerHandler mHandler;
+
+    // Context cache used for loading pointer resources.
+    private Context mDisplayContext;
 
     private final File mDoubleTouchGestureEnableFile;
 
@@ -213,8 +216,6 @@ public class InputManagerService extends IInputManager.Stub
     private static native void nativeSetFocusedApplication(long ptr,
             int displayId, InputApplicationHandle application);
     private static native void nativeSetFocusedDisplay(long ptr, int displayId);
-    private static native boolean nativeTransferTouchFocus(long ptr,
-            InputChannel fromChannel, InputChannel toChannel);
     private static native void nativeSetPointerSpeed(long ptr, int speed);
     private static native void nativeSetShowTouches(long ptr, boolean enabled);
     private static native void nativeSetInteractive(long ptr, boolean interactive);
@@ -233,6 +234,7 @@ public class InputManagerService extends IInputManager.Stub
     private static native void nativeReloadPointerIcons(long ptr);
     private static native void nativeSetCustomPointerIcon(long ptr, PointerIcon icon);
     private static native void nativeSetPointerCapture(long ptr, boolean detached);
+    private static native boolean nativeCanDispatchToDisplay(long ptr, int deviceId, int displayId);
 
     // Input event injection constants defined in InputDispatcher.h.
     private static final int INPUT_EVENT_INJECTION_SUCCEEDED = 0;
@@ -1443,23 +1445,8 @@ public class InputManagerService extends IInputManager.Stub
         }
     }
 
-    public void setInputWindows(InputWindowHandle[] windowHandles, int displayId) {
-        nativeSetInputWindows(mPtr, windowHandles, displayId);
-    }
-
     public void setFocusedApplication(int displayId, InputApplicationHandle application) {
         nativeSetFocusedApplication(mPtr, displayId, application);
-    }
-
-    public void setFocusedWindow(InputWindowHandle focusedWindowHandle) {
-        final IWindow newFocusedWindow =
-            focusedWindowHandle != null ? focusedWindowHandle.clientWindow : null;
-        if (mFocusedWindow != newFocusedWindow) {
-            if (mFocusedWindowHasCapture) {
-                setPointerCapture(false);
-            }
-            mFocusedWindow = newFocusedWindow;
-        }
     }
 
     public void setFocusedDisplay(int displayId) {
@@ -1498,29 +1485,6 @@ public class InputManagerService extends IInputManager.Stub
 
     public void setSystemUiVisibility(int visibility) {
         nativeSetSystemUiVisibility(mPtr, visibility);
-    }
-
-    /**
-     * Atomically transfers touch focus from one window to another as identified by
-     * their input channels.  It is possible for multiple windows to have
-     * touch focus if they support split touch dispatch
-     * {@link android.view.WindowManager.LayoutParams#FLAG_SPLIT_TOUCH} but this
-     * method only transfers touch focus of the specified window without affecting
-     * other windows that may also have touch focus at the same time.
-     * @param fromChannel The channel of a window that currently has touch focus.
-     * @param toChannel The channel of the window that should receive touch focus in
-     * place of the first.
-     * @return True if the transfer was successful.  False if the window with the
-     * specified channel did not actually have touch focus at the time of the request.
-     */
-    public boolean transferTouchFocus(InputChannel fromChannel, InputChannel toChannel) {
-        if (fromChannel == null) {
-            throw new IllegalArgumentException("fromChannel must not be null.");
-        }
-        if (toChannel == null) {
-            throw new IllegalArgumentException("toChannel must not be null.");
-        }
-        return nativeTransferTouchFocus(mPtr, fromChannel, toChannel);
     }
 
     @Override // Binder call
@@ -1799,11 +1763,24 @@ public class InputManagerService extends IInputManager.Stub
         mWindowManagerCallbacks.notifyInputChannelBroken(token);
     }
 
+    // Native callback
+    private void notifyFocusChanged(IBinder oldToken, IBinder newToken) {
+        if (mFocusedWindow != null) {
+            if (mFocusedWindow.asBinder() == newToken) {
+                Slog.w(TAG, "notifyFocusChanged called with unchanged mFocusedWindow="
+                        + mFocusedWindow);
+                return;
+            }
+            setPointerCapture(false);
+        }
+
+        mFocusedWindow = IWindow.Stub.asInterface(newToken);
+    }
+
     // Native callback.
-    private long notifyANR(InputApplicationHandle inputApplicationHandle,
-            IBinder token, String reason) {
+    private long notifyANR(IBinder token, String reason) {
         return mWindowManagerCallbacks.notifyANR(
-                inputApplicationHandle, token, reason);
+                token, reason);
     }
 
     // Native callback.
@@ -1834,14 +1811,12 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     // Native callback.
-    private long interceptKeyBeforeDispatching(IBinder focus,
-            KeyEvent event, int policyFlags) {
+    private long interceptKeyBeforeDispatching(IBinder focus, KeyEvent event, int policyFlags) {
         return mWindowManagerCallbacks.interceptKeyBeforeDispatching(focus, event, policyFlags);
     }
 
     // Native callback.
-    private KeyEvent dispatchUnhandledKey(IBinder focus,
-            KeyEvent event, int policyFlags) {
+    private KeyEvent dispatchUnhandledKey(IBinder focus, KeyEvent event, int policyFlags) {
         return mWindowManagerCallbacks.dispatchUnhandledKey(focus, event, policyFlags);
     }
 
@@ -1858,11 +1833,9 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     // Native callback.
-    private String[] getExcludedDeviceNames() {
-        ArrayList<String> names = new ArrayList<String>();
-
+    private static String[] getExcludedDeviceNames() {
+        List<String> names = new ArrayList<>();
         // Read partner-provided list of excluded input devices
-        XmlPullParser parser = null;
         // Environment.getRootDirectory() is a fancy way of saying ANDROID_ROOT or "/system".
         final File[] baseDirs = {
             Environment.getRootDirectory(),
@@ -1870,33 +1843,62 @@ public class InputManagerService extends IInputManager.Stub
         };
         for (File baseDir: baseDirs) {
             File confFile = new File(baseDir, EXCLUDED_DEVICES_PATH);
-            FileReader confreader = null;
             try {
-                confreader = new FileReader(confFile);
-                parser = Xml.newPullParser();
-                parser.setInput(confreader);
-                XmlUtils.beginDocument(parser, "devices");
-
-                while (true) {
-                    XmlUtils.nextElement(parser);
-                    if (!"device".equals(parser.getName())) {
-                        break;
-                    }
-                    String name = parser.getAttributeValue(null, "name");
-                    if (name != null) {
-                        names.add(name);
-                    }
-                }
+                InputStream stream = new FileInputStream(confFile);
+                names.addAll(ConfigurationProcessor.processExcludedDeviceNames(stream));
             } catch (FileNotFoundException e) {
                 // It's ok if the file does not exist.
             } catch (Exception e) {
-                Slog.e(TAG, "Exception while parsing '" + confFile.getAbsolutePath() + "'", e);
-            } finally {
-                try { if (confreader != null) confreader.close(); } catch (IOException e) { }
+                Slog.e(TAG, "Could not parse '" + confFile.getAbsolutePath() + "'", e);
             }
         }
+        return names.toArray(new String[0]);
+    }
 
-        return names.toArray(new String[names.size()]);
+    /**
+     * Flatten a list of pairs into a list, with value positioned directly next to the key
+     * @return Flattened list
+     */
+    private static <T> List<T> flatten(@NonNull List<Pair<T, T>> pairs) {
+        List<T> list = new ArrayList<>(pairs.size() * 2);
+        for (Pair<T, T> pair : pairs) {
+            list.add(pair.first);
+            list.add(pair.second);
+        }
+        return list;
+    }
+
+    /**
+     * Ports are highly platform-specific, so only allow these to be specified in the vendor
+     * directory.
+     */
+    // Native callback
+    private static String[] getInputPortAssociations() {
+        File baseDir = Environment.getVendorDirectory();
+        File confFile = new File(baseDir, PORT_ASSOCIATIONS_PATH);
+
+        try {
+            InputStream stream = new FileInputStream(confFile);
+            List<Pair<String, String>> associations =
+                    ConfigurationProcessor.processInputPortAssociations(stream);
+            List<String> associationList = flatten(associations);
+            return associationList.toArray(new String[0]);
+        } catch (FileNotFoundException e) {
+            // Most of the time, file will not exist, which is expected.
+        } catch (Exception e) {
+            Slog.e(TAG, "Could not parse '" + confFile.getAbsolutePath() + "'", e);
+        }
+        return new String[0];
+    }
+
+    /**
+     * Gets if an input device could dispatch to the given display".
+     * @param deviceId The input device id.
+     * @param displayId The specific display id.
+     * @return True if the device could dispatch to the given display, false otherwise.
+     */
+    public boolean canDispatchToDisplay(int deviceId, int displayId) {
+        return nativeCanDispatchToDisplay(mPtr, deviceId, displayId);
     }
 
     // Native callback.
@@ -1935,8 +1937,30 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     // Native callback.
-    private PointerIcon getPointerIcon() {
-        return PointerIcon.getDefaultIcon(mContext);
+    private PointerIcon getPointerIcon(int displayId) {
+        return PointerIcon.getDefaultIcon(getContextForDisplay(displayId));
+    }
+
+    private Context getContextForDisplay(int displayId) {
+        if (mDisplayContext != null && mDisplayContext.getDisplay().getDisplayId() == displayId) {
+            return mDisplayContext;
+        }
+
+        if (mContext.getDisplay().getDisplayId() == displayId) {
+            mDisplayContext = mContext;
+            return mDisplayContext;
+        }
+
+        // Create and cache context for non-default display.
+        final DisplayManager displayManager = mContext.getSystemService(DisplayManager.class);
+        final Display display = displayManager.getDisplay(displayId);
+        mDisplayContext = mContext.createDisplayContext(display);
+        return mDisplayContext;
+    }
+
+    // Native callback.
+    private int getPointerDisplayId() {
+        return mWindowManagerCallbacks.getPointerDisplayId();
     }
 
     // Native callback.
@@ -1993,8 +2017,7 @@ public class InputManagerService extends IInputManager.Stub
 
         public void notifyInputChannelBroken(IBinder token);
 
-        public long notifyANR(InputApplicationHandle inputApplicationHandle,
-                IBinder token, String reason);
+        public long notifyANR(IBinder token, String reason);
 
         public int interceptKeyBeforeQueueing(KeyEvent event, int policyFlags);
 
@@ -2007,6 +2030,8 @@ public class InputManagerService extends IInputManager.Stub
                 KeyEvent event, int policyFlags);
 
         public int getPointerLayer();
+
+        public int getPointerDisplayId();
     }
 
     /**

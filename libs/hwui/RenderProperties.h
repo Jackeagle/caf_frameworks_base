@@ -98,14 +98,14 @@ public:
 
     LayerProperties& operator=(const LayerProperties& other);
 
+    // Strongly recommend using effectiveLayerType instead
+    LayerType type() const { return mType; }
+
 private:
     LayerProperties();
     ~LayerProperties();
     void reset();
     bool setColorFilter(SkColorFilter* filter);
-
-    // Private since external users should go through properties().effectiveLayerType()
-    LayerType type() const { return mType; }
 
     friend class RenderProperties;
 
@@ -151,6 +151,7 @@ public:
         // parent may have already dictated that a descendant layer is needed
         bool functorsNeedLayer =
                 ancestorDictatesFunctorsNeedLayer
+                || CC_UNLIKELY(isClipMayBeComplex())
 
                 // Round rect clipping forces layer for functors
                 || CC_UNLIKELY(getOutline().willRoundRectClip()) ||
@@ -192,6 +193,12 @@ public:
     }
 
     bool isProjectionReceiver() const { return mPrimitiveFields.mProjectionReceiver; }
+
+    bool setClipMayBeComplex(bool isClipMayBeComplex) {
+        return RP_SET(mPrimitiveFields.mClipMayBeComplex, isClipMayBeComplex);
+    }
+
+    bool isClipMayBeComplex() const { return mPrimitiveFields.mClipMayBeComplex; }
 
     bool setStaticMatrix(const SkMatrix* matrix) {
         delete mStaticMatrix;
@@ -563,6 +570,7 @@ private:
         bool mProjectBackwards = false;
         bool mProjectionReceiver = false;
         bool mAllowForceDark = true;
+        bool mClipMayBeComplex = false;
         Rect mClipBounds;
         Outline mOutline;
         RevealClip mRevealClip;

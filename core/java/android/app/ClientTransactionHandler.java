@@ -105,6 +105,16 @@ public abstract class ClientTransactionHandler {
             boolean isForward, String reason);
 
     /**
+     * Notify the activity about top resumed state change.
+     * @param token Target activity token.
+     * @param isTopResumedActivity Current state of the activity, {@code true} if it's the
+     *                             topmost resumed activity in the system, {@code false} otherwise.
+     * @param reason Reason for performing this operation.
+     */
+    public abstract void handleTopResumedActivityChanged(IBinder token,
+            boolean isTopResumedActivity, String reason);
+
+    /**
      * Stop the activity.
      * @param token Target activity token.
      * @param show Flag indicating whether activity is still shown.
@@ -123,6 +133,10 @@ public abstract class ClientTransactionHandler {
 
     /** Restart the activity after it was stopped. */
     public abstract void performRestartActivity(IBinder token, boolean start);
+
+    /** Set pending activity configuration in case it will be updated by other transaction item. */
+    public abstract void updatePendingActivityConfiguration(IBinder activityToken,
+            Configuration overrideConfig);
 
     /** Deliver activity (override) configuration change. */
     public abstract void handleActivityConfigurationChanged(IBinder activityToken,

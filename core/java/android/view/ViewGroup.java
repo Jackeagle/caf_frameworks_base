@@ -51,6 +51,7 @@ import android.util.Pools;
 import android.util.Pools.SynchronizedPool;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
+import android.view.WindowInsetsAnimationListener.InsetsAnimation;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -143,7 +144,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     protected OnHierarchyChangeListener mOnHierarchyChangeListener;
 
     // The view contained within this ViewGroup that has or contains focus.
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private View mFocused;
     // The view contained within this ViewGroup (excluding nested keyboard navigation clusters)
     // that is or contains a default-focus view.
@@ -7042,10 +7043,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * suppression is disabled with a later call to suppressLayout(false).
      * When layout suppression is disabled, a requestLayout() call is sent
      * if layout() was attempted while layout was being suppressed.
-     *
-     * @hide
      */
-    @UnsupportedAppUsage
     public void suppressLayout(boolean suppress) {
         mSuppressLayout = suppress;
         if (!suppress) {
@@ -7061,8 +7059,6 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * suppressed, due to an earlier call to {@link #suppressLayout(boolean)}.
      *
      * @return true if layout calls are currently suppressed, false otherwise.
-     *
-     * @hide
      */
     public boolean isLayoutSuppressed() {
         return mSuppressLayout;
@@ -7116,6 +7112,14 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     @Override
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         insets = super.dispatchApplyWindowInsets(insets);
+        if (View.sBrokenInsetsDispatch) {
+            return brokenDispatchApplyWindowInsets(insets);
+        } else {
+            return newDispatchApplyWindowInsets(insets);
+        }
+    }
+
+    private WindowInsets brokenDispatchApplyWindowInsets(WindowInsets insets) {
         if (!insets.isConsumed()) {
             final int count = getChildCount();
             for (int i = 0; i < count; i++) {
@@ -7126,6 +7130,42 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
         }
         return insets;
+    }
+
+    private WindowInsets newDispatchApplyWindowInsets(WindowInsets insets) {
+        final int count = getChildCount();
+        for (int i = 0; i < count; i++) {
+            getChildAt(i).dispatchApplyWindowInsets(insets);
+        }
+        return insets;
+    }
+
+    @Override
+    void dispatchWindowInsetsAnimationStarted(InsetsAnimation animation) {
+        super.dispatchWindowInsetsAnimationStarted(animation);
+        final int count = getChildCount();
+        for (int i = 0; i < count; i++) {
+            getChildAt(i).dispatchWindowInsetsAnimationStarted(animation);
+        }
+    }
+
+    @Override
+    WindowInsets dispatchWindowInsetsAnimationProgress(WindowInsets insets) {
+        insets = super.dispatchWindowInsetsAnimationProgress(insets);
+        final int count = getChildCount();
+        for (int i = 0; i < count; i++) {
+            getChildAt(i).dispatchWindowInsetsAnimationProgress(insets);
+        }
+        return insets;
+    }
+
+    @Override
+    void dispatchWindowInsetsAnimationFinished(InsetsAnimation animation) {
+        super.dispatchWindowInsetsAnimationFinished(animation);
+        final int count = getChildCount();
+        for (int i = 0; i < count; i++) {
+            getChildAt(i).dispatchWindowInsetsAnimationFinished(animation);
+        }
     }
 
     /**

@@ -16,6 +16,7 @@
 
 package android.net.wifi.hotspot2;
 
+import android.annotation.SystemApi;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 
@@ -25,6 +26,7 @@ import android.os.Handler;
  *
  * @hide
  */
+@SystemApi
 public abstract class ProvisioningCallback {
 
     /**
@@ -63,9 +65,9 @@ public abstract class ProvisioningCallback {
     public static final int OSU_FAILURE_PROVISIONING_NOT_AVAILABLE = 7;
 
     /**
-     * The reason code for provisioning failure due to invalid server url.
+     * The reason code for provisioning failure due to invalid web url format for an OSU web page.
      */
-    public static final int OSU_FAILURE_INVALID_SERVER_URL = 8;
+    public static final int OSU_FAILURE_INVALID_URL_FORMAT_FOR_OSU = 8;
 
     /**
      * The reason code for provisioning failure when a command received is not the expected command
@@ -148,6 +150,12 @@ public abstract class ProvisioningCallback {
      * install.
      */
     public static final int OSU_FAILURE_ADD_PASSPOINT_CONFIGURATION = 22;
+
+    /**
+     * The reason code for provisioning failure when an {@link OsuProvider} is not found for
+     * provisioning.
+     */
+    public static final int OSU_FAILURE_OSU_PROVIDER_NOT_FOUND = 23;
 
     /**
      * The status code for provisioning flow to indicate connecting to OSU AP

@@ -16,7 +16,6 @@
 
 package android.telephony.data;
 
-import android.annotation.CallSuper;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -60,7 +59,6 @@ public abstract class DataService extends Service {
     private static final String TAG = DataService.class.getSimpleName();
 
     public static final String DATA_SERVICE_INTERFACE = "android.telephony.data.DataService";
-    public static final String DATA_SERVICE_EXTRA_SLOT_ID = "android.telephony.data.extra.SLOT_ID";
 
     /** {@hide} */
     @IntDef(prefix = "REQUEST_REASON_", value = {
@@ -116,7 +114,7 @@ public abstract class DataService extends Service {
      * must extend this class to support data connection. Note that each instance of data service
      * provider is associated with one physical SIM slot.
      */
-    public class DataServiceProvider {
+    public abstract class DataServiceProvider implements AutoCloseable {
 
         private final int mSlotId;
 
@@ -159,7 +157,10 @@ public abstract class DataService extends Service {
                                   @Nullable LinkProperties linkProperties,
                                   @Nullable DataServiceCallback callback) {
             // The default implementation is to return unsupported.
-            callback.onSetupDataCallComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED, null);
+            if (callback != null) {
+                callback.onSetupDataCallComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED,
+                        null);
+            }
         }
 
         /**
@@ -178,7 +179,9 @@ public abstract class DataService extends Service {
         public void deactivateDataCall(int cid, @DeactivateDataReason int reason,
                                        @Nullable DataServiceCallback callback) {
             // The default implementation is to return unsupported.
-            callback.onDeactivateDataCallComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED);
+            if (callback != null) {
+                callback.onDeactivateDataCallComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED);
+            }
         }
 
         /**
@@ -192,7 +195,10 @@ public abstract class DataService extends Service {
         public void setInitialAttachApn(DataProfile dataProfile, boolean isRoaming,
                                         @Nullable DataServiceCallback callback) {
             // The default implementation is to return unsupported.
-            callback.onSetInitialAttachApnComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED);
+            if (callback != null) {
+                callback.onSetInitialAttachApnComplete(
+                        DataServiceCallback.RESULT_ERROR_UNSUPPORTED);
+            }
         }
 
         /**
@@ -208,7 +214,9 @@ public abstract class DataService extends Service {
         public void setDataProfile(List<DataProfile> dps, boolean isRoaming,
                                    @Nullable DataServiceCallback callback) {
             // The default implementation is to return unsupported.
-            callback.onSetDataProfileComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED);
+            if (callback != null) {
+                callback.onSetDataProfileComplete(DataServiceCallback.RESULT_ERROR_UNSUPPORTED);
+            }
         }
 
         /**
@@ -250,12 +258,12 @@ public abstract class DataService extends Service {
         }
 
         /**
-         * Called when the instance of data service is destroyed (e.g. got unbind or binder died).
+         * Called when the instance of data service is destroyed (e.g. got unbind or binder died)
+         * or when the data service provider is removed. The extended class should implement this
+         * method to perform cleanup works.
          */
-        @CallSuper
-        protected void onDestroy() {
-            mDataCallListChangedCallbacks.clear();
-        }
+        @Override
+        public abstract void close();
     }
 
     private static final class SetupDataCallRequest {
@@ -345,7 +353,7 @@ public abstract class DataService extends Service {
                     break;
                 case DATA_SERVICE_REMOVE_DATA_SERVICE_PROVIDER:
                     if (serviceProvider != null) {
-                        serviceProvider.onDestroy();
+                        serviceProvider.close();
                         mServiceMap.remove(slotId);
                     }
                     break;
@@ -353,7 +361,7 @@ public abstract class DataService extends Service {
                     for (int i = 0; i < mServiceMap.size(); i++) {
                         serviceProvider = mServiceMap.get(i);
                         if (serviceProvider != null) {
-                            serviceProvider.onDestroy();
+                            serviceProvider.close();
                         }
                     }
                     mServiceMap.clear();

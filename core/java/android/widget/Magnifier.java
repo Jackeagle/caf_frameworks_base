@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Outline;
@@ -38,6 +39,8 @@ import android.graphics.PointF;
 import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
 import android.graphics.RenderNode;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -95,12 +98,15 @@ public final class Magnifier {
     private final float mWindowElevation;
     // The corner radius of the window containing the magnifier.
     private final float mWindowCornerRadius;
+    // The overlay to be drawn on the top of the magnifier content.
+    private final Drawable mOverlay;
     // The horizontal offset between the source and window coords when #show(float, float) is used.
     private final int mDefaultHorizontalSourceToMagnifierOffset;
     // The vertical offset between the source and window coords when #show(float, float) is used.
     private final int mDefaultVerticalSourceToMagnifierOffset;
-    // Whether the magnifier will be clamped inside the main surface and not overlap system insets.
-    private final boolean mForcePositionWithinWindowSystemInsetsBounds;
+    // Whether the area where the magnifier can be positioned will be clipped to the main window
+    // and within system insets.
+    private final boolean mClippingEnabled;
     // The behavior of the left bound of the rectangle where the content can be copied from.
     private @SourceBound int mLeftContentBound;
     // The behavior of the top bound of the rectangle where the content can be copied from.
@@ -140,7 +146,47 @@ public final class Magnifier {
      */
     @Deprecated
     public Magnifier(@NonNull View view) {
-        this(new Builder(view));
+        this(createBuilderWithOldMagnifierDefaults(view));
+    }
+
+    static Builder createBuilderWithOldMagnifierDefaults(final View view) {
+        final Builder params = new Builder(view);
+        final Context context = view.getContext();
+        final TypedArray a = context.obtainStyledAttributes(null, R.styleable.Magnifier,
+                R.attr.magnifierStyle, 0);
+        params.mWidth = a.getDimensionPixelSize(R.styleable.Magnifier_magnifierWidth, 0);
+        params.mHeight = a.getDimensionPixelSize(R.styleable.Magnifier_magnifierHeight, 0);
+        params.mElevation = a.getDimension(R.styleable.Magnifier_magnifierElevation, 0);
+        params.mCornerRadius = getDeviceDefaultDialogCornerRadius(context);
+        params.mZoom = a.getFloat(R.styleable.Magnifier_magnifierZoom, 0);
+        params.mHorizontalDefaultSourceToMagnifierOffset =
+                a.getDimensionPixelSize(R.styleable.Magnifier_magnifierHorizontalOffset, 0);
+        params.mVerticalDefaultSourceToMagnifierOffset =
+                a.getDimensionPixelSize(R.styleable.Magnifier_magnifierVerticalOffset, 0);
+        params.mOverlay = new ColorDrawable(a.getColor(
+                R.styleable.Magnifier_magnifierColorOverlay, Color.TRANSPARENT));
+        a.recycle();
+        params.mClippingEnabled = true;
+        params.mLeftContentBound = SOURCE_BOUND_MAX_VISIBLE;
+        params.mTopContentBound = SOURCE_BOUND_MAX_IN_SURFACE;
+        params.mRightContentBound = SOURCE_BOUND_MAX_VISIBLE;
+        params.mBottomContentBound = SOURCE_BOUND_MAX_IN_SURFACE;
+        return params;
+    }
+
+    /**
+     * Returns the device default theme dialog corner radius attribute.
+     * We retrieve this from the device default theme to avoid
+     * using the values set in the custom application themes.
+     */
+    private static float getDeviceDefaultDialogCornerRadius(final Context context) {
+        final Context deviceDefaultContext =
+                new ContextThemeWrapper(context, R.style.Theme_DeviceDefault);
+        final TypedArray ta = deviceDefaultContext.obtainStyledAttributes(
+                new int[]{android.R.attr.dialogCornerRadius});
+        final float dialogCornerRadius = ta.getDimension(0, 0);
+        ta.recycle();
+        return dialogCornerRadius;
     }
 
     private Magnifier(@NonNull Builder params) {
@@ -153,12 +199,12 @@ public final class Magnifier {
         mSourceHeight = Math.round(mWindowHeight / mZoom);
         mWindowElevation = params.mElevation;
         mWindowCornerRadius = params.mCornerRadius;
+        mOverlay = params.mOverlay;
         mDefaultHorizontalSourceToMagnifierOffset =
                 params.mHorizontalDefaultSourceToMagnifierOffset;
         mDefaultVerticalSourceToMagnifierOffset =
                 params.mVerticalDefaultSourceToMagnifierOffset;
-        mForcePositionWithinWindowSystemInsetsBounds =
-                params.mForcePositionWithinWindowSystemInsetsBounds;
+        mClippingEnabled = params.mClippingEnabled;
         mLeftContentBound = params.mLeftContentBound;
         mTopContentBound = params.mTopContentBound;
         mRightContentBound = params.mRightContentBound;
@@ -225,8 +271,9 @@ public final class Magnifier {
             if (mWindow == null) {
                 synchronized (mLock) {
                     mWindow = new InternalPopupWindow(mView.getContext(), mView.getDisplay(),
-                            mParentSurface.mSurface,
-                            mWindowWidth, mWindowHeight, mWindowElevation, mWindowCornerRadius,
+                            mParentSurface.mSurfaceControl, mWindowWidth, mWindowHeight,
+                            mWindowElevation, mWindowCornerRadius,
+                            mOverlay != null ? mOverlay : new ColorDrawable(Color.TRANSPARENT),
                             Handler.getMain() /* draw the magnifier on the UI thread */, mLock,
                             mCallback);
                 }
@@ -312,7 +359,7 @@ public final class Magnifier {
     /**
      * @return the initial width of the content magnified and copied to the magnifier, in pixels
      * @see Magnifier.Builder#setSize(int, int)
-     * @see Magnifier.Builder#setZoom(float)
+     * @see Magnifier.Builder#setInitialZoom(float)
      */
     @Px
     public int getSourceWidth() {
@@ -322,7 +369,7 @@ public final class Magnifier {
     /**
      * @return the initial height of the content magnified and copied to the magnifier, in pixels
      * @see Magnifier.Builder#setSize(int, int)
-     * @see Magnifier.Builder#setZoom(float)
+     * @see Magnifier.Builder#setInitialZoom(float)
      */
     @Px
     public int getSourceHeight() {
@@ -347,7 +394,7 @@ public final class Magnifier {
      * If the zoom is x and the magnifier window size is (width, height), the original size
      * of the content being magnified will be (width / x, height / x).
      * @return the zoom applied to the content
-     * @see Magnifier.Builder#setZoom(float)
+     * @see Magnifier.Builder#setInitialZoom(float)
      */
     public float getZoom() {
         return mZoom;
@@ -400,14 +447,27 @@ public final class Magnifier {
     }
 
     /**
-     * Returns whether the magnifier position will be adjusted such that the magnifier will be
-     * fully within the bounds of the main application window, by also avoiding any overlap with
-     * system insets (such as the one corresponding to the status bar).
-     * @return whether the magnifier position will be adjusted
-     * @see Magnifier.Builder#setForcePositionWithinWindowSystemInsetsBounds(boolean)
+     * Returns the overlay to be drawn on the top of the magnifier, or
+     * {@code null} if no overlay should be drawn.
+     * @return the overlay
+     * @see Magnifier.Builder#setOverlay(Drawable)
      */
-    public boolean isForcePositionWithinWindowSystemInsetsBounds() {
-        return mForcePositionWithinWindowSystemInsetsBounds;
+    @Nullable
+    public Drawable getOverlay() {
+        return mOverlay;
+    }
+
+    /**
+     * Returns whether the magnifier position will be adjusted such that the magnifier will be
+     * fully within the bounds of the main application window, by also avoiding any overlap
+     * with system insets (such as the one corresponding to the status bar) i.e. whether the
+     * area where the magnifier can be positioned will be clipped to the main application window
+     * and the system insets.
+     * @return whether the magnifier position will be adjusted
+     * @see Magnifier.Builder#setClippingEnabled(boolean)
+     */
+    public boolean isClippingEnabled() {
+        return mClippingEnabled;
     }
 
     /**
@@ -470,17 +530,20 @@ public final class Magnifier {
                 final int surfaceHeight =
                         viewRootImpl.getHeight() + surfaceInsets.top + surfaceInsets.bottom;
                 validMainWindowSurface =
-                        new SurfaceInfo(mainWindowSurface, surfaceWidth, surfaceHeight, true);
+                        new SurfaceInfo(viewRootImpl.getSurfaceControl(), mainWindowSurface,
+                                surfaceWidth, surfaceHeight, true);
             }
         }
         // Get the surface backing the magnified view, if it is a SurfaceView.
         SurfaceInfo validSurfaceViewSurface = SurfaceInfo.NULL;
         if (mView instanceof SurfaceView) {
+            final SurfaceControl sc = ((SurfaceView) mView).getSurfaceControl();
             final SurfaceHolder surfaceHolder = ((SurfaceView) mView).getHolder();
             final Surface surfaceViewSurface = surfaceHolder.getSurface();
-            if (surfaceViewSurface != null && surfaceViewSurface.isValid()) {
+
+            if (sc != null && sc.isValid()) {
                 final Rect surfaceFrame = surfaceHolder.getSurfaceFrame();
-                validSurfaceViewSurface = new SurfaceInfo(surfaceViewSurface,
+                validSurfaceViewSurface = new SurfaceInfo(sc, surfaceViewSurface,
                         surfaceFrame.right, surfaceFrame.bottom, false);
             }
         }
@@ -516,24 +579,11 @@ public final class Magnifier {
             zoomCenterY = Math.round(yPosInView + mViewCoordinatesInSurface[1]);
         }
 
-        final Rect[] bounds = new Rect[3]; // [MAX_IN_SURFACE, MAX_IN_VIEW, MAX_VISIBLE]
+        final Rect[] bounds = new Rect[2]; // [MAX_IN_SURFACE, MAX_VISIBLE]
         // Obtain the surface bounds rectangle.
         final Rect surfaceBounds = new Rect(0, 0,
                 mContentCopySurface.mWidth, mContentCopySurface.mHeight);
         bounds[0] = surfaceBounds;
-        // Obtain the view bounds rectangle.
-        final Rect viewBounds;
-        if (mView instanceof SurfaceView) {
-            viewBounds = new Rect(0, 0, mContentCopySurface.mWidth, mContentCopySurface.mHeight);
-        } else {
-            viewBounds = new Rect(
-                    mViewCoordinatesInSurface[0],
-                    mViewCoordinatesInSurface[1],
-                    mViewCoordinatesInSurface[0] + mView.getWidth(),
-                    mViewCoordinatesInSurface[1] + mView.getHeight()
-            );
-        }
-        bounds[1] = viewBounds;
         // Obtain the visible view region rectangle.
         final Rect viewVisibleRegion = new Rect();
         mView.getGlobalVisibleRect(viewVisibleRegion);
@@ -546,7 +596,7 @@ public final class Magnifier {
             // If we copy content from a SurfaceView, clamp coordinates relative to it.
             viewVisibleRegion.offset(-mViewCoordinatesInSurface[0], -mViewCoordinatesInSurface[1]);
         }
-        bounds[2] = viewVisibleRegion;
+        bounds[1] = viewVisibleRegion;
 
         // Aggregate the above to obtain the bounds where the content copy will be restricted.
         int resolvedLeft = Integer.MIN_VALUE;
@@ -650,7 +700,7 @@ public final class Magnifier {
      * @return the current window coordinates, after they are clamped inside the parent surface
      */
     private Point getCurrentClampedWindowCoordinates() {
-        if (!mForcePositionWithinWindowSystemInsetsBounds) {
+        if (!mClippingEnabled) {
             // No position adjustment should be done, so return the raw coordinates.
             return new Point(mWindowCoords);
         }
@@ -675,15 +725,18 @@ public final class Magnifier {
      * Contains a surface and metadata corresponding to it.
      */
     private static class SurfaceInfo {
-        public static final SurfaceInfo NULL = new SurfaceInfo(null, 0, 0, false);
+        public static final SurfaceInfo NULL = new SurfaceInfo(null, null, 0, 0, false);
 
         private Surface mSurface;
+        private SurfaceControl mSurfaceControl;
         private int mWidth;
         private int mHeight;
         private boolean mIsMainWindowSurface;
 
-        SurfaceInfo(final Surface surface, final int width, final int height,
+        SurfaceInfo(final SurfaceControl surfaceControl, final Surface surface,
+                final int width, final int height,
                 final boolean isMainWindowSurface) {
+            mSurfaceControl = surfaceControl;
             mSurface = surface;
             mWidth = width;
             mHeight = height;
@@ -698,9 +751,6 @@ public final class Magnifier {
      * producing a shakiness effect for the magnifier content.
      */
     private static class InternalPopupWindow {
-        // The alpha set on the magnifier's content, which defines how
-        // prominent the white background is.
-        private static final int CONTENT_BITMAP_ALPHA = 242;
         // The z of the magnifier surface, defining its z order in the list of
         // siblings having the same parent surface (usually the main app surface).
         private static final int SURFACE_Z = 5;
@@ -716,6 +766,8 @@ public final class Magnifier {
         // The insets of the content inside the allocated surface.
         private final int mOffsetX;
         private final int mOffsetY;
+        // The overlay to be drawn on the top of the content.
+        private final Drawable mOverlay;
         // The surface we allocate for the magnifier content + shadow.
         private final SurfaceSession mSurfaceSession;
         private final SurfaceControl mSurfaceControl;
@@ -724,6 +776,8 @@ public final class Magnifier {
         private final ThreadedRenderer.SimpleRenderer mRenderer;
         // The RenderNode used to draw the magnifier content in the surface.
         private final RenderNode mBitmapRenderNode;
+        // The RenderNode used to draw the overlay over the magnifier content.
+        private final RenderNode mOverlayRenderNode;
         // The job that will be post'd to apply the pending magnifier updates to the surface.
         private final Runnable mMagnifierUpdater;
         // The handler where the magnifier updater jobs will be post'd.
@@ -740,7 +794,7 @@ public final class Magnifier {
         private final Object mLock;
         // Whether a magnifier frame draw is currently pending in the UI thread queue.
         private boolean mFrameDrawScheduled;
-        // The content bitmap.
+        // The content bitmap, as returned by pixel copy.
         private Bitmap mBitmap;
         // Whether the next draw will be the first one for the current instance.
         private boolean mFirstDraw = true;
@@ -756,32 +810,39 @@ public final class Magnifier {
         // mDestroyLock should be acquired before mLock in order to avoid deadlocks.
         private final Object mDestroyLock = new Object();
 
+        // The current content of the magnifier. It is mBitmap + mOverlay, only used for testing.
+        private Bitmap mCurrentContent;
+
         InternalPopupWindow(final Context context, final Display display,
-                final Surface parentSurface,
-                final int width, final int height, final float elevation, final float cornerRadius,
+                final SurfaceControl parentSurfaceControl, final int width, final int height,
+                final float elevation, final float cornerRadius, final Drawable overlay,
                 final Handler handler, final Object lock, final Callback callback) {
             mDisplay = display;
+            mOverlay = overlay;
             mLock = lock;
             mCallback = callback;
 
             mContentWidth = width;
             mContentHeight = height;
-            mOffsetX = (int) (0.1f * width);
-            mOffsetY = (int) (0.1f * height);
+            mOffsetX = (int) (1.05f * elevation);
+            mOffsetY = (int) (1.05f * elevation);
             // Setup the surface we will use for drawing the content and shadow.
             mSurfaceWidth = mContentWidth + 2 * mOffsetX;
             mSurfaceHeight = mContentHeight + 2 * mOffsetY;
-            mSurfaceSession = new SurfaceSession(parentSurface);
+            mSurfaceSession = new SurfaceSession();
             mSurfaceControl = new SurfaceControl.Builder(mSurfaceSession)
                     .setFormat(PixelFormat.TRANSLUCENT)
-                    .setSize(mSurfaceWidth, mSurfaceHeight)
+                    .setBufferSize(mSurfaceWidth, mSurfaceHeight)
                     .setName("magnifier surface")
                     .setFlags(SurfaceControl.HIDDEN)
+                    .setParent(parentSurfaceControl)
                     .build();
             mSurface = new Surface();
             mSurface.copyFrom(mSurfaceControl);
 
-            // Setup the RenderNode tree. The root has only one child, which contains the bitmap.
+            // Setup the RenderNode tree. The root has two children, one containing the bitmap
+            // and one containing the overlay. We use a separate render node for the overlay
+            // to avoid drawing this as the same rate we do for content.
             mRenderer = new ThreadedRenderer.SimpleRenderer(
                     context,
                     "magnifier renderer",
@@ -792,14 +853,26 @@ public final class Magnifier {
                     elevation,
                     cornerRadius
             );
+            mOverlayRenderNode = createRenderNodeForOverlay(
+                    "magnifier overlay",
+                    cornerRadius
+            );
+            setupOverlay();
 
             final RecordingCanvas canvas = mRenderer.getRootNode().start(width, height);
             try {
                 canvas.insertReorderBarrier();
                 canvas.drawRenderNode(mBitmapRenderNode);
                 canvas.insertInorderBarrier();
+                canvas.drawRenderNode(mOverlayRenderNode);
+                canvas.insertInorderBarrier();
             } finally {
                 mRenderer.getRootNode().end(canvas);
+            }
+            if (mCallback != null) {
+                mCurrentContent =
+                        Bitmap.createBitmap(mContentWidth, mContentHeight, Bitmap.Config.ARGB_8888);
+                updateCurrentContentForTesting();
             }
 
             // Initialize the update job and the handler where this will be post'd.
@@ -833,6 +906,61 @@ public final class Magnifier {
             }
 
             return bitmapRenderNode;
+        }
+
+        private RenderNode createRenderNodeForOverlay(final String name, final float cornerRadius) {
+            final RenderNode overlayRenderNode = RenderNode.create(name, null);
+
+            // Define the position of the overlay in the parent render node.
+            // This coincides with the position of the content.
+            overlayRenderNode.setLeftTopRightBottom(mOffsetX, mOffsetY,
+                    mOffsetX + mContentWidth, mOffsetY + mContentHeight);
+
+            final Outline outline = new Outline();
+            outline.setRoundRect(0, 0, mContentWidth, mContentHeight, cornerRadius);
+            outline.setAlpha(1.0f);
+            overlayRenderNode.setOutline(outline);
+            overlayRenderNode.setClipToOutline(true);
+
+            return overlayRenderNode;
+        }
+
+        private void setupOverlay() {
+            drawOverlay();
+
+            mOverlay.setCallback(new Drawable.Callback() {
+                @Override
+                public void invalidateDrawable(Drawable who) {
+                    // When the overlay drawable is invalidated, redraw it to the render node.
+                    drawOverlay();
+                    if (mCallback != null) {
+                        updateCurrentContentForTesting();
+                    }
+                }
+
+                @Override
+                public void scheduleDrawable(Drawable who, Runnable what, long when) {
+                    Handler.getMain().postAtTime(what, who, when);
+                }
+
+                @Override
+                public void unscheduleDrawable(Drawable who, Runnable what) {
+                    Handler.getMain().removeCallbacks(what, who);
+                }
+            });
+        }
+
+        private void drawOverlay() {
+            // Draw the drawable to the render node. This happens once during
+            // initialization and whenever the overlay drawable is invalidated.
+            final RecordingCanvas canvas =
+                    mOverlayRenderNode.startRecording(mContentWidth, mContentHeight);
+            try {
+                mOverlay.setBounds(0, 0, mContentWidth, mContentHeight);
+                mOverlay.draw(canvas);
+            } finally {
+                mOverlayRenderNode.endRecording();
+            }
         }
 
         /**
@@ -909,13 +1037,10 @@ public final class Magnifier {
                 final RecordingCanvas canvas =
                         mBitmapRenderNode.start(mContentWidth, mContentHeight);
                 try {
-                    canvas.drawColor(Color.WHITE);
-
                     final Rect srcRect = new Rect(0, 0, mBitmap.getWidth(), mBitmap.getHeight());
                     final Rect dstRect = new Rect(0, 0, mContentWidth, mContentHeight);
                     final Paint paint = new Paint();
                     paint.setFilterBitmap(true);
-                    paint.setAlpha(CONTENT_BITMAP_ALPHA);
                     canvas.drawBitmap(mBitmap, srcRect, dstRect, paint);
                 } finally {
                     mBitmapRenderNode.end(canvas);
@@ -962,8 +1087,28 @@ public final class Magnifier {
 
             mRenderer.draw(callback);
             if (mCallback != null) {
+                // The current content bitmap is only used in testing, so, for performance,
+                // we only want to update it when running tests. For this, we check that
+                // mCallback is not null, as it can only be set from a @TestApi.
+                updateCurrentContentForTesting();
                 mCallback.onOperationComplete();
             }
+        }
+
+        /**
+         * Updates mCurrentContent, which reproduces what is currently supposed to be
+         * drawn in the magnifier. mCurrentContent is only used for testing, so this method
+         * should only be called otherwise.
+         */
+        private void updateCurrentContentForTesting() {
+            final Canvas canvas = new Canvas(mCurrentContent);
+            final Rect bounds = new Rect(0, 0, mContentWidth, mContentHeight);
+            if (mBitmap != null && !mBitmap.isRecycled()) {
+                final Rect originalBounds = new Rect(0, 0, mBitmap.getWidth(), mBitmap.getHeight());
+                canvas.drawBitmap(mBitmap, originalBounds, bounds, null);
+            }
+            mOverlay.setBounds(bounds);
+            mOverlay.draw(canvas);
         }
     }
 
@@ -977,9 +1122,10 @@ public final class Magnifier {
         private float mZoom;
         private @FloatRange(from = 0f) float mElevation;
         private @FloatRange(from = 0f) float mCornerRadius;
+        private @Nullable Drawable mOverlay;
         private int mHorizontalDefaultSourceToMagnifierOffset;
         private int mVerticalDefaultSourceToMagnifierOffset;
-        private boolean mForcePositionWithinWindowSystemInsetsBounds;
+        private boolean mClippingEnabled;
         private @SourceBound int mLeftContentBound;
         private @SourceBound int mTopContentBound;
         private @SourceBound int mRightContentBound;
@@ -995,39 +1141,23 @@ public final class Magnifier {
         }
 
         private void applyDefaults() {
-            final Context context = mView.getContext();
-            final TypedArray a = context.obtainStyledAttributes(null, R.styleable.Magnifier,
-                    R.attr.magnifierStyle, 0);
-            mWidth = a.getDimensionPixelSize(R.styleable.Magnifier_magnifierWidth, 0);
-            mHeight = a.getDimensionPixelSize(R.styleable.Magnifier_magnifierHeight, 0);
-            mElevation = a.getDimension(R.styleable.Magnifier_magnifierElevation, 0);
-            mCornerRadius = getDeviceDefaultDialogCornerRadius();
-            mZoom = a.getFloat(R.styleable.Magnifier_magnifierZoom, 0);
+            final Resources resources = mView.getContext().getResources();
+            mWidth = resources.getDimensionPixelSize(R.dimen.default_magnifier_width);
+            mHeight = resources.getDimensionPixelSize(R.dimen.default_magnifier_height);
+            mElevation = resources.getDimension(R.dimen.default_magnifier_elevation);
+            mCornerRadius = resources.getDimension(R.dimen.default_magnifier_corner_radius);
+            mZoom = resources.getFloat(R.dimen.default_magnifier_zoom);
             mHorizontalDefaultSourceToMagnifierOffset =
-                    a.getDimensionPixelSize(R.styleable.Magnifier_magnifierHorizontalOffset, 0);
+                    resources.getDimensionPixelSize(R.dimen.default_magnifier_horizontal_offset);
             mVerticalDefaultSourceToMagnifierOffset =
-                    a.getDimensionPixelSize(R.styleable.Magnifier_magnifierVerticalOffset, 0);
-            a.recycle();
-            mForcePositionWithinWindowSystemInsetsBounds = true;
+                    resources.getDimensionPixelSize(R.dimen.default_magnifier_vertical_offset);
+            mOverlay = new ColorDrawable(resources.getColor(
+                    R.color.default_magnifier_color_overlay, null));
+            mClippingEnabled = true;
             mLeftContentBound = SOURCE_BOUND_MAX_VISIBLE;
-            mTopContentBound = SOURCE_BOUND_MAX_IN_SURFACE;
+            mTopContentBound = SOURCE_BOUND_MAX_VISIBLE;
             mRightContentBound = SOURCE_BOUND_MAX_VISIBLE;
-            mBottomContentBound = SOURCE_BOUND_MAX_IN_SURFACE;
-        }
-
-        /**
-         * Returns the device default theme dialog corner radius attribute.
-         * We retrieve this from the device default theme to avoid
-         * using the values set in the custom application themes.
-         */
-        private float getDeviceDefaultDialogCornerRadius() {
-            final Context deviceDefaultContext =
-                    new ContextThemeWrapper(mView.getContext(), R.style.Theme_DeviceDefault);
-            final TypedArray ta = deviceDefaultContext.obtainStyledAttributes(
-                    new int[]{android.R.attr.dialogCornerRadius});
-            final float dialogCornerRadius = ta.getDimension(0, 0);
-            ta.recycle();
-            return dialogCornerRadius;
+            mBottomContentBound = SOURCE_BOUND_MAX_VISIBLE;
         }
 
         /**
@@ -1037,6 +1167,7 @@ public final class Magnifier {
          * @param width the window width to be set
          * @param height the window height to be set
          */
+        @NonNull
         public Builder setSize(@Px @IntRange(from = 0) int width,
                 @Px @IntRange(from = 0) int height) {
             Preconditions.checkArgumentPositive(width, "Width should be positive");
@@ -1052,9 +1183,12 @@ public final class Magnifier {
          * (content_width * zoom, content_height * zoom), which will coincide with the size
          * of the magnifier. A zoom of 1 will translate to no magnification (the content will
          * be just copied to the magnifier with no scaling). The zoom defaults to 1.25.
+         * Note that the zoom can also be changed after the instance is built, using the
+         * {@link Magnifier#setZoom(float)} method.
          * @param zoom the zoom to be set
          */
-        public Builder setZoom(@FloatRange(from = 0f) float zoom) {
+        @NonNull
+        public Builder setInitialZoom(@FloatRange(from = 0f) float zoom) {
             Preconditions.checkArgumentPositive(zoom, "Zoom should be positive");
             mZoom = zoom;
             return this;
@@ -1064,6 +1198,7 @@ public final class Magnifier {
          * Sets the elevation of the magnifier window, in pixels. Defaults to 4dp.
          * @param elevation the elevation to be set
          */
+        @NonNull
         public Builder setElevation(@Px @FloatRange(from = 0) float elevation) {
             Preconditions.checkArgumentNonNegative(elevation, "Elevation should be non-negative");
             mElevation = elevation;
@@ -1071,10 +1206,10 @@ public final class Magnifier {
         }
 
         /**
-         * Sets the corner radius of the magnifier window, in pixels.
-         * Defaults to the corner radius defined in the device default theme.
+         * Sets the corner radius of the magnifier window, in pixels. Defaults to 2dp.
          * @param cornerRadius the corner radius to be set
          */
+        @NonNull
         public Builder setCornerRadius(@Px @FloatRange(from = 0) float cornerRadius) {
             Preconditions.checkArgumentNonNegative(cornerRadius,
                     "Corner radius should be non-negative");
@@ -1083,13 +1218,33 @@ public final class Magnifier {
         }
 
         /**
-         * Sets an offset, in pixels, that should be added to the content source center to obtain
+         * Sets an overlay that will be drawn on the top of the magnifier.
+         * In general, the overlay should not be opaque, in order to let the magnified
+         * content be partially visible in the magnifier. The default overlay is {@code null}
+         * (no overlay). As an example, TextView applies a white {@link ColorDrawable}
+         * overlay with 5% alpha, aiming to make the magnifier distinguishable when shown in dark
+         * application regions. To disable the overlay, the parameter should be set
+         * to {@code null}. If not null, the overlay will be automatically redrawn
+         * when the drawable is invalidated. To achieve this, the magnifier will set a new
+         * {@link android.graphics.drawable.Drawable.Callback} for the overlay drawable,
+         * so keep in mind that any existing one set by the application will be lost.
+         * @param overlay the overlay to be drawn on top
+         */
+        @NonNull
+        public Builder setOverlay(@Nullable Drawable overlay) {
+            mOverlay = overlay;
+            return this;
+        }
+
+        /**
+         * Sets an offset that should be added to the content source center to obtain
          * the position of the magnifier window, when the {@link #show(float, float)}
          * method is called. The offset is ignored when {@link #show(float, float, float, float)}
-         * is used. The offset can be negative, and it defaults to (0dp, -42dp).
+         * is used. The offset can be negative. It defaults to (0dp, 0dp).
          * @param horizontalOffset the horizontal component of the offset
          * @param verticalOffset the vertical component of the offset
          */
+        @NonNull
         public Builder setDefaultSourceToMagnifierOffset(@Px int horizontalOffset,
                 @Px int verticalOffset) {
             mHorizontalDefaultSourceToMagnifierOffset = horizontalOffset;
@@ -1101,21 +1256,24 @@ public final class Magnifier {
          * Defines the behavior of the magnifier when it is requested to position outside the
          * surface of the main application window. The default value is {@code true}, which means
          * that the position will be adjusted such that the magnifier will be fully within the
-         * bounds of the main application window, by also avoiding any overlap with system insets
-         * (such as the one corresponding to the status bar). If you require a custom behavior, this
-         * flag should be set to {@code false}, meaning that the magnifier will be able to cross the
-         * main application surface boundaries (and also overlap the system insets). This should be
-         * handled with care, when passing coordinates to {@link #show(float, float)}; note that:
+         * bounds of the main application window, while also avoiding any overlap with system insets
+         * (such as the one corresponding to the status bar). If this flag is set to {@code false},
+         * the area where the magnifier can be positioned will no longer be clipped, so the
+         * magnifier will be able to extend outside the main application window boundaries (and also
+         * overlap the system insets). This can be useful if you require a custom behavior, but it
+         * should be handled with care, when passing coordinates to {@link #show(float, float)};
+         * note that:
          * <ul>
          *   <li>in a multiwindow context, if the magnifier crosses the boundary between the two
          *   windows, it will not be able to show over the window of the other application</li>
          *   <li>if the magnifier overlaps the status bar, there is no guarantee about which one
          *   will be displayed on top. This should be handled with care.</li>
          * </ul>
-         * @param force whether the magnifier position will be adjusted
+         * @param clip whether the magnifier position will be adjusted
          */
-        public Builder setForcePositionWithinWindowSystemInsetsBounds(boolean force) {
-            mForcePositionWithinWindowSystemInsetsBounds = force;
+        @NonNull
+        public Builder setClippingEnabled(boolean clip) {
+            mClippingEnabled = clip;
             return this;
         }
 
@@ -1130,11 +1288,6 @@ public final class Magnifier {
          *   {@link android.view.View#getGlobalVisibleRect(Rect)}. For example, this will take into
          *   account the case when the view is contained in a scrollable container, and the
          *   magnifier will refuse to copy content outside of the visible view region</li>
-         *   <li>{@link #SOURCE_BOUND_MAX_IN_VIEW}, which extends the bound as much as possible
-         *   while remaining in the bounds of the view. Note that, although this option is
-         *   used, the magnifier will always only display content visible on the screen: if the
-         *   view lays outside the screen or is covered by a different view either partially or
-         *   totally, the magnifier will not show any view region not visible on the screen.</li>
          *   <li>{@link #SOURCE_BOUND_MAX_IN_SURFACE}, which extends the bound as much
          *   as possible while remaining inside the surface the content is copied from.</li>
          * </ul>
@@ -1156,6 +1309,7 @@ public final class Magnifier {
          * @param right the right bound for content copy
          * @param bottom the bottom bound for content copy
          */
+        @NonNull
         public Builder setSourceBounds(@SourceBound int left, @SourceBound int top,
                 @SourceBound int right, @SourceBound int bottom) {
             mLeftContentBound = left;
@@ -1177,21 +1331,14 @@ public final class Magnifier {
      * A source bound that will extend as much as possible, while remaining within the surface
      * the content is copied from.
      */
-
     public static final int SOURCE_BOUND_MAX_IN_SURFACE = 0;
-    /**
-     * A source bound that will extend as much as possible, while remaining within the
-     * magnified view.
-     */
-
-    public static final int SOURCE_BOUND_MAX_IN_VIEW = 1;
 
     /**
      * A source bound that will extend as much as possible, while remaining within the
      * visible region of the magnified view, as determined by
      * {@link View#getGlobalVisibleRect(Rect)}.
      */
-    public static final int SOURCE_BOUND_MAX_VISIBLE = 2;
+    public static final int SOURCE_BOUND_MAX_VISIBLE = 1;
 
 
     /**
@@ -1201,11 +1348,11 @@ public final class Magnifier {
      *
      * @hide
      */
-    @IntDef({SOURCE_BOUND_MAX_IN_SURFACE, SOURCE_BOUND_MAX_IN_VIEW, SOURCE_BOUND_MAX_VISIBLE})
+    @IntDef({SOURCE_BOUND_MAX_IN_SURFACE, SOURCE_BOUND_MAX_VISIBLE})
     @Retention(RetentionPolicy.SOURCE)
     public @interface SourceBound {}
 
-    // The rest of the file consists of test APIs.
+    // The rest of the file consists of test APIs and methods relevant for tests.
 
     /**
      * See {@link #setOnOperationCompleteCallback(Callback)}.
@@ -1228,7 +1375,7 @@ public final class Magnifier {
     }
 
     /**
-     * @return the content being currently displayed in the magnifier, as bitmap
+     * @return the drawing being currently displayed in the magnifier, as bitmap
      *
      * @hide
      */
@@ -1238,12 +1385,14 @@ public final class Magnifier {
             return null;
         }
         synchronized (mWindow.mLock) {
-            return Bitmap.createScaledBitmap(mWindow.mBitmap, mWindowWidth, mWindowHeight, true);
+            return mWindow.mCurrentContent;
         }
     }
 
     /**
-     * @return the content to be magnified, as bitmap
+     * Returns a bitmap containing the content that was magnified and drew to the
+     * magnifier, at its original size, without the overlay applied.
+     * @return the content that is magnified, as bitmap
      *
      * @hide
      */
@@ -1267,8 +1416,8 @@ public final class Magnifier {
         final Resources resources = Resources.getSystem();
         final float density = resources.getDisplayMetrics().density;
         final PointF size = new PointF();
-        size.x = resources.getDimension(R.dimen.magnifier_width) / density;
-        size.y = resources.getDimension(R.dimen.magnifier_height) / density;
+        size.x = resources.getDimension(R.dimen.default_magnifier_width) / density;
+        size.y = resources.getDimension(R.dimen.default_magnifier_height) / density;
         return size;
     }
 

@@ -96,6 +96,7 @@ interface IActivityManager {
             String callingPackage);
     void unregisterUidObserver(in IUidObserver observer);
     boolean isUidActive(int uid, String callingPackage);
+    int getUidProcessState(int uid, in String callingPackage);
     // =============== End of transactions used on native side as well ============================
 
     // Special low-level communication with activity manager.
@@ -123,7 +124,7 @@ interface IActivityManager {
             int ignoreWindowingMode);
     void moveTaskToFront(int task, int flags, in Bundle options);
     int getTaskForActivity(in IBinder token, in boolean onlyRoot);
-    ContentProviderHolder getContentProvider(in IApplicationThread caller,
+    ContentProviderHolder getContentProvider(in IApplicationThread caller, in String callingPackage,
             in String name, int userId, boolean stable);
     void publishContentProviders(in IApplicationThread caller,
             in List<ContentProviderHolder> providers);
@@ -140,6 +141,7 @@ interface IActivityManager {
     int bindIsolatedService(in IApplicationThread caller, in IBinder token, in Intent service,
             in String resolvedType, in IServiceConnection connection, int flags,
             in String instanceName, in String callingPackage, int userId);
+    void updateServiceGroup(in IServiceConnection connection, int group, int importance);
     boolean unbindService(in IServiceConnection connection);
     void publishService(in IBinder token, in Intent intent, in IBinder service);
     void setDebugApp(in String packageName, boolean waitForDebugger, boolean persistent);
@@ -201,7 +203,7 @@ interface IActivityManager {
     void unbindFinished(in IBinder token, in Intent service, boolean doRebind);
     void setProcessImportant(in IBinder token, int pid, boolean isForeground, String reason);
     void setServiceForeground(in ComponentName className, in IBinder token,
-            int id, in Notification notification, int flags);
+            int id, in Notification notification, int flags, int foregroundServiceType);
     boolean moveActivityTaskToBack(in IBinder token, boolean nonRoot);
     void getMemoryInfo(out ActivityManager.MemoryInfo outInfo);
     List<ActivityManager.ProcessErrorStateInfo> getProcessesInErrorState();
@@ -219,8 +221,8 @@ interface IActivityManager {
     boolean shutdown(int timeout);
     void stopAppSwitches();
     void resumeAppSwitches();
-    boolean bindBackupAgent(in String packageName, int backupRestoreMode, int userId);
-    void backupAgentCreated(in String packageName, in IBinder agent);
+    boolean bindBackupAgent(in String packageName, int backupRestoreMode, int targetUserId);
+    void backupAgentCreated(in String packageName, in IBinder agent, int userId);
     void unbindBackupAgent(in ApplicationInfo appInfo);
     int getUidForIntentSender(in IIntentSender sender);
     int handleIncomingUser(int callingPid, int callingUid, int userId, boolean allowAll,
@@ -275,6 +277,7 @@ interface IActivityManager {
     void unstableProviderDied(in IBinder connection);
     boolean isIntentSenderAnActivity(in IIntentSender sender);
     boolean isIntentSenderAForegroundService(in IIntentSender sender);
+    boolean isIntentSenderABroadcast(in IIntentSender sender);
     int startActivityAsUser(in IApplicationThread caller, in String callingPackage,
             in Intent intent, in String resolvedType, in IBinder resultTo, in String resultWho,
             int requestCode, int flags, in ProfilerInfo profilerInfo,
@@ -315,7 +318,6 @@ interface IActivityManager {
      */
     void requestWifiBugReport(in String shareTitle, in String shareDescription);
 
-    void clearPendingBackup();
     Intent getIntentForIntentSender(in IIntentSender sender);
     // This is not public because you need to be very careful in how you
     // manage your activity to make sure it is always the uid you expect.
@@ -378,8 +380,6 @@ interface IActivityManager {
     void noteAlarmFinish(in IIntentSender sender, in WorkSource workSource, int sourceUid, in String tag);
     int getPackageProcessState(in String packageName, in String callingPackage);
     void updateDeviceOwner(in String packageName);
-    int getUidProcessState(int uid, in String callingPackage);
-
 
     // Start of N transactions
     // Start Binder transaction tracking for all applications.
@@ -421,7 +421,6 @@ interface IActivityManager {
     void resizeDockedStack(in Rect dockedBounds, in Rect tempDockedTaskBounds,
             in Rect tempDockedTaskInsetBounds,
             in Rect tempOtherTaskBounds, in Rect tempOtherTaskInsetBounds);
-    boolean isAppForeground(int uid);
     void removeStack(int stackId);
     void makePackageIdle(String packageName, int userId);
     int getMemoryTrimLevel();

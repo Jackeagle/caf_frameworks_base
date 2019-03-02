@@ -21,8 +21,9 @@ import static org.junit.Assert.assertEquals;
 import android.icu.util.ULocale;
 import android.os.Bundle;
 import android.os.Parcel;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -69,10 +70,12 @@ public final class TextLanguageTest {
         final String bundleKey = "experiment.str";
         final Bundle bundle = new Bundle();
         bundle.putString(bundleKey, "bundle");
+        final String packageName = "packageName";
 
         final TextLanguage.Request reference = new TextLanguage.Request.Builder(text)
                 .setExtras(bundle)
                 .build();
+        reference.setCallingPackageName(packageName);
 
         final Parcel parcel = Parcel.obtain();
         reference.writeToParcel(parcel, 0);
@@ -81,5 +84,6 @@ public final class TextLanguageTest {
 
         assertEquals(text, result.getText());
         assertEquals("bundle", result.getExtras().getString(bundleKey));
+        assertEquals(packageName, result.getCallingPackageName());
     }
 }

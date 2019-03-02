@@ -1,0 +1,16 @@
+{
+    "presubmit": [
+        {
+            "name": "FrameworksMockingServicesTests",
+            "file_patterns": ["AlarmManagerService\\.java"],
+            "options": [
+                {
+                  "include-annotation": "android.platform.test.annotations.Presubmit"
+                },
+                {
+                  "exclude-annotation": "androidx.test.filters.FlakyTest"
+                }
+            ]
+        }
+    ]
+}

@@ -29,11 +29,9 @@
 
 #include "TestHelpers.h"
 
-using ::testing::IsNull;
 using ::testing::NotNull;
 
-namespace android {
-namespace idmap2 {
+namespace android::idmap2 {
 
 TEST(BinaryStreamVisitorTests, CreateBinaryStreamViaBinaryStreamVisitor) {
   std::string raw(reinterpret_cast<const char*>(idmap_raw_data), idmap_raw_data_len);
@@ -52,14 +50,14 @@ TEST(BinaryStreamVisitorTests, CreateBinaryStreamViaBinaryStreamVisitor) {
 
   ASSERT_EQ(idmap1->GetHeader()->GetTargetCrc(), idmap2->GetHeader()->GetTargetCrc());
   ASSERT_EQ(idmap1->GetHeader()->GetTargetPath(), idmap2->GetHeader()->GetTargetPath());
-  ASSERT_EQ(idmap1->GetData().size(), 1u);
+  ASSERT_EQ(idmap1->GetData().size(), 1U);
   ASSERT_EQ(idmap1->GetData().size(), idmap2->GetData().size());
 
   const auto& data1 = idmap1->GetData()[0];
   const auto& data2 = idmap2->GetData()[0];
 
   ASSERT_EQ(data1->GetHeader()->GetTargetPackageId(), data2->GetHeader()->GetTargetPackageId());
-  ASSERT_EQ(data1->GetTypeEntries().size(), 2u);
+  ASSERT_EQ(data1->GetTypeEntries().size(), 2U);
   ASSERT_EQ(data1->GetTypeEntries().size(), data2->GetTypeEntries().size());
   ASSERT_EQ(data1->GetTypeEntries()[0]->GetEntry(0), data2->GetTypeEntries()[0]->GetEntry(0));
   ASSERT_EQ(data1->GetTypeEntries()[0]->GetEntry(1), data2->GetTypeEntries()[0]->GetEntry(1));
@@ -80,7 +78,8 @@ TEST(BinaryStreamVisitorTests, CreateIdmapFromApkAssetsInteropWithLoadedIdmap) {
 
   std::stringstream error;
   std::unique_ptr<const Idmap> idmap =
-      Idmap::FromApkAssets(target_apk_path, *target_apk, overlay_apk_path, *overlay_apk, error);
+      Idmap::FromApkAssets(target_apk_path, *target_apk, overlay_apk_path, *overlay_apk,
+                           PolicyFlags::POLICY_PUBLIC, /* enforce_overlayable */ true, error);
   ASSERT_THAT(idmap, NotNull());
 
   std::stringstream stream;
@@ -103,27 +102,56 @@ TEST(BinaryStreamVisitorTests, CreateIdmapFromApkAssetsInteropWithLoadedIdmap) {
   header = loaded_idmap->GetEntryMapForType(0x02);
   ASSERT_THAT(header, NotNull());
 
-  success = LoadedIdmap::Lookup(header, 0x0002, &entry);
+  success = LoadedIdmap::Lookup(header, 0x0000, &entry);  // string/a
   ASSERT_FALSE(success);
 
-  success = LoadedIdmap::Lookup(header, 0x0003, &entry);
+  success = LoadedIdmap::Lookup(header, 0x0001, &entry);  // string/b
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0002, &entry);  // string/c
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0003, &entry);  // string/other
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0004, &entry);  // string/not_overlayable
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0005, &entry);  // string/policy_product
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0006, &entry);  // string/policy_public
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0007, &entry);  // string/policy_system
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0008, &entry);  // string/policy_system_vendor
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x0009, &entry);  // string/str1
   ASSERT_TRUE(success);
   ASSERT_EQ(entry, 0x0000);
 
-  success = LoadedIdmap::Lookup(header, 0x0004, &entry);
+  success = LoadedIdmap::Lookup(header, 0x000a, &entry);  // string/str2
   ASSERT_FALSE(success);
 
-  success = LoadedIdmap::Lookup(header, 0x0005, &entry);
+  success = LoadedIdmap::Lookup(header, 0x000b, &entry);  // string/str3
   ASSERT_TRUE(success);
   ASSERT_EQ(entry, 0x0001);
 
-  success = LoadedIdmap::Lookup(header, 0x0006, &entry);
+  success = LoadedIdmap::Lookup(header, 0x000c, &entry);  // string/str4
   ASSERT_TRUE(success);
   ASSERT_EQ(entry, 0x0002);
 
-  success = LoadedIdmap::Lookup(header, 0x0007, &entry);
+  success = LoadedIdmap::Lookup(header, 0x000d, &entry);  // string/x
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x000e, &entry);  // string/y
+  ASSERT_FALSE(success);
+
+  success = LoadedIdmap::Lookup(header, 0x000f, &entry);  // string/z
   ASSERT_FALSE(success);
 }
 
-}  // namespace idmap2
-}  // namespace android
+}  // namespace android::idmap2

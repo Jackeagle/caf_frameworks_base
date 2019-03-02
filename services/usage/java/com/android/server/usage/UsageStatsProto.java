@@ -135,6 +135,15 @@ final class UsageStatsProto {
                     stats.mTotalTimeForegroundServiceUsed = proto.readLong(
                             IntervalStatsProto.UsageStats.TOTAL_TIME_SERVICE_USED_MS);
                     break;
+                case (int) IntervalStatsProto.UsageStats.LAST_TIME_VISIBLE_MS:
+                    // Time attributes stored is an offset of the beginTime.
+                    stats.mLastTimeVisible = statsOut.beginTime + proto.readLong(
+                            IntervalStatsProto.UsageStats.LAST_TIME_VISIBLE_MS);
+                    break;
+                case (int) IntervalStatsProto.UsageStats.TOTAL_TIME_VISIBLE_MS:
+                    stats.mTotalTimeVisible = proto.readLong(
+                            IntervalStatsProto.UsageStats.TOTAL_TIME_VISIBLE_MS);
+                    break;
             }
         }
         if (stats.mLastTimeUsed == 0) {
@@ -337,6 +346,11 @@ final class UsageStatsProto {
                 usageStats.mLastTimeForegroundServiceUsed - stats.beginTime);
         proto.write(IntervalStatsProto.UsageStats.TOTAL_TIME_SERVICE_USED_MS,
                 usageStats.mTotalTimeForegroundServiceUsed);
+        // Time attributes stored as an offset of the beginTime.
+        proto.write(IntervalStatsProto.UsageStats.LAST_TIME_VISIBLE_MS,
+                usageStats.mLastTimeVisible - stats.beginTime);
+        proto.write(IntervalStatsProto.UsageStats.TOTAL_TIME_VISIBLE_MS,
+                usageStats.mTotalTimeVisible);
         proto.write(IntervalStatsProto.UsageStats.APP_LAUNCH_COUNT, usageStats.mAppLaunchCount);
         writeChooserCounts(proto, usageStats);
         proto.end(token);
@@ -427,6 +441,29 @@ final class UsageStatsProto {
         proto.write(IntervalStatsProto.Event.TIME_MS, event.mTimeStamp - stats.beginTime);
         proto.write(IntervalStatsProto.Event.FLAGS, event.mFlags);
         proto.write(IntervalStatsProto.Event.TYPE, event.mEventType);
+        proto.write(IntervalStatsProto.Event.INSTANCE_ID, event.mInstanceId);
+        if (event.mTaskRootPackage != null) {
+            final int taskRootPackageIndex = stats.mStringCache.indexOf(event.mTaskRootPackage);
+            if (taskRootPackageIndex >= 0) {
+                proto.write(IntervalStatsProto.Event.TASK_ROOT_PACKAGE_INDEX,
+                        taskRootPackageIndex + 1);
+            } else {
+                // Task root package not in Stringpool for some reason.
+                Slog.w(TAG, "Usage event task root package name (" + event.mTaskRootPackage
+                        + ") not found in IntervalStats string cache");
+            }
+        }
+        if (event.mTaskRootClass != null) {
+            final int taskRootClassIndex = stats.mStringCache.indexOf(event.mTaskRootClass);
+            if (taskRootClassIndex >= 0) {
+                proto.write(IntervalStatsProto.Event.TASK_ROOT_CLASS_INDEX,
+                        taskRootClassIndex + 1);
+            } else {
+                // Task root class not in Stringpool for some reason.
+                Slog.w(TAG, "Usage event task root class name (" + event.mTaskRootClass
+                        + ") not found in IntervalStats string cache");
+            }
+        }
         switch (event.mEventType) {
             case UsageEvents.Event.CONFIGURATION_CHANGE:
                 if (event.mConfiguration != null) {

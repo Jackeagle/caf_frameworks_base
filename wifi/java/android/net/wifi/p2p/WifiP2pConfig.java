@@ -16,10 +16,16 @@
 
 package android.net.wifi.p2p;
 
+import android.annotation.IntDef;
 import android.annotation.UnsupportedAppUsage;
+import android.net.MacAddress;
 import android.net.wifi.WpsInfo;
-import android.os.Parcelable;
 import android.os.Parcel;
+import android.os.Parcelable;
+import android.text.TextUtils;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 /**
  * A class representing a Wi-Fi P2p configuration for setting up a connection
@@ -38,11 +44,45 @@ public class WifiP2pConfig implements Parcelable {
      */
     public WpsInfo wps;
 
+    /**
+     * The network name of a group, should be configured by helper method
+     */
+    /** @hide */
+    public String networkName = "";
+
+    /**
+     * The passphrase of a group, should be configured by helper method
+     */
+    /** @hide */
+    public String passphrase = "";
+
+    /**
+     * The required band for Group Owner
+     */
+    /** @hide */
+    public int groupOwnerBand = GROUP_OWNER_BAND_AUTO;
+
     /** @hide */
     public static final int MAX_GROUP_OWNER_INTENT   =   15;
     /** @hide */
     @UnsupportedAppUsage
     public static final int MIN_GROUP_OWNER_INTENT   =   0;
+
+    /** @hide */
+    @IntDef(flag = false, prefix = { "GROUP_OWNER_BAND_" }, value = {
+        GROUP_OWNER_BAND_AUTO,
+        GROUP_OWNER_BAND_2GHZ,
+        GROUP_OWNER_BAND_5GHZ
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface GroupOwnerBandType {}
+
+    /**
+     * Recognized Group Owner required band.
+     */
+    public static final int GROUP_OWNER_BAND_AUTO = 0;
+    public static final int GROUP_OWNER_BAND_2GHZ = 1;
+    public static final int GROUP_OWNER_BAND_5GHZ = 2;
 
     /**
      * This is an integer value between 0 and 15 where 0 indicates the least
@@ -115,6 +155,10 @@ public class WifiP2pConfig implements Parcelable {
         sbuf.append("\n wps: ").append(wps);
         sbuf.append("\n groupOwnerIntent: ").append(groupOwnerIntent);
         sbuf.append("\n persist: ").append(netId);
+        sbuf.append("\n networkName: ").append(networkName);
+        sbuf.append("\n passphrase: ").append(
+                TextUtils.isEmpty(passphrase) ? "<empty>" : "<non-empty>");
+        sbuf.append("\n groupOwnerBand: ").append(groupOwnerBand);
         return sbuf.toString();
     }
 
@@ -130,6 +174,9 @@ public class WifiP2pConfig implements Parcelable {
             wps = new WpsInfo(source.wps);
             groupOwnerIntent = source.groupOwnerIntent;
             netId = source.netId;
+            networkName = source.networkName;
+            passphrase = source.passphrase;
+            groupOwnerBand = source.groupOwnerBand;
         }
     }
 
@@ -139,6 +186,9 @@ public class WifiP2pConfig implements Parcelable {
         dest.writeParcelable(wps, flags);
         dest.writeInt(groupOwnerIntent);
         dest.writeInt(netId);
+        dest.writeString(networkName);
+        dest.writeString(passphrase);
+        dest.writeInt(groupOwnerBand);
     }
 
     /** Implement the Parcelable interface */
@@ -150,6 +200,9 @@ public class WifiP2pConfig implements Parcelable {
                 config.wps = (WpsInfo) in.readParcelable(null);
                 config.groupOwnerIntent = in.readInt();
                 config.netId = in.readInt();
+                config.networkName = in.readString();
+                config.passphrase = in.readString();
+                config.groupOwnerBand = in.readInt();
                 return config;
             }
 
@@ -157,4 +210,213 @@ public class WifiP2pConfig implements Parcelable {
                 return new WifiP2pConfig[size];
             }
         };
+
+    /**
+     * Builder used to build {@link WifiP2pConfig} objects for
+     * creating or joining a group.
+     */
+    public static final class Builder {
+
+        private static final MacAddress MAC_ANY_ADDRESS =
+                MacAddress.fromString("00:00:00:00:00:00");
+
+        private MacAddress mDeviceAddress = MAC_ANY_ADDRESS;
+        private String mNetworkName = "";
+        private String mPassphrase = "";
+        private int mGroupOperatingBand = GROUP_OWNER_BAND_AUTO;
+        private int mGroupOperatingFrequency = GROUP_OWNER_BAND_AUTO;
+        private int mNetId = WifiP2pGroup.TEMPORARY_NET_ID;
+
+        /**
+         * Specify the peer's MAC address. If not set, the device will
+         * try to find a peer whose SSID matches the network name as
+         * specified by {@link #setNetworkName(String)}. Specifying null will
+         * reset the peer's MAC address to "00:00:00:00:00:00".
+         * <p>
+         *     Optional. "00:00:00:00:00:00" by default.
+         *
+         * @param deviceAddress the peer's MAC address.
+         * @return The builder to facilitate chaining
+         *         {@code builder.setXXX(..).setXXX(..)}.
+         */
+        public Builder setDeviceAddress(MacAddress deviceAddress) {
+            if (deviceAddress == null) {
+                mDeviceAddress = MAC_ANY_ADDRESS;
+            } else {
+                mDeviceAddress = deviceAddress;
+            }
+            return this;
+        }
+
+        /**
+         * Specify the network name, a.k.a. group name,
+         * for creating or joining a group.
+         * <p>
+         *     Must be called - an empty network name is not valid.
+         *
+         * @param networkName network name of a group.
+         * @return The builder to facilitate chaining
+         *         {@code builder.setXXX(..).setXXX(..)}.
+         */
+        public Builder setNetworkName(String networkName) {
+            if (TextUtils.isEmpty(networkName)) {
+                throw new IllegalArgumentException(
+                        "network name must be non-empty.");
+            }
+            mNetworkName = networkName;
+            return this;
+        }
+
+        /**
+         * Specify the passphrase for creating or joining a group.
+         * <p>
+         *     Must be called - an empty passphrase is not valid.
+         *
+         * @param passphrase the passphrase of a group.
+         * @return The builder to facilitate chaining
+         *         {@code builder.setXXX(..).setXXX(..)}.
+         */
+        public Builder setPassphrase(String passphrase) {
+            if (TextUtils.isEmpty(passphrase)) {
+                throw new IllegalArgumentException(
+                        "passphrase must be non-empty.");
+            }
+            mPassphrase = passphrase;
+            return this;
+        }
+
+        /**
+         * Specify the band to use for creating the group or joining the group. The band should
+         * be {@link #GROUP_OWNER_BAND_2GHZ}, {@link #GROUP_OWNER_BAND_5GHZ} or
+         * {@link #GROUP_OWNER_BAND_AUTO}.
+         * <p>
+         * When creating a group as Group Owner using {@link
+         * WifiP2pManager#createGroup(WifiP2pManager.Channel,
+         * WifiP2pConfig, WifiP2pManager.ActionListener)},
+         * specifying {@link #GROUP_OWNER_BAND_AUTO} allows the system to pick the operating
+         * frequency from all supported bands.
+         * Specifying {@link #GROUP_OWNER_BAND_2GHZ} or {@link #GROUP_OWNER_BAND_5GHZ}
+         * only allows the system to pick the operating frequency in the specified band.
+         * If the Group Owner cannot create a group in the specified band, the operation will fail.
+         * <p>
+         * When joining a group as Group Client using {@link
+         * WifiP2pManager#connect(WifiP2pManager.Channel, WifiP2pConfig,
+         * WifiP2pManager.ActionListener)},
+         * specifying {@link #GROUP_OWNER_BAND_AUTO} allows the system to scan all supported
+         * frequencies to find the desired group. Specifying {@link #GROUP_OWNER_BAND_2GHZ} or
+         * {@link #GROUP_OWNER_BAND_5GHZ} only allows the system to scan the specified band.
+         * <p>
+         *     {@link #setGroupOperatingBand(int)} and {@link #setGroupOperatingFrequency(int)} are
+         *     mutually exclusive. Setting operating band and frequency both is invalid.
+         * <p>
+         *     Optional. {@link #GROUP_OWNER_BAND_AUTO} by default.
+         *
+         * @param band the operating band of the group.
+         *             This should be one of {@link #GROUP_OWNER_BAND_AUTO},
+         *             {@link #GROUP_OWNER_BAND_2GHZ}, {@link #GROUP_OWNER_BAND_5GHZ}.
+         * @return The builder to facilitate chaining
+         *         {@code builder.setXXX(..).setXXX(..)}.
+         */
+        public Builder setGroupOperatingBand(@GroupOwnerBandType int band) {
+            switch (band) {
+                case GROUP_OWNER_BAND_AUTO:
+                case GROUP_OWNER_BAND_2GHZ:
+                case GROUP_OWNER_BAND_5GHZ:
+                    mGroupOperatingBand = band;
+                    break;
+                default:
+                    throw new IllegalArgumentException(
+                        "Invalid constant for the group operating band!");
+            }
+            return this;
+        }
+
+        /**
+         * Specify the frequency to use for creating the group or joining the group.
+         * <p>
+         * When creating a group as Group Owner using {@link WifiP2pManager#createGroup(
+         * WifiP2pManager.Channel, WifiP2pConfig, WifiP2pManager.ActionListener)},
+         * specifying a frequency only allows the system to pick the specified frequency.
+         * If the Group Owner cannot create a group at the specified frequency,
+         * the operation will fail.
+         * When not specifying a frequency, it allows the system to pick operating frequency
+         * from all supported bands.
+         * <p>
+         * When joining a group as Group Client using {@link WifiP2pManager#connect(
+         * WifiP2pManager.Channel, WifiP2pConfig, WifiP2pManager.ActionListener)},
+         * specifying a frequency only allows the system to scan the specified frequency.
+         * If the frequency is not supported or invalid, the operation will fail.
+         * When not specifying a frequency, it allows the system to scan all supported
+         * frequencies to find the desired group.
+         * <p>
+         *     {@link #setGroupOperatingBand(int)} and {@link #setGroupOperatingFrequency(int)} are
+         *     mutually exclusive. Setting operating band and frequency both is invalid.
+         * <p>
+         *     Optional. 0 by default.
+         *
+         * @param frequency the operating frequency of the group.
+         * @return The builder to facilitate chaining
+         *         {@code builder.setXXX(..).setXXX(..)}.
+         */
+        public Builder setGroupOperatingFrequency(int frequency) {
+            if (frequency < 0) {
+                throw new IllegalArgumentException(
+                    "Invalid group operating frequency!");
+            }
+            mGroupOperatingFrequency = frequency;
+            return this;
+        }
+
+        /**
+         * Specify that the group configuration be persisted (i.e. saved).
+         * By default the group configuration will not be saved.
+         * <p>
+         *     Optional. false by default.
+         *
+         * @param persistent is this group persistent group.
+         * @return The builder to facilitate chaining
+         *         {@code builder.setXXX(..).setXXX(..)}.
+         */
+        public Builder enablePersistentMode(boolean persistent) {
+            if (persistent) {
+                mNetId = WifiP2pGroup.PERSISTENT_NET_ID;
+            } else {
+                mNetId = WifiP2pGroup.TEMPORARY_NET_ID;
+            }
+            return this;
+        }
+
+        /**
+         * Build {@link WifiP2pConfig} given the current requests made on the builder.
+         * @return {@link WifiP2pConfig} constructed based on builder method calls.
+         */
+        public WifiP2pConfig build() {
+            if (TextUtils.isEmpty(mNetworkName)) {
+                throw new IllegalStateException(
+                        "network name must be non-empty.");
+            }
+            if (TextUtils.isEmpty(mPassphrase)) {
+                throw new IllegalStateException(
+                        "passphrase must be non-empty.");
+            }
+
+            if (mGroupOperatingFrequency > 0 && mGroupOperatingBand > 0) {
+                throw new IllegalStateException(
+                        "Preferred frequency and band are mutually exclusive.");
+            }
+
+            WifiP2pConfig config = new WifiP2pConfig();
+            config.deviceAddress = mDeviceAddress.toString();
+            config.networkName = mNetworkName;
+            config.passphrase = mPassphrase;
+            config.groupOwnerBand = GROUP_OWNER_BAND_AUTO;
+            if (mGroupOperatingFrequency > 0) {
+                config.groupOwnerBand = mGroupOperatingFrequency;
+            } else if (mGroupOperatingBand > 0) {
+                config.groupOwnerBand = mGroupOperatingBand;
+            }
+            config.netId = mNetId;
+            return config;
+        }
+    }
 }

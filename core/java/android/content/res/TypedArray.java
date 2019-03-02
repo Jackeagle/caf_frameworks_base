@@ -19,6 +19,7 @@ package android.content.res;
 import android.annotation.AnyRes;
 import android.annotation.ColorInt;
 import android.annotation.Nullable;
+import android.annotation.StyleRes;
 import android.annotation.StyleableRes;
 import android.annotation.UnsupportedAppUsage;
 import android.content.pm.ActivityInfo;
@@ -63,13 +64,15 @@ public class TypedArray {
     }
 
     // STYLE_ prefixed constants are offsets within the typed data array.
-    static final int STYLE_NUM_ENTRIES = 6;
+    // Keep this in sync with libs/androidfw/include/androidfw/AttributeResolution.h
+    static final int STYLE_NUM_ENTRIES = 7;
     static final int STYLE_TYPE = 0;
     static final int STYLE_DATA = 1;
     static final int STYLE_ASSET_COOKIE = 2;
     static final int STYLE_RESOURCE_ID = 3;
     static final int STYLE_CHANGING_CONFIGURATIONS = 4;
     static final int STYLE_DENSITY = 5;
+    static final int SYTLE_SOURCE_RESOURCE_ID = 6;
 
     @UnsupportedAppUsage
     private final Resources mResources;
@@ -1098,6 +1101,54 @@ public class TypedArray {
     }
 
     /**
+     * Returns the resource ID of the style or layout against which the specified attribute was
+     * resolved, otherwise returns defValue.
+     *
+     * For example, if you we resolving two attributes {@code android:attribute1} and
+     * {@code android:attribute2} and you were inflating a {@link android.view.View} from
+     * {@code layout/my_layout.xml}:
+     * <pre>
+     *     &lt;View
+     *         style="@style/viewStyle"
+     *         android:layout_width="wrap_content"
+     *         android:layout_height="wrap_content"
+     *         android:attribute1="foo"/&gt;
+     * </pre>
+     *
+     * and {@code @style/viewStyle} is:
+     * <pre>
+     *     &lt;style android:name="viewStyle"&gt;
+     *         &lt;item name="android:attribute2"&gt;bar&lt;item/&gt;
+     *     &lt;style/&gt;
+     * </pre>
+     *
+     * then resolved {@link TypedArray} will have values that return source resource ID of
+     * {@code R.layout.my_layout} for {@code android:attribute1} and {@code R.style.viewStyle} for
+     * {@code android:attribute2}.
+     *
+     * @param index Index of attribute whose source style to retrieve.
+     * @param defaultValue Value to return if the attribute is not defined or
+     *                     not a resource.
+     *
+     * @return Either a style resource ID, layout resource ID, or defaultValue if it was not
+     * resolved in a style or layout.
+     * @throws RuntimeException if the TypedArray has already been recycled.
+     */
+    @StyleRes
+    public int getSourceResourceId(@StyleableRes int index, @StyleRes int defaultValue) {
+        if (mRecycled) {
+            throw new RuntimeException("Cannot make calls to a recycled instance!");
+        }
+
+        index *= STYLE_NUM_ENTRIES;
+        final int resid = mData[index + SYTLE_SOURCE_RESOURCE_ID];
+        if (resid != 0) {
+            return resid;
+        }
+        return defaultValue;
+    }
+
+    /**
      * Determines whether there is an attribute at <var>index</var>.
      * <p>
      * <strong>Note:</strong> If the attribute was set to {@code @empty} or
@@ -1309,6 +1360,7 @@ public class TypedArray {
                 data[index + STYLE_CHANGING_CONFIGURATIONS]);
         outValue.density = data[index + STYLE_DENSITY];
         outValue.string = (type == TypedValue.TYPE_STRING) ? loadStringValueAt(index) : null;
+        outValue.sourceResourceId = data[index + SYTLE_SOURCE_RESOURCE_ID];
         return true;
     }
 

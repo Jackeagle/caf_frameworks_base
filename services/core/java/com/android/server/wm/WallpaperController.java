@@ -34,8 +34,10 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.H.WALLPAPER_DRAW_PENDING_TIMEOUT;
 
 import android.graphics.Bitmap;
+import android.graphics.ColorSpace;
 import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
+import android.hardware.HardwareBuffer;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.IBinder;
@@ -60,6 +62,7 @@ import java.util.ArrayList;
 class WallpaperController {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "WallpaperController" : TAG_WM;
     private WindowManagerService mService;
+    private final DisplayContent mDisplayContent;
 
     private final ArrayList<WallpaperWindowToken> mWallpaperTokens = new ArrayList<>();
 
@@ -187,8 +190,9 @@ class WallpaperController {
         return false;
     };
 
-    public WallpaperController(WindowManagerService service) {
+    WallpaperController(WindowManagerService service, DisplayContent displayContent) {
         mService = service;
+        mDisplayContent = displayContent;
     }
 
     WindowState getWallpaperTarget() {
@@ -397,11 +401,7 @@ class WallpaperController {
     }
 
     private void updateWallpaperOffsetLocked(WindowState changingTarget, boolean sync) {
-        final DisplayContent displayContent = changingTarget.getDisplayContent();
-        if (displayContent == null) {
-            return;
-        }
-        final DisplayInfo displayInfo = displayContent.getDisplayInfo();
+        final DisplayInfo displayInfo = mDisplayContent.getDisplayInfo();
         final int dw = displayInfo.logicalWidth;
         final int dh = displayInfo.logicalHeight;
 
@@ -464,15 +464,15 @@ class WallpaperController {
         }
     }
 
-    private void findWallpaperTarget(DisplayContent dc) {
+    private void findWallpaperTarget() {
         mFindResults.reset();
-        if (dc.isStackVisible(WINDOWING_MODE_FREEFORM)) {
+        if (mDisplayContent.isStackVisible(WINDOWING_MODE_FREEFORM)) {
             // In freeform mode we set the wallpaper as its own target, so we don't need an
             // additional window to make it visible.
             mFindResults.setUseTopWallpaperAsTarget(true);
         }
 
-        dc.forAllWindows(mFindWallpaperTargetFunction, true /* traverseTopToBottom */);
+        mDisplayContent.forAllWindows(mFindWallpaperTargetFunction, true /* traverseTopToBottom */);
 
         if (mFindResults.wallpaperTarget == null && mFindResults.useTopWallpaperAsTarget) {
             mFindResults.setWallpaperTarget(mFindResults.topWallpaper);
@@ -485,8 +485,7 @@ class WallpaperController {
     }
 
     /** Updates the target wallpaper if needed and returns true if an update happened. */
-    private void updateWallpaperWindowsTarget(DisplayContent dc,
-            FindWallpaperTargetResult result) {
+    private void updateWallpaperWindowsTarget(FindWallpaperTargetResult result) {
 
         WindowState wallpaperTarget = result.wallpaperTarget;
 
@@ -529,7 +528,7 @@ class WallpaperController {
             return;
         }
 
-        if (dc.getWindow(w -> w == prevWallpaperTarget) == null) {
+        if (mDisplayContent.getWindow(w -> w == prevWallpaperTarget) == null) {
             return;
         }
 
@@ -550,9 +549,9 @@ class WallpaperController {
             // is not. If they're both hidden, still use the new target.
             mWallpaperTarget = prevWallpaperTarget;
         } else if (newTargetHidden == oldTargetHidden
-                && !dc.mOpeningApps.contains(wallpaperTarget.mAppToken)
-                && (dc.mOpeningApps.contains(prevWallpaperTarget.mAppToken)
-                || dc.mClosingApps.contains(prevWallpaperTarget.mAppToken))) {
+                && !mDisplayContent.mOpeningApps.contains(wallpaperTarget.mAppToken)
+                && (mDisplayContent.mOpeningApps.contains(prevWallpaperTarget.mAppToken)
+                || mDisplayContent.mClosingApps.contains(prevWallpaperTarget.mAppToken))) {
             // If they're both hidden (or both not hidden), prefer the one that's currently in
             // opening or closing app list, this allows transition selection logic to better
             // determine the wallpaper status of opening/closing apps.
@@ -570,18 +569,21 @@ class WallpaperController {
         }
     }
 
-    void adjustWallpaperWindows(DisplayContent dc) {
-        mService.mRoot.mWallpaperMayChange = false;
+    void adjustWallpaperWindows() {
+        mDisplayContent.mWallpaperMayChange = false;
 
         // First find top-most window that has asked to be on top of the wallpaper;
         // all wallpapers go behind it.
-        findWallpaperTarget(dc);
-        updateWallpaperWindowsTarget(dc, mFindResults);
+        findWallpaperTarget();
+        updateWallpaperWindowsTarget(mFindResults);
 
         // The window is visible to the compositor...but is it visible to the user?
         // That is what the wallpaper cares about.
         final boolean visible = mWallpaperTarget != null && isWallpaperVisible(mWallpaperTarget);
-        if (DEBUG_WALLPAPER) Slog.v(TAG, "Wallpaper visibility: " + visible);
+        if (DEBUG_WALLPAPER) {
+            Slog.v(TAG, "Wallpaper visibility: " + visible + " at display "
+                    + mDisplayContent.getDisplayId());
+        }
 
         if (visible) {
             if (mWallpaperTarget.mWallpaperX >= 0) {
@@ -637,9 +639,11 @@ class WallpaperController {
                 }
                 if (mWallpaperDrawState == WALLPAPER_DRAW_NORMAL) {
                     mWallpaperDrawState = WALLPAPER_DRAW_PENDING;
-                    mService.mH.removeMessages(WALLPAPER_DRAW_PENDING_TIMEOUT);
-                    mService.mH.sendEmptyMessageDelayed(WALLPAPER_DRAW_PENDING_TIMEOUT,
-                            WALLPAPER_DRAW_PENDING_TIMEOUT_DURATION);
+                    mService.mH.removeMessages(WALLPAPER_DRAW_PENDING_TIMEOUT, this);
+                    mService.mH.sendMessageDelayed(
+                                mService.mH.obtainMessage(WALLPAPER_DRAW_PENDING_TIMEOUT, this),
+                                WALLPAPER_DRAW_PENDING_TIMEOUT_DURATION);
+
                 }
                 if (DEBUG_APP_TRANSITIONS || DEBUG_WALLPAPER) Slog.v(TAG,
                         "Wallpaper should be visible but has not been drawn yet. " +
@@ -649,7 +653,7 @@ class WallpaperController {
         }
         if (wallpaperReady) {
             mWallpaperDrawState = WALLPAPER_DRAW_NORMAL;
-            mService.mH.removeMessages(WALLPAPER_DRAW_PENDING_TIMEOUT);
+            mService.mH.removeMessages(WALLPAPER_DRAW_PENDING_TIMEOUT, this);
         }
 
         return transitionReady;
@@ -659,10 +663,10 @@ class WallpaperController {
      * Adjusts the wallpaper windows if the input display has a pending wallpaper layout or one of
      * the opening apps should be a wallpaper target.
      */
-    void adjustWallpaperWindowsForAppTransitionIfNeeded(DisplayContent dc,
-            ArraySet<AppWindowToken> openingApps) {
+    void adjustWallpaperWindowsForAppTransitionIfNeeded(ArraySet<AppWindowToken> openingApps,
+            ArraySet<AppWindowToken> changingApps) {
         boolean adjust = false;
-        if ((dc.pendingLayoutChanges & FINISH_LAYOUT_REDO_WALLPAPER) != 0) {
+        if ((mDisplayContent.pendingLayoutChanges & FINISH_LAYOUT_REDO_WALLPAPER) != 0) {
             adjust = true;
         } else {
             for (int i = openingApps.size() - 1; i >= 0; --i) {
@@ -672,10 +676,19 @@ class WallpaperController {
                     break;
                 }
             }
+            if (!adjust) {
+                for (int i = changingApps.size() - 1; i >= 0; --i) {
+                    final AppWindowToken token = changingApps.valueAt(i);
+                    if (token.windowsCanBeWallpaperTarget()) {
+                        adjust = true;
+                        break;
+                    }
+                }
+            }
         }
 
         if (adjust) {
-            adjustWallpaperWindows(dc);
+            adjustWallpaperWindows();
         }
     }
 
@@ -718,7 +731,10 @@ class WallpaperController {
             Slog.w(TAG_WM, "Failed to screenshot wallpaper");
             return null;
         }
-        return Bitmap.createHardwareBitmap(wallpaperBuffer);
+        // TODO(b/116112787) Now that hardware bitmap creation can take color space, we
+        // should continue to fix screenshot.
+        return Bitmap.wrapHardwareBuffer(HardwareBuffer.createFromGraphicBuffer(wallpaperBuffer),
+                                         ColorSpace.get(ColorSpace.Named.SRGB));
     }
 
     private WindowState getTopVisibleWallpaper() {
@@ -740,6 +756,7 @@ class WallpaperController {
     }
 
     void dump(PrintWriter pw, String prefix) {
+        pw.print(prefix); pw.print("displayId="); pw.println(mDisplayContent.getDisplayId());
         pw.print(prefix); pw.print("mWallpaperTarget="); pw.println(mWallpaperTarget);
         if (mPrevWallpaperTarget != null) {
             pw.print(prefix); pw.print("mPrevWallpaperTarget="); pw.println(mPrevWallpaperTarget);

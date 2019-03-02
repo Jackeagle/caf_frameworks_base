@@ -67,7 +67,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
 
     private static final boolean DEBUG = false;
 
-    public static final String AUTHORITY = "com.android.externalstorage.documents";
+    public static final String AUTHORITY = DocumentsContract.EXTERNAL_STORAGE_PROVIDER_AUTHORITY;
 
     private static final Uri BASE_URI =
             new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(AUTHORITY).build();
@@ -76,7 +76,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
 
     private static final String[] DEFAULT_ROOT_PROJECTION = new String[] {
             Root.COLUMN_ROOT_ID, Root.COLUMN_FLAGS, Root.COLUMN_ICON, Root.COLUMN_TITLE,
-            Root.COLUMN_DOCUMENT_ID, Root.COLUMN_AVAILABLE_BYTES,
+            Root.COLUMN_DOCUMENT_ID, Root.COLUMN_AVAILABLE_BYTES, Root.COLUMN_QUERY_ARGS
     };
 
     private static final String[] DEFAULT_DOCUMENT_PROJECTION = new String[] {
@@ -96,7 +96,8 @@ public class ExternalStorageProvider extends FileSystemProvider {
         public boolean reportAvailableBytes = true;
     }
 
-    private static final String ROOT_ID_PRIMARY_EMULATED = "primary";
+    private static final String ROOT_ID_PRIMARY_EMULATED =
+            DocumentsContract.EXTERNAL_STORAGE_PRIMARY_EMULATED_ROOT_ID;
     private static final String ROOT_ID_HOME = "home";
 
     private StorageManager mStorageManager;
@@ -224,7 +225,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
                 root.flags |= Root.FLAG_REMOVABLE_USB;
             }
 
-            if (!VolumeInfo.ID_EMULATED_INTERNAL.equals(volume.getId())) {
+            if (volume.getType() != VolumeInfo.TYPE_EMULATED) {
                 root.flags |= Root.FLAG_SUPPORTS_EJECT;
             }
 
@@ -443,6 +444,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
                 row.add(Root.COLUMN_FLAGS, root.flags);
                 row.add(Root.COLUMN_TITLE, root.title);
                 row.add(Root.COLUMN_DOCUMENT_ID, root.docId);
+                row.add(Root.COLUMN_QUERY_ARGS, SUPPORTED_QUERY_ARGS);
 
                 long availableBytes = -1;
                 if (root.reportAvailableBytes) {

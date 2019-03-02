@@ -19,7 +19,6 @@ package com.android.server.wm;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.ClipData;
-import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.hardware.display.DisplayManagerInternal;
@@ -119,8 +118,6 @@ public abstract class WindowManagerInternal {
          *
          * @param transit transition type indicating what kind of transition gets run, must be one
          *                of AppTransition.TRANSIT_* values
-         * @param openToken the token for the opening app
-         * @param closeToken the token for the closing app
          * @param duration the total duration of the transition
          * @param statusBarAnimationStartTime the desired start time for all visual animations in
          *        the status bar caused by this app transition in uptime millis
@@ -132,8 +129,8 @@ public abstract class WindowManagerInternal {
          * {@link WindowManagerPolicy#FINISH_LAYOUT_REDO_WALLPAPER},
          * or {@link WindowManagerPolicy#FINISH_LAYOUT_REDO_ANIM}.
          */
-        public int onAppTransitionStartingLocked(int transit, IBinder openToken, IBinder closeToken,
-                long duration, long statusBarAnimationStartTime, long statusBarAnimationDuration) {
+        public int onAppTransitionStartingLocked(int transit, long duration,
+                long statusBarAnimationStartTime, long statusBarAnimationDuration) {
             return 0;
         }
 
@@ -159,8 +156,9 @@ public abstract class WindowManagerInternal {
         default boolean registerInputChannel(
                 DragState state, Display display, InputManagerService service,
                 InputChannel source) {
+            state.mTransferTouchFromToken = source.getToken();
             state.register(display);
-            return service.transferTouchFocus(source, state.getInputChannel());
+            return true;
         }
 
         /**
@@ -212,34 +210,40 @@ public abstract class WindowManagerInternal {
      * and has access to the raw window data while the accessibility layer serves
      * as a controller.
      *
+     * @param displayId The logical display id.
      * @param callbacks The callbacks to invoke.
+     * @return {@code false} if display id is not valid.
      */
-    public abstract void setMagnificationCallbacks(@Nullable MagnificationCallbacks callbacks);
+    public abstract boolean setMagnificationCallbacks(int displayId,
+            @Nullable MagnificationCallbacks callbacks);
 
     /**
      * Set by the accessibility layer to specify the magnification and panning to
      * be applied to all windows that should be magnified.
      *
+     * @param displayId The logical display id.
      * @param spec The MagnficationSpec to set.
      *
-     * @see #setMagnificationCallbacks(MagnificationCallbacks)
+     * @see #setMagnificationCallbacks(int, MagnificationCallbacks)
      */
-    public abstract void setMagnificationSpec(MagnificationSpec spec);
+    public abstract void setMagnificationSpec(int displayId, MagnificationSpec spec);
 
     /**
      * Set by the accessibility framework to indicate whether the magnifiable regions of the display
      * should be shown.
      *
+     * @param displayId The logical display id.
      * @param show {@code true} to show magnifiable region bounds, {@code false} to hide
      */
-    public abstract void setForceShowMagnifiableBounds(boolean show);
+    public abstract void setForceShowMagnifiableBounds(int displayId, boolean show);
 
     /**
      * Obtains the magnification regions.
      *
+     * @param displayId The logical display id.
      * @param magnificationRegion the current magnification region
      */
-    public abstract void getMagnificationRegion(@NonNull Region magnificationRegion);
+    public abstract void getMagnificationRegion(int displayId, @NonNull Region magnificationRegion);
 
     /**
      * Gets the magnification and translation applied to a window given its token.
@@ -251,7 +255,7 @@ public abstract class WindowManagerInternal {
      *
      * @return The magnification spec for the window.
      *
-     * @see #setMagnificationCallbacks(MagnificationCallbacks)
+     * @see #setMagnificationCallbacks(int, MagnificationCallbacks)
      */
     public abstract MagnificationSpec getCompatibleMagnificationSpecForWindow(
             IBinder windowToken);
@@ -309,6 +313,22 @@ public abstract class WindowManagerInternal {
     public abstract void waitForAllWindowsDrawn(Runnable callback, long timeout);
 
     /**
+     * Overrides the display size.
+     *
+     * @param displayId The display to override the display size.
+     * @param width The width to override.
+     * @param height The height to override.
+     */
+    public abstract void setForcedDisplaySize(int displayId, int width, int height);
+
+    /**
+     * Recover the display size to real display size.
+     *
+     * @param displayId The display to recover the display size.
+     */
+    public abstract void clearForcedDisplaySize(int displayId);
+
+    /**
      * Adds a window token for a given window type.
      *
      * @param token The token to add.
@@ -333,6 +353,11 @@ public abstract class WindowManagerInternal {
      * @param listener The listener to register.
      */
     public abstract void registerAppTransitionListener(AppTransitionListener listener);
+
+    /**
+     * Reports that the password for the given user has changed.
+     */
+    public abstract void reportPasswordChanged(int userId);
 
     /**
      * Retrieves a height of input method window for given display.
@@ -392,11 +417,6 @@ public abstract class WindowManagerInternal {
     public abstract boolean isStackVisible(int windowingMode);
 
     /**
-     * @return True if and only if the docked divider is currently in resize mode.
-     */
-    public abstract boolean isDockedDividerResizing();
-
-    /**
      * Requests the window manager to resend the windows for accessibility.
      */
     public abstract void computeWindowsForAccessibility();
@@ -454,11 +474,4 @@ public abstract class WindowManagerInternal {
      * Return the display Id for given window.
      */
     public abstract int getDisplayIdForWindow(IBinder windowToken);
-
-    // TODO: use WindowProcessController once go/wm-unified is done.
-    /**
-     * Notifies the window manager that configuration of the process associated with the input pid
-     * changed.
-     */
-    public abstract void onProcessConfigurationChanged(int pid, Configuration newConfig);
 }

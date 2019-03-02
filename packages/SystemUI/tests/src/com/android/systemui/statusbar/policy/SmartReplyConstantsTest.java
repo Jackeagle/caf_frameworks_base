@@ -20,6 +20,7 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
+import android.app.RemoteInput;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -51,6 +52,12 @@ public class SmartReplyConstantsTest extends SysuiTestCase {
         resources.addOverride(R.bool.config_smart_replies_in_notifications_enabled, true);
         resources.addOverride(
                 R.integer.config_smart_replies_in_notifications_max_squeeze_remeasure_attempts, 7);
+        resources.addOverride(
+                R.bool.config_smart_replies_in_notifications_edit_choices_before_sending, false);
+        resources.addOverride(R.bool.config_smart_replies_in_notifications_show_in_heads_up, true);
+        resources.addOverride(
+                R.integer.config_smart_replies_in_notifications_min_num_system_generated_replies,
+                2);
         mConstants = new SmartReplyConstants(Handler.createAsync(Looper.myLooper()), mContext);
     }
 
@@ -104,9 +111,100 @@ public class SmartReplyConstantsTest extends SysuiTestCase {
         assertEquals(5, mConstants.getMaxSqueezeRemeasureAttempts());
     }
 
+    @Test
+    public void testGetEffectiveEditChoicesBeforeSendingWithNoConfig() {
+        overrideSetting("enabled=true");
+        triggerConstantsOnChange();
+        assertFalse(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_AUTO));
+        assertTrue(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_ENABLED));
+        assertFalse(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED));
+    }
+
+    @Test
+    public void testGetEffectiveEditChoicesBeforeSendingWithEnabledConfig() {
+        overrideSetting("enabled=true,edit_choices_before_sending=true");
+        triggerConstantsOnChange();
+        assertTrue(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_AUTO));
+        assertTrue(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_ENABLED));
+        assertFalse(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED));
+    }
+
+    @Test
+    public void testGetEffectiveEditChoicesBeforeSendingWithDisabledConfig() {
+        overrideSetting("enabled=true,edit_choices_before_sending=false");
+        triggerConstantsOnChange();
+        assertFalse(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_AUTO));
+        assertTrue(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_ENABLED));
+        assertFalse(
+                mConstants.getEffectiveEditChoicesBeforeSending(
+                        RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED));
+    }
+
+    @Test
+    public void testShowInHeadsUpWithNoConfig() {
+        assertTrue(mConstants.isEnabled());
+        assertTrue(mConstants.getShowInHeadsUp());
+    }
+
+    @Test
+    public void testShowInHeadsUpEnabled() {
+        overrideSetting("enabled=true,show_in_heads_up=true");
+        triggerConstantsOnChange();
+        assertTrue(mConstants.getShowInHeadsUp());
+    }
+
+    @Test
+    public void testShowInHeadsUpDisabled() {
+        overrideSetting("enabled=true,show_in_heads_up=false");
+        triggerConstantsOnChange();
+        assertFalse(mConstants.getShowInHeadsUp());
+    }
+
+    @Test
+    public void testMaxNumActionsWithNoConfig() {
+        assertTrue(mConstants.isEnabled());
+        assertEquals(-1, mConstants.getMaxNumActions());
+    }
+
+    @Test
+    public void testMaxNumActionsSet() {
+        overrideSetting("enabled=true,max_num_actions=10");
+        triggerConstantsOnChange();
+        assertEquals(10, mConstants.getMaxNumActions());
+    }
+
     private void overrideSetting(String flags) {
         Settings.Global.putString(mContext.getContentResolver(),
                 Settings.Global.SMART_REPLIES_IN_NOTIFICATIONS_FLAGS, flags);
+    }
+
+    @Test
+    public void testGetMinNumSystemGeneratedRepliesWithNoConfig() {
+        assertTrue(mConstants.isEnabled());
+        assertEquals(2, mConstants.getMinNumSystemGeneratedReplies());
+    }
+
+    @Test
+    public void testGetMinNumSystemGeneratedRepliesWithValidConfig() {
+        overrideSetting("enabled=true,min_num_system_generated_replies=5");
+        triggerConstantsOnChange();
+        assertEquals(5, mConstants.getMinNumSystemGeneratedReplies());
     }
 
     private void triggerConstantsOnChange() {

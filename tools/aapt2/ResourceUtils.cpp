@@ -16,6 +16,7 @@
 
 #include "ResourceUtils.h"
 
+#include <algorithm>
 #include <sstream>
 
 #include "android-base/stringprintf.h"
@@ -362,7 +363,7 @@ std::unique_ptr<BinaryPrimitive> TryParseFlagSymbol(const Attribute* flag_attr,
     return util::make_unique<BinaryPrimitive>(flags);
   }
 
-  for (StringPiece part : util::Tokenize(str, '|')) {
+  for (const StringPiece& part : util::Tokenize(str, '|')) {
     StringPiece trimmed_part = util::TrimWhitespace(part);
 
     bool flag_set = false;
@@ -501,6 +502,14 @@ Maybe<int> ParseSdkVersion(const StringPiece& str) {
   // Try parsing the code name.
   std::pair<StringPiece, int> entry = GetDevelopmentSdkCodeNameAndVersion();
   if (entry.first == trimmed_str) {
+    return entry.second;
+  }
+
+  // Try parsing codename from "[codename].[preview_sdk_fingerprint]" value.
+  const StringPiece::const_iterator begin = std::begin(trimmed_str);
+  const StringPiece::const_iterator end = std::end(trimmed_str);
+  const StringPiece::const_iterator codename_end = std::find(begin, end, '.');
+  if (codename_end != end && entry.first == trimmed_str.substr(begin, codename_end)) {
     return entry.second;
   }
   return {};

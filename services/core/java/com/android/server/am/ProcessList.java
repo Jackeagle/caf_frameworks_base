@@ -17,17 +17,15 @@
 package com.android.server.am;
 
 import static android.app.ActivityManager.PROCESS_STATE_CACHED_ACTIVITY;
+import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.ActivityThread.PROC_START_SEQ_IDENT;
 import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_AUTO;
-import static android.os.Process.FIRST_ISOLATED_UID;
-import static android.os.Process.LAST_ISOLATED_UID;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 import static android.os.Process.getFreeMemory;
 import static android.os.Process.getTotalMemory;
 import static android.os.Process.killProcessQuiet;
 import static android.os.Process.startWebView;
-import static android.os.storage.StorageManager.PROP_ISOLATED_STORAGE;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_LRU;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_PROCESSES;
@@ -35,6 +33,8 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_PSS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_UID_OBSERVERS;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.am.ActivityManagerService.KILL_APP_ZYGOTE_DELAY_MS;
+import static com.android.server.am.ActivityManagerService.KILL_APP_ZYGOTE_MSG;
 import static com.android.server.am.ActivityManagerService.PERSISTENT_MASK;
 import static com.android.server.am.ActivityManagerService.PROC_START_TIMEOUT;
 import static com.android.server.am.ActivityManagerService.PROC_START_TIMEOUT_MSG;
@@ -50,6 +50,7 @@ import android.app.AppGlobals;
 import android.app.AppProtoEnums;
 import android.app.IApplicationThread;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
@@ -57,7 +58,7 @@ import android.content.res.Resources;
 import android.graphics.Point;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
-import android.net.Uri;
+import android.os.AppZygote;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -72,12 +73,15 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.os.storage.StorageManager;
 import android.os.storage.StorageManagerInternal;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.EventLog;
 import android.util.LongSparseArray;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseBooleanArray;
 import android.util.StatsLog;
 import android.view.Display;
 
@@ -107,6 +111,7 @@ import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -118,7 +123,7 @@ import java.util.List;
  * </ul>
  */
 public final class ProcessList {
-    private static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessList" : TAG_AM;
+    static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessList" : TAG_AM;
 
     // The minimum time we allow between crashes, for us to consider this
     // application to be bad and stop and its services and reject broadcasts.
@@ -136,8 +141,17 @@ public final class ProcessList {
 
     // This is a process only hosting activities that are not visible,
     // so it can be killed without any disruption.
-    static final int CACHED_APP_MAX_ADJ = 906;
+    static final int CACHED_APP_MAX_ADJ = 999;
     static final int CACHED_APP_MIN_ADJ = 900;
+
+    // This is the oom_adj level that we allow to die first. This cannot be equal to
+    // CACHED_APP_MAX_ADJ unless processes are actively being assigned an oom_score_adj of
+    // CACHED_APP_MAX_ADJ.
+    static final int CACHED_APP_LMK_FIRST_ADJ = 950;
+
+    // Number of levels we have available for different service connection group importance
+    // levels.
+    static final int CACHED_APP_IMPORTANCE_LEVELS = 5;
 
     // The B list of SERVICE_ADJ -- these are the old and decrepit
     // services that aren't as shiny and interesting as the ones in the A list.
@@ -256,7 +270,7 @@ public final class ProcessList {
     // can't give it a different value for every possible kind of process.
     private final int[] mOomAdj = new int[] {
             FOREGROUND_APP_ADJ, VISIBLE_APP_ADJ, PERCEPTIBLE_APP_ADJ,
-            BACKUP_APP_ADJ, CACHED_APP_MIN_ADJ, CACHED_APP_MAX_ADJ
+            BACKUP_APP_ADJ, CACHED_APP_MIN_ADJ, CACHED_APP_LMK_FIRST_ADJ
     };
     // These are the low-end OOM level limits.  This is appropriate for an
     // HVGA or smaller phone with less than 512MB.  Values are in KB.
@@ -343,16 +357,144 @@ public final class ProcessList {
      */
     int mLruSeq = 0;
 
+    ActiveUids mActiveUids;
+
     /**
      * The currently running isolated processes.
      */
     final SparseArray<ProcessRecord> mIsolatedProcesses = new SparseArray<>();
 
     /**
-     * Counter for assigning isolated process uids, to avoid frequently reusing the
-     * same ones.
+     * The currently running application zygotes.
      */
-    int mNextIsolatedProcessUid = 0;
+    final ProcessMap<AppZygote> mAppZygotes = new ProcessMap<AppZygote>();
+
+    /**
+     * The processes that are forked off an application zygote.
+     */
+    final ArrayMap<AppZygote, ArrayList<ProcessRecord>> mAppZygoteProcesses =
+            new ArrayMap<AppZygote, ArrayList<ProcessRecord>>();
+
+    final class IsolatedUidRange {
+        @VisibleForTesting
+        public final int mFirstUid;
+        @VisibleForTesting
+        public final int mLastUid;
+
+        @GuardedBy("ProcessList.this.mService")
+        private final SparseBooleanArray mUidUsed = new SparseBooleanArray();
+
+        @GuardedBy("ProcessList.this.mService")
+        private int mNextUid;
+
+        IsolatedUidRange(int firstUid, int lastUid) {
+            mFirstUid = firstUid;
+            mLastUid = lastUid;
+            mNextUid = firstUid;
+        }
+
+        @GuardedBy("ProcessList.this.mService")
+        int allocateIsolatedUidLocked(int userId) {
+            int uid;
+            int stepsLeft = (mLastUid - mFirstUid + 1);
+            for (int i = 0; i < stepsLeft; ++i) {
+                if (mNextUid < mFirstUid || mNextUid > mLastUid) {
+                    mNextUid = mFirstUid;
+                }
+                uid = UserHandle.getUid(userId, mNextUid);
+                mNextUid++;
+                if (!mUidUsed.get(uid, false)) {
+                    mUidUsed.put(uid, true);
+                    return uid;
+                }
+            }
+            return -1;
+        }
+
+        @GuardedBy("ProcessList.this.mService")
+        void freeIsolatedUidLocked(int uid) {
+            // Strip out userId
+            final int appId = UserHandle.getAppId(uid);
+            mUidUsed.delete(appId);
+        }
+    };
+
+    /**
+     * A class that allocates ranges of isolated UIDs per application, and keeps track of them.
+     */
+    final class IsolatedUidRangeAllocator {
+        private final int mFirstUid;
+        private final int mNumUidRanges;
+        private final int mNumUidsPerRange;
+        /**
+         * We map the uid range [mFirstUid, mFirstUid + mNumUidRanges * mNumUidsPerRange)
+         * back to an underlying bitset of [0, mNumUidRanges) and allocate out of that.
+         */
+        @GuardedBy("ProcessList.this.mService")
+        private final BitSet mAvailableUidRanges;
+        @GuardedBy("ProcessList.this.mService")
+        private final ProcessMap<IsolatedUidRange> mAppRanges = new ProcessMap<IsolatedUidRange>();
+
+        IsolatedUidRangeAllocator(int firstUid, int lastUid, int numUidsPerRange) {
+            mFirstUid = firstUid;
+            mNumUidsPerRange = numUidsPerRange;
+            mNumUidRanges = (lastUid - firstUid + 1) / numUidsPerRange;
+            mAvailableUidRanges = new BitSet(mNumUidRanges);
+            // Mark all as available
+            mAvailableUidRanges.set(0, mNumUidRanges);
+        }
+
+        @GuardedBy("ProcessList.this.mService")
+        IsolatedUidRange getIsolatedUidRangeLocked(ApplicationInfo info) {
+            return mAppRanges.get(info.processName, info.uid);
+        }
+
+        @GuardedBy("ProcessList.this.mService")
+        IsolatedUidRange getOrCreateIsolatedUidRangeLocked(ApplicationInfo info) {
+            IsolatedUidRange range = getIsolatedUidRangeLocked(info);
+            if (range == null) {
+                int uidRangeIndex = mAvailableUidRanges.nextSetBit(0);
+                if (uidRangeIndex < 0) {
+                    // No free range
+                    return null;
+                }
+                mAvailableUidRanges.clear(uidRangeIndex);
+                int actualUid = mFirstUid + uidRangeIndex * mNumUidsPerRange;
+                range = new IsolatedUidRange(actualUid, actualUid + mNumUidsPerRange - 1);
+                mAppRanges.put(info.processName, info.uid, range);
+            }
+            return range;
+        }
+
+        @GuardedBy("ProcessList.this.mService")
+        void freeUidRangeLocked(ApplicationInfo info) {
+            // Find the UID range
+            IsolatedUidRange range = mAppRanges.get(info.processName, info.uid);
+            if (range != null) {
+                // Map back to starting uid
+                final int uidRangeIndex = (range.mFirstUid - mFirstUid) / mNumUidsPerRange;
+                // Mark it as available in the underlying bitset
+                mAvailableUidRanges.set(uidRangeIndex);
+                // And the map
+                mAppRanges.remove(info.processName, info.uid);
+            }
+        }
+    }
+
+    /**
+     * The available isolated UIDs for processes that are not spawned from an application zygote.
+     */
+    @VisibleForTesting
+    IsolatedUidRange mGlobalIsolatedUids = new IsolatedUidRange(Process.FIRST_ISOLATED_UID,
+            Process.LAST_ISOLATED_UID);
+
+    /**
+     * An allocator for isolated UID ranges for apps that use an application zygote.
+     */
+    @VisibleForTesting
+    IsolatedUidRangeAllocator mAppIsolatedUidRangeAllocator =
+            new IsolatedUidRangeAllocator(Process.FIRST_APP_ZYGOTE_ISOLATED_UID,
+                    Process.LAST_APP_ZYGOTE_ISOLATED_UID, Process.NUM_UIDS_PER_APP_ZYGOTE);
 
     /**
      * Processes that are being forcibly torn down.
@@ -414,8 +556,10 @@ public final class ProcessList {
         updateOomLevels(0, 0, false);
     }
 
-    void init(ActivityManagerService service) {
+    void init(ActivityManagerService service, ActiveUids activeUids) {
         mService = service;
+        mActiveUids = activeUids;
+
         if (sKillHandler == null) {
             sKillThread = new ServiceThread(TAG + ":kill",
                     THREAD_PRIORITY_BACKGROUND, true /* allowIo */);
@@ -536,40 +680,44 @@ public final class ProcessList {
     }
 
     private static String buildOomTag(String prefix, String space, int val, int base) {
-        if (val == base) {
+        final int diff = val - base;
+        if (diff == 0) {
             if (space == null) return prefix;
-            return prefix + "  ";
+            return prefix + space;
         }
-        return prefix + "+" + Integer.toString(val - base);
+        if (diff < 10) {
+            return prefix + "+ " + Integer.toString(diff);
+        }
+        return prefix + "+" + Integer.toString(diff);
     }
 
     public static String makeOomAdjString(int setAdj) {
         if (setAdj >= ProcessList.CACHED_APP_MIN_ADJ) {
-            return buildOomTag("cch", "  ", setAdj, ProcessList.CACHED_APP_MIN_ADJ);
+            return buildOomTag("cch", "   ", setAdj, ProcessList.CACHED_APP_MIN_ADJ);
         } else if (setAdj >= ProcessList.SERVICE_B_ADJ) {
-            return buildOomTag("svcb ", null, setAdj, ProcessList.SERVICE_B_ADJ);
+            return buildOomTag("svcb  ", null, setAdj, ProcessList.SERVICE_B_ADJ);
         } else if (setAdj >= ProcessList.PREVIOUS_APP_ADJ) {
-            return buildOomTag("prev ", null, setAdj, ProcessList.PREVIOUS_APP_ADJ);
+            return buildOomTag("prev  ", null, setAdj, ProcessList.PREVIOUS_APP_ADJ);
         } else if (setAdj >= ProcessList.HOME_APP_ADJ) {
-            return buildOomTag("home ", null, setAdj, ProcessList.HOME_APP_ADJ);
+            return buildOomTag("home  ", null, setAdj, ProcessList.HOME_APP_ADJ);
         } else if (setAdj >= ProcessList.SERVICE_ADJ) {
-            return buildOomTag("svc  ", null, setAdj, ProcessList.SERVICE_ADJ);
+            return buildOomTag("svc   ", null, setAdj, ProcessList.SERVICE_ADJ);
         } else if (setAdj >= ProcessList.HEAVY_WEIGHT_APP_ADJ) {
-            return buildOomTag("hvy  ", null, setAdj, ProcessList.HEAVY_WEIGHT_APP_ADJ);
+            return buildOomTag("hvy   ", null, setAdj, ProcessList.HEAVY_WEIGHT_APP_ADJ);
         } else if (setAdj >= ProcessList.BACKUP_APP_ADJ) {
-            return buildOomTag("bkup ", null, setAdj, ProcessList.BACKUP_APP_ADJ);
+            return buildOomTag("bkup  ", null, setAdj, ProcessList.BACKUP_APP_ADJ);
         } else if (setAdj >= ProcessList.PERCEPTIBLE_APP_ADJ) {
-            return buildOomTag("prcp ", null, setAdj, ProcessList.PERCEPTIBLE_APP_ADJ);
+            return buildOomTag("prcp  ", null, setAdj, ProcessList.PERCEPTIBLE_APP_ADJ);
         } else if (setAdj >= ProcessList.VISIBLE_APP_ADJ) {
-            return buildOomTag("vis  ", null, setAdj, ProcessList.VISIBLE_APP_ADJ);
+            return buildOomTag("vis", "   ", setAdj, ProcessList.VISIBLE_APP_ADJ);
         } else if (setAdj >= ProcessList.FOREGROUND_APP_ADJ) {
-            return buildOomTag("fore ", null, setAdj, ProcessList.FOREGROUND_APP_ADJ);
+            return buildOomTag("fore  ", null, setAdj, ProcessList.FOREGROUND_APP_ADJ);
         } else if (setAdj >= ProcessList.PERSISTENT_SERVICE_ADJ) {
-            return buildOomTag("psvc ", null, setAdj, ProcessList.PERSISTENT_SERVICE_ADJ);
+            return buildOomTag("psvc  ", null, setAdj, ProcessList.PERSISTENT_SERVICE_ADJ);
         } else if (setAdj >= ProcessList.PERSISTENT_PROC_ADJ) {
-            return buildOomTag("pers ", null, setAdj, ProcessList.PERSISTENT_PROC_ADJ);
+            return buildOomTag("pers  ", null, setAdj, ProcessList.PERSISTENT_PROC_ADJ);
         } else if (setAdj >= ProcessList.SYSTEM_ADJ) {
-            return buildOomTag("sys  ", null, setAdj, ProcessList.SYSTEM_ADJ);
+            return buildOomTag("sys   ", null, setAdj, ProcessList.SYSTEM_ADJ);
         } else if (setAdj >= ProcessList.NATIVE_ADJ) {
             return buildOomTag("ntv  ", null, setAdj, ProcessList.NATIVE_ADJ);
         } else {
@@ -588,6 +736,9 @@ public final class ProcessList {
                 break;
             case ActivityManager.PROCESS_STATE_TOP:
                 procState = "TOP ";
+                break;
+            case ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE_LOCATION:
+                procState = "FGSL";
                 break;
             case ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE:
                 procState = "FGS ";
@@ -655,10 +806,11 @@ public final class ProcessList {
                 return AppProtoEnums.PROCESS_STATE_PERSISTENT_UI;
             case ActivityManager.PROCESS_STATE_TOP:
                 return AppProtoEnums.PROCESS_STATE_TOP;
-            case ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE:
-                return AppProtoEnums.PROCESS_STATE_BOUND_FOREGROUND_SERVICE;
+            case ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE_LOCATION:
             case ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE:
                 return AppProtoEnums.PROCESS_STATE_FOREGROUND_SERVICE;
+            case ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE:
+                return AppProtoEnums.PROCESS_STATE_BOUND_FOREGROUND_SERVICE;
             case ActivityManager.PROCESS_STATE_TOP_SLEEPING:
                 return AppProtoEnums.PROCESS_STATE_TOP_SLEEPING;
             case ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND:
@@ -783,6 +935,7 @@ public final class ProcessList {
         PROC_MEM_PERSISTENT,            // ActivityManager.PROCESS_STATE_PERSISTENT
         PROC_MEM_PERSISTENT,            // ActivityManager.PROCESS_STATE_PERSISTENT_UI
         PROC_MEM_TOP,                   // ActivityManager.PROCESS_STATE_TOP
+        PROC_MEM_IMPORTANT,             // ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE_LOCATION
         PROC_MEM_IMPORTANT,             // ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE
         PROC_MEM_IMPORTANT,             // ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE
         PROC_MEM_IMPORTANT,             // ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND
@@ -1245,10 +1398,8 @@ public final class ProcessList {
         long startTime = SystemClock.elapsedRealtime();
         if (app.pid > 0 && app.pid != ActivityManagerService.MY_PID) {
             checkSlow(startTime, "startProcess: removing from pids map");
-            synchronized (mService.mPidsSelfLocked) {
-                mService.mPidsSelfLocked.remove(app.pid);
-                mService.mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
-            }
+            mService.mPidsSelfLocked.remove(app.pid);
+            mService.mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
             checkSlow(startTime, "startProcess: done removing from pids map");
             app.setPid(0);
         }
@@ -1280,8 +1431,7 @@ public final class ProcessList {
                     final IPackageManager pm = AppGlobals.getPackageManager();
                     permGids = pm.getPackageGids(app.info.packageName,
                             MATCH_DIRECT_BOOT_AUTO, app.userId);
-                    if (SystemProperties.getBoolean(PROP_ISOLATED_STORAGE, false)
-                            && mountExtStorageFull) {
+                    if (StorageManager.hasIsolatedStorage() && mountExtStorageFull) {
                         mountExternal = Zygote.MOUNT_EXTERNAL_FULL;
                     } else {
                         StorageManagerInternal storageManagerInternal = LocalServices.getService(
@@ -1330,6 +1480,9 @@ public final class ProcessList {
                     mService.mSafeMode == true) {
                 runtimeFlags |= Zygote.DEBUG_ENABLE_SAFEMODE;
             }
+            if ((app.info.privateFlags & ApplicationInfo.PRIVATE_FLAG_PROFILEABLE_BY_SHELL) != 0) {
+                runtimeFlags |= Zygote.PROFILE_FROM_SHELL;
+            }
             if ("1".equals(SystemProperties.get("debug.checkjni"))) {
                 runtimeFlags |= Zygote.DEBUG_ENABLE_CHECKJNI;
             }
@@ -1356,8 +1509,9 @@ public final class ProcessList {
                 mService.mNativeDebuggingApp = null;
             }
 
-            if (app.info.isPrivilegedApp() &&
-                    DexManager.isPackageSelectedToRunOob(app.pkgList.mPkgList.keySet())) {
+            if (app.info.isEmbeddedDexUsed()
+                    || (app.info.isPrivilegedApp()
+                        && DexManager.isPackageSelectedToRunOob(app.pkgList.mPkgList.keySet()))) {
                 runtimeFlags |= Zygote.ONLY_USE_SYSTEM_OAT_FILES;
             }
 
@@ -1498,6 +1652,69 @@ public final class ProcessList {
         }
     }
 
+    @GuardedBy("mService")
+    public void killAppZygoteIfNeededLocked(AppZygote appZygote) {
+        final ApplicationInfo appInfo = appZygote.getAppInfo();
+        ArrayList<ProcessRecord> zygoteProcesses = mAppZygoteProcesses.get(appZygote);
+        if (zygoteProcesses.size() == 0) { // Only remove if no longer in use now
+            mAppZygotes.remove(appInfo.processName, appInfo.uid);
+            mAppZygoteProcesses.remove(appZygote);
+            mAppIsolatedUidRangeAllocator.freeUidRangeLocked(appInfo);
+            appZygote.stopZygote();
+        }
+    }
+
+    @GuardedBy("mService")
+    private void removeProcessFromAppZygoteLocked(final ProcessRecord app) {
+        // Free the isolated uid for this process
+        final IsolatedUidRange appUidRange =
+                mAppIsolatedUidRangeAllocator.getIsolatedUidRangeLocked(app.info);
+        if (appUidRange != null) {
+            appUidRange.freeIsolatedUidLocked(app.uid);
+        }
+
+        final AppZygote appZygote = mAppZygotes.get(app.info.processName, app.info.uid);
+        if (appZygote != null) {
+            ArrayList<ProcessRecord> zygoteProcesses = mAppZygoteProcesses.get(appZygote);
+            zygoteProcesses.remove(app);
+            if (zygoteProcesses.size() == 0) {
+                Message msg = mService.mHandler.obtainMessage(KILL_APP_ZYGOTE_MSG);
+                msg.obj = appZygote;
+                mService.mHandler.sendMessageDelayed(msg, KILL_APP_ZYGOTE_DELAY_MS);
+            }
+        }
+    }
+
+    private AppZygote createAppZygoteForProcessIfNeeded(final ProcessRecord app) {
+        synchronized (mService) {
+            AppZygote appZygote = mAppZygotes.get(app.info.processName, app.info.uid);
+            final ArrayList<ProcessRecord> zygoteProcessList;
+            if (appZygote == null) {
+                final IsolatedUidRange uidRange =
+                        mAppIsolatedUidRangeAllocator.getIsolatedUidRangeLocked(app.info);
+                final int userId = UserHandle.getUserId(app.info.uid);
+                // Create the app-zygote and provide it with the UID-range it's allowed
+                // to setresuid/setresgid to.
+                final int firstUid = UserHandle.getUid(userId, uidRange.mFirstUid);
+                final int lastUid = UserHandle.getUid(userId, uidRange.mLastUid);
+                appZygote = new AppZygote(app.info, app.info.uid, firstUid, lastUid);
+                mAppZygotes.put(app.info.processName, app.info.uid, appZygote);
+                zygoteProcessList = new ArrayList<ProcessRecord>();
+                mAppZygoteProcesses.put(appZygote, zygoteProcessList);
+            } else {
+                mService.mHandler.removeMessages(KILL_APP_ZYGOTE_MSG, appZygote);
+                zygoteProcessList = mAppZygoteProcesses.get(appZygote);
+            }
+            // Note that we already add the app to mAppZygoteProcesses here;
+            // this is so that another thread can't come in and kill the zygote
+            // before we've even tried to start the process. If the process launch
+            // goes wrong, we'll clean this up in removeProcessNameLocked()
+            zygoteProcessList.add(app);
+
+            return appZygote;
+        }
+    }
+
     private Process.ProcessStartResult startProcess(String hostingType, String entryPoint,
             ProcessRecord app, int uid, int[] gids, int runtimeFlags, int mountExternal,
             String seInfo, String requiredAbi, String instructionSet, String invokeWith,
@@ -1517,6 +1734,15 @@ public final class ProcessList {
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, null, app.info.packageName,
                         packageNames, visibleVolIds,
+                        new String[] {PROC_START_SEQ_IDENT + app.startSeq});
+            } else if (hostingType.equals("app_zygote")) {
+                final AppZygote appZygote = createAppZygoteForProcessIfNeeded(app);
+
+                startResult = appZygote.getProcess().start(entryPoint,
+                        app.processName, uid, uid, gids, runtimeFlags, mountExternal,
+                        app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
+                        app.info.dataDir, null, app.info.packageName,
+                        packageNames, visibleVolIds, /*useBlastulaPool=*/ false,
                         new String[] {PROC_START_SEQ_IDENT + app.startSeq});
             } else {
                 startResult = Process.start(entryPoint,
@@ -1622,8 +1848,9 @@ public final class ProcessList {
                 ? hostingName.flattenToShortString() : null;
 
         if (app == null) {
+            final boolean fromAppZygote = "app_zygote".equals(hostingType);
             checkSlow(startTime, "startProcess: creating new process record");
-            app = newProcessRecordLocked(info, processName, isolated, isolatedUid);
+            app = newProcessRecordLocked(info, processName, isolated, isolatedUid, fromAppZygote);
             if (app == null) {
                 Slog.w(TAG, "Failed making new process record for "
                         + processName + "/" + info.uid + " isolated=" + isolated);
@@ -1767,8 +1994,8 @@ public final class ProcessList {
             mService.cleanUpApplicationRecordLocked(oldApp, false, false, -1,
                     true /*replacingPid*/);
         }
+        mService.mPidsSelfLocked.put(pid, app);
         synchronized (mService.mPidsSelfLocked) {
-            mService.mPidsSelfLocked.put(pid, app);
             if (!procAttached) {
                 Message msg = mService.mHandler.obtainMessage(PROC_START_TIMEOUT_MSG);
                 msg.obj = app;
@@ -1818,25 +2045,25 @@ public final class ProcessList {
                     // We don't kill persistent processes.
                     continue;
                 }
-                if (app.removed) {
-                    procs.add(app);
-                } else if (app.setAdj >= ProcessList.CACHED_APP_MIN_ADJ) {
-                    app.removed = true;
+                if (app.removed || app.setAdj >= ProcessList.CACHED_APP_MIN_ADJ) {
                     procs.add(app);
                 }
             }
         }
+    }
 
-        final int N = procs.size();
-        for (int i = 0; i < N; i++) {
-            removeProcessLocked(procs.get(i), false, true, "kill all background");
-        }
+    @GuardedBy("mService")
+    boolean killPackageProcessesLocked(String packageName, int appId, int userId, int minOomAdj,
+            String reason) {
+        return killPackageProcessesLocked(packageName, appId, userId, minOomAdj,
+                false /* callerWillRestart */, true /* allowRestart */, true /* doit */,
+                false /* evenPersistent */, false /* setRemoved */, reason);
     }
 
     @GuardedBy("mService")
     final boolean killPackageProcessesLocked(String packageName, int appId,
             int userId, int minOomAdj, boolean callerWillRestart, boolean allowRestart,
-            boolean doit, boolean evenPersistent, String reason) {
+            boolean doit, boolean evenPersistent, boolean setRemoved, String reason) {
         ArrayList<ProcessRecord> procs = new ArrayList<>();
 
         // Remove all processes this package may have touched: all with the
@@ -1894,7 +2121,9 @@ public final class ProcessList {
                 if (!doit) {
                     return true;
                 }
-                app.removed = true;
+                if (setRemoved) {
+                    app.removed = true;
+                }
                 procs.add(app);
             }
         }
@@ -1928,10 +2157,8 @@ public final class ProcessList {
                 .pendingStart)) {
             int pid = app.pid;
             if (pid > 0) {
-                synchronized (mService.mPidsSelfLocked) {
-                    mService.mPidsSelfLocked.remove(pid);
-                    mService.mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
-                }
+                mService.mPidsSelfLocked.remove(pid);
+                mService.mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
                 mService.mBatteryStatsService.noteProcessFinish(app.processName, app.info.uid);
                 if (app.isolated) {
                     mService.mBatteryStatsService.removeIsolatedUid(app.uid, app.info.uid);
@@ -1970,9 +2197,9 @@ public final class ProcessList {
         } else if (old != null) {
             Slog.wtf(TAG, "Already have existing proc " + old + " when adding " + proc);
         }
-        UidRecord uidRec = mService.mActiveUids.get(proc.uid);
+        UidRecord uidRec = mActiveUids.get(proc.uid);
         if (uidRec == null) {
-            uidRec = new UidRecord(proc.uid, mService.mAtmInternal);
+            uidRec = new UidRecord(proc.uid);
             // This is the first appearance of the uid, report it now!
             if (DEBUG_UID_OBSERVERS) Slog.i(TAG_UID_OBSERVERS,
                     "Creating new process uid: " + uidRec);
@@ -1982,7 +2209,7 @@ public final class ProcessList {
                 uidRec.setWhitelist = uidRec.curWhitelist = true;
             }
             uidRec.updateHasInternetPermission();
-            mService.mActiveUids.put(proc.uid, uidRec);
+            mActiveUids.put(proc.uid, uidRec);
             EventLogTags.writeAmUidRunning(uidRec.uid);
             mService.noteUidProcessState(uidRec.uid, uidRec.getCurProcState());
         }
@@ -1998,29 +2225,31 @@ public final class ProcessList {
     }
 
     @GuardedBy("mService")
+    private IsolatedUidRange getOrCreateIsolatedUidRangeLocked(ApplicationInfo info,
+            boolean fromAppZygote) {
+        if (!fromAppZygote) {
+            // Allocate an isolated UID from the global range
+            return mGlobalIsolatedUids;
+        } else {
+            return mAppIsolatedUidRangeAllocator.getOrCreateIsolatedUidRangeLocked(info);
+        }
+    }
+
+    @GuardedBy("mService")
     final ProcessRecord newProcessRecordLocked(ApplicationInfo info, String customProcess,
-            boolean isolated, int isolatedUid) {
+            boolean isolated, int isolatedUid, boolean fromAppZygote) {
         String proc = customProcess != null ? customProcess : info.processName;
         final int userId = UserHandle.getUserId(info.uid);
         int uid = info.uid;
         if (isolated) {
             if (isolatedUid == 0) {
-                int stepsLeft = LAST_ISOLATED_UID - FIRST_ISOLATED_UID + 1;
-                while (true) {
-                    if (mNextIsolatedProcessUid < FIRST_ISOLATED_UID
-                            || mNextIsolatedProcessUid > LAST_ISOLATED_UID) {
-                        mNextIsolatedProcessUid = FIRST_ISOLATED_UID;
-                    }
-                    uid = UserHandle.getUid(userId, mNextIsolatedProcessUid);
-                    mNextIsolatedProcessUid++;
-                    if (mIsolatedProcesses.indexOfKey(uid) < 0) {
-                        // No process for this uid, use it.
-                        break;
-                    }
-                    stepsLeft--;
-                    if (stepsLeft <= 0) {
-                        return null;
-                    }
+                IsolatedUidRange uidRange = getOrCreateIsolatedUidRangeLocked(info, fromAppZygote);
+                if (uidRange == null) {
+                    return null;
+                }
+                uid = uidRange.allocateIsolatedUidLocked(userId);
+                if (uid == -1) {
+                    return null;
                 }
             } else {
                 // Special case for startIsolatedProcess (internal only), where
@@ -2082,12 +2311,19 @@ public final class ProcessList {
                         "No more processes in " + old.uidRecord);
                 mService.enqueueUidChangeLocked(old.uidRecord, -1, UidRecord.CHANGE_GONE);
                 EventLogTags.writeAmUidStopped(uid);
-                mService.mActiveUids.remove(uid);
+                mActiveUids.remove(uid);
                 mService.noteUidProcessState(uid, ActivityManager.PROCESS_STATE_NONEXISTENT);
             }
             old.uidRecord = null;
         }
         mIsolatedProcesses.remove(uid);
+        mGlobalIsolatedUids.freeIsolatedUidLocked(uid);
+        // Remove the (expected) ProcessRecord from the app zygote
+        final ProcessRecord record = expecting != null ? expecting : old;
+        if (record != null && record.appZygote) {
+            removeProcessFromAppZygoteLocked(record);
+        }
+
         return old;
     }
 
@@ -2121,11 +2357,8 @@ public final class ProcessList {
             final int NA = apps.size();
             for (int ia = 0; ia < NA; ia++) {
                 final ProcessRecord app = apps.valueAt(ia);
-                if (app.removed) {
-                    procs.add(app);
-                } else if ((minTargetSdk < 0 || app.info.targetSdkVersion < minTargetSdk)
-                        && (maxProcState < 0 || app.setProcState > maxProcState)) {
-                    app.removed = true;
+                if (app.removed || ((minTargetSdk < 0 || app.info.targetSdkVersion < minTargetSdk)
+                        && (maxProcState < 0 || app.setProcState > maxProcState))) {
                     procs.add(app);
                 }
             }
@@ -2157,14 +2390,14 @@ public final class ProcessList {
     }
 
     @GuardedBy("mService")
-    void setAllHttpProxyLocked(String host, String port, String exclList, Uri pacFileUrl) {
+    void setAllHttpProxyLocked() {
         for (int i = mLruProcesses.size() - 1; i >= 0; i--) {
             ProcessRecord r = mLruProcesses.get(i);
             // Don't dispatch to isolated processes as they can't access
             // ConnectivityManager and don't have network privileges anyway.
             if (r.thread != null && !r.isolated) {
                 try {
-                    r.thread.setHttpProxy(host, port, exclList, pacFileUrl);
+                    r.thread.updateHttpProxy();
                 } catch (RemoteException ex) {
                     Slog.w(TAG, "Failed to update http proxy for: " +
                             r.info.processName);
@@ -2204,7 +2437,7 @@ public final class ProcessList {
 
     @GuardedBy("mService")
     int updateLruProcessInternalLocked(ProcessRecord app, long now, int index,
-            String what, Object obj, ProcessRecord srcApp) {
+            int lruSeq, String what, Object obj, ProcessRecord srcApp) {
         app.lastActivityTime = now;
 
         if (app.hasActivitiesOrRecentTasks()) {
@@ -2225,7 +2458,7 @@ public final class ProcessList {
             return index;
         }
 
-        if (lrui >= mLruProcessActivityStart) {
+        if (lrui >= mLruProcessActivityStart && index < mLruProcessActivityStart) {
             // Don't want to touch dependent processes that are hosting activities.
             return index;
         }
@@ -2237,7 +2470,193 @@ public final class ProcessList {
         if (DEBUG_LRU) Slog.d(TAG_LRU, "Moving dep from " + lrui + " to " + index
                 + " in LRU list: " + app);
         mLruProcesses.add(index, app);
+        app.lruSeq = lruSeq;
         return index;
+    }
+
+    /**
+     * Handle the case where we are inserting a process hosting client activities:
+     * Make sure any groups have their order match their importance, and take care of
+     * distributing old clients across other activity processes so they can't spam
+     * the LRU list.  Processing of the list will be restricted by the indices provided,
+     * and not extend out of them.
+     *
+     * @param topApp The app at the top that has just been inserted in to the list.
+     * @param topI The position in the list where topApp was inserted; this is the start (at the
+     *             top) where we are going to do our processing.
+     * @param bottomI The last position at which we will be processing; this is the end position
+     *                of whichever section of the LRU list we are in.  Nothing past it will be
+     *                touched.
+     * @param endIndex The current end of the top being processed.  Typically topI - 1.  That is,
+     *                 where we are going to start potentially adjusting other entries in the list.
+     */
+    private void updateClientActivitiesOrdering(final ProcessRecord topApp, final int topI,
+            final int bottomI, int endIndex) {
+        if (topApp.hasActivitiesOrRecentTasks() || topApp.treatLikeActivity
+                || !topApp.hasClientActivities()) {
+            // If this is not a special process that has client activities, then there is
+            // nothing to do.
+            return;
+        }
+
+        final int uid = topApp.info.uid;
+        if (topApp.connectionGroup > 0) {
+            int endImportance = topApp.connectionImportance;
+            for (int i = endIndex; i >= bottomI; i--) {
+                final ProcessRecord subProc = mLruProcesses.get(i);
+                if (subProc.info.uid == uid
+                        && subProc.connectionGroup == topApp.connectionGroup) {
+                    if (i == endIndex && subProc.connectionImportance >= endImportance) {
+                        // This process is already in the group, and its importance
+                        // is not as strong as the process before it, so keep it
+                        // correctly positioned in the group.
+                        if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                "Keeping in-place above " + subProc
+                                        + " endImportance=" + endImportance
+                                        + " group=" + subProc.connectionGroup
+                                        + " importance=" + subProc.connectionImportance);
+                        endIndex--;
+                        endImportance = subProc.connectionImportance;
+                    } else {
+                        // We want to pull this up to be with the rest of the group,
+                        // and order within the group by importance.
+                        if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                "Pulling up " + subProc
+                                        + " to position in group with importance="
+                                        + subProc.connectionImportance);
+                        boolean moved = false;
+                        for (int pos = topI; pos > endIndex; pos--) {
+                            final ProcessRecord posProc = mLruProcesses.get(pos);
+                            if (subProc.connectionImportance
+                                    <= posProc.connectionImportance) {
+                                mLruProcesses.remove(i);
+                                mLruProcesses.add(pos, subProc);
+                                if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                        "Moving " + subProc
+                                                + " from position " + i + " to above " + posProc
+                                                + " @ " + pos);
+                                moved = true;
+                                endIndex--;
+                                break;
+                            }
+                        }
+                        if (!moved) {
+                            // Goes to the end of the group.
+                            mLruProcesses.remove(i);
+                            mLruProcesses.add(endIndex - 1, subProc);
+                            if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                    "Moving " + subProc
+                                            + " from position " + i + " to end of group @ "
+                                            + endIndex);
+                            endIndex--;
+                            endImportance = subProc.connectionImportance;
+                        }
+                    }
+                }
+            }
+
+        }
+        // To keep it from spamming the LRU list (by making a bunch of clients),
+        // we will distribute other entries owned by it to be in-between other apps.
+        int i = endIndex;
+        while (i >= bottomI) {
+            ProcessRecord subProc = mLruProcesses.get(i);
+            if (DEBUG_LRU) Slog.d(TAG_LRU,
+                    "Looking to spread old procs, at " + subProc + " @ " + i);
+            if (subProc.info.uid != uid) {
+                // This is a different app...  if we have gone through some of the
+                // target app, pull this up to be before them.  We want to pull up
+                // one activity process, but any number of non-activity processes.
+                if (i < endIndex) {
+                    boolean hasActivity = false;
+                    int connUid = 0;
+                    int connGroup = 0;
+                    while (i >= bottomI) {
+                        mLruProcesses.remove(i);
+                        mLruProcesses.add(endIndex, subProc);
+                        if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                "Different app, moving to " + endIndex);
+                        i--;
+                        if (i < bottomI) {
+                            break;
+                        }
+                        subProc = mLruProcesses.get(i);
+                        if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                "Looking at next app at " + i + ": " + subProc);
+                        if (subProc.hasActivitiesOrRecentTasks() || subProc.treatLikeActivity) {
+                            if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                    "This is hosting an activity!");
+                            if (hasActivity) {
+                                // Already found an activity, done.
+                                if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                        "Already found an activity, done");
+                                break;
+                            }
+                            hasActivity = true;
+                        } else if (subProc.hasClientActivities()) {
+                            if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                    "This is a client of an activity");
+                            if (hasActivity) {
+                                if (connUid == 0 || connUid != subProc.info.uid) {
+                                    // Already have an activity that is not from from a client
+                                    // connection or is a different client connection, done.
+                                    if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                            "Already found a different activity: connUid="
+                                            + connUid + " uid=" + subProc.info.uid);
+                                    break;
+                                } else if (connGroup == 0 || connGroup != subProc.connectionGroup) {
+                                    // Previously saw a different group or not from a group,
+                                    // want to treat these as different things.
+                                    if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                            "Already found a different group: connGroup="
+                                            + connGroup + " group=" + subProc.connectionGroup);
+                                    break;
+                                }
+                            } else {
+                                if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                        "This is an activity client!  uid="
+                                        + subProc.info.uid + " group=" + subProc.connectionGroup);
+                                hasActivity = true;
+                                connUid = subProc.info.uid;
+                                connGroup = subProc.connectionGroup;
+                            }
+                        }
+                        endIndex--;
+                    }
+                }
+                // Find the end of the next group of processes for target app.  This
+                // is after any entries of different apps (so we don't change the existing
+                // relative order of apps) and then after the next last group of processes
+                // of the target app.
+                for (endIndex--; endIndex >= bottomI; endIndex--) {
+                    final ProcessRecord endProc = mLruProcesses.get(endIndex);
+                    if (endProc.info.uid == uid) {
+                        if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                "Found next group of app: " + endProc + " @ "
+                                        + endIndex);
+                        break;
+                    }
+                }
+                if (endIndex >= bottomI) {
+                    final ProcessRecord endProc = mLruProcesses.get(endIndex);
+                    for (endIndex--; endIndex >= bottomI; endIndex--) {
+                        final ProcessRecord nextEndProc = mLruProcesses.get(endIndex);
+                        if (nextEndProc.info.uid != uid
+                                || nextEndProc.connectionGroup != endProc.connectionGroup) {
+                            if (DEBUG_LRU) Slog.d(TAG_LRU,
+                                    "Found next group or app: " + nextEndProc + " @ "
+                                            + endIndex + " group=" + nextEndProc.connectionGroup);
+                            break;
+                        }
+                    }
+                }
+                if (DEBUG_LRU) Slog.d(TAG_LRU,
+                        "Bumping scan position to " + endIndex);
+                i = endIndex;
+            } else {
+                i--;
+            }
+        }
     }
 
     final void updateLruProcessLocked(ProcessRecord app, boolean activityChange,
@@ -2345,46 +2764,44 @@ public final class ProcessList {
         */
 
         int nextIndex;
+        int nextActivityIndex = -1;
         if (hasActivity) {
             final int N = mLruProcesses.size();
-            if ((!app.hasActivities() || app.hasRecentTasks())
+            nextIndex = mLruProcessServiceStart;
+            if (!app.hasActivitiesOrRecentTasks() && !app.treatLikeActivity
                     && mLruProcessActivityStart < (N - 1)) {
                 // Process doesn't have activities, but has clients with
-                // activities...  move it up, but one below the top (the top
-                // should always have a real activity).
+                // activities...  move it up, but below the app that is binding to it.
                 if (DEBUG_LRU) Slog.d(TAG_LRU,
-                        "Adding to second-top of LRU activity list: " + app);
-                mLruProcesses.add(N - 1, app);
-                // To keep it from spamming the LRU list (by making a bunch of clients),
-                // we will push down any other entries owned by the app.
-                final int uid = app.info.uid;
-                for (int i = N - 2; i > mLruProcessActivityStart; i--) {
-                    ProcessRecord subProc = mLruProcesses.get(i);
-                    if (subProc.info.uid == uid) {
-                        // We want to push this one down the list.  If the process after
-                        // it is for the same uid, however, don't do so, because we don't
-                        // want them internally to be re-ordered.
-                        if (mLruProcesses.get(i - 1).info.uid != uid) {
-                            if (DEBUG_LRU) Slog.d(TAG_LRU,
-                                    "Pushing uid " + uid + " swapping at " + i + ": "
-                                            + mLruProcesses.get(i) + " : "
-                                            + mLruProcesses.get(i - 1));
-                            ProcessRecord tmp = mLruProcesses.get(i);
-                            mLruProcesses.set(i, mLruProcesses.get(i - 1));
-                            mLruProcesses.set(i - 1, tmp);
-                            i--;
-                        }
-                    } else {
-                        // A gap, we can stop here.
+                        "Adding to second-top of LRU activity list: " + app
+                        + " group=" + app.connectionGroup
+                        + " importance=" + app.connectionImportance);
+                int pos = N - 1;
+                while (pos > mLruProcessActivityStart) {
+                    final ProcessRecord posproc = mLruProcesses.get(pos);
+                    if (posproc.info.uid == app.info.uid) {
+                        // Technically this app could have multiple processes with different
+                        // activities and so we should be looking for the actual process that
+                        // is bound to the target proc...  but I don't really care, do you?
                         break;
                     }
+                    pos--;
                 }
+                mLruProcesses.add(pos, app);
+                // If this process is part of a group, need to pull up any other processes
+                // in that group to be with it.
+                int endIndex = pos - 1;
+                if (endIndex < mLruProcessActivityStart) {
+                    endIndex = mLruProcessActivityStart;
+                }
+                nextActivityIndex = endIndex;
+                updateClientActivitiesOrdering(app, pos, mLruProcessActivityStart, endIndex);
             } else {
                 // Process has activities, put it at the very tipsy-top.
                 if (DEBUG_LRU) Slog.d(TAG_LRU, "Adding to top of LRU activity list: " + app);
                 mLruProcesses.add(app);
+                nextActivityIndex = mLruProcesses.size() - 1;
             }
-            nextIndex = mLruProcessServiceStart;
         } else if (hasService) {
             // Process has services, put it at the top of the service list.
             if (DEBUG_LRU) Slog.d(TAG_LRU, "Adding to top of LRU service list: " + app);
@@ -2414,7 +2831,12 @@ public final class ProcessList {
             nextIndex = index - 1;
             mLruProcessActivityStart++;
             mLruProcessServiceStart++;
+            if (index > 1) {
+                updateClientActivitiesOrdering(app, mLruProcessServiceStart - 1, 0, index - 1);
+            }
         }
+
+        app.lruSeq = mLruSeq;
 
         // If the app is currently using a content provider or service,
         // bump those processes as well.
@@ -2423,17 +2845,27 @@ public final class ProcessList {
             if (cr.binding != null && !cr.serviceDead && cr.binding.service != null
                     && cr.binding.service.app != null
                     && cr.binding.service.app.lruSeq != mLruSeq
+                    && (cr.flags & Context.BIND_REDUCTION_FLAGS) == 0
                     && !cr.binding.service.app.isPersistent()) {
-                nextIndex = updateLruProcessInternalLocked(cr.binding.service.app,
-                        now,
-                        nextIndex,
-                        "service connection", cr, app);
+                if (cr.binding.service.app.hasClientActivities()) {
+                    if (nextActivityIndex >= 0) {
+                        nextActivityIndex = updateLruProcessInternalLocked(cr.binding.service.app,
+                                now,
+                                nextActivityIndex, mLruSeq,
+                                "service connection", cr, app);
+                    }
+                } else {
+                    nextIndex = updateLruProcessInternalLocked(cr.binding.service.app,
+                            now,
+                            nextIndex, mLruSeq,
+                            "service connection", cr, app);
+                }
             }
         }
         for (int j = app.conProviders.size() - 1; j >= 0; j--) {
             ContentProviderRecord cpr = app.conProviders.get(j).provider;
             if (cpr.proc != null && cpr.proc.lruSeq != mLruSeq && !cpr.proc.isPersistent()) {
-                nextIndex = updateLruProcessInternalLocked(cpr.proc, now, nextIndex,
+                nextIndex = updateLruProcessInternalLocked(cpr.proc, now, nextIndex, mLruSeq,
                         "provider reference", cpr, app);
             }
         }
@@ -2634,6 +3066,39 @@ public final class ProcessList {
                 } catch (RemoteException ex) {
                 }
             }
+        }
+    }
+
+    /** Returns the uid's process state or PROCESS_STATE_NONEXISTENT if not running */
+    @GuardedBy("mService")
+    int getUidProcStateLocked(int uid) {
+        UidRecord uidRec = mActiveUids.get(uid);
+        return uidRec == null ? PROCESS_STATE_NONEXISTENT : uidRec.getCurProcState();
+    }
+
+    /** Returns the UidRecord for the given uid, if it exists. */
+    @GuardedBy("mService")
+    UidRecord getUidRecordLocked(int uid) {
+        return mActiveUids.get(uid);
+    }
+
+    /**
+     * Call {@link ActivityManagerService#doStopUidLocked}
+     * (which will also stop background services) for all idle UIDs.
+     */
+    @GuardedBy("mService")
+    void doStopUidForIdleUidsLocked() {
+        final int size = mActiveUids.size();
+        for (int i = 0; i < size; i++) {
+            final int uid = mActiveUids.keyAt(i);
+            if (UserHandle.isCore(uid)) {
+                continue;
+            }
+            final UidRecord uidRec = mActiveUids.valueAt(i);
+            if (!uidRec.idle) {
+                continue;
+            }
+            mService.doStopUidLocked(uidRec.uid, uidRec);
         }
     }
 }

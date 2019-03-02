@@ -25,7 +25,7 @@ import com.android.systemui.R;
 import com.android.systemui.statusbar.AmbientPulseManager;
 import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.notification.NotificationData;
+import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
@@ -40,8 +40,10 @@ public class AmbientState {
 
     private static final int NO_SECTION_BOUNDARY = -1;
 
-    private ArrayList<View> mDraggedViews = new ArrayList<>();
+    private ArrayList<ExpandableView> mDraggedViews = new ArrayList<>();
     private int mScrollY;
+    private int mAnchorViewIndex;
+    private int mAnchorViewY;
     private boolean mDimmed;
     private ActivatableNotificationView mActivatedChild;
     private float mOverScrollTopAmount;
@@ -75,7 +77,6 @@ public class AmbientState {
     private int mIntrinsicPadding;
     private int mExpandAnimationTopChange;
     private ExpandableNotificationRow mExpandingNotification;
-    private int mDarkTopPadding;
     private float mDarkAmount;
     private boolean mAppearing;
 
@@ -131,7 +132,29 @@ public class AmbientState {
         this.mScrollY = scrollY;
     }
 
-    public void onBeginDrag(View view) {
+    /**
+     * Index of the child view whose Y position on screen is returned by {@link #getAnchorViewY()}.
+     * Other views are laid out outwards from this view in both directions.
+     */
+    public int getAnchorViewIndex() {
+        return mAnchorViewIndex;
+    }
+
+    public void setAnchorViewIndex(int anchorViewIndex) {
+        mAnchorViewIndex = anchorViewIndex;
+    }
+
+    /** Current Y position of the view at {@link #getAnchorViewIndex()}. */
+    public int getAnchorViewY() {
+        return mAnchorViewY;
+    }
+
+    public void setAnchorViewY(int anchorViewY) {
+        mAnchorViewY = anchorViewY;
+    }
+
+    /** Call when dragging begins. */
+    public void onBeginDrag(ExpandableView view) {
         mDraggedViews.add(view);
     }
 
@@ -139,7 +162,7 @@ public class AmbientState {
         mDraggedViews.remove(view);
     }
 
-    public ArrayList<View> getDraggedViews() {
+    public ArrayList<ExpandableView> getDraggedViews() {
         return mDraggedViews;
     }
 
@@ -350,14 +373,15 @@ public class AmbientState {
     }
 
     public boolean hasPulsingNotifications() {
-        return mPulsing;
+        return mPulsing && mAmbientPulseManager != null
+                && mAmbientPulseManager.hasNotifications();
     }
 
     public void setPulsing(boolean hasPulsing) {
         mPulsing = hasPulsing;
     }
 
-    public boolean isPulsing(NotificationData.Entry entry) {
+    public boolean isPulsing(NotificationEntry entry) {
         if (!mPulsing || mAmbientPulseManager == null) {
             return false;
         }
@@ -455,14 +479,6 @@ public class AmbientState {
 
     public boolean isDarkAtAll() {
         return mDarkAmount != 0;
-    }
-
-    public void setDarkTopPadding(int darkTopPadding) {
-        mDarkTopPadding = darkTopPadding;
-    }
-
-    public int getDarkTopPadding() {
-        return mDarkTopPadding;
     }
 
     public void setAppearing(boolean appearing) {

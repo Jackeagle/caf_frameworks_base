@@ -17,12 +17,12 @@
 package com.android.server.backup.restore;
 
 import static com.android.server.backup.BackupManagerService.DEBUG;
-import static com.android.server.backup.BackupManagerService.KEY_WIDGET_STATE;
 import static com.android.server.backup.BackupManagerService.MORE_DEBUG;
-import static com.android.server.backup.BackupManagerService.OP_TYPE_RESTORE_WAIT;
-import static com.android.server.backup.BackupManagerService.PACKAGE_MANAGER_SENTINEL;
-import static com.android.server.backup.BackupManagerService.SETTINGS_PACKAGE;
 import static com.android.server.backup.BackupManagerService.TAG;
+import static com.android.server.backup.UserBackupManagerService.KEY_WIDGET_STATE;
+import static com.android.server.backup.UserBackupManagerService.OP_TYPE_RESTORE_WAIT;
+import static com.android.server.backup.UserBackupManagerService.PACKAGE_MANAGER_SENTINEL;
+import static com.android.server.backup.UserBackupManagerService.SETTINGS_PACKAGE;
 import static com.android.server.backup.internal.BackupHandler.MSG_BACKUP_RESTORE_STEP;
 import static com.android.server.backup.internal.BackupHandler.MSG_RESTORE_OPERATION_TIMEOUT;
 import static com.android.server.backup.internal.BackupHandler.MSG_RESTORE_SESSION_TIMEOUT;
@@ -40,12 +40,11 @@ import android.app.backup.RestoreDescription;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManagerInternal;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.PackageManagerInternal;
 import android.os.Bundle;
 import android.os.Message;
 import android.os.ParcelFileDescriptor;
-import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -62,8 +61,8 @@ import com.android.server.backup.BackupRestoreTask;
 import com.android.server.backup.BackupUtils;
 import com.android.server.backup.PackageManagerBackupAgent;
 import com.android.server.backup.PackageManagerBackupAgent.Metadata;
-import com.android.server.backup.BackupManagerService;
 import com.android.server.backup.TransportManager;
+import com.android.server.backup.UserBackupManagerService;
 import com.android.server.backup.internal.OnTaskFinishedListener;
 import com.android.server.backup.transport.TransportClient;
 import com.android.server.backup.utils.AppBackupUtils;
@@ -80,7 +79,8 @@ import java.util.List;
 
 public class PerformUnifiedRestoreTask implements BackupRestoreTask {
 
-    private BackupManagerService backupManagerService;
+    private UserBackupManagerService backupManagerService;
+    private final int mUserId;
     private final TransportManager mTransportManager;
     // Transport client we're working with to do the restore
     private final TransportClient mTransportClient;
@@ -164,7 +164,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
     // This task can assume that the wakelock is properly held for it and doesn't have to worry
     // about releasing it.
     public PerformUnifiedRestoreTask(
-            BackupManagerService backupManagerService,
+            UserBackupManagerService backupManagerService,
             TransportClient transportClient,
             IRestoreObserver observer,
             IBackupManagerMonitor monitor,
@@ -175,6 +175,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
             @Nullable String[] filterSet,
             OnTaskFinishedListener listener) {
         this.backupManagerService = backupManagerService;
+        mUserId = backupManagerService.getUserId();
         mTransportManager = backupManagerService.getTransportManager();
         mEphemeralOpToken = backupManagerService.generateRandomIntegerToken();
         mState = UnifiedRestoreState.INITIAL;
@@ -204,7 +205,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
                 // We want everything and a pony
                 List<PackageInfo> apps =
                         PackageManagerBackupAgent.getStorableApplications(
-                                backupManagerService.getPackageManager());
+                                backupManagerService.getPackageManager(), mUserId);
                 filterSet = packagesToNames(apps);
                 if (DEBUG) {
                     Slog.i(TAG, "Full restore; asking about " + filterSet.length + " apps");
@@ -221,7 +222,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
             for (int i = 0; i < filterSet.length; i++) {
                 try {
                     PackageManager pm = backupManagerService.getPackageManager();
-                    PackageInfo info = pm.getPackageInfo(filterSet[i], 0);
+                    PackageInfo info = pm.getPackageInfoAsUser(filterSet[i], 0, mUserId);
                     if ("android".equals(info.packageName)) {
                         hasSystem = true;
                         continue;
@@ -231,7 +232,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
                         continue;
                     }
 
-                    if (AppBackupUtils.appIsEligibleForBackup(info.applicationInfo, pm)) {
+                    if (AppBackupUtils.appIsEligibleForBackup(info.applicationInfo, mUserId)) {
                         mAcceptSet.add(info);
                     }
                 } catch (NameNotFoundException e) {
@@ -240,16 +241,16 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
             }
             if (hasSystem) {
                 try {
-                    mAcceptSet.add(0,
-                            backupManagerService.getPackageManager().getPackageInfo("android", 0));
+                    mAcceptSet.add(0, backupManagerService.getPackageManager().getPackageInfoAsUser(
+                                    "android", 0, mUserId));
                 } catch (NameNotFoundException e) {
                     // won't happen; we know a priori that it's valid
                 }
             }
             if (hasSettings) {
                 try {
-                    mAcceptSet.add(backupManagerService.getPackageManager().getPackageInfo(
-                            SETTINGS_PACKAGE, 0));
+                    mAcceptSet.add(backupManagerService.getPackageManager().getPackageInfoAsUser(
+                            SETTINGS_PACKAGE, 0, mUserId));
                 } catch (NameNotFoundException e) {
                     // this one is always valid too
                 }
@@ -359,8 +360,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
 
         // If we're starting a full-system restore, set up to begin widget ID remapping
         if (mIsSystemRestore) {
-            // TODO: http://b/22388012
-            AppWidgetBackupBridge.restoreStarting(UserHandle.USER_SYSTEM);
+            AppWidgetBackupBridge.restoreStarting(mUserId);
         }
 
         try {
@@ -508,8 +508,8 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
             }
 
             try {
-                mCurrentPackage = backupManagerService.getPackageManager().getPackageInfo(
-                        pkgName, PackageManager.GET_SIGNING_CERTIFICATES);
+                mCurrentPackage = backupManagerService.getPackageManager().getPackageInfoAsUser(
+                        pkgName, PackageManager.GET_SIGNING_CERTIFICATES, mUserId);
             } catch (NameNotFoundException e) {
                 // Whoops, we thought we could restore this package but it
                 // turns out not to be present.  Skip it.
@@ -1078,8 +1078,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
         }
 
         // Kick off any work that may be needed regarding app widget restores
-        // TODO: http://b/22388012
-        AppWidgetBackupBridge.restoreFinished(UserHandle.USER_SYSTEM);
+        AppWidgetBackupBridge.restoreFinished(mUserId);
 
         // If this was a full-system restore, record the ancestral
         // dataset information
@@ -1175,7 +1174,7 @@ public class PerformUnifiedRestoreTask implements BackupRestoreTask {
                 //     b. the app does not state android:killAfterRestore="false" in its manifest
                 final int appFlags = mCurrentPackage.applicationInfo.flags;
                 final boolean killAfterRestore =
-                        (mCurrentPackage.applicationInfo.uid >= Process.FIRST_APPLICATION_UID)
+                        !UserHandle.isCore(mCurrentPackage.applicationInfo.uid)
                                 && ((mRestoreDescription.getDataType()
                                 == RestoreDescription.TYPE_FULL_STREAM)
                                 || ((appFlags & ApplicationInfo.FLAG_KILL_AFTER_RESTORE) != 0));

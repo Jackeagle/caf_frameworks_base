@@ -90,11 +90,13 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
         }
 
         /**
-         * Visible for testing and vendor extensions only.
+         * Construct a new Key with a given name and type.
          *
-         * @hide
+         * <p>Normally, applications should use the existing Key definitions in
+         * {@link CameraCharacteristics}, and not need to construct their own Key objects. However,
+         * they may be useful for testing purposes and for defining custom camera
+         * characteristics.</p>
          */
-        @UnsupportedAppUsage
         public Key(String name, Class<T> type) {
             mKey = new CameraMetadataNative.Key<T>(name,  type);
         }
@@ -393,7 +395,7 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
      *         doesn't have any recommendation for this use case or the recommended configurations
      *         are invalid.
      */
-    public RecommendedStreamConfigurationMap getRecommendedStreamConfigurationMap(
+    public @Nullable RecommendedStreamConfigurationMap getRecommendedStreamConfigurationMap(
             @RecommendedStreamConfigurationMap.RecommendedUsecase int usecase) {
         if (((usecase >= RecommendedStreamConfigurationMap.USECASE_PREVIEW) &&
                 (usecase <= RecommendedStreamConfigurationMap.USECASE_RAW)) ||
@@ -2609,6 +2611,39 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
             new Key<android.hardware.camera2.params.ReprocessFormatsMap>("android.scaler.availableRecommendedInputOutputFormatsMap", android.hardware.camera2.params.ReprocessFormatsMap.class);
 
     /**
+     * <p>An array of mandatory stream combinations generated according to the camera device
+     * {@link android.hardware.camera2.CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL }
+     * and {@link android.hardware.camera2.CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES }.
+     * This is an app-readable conversion of the mandatory stream combination
+     * {@link android.hardware.camera2.CameraDevice#createCaptureSession tables}.</p>
+     * <p>The array of
+     * {@link android.hardware.camera2.params.MandatoryStreamCombination combinations} is
+     * generated according to the documented
+     * {@link android.hardware.camera2.CameraDevice#createCaptureSession guideline} based on
+     * specific device level and capabilities.
+     * Clients can use the array as a quick reference to find an appropriate camera stream
+     * combination.
+     * As per documentation, the stream combinations with given PREVIEW, RECORD and
+     * MAXIMUM resolutions and anything smaller from the list given by
+     * {@link android.hardware.camera2.params.StreamConfigurationMap#getOutputSizes } are
+     * guaranteed to work.
+     * The mandatory stream combination array will be {@code null} in case the device is a
+     * physical camera not independently exposed in
+     * {@link android.hardware.camera2.CameraManager#getCameraIdList } or is not backward
+     * compatible.</p>
+     * <p><b>Optional</b> - This value may be {@code null} on some devices.</p>
+     * <p><b>Limited capability</b> -
+     * Present on all camera devices that report being at least {@link CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED HARDWARE_LEVEL_LIMITED} devices in the
+     * {@link CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL android.info.supportedHardwareLevel} key</p>
+     *
+     * @see CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL
+     */
+    @PublicKey
+    @SyntheticKey
+    public static final Key<android.hardware.camera2.params.MandatoryStreamCombination[]> SCALER_MANDATORY_STREAM_COMBINATIONS =
+            new Key<android.hardware.camera2.params.MandatoryStreamCombination[]>("android.scaler.mandatoryStreamCombinations", android.hardware.camera2.params.MandatoryStreamCombination[].class);
+
+    /**
      * <p>The area of the image sensor which corresponds to active pixels after any geometric
      * distortion correction has been applied.</p>
      * <p>This is the rectangle representing the size of the active region of the sensor (i.e.
@@ -3686,13 +3721,66 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
             new Key<android.hardware.camera2.params.RecommendedStreamConfiguration[]>("android.depth.availableRecommendedDepthStreamConfigurations", android.hardware.camera2.params.RecommendedStreamConfiguration[].class);
 
     /**
+     * <p>The available dynamic depth dataspace stream
+     * configurations that this camera device supports
+     * (i.e. format, width, height, output/input stream).</p>
+     * <p>These are output stream configurations for use with
+     * dataSpace DYNAMIC_DEPTH. The configurations are
+     * listed as <code>(format, width, height, input?)</code> tuples.</p>
+     * <p>Only devices that support depth output for at least
+     * the HAL_PIXEL_FORMAT_Y16 dense depth map along with
+     * HAL_PIXEL_FORMAT_BLOB with the same size or size with
+     * the same aspect ratio can have dynamic depth dataspace
+     * stream configuration. {@link CameraCharacteristics#DEPTH_DEPTH_IS_EXCLUSIVE android.depth.depthIsExclusive} also
+     * needs to be set to FALSE.</p>
+     * <p><b>Optional</b> - This value may be {@code null} on some devices.</p>
+     *
+     * @see CameraCharacteristics#DEPTH_DEPTH_IS_EXCLUSIVE
+     * @hide
+     */
+    public static final Key<android.hardware.camera2.params.StreamConfiguration[]> DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS =
+            new Key<android.hardware.camera2.params.StreamConfiguration[]>("android.depth.availableDynamicDepthStreamConfigurations", android.hardware.camera2.params.StreamConfiguration[].class);
+
+    /**
+     * <p>This lists the minimum frame duration for each
+     * format/size combination for dynamic depth output streams.</p>
+     * <p>This should correspond to the frame duration when only that
+     * stream is active, with all processing (typically in android.*.mode)
+     * set to either OFF or FAST.</p>
+     * <p>When multiple streams are used in a request, the minimum frame
+     * duration will be max(individual stream min durations).</p>
+     * <p>The minimum frame duration of a stream (of a particular format, size)
+     * is the same regardless of whether the stream is input or output.</p>
+     * <p><b>Units</b>: (format, width, height, ns) x n</p>
+     * <p><b>Optional</b> - This value may be {@code null} on some devices.</p>
+     * @hide
+     */
+    public static final Key<android.hardware.camera2.params.StreamConfigurationDuration[]> DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS =
+            new Key<android.hardware.camera2.params.StreamConfigurationDuration[]>("android.depth.availableDynamicDepthMinFrameDurations", android.hardware.camera2.params.StreamConfigurationDuration[].class);
+
+    /**
+     * <p>This lists the maximum stall duration for each
+     * output format/size combination for dynamic depth streams.</p>
+     * <p>A stall duration is how much extra time would get added
+     * to the normal minimum frame duration for a repeating request
+     * that has streams with non-zero stall.</p>
+     * <p>All dynamic depth output streams may have a nonzero stall
+     * duration.</p>
+     * <p><b>Units</b>: (format, width, height, ns) x n</p>
+     * <p><b>Optional</b> - This value may be {@code null} on some devices.</p>
+     * @hide
+     */
+    public static final Key<android.hardware.camera2.params.StreamConfigurationDuration[]> DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS =
+            new Key<android.hardware.camera2.params.StreamConfigurationDuration[]>("android.depth.availableDynamicDepthStallDurations", android.hardware.camera2.params.StreamConfigurationDuration[].class);
+
+    /**
      * <p>String containing the ids of the underlying physical cameras.</p>
-     * <p>For a logical camera, this is concatenation of all underlying physical camera ids.
-     * The null terminator for physical camera id must be preserved so that the whole string
-     * can be tokenized using '\0' to generate list of physical camera ids.</p>
-     * <p>For example, if the physical camera ids of the logical camera are "2" and "3", the
+     * <p>For a logical camera, this is concatenation of all underlying physical camera IDs.
+     * The null terminator for physical camera ID must be preserved so that the whole string
+     * can be tokenized using '\0' to generate list of physical camera IDs.</p>
+     * <p>For example, if the physical camera IDs of the logical camera are "2" and "3", the
      * value of this tag will be ['2', '\0', '3', '\0'].</p>
-     * <p>The number of physical camera ids must be no less than 2.</p>
+     * <p>The number of physical camera IDs must be no less than 2.</p>
      * <p><b>Units</b>: UTF-8 null-terminated string</p>
      * <p><b>Optional</b> - This value may be {@code null} on some devices.</p>
      * <p><b>Limited capability</b> -

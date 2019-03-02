@@ -33,7 +33,6 @@ import java.util.List;
  */
 public class HidProfile implements LocalBluetoothProfile {
     private static final String TAG = "HidProfile";
-    private static boolean V = true;
 
     private BluetoothHidHost mService;
     private boolean mIsProfileReady;
@@ -51,7 +50,6 @@ public class HidProfile implements LocalBluetoothProfile {
             implements BluetoothProfile.ServiceListener {
 
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            if (V) Log.d(TAG,"Bluetooth service connected");
             mService = (BluetoothHidHost) proxy;
             // We just bound to the service, so refresh the UI for any connected HID devices.
             List<BluetoothDevice> deviceList = mService.getConnectedDevices();
@@ -70,7 +68,6 @@ public class HidProfile implements LocalBluetoothProfile {
         }
 
         public void onServiceDisconnected(int profile) {
-            if (V) Log.d(TAG,"Bluetooth service disconnected");
             mIsProfileReady=false;
         }
     }
@@ -168,7 +165,7 @@ public class HidProfile implements LocalBluetoothProfile {
 
     public int getDrawableResource(BluetoothClass btClass) {
         if (btClass == null) {
-            return R.drawable.ic_lockscreen_ime;
+            return com.android.internal.R.drawable.ic_lockscreen_ime;
         }
         return getHidClassDrawable(btClass);
     }
@@ -177,16 +174,16 @@ public class HidProfile implements LocalBluetoothProfile {
         switch (btClass.getDeviceClass()) {
             case BluetoothClass.Device.PERIPHERAL_KEYBOARD:
             case BluetoothClass.Device.PERIPHERAL_KEYBOARD_POINTING:
-                return R.drawable.ic_lockscreen_ime;
+                return com.android.internal.R.drawable.ic_lockscreen_ime;
             case BluetoothClass.Device.PERIPHERAL_POINTING:
-                return R.drawable.ic_bt_pointing_hid;
+                return com.android.internal.R.drawable.ic_bt_pointing_hid;
             default:
-                return R.drawable.ic_bt_misc_hid;
+                return com.android.internal.R.drawable.ic_bt_misc_hid;
         }
     }
 
     protected void finalize() {
-        if (V) Log.d(TAG, "finalize()");
+        Log.d(TAG, "finalize()");
         if (mService != null) {
             try {
                 BluetoothAdapter.getDefaultAdapter().closeProfileProxy(BluetoothProfile.HID_HOST,

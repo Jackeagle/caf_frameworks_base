@@ -16,19 +16,27 @@
 
 package android.view.inspector;
 
+import android.annotation.ColorInt;
+import android.annotation.ColorLong;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.graphics.Color;
 
 /**
  * An interface for reading the properties of an inspectable object.
  *
- * Used as the parameter for {@link InspectionHelper#readProperties(Object, PropertyReader)}.
+ * {@code PropertyReader} is defined as an interface that will be called by
+ * {@link InspectionCompanion#readProperties(Object, PropertyReader)}. This approach allows a
+ * client inspector to read the values of primitive properties without the overhead of
+ * instantiating a class to hold the property values for each inspection pass. If an inspectable
+ * remains unchanged between reading passes, it should be possible for a {@code PropertyReader} to
+ * avoid new allocations for subsequent reading passes.
+ *
  * It has separate methods for all primitive types to avoid autoboxing overhead if a concrete
  * implementation is able to work with primitives. Implementations should be prepared to accept
  * {null} as the value of {@link PropertyReader#readObject(int, Object)}.
  *
- * @see InspectionHelper#readProperties(Object, PropertyReader)
- * @hide
+ * @see InspectionCompanion#readProperties(Object, PropertyReader)
  */
 public interface PropertyReader {
     /**
@@ -36,7 +44,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {boolean}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code boolean}
      */
     void readBoolean(int id, boolean value);
 
@@ -45,7 +53,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {byte}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code byte}
      */
     void readByte(int id, byte value);
 
@@ -54,7 +62,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {char}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code char}
      */
     void readChar(int id, char value);
 
@@ -63,7 +71,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {double}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code double}
      */
     void readDouble(int id, double value);
 
@@ -72,7 +80,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {float}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code float}
      */
     void readFloat(int id, float value);
 
@@ -81,7 +89,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as an {int}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as an {@code int}
      */
     void readInt(int id, int value);
 
@@ -90,7 +98,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {long}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code long}
      */
     void readLong(int id, long value);
 
@@ -99,7 +107,7 @@ public interface PropertyReader {
      *
      * @param id Identifier of the property from a {@link PropertyMapper}
      * @param value Value of the property
-     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {short}
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a {@code short}
      */
     void readShort(int id, short value);
 
@@ -113,6 +121,60 @@ public interface PropertyReader {
      * @throws PropertyTypeMismatchException If the property ID is not mapped as an object
      */
     void readObject(int id, @Nullable Object value);
+
+    /**
+     * Read a color packed into a {@link ColorInt} as a property.
+     *
+     * @param id Identifier of the property from a {@link PropertyMapper}
+     * @param value Value of the property
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a color
+     */
+    void readColor(int id, @ColorInt int value);
+
+    /**
+     * Read a color packed into a {@link ColorLong} as a property.
+     *
+     * @param id Identifier of the property from a {@link PropertyMapper}
+     * @param value Value of the property
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a color
+     */
+    void readColor(int id, @ColorLong long value);
+
+    /**
+     * Read a {@link Color} object as a property.
+     *
+     * @param id Identifier of the property from a {@link PropertyMapper}
+     * @param value Value of the property
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a color
+     */
+    void readColor(int id, @Nullable Color value);
+
+    /**
+     * Read {@link android.view.Gravity} packed into an primitive {int}.
+     *
+     * @param id Identifier of the property from a {@link PropertyMapper}
+     * @param value Value of the property
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as a gravity property
+     */
+    void readGravity(int id, int value);
+
+    /**
+     * Read an enumeration packed into a primitive {int}.
+     *
+     * @param id Identifier of the property from a {@link PropertyMapper}
+     * @param value Value of the property
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as an object
+     */
+    void readIntEnum(int id, int value);
+
+    /**
+     * Read a flag packed into a primitive {int}.
+     *
+     * @param id Identifier of the property from a {@link PropertyMapper}
+     * @param value Value of the property
+     * @throws PropertyTypeMismatchException If the property ID is not mapped as an object
+     */
+    void readIntFlag(int id, int value);
 
     /**
      * Thrown if a client calls a typed read method for a property of a different type.

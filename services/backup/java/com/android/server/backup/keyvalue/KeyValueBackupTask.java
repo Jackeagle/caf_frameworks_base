@@ -22,9 +22,9 @@ import static android.os.ParcelFileDescriptor.MODE_READ_ONLY;
 import static android.os.ParcelFileDescriptor.MODE_READ_WRITE;
 import static android.os.ParcelFileDescriptor.MODE_TRUNCATE;
 
-import static com.android.server.backup.BackupManagerService.KEY_WIDGET_STATE;
-import static com.android.server.backup.BackupManagerService.OP_PENDING;
-import static com.android.server.backup.BackupManagerService.OP_TYPE_BACKUP;
+import static com.android.server.backup.UserBackupManagerService.KEY_WIDGET_STATE;
+import static com.android.server.backup.UserBackupManagerService.OP_PENDING;
+import static com.android.server.backup.UserBackupManagerService.OP_TYPE_BACKUP;
 
 import android.annotation.IntDef;
 import android.annotation.Nullable;
@@ -35,7 +35,6 @@ import android.app.backup.BackupDataOutput;
 import android.app.backup.BackupManager;
 import android.app.backup.BackupTransport;
 import android.app.backup.IBackupCallback;
-import android.app.backup.IBackupManager;
 import android.app.backup.IBackupManagerMonitor;
 import android.app.backup.IBackupObserver;
 import android.content.pm.ApplicationInfo;
@@ -55,11 +54,11 @@ import com.android.internal.backup.IBackupTransport;
 import com.android.internal.util.Preconditions;
 import com.android.server.AppWidgetBackupBridge;
 import com.android.server.backup.BackupAgentTimeoutParameters;
-import com.android.server.backup.BackupManagerService;
 import com.android.server.backup.BackupRestoreTask;
 import com.android.server.backup.DataChangedJournal;
 import com.android.server.backup.KeyValueBackupJob;
 import com.android.server.backup.TransportManager;
+import com.android.server.backup.UserBackupManagerService;
 import com.android.server.backup.fullbackup.PerformFullTransportBackupTask;
 import com.android.server.backup.internal.OnTaskFinishedListener;
 import com.android.server.backup.internal.Operation;
@@ -95,12 +94,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>A few definitions:
  *
  * <ul>
- *   <li>State directory: {@link BackupManagerService#getBaseStateDir()}/&lt;transport&gt;
+ *   <li>State directory: {@link UserBackupManagerService#getBaseStateDir()}/&lt;transport&gt;
  *   <li>State file: {@link
- *       BackupManagerService#getBaseStateDir()}/&lt;transport&gt;/&lt;package&gt;<br>
+ *       UserBackupManagerService#getBaseStateDir()}/&lt;transport&gt;/&lt;package&gt;<br>
  *       Represents the state of the backup data for a specific package in the current dataset.
- *   <li>Stage directory: {@link BackupManagerService#getDataDir()}
- *   <li>Stage file: {@link BackupManagerService#getDataDir()}/&lt;package&gt;.data<br>
+ *   <li>Stage directory: {@link UserBackupManagerService#getDataDir()}
+ *   <li>Stage file: {@link UserBackupManagerService#getDataDir()}/&lt;package&gt;.data<br>
  *       Contains staged data that the agents wrote via {@link BackupDataOutput}, to be transmitted
  *       to the transport.
  * </ul>
@@ -112,7 +111,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * of incremental choice. If non-incremental, PM will only be backed-up if specified in the queue,
  * and if it's the case it will be re-positioned at the head of the queue.
  *
- * <p>Before starting, this task will register itself in {@link BackupManagerService} current
+ * <p>Before starting, this task will register itself in {@link UserBackupManagerService} current
  * operations.
  *
  * <p>In summary, this task will for each package:
@@ -121,7 +120,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>Bind to its {@link IBackupAgent}.
  *   <li>Request transport quota and flags.
  *   <li>Call {@link IBackupAgent#doBackup(ParcelFileDescriptor, ParcelFileDescriptor,
- *       ParcelFileDescriptor, long, int, IBackupManager, int)} via {@link RemoteCall} passing the
+ *       ParcelFileDescriptor, long, IBackupCallback, int)} via {@link RemoteCall} passing the
  *       old state file descriptor (read), the backup data file descriptor (write), the new state
  *       file descriptor (write), the quota and the transport flags. This will call {@link
  *       BackupAgent#onBackup(ParcelFileDescriptor, BackupDataOutput, ParcelFileDescriptor)} with
@@ -131,7 +130,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       <ul>
  *         <li>Agent response.
  *         <li>Agent time-out (specified via {@link
- *             BackupManagerService#getAgentTimeoutParameters()}.
+ *             UserBackupManagerService#getAgentTimeoutParameters()}.
  *         <li>External cancellation or thread interrupt.
  *       </ul>
  *   <li>Unbind the agent.
@@ -149,11 +148,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>Mark data-changed for the remaining packages in the queue (skipped packages).
  *   <li>Delete the {@link DataChangedJournal} provided. Note that this should not be the current
  *       journal.
- *   <li>Set {@link BackupManagerService} current token as {@link
+ *   <li>Set {@link UserBackupManagerService} current token as {@link
  *       IBackupTransport#getCurrentRestoreSet()}, if applicable.
  *   <li>Add the transport to the list of transports pending initialization ({@link
- *       BackupManagerService#getPendingInits()}) and kick-off initialization if the transport ever
- *       returned {@link BackupTransport#TRANSPORT_NOT_INITIALIZED}.
+ *       UserBackupManagerService#getPendingInits()}) and kick-off initialization if the transport
+ *       ever returned {@link BackupTransport#TRANSPORT_NOT_INITIALIZED}.
  *   <li>Unregister the task in current operations.
  *   <li>Release the wakelock.
  *   <li>Kick-off {@link PerformFullTransportBackupTask} if a list of full-backup packages was
@@ -174,7 +173,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
     private static final int THREAD_PRIORITY = Process.THREAD_PRIORITY_BACKGROUND;
     private static final AtomicInteger THREAD_COUNT = new AtomicInteger();
     private static final String BLANK_STATE_FILE_NAME = "blank_state";
-    private static final String PM_PACKAGE = BackupManagerService.PACKAGE_MANAGER_SENTINEL;
+    private static final String PM_PACKAGE = UserBackupManagerService.PACKAGE_MANAGER_SENTINEL;
     @VisibleForTesting public static final String STAGING_FILE_SUFFIX = ".data";
     @VisibleForTesting public static final String NEW_STATE_FILE_SUFFIX = ".new";
 
@@ -182,7 +181,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
      * Creates a new {@link KeyValueBackupTask} for key-value backup operation, spins up a new
      * dedicated thread and kicks off the operation in it.
      *
-     * @param backupManagerService The {@link BackupManagerService} system service.
+     * @param backupManagerService The {@link UserBackupManagerService} instance.
      * @param transportClient The {@link TransportClient} that contains the transport used for the
      *     operation.
      * @param transportDirName The value of {@link IBackupTransport#transportDirName()} for the
@@ -201,7 +200,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
      * @return The {@link KeyValueBackupTask} that was started.
      */
     public static KeyValueBackupTask start(
-            BackupManagerService backupManagerService,
+            UserBackupManagerService backupManagerService,
             TransportClient transportClient,
             String transportDirName,
             List<String> queue,
@@ -232,7 +231,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
         return task;
     }
 
-    private final BackupManagerService mBackupManagerService;
+    private final UserBackupManagerService mBackupManagerService;
     private final PackageManager mPackageManager;
     private final TransportManager mTransportManager;
     private final TransportClient mTransportClient;
@@ -242,6 +241,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
     private final boolean mUserInitiated;
     private final boolean mNonIncremental;
     private final int mCurrentOpToken;
+    private final int mUserId;
     private final File mStateDirectory;
     private final File mDataDirectory;
     private final File mBlankStateFile;
@@ -289,7 +289,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
 
     @VisibleForTesting
     public KeyValueBackupTask(
-            BackupManagerService backupManagerService,
+            UserBackupManagerService backupManagerService,
             TransportClient transportClient,
             String transportDirName,
             List<String> queue,
@@ -321,6 +321,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
         mCurrentOpToken = backupManagerService.generateRandomIntegerToken();
         mQueueLock = mBackupManagerService.getQueueLock();
         mBlankStateFile = new File(mStateDirectory, BLANK_STATE_FILE_NAME);
+        mUserId = backupManagerService.getUserId();
     }
 
     private void registerTask() {
@@ -481,14 +482,14 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
         final PackageInfo packageInfo;
         try {
             packageInfo =
-                    mPackageManager.getPackageInfo(
-                            packageName, PackageManager.GET_SIGNING_CERTIFICATES);
+                    mPackageManager.getPackageInfoAsUser(
+                            packageName, PackageManager.GET_SIGNING_CERTIFICATES, mUserId);
         } catch (PackageManager.NameNotFoundException e) {
             mReporter.onAgentUnknown(packageName);
             throw AgentException.permanent(e);
         }
         ApplicationInfo applicationInfo = packageInfo.applicationInfo;
-        if (!AppBackupUtils.appIsEligibleForBackup(applicationInfo, mPackageManager)) {
+        if (!AppBackupUtils.appIsEligibleForBackup(applicationInfo, mUserId)) {
             mReporter.onPackageNotEligibleForBackup(packageName);
             throw AgentException.permanent();
         }
@@ -686,8 +687,12 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
                     ParcelFileDescriptor.open(
                             mNewStateFile, MODE_READ_WRITE | MODE_CREATE | MODE_TRUNCATE);
 
-            if (!SELinux.restorecon(mBackupDataFile)) {
-                mReporter.onRestoreconFailed(mBackupDataFile);
+            // TODO (b/120424138): Remove once the system user is migrated to use the per-user CE
+            // directory. Per-user CE directories are managed by vold.
+            if (mUserId == UserHandle.USER_SYSTEM) {
+                if (!SELinux.restorecon(mBackupDataFile)) {
+                    mReporter.onRestoreconFailed(mBackupDataFile);
+                }
             }
 
             IBackupTransport transport = mTransportClient.connectOrThrow("KVBT.extractAgentData()");
@@ -771,8 +776,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
 
     private void writeWidgetPayloadIfAppropriate(FileDescriptor fd, String pkgName)
             throws IOException {
-        // TODO: http://b/22388012
-        byte[] widgetState = AppWidgetBackupBridge.getWidgetState(pkgName, UserHandle.USER_SYSTEM);
+        byte[] widgetState = AppWidgetBackupBridge.getWidgetState(pkgName, mUserId);
         File widgetFile = new File(mStateDirectory, pkgName + "_widget");
         boolean priorStateExists = widgetFile.exists();
         if (!priorStateExists && widgetState == null) {
@@ -1004,7 +1008,7 @@ public class KeyValueBackupTask implements BackupRestoreTask, Runnable {
             // Use the scheduler's default.
             delay = 0;
         }
-        KeyValueBackupJob.schedule(
+        KeyValueBackupJob.schedule(mBackupManagerService.getUserId(),
                 mBackupManagerService.getContext(), delay, mBackupManagerService.getConstants());
 
         for (String packageName : mOriginalQueue) {

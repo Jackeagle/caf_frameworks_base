@@ -27,6 +27,7 @@ import android.content.Context;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Environment;
 import android.os.SystemProperties;
 import android.util.DisplayMetrics;
@@ -34,7 +35,6 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.UserHandle;
 import android.os.storage.StorageManager;
-import android.text.TextUtils;
 import android.util.Printer;
 import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
@@ -47,6 +47,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.text.Collator;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -465,16 +466,6 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public static final int PRIVATE_FLAG_CANT_SAVE_STATE = 1<<1;
 
     /**
-     * Value for {@link #privateFlags}: Set to true if the application has been
-     * installed using the forward lock option.
-     *
-     * NOTE: DO NOT CHANGE THIS VALUE!  It is saved in packages.xml.
-     *
-     * {@hide}
-     */
-    public static final int PRIVATE_FLAG_FORWARD_LOCK = 1<<2;
-
-    /**
      * Value for {@link #privateFlags}: set to {@code true} if the application
      * is permitted to hold privileged permissions.
      *
@@ -643,6 +634,24 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      */
     public static final int PRIVATE_FLAG_PROFILEABLE_BY_SHELL = 1 << 23;
 
+    /**
+     * Indicates whether this package requires access to non-SDK APIs.
+     * Only system apps and tests are allowed to use this property.
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_HAS_FRAGILE_USER_DATA = 1 << 24;
+
+    /**
+     * Indicates whether this application wants to use the embedded dex in the APK, rather than
+     * extracted or locally compiled variants. This keeps the dex code protected by the APK
+     * signature. Such apps will always run in JIT mode (same when they are first installed), and
+     * the system will never generate ahead-of-time compiled code for them. Depending on the app's
+     * workload, there may be some run time performance change, noteably the cold start time.
+     *
+     * @hide
+     */
+    public static final int PRIVATE_FLAG_USE_EMBEDDED_DEX = 1 << 25;
+
     /** @hide */
     @IntDef(flag = true, prefix = { "PRIVATE_FLAG_" }, value = {
             PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE,
@@ -652,13 +661,13 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             PRIVATE_FLAG_CANT_SAVE_STATE,
             PRIVATE_FLAG_DEFAULT_TO_DEVICE_PROTECTED_STORAGE,
             PRIVATE_FLAG_DIRECT_BOOT_AWARE,
-            PRIVATE_FLAG_FORWARD_LOCK,
             PRIVATE_FLAG_HAS_DOMAIN_URLS,
             PRIVATE_FLAG_HIDDEN,
             PRIVATE_FLAG_INSTANT,
             PRIVATE_FLAG_ISOLATED_SPLIT_LOADING,
             PRIVATE_FLAG_OEM,
             PRIVATE_FLAG_PARTIALLY_DIRECT_BOOT_AWARE,
+            PRIVATE_FLAG_USE_EMBEDDED_DEX,
             PRIVATE_FLAG_PRIVILEGED,
             PRIVATE_FLAG_PRODUCT,
             PRIVATE_FLAG_PRODUCT_SERVICES,
@@ -668,6 +677,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             PRIVATE_FLAG_STATIC_SHARED_LIBRARY,
             PRIVATE_FLAG_VENDOR,
             PRIVATE_FLAG_VIRTUAL_PRELOAD,
+            PRIVATE_FLAG_HAS_FRAGILE_USER_DATA,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ApplicationInfoPrivateFlags {}
@@ -729,6 +739,15 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * @hide
      */
     public float maxAspectRatio;
+
+    /**
+     * Value indicating the minimum aspect ratio the application supports.
+     * <p>
+     * 0 means unset.
+     * @see {@link android.R.attr#minAspectRatio}.
+     * @hide
+     */
+    public float minAspectRatio;
 
     /** @removed */
     @Deprecated
@@ -845,7 +864,17 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * the structure.
      */
     public String[] sharedLibraryFiles;
-    
+
+    /**
+     * List of all shared libraries this application is linked against.  This
+     * field is only set if the {@link PackageManager#GET_SHARED_LIBRARY_FILES
+     * PackageManager.GET_SHARED_LIBRARY_FILES} flag was used when retrieving
+     * the structure.
+     *
+     * {@hide}
+     */
+    public List<SharedLibraryInfo> sharedLibraryInfos;
+
     /**
      * Full path to the default directory assigned to the package for its
      * persistent data.
@@ -1174,6 +1203,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /** @hide */
     public boolean hiddenUntilInstalled;
 
+    /** @hide */
+    public String zygotePreloadName;
+
     /**
      * Represents the default policy. The actual policy used will depend on other properties of
      * the application, e.g. the target SDK version.
@@ -1319,7 +1351,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /** {@hide} */
     public void writeToProto(ProtoOutputStream proto, long fieldId, int dumpFlags) {
         long token = proto.start(fieldId);
-        super.writeToProto(proto, ApplicationInfoProto.PACKAGE);
+        super.writeToProto(proto, ApplicationInfoProto.PACKAGE, dumpFlags);
         proto.write(ApplicationInfoProto.PERMISSION, permission);
         proto.write(ApplicationInfoProto.PROCESS_NAME, processName);
         proto.write(ApplicationInfoProto.UID, uid);
@@ -1448,9 +1480,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             return sCollator.compare(sa.toString(), sb.toString());
         }
 
-        @UnsupportedAppUsage
+        @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
         private final Collator   sCollator = Collator.getInstance();
-        @UnsupportedAppUsage
+        @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
         private PackageManager   mPM;
     }
 
@@ -1491,6 +1523,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         seInfo = orig.seInfo;
         seInfoUser = orig.seInfoUser;
         sharedLibraryFiles = orig.sharedLibraryFiles;
+        sharedLibraryInfos = orig.sharedLibraryInfos;
         dataDir = orig.dataDir;
         deviceProtectedDataDir = orig.deviceProtectedDataDir;
         credentialProtectedDataDir = orig.credentialProtectedDataDir;
@@ -1516,6 +1549,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         compileSdkVersionCodename = orig.compileSdkVersionCodename;
         mHiddenApiPolicy = orig.mHiddenApiPolicy;
         hiddenUntilInstalled = orig.hiddenUntilInstalled;
+        zygotePreloadName = orig.zygotePreloadName;
     }
 
     public String toString() {
@@ -1568,6 +1602,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeString(seInfo);
         dest.writeString(seInfoUser);
         dest.writeStringArray(sharedLibraryFiles);
+        dest.writeTypedList(sharedLibraryInfos);
         dest.writeString(dataDir);
         dest.writeString(deviceProtectedDataDir);
         dest.writeString(credentialProtectedDataDir);
@@ -1593,6 +1628,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeString(appComponentFactory);
         dest.writeInt(mHiddenApiPolicy);
         dest.writeInt(hiddenUntilInstalled ? 1 : 0);
+        dest.writeString(zygotePreloadName);
     }
 
     public static final Parcelable.Creator<ApplicationInfo> CREATOR
@@ -1642,6 +1678,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         seInfo = source.readString();
         seInfoUser = source.readString();
         sharedLibraryFiles = source.readStringArray();
+        sharedLibraryInfos = source.createTypedArrayList(SharedLibraryInfo.CREATOR);
         dataDir = source.readString();
         deviceProtectedDataDir = source.readString();
         credentialProtectedDataDir = source.readString();
@@ -1667,6 +1704,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         appComponentFactory = source.readString();
         mHiddenApiPolicy = source.readInt();
         hiddenUntilInstalled = source.readInt() != 0;
+        zygotePreloadName = source.readString();
     }
 
     /**
@@ -1695,7 +1733,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * 
      * @hide
      */
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public void disableCompatibilityMode() {
         flags |= (FLAG_SUPPORTS_LARGE_SCREENS | FLAG_SUPPORTS_NORMAL_SCREENS |
                 FLAG_SUPPORTS_SMALL_SCREENS | FLAG_RESIZEABLE_FOR_SCREENS |
@@ -1749,6 +1787,17 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         return (privateFlags & PRIVATE_FLAG_USES_NON_SDK_API) != 0;
     }
 
+    /**
+     * Whether an app needs to keep the app data on uninstall.
+     *
+     * @return {@code true} if the app indicates that it needs to keep the app data
+     *
+     * @hide
+     */
+    public boolean hasFragileUserData() {
+        return (privateFlags & PRIVATE_FLAG_HAS_FRAGILE_USER_DATA) != 0;
+    }
+
     private boolean isAllowedToUseHiddenApis() {
         if (isSignedWithPlatformKey()) {
             return true;
@@ -1789,7 +1838,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * is on the package whitelist.
      *
      * @param policy configured policy for this app, or {@link #HIDDEN_API_ENFORCEMENT_DEFAULT}
-     *               if nothing configured.
+     *        if nothing configured.
      * @hide
      */
     public void maybeUpdateHiddenApiEnforcementPolicy(@HiddenApiEnforcementPolicy int policy) {
@@ -1820,7 +1869,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         return pm.getDefaultActivityIcon();
     }
     
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private boolean isPackageUnavailable(PackageManager pm) {
         try {
             return pm.getPackageInfo(packageName, 0) == null;
@@ -1840,7 +1889,15 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         return (privateFlags & ApplicationInfo.PRIVATE_FLAG_DIRECT_BOOT_AWARE) != 0;
     }
 
-    /** @hide */
+    /**
+     * Check whether the application is encryption aware.
+     *
+     * @see #isDirectBootAware()
+     * @see #isPartiallyDirectBootAware()
+     *
+     * @hide
+     */
+    @SystemApi
     public boolean isEncryptionAware() {
         return isDirectBootAware() || isPartiallyDirectBootAware();
     }
@@ -1848,17 +1905,6 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /** @hide */
     public boolean isExternal() {
         return (flags & ApplicationInfo.FLAG_EXTERNAL_STORAGE) != 0;
-    }
-
-    /** @hide */
-    public boolean isExternalAsec() {
-        return TextUtils.isEmpty(volumeUuid) && isExternal();
-    }
-
-    /** @hide */
-    @UnsupportedAppUsage
-    public boolean isForwardLocked() {
-        return (privateFlags & ApplicationInfo.PRIVATE_FLAG_FORWARD_LOCK) != 0;
     }
 
     /**
@@ -1930,6 +1976,11 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /** @hide */
     public boolean isProductServices() {
         return (privateFlags & ApplicationInfo.PRIVATE_FLAG_PRODUCT_SERVICES) != 0;
+    }
+
+    /** @hide */
+    public boolean isEmbeddedDexUsed() {
+        return (privateFlags & PRIVATE_FLAG_USE_EMBEDDED_DEX) != 0;
     }
 
     /**

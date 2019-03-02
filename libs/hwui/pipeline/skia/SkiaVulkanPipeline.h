@@ -19,14 +19,16 @@
 #include "SkiaPipeline.h"
 #include "renderthread/VulkanManager.h"
 
+#include "renderstate/RenderState.h"
+
 namespace android {
 namespace uirenderer {
 namespace skiapipeline {
 
-class SkiaVulkanPipeline : public SkiaPipeline {
+class SkiaVulkanPipeline : public SkiaPipeline, public IGpuContextCallback {
 public:
-    SkiaVulkanPipeline(renderthread::RenderThread& thread);
-    virtual ~SkiaVulkanPipeline() {}
+    explicit SkiaVulkanPipeline(renderthread::RenderThread& thread);
+    virtual ~SkiaVulkanPipeline();
 
     renderthread::MakeCurrentResult makeCurrent() override;
     renderthread::Frame getFrame() override;
@@ -35,10 +37,11 @@ public:
               const Rect& contentDrawBounds, bool opaque, const LightInfo& lightInfo,
               const std::vector<sp<RenderNode> >& renderNodes,
               FrameInfoVisualizer* profiler) override;
+    GrSurfaceOrigin getSurfaceOrigin() override { return kTopLeft_GrSurfaceOrigin; }
     bool swapBuffers(const renderthread::Frame& frame, bool drew, const SkRect& screenDirty,
                      FrameInfo* currentFrameInfo, bool* requireSwap) override;
     DeferredLayerUpdater* createTextureLayer() override;
-    bool setSurface(Surface* window, renderthread::SwapBehavior swapBehavior,
+    bool setSurface(ANativeWindow* surface, renderthread::SwapBehavior swapBehavior,
                     renderthread::ColorMode colorMode) override;
     void onStop() override;
     bool isSurfaceReady() override;
@@ -47,6 +50,9 @@ public:
     static void invokeFunctor(const renderthread::RenderThread& thread, Functor* functor);
     static sk_sp<Bitmap> allocateHardwareBitmap(renderthread::RenderThread& thread,
                                                 SkBitmap& skBitmap);
+
+protected:
+    void onContextDestroyed() override;
 
 private:
     renderthread::VulkanManager& mVkManager;

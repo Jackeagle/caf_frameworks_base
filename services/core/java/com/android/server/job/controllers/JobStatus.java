@@ -33,6 +33,7 @@ import android.text.format.Time;
 import android.util.ArraySet;
 import android.util.Pair;
 import android.util.Slog;
+import android.util.StatsLog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 
@@ -40,6 +41,7 @@ import com.android.server.LocalServices;
 import com.android.server.job.GrantedUriPermissions;
 import com.android.server.job.JobSchedulerInternal;
 import com.android.server.job.JobSchedulerService;
+import com.android.server.job.JobServerProtoEnums;
 import com.android.server.job.JobStatusDumpProto;
 import com.android.server.job.JobStatusShortInfoProto;
 
@@ -76,8 +78,31 @@ public final class JobStatus {
     static final int CONSTRAINT_DEADLINE = 1<<30;
     static final int CONSTRAINT_CONNECTIVITY = 1<<28;
     static final int CONSTRAINT_CONTENT_TRIGGER = 1<<26;
-    static final int CONSTRAINT_DEVICE_NOT_DOZING = 1<<25;
-    static final int CONSTRAINT_BACKGROUND_NOT_RESTRICTED = 1<<22;
+    static final int CONSTRAINT_DEVICE_NOT_DOZING = 1 << 25; // Implicit constraint
+    static final int CONSTRAINT_WITHIN_QUOTA = 1 << 24;      // Implicit constraint
+    static final int CONSTRAINT_BACKGROUND_NOT_RESTRICTED = 1 << 22; // Implicit constraint
+
+    /**
+     * The constraints that we want to log to statsd.
+     *
+     * Constraints that can be inferred from other atoms have been excluded to avoid logging too
+     * much information and to reduce redundancy:
+     *
+     * * CONSTRAINT_CHARGING can be inferred with PluggedStateChanged (Atom #32)
+     * * CONSTRAINT_BATTERY_NOT_LOW can be inferred with BatteryLevelChanged (Atom #30)
+     * * CONSTRAINT_CONNECTIVITY can be partially inferred with ConnectivityStateChanged
+     * (Atom #98) and BatterySaverModeStateChanged (Atom #20).
+     * * CONSTRAINT_DEVICE_NOT_DOZING can be mostly inferred with DeviceIdleModeStateChanged
+     * (Atom #21)
+     * * CONSTRAINT_BACKGROUND_NOT_RESTRICTED can be inferred with BatterySaverModeStateChanged
+     * (Atom #20)
+     */
+    private static final int STATSD_CONSTRAINTS_TO_LOG = CONSTRAINT_CONTENT_TRIGGER
+            | CONSTRAINT_DEADLINE
+            | CONSTRAINT_IDLE
+            | CONSTRAINT_STORAGE_NOT_LOW
+            | CONSTRAINT_TIMING_DELAY
+            | CONSTRAINT_WITHIN_QUOTA;
 
     // Soft override: ignore constraints like time that don't affect API availability
     public static final int OVERRIDE_SOFT = 1;
@@ -192,6 +217,10 @@ public final class JobStatus {
      * Flag for {@link #trackingControllers}: the time controller is currently tracking this job.
      */
     public static final int TRACKING_TIME = 1<<5;
+    /**
+     * Flag for {@link #trackingControllers}: the quota controller is currently tracking this job.
+     */
+    public static final int TRACKING_QUOTA = 1 << 6;
 
     /**
      * Bit mask of controllers that are currently tracking the job.
@@ -290,6 +319,9 @@ public final class JobStatus {
      * implicit constraint must be satisfied.
      */
     private boolean mReadyNotRestrictedInBg;
+
+    /** The job is within its quota based on its standby bucket. */
+    private boolean mReadyWithinQuota;
 
     /** Provide a handle to the service that this job will be run on. */
     public int getServiceToken() {
@@ -675,7 +707,6 @@ public final class JobStatus {
         return baseHeartbeat;
     }
 
-    // Called only by the standby monitoring code
     public void setStandbyBucket(int newBucket) {
         standbyBucket = newBucket;
     }
@@ -876,22 +907,27 @@ public final class JobStatus {
         mPersistedUtcTimes = null;
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setChargingConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_CHARGING, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setBatteryNotLowConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_BATTERY_NOT_LOW, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setStorageNotLowConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_STORAGE_NOT_LOW, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setTimingDelayConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_TIMING_DELAY, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setDeadlineConstraintSatisfied(boolean state) {
         if (setConstraintSatisfied(CONSTRAINT_DEADLINE, state)) {
             // The constraint was changed. Update the ready flag.
@@ -901,18 +937,22 @@ public final class JobStatus {
         return false;
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setIdleConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_IDLE, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setConnectivityConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_CONNECTIVITY, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setContentTriggerConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_CONTENT_TRIGGER, state);
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setDeviceNotDozingConstraintSatisfied(boolean state, boolean whitelisted) {
         dozeWhitelisted = whitelisted;
         if (setConstraintSatisfied(CONSTRAINT_DEVICE_NOT_DOZING, state)) {
@@ -923,6 +963,7 @@ public final class JobStatus {
         return false;
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setBackgroundNotRestrictedConstraintSatisfied(boolean state) {
         if (setConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED, state)) {
             // The constraint was changed. Update the ready flag.
@@ -932,6 +973,17 @@ public final class JobStatus {
         return false;
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
+    boolean setQuotaConstraintSatisfied(boolean state) {
+        if (setConstraintSatisfied(CONSTRAINT_WITHIN_QUOTA, state)) {
+            // The constraint was changed. Update the ready flag.
+            mReadyWithinQuota = state;
+            return true;
+        }
+        return false;
+    }
+
+    /** @return true if the state was changed, false otherwise. */
     boolean setUidActive(final boolean newActiveState) {
         if (newActiveState != uidActive) {
             uidActive = newActiveState;
@@ -940,6 +992,7 @@ public final class JobStatus {
         return false; /* unchanged */
     }
 
+    /** @return true if the constraint was changed, false otherwise. */
     boolean setConstraintSatisfied(int constraint, boolean state) {
         boolean old = (satisfiedConstraints&constraint) != 0;
         if (old == state) {
@@ -947,6 +1000,12 @@ public final class JobStatus {
         }
         satisfiedConstraints = (satisfiedConstraints&~constraint) | (state ? constraint : 0);
         mSatisfiedConstraintsOfInterest = satisfiedConstraints & CONSTRAINTS_OF_INTEREST;
+        if ((STATSD_CONSTRAINTS_TO_LOG & constraint) != 0) {
+            StatsLog.write_non_chained(StatsLog.SCHEDULED_JOB_CONSTRAINT_CHANGED,
+                    sourceUid, null, getBatteryName(), getProtoConstraint(constraint),
+                    state ? StatsLog.SCHEDULED_JOB_CONSTRAINT_CHANGED__STATE__SATISFIED
+                            : StatsLog.SCHEDULED_JOB_CONSTRAINT_CHANGED__STATE__UNSATISFIED);
+        }
         return true;
     }
 
@@ -978,13 +1037,69 @@ public final class JobStatus {
      * @return Whether or not this job is ready to run, based on its requirements.
      */
     public boolean isReady() {
-        // Deadline constraint trumps other constraints (except for periodic jobs where deadline
-        // is an implementation detail. A periodic job should only run if its constraints are
-        // satisfied).
+        return isReady(mSatisfiedConstraintsOfInterest);
+    }
+
+    /**
+     * @return Whether or not this job would be ready to run if it had the specified constraint
+     * granted, based on its requirements.
+     */
+    boolean wouldBeReadyWithConstraint(int constraint) {
+        boolean oldValue = false;
+        int satisfied = mSatisfiedConstraintsOfInterest;
+        switch (constraint) {
+            case CONSTRAINT_BACKGROUND_NOT_RESTRICTED:
+                oldValue = mReadyNotRestrictedInBg;
+                mReadyNotRestrictedInBg = true;
+                break;
+            case CONSTRAINT_DEADLINE:
+                oldValue = mReadyDeadlineSatisfied;
+                mReadyDeadlineSatisfied = true;
+                break;
+            case CONSTRAINT_DEVICE_NOT_DOZING:
+                oldValue = mReadyNotDozing;
+                mReadyNotDozing = true;
+                break;
+            case CONSTRAINT_WITHIN_QUOTA:
+                oldValue = mReadyWithinQuota;
+                mReadyWithinQuota = true;
+                break;
+            default:
+                satisfied |= constraint;
+                break;
+        }
+
+        boolean toReturn = isReady(satisfied);
+
+        switch (constraint) {
+            case CONSTRAINT_BACKGROUND_NOT_RESTRICTED:
+                mReadyNotRestrictedInBg = oldValue;
+                break;
+            case CONSTRAINT_DEADLINE:
+                mReadyDeadlineSatisfied = oldValue;
+                break;
+            case CONSTRAINT_DEVICE_NOT_DOZING:
+                mReadyNotDozing = oldValue;
+                break;
+            case CONSTRAINT_WITHIN_QUOTA:
+                mReadyWithinQuota = oldValue;
+                break;
+        }
+        return toReturn;
+    }
+
+    private boolean isReady(int satisfiedConstraints) {
+        // Quota constraints trumps all other constraints.
+        if (!mReadyWithinQuota) {
+            return false;
+        }
+        // Deadline constraint trumps other constraints besides quota (except for periodic jobs
+        // where deadline is an implementation detail. A periodic job should only run if its
+        // constraints are satisfied).
         // DeviceNotDozing implicit constraint must be satisfied
         // NotRestrictedInBackground implicit constraint must be satisfied
         return mReadyNotDozing && mReadyNotRestrictedInBg && (mReadyDeadlineSatisfied
-                || isConstraintsSatisfied());
+                || isConstraintsSatisfied(satisfiedConstraints));
     }
 
     static final int CONSTRAINTS_OF_INTEREST = CONSTRAINT_CHARGING | CONSTRAINT_BATTERY_NOT_LOW
@@ -1000,12 +1115,16 @@ public final class JobStatus {
      * @return Whether the constraints set on this job are satisfied.
      */
     public boolean isConstraintsSatisfied() {
+        return isConstraintsSatisfied(mSatisfiedConstraintsOfInterest);
+    }
+
+    private boolean isConstraintsSatisfied(int satisfiedConstraints) {
         if (overrideState == OVERRIDE_FULL) {
             // force override: the job is always runnable
             return true;
         }
 
-        int sat = mSatisfiedConstraintsOfInterest;
+        int sat = satisfiedConstraints;
         if (overrideState == OVERRIDE_SOFT) {
             // override: pretend all 'soft' requirements are satisfied
             sat |= (requiredConstraints & SOFT_OVERRIDE_CONSTRAINTS);
@@ -1169,6 +1288,9 @@ public final class JobStatus {
         if ((constraints&CONSTRAINT_BACKGROUND_NOT_RESTRICTED) != 0) {
             pw.print(" BACKGROUND_NOT_RESTRICTED");
         }
+        if ((constraints & CONSTRAINT_WITHIN_QUOTA) != 0) {
+            pw.print(" WITHIN_QUOTA");
+        }
         if (constraints != 0) {
             pw.print(" [0x");
             pw.print(Integer.toHexString(constraints));
@@ -1176,34 +1298,70 @@ public final class JobStatus {
         }
     }
 
+    /** Returns a {@link JobServerProtoEnums.Constraint} enum value for the given constraint. */
+    private int getProtoConstraint(int constraint) {
+        switch (constraint) {
+            case CONSTRAINT_BACKGROUND_NOT_RESTRICTED:
+                return JobServerProtoEnums.CONSTRAINT_BACKGROUND_NOT_RESTRICTED;
+            case CONSTRAINT_BATTERY_NOT_LOW:
+                return JobServerProtoEnums.CONSTRAINT_BATTERY_NOT_LOW;
+            case CONSTRAINT_CHARGING:
+                return JobServerProtoEnums.CONSTRAINT_CHARGING;
+            case CONSTRAINT_CONNECTIVITY:
+                return JobServerProtoEnums.CONSTRAINT_CONNECTIVITY;
+            case CONSTRAINT_CONTENT_TRIGGER:
+                return JobServerProtoEnums.CONSTRAINT_CONTENT_TRIGGER;
+            case CONSTRAINT_DEADLINE:
+                return JobServerProtoEnums.CONSTRAINT_DEADLINE;
+            case CONSTRAINT_DEVICE_NOT_DOZING:
+                return JobServerProtoEnums.CONSTRAINT_DEVICE_NOT_DOZING;
+            case CONSTRAINT_IDLE:
+                return JobServerProtoEnums.CONSTRAINT_IDLE;
+            case CONSTRAINT_STORAGE_NOT_LOW:
+                return JobServerProtoEnums.CONSTRAINT_STORAGE_NOT_LOW;
+            case CONSTRAINT_TIMING_DELAY:
+                return JobServerProtoEnums.CONSTRAINT_TIMING_DELAY;
+            case CONSTRAINT_WITHIN_QUOTA:
+                return JobServerProtoEnums.CONSTRAINT_WITHIN_QUOTA;
+            default:
+                return JobServerProtoEnums.CONSTRAINT_UNKNOWN;
+        }
+    }
+
     /** Writes constraints to the given repeating proto field. */
     void dumpConstraints(ProtoOutputStream proto, long fieldId, int constraints) {
         if ((constraints & CONSTRAINT_CHARGING) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_CHARGING);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_CHARGING);
         }
         if ((constraints & CONSTRAINT_BATTERY_NOT_LOW) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_BATTERY_NOT_LOW);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_BATTERY_NOT_LOW);
         }
         if ((constraints & CONSTRAINT_STORAGE_NOT_LOW) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_STORAGE_NOT_LOW);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_STORAGE_NOT_LOW);
         }
         if ((constraints & CONSTRAINT_TIMING_DELAY) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_TIMING_DELAY);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_TIMING_DELAY);
         }
         if ((constraints & CONSTRAINT_DEADLINE) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_DEADLINE);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_DEADLINE);
         }
         if ((constraints & CONSTRAINT_IDLE) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_IDLE);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_IDLE);
         }
         if ((constraints & CONSTRAINT_CONNECTIVITY) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_CONNECTIVITY);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_CONNECTIVITY);
         }
         if ((constraints & CONSTRAINT_CONTENT_TRIGGER) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_CONTENT_TRIGGER);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_CONTENT_TRIGGER);
         }
         if ((constraints & CONSTRAINT_DEVICE_NOT_DOZING) != 0) {
-            proto.write(fieldId, JobStatusDumpProto.CONSTRAINT_DEVICE_NOT_DOZING);
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_DEVICE_NOT_DOZING);
+        }
+        if ((constraints & CONSTRAINT_WITHIN_QUOTA) != 0) {
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_WITHIN_QUOTA);
+        }
+        if ((constraints & CONSTRAINT_BACKGROUND_NOT_RESTRICTED) != 0) {
+            proto.write(fieldId, JobServerProtoEnums.CONSTRAINT_BACKGROUND_NOT_RESTRICTED);
         }
     }
 
@@ -1237,6 +1395,13 @@ public final class JobStatus {
      * Returns a bucket name based on the normalized bucket indices, not the AppStandby constants.
      */
     String getBucketName() {
+        return bucketName(standbyBucket);
+    }
+
+    /**
+     * Returns a bucket name based on the normalized bucket indices, not the AppStandby constants.
+     */
+    static String bucketName(int standbyBucket) {
         switch (standbyBucket) {
             case 0: return "ACTIVE";
             case 1: return "WORKING_SET";
@@ -1275,7 +1440,8 @@ public final class JobStatus {
                 pw.print(prefix); pw.println("  PERSISTED");
             }
             if (job.getPriority() != 0) {
-                pw.print(prefix); pw.print("  Priority: "); pw.println(job.getPriority());
+                pw.print(prefix); pw.print("  Priority: ");
+                pw.println(JobInfo.getPriorityString(job.getPriority()));
             }
             if (job.getFlags() != 0) {
                 pw.print(prefix); pw.print("  Flags: ");
@@ -1367,13 +1533,17 @@ public final class JobStatus {
             dumpConstraints(pw, satisfiedConstraints);
             pw.println();
             pw.print(prefix); pw.print("Unsatisfied constraints:");
-            dumpConstraints(pw, (requiredConstraints & ~satisfiedConstraints));
+            dumpConstraints(pw,
+                    ((requiredConstraints | CONSTRAINT_WITHIN_QUOTA) & ~satisfiedConstraints));
             pw.println();
             if (dozeWhitelisted) {
                 pw.print(prefix); pw.println("Doze whitelisted: true");
             }
             if (uidActive) {
                 pw.print(prefix); pw.println("Uid: active");
+            }
+            if (job.isExemptedFromAppStandby()) {
+                pw.print(prefix); pw.println("Is exempted from app standby");
             }
         }
         if (trackingControllers != 0) {
@@ -1384,6 +1554,7 @@ public final class JobStatus {
             if ((trackingControllers&TRACKING_IDLE) != 0) pw.print(" IDLE");
             if ((trackingControllers&TRACKING_STORAGE) != 0) pw.print(" STORAGE");
             if ((trackingControllers&TRACKING_TIME) != 0) pw.print(" TIME");
+            if ((trackingControllers & TRACKING_QUOTA) != 0) pw.print(" QUOTA");
             pw.println();
         }
 
@@ -1546,8 +1717,11 @@ public final class JobStatus {
         if (full) {
             dumpConstraints(proto, JobStatusDumpProto.SATISFIED_CONSTRAINTS, satisfiedConstraints);
             dumpConstraints(proto, JobStatusDumpProto.UNSATISFIED_CONSTRAINTS,
-                    (requiredConstraints & ~satisfiedConstraints));
+                    ((requiredConstraints | CONSTRAINT_WITHIN_QUOTA) & ~satisfiedConstraints));
             proto.write(JobStatusDumpProto.IS_DOZE_WHITELISTED, dozeWhitelisted);
+            proto.write(JobStatusDumpProto.IS_UID_ACTIVE, uidActive);
+            proto.write(JobStatusDumpProto.IS_EXEMPTED_FROM_APP_STANDBY,
+                    job.isExemptedFromAppStandby());
         }
 
         // Tracking controllers
@@ -1574,6 +1748,10 @@ public final class JobStatus {
         if ((trackingControllers&TRACKING_TIME) != 0) {
             proto.write(JobStatusDumpProto.TRACKING_CONTROLLERS,
                     JobStatusDumpProto.TRACKING_TIME);
+        }
+        if ((trackingControllers & TRACKING_QUOTA) != 0) {
+            proto.write(JobStatusDumpProto.TRACKING_CONTROLLERS,
+                    JobStatusDumpProto.TRACKING_QUOTA);
         }
 
         // Implicit constraints

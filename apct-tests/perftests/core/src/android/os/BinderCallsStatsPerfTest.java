@@ -18,8 +18,9 @@ package android.os;
 
 import android.perftests.utils.BenchmarkState;
 import android.perftests.utils.PerfStatusReporter;
-import android.support.test.filters.LargeTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.LargeTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.os.BinderCallsStats;
 import com.android.internal.os.BinderInternal.CallSession;
@@ -31,7 +32,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-
 /**
  * Performance tests for {@link BinderCallsStats}
  */
@@ -39,6 +39,7 @@ import org.junit.runner.RunWith;
 @LargeTest
 public class BinderCallsStatsPerfTest {
     private static final int DEFAULT_BUCKET_SIZE = 1000;
+    private static final int WORKSOURCE_UID = 1;
     static class FakeCpuTimeBinderCallsStats extends BinderCallsStats {
         private int mTimeMs;
 
@@ -117,8 +118,8 @@ public class BinderCallsStatsPerfTest {
         Binder b = new Binder();
         while (state.keepRunning()) {
             for (int i = 0; i < 10000; i++) {
-                CallSession s = mBinderCallsStats.callStarted(b, i % maxBucketSize);
-                mBinderCallsStats.callEnded(s, 0, 0);
+                CallSession s = mBinderCallsStats.callStarted(b, i % maxBucketSize, WORKSOURCE_UID);
+                mBinderCallsStats.callEnded(s, 0, 0, WORKSOURCE_UID);
             }
         }
     }

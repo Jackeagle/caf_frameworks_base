@@ -17,6 +17,7 @@
 package com.android.internal.os;
 
 import android.os.SystemProperties;
+import android.sysprop.CryptoProperties;
 
 /**
  * This is a cache of various ro.* properties so that they can be read just once
@@ -29,6 +30,23 @@ public class RoSystemProperties {
             SystemProperties.getInt("ro.factorytest", 0);
     public static final String CONTROL_PRIVAPP_PERMISSIONS =
             SystemProperties.get("ro.control_privapp_permissions");
+
+    // ------ ro.hdmi.* -------- //
+    /**
+     * Property to indicate if a CEC audio device should forward volume keys when system audio
+     * mode is off.
+     */
+    public static final boolean CEC_AUDIO_DEVICE_FORWARD_VOLUME_KEYS_SYSTEM_AUDIO_MODE_OFF =
+            SystemProperties.getBoolean(
+                    "ro.hdmi.cec_audio_device_forward_volume_keys_system_audio_mode_off", false);
+
+    /**
+     * Property to indicate if the current device is a cec switch device.
+     *
+     * <p> Default is false.
+     */
+    public static final String PROPERTY_HDMI_IS_DEVICE_HDMI_CEC_SWITCH =
+            "ro.hdmi.property_is_device_hdmi_cec_switch";
 
     // ------ ro.config.* -------- //
     public static final boolean CONFIG_AVOID_GFX_ACCEL =
@@ -44,7 +62,7 @@ public class RoSystemProperties {
 
     // ------ ro.crypto.* -------- //
     public static final String CRYPTO_STATE = SystemProperties.get("ro.crypto.state");
-    public static final String CRYPTO_TYPE = SystemProperties.get("ro.crypto.type");
+    public static final String CRYPTO_TYPE = CryptoProperties.type().orElse("");
     // These are pseudo-properties
     public static final boolean CRYPTO_ENCRYPTABLE =
             !CRYPTO_STATE.isEmpty() && !"unsupported".equals(CRYPTO_STATE);

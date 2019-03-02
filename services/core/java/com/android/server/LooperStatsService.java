@@ -31,6 +31,7 @@ import android.text.format.DateFormat;
 import android.util.KeyValueListParser;
 import android.util.Slog;
 
+import com.android.internal.os.AppIdToPackageMap;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.CachedDeviceState;
 import com.android.internal.os.LooperStats;
@@ -54,10 +55,11 @@ public class LooperStatsService extends Binder {
             "debug.sys.looper_stats_enabled";
     private static final int DEFAULT_SAMPLING_INTERVAL = 100;
     private static final int DEFAULT_ENTRIES_SIZE_CAP = 2000;
-    private static final boolean DEFAULT_ENABLED = false;
+    private static final boolean DEFAULT_ENABLED = true;
 
     private final Context mContext;
     private final LooperStats mStats;
+    // Default should be false so that the first call to #setEnabled installed the looper observer.
     private boolean mEnabled = false;
 
     private LooperStatsService(Context context, LooperStats stats) {
@@ -92,8 +94,11 @@ public class LooperStatsService extends Binder {
     @Override
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         if (!DumpUtils.checkDumpPermission(mContext, TAG, pw)) return;
+        AppIdToPackageMap packageMap = AppIdToPackageMap.getSnapshot();
         pw.print("Start time: ");
         pw.println(DateFormat.format("yyyy-MM-dd HH:mm:ss", mStats.getStartTimeMillis()));
+        pw.print("On battery time (ms): ");
+        pw.println(mStats.getBatteryTimeMillis());
         final List<LooperStats.ExportedEntry> entries = mStats.getEntries();
         entries.sort(Comparator
                 .comparing((LooperStats.ExportedEntry entry) -> entry.workSourceUid)
@@ -118,8 +123,12 @@ public class LooperStatsService extends Binder {
                 "exception_count"));
         pw.println(header);
         for (LooperStats.ExportedEntry entry : entries) {
+            if (entry.messageName.startsWith(LooperStats.DEBUG_ENTRY_PREFIX)) {
+                // Do not dump debug entries.
+                continue;
+            }
             pw.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
-                    entry.workSourceUid,
+                    packageMap.mapUid(entry.workSourceUid),
                     entry.threadName,
                     entry.handlerClassName,
                     entry.messageName,
@@ -141,6 +150,7 @@ public class LooperStatsService extends Binder {
         if (mEnabled != enabled) {
             mEnabled = enabled;
             mStats.reset();
+            mStats.setAddDebugEntries(enabled);
             Looper.setObserver(enabled ? mStats : null);
         }
     }

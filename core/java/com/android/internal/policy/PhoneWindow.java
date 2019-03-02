@@ -90,6 +90,7 @@ import android.view.ViewParent;
 import android.view.ViewRootImpl;
 import android.view.ViewRootImpl.ActivityConfigCallback;
 import android.view.Window;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -1883,7 +1884,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 // If we have a session send it the volume command, otherwise
                 // use the suggested stream.
                 if (mMediaController != null) {
-                    mMediaController.dispatchVolumeButtonEventAsSystemService(event);
+                    getMediaSessionManager().dispatchVolumeKeyEventAsSystemService(
+                            mMediaController.getSessionToken(), event);
                 } else {
                     getMediaSessionManager().dispatchVolumeKeyEventAsSystemService(event,
                             mVolumeControlStreamType);
@@ -1891,7 +1893,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 return true;
             }
             // These are all the recognized media key codes in
-            // KeyEvent.isMediaKey()
+            // KeyEvent.isMediaSessionKey()
             case KeyEvent.KEYCODE_MEDIA_PLAY:
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
@@ -1904,7 +1906,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             case KeyEvent.KEYCODE_MEDIA_RECORD:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD: {
                 if (mMediaController != null) {
-                    if (mMediaController.dispatchMediaButtonEventAsSystemService(event)) {
+                    if (getMediaSessionManager().dispatchMediaKeyEventAsSystemService(
+                            mMediaController.getSessionToken(), event)) {
                         return true;
                     }
                 }
@@ -1975,7 +1978,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 // If we have a session send it the volume command, otherwise
                 // use the suggested stream.
                 if (mMediaController != null) {
-                    mMediaController.dispatchVolumeButtonEventAsSystemService(event);
+                    getMediaSessionManager().dispatchVolumeKeyEventAsSystemService(
+                            mMediaController.getSessionToken(), event);
                 } else {
                     getMediaSessionManager().dispatchVolumeKeyEventAsSystemService(
                             event, mVolumeControlStreamType);
@@ -1992,7 +1996,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                 return true;
             }
             // These are all the recognized media key codes in
-            // KeyEvent.isMediaKey()
+            // KeyEvent.isMediaSessionKey()
             case KeyEvent.KEYCODE_MEDIA_PLAY:
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
@@ -2005,7 +2009,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             case KeyEvent.KEYCODE_MEDIA_RECORD:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD: {
                 if (mMediaController != null) {
-                    if (mMediaController.dispatchMediaButtonEventAsSystemService(event)) {
+                    if (getMediaSessionManager().dispatchMediaKeyEventAsSystemService(
+                            mMediaController.getSessionToken(), event)) {
                         return true;
                     }
                 }
@@ -3875,5 +3880,10 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         if (mDecor != null) {
             mDecor.updateLogTag(params);
         }
+    }
+
+    @Override
+    public WindowInsetsController getInsetsController() {
+        return mDecor.getWindowInsetsController();
     }
 }

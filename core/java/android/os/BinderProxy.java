@@ -360,6 +360,16 @@ public final class BinderProxy implements IBinder {
     }
 
     /**
+     * Returns the number of binder proxies held in this process.
+     * @return number of binder proxies in this process
+     */
+    public static int getProxyCount() {
+        synchronized (sProxyMap) {
+            return sProxyMap.size();
+        }
+    }
+
+    /**
      * Dump proxy debug information.
      *
      * @hide
@@ -483,8 +493,17 @@ public final class BinderProxy implements IBinder {
         // Make sure the listener won't change while processing a transaction.
         final Binder.ProxyTransactListener transactListener = sTransactListener;
         Object session = null;
+
         if (transactListener != null) {
+            final int origWorkSourceUid = Binder.getCallingWorkSourceUid();
             session = transactListener.onTransactStarted(this, code);
+
+            // Allow the listener to update the work source uid. We need to update the request
+            // header if the uid is updated.
+            final int updatedWorkSourceUid = Binder.getCallingWorkSourceUid();
+            if (origWorkSourceUid != updatedWorkSourceUid) {
+                data.replaceCallingWorkSourceUid(updatedWorkSourceUid);
+            }
         }
 
         try {

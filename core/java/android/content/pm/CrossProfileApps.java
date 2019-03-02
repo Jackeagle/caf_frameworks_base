@@ -16,6 +16,8 @@
 package android.content.pm;
 
 import android.annotation.NonNull;
+import android.annotation.RequiresPermission;
+import android.annotation.SystemApi;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.res.Resources;
@@ -66,7 +68,32 @@ public class CrossProfileApps {
                     mContext.getIApplicationThread(),
                     mContext.getPackageName(),
                     component,
-                    targetUser);
+                    targetUser.getIdentifier(),
+                    true);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Starts the specified activity of the caller package in the specified profile. Unlike
+     * {@link #startMainActivity}, this can start any activity of the caller package, not just
+     * the main activity.
+     * The caller must have the {@link android.Manifest.permission#INTERACT_ACROSS_PROFILES}
+     * permission and both the caller and target user profiles must be in the same profile group.
+     *
+     * @param component The ComponentName of the activity to launch. It must be exported.
+     * @param targetUser The UserHandle of the profile, must be one of the users returned by
+     *        {@link #getTargetUserProfiles()}, otherwise a {@link SecurityException} will
+     *        be thrown.
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_PROFILES)
+    public void startActivity(@NonNull ComponentName component, @NonNull UserHandle targetUser) {
+        try {
+            mService.startActivityAsUser(mContext.getIApplicationThread(),
+                    mContext.getPackageName(), component, targetUser.getIdentifier(), false);
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }

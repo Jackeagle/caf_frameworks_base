@@ -23,9 +23,10 @@ import static org.junit.Assert.assertNull;
 
 import android.content.Context;
 import android.graphics.Typeface;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -133,7 +134,8 @@ public class MeasuredParagraphTest {
     public void buildForStaticLayout() {
         MeasuredParagraph mt = null;
 
-        mt = MeasuredParagraph.buildForStaticLayout(PAINT, "XXX", 0, 3, LTR, false, false, null);
+        mt = MeasuredParagraph.buildForStaticLayout(
+                PAINT, "XXX", 0, 3, LTR, false, false, null /* no hint */, null);
         assertNotNull(mt);
         assertNotNull(mt.getChars());
         assertEquals("XXX", charsToString(mt.getChars()));
@@ -147,8 +149,8 @@ public class MeasuredParagraphTest {
         assertNotNull(mt.getMeasuredText());
 
         // Recycle it
-        MeasuredParagraph mt2 =
-                MeasuredParagraph.buildForStaticLayout(PAINT, "_VVV_", 1, 4, RTL, false, false, mt);
+        MeasuredParagraph mt2 = MeasuredParagraph.buildForStaticLayout(
+                PAINT, "_VVV_", 1, 4, RTL, false, false, null /* no hint */, mt);
         assertEquals(mt2, mt);
         assertNotNull(mt2.getChars());
         assertEquals("VVV", charsToString(mt.getChars()));

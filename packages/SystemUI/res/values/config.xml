@@ -106,12 +106,12 @@
 
     <!-- The default tiles to display in QuickSettings -->
     <string name="quick_settings_tiles_default" translatable="false">
-        wifi,bt,dnd,flashlight,rotation,battery,cell,airplane,cast
+        wifi,bt,dnd,flashlight,rotation,battery,cell,airplane,cast,sensorprivacy
     </string>
 
     <!-- Tiles native to System UI. Order should match "quick_settings_tiles_default" -->
     <string name="quick_settings_tiles_stock" translatable="false">
-        wifi,cell,battery,dnd,flashlight,rotation,bt,airplane,location,hotspot,inversion,saver,work,cast,night
+        wifi,cell,battery,dnd,flashlight,rotation,bt,airplane,location,hotspot,inversion,saver,work,cast,night,sensorprivacy
     </string>
 
     <!-- The tiles to display in QuickSettings -->
@@ -129,11 +129,6 @@
     <integer name="quick_settings_brightness_dialog_short_timeout">2000</integer>
     <integer name="quick_settings_brightness_dialog_long_timeout">4000</integer>
 
-    <!-- Show indicator for Wifi on but not connected. -->
-    <bool name="config_showWifiIndicatorWhenEnabled">false</bool>
-
-    <!-- Whether to show wifi activity indicators in the status bar -->
-    <bool name="config_showWifiActivity">true</bool>
 
     <!-- Whether or not we also show rsrp level for LTE. -->
     <bool name="config_showRsrpSignalLevelforLTE">false</bool>
@@ -146,9 +141,6 @@
 
     <!-- When true, hide no internet statue on signal strength icon -->
     <bool name="config_hideNoInternetState">false</bool>
-
-    <!-- Control whether status bar should fetch mobile signal icons from xml file dynamically -->
-    <bool name="config_read_icons_from_xml">false</bool>
 
     <!-- Should "LTE"/"4G" be shown instead of "LTE+"/"4G+" when on NETWORK_TYPE_LTE_CA? -->
     <bool name="config_hideLtePlus">false</bool>
@@ -311,7 +303,7 @@
 
     <!-- SystemUI Services: The classes of the stuff to start. -->
     <string-array name="config_systemUIServiceComponents" translatable="false">
-        <item>com.android.systemui.Dependency</item>
+        <item>com.android.systemui.Dependency$DependencyCreator</item>
         <item>com.android.systemui.util.NotificationChannels</item>
         <item>com.android.systemui.statusbar.CommandQueue$CommandQueueStart</item>
         <item>com.android.systemui.keyguard.KeyguardViewMediator</item>
@@ -339,7 +331,7 @@
 
     <!-- SystemUI Services (per user): The classes of the stuff to start for each user. This is a subset of the config_systemUIServiceComponents -->
     <string-array name="config_systemUIServiceComponentsPerUser" translatable="false">
-        <item>com.android.systemui.Dependency</item>
+        <item>com.android.systemui.Dependency$DependencyCreator</item>
         <item>com.android.systemui.util.NotificationChannels</item>
     </string-array>
 
@@ -520,6 +512,24 @@
          better (narrower) line-break for a double-line smart reply button. -->
     <integer name="config_smart_replies_in_notifications_max_squeeze_remeasure_attempts">3</integer>
 
+    <!-- Smart replies in notifications: Whether by default tapping on a choice should let the user
+         edit the input before it is sent to the app. Developers can override this via
+         RemoteInput.Builder.setEditChoicesBeforeSending. -->
+    <bool name="config_smart_replies_in_notifications_edit_choices_before_sending">false</bool>
+
+    <!-- Smart replies in notifications: Whether smart suggestions in notifications are enabled in
+         heads-up notifications.  -->
+    <bool name="config_smart_replies_in_notifications_show_in_heads_up">true</bool>
+
+    <!-- Smart replies in notifications: Minimum number of system generated smart replies that
+         should be shown in a notification. If we cannot show at least this many replies we instead
+         show none. -->
+    <integer name="config_smart_replies_in_notifications_min_num_system_generated_replies">0</integer>
+
+    <!-- Smart replies in notifications: Maximum number of smart actions to show in notifications.
+         -->
+    <integer name="config_smart_replies_in_notifications_max_num_actions">-1</integer>
+
     <!-- Screenshot editing default activity.  Must handle ACTION_EDIT image/png intents.
          Blank sends the user to the Chooser first.
          This name is in the ComponentName flattened format (package/class)  -->
@@ -538,4 +548,6 @@
     <string-array name="config_pluginWhitelist" translatable="false">
         <item>com.android.systemui</item>
     </string-array>
+
+    <integer name="ongoing_appops_dialog_max_apps">5</integer>
 </resources>

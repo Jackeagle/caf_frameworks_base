@@ -25,6 +25,8 @@ import android.annotation.Size;
 import android.annotation.SuppressAutoDoc;
 import android.util.Pair;
 
+import libcore.util.NativeAllocationRegistry;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -198,6 +200,9 @@ public abstract class ColorSpace {
     private static final float[] SRGB_PRIMARIES = { 0.640f, 0.330f, 0.300f, 0.600f, 0.150f, 0.060f };
     private static final float[] NTSC_1953_PRIMARIES = { 0.67f, 0.33f, 0.21f, 0.71f, 0.14f, 0.08f };
     private static final float[] ILLUMINANT_D50_XYZ = { 0.964212f, 1.0f, 0.825188f };
+
+    private static final Rgb.TransferParameters SRGB_TRANSFER_PARAMETERS =
+            new Rgb.TransferParameters(1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4);
 
     // See static initialization block next to #get(Named)
     private static final ColorSpace[] sNamedColorSpaces = new ColorSpace[Named.values().length];
@@ -984,11 +989,12 @@ public abstract class ColorSpace {
      *         {@link Named#SRGB sRGB} primaries.
      *     </li>
      *     <li>
-     *         Its white point is withing 1e-3 of the CIE standard
+     *         Its white point is within 1e-3 of the CIE standard
      *         illuminant {@link #ILLUMINANT_D65 D65}.
      *     </li>
      *     <li>Its opto-electronic transfer function is not linear.</li>
      *     <li>Its electro-optical transfer function is not linear.</li>
+     *     <li>Its transfer functions yield values within 1e-3 of {@link Named#SRGB}.</li>
      *     <li>Its range is \([0..1]\).</li>
      * </ul>
      * <p>This method always returns true for {@link Named#SRGB}.</p>
@@ -1340,6 +1346,26 @@ public abstract class ColorSpace {
     }
 
     /**
+     * Helper method for creating native SkColorSpace.
+     *
+     * This essentially calls adapt on a ColorSpace that has not been fully
+     * created. It also does not fully create the adapted ColorSpace, but
+     * just returns the transform.
+     */
+    @NonNull @Size(9)
+    private static float[] adaptToIlluminantD50(
+            @NonNull @Size(2) float[] origWhitePoint,
+            @NonNull @Size(9) float[] origTransform) {
+        float[] desired = ILLUMINANT_D50;
+        if (compare(origWhitePoint, desired)) return origTransform;
+
+        float[] xyz = xyYToXyz(desired);
+        float[] adaptationTransform = chromaticAdaptation(Adaptation.BRADFORD.mTransform,
+                    xyYToXyz(origWhitePoint), xyz);
+        return mul3x3(adaptationTransform, origTransform);
+    }
+
+    /**
      * <p>Returns an instance of {@link ColorSpace} whose ID matches the
      * specified ID.</p>
      *
@@ -1354,9 +1380,9 @@ public abstract class ColorSpace {
      */
     @NonNull
     static ColorSpace get(@IntRange(from = MIN_ID, to = MAX_ID) int index) {
-        if (index < 0 || index > Named.values().length) {
+        if (index < 0 || index >= Named.values().length) {
             throw new IllegalArgumentException("Invalid ID, must be in the range [0.." +
-                    Named.values().length + "]");
+                    Named.values().length + ")");
         }
         return sNamedColorSpaces[index];
     }
@@ -1430,7 +1456,7 @@ public abstract class ColorSpace {
                 "sRGB IEC61966-2.1",
                 SRGB_PRIMARIES,
                 ILLUMINANT_D65,
-                new Rgb.TransferParameters(1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4),
+                SRGB_TRANSFER_PARAMETERS,
                 Named.SRGB.ordinal()
         );
         sNamedColorSpaces[Named.LINEAR_SRGB.ordinal()] = new ColorSpace.Rgb(
@@ -1445,9 +1471,11 @@ public abstract class ColorSpace {
                 "scRGB-nl IEC 61966-2-2:2003",
                 SRGB_PRIMARIES,
                 ILLUMINANT_D65,
+                null,
                 x -> absRcpResponse(x, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4),
                 x -> absResponse(x, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4),
                 -0.799f, 2.399f,
+                null, // FIXME: Use SRGB_TRANSFER_PARAMETERS
                 Named.EXTENDED_SRGB.ordinal()
         );
         sNamedColorSpaces[Named.LINEAR_EXTENDED_SRGB.ordinal()] = new ColorSpace.Rgb(
@@ -1484,7 +1512,7 @@ public abstract class ColorSpace {
                 "Display P3",
                 new float[] { 0.680f, 0.320f, 0.265f, 0.690f, 0.150f, 0.060f },
                 ILLUMINANT_D65,
-                new Rgb.TransferParameters(1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045, 2.4),
+                SRGB_TRANSFER_PARAMETERS,
                 Named.DISPLAY_P3.ordinal()
         );
         sNamedColorSpaces[Named.NTSC_1953.ordinal()] = new ColorSpace.Rgb(
@@ -1660,10 +1688,12 @@ public abstract class ColorSpace {
      * @param rhs 3x3 matrix, as a non-null array of 9 floats
      * @return A new array of 9 floats containing the result of the multiplication
      *         of rhs by lhs
+     *
+     * @hide
      */
     @NonNull
     @Size(9)
-    private static float[] mul3x3(@NonNull @Size(9) float[] lhs, @NonNull @Size(9) float[] rhs) {
+    public static float[] mul3x3(@NonNull @Size(9) float[] lhs, @NonNull @Size(9) float[] rhs) {
         float[] r = new float[9];
         r[0] = lhs[0] * rhs[0] + lhs[3] * rhs[1] + lhs[6] * rhs[2];
         r[1] = lhs[1] * rhs[0] + lhs[4] * rhs[1] + lhs[7] * rhs[2];
@@ -1776,6 +1806,74 @@ public abstract class ColorSpace {
         // LMS is a diagonal matrix stored as a float[3]
         float[] LMS = { dstLMS[0] / srcLMS[0], dstLMS[1] / srcLMS[1], dstLMS[2] / srcLMS[2] };
         return mul3x3(inverse3x3(matrix), mul3x3Diag(LMS, matrix));
+    }
+
+    /**
+     * <p>Computes the chromaticity coordinates of a CIE series D illuminant
+     * from the specified correlated color temperature (CCT). The specified CCT
+     * must be greater than 0. A meaningful CCT range is [4000, 25000].</p>
+     *
+     * <p>The transform is computed using the methods referred to in Kang et
+     * al., <i>Design of Advanced Color - Temperature Control System for HDTV
+     * Applications</i>, Journal of Korean Physical Society 41, 865-871
+     * (2002).</p>
+     *
+     * @param cct The correlated color temperature, in Kelvin
+     * @return Corresponding XYZ values
+     * @throws IllegalArgumentException If cct is invalid
+     *
+     * @hide
+     */
+    @NonNull
+    @Size(3)
+    public static float[] cctToIlluminantdXyz(@IntRange(from = 1) int cct) {
+        if (cct < 1) {
+            throw new IllegalArgumentException("Temperature must be greater than 0");
+        }
+
+        final float icct = 1.0f / cct;
+        final float icct2 = icct * icct;
+        final float x = cct <= 7000.0f ?
+            0.244063f + 0.09911e3f * icct + 2.9678e6f * icct2 - 4.6070e9f * icct2 * icct :
+            0.237040f + 0.24748e3f * icct + 1.9018e6f * icct2 - 2.0064e9f * icct2 * icct;
+        final float y = -3.0f * x * x + 2.87f * x - 0.275f;
+        return xyYToXyz(new float[] {x, y});
+    }
+
+    /**
+     * <p>Computes the chromatic adaptation transform from the specified
+     * source white point to the specified destination white point.</p>
+     *
+     * <p>The transform is computed using the von Kries method, described
+     * in more details in the documentation of {@link Adaptation}. The
+     * {@link Adaptation} enum provides different matrices that can be
+     * used to perform the adaptation.</p>
+     *
+     * @param adaptation The adaptation method
+     * @param srcWhitePoint The white point to adapt from
+     * @param dstWhitePoint The white point to adapt to
+     * @return A 3x3 matrix as a non-null array of 9 floats
+     *
+     * @hide
+     */
+    @NonNull
+    @Size(9)
+    public static float[] chromaticAdaptation(@NonNull Adaptation adaptation,
+            @NonNull @Size(min = 2, max = 3) float[] srcWhitePoint,
+            @NonNull @Size(min = 2, max = 3) float[] dstWhitePoint) {
+        float[] srcXyz = srcWhitePoint.length == 3 ?
+            Arrays.copyOf(srcWhitePoint, 3) : xyYToXyz(srcWhitePoint);
+        float[] dstXyz = dstWhitePoint.length == 3 ?
+            Arrays.copyOf(dstWhitePoint, 3) : xyYToXyz(dstWhitePoint);
+
+        if (compare(srcXyz, dstXyz)) {
+            return new float[] {
+                1.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f,
+                0.0f, 0.0f, 1.0f
+            };
+        }
+        return chromaticAdaptation(adaptation.mTransform, srcXyz, dstXyz);
     }
 
     /**
@@ -1897,6 +1995,15 @@ public abstract class ColorSpace {
         private static float clamp(float x, float min, float max) {
             return x < min ? min : x > max ? max : x;
         }
+    }
+
+    /**
+     * Retrieve the native SkColorSpace object for passing to native.
+     *
+     * Only valid on ColorSpace.Rgb.
+     */
+    long getNativeInstance() {
+        throw new IllegalArgumentException("colorSpace must be an RGB color space");
     }
 
     /**
@@ -2202,7 +2309,22 @@ public abstract class ColorSpace {
         private final boolean mIsWideGamut;
         private final boolean mIsSrgb;
 
-        @Nullable private TransferParameters mTransferParameters;
+        @Nullable private final TransferParameters mTransferParameters;
+        private final long mNativePtr;
+
+        @Override
+        long getNativeInstance() {
+            if (mNativePtr == 0) {
+                // If this object has TransferParameters, it must have a native object.
+                throw new IllegalArgumentException("ColorSpace must use an ICC "
+                        + "parametric transfer function! used " + this);
+            }
+            return mNativePtr;
+        }
+
+        private static native long nativeGetNativeFinalizer();
+        private static native long nativeCreate(float a, float b, float c, float d,
+                float e, float f, float g, float[] xyz);
 
         /**
          * <p>Creates a new RGB color space using a 3x3 column-major transform matrix.
@@ -2231,8 +2353,8 @@ public abstract class ColorSpace {
                 @NonNull @Size(9) float[] toXYZ,
                 @NonNull DoubleUnaryOperator oetf,
                 @NonNull DoubleUnaryOperator eotf) {
-            this(name, computePrimaries(toXYZ), computeWhitePoint(toXYZ),
-                    oetf, eotf, 0.0f, 1.0f, MIN_ID);
+            this(name, computePrimaries(toXYZ), computeWhitePoint(toXYZ), null,
+                    oetf, eotf, 0.0f, 1.0f, null, MIN_ID);
         }
 
         /**
@@ -2282,7 +2404,7 @@ public abstract class ColorSpace {
                 @NonNull DoubleUnaryOperator eotf,
                 float min,
                 float max) {
-            this(name, primaries, whitePoint, oetf, eotf, min, max, MIN_ID);
+            this(name, primaries, whitePoint, null, oetf, eotf, min, max, null, MIN_ID);
         }
 
         /**
@@ -2392,7 +2514,7 @@ public abstract class ColorSpace {
                 @NonNull @Size(min = 2, max = 3) float[] whitePoint,
                 @NonNull TransferParameters function,
                 @IntRange(from = MIN_ID, to = MAX_ID) int id) {
-            this(name, primaries, whitePoint,
+            this(name, primaries, whitePoint, null,
                     function.e == 0.0 && function.f == 0.0 ?
                             x -> rcpResponse(x, function.a, function.b,
                                     function.c, function.d, function.g) :
@@ -2403,8 +2525,7 @@ public abstract class ColorSpace {
                                     function.c, function.d, function.g) :
                             x -> response(x, function.a, function.b, function.c,
                                     function.d, function.e, function.f, function.g),
-                    0.0f, 1.0f, id);
-            mTransferParameters = function;
+                    0.0f, 1.0f, function, id);
         }
 
         /**
@@ -2519,13 +2640,12 @@ public abstract class ColorSpace {
                 float min,
                 float max,
                 @IntRange(from = MIN_ID, to = MAX_ID) int id) {
-            this(name, primaries, whitePoint,
+            this(name, primaries, whitePoint, null,
                     gamma == 1.0 ? DoubleUnaryOperator.identity() :
                             x -> Math.pow(x < 0.0 ? 0.0 : x, 1 / gamma),
                     gamma == 1.0 ? DoubleUnaryOperator.identity() :
                             x -> Math.pow(x < 0.0 ? 0.0 : x, gamma),
-                    min, max, id);
-            mTransferParameters = new TransferParameters(1.0, 0.0, 0.0, 0.0, gamma);
+                    min, max, new TransferParameters(1.0, 0.0, 0.0, 0.0, gamma), id);
         }
 
         /**
@@ -2548,10 +2668,13 @@ public abstract class ColorSpace {
          * @param name Name of the color space, cannot be null, its length must be >= 1
          * @param primaries RGB primaries as an array of 6 (xy) or 9 (XYZ) floats
          * @param whitePoint Reference white as an array of 2 (xy) or 3 (XYZ) floats
+         * @param transform Computed transform matrix that converts from RGB to XYZ, or
+         *      {@code null} to compute it from {@code primaries} and {@code whitePoint}.
          * @param oetf Opto-electronic transfer function, cannot be null
          * @param eotf Electro-optical transfer function, cannot be null
          * @param min The minimum valid value in this color space's RGB range
          * @param max The maximum valid value in this color space's RGB range
+         * @param transferParameters Parameters for the transfer functions
          * @param id ID of this color space as an integer between {@link #MIN_ID} and {@link #MAX_ID}
          *
          * @throws IllegalArgumentException If any of the following conditions is met:
@@ -2570,10 +2693,12 @@ public abstract class ColorSpace {
                 @NonNull @Size(min = 1) String name,
                 @NonNull @Size(min = 6, max = 9) float[] primaries,
                 @NonNull @Size(min = 2, max = 3) float[] whitePoint,
+                @Nullable @Size(9) float[] transform,
                 @NonNull DoubleUnaryOperator oetf,
                 @NonNull DoubleUnaryOperator eotf,
                 float min,
                 float max,
+                @Nullable TransferParameters transferParameters,
                 @IntRange(from = MIN_ID, to = MAX_ID) int id) {
 
             super(name, Model.RGB, id);
@@ -2601,7 +2726,15 @@ public abstract class ColorSpace {
             mWhitePoint = xyWhitePoint(whitePoint);
             mPrimaries =  xyPrimaries(primaries);
 
-            mTransform = computeXYZMatrix(mPrimaries, mWhitePoint);
+            if (transform == null) {
+                mTransform = computeXYZMatrix(mPrimaries, mWhitePoint);
+            } else {
+                if (transform.length != 9) {
+                    throw new IllegalArgumentException("Transform must have 9 entries! Has "
+                            + transform.length);
+                }
+                mTransform = transform;
+            }
             mInverseTransform = inverse3x3(mTransform);
 
             mOetf = oetf;
@@ -2614,10 +2747,39 @@ public abstract class ColorSpace {
             mClampedOetf = oetf.andThen(clamp);
             mClampedEotf = clamp.andThen(eotf);
 
+            mTransferParameters = transferParameters;
+
             // A color space is wide-gamut if its area is >90% of NTSC 1953 and
             // if it entirely contains the Color space definition in xyY
             mIsWideGamut = isWideGamut(mPrimaries, min, max);
             mIsSrgb = isSrgb(mPrimaries, mWhitePoint, oetf, eotf, min, max, id);
+
+            if (mTransferParameters != null) {
+                if (mWhitePoint == null || mTransform == null) {
+                    throw new IllegalStateException(
+                            "ColorSpace (" + this + ") cannot create native object! mWhitePoint: "
+                            + mWhitePoint + " mTransform: " + mTransform);
+                }
+
+                // This mimics the old code that was in native.
+                float[] nativeTransform = adaptToIlluminantD50(mWhitePoint, mTransform);
+                mNativePtr = nativeCreate((float) mTransferParameters.a,
+                                          (float) mTransferParameters.b,
+                                          (float) mTransferParameters.c,
+                                          (float) mTransferParameters.d,
+                                          (float) mTransferParameters.e,
+                                          (float) mTransferParameters.f,
+                                          (float) mTransferParameters.g,
+                                          nativeTransform);
+                NoImagePreloadHolder.sRegistry.registerNativeAllocation(this, mNativePtr);
+            } else {
+                mNativePtr = 0;
+            }
+        }
+
+        private static class NoImagePreloadHolder {
+            public static final NativeAllocationRegistry sRegistry = new NativeAllocationRegistry(
+                ColorSpace.Rgb.class.getClassLoader(), nativeGetNativeFinalizer(), 0);
         }
 
         /**
@@ -2628,27 +2790,9 @@ public abstract class ColorSpace {
         private Rgb(Rgb colorSpace,
                 @NonNull @Size(9) float[] transform,
                 @NonNull @Size(min = 2, max = 3) float[] whitePoint) {
-            super(colorSpace.getName(), Model.RGB, -1);
-
-            mWhitePoint = xyWhitePoint(whitePoint);
-            mPrimaries = colorSpace.mPrimaries;
-
-            mTransform = transform;
-            mInverseTransform = inverse3x3(transform);
-
-            mMin = colorSpace.mMin;
-            mMax = colorSpace.mMax;
-
-            mOetf = colorSpace.mOetf;
-            mEotf = colorSpace.mEotf;
-
-            mClampedOetf = colorSpace.mClampedOetf;
-            mClampedEotf = colorSpace.mClampedEotf;
-
-            mIsWideGamut = colorSpace.mIsWideGamut;
-            mIsSrgb = colorSpace.mIsSrgb;
-
-            mTransferParameters = colorSpace.mTransferParameters;
+            this(colorSpace.getName(), colorSpace.mPrimaries, whitePoint, transform,
+                    colorSpace.mOetf, colorSpace.mEotf, colorSpace.mMin, colorSpace.mMax,
+                    colorSpace.mTransferParameters, MIN_ID);
         }
 
         /**
@@ -3081,17 +3225,33 @@ public abstract class ColorSpace {
                 float max,
                 @IntRange(from = MIN_ID, to = MAX_ID) int id) {
             if (id == 0) return true;
-            if (!compare(primaries, SRGB_PRIMARIES)) {
+            if (!ColorSpace.compare(primaries, SRGB_PRIMARIES)) {
                 return false;
             }
-            if (!compare(whitePoint, ILLUMINANT_D65)) {
+            if (!ColorSpace.compare(whitePoint, ILLUMINANT_D65)) {
                 return false;
             }
-            if (OETF.applyAsDouble(0.5) < 0.5001) return false;
-            if (EOTF.applyAsDouble(0.5) > 0.5001) return false;
+
             if (min != 0.0f) return false;
             if (max != 1.0f) return false;
+
+            // We would have already returned true if this was SRGB itself, so
+            // it is safe to reference it here.
+            ColorSpace.Rgb srgb = (ColorSpace.Rgb) get(Named.SRGB);
+
+            for (double x = 0.0; x <= 1.0; x += 1 / 255.0) {
+                if (!compare(x, OETF, srgb.mOetf)) return false;
+                if (!compare(x, EOTF, srgb.mEotf)) return false;
+            }
+
             return true;
+        }
+
+        private static boolean compare(double point, @NonNull DoubleUnaryOperator a,
+                @NonNull DoubleUnaryOperator b) {
+            double rA = a.applyAsDouble(point);
+            double rB = b.applyAsDouble(point);
+            return Math.abs(rA - rB) <= 1e-3;
         }
 
         /**

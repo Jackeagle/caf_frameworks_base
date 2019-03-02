@@ -36,6 +36,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.graphics.ColorSpace;
 import android.graphics.Point;
 import android.hardware.SensorManager;
 import android.hardware.display.AmbientBrightnessDayStats;
@@ -46,6 +47,8 @@ import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.DisplayManagerInternal.DisplayTransactionListener;
 import android.hardware.display.DisplayViewport;
+import android.hardware.display.DisplayedContentSample;
+import android.hardware.display.DisplayedContentSamplingAttributes;
 import android.hardware.display.IDisplayManager;
 import android.hardware.display.IDisplayManagerCallback;
 import android.hardware.display.IVirtualDisplayCallback;
@@ -91,6 +94,7 @@ import com.android.server.DisplayThread;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.UiThread;
+import com.android.server.display.ColorDisplayService.ColorDisplayServiceInternal;
 import com.android.server.wm.SurfaceAnimationThread;
 import com.android.server.wm.WindowManagerInternal;
 
@@ -248,9 +252,6 @@ public final class DisplayManagerService extends SystemService {
     // device).
     private Point mStableDisplaySize = new Point();
 
-    // Whether the system has finished booting or not.
-    private boolean mSystemReady;
-
     // The top inset of the default display.
     // This gets persisted so that the boot animation knows how to transition from the display's
     // full size to the size configured by the user. Right now we only persist and animate the top
@@ -295,6 +296,7 @@ public final class DisplayManagerService extends SystemService {
     // is rejected by the system.
     private final Curve mMinimumBrightnessCurve;
     private final Spline mMinimumBrightnessSpline;
+    private final ColorSpace mWideColorSpace;
 
     public DisplayManagerService(Context context) {
         this(context, new Injector());
@@ -323,8 +325,8 @@ public final class DisplayManagerService extends SystemService {
         PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
         mGlobalDisplayBrightness = pm.getDefaultScreenBrightnessSetting();
         mCurrentUserId = UserHandle.USER_SYSTEM;
-
-        mSystemReady = false;
+        ColorSpace[] colorSpaces = SurfaceControl.getCompositionColorSpaces();
+        mWideColorSpace = colorSpaces[1];
     }
 
     public void setupSchedulerPolicies() {
@@ -414,10 +416,6 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             mSafeMode = safeMode;
             mOnlyCore = onlyCore;
-            mSystemReady = true;
-            // Just in case the top inset changed before the system was ready. At this point, any
-            // relevant configuration should be in place.
-            recordTopInsetLocked(mLogicalDisplays.get(Display.DEFAULT_DISPLAY));
         }
 
         mHandler.sendEmptyMessage(MSG_REGISTER_ADDITIONAL_DISPLAY_ADAPTERS);
@@ -507,7 +505,7 @@ public final class DisplayManagerService extends SystemService {
 
         // List is self-synchronized copy-on-write.
         for (DisplayTransactionListener listener : mDisplayTransactionListeners) {
-            listener.onDisplayTransaction();
+            listener.onDisplayTransaction(t);
         }
     }
 
@@ -732,27 +730,6 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private void setSaturationLevelInternal(float level) {
-        if (level < 0 || level > 1) {
-            throw new IllegalArgumentException("Saturation level must be between 0 and 1");
-        }
-        float[] matrix = (level == 1.0f ? null : computeSaturationMatrix(level));
-        DisplayTransformManager dtm = LocalServices.getService(DisplayTransformManager.class);
-        dtm.setColorMatrix(DisplayTransformManager.LEVEL_COLOR_MATRIX_SATURATION, matrix);
-    }
-
-    private static float[] computeSaturationMatrix(float saturation) {
-        float desaturation = 1.0f - saturation;
-        float[] luminance = {0.231f * desaturation, 0.715f * desaturation, 0.072f * desaturation};
-        float[] matrix = {
-            luminance[0] + saturation, luminance[0], luminance[0], 0,
-            luminance[1], luminance[1] + saturation, luminance[1], 0,
-            luminance[2], luminance[2], luminance[2] + saturation, 0,
-            0, 0, 0, 1
-        };
-        return matrix;
-    }
-
     private int createVirtualDisplayInternal(IVirtualDisplayCallback callback,
             IMediaProjection projection, int callingUid, String packageName, String name, int width,
             int height, int densityDpi, Surface surface, int flags, String uniqueId) {
@@ -817,6 +794,16 @@ public final class DisplayManagerService extends SystemService {
             if (device != null) {
                 handleDisplayDeviceRemovedLocked(device);
             }
+        }
+    }
+
+    private void setVirtualDisplayStateInternal(IBinder appToken, boolean isOn) {
+        synchronized (mSyncRoot) {
+            if (mVirtualDisplayAdapter == null) {
+                return;
+            }
+
+            mVirtualDisplayAdapter.setVirtualDisplayStateLocked(appToken, isOn);
         }
     }
 
@@ -1075,10 +1062,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void recordTopInsetLocked(@Nullable LogicalDisplay d) {
-        // We must only persist the inset after boot has completed, otherwise we will end up
-        // overwriting the persisted value before the masking flag has been loaded from the
-        // resource overlay.
-        if (!mSystemReady || d == null) {
+        if (d == null) {
             return;
         }
         int topInset = d.getInsets().top;
@@ -1101,6 +1085,10 @@ public final class DisplayManagerService extends SystemService {
     @VisibleForTesting
     Curve getMinimumBrightnessCurveInternal() {
         return mMinimumBrightnessCurve;
+    }
+
+    int getPreferredWideGamutColorSpaceIdInternal() {
+        return mWideColorSpace.getId();
     }
 
     private void setBrightnessConfigurationForUserInternal(
@@ -1263,6 +1251,61 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
+    @Nullable
+    private IBinder getDisplayToken(int displayId) {
+        synchronized (mSyncRoot) {
+            final LogicalDisplay display = mLogicalDisplays.get(displayId);
+            if (display != null) {
+                final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
+                if (device != null) {
+                    return device.getDisplayTokenLocked();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean screenshotInternal(int displayId, Surface outSurface) {
+        final IBinder token = getDisplayToken(displayId);
+        if (token == null) {
+            return false;
+        }
+        SurfaceControl.screenshot(token, outSurface);
+        return true;
+    }
+
+    @VisibleForTesting
+    DisplayedContentSamplingAttributes getDisplayedContentSamplingAttributesInternal(
+            int displayId) {
+        final IBinder token = getDisplayToken(displayId);
+        if (token == null) {
+            return null;
+        }
+        return SurfaceControl.getDisplayedContentSamplingAttributes(token);
+    }
+
+    @VisibleForTesting
+    boolean setDisplayedContentSamplingEnabledInternal(
+            int displayId, boolean enable, int componentMask, int maxFrames) {
+        final IBinder token = getDisplayToken(displayId);
+        if (token == null) {
+            return false;
+        }
+        return SurfaceControl.setDisplayedContentSamplingEnabled(
+                token, enable, componentMask, maxFrames);
+    }
+
+    @VisibleForTesting
+    DisplayedContentSample getDisplayedContentSampleInternal(int displayId,
+            long maxFrames, long timestamp) {
+        final IBinder token = getDisplayToken(displayId);
+        if (token == null) {
+            return null;
+        }
+        return SurfaceControl.getDisplayedContentSample(token, maxFrames, timestamp);
+    }
+
     private void clearViewportsLocked() {
         mViewports.clear();
     }
@@ -1293,58 +1336,21 @@ public final class DisplayManagerService extends SystemService {
             return;
         }
         display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
-
+        final int viewportType;
         // Update the corresponding viewport.
-        DisplayViewport internalViewport = getInternalViewportLocked();
         if ((info.flags & DisplayDeviceInfo.FLAG_DEFAULT_DISPLAY) != 0) {
-            populateViewportLocked(internalViewport, display, device);
-        }
-        DisplayViewport externalViewport = getExternalViewportLocked();
-        if (info.touch == DisplayDeviceInfo.TOUCH_EXTERNAL) {
-            populateViewportLocked(externalViewport, display, device);
-        } else if (!externalViewport.valid) {
-            // TODO (b/116850516) move this logic into InputReader
-            externalViewport.copyFrom(internalViewport);
-            externalViewport.type = DisplayViewport.VIEWPORT_EXTERNAL;
-        }
-
-        if (info.touch == DisplayDeviceInfo.TOUCH_VIRTUAL && !TextUtils.isEmpty(info.uniqueId)) {
-            final DisplayViewport viewport = getVirtualViewportLocked(info.uniqueId);
-            populateViewportLocked(viewport, display, device);
-        }
-    }
-
-    /** Get the virtual device viewport that has the specified uniqueId.
-     * If such viewport does not exist, create it. */
-    private DisplayViewport getVirtualViewportLocked(@NonNull String uniqueId) {
-        DisplayViewport viewport;
-        final int count = mViewports.size();
-        for (int i = 0; i < count; i++) {
-            viewport = mViewports.get(i);
-            if (uniqueId.equals(viewport.uniqueId)) {
-                if (viewport.type != VIEWPORT_VIRTUAL) {
-                    Slog.wtf(TAG, "Found a viewport with uniqueId '"  + uniqueId
-                            + "' but it has type " + DisplayViewport.typeToString(viewport.type)
-                            + " (expected VIRTUAL)");
-                    continue;
-                }
-                return viewport;
-            }
+            viewportType = VIEWPORT_INTERNAL;
+        } else if (info.touch == DisplayDeviceInfo.TOUCH_EXTERNAL) {
+            viewportType = VIEWPORT_EXTERNAL;
+        } else if (info.touch == DisplayDeviceInfo.TOUCH_VIRTUAL
+                && !TextUtils.isEmpty(info.uniqueId)) {
+            viewportType = VIEWPORT_VIRTUAL;
+        } else {
+            Slog.wtf(TAG, "Unable to populate viewport for display device: " + info);
+            return;
         }
 
-        viewport = new DisplayViewport();
-        viewport.uniqueId = uniqueId;
-        viewport.type = VIEWPORT_VIRTUAL;
-        mViewports.add(viewport);
-        return viewport;
-    }
-
-    private DisplayViewport getInternalViewportLocked() {
-        return getViewportByTypeLocked(VIEWPORT_INTERNAL);
-    }
-
-    private DisplayViewport getExternalViewportLocked() {
-        return getViewportByTypeLocked(VIEWPORT_EXTERNAL);
+        populateViewportLocked(viewportType, display.getDisplayIdLocked(), device, info.uniqueId);
     }
 
     /**
@@ -1352,35 +1358,44 @@ public final class DisplayManagerService extends SystemService {
      * @param viewportType - either INTERNAL or EXTERNAL
      * @return the viewport with the requested type
      */
-    private DisplayViewport getViewportByTypeLocked(int viewportType) {
-        // Only allow a single INTERNAL or EXTERNAL viewport, which makes this function possible.
-        // TODO (b/116824030) allow multiple EXTERNAL viewports and remove this function.
-        // Creates the viewport if none exists.
-        if (viewportType != VIEWPORT_INTERNAL && viewportType != VIEWPORT_EXTERNAL) {
+    private DisplayViewport getViewportLocked(int viewportType, String uniqueId) {
+        if (viewportType != VIEWPORT_INTERNAL && viewportType != VIEWPORT_EXTERNAL
+                && viewportType != VIEWPORT_VIRTUAL) {
             Slog.wtf(TAG, "Cannot call getViewportByTypeLocked for type "
                     + DisplayViewport.typeToString(viewportType));
             return null;
         }
+
+        // Only allow a single INTERNAL or EXTERNAL viewport by forcing their uniqueIds
+        // to be identical (in particular, empty).
+        // TODO (b/116824030) allow multiple EXTERNAL viewports and remove this function.
+        if (viewportType != VIEWPORT_VIRTUAL) {
+            uniqueId = "";
+        }
+
         DisplayViewport viewport;
         final int count = mViewports.size();
         for (int i = 0; i < count; i++) {
             viewport = mViewports.get(i);
-            if (viewport.type == viewportType) {
+            if (viewport.type == viewportType && uniqueId.equals(viewport.uniqueId)) {
                 return viewport;
             }
         }
 
+        // Creates the viewport if none exists.
         viewport = new DisplayViewport();
         viewport.type = viewportType;
+        viewport.uniqueId = uniqueId;
         mViewports.add(viewport);
         return viewport;
     }
 
-    private static void populateViewportLocked(DisplayViewport viewport,
-            LogicalDisplay display, DisplayDevice device) {
-        viewport.valid = true;
-        viewport.displayId = display.getDisplayIdLocked();
+    private void populateViewportLocked(int viewportType,
+            int displayId, DisplayDevice device, String uniqueId) {
+        final DisplayViewport viewport = getViewportLocked(viewportType, uniqueId);
         device.populateViewportLocked(viewport);
+        viewport.valid = true;
+        viewport.displayId = displayId;
     }
 
     private LogicalDisplay findLogicalDisplayForDeviceLocked(DisplayDevice device) {
@@ -1505,6 +1520,13 @@ public final class DisplayManagerService extends SystemService {
 
             pw.println();
             mPersistentDataStore.dump(pw);
+
+            final ColorDisplayServiceInternal cds = LocalServices.getService(
+                    ColorDisplayServiceInternal.class);
+            if (cds != null) {
+                pw.println();
+                cds.dump(pw);
+            }
         }
     }
 
@@ -1861,19 +1883,6 @@ public final class DisplayManagerService extends SystemService {
         }
 
         @Override // Binder call
-        public void setSaturationLevel(float level) {
-            mContext.enforceCallingOrSelfPermission(
-                   Manifest.permission.CONTROL_DISPLAY_SATURATION,
-                   "Permission required to set display saturation level");
-            final long token = Binder.clearCallingIdentity();
-            try {
-                setSaturationLevelInternal(level);
-            } finally {
-                Binder.restoreCallingIdentity(token);
-            }
-        }
-
-        @Override // Binder call
         public int createVirtualDisplay(IVirtualDisplayCallback callback,
                 IMediaProjection projection, String packageName, String name,
                 int width, int height, int densityDpi, Surface surface, int flags,
@@ -1975,6 +1984,16 @@ public final class DisplayManagerService extends SystemService {
             final long token = Binder.clearCallingIdentity();
             try {
                 releaseVirtualDisplayInternal(callback.asBinder());
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @Override // Binder call
+        public void setVirtualDisplayState(IVirtualDisplayCallback callback, boolean isOn) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                setVirtualDisplayStateInternal(callback.asBinder(), isOn);
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
@@ -2159,6 +2178,16 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @Override // Binder call
+        public int getPreferredWideGamutColorSpaceId() {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                return getPreferredWideGamutColorSpaceIdInternal();
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
         void setBrightness(int brightness) {
             Settings.System.putIntForUser(mContext.getContentResolver(),
                     Settings.System.SCREEN_BRIGHTNESS, brightness, UserHandle.USER_CURRENT);
@@ -2167,6 +2196,30 @@ public final class DisplayManagerService extends SystemService {
         void resetBrightnessConfiguration() {
             setBrightnessConfigurationForUserInternal(null, mContext.getUserId(),
                     mContext.getPackageName());
+        }
+
+        void setAutoBrightnessLoggingEnabled(boolean enabled) {
+            if (mDisplayPowerController != null) {
+                synchronized (mSyncRoot) {
+                    mDisplayPowerController.setAutoBrightnessLoggingEnabled(enabled);
+                }
+            }
+        }
+
+        void setDisplayWhiteBalanceLoggingEnabled(boolean enabled) {
+            if (mDisplayPowerController != null) {
+                synchronized (mSyncRoot) {
+                    mDisplayPowerController.setDisplayWhiteBalanceLoggingEnabled(enabled);
+                }
+            }
+        }
+
+        void setAmbientColorTemperatureOverride(float cct) {
+            if (mDisplayPowerController != null) {
+                synchronized (mSyncRoot) {
+                    mDisplayPowerController.setAmbientColorTemperatureOverride(cct);
+                }
+            }
         }
 
         private boolean validatePackageName(int uid, String packageName) {
@@ -2262,20 +2315,7 @@ public final class DisplayManagerService extends SystemService {
 
         @Override
         public boolean screenshot(int displayId, Surface outSurface) {
-            synchronized (mSyncRoot) {
-                final LogicalDisplay display = mLogicalDisplays.get(displayId);
-                if (display != null) {
-                    final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
-                    if (device != null) {
-                        final IBinder token = device.getDisplayTokenLocked();
-                        if (token != null) {
-                            SurfaceControl.screenshot(token, outSurface);
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
+            return screenshotInternal(displayId, outSurface);
         }
 
         @Override
@@ -2353,5 +2393,25 @@ public final class DisplayManagerService extends SystemService {
                 }
             }
         }
+
+        @Override
+        public DisplayedContentSamplingAttributes getDisplayedContentSamplingAttributes(
+                int displayId) {
+            return getDisplayedContentSamplingAttributesInternal(displayId);
+        }
+
+        @Override
+        public boolean setDisplayedContentSamplingEnabled(
+                int displayId, boolean enable, int componentMask, int maxFrames) {
+            return setDisplayedContentSamplingEnabledInternal(
+                    displayId, enable, componentMask, maxFrames);
+        }
+
+        @Override
+        public DisplayedContentSample getDisplayedContentSample(int displayId,
+                long maxFrames, long timestamp) {
+            return getDisplayedContentSampleInternal(displayId, maxFrames, timestamp);
+        }
+
     }
 }

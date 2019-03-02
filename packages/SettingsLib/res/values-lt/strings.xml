@@ -21,6 +21,7 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="wifi_fail_to_scan" msgid="1265540342578081461">"Nepavyksta nuskaityti tinklų"</string>
+    <string name="wifi_security_none" msgid="7985461072596594400">"Nėra"</string>
     <string name="wifi_remembered" msgid="4955746899347821096">"Išsaugotas"</string>
     <string name="wifi_disabled_generic" msgid="4259794910584943386">"Neleidžiama"</string>
     <string name="wifi_disabled_network_failure" msgid="2364951338436007124">"IP konfigūracijos triktis"</string>
@@ -37,13 +38,50 @@
     <string name="connected_via_network_scorer" msgid="5713793306870815341">"Automatiškai prisijungta naudojant „%1$s“"</string>
     <string name="connected_via_network_scorer_default" msgid="7867260222020343104">"Automatiškai prisijungta naudojant tinklo įvertinimo paslaugos teikėjo paslaugomis"</string>
     <string name="connected_via_passpoint" msgid="2826205693803088747">"Prisijungta naudojant „%1$s“"</string>
+    <string name="ssid_by_passpoint_provider" msgid="7898171424140673315">"<xliff:g id="SSID">%1$s</xliff:g>, <xliff:g id="PASSPOINTPROVIDER">%2$s</xliff:g>"</string>
     <string name="available_via_passpoint" msgid="1617440946846329613">"Pasiekiama naudojant „%1$s“"</string>
+    <string name="tap_to_set_up" msgid="2468970825530423314">"Palieskite, kad nustatytumėte"</string>
     <string name="wifi_connected_no_internet" msgid="8202906332837777829">"Prisijungta, nėra interneto"</string>
     <string name="wifi_status_no_internet" msgid="5784710974669608361">"Nėra interneto ryšio"</string>
     <string name="wifi_status_sign_in_required" msgid="123517180404752756">"Reikia prisijungti"</string>
     <string name="wifi_ap_unable_to_handle_new_sta" msgid="5348824313514404541">"Prieigos taškas laikinai visiškai užimtas"</string>
     <string name="connected_via_carrier" msgid="7583780074526041912">"Prisijungta naudojant „%1$s“"</string>
     <string name="available_via_carrier" msgid="1469036129740799053">"Pasiekiama naudojant „%1$s“"</string>
+    <string name="osu_failure_ap_connection" msgid="598977488344424542">"Nepavyko užmegzti ryšio"</string>
+    <string name="osu_failure_server_url_invalid" msgid="2237477219243136714">"Netinkamas OSU serverio URL"</string>
+    <string name="osu_failure_server_connection" msgid="8192988165059982174">"Nepavyko užmegzti OSU serverio ryšio"</string>
+    <string name="osu_failure_server_validation" msgid="4631649978129606823">"Nepavyko patvirtinti OSU serverio"</string>
+    <string name="osu_failure_service_provider_verification" msgid="4854091521439785597">"Netinkamas OSU serverio sertifikatas"</string>
+    <string name="osu_failure_provisioning_aborted" msgid="424627208135320329">"Aprūpinimas nutrauktas"</string>
+    <string name="osu_failure_provisioning_not_available" msgid="3021783729256985432">"Negalima aprūpinti"</string>
+    <string name="osu_failure_invalid_server_url" msgid="8548886196179435758">"Netinkamas OSU serverio URL"</string>
+    <string name="osu_failure_unexpected_command_type" msgid="8245921319866603904">"Nenumatytas komandos tipas"</string>
+    <string name="osu_failure_unexpected_soap_message_type" msgid="2255897608510053065">"Nenumatytas SOAP pranešimo tipas"</string>
+    <string name="osu_failure_soap_message_exchange" msgid="4357358438685987192">"Nepavyko atlikti SOAP pranešimo mainų operacijos"</string>
+    <string name="osu_failure_start_redirect_listener" msgid="4292769407279548482">"Nepavyko paleisti peradresavimo apdorojimo priemonės"</string>
+    <string name="osu_failure_timed_out_redirect_listener" msgid="3168657820278807508">"Laukiant peradresavimo baigėsi skirtasis laikas"</string>
+    <string name="osu_failure_no_osu_activity_found" msgid="4593038891437878675">"Nerasta OSU veiklos duomenų"</string>
+    <string name="osu_failure_unexpected_soap_message_status" msgid="6568467710235256675">"Nenumatyta SOAP pranešimo būsena"</string>
+    <string name="osu_failure_no_pps_mo" msgid="850567403039076835">"Nepavyko rasti PPS-MO"</string>
+    <string name="osu_failure_no_aaa_server_trust_root_node" msgid="8961455873459838456">"Nepavyko rasti patikimo AAA serverio šakninio mazgo"</string>
+    <string name="osu_failure_no_remediation_server_trust_root_node" msgid="5041179688081545244">"Nepavyko rasti patikimo problemų sprendimo serverio šakninio mazgo"</string>
+    <string name="osu_failure_no_policy_server_trust_root_node" msgid="6617290380940513539">"Nepavyko rasti patikimo politikos serverio šakninio mazgo"</string>
+    <string name="osu_failure_retrieve_trust_root_certificates" msgid="1499136256195528265">"Nepavyko gauti patikimų šakninių sertifikatų"</string>
+    <string name="osu_failure_no_aaa_trust_root_certificate" msgid="1904322497042226984">"Nepavyko rasti patikimo AAA serverio šakninio sertifikato"</string>
+    <string name="osu_failure_add_passpoint_configuration" msgid="2173557755811446047">"Nepavyko pridėti „PassPoint“ konfigūracijos"</string>
+    <string name="osu_failure_osu_provider_not_found" msgid="6616172862116673082">"Nepavyko rasti OSU teikėjo"</string>
+    <string name="osu_status_ap_connecting" msgid="5296821043003441437">"Sujungiama"</string>
+    <string name="osu_status_ap_connected" msgid="3777289375683170728">"Sujungta"</string>
+    <string name="osu_status_server_connecting" msgid="8499785407540355867">"Prisijungiama prie OSU serverio"</string>
+    <string name="osu_status_server_validated" msgid="3158727184762596355">"OSU serveris patvirtintas"</string>
+    <string name="osu_status_server_connected" msgid="8382024481520158168">"Prisijungta prie OSU serverio"</string>
+    <string name="osu_status_init_soap_exchange" msgid="8628063888912101981">"Pradinė SOAP mainų operacija"</string>
+    <string name="osu_status_waiting_for_redirect_response" msgid="2343016207837053197">"Laukiama tiesioginio atsakymo"</string>
+    <string name="osu_status_redirect_response_received" msgid="5323368411922609405">"Gautas tiesioginis atsakymas"</string>
+    <string name="osu_status_second_soap_exchange" msgid="7115332266758483909">"Antroji SOAP mainų operacija"</string>
+    <string name="osu_status_third_soap_exchange" msgid="8460901783597440766">"Trečioji SOAP mainų operacija"</string>
+    <string name="osu_status_retrieving_trust_root_certs" msgid="1563445892926269689">"Gaunami patikimi šakniniai sertifikatai"</string>
+    <string name="osu_provisioning_complete" msgid="5120178802493970149">"Aprūpinta"</string>
     <string name="speed_label_very_slow" msgid="1867055264243608530">"Labai lėtas"</string>
     <string name="speed_label_slow" msgid="813109590815810235">"Lėtas"</string>
     <string name="speed_label_okay" msgid="2331665440671174858">"Gerai"</string>
@@ -196,7 +234,8 @@
     <string name="keep_screen_on" msgid="1146389631208760344">"Veikti"</string>
     <string name="keep_screen_on_summary" msgid="2173114350754293009">"Kraunant ekranas niekada neveiks miego režimu"</string>
     <string name="bt_hci_snoop_log" msgid="3340699311158865670">"Įgalinti „Bluetooth“ HCI šnipinėjimo žurnalą"</string>
-    <string name="bt_hci_snoop_log_summary" msgid="366083475849911315">"Užfiksuoti visus faile esančius „Bluetooth“ HCI paketus (pakeitę nustatymą išjunkite ir vėl įjunkite „Bluetooth“)"</string>
+    <!-- no translation found for bt_hci_snoop_log_summary (8857606786588106495) -->
+    <skip />
     <string name="oem_unlock_enable" msgid="6040763321967327691">"OĮG atrakinimas"</string>
     <string name="oem_unlock_enable_summary" msgid="4720281828891618376">"Leisti atrakinti oper. sistemos paleidimo progr."</string>
     <string name="confirm_enable_oem_unlock_title" msgid="4802157344812385674">"Leisti OĮG atrakinimą?"</string>
@@ -329,6 +368,7 @@
     <string name="local_backup_password_toast_success" msgid="582016086228434290">"Nustatytas naujas atsarginės kopijos slaptažodis"</string>
     <string name="local_backup_password_toast_confirmation_mismatch" msgid="7805892532752708288">"Naujas slaptažodis ir patvirtinimas neatitinka"</string>
     <string name="local_backup_password_toast_validation_failure" msgid="5646377234895626531">"Nustatant atsarginės kopijos slaptažodį įvyko klaida"</string>
+    <string name="loading_injected_setting_summary" msgid="4095178591461231376">"Įkeliama…"</string>
   <string-array name="color_mode_names">
     <item msgid="2425514299220523812">"Ryškus (numatytasis)"</item>
     <item msgid="8446070607501413455">"Natūralus"</item>
@@ -374,6 +414,7 @@
     <string name="power_discharge_by_only_enhanced" msgid="2175151772952365149">"Pagal tai, kaip naudojama, turėtų išsikrauti maždaug po <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="power_discharge_by" msgid="6453537733650125582">"Turėtų išsikrauti maždaug po <xliff:g id="TIME">%1$s</xliff:g> (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
     <string name="power_discharge_by_only" msgid="107616694963545745">"Turėtų išsikrauti maždaug po <xliff:g id="TIME">%1$s</xliff:g>"</string>
+    <string name="power_discharge_by_only_short" msgid="1372817269546888804">"Iki <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="power_remaining_less_than_duration_only" msgid="5996752448813295329">"Liko mažiau nei <xliff:g id="THRESHOLD">%1$s</xliff:g>"</string>
     <string name="power_remaining_less_than_duration" msgid="5751885147712659423">"Liko mažiau nei <xliff:g id="THRESHOLD">%1$s</xliff:g> (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
     <string name="power_remaining_more_than_subtext" msgid="3176771815132876675">"Liko daugiau nei <xliff:g id="TIME_REMAINING">%1$s</xliff:g> (<xliff:g id="LEVEL">%2$s</xliff:g>)"</string>
@@ -449,4 +490,5 @@
     <string name="zen_mode_duration_always_prompt_title" msgid="6478923750878945501">"Klausti kaskart"</string>
     <string name="zen_mode_forever" msgid="2704305038191592967">"Kol išjungsite"</string>
     <string name="time_unit_just_now" msgid="6363336622778342422">"Ką tik"</string>
+    <string name="media_transfer_phone_device_name" msgid="1003823744105758574">"Telefono garsiakalbis"</string>
 </resources>

@@ -613,7 +613,7 @@ public class ManagedServicesTest extends UiServiceTestCase {
     }
 
     @Test
-    public void testGetAllowedPackages() throws Exception {
+    public void testGetAllowedPackages_byUser() throws Exception {
         for (int approvalLevel : new int[] {APPROVAL_BY_COMPONENT, APPROVAL_BY_PACKAGE}) {
             ManagedServices service = new TestManagedServices(getContext(), mLock, mUserProfiles,
                     mIpm, approvalLevel);
@@ -678,6 +678,30 @@ public class ManagedServicesTest extends UiServiceTestCase {
         loadXml(service);
 
         assertEquals(0, service.getAllowedComponents(10).size());
+    }
+
+    @Test
+    public void testGetAllowedPackages() throws Exception {
+        ManagedServices service = new TestManagedServices(getContext(), mLock, mUserProfiles,
+                mIpm, APPROVAL_BY_COMPONENT);
+        loadXml(service);
+        service.mApprovalLevel = APPROVAL_BY_PACKAGE;
+        loadXml(service);
+
+        List<String> allowedPackages = new ArrayList<>();
+        allowedPackages.add("this.is.a.package.name");
+        allowedPackages.add("another.package");
+        allowedPackages.add("secondary");
+        allowedPackages.add("this.is.another.package");
+        allowedPackages.add("package");
+        allowedPackages.add("component");
+        allowedPackages.add("bananas!");
+
+        Set<String> actual = service.getAllowedPackages();
+        assertEquals(allowedPackages.size(), actual.size());
+        for (String pkg : allowedPackages) {
+            assertTrue(actual.contains(pkg));
+        }
     }
 
     @Test
@@ -857,6 +881,19 @@ public class ManagedServicesTest extends UiServiceTestCase {
         assertEquals(2, componentsToBind.get(10).size());
         assertTrue(componentsToBind.get(10).contains(ComponentName.unflattenFromString("b/b")));
         assertTrue(componentsToBind.get(10).contains(ComponentName.unflattenFromString("c/c")));
+    }
+
+    @Test
+    public void testOnPackagesChanged_nullValuesPassed_noNullPointers() {
+        for (int approvalLevel : new int[] {APPROVAL_BY_COMPONENT, APPROVAL_BY_PACKAGE}) {
+            ManagedServices service = new TestManagedServices(getContext(), mLock, mUserProfiles,
+                    mIpm, approvalLevel);
+            // null uid list
+            service.onPackagesChanged(true, new String[]{"this.is.a.package.name"}, null);
+
+            // null package list
+            service.onPackagesChanged(true, null, new int[]{103});
+        }
     }
 
     private void loadXml(ManagedServices service) throws Exception {

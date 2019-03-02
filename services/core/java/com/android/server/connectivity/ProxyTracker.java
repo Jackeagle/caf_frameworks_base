@@ -208,7 +208,10 @@ public class ProxyTracker {
     public void sendProxyBroadcast() {
         final ProxyInfo defaultProxy = getDefaultProxy();
         final ProxyInfo proxyInfo = null != defaultProxy ? defaultProxy : new ProxyInfo("", 0, "");
-        if (mPacManager.setCurrentProxyScriptUrl(proxyInfo)) return;
+        if (mPacManager.setCurrentProxyScriptUrl(proxyInfo)
+                == PacManager.ToSendOrNotToSendBroadcast.DONT_SEND_BROADCAST) {
+            return;
+        }
         if (DBG) Slog.d(TAG, "sending Proxy Broadcast for " + proxyInfo);
         Intent intent = new Intent(Proxy.PROXY_CHANGE_ACTION);
         intent.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING |
@@ -303,24 +306,6 @@ public class ProxyTracker {
             if (mGlobalProxy != null) return;
             if (mDefaultProxyEnabled) {
                 sendProxyBroadcast();
-            }
-        }
-    }
-
-    /**
-     * Enable or disable the default proxy.
-     *
-     * This sets the flag for enabling/disabling the default proxy and sends the broadcast
-     * if applicable.
-     * @param enabled whether the default proxy should be enabled.
-     */
-    public void setDefaultProxyEnabled(final boolean enabled) {
-        synchronized (mProxyLock) {
-            if (mDefaultProxyEnabled != enabled) {
-                mDefaultProxyEnabled = enabled;
-                if (mGlobalProxy == null && mDefaultProxy != null) {
-                    sendProxyBroadcast();
-                }
             }
         }
     }

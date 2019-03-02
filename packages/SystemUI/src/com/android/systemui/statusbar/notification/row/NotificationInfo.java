@@ -21,7 +21,6 @@ import static android.app.NotificationManager.IMPORTANCE_HIGH;
 import static android.app.NotificationManager.IMPORTANCE_LOW;
 import static android.app.NotificationManager.IMPORTANCE_MIN;
 import static android.app.NotificationManager.IMPORTANCE_NONE;
-import static android.app.NotificationManager.IMPORTANCE_UNSPECIFIED;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -40,6 +39,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
+import android.metrics.LogMaker;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.service.notification.StatusBarNotification;
@@ -92,18 +92,22 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     private String mPackageName;
     private String mAppName;
     private int mAppUid;
+    private String mDelegatePkg;
     private int mNumUniqueChannelsInRow;
     private NotificationChannel mSingleNotificationChannel;
     private int mStartingChannelImportance;
-    private int mStartingChannelOrNotificationImportance;
-    private int mChosenImportance;
+    private boolean mWasShownHighPriority;
+    /**
+     * The last importance level chosen by the user.  Null if the user has not chosen an importance
+     * level; non-null once the user takes an action which indicates an explicit preference.
+     */
+    @Nullable private Integer mChosenImportance;
     private boolean mIsSingleDefaultChannel;
     private boolean mIsNonblockable;
     private StatusBarNotification mSbn;
     private AnimatorSet mExpandAnimation;
     private boolean mIsForeground;
     private boolean mIsDeviceProvisioned;
-    private boolean mIsNoisy;
 
     private CheckSaveListener mCheckSaveListener;
     private OnSettingsClickListener mOnSettingsClickListener;
@@ -122,11 +126,23 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     private OnClickListener mOnKeepShowing = v -> {
         mExitReason = NotificationCounters.BLOCKING_HELPER_KEEP_SHOWING;
         closeControls(v);
+        if (mIsForBlockingHelper) {
+            mMetricsLogger.write(getLogMaker().setCategory(
+                    MetricsEvent.NOTIFICATION_BLOCKING_HELPER)
+                    .setType(MetricsEvent.TYPE_ACTION)
+                    .setSubtype(MetricsEvent.BLOCKING_HELPER_CLICK_STAY_SILENT));
+        }
     };
 
     private OnClickListener mOnToggleSilent = v -> {
         Runnable saveImportance = () -> {
             swapContent(ACTION_TOGGLE_SILENT, true /* animate */);
+            if (mIsForBlockingHelper) {
+                mMetricsLogger.write(getLogMaker()
+                        .setCategory(MetricsEvent.NOTIFICATION_BLOCKING_HELPER)
+                        .setType(MetricsEvent.TYPE_ACTION)
+                        .setSubtype(MetricsEvent.BLOCKING_HELPER_CLICK_ALERT_ME));
+            }
         };
         if (mCheckSaveListener != null) {
             mCheckSaveListener.checkSave(saveImportance, mSbn);
@@ -138,6 +154,12 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     private OnClickListener mOnStopOrMinimizeNotifications = v -> {
         Runnable saveImportance = () -> {
             swapContent(ACTION_BLOCK, true /* animate */);
+            if (mIsForBlockingHelper) {
+                mMetricsLogger.write(getLogMaker()
+                        .setCategory(MetricsEvent.NOTIFICATION_BLOCKING_HELPER)
+                        .setType(MetricsEvent.TYPE_ACTION)
+                        .setSubtype(MetricsEvent.BLOCKING_HELPER_CLICK_BLOCKED));
+            }
         };
         if (mCheckSaveListener != null) {
             mCheckSaveListener.checkSave(saveImportance, mSbn);
@@ -149,7 +171,15 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
     private OnClickListener mOnUndo = v -> {
         // Reset exit counter that we'll log and record an undo event separately (not an exit event)
         mExitReason = NotificationCounters.BLOCKING_HELPER_DISMISSED;
-        logBlockingHelperCounter(NotificationCounters.BLOCKING_HELPER_UNDO);
+        if (mIsForBlockingHelper) {
+            logBlockingHelperCounter(NotificationCounters.BLOCKING_HELPER_UNDO);
+            mMetricsLogger.write(getLogMaker().setCategory(
+                    MetricsEvent.NOTIFICATION_BLOCKING_HELPER)
+                    .setType(MetricsEvent.TYPE_DISMISS)
+                    .setSubtype(MetricsEvent.BLOCKING_HELPER_CLICK_UNDO));
+        } else {
+            mMetricsLogger.write(importanceChangeLogMaker().setType(MetricsEvent.TYPE_DISMISS));
+        }
         swapContent(ACTION_UNDO, true /* animate */);
     };
 
@@ -185,15 +215,14 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
             final OnAppSettingsClickListener onAppSettingsClick,
             boolean isDeviceProvisioned,
             boolean isNonblockable,
-            boolean isNoisy,
             int importance,
-            @NotificationInfoAction int action)
+            boolean wasShownHighPriority)
             throws RemoteException {
         bindNotification(pm, iNotificationManager, pkg, notificationChannel,
                 numUniqueChannelsInRow, sbn, checkSaveListener, onSettingsClick,
                 onAppSettingsClick, isDeviceProvisioned, isNonblockable,
-                false /* isBlockingHelper */, false /* isUserSentimentNegative */, isNoisy,
-                importance, action);
+                false /* isBlockingHelper */, false /* isUserSentimentNegative */,
+                importance, wasShownHighPriority);
     }
 
     public void bindNotification(
@@ -210,9 +239,8 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
             boolean isNonblockable,
             boolean isForBlockingHelper,
             boolean isUserSentimentNegative,
-            boolean isNoisy,
             int importance,
-            @NotificationInfoAction int action)
+            boolean wasShownHighPriority)
             throws RemoteException {
         mINotificationManager = iNotificationManager;
         mMetricsLogger = Dependency.get(MetricsLogger.class);
@@ -225,18 +253,16 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         mCheckSaveListener = checkSaveListener;
         mOnSettingsClickListener = onSettingsClick;
         mSingleNotificationChannel = notificationChannel;
-        int channelImportance = mSingleNotificationChannel.getImportance();
-        mStartingChannelImportance = mChosenImportance = channelImportance;
-        mStartingChannelOrNotificationImportance =
-                channelImportance == IMPORTANCE_UNSPECIFIED ? importance : channelImportance;
+        mStartingChannelImportance = mSingleNotificationChannel.getImportance();
+        mWasShownHighPriority = wasShownHighPriority;
         mNegativeUserSentiment = isUserSentimentNegative;
         mIsNonblockable = isNonblockable;
         mIsForeground =
                 (mSbn.getNotification().flags & Notification.FLAG_FOREGROUND_SERVICE) != 0;
         mIsForBlockingHelper = isForBlockingHelper;
         mAppUid = mSbn.getUid();
+        mDelegatePkg = mSbn.getOpPkg();
         mIsDeviceProvisioned = isDeviceProvisioned;
-        mIsNoisy = isNoisy;
 
         int numTotalChannels = mINotificationManager.getNumNotificationChannelsForPackage(
                 pkg, mAppUid, false /* includeDeleted */);
@@ -254,10 +280,10 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         bindPrompt();
         bindButtons();
 
-        if (action != ACTION_NONE) {
-            swapContent(action, false /* don't animate */);
-        }
+        mMetricsLogger.write(notificationControlsLogMaker());
     }
+
+
 
     private void bindHeader() throws RemoteException {
         // Package name
@@ -281,26 +307,8 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         ((ImageView) findViewById(R.id.pkgicon)).setImageDrawable(pkgicon);
         ((TextView) findViewById(R.id.pkgname)).setText(mAppName);
 
-        // Set group information if this channel has an associated group.
-        CharSequence groupName = null;
-        if (mSingleNotificationChannel != null && mSingleNotificationChannel.getGroup() != null) {
-            final NotificationChannelGroup notificationChannelGroup =
-                    mINotificationManager.getNotificationChannelGroupForPackage(
-                            mSingleNotificationChannel.getGroup(), mPackageName, mAppUid);
-            if (notificationChannelGroup != null) {
-                groupName = notificationChannelGroup.getName();
-            }
-        }
-        TextView groupNameView = findViewById(R.id.group_name);
-        TextView groupDividerView = findViewById(R.id.pkg_group_divider);
-        if (groupName != null) {
-            groupNameView.setText(groupName);
-            groupNameView.setVisibility(View.VISIBLE);
-            groupDividerView.setVisibility(View.VISIBLE);
-        } else {
-            groupNameView.setVisibility(View.GONE);
-            groupDividerView.setVisibility(View.GONE);
-        }
+        // Delegate
+        bindDelegate();
 
         // Settings button.
         final View settingsButton = findViewById(R.id.info);
@@ -320,9 +328,10 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         }
     }
 
-    private void bindPrompt() {
+    private void bindPrompt() throws RemoteException {
         final TextView blockPrompt = findViewById(R.id.block_prompt);
         bindName();
+        bindGroup();
         if (mIsNonblockable) {
             blockPrompt.setText(R.string.notification_unblockable_desc);
         } else {
@@ -345,6 +354,60 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         }
     }
 
+    private void bindDelegate() {
+        TextView delegateView = findViewById(R.id.delegate_name);
+        TextView dividerView = findViewById(R.id.pkg_divider);
+
+        CharSequence delegatePkg = null;
+        if (!TextUtils.equals(mPackageName, mDelegatePkg)) {
+            // this notification was posted by a delegate!
+            ApplicationInfo info;
+            try {
+                info = mPm.getApplicationInfo(
+                        mDelegatePkg,
+                        PackageManager.MATCH_UNINSTALLED_PACKAGES
+                                | PackageManager.MATCH_DISABLED_COMPONENTS
+                                | PackageManager.MATCH_DIRECT_BOOT_UNAWARE
+                                | PackageManager.MATCH_DIRECT_BOOT_AWARE);
+                if (info != null) {
+                    delegatePkg = String.valueOf(mPm.getApplicationLabel(info));
+                }
+            } catch (PackageManager.NameNotFoundException e) { }
+        }
+        if (delegatePkg != null) {
+            delegateView.setText(mContext.getResources().getString(
+                    R.string.notification_delegate_header, delegatePkg));
+            delegateView.setVisibility(View.VISIBLE);
+            dividerView.setVisibility(View.VISIBLE);
+        } else {
+            delegateView.setVisibility(View.GONE);
+            dividerView.setVisibility(View.GONE);
+        }
+    }
+
+    private void bindGroup() throws RemoteException {
+        // Set group information if this channel has an associated group.
+        CharSequence groupName = null;
+        if (mSingleNotificationChannel != null && mSingleNotificationChannel.getGroup() != null) {
+            final NotificationChannelGroup notificationChannelGroup =
+                    mINotificationManager.getNotificationChannelGroupForPackage(
+                            mSingleNotificationChannel.getGroup(), mPackageName, mAppUid);
+            if (notificationChannelGroup != null) {
+                groupName = notificationChannelGroup.getName();
+            }
+        }
+        TextView groupNameView = findViewById(R.id.group_name);
+        TextView groupDividerView = findViewById(R.id.pkg_group_divider);
+        if (groupName != null) {
+            groupNameView.setText(groupName);
+            groupNameView.setVisibility(View.VISIBLE);
+            groupDividerView.setVisibility(View.VISIBLE);
+        } else {
+            groupNameView.setVisibility(View.GONE);
+            groupDividerView.setVisibility(View.GONE);
+        }
+    }
+
     @VisibleForTesting
     void logBlockingHelperCounter(String counterTag) {
         if (mIsForBlockingHelper) {
@@ -354,12 +417,18 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
 
     private boolean hasImportanceChanged() {
         return mSingleNotificationChannel != null
-                && mStartingChannelImportance != mChosenImportance;
+                && mChosenImportance != null
+                && (mStartingChannelImportance != mChosenImportance
+                || (mWasShownHighPriority && mChosenImportance < IMPORTANCE_DEFAULT)
+                || (!mWasShownHighPriority && mChosenImportance >= IMPORTANCE_DEFAULT));
     }
 
     private void saveImportance() {
         if (!mIsNonblockable
                 || mExitReason != NotificationCounters.BLOCKING_HELPER_STOP_NOTIFICATIONS) {
+            if (mChosenImportance == null) {
+                mChosenImportance = mStartingChannelImportance;
+            }
             updateImportance();
         }
     }
@@ -368,64 +437,83 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
      * Commits the updated importance values on the background thread.
      */
     private void updateImportance() {
-        MetricsLogger.action(mContext, MetricsEvent.ACTION_SAVE_IMPORTANCE,
-                mChosenImportance - mStartingChannelImportance);
+        if (mChosenImportance != null) {
+            mMetricsLogger.write(importanceChangeLogMaker());
 
-        Handler bgHandler = new Handler(Dependency.get(Dependency.BG_LOOPER));
-        bgHandler.post(new UpdateImportanceRunnable(mINotificationManager, mPackageName, mAppUid,
-                mNumUniqueChannelsInRow == 1 ? mSingleNotificationChannel : null,
-                mStartingChannelImportance, mChosenImportance));
+            Handler bgHandler = new Handler(Dependency.get(Dependency.BG_LOOPER));
+            bgHandler.post(
+                    new UpdateImportanceRunnable(mINotificationManager, mPackageName, mAppUid,
+                            mNumUniqueChannelsInRow == 1 ? mSingleNotificationChannel : null,
+                            mStartingChannelImportance, mChosenImportance));
+        }
     }
 
     private void bindButtons() {
-        // Set up stay-in-notification actions
-        View block =  findViewById(R.id.block);
-        TextView keep = findViewById(R.id.keep);
-        TextView silent = findViewById(R.id.toggle_silent);
-        View minimize = findViewById(R.id.minimize);
-
         findViewById(R.id.undo).setOnClickListener(mOnUndo);
-        block.setOnClickListener(mOnStopOrMinimizeNotifications);
-        keep.setOnClickListener(mOnKeepShowing);
-        silent.setOnClickListener(mOnToggleSilent);
-        minimize.setOnClickListener(mOnStopOrMinimizeNotifications);
 
-        if (mIsNonblockable) {
-            keep.setText(android.R.string.ok);
-            block.setVisibility(GONE);
-            silent.setVisibility(GONE);
-            minimize.setVisibility(GONE);
-        } else if (mIsForeground) {
-            block.setVisibility(GONE);
-            silent.setVisibility(GONE);
-            minimize.setVisibility(VISIBLE);
-        } else {
-            block.setVisibility(VISIBLE);
-            boolean showToggleSilent = mIsNoisy
-                    && NotificationUtils.useNewInterruptionModel(mContext);
-            silent.setVisibility(showToggleSilent ? VISIBLE : GONE);
-            boolean isCurrentlyAlerting =
-                    mStartingChannelOrNotificationImportance >= IMPORTANCE_DEFAULT;
-            silent.setText(isCurrentlyAlerting
-                    ? R.string.inline_silent_button_silent
-                    : R.string.inline_silent_button_alert);
-            minimize.setVisibility(GONE);
-        }
+        boolean showInterruptivenessSettings =
+                !mIsNonblockable
+                        && !mIsForeground
+                        && !mIsForBlockingHelper
+                        && NotificationUtils.useNewInterruptionModel(mContext);
+        if (showInterruptivenessSettings) {
+            findViewById(R.id.block_or_minimize).setVisibility(GONE);
+            findViewById(R.id.interruptiveness_settings).setVisibility(VISIBLE);
+            View block = findViewById(R.id.int_block);
+            TextView silent = findViewById(R.id.int_silent);
+            TextView alert = findViewById(R.id.int_alert);
 
-        // Set up app settings link (i.e. Customize)
-        TextView settingsLinkView = findViewById(R.id.app_settings);
-        Intent settingsIntent = getAppSettingsIntent(mPm, mPackageName, mSingleNotificationChannel,
-                mSbn.getId(), mSbn.getTag());
-        if (!mIsForBlockingHelper
-                && settingsIntent != null
-                && !TextUtils.isEmpty(mSbn.getNotification().getSettingsText())) {
-            settingsLinkView.setVisibility(VISIBLE);
-            settingsLinkView.setText(mContext.getString(R.string.notification_app_settings));
-            settingsLinkView.setOnClickListener((View view) -> {
-                mAppSettingsClickListener.onClick(view, settingsIntent);
-            });
+            block.setOnClickListener(mOnStopOrMinimizeNotifications);
+            if (mWasShownHighPriority) {
+                silent.setOnClickListener(mOnToggleSilent);
+                silent.setText(R.string.inline_silent_button_silent);
+                alert.setOnClickListener(mOnKeepShowing);
+                alert.setText(R.string.inline_silent_button_keep_alerting);
+            } else {
+                silent.setOnClickListener(mOnKeepShowing);
+                silent.setText(R.string.inline_silent_button_stay_silent);
+                alert.setOnClickListener(mOnToggleSilent);
+                alert.setText(R.string.inline_silent_button_alert);
+            }
         } else {
-            settingsLinkView.setVisibility(View.GONE);
+            findViewById(R.id.block_or_minimize).setVisibility(VISIBLE);
+            findViewById(R.id.interruptiveness_settings).setVisibility(GONE);
+            View block = findViewById(R.id.block);
+            TextView keep = findViewById(R.id.keep);
+            View minimize = findViewById(R.id.minimize);
+
+            block.setOnClickListener(mOnStopOrMinimizeNotifications);
+            keep.setOnClickListener(mOnKeepShowing);
+            minimize.setOnClickListener(mOnStopOrMinimizeNotifications);
+
+            if (mIsNonblockable) {
+                keep.setText(android.R.string.ok);
+                block.setVisibility(GONE);
+                minimize.setVisibility(GONE);
+            } else if (mIsForeground) {
+                block.setVisibility(GONE);
+                minimize.setVisibility(VISIBLE);
+            } else {
+                block.setVisibility(VISIBLE);
+                minimize.setVisibility(GONE);
+            }
+
+            // Set up app settings link (i.e. Customize)
+            TextView settingsLinkView = findViewById(R.id.app_settings);
+            Intent settingsIntent = getAppSettingsIntent(mPm, mPackageName,
+                    mSingleNotificationChannel,
+                    mSbn.getId(), mSbn.getTag());
+            if (!mIsForBlockingHelper
+                    && settingsIntent != null
+                    && !TextUtils.isEmpty(mSbn.getNotification().getSettingsText())) {
+                settingsLinkView.setVisibility(VISIBLE);
+                settingsLinkView.setText(mContext.getString(R.string.notification_app_settings));
+                settingsLinkView.setOnClickListener((View view) -> {
+                    mAppSettingsClickListener.onClick(view, settingsIntent);
+                });
+            } else {
+                settingsLinkView.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -445,7 +533,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
                 break;
             case ACTION_TOGGLE_SILENT:
                 mExitReason = NotificationCounters.BLOCKING_HELPER_TOGGLE_SILENT;
-                if (mStartingChannelOrNotificationImportance >= IMPORTANCE_DEFAULT) {
+                if (mWasShownHighPriority) {
                     mChosenImportance = IMPORTANCE_LOW;
                     confirmationText.setText(R.string.notification_channel_silenced);
                 } else {
@@ -512,9 +600,8 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
 
     @Override
     public void onFinishedClosing() {
-        mStartingChannelImportance = mChosenImportance;
-        if (mChosenImportance != IMPORTANCE_UNSPECIFIED) {
-            mStartingChannelOrNotificationImportance = mChosenImportance;
+        if (mChosenImportance != null) {
+            mStartingChannelImportance = mChosenImportance;
         }
         mExitReason = NotificationCounters.BLOCKING_HELPER_DISMISSED;
 
@@ -527,6 +614,8 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         confirmation.setAlpha(1f);
         header.setVisibility(VISIBLE);
         header.setAlpha(1f);
+
+        mMetricsLogger.write(notificationControlsLogMaker().setType(MetricsEvent.TYPE_CLOSE));
     }
 
     @Override
@@ -671,5 +760,41 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
                 Log.e(TAG, "Unable to update notification importance", e);
             }
         }
+    }
+
+    /**
+     * Returns a LogMaker with all available notification information.
+     * Caller should set category, type, and maybe subtype, before passing it to mMetricsLogger.
+     * @return LogMaker
+     */
+    private LogMaker getLogMaker() {
+        // The constructor requires a category, so also do it in the other branch for consistency.
+        return mSbn == null ? new LogMaker(MetricsEvent.NOTIFICATION_BLOCKING_HELPER)
+                : mSbn.getLogMaker().setCategory(MetricsEvent.NOTIFICATION_BLOCKING_HELPER);
+    }
+
+    /**
+     * Returns an initialized LogMaker for logging importance changes.
+     * The caller may override the type before passing it to mMetricsLogger.
+     * @return LogMaker
+     */
+    private LogMaker importanceChangeLogMaker() {
+        Integer chosenImportance =
+                mChosenImportance != null ? mChosenImportance : mStartingChannelImportance;
+        return getLogMaker().setCategory(MetricsEvent.ACTION_SAVE_IMPORTANCE)
+                .setType(MetricsEvent.TYPE_ACTION)
+                .setSubtype(chosenImportance - mStartingChannelImportance);
+    }
+
+    /**
+     * Returns an initialized LogMaker for logging open/close of the info display.
+     * The caller may override the type before passing it to mMetricsLogger.
+     * @return LogMaker
+     */
+    private LogMaker notificationControlsLogMaker() {
+        return getLogMaker().setCategory(MetricsEvent.ACTION_NOTE_CONTROLS)
+                .setType(MetricsEvent.TYPE_OPEN)
+                .setSubtype(mIsForBlockingHelper ? MetricsEvent.BLOCKING_HELPER_DISPLAY
+                        : MetricsEvent.BLOCKING_HELPER_UNKNOWN);
     }
 }

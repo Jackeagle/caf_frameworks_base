@@ -16,8 +16,11 @@
 
 package android.location;
 
+import android.Manifest;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.UnsupportedAppUsage;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
@@ -142,24 +145,25 @@ public final class LocationRequest implements Parcelable {
      */
     private static final double FASTEST_INTERVAL_FACTOR = 6.0;  // 6x
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mQuality = POWER_LOW;
     @UnsupportedAppUsage
     private long mInterval = 60 * 60 * 1000;   // 60 minutes
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private long mFastestInterval = (long) (mInterval / FASTEST_INTERVAL_FACTOR);  // 10 minutes
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private boolean mExplicitFastestInterval = false;
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private long mExpireAt = Long.MAX_VALUE;  // no expiry
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private int mNumUpdates = Integer.MAX_VALUE;  // no expiry
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private float mSmallestDisplacement = 0.0f;    // meters
     @UnsupportedAppUsage
     private WorkSource mWorkSource = null;
     @UnsupportedAppUsage
     private boolean mHideFromAppOps = false; // True if this request shouldn't be counted by AppOps
+    private boolean mLocationSettingsIgnored = false;
 
     @UnsupportedAppUsage
     private String mProvider = LocationManager.FUSED_PROVIDER;
@@ -260,6 +264,7 @@ public final class LocationRequest implements Parcelable {
         mWorkSource = src.mWorkSource;
         mHideFromAppOps = src.mHideFromAppOps;
         mLowPowerMode = src.mLowPowerMode;
+        mLocationSettingsIgnored = src.mLocationSettingsIgnored;
     }
 
     /**
@@ -371,6 +376,32 @@ public final class LocationRequest implements Parcelable {
     @SystemApi
     public boolean isLowPowerMode() {
         return mLowPowerMode;
+    }
+
+    /**
+     * Requests that user location settings be ignored in order to satisfy this request. This API
+     * is only for use in extremely rare scenarios where it is appropriate to ignore user location
+     * settings, such as a user initiated emergency (dialing 911 for instance).
+     *
+     * @param locationSettingsIgnored Whether to ignore location settings
+     * @return the same object, so that setters can be chained
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
+    @SystemApi
+    public LocationRequest setLocationSettingsIgnored(boolean locationSettingsIgnored) {
+        mLocationSettingsIgnored = locationSettingsIgnored;
+        return this;
+    }
+
+    /**
+     * Returns true if location settings will be ignored in order to satisfy this request.
+     *
+     * @hide
+     */
+    @SystemApi
+    public boolean isLocationSettingsIgnored() {
+        return mLocationSettingsIgnored;
     }
 
     /**
@@ -603,14 +634,14 @@ public final class LocationRequest implements Parcelable {
         return mHideFromAppOps;
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private static void checkInterval(long millis) {
         if (millis < 0) {
             throw new IllegalArgumentException("invalid interval: " + millis);
         }
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private static void checkQuality(int quality) {
         switch (quality) {
             case ACCURACY_FINE:
@@ -625,14 +656,14 @@ public final class LocationRequest implements Parcelable {
         }
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private static void checkDisplacement(float meters) {
         if (meters < 0.0f) {
             throw new IllegalArgumentException("invalid displacement: " + meters);
         }
     }
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private static void checkProvider(String name) {
         if (name == null) {
             throw new IllegalArgumentException("invalid provider: " + name);
@@ -652,6 +683,7 @@ public final class LocationRequest implements Parcelable {
                     request.setSmallestDisplacement(in.readFloat());
                     request.setHideFromAppOps(in.readInt() != 0);
                     request.setLowPowerMode(in.readInt() != 0);
+                    request.setLocationSettingsIgnored(in.readInt() != 0);
                     String provider = in.readString();
                     if (provider != null) request.setProvider(provider);
                     WorkSource workSource = in.readParcelable(null);
@@ -680,6 +712,7 @@ public final class LocationRequest implements Parcelable {
         parcel.writeFloat(mSmallestDisplacement);
         parcel.writeInt(mHideFromAppOps ? 1 : 0);
         parcel.writeInt(mLowPowerMode ? 1 : 0);
+        parcel.writeInt(mLocationSettingsIgnored ? 1 : 0);
         parcel.writeString(mProvider);
         parcel.writeParcelable(mWorkSource, 0);
     }
@@ -724,6 +757,9 @@ public final class LocationRequest implements Parcelable {
             s.append(" num=").append(mNumUpdates);
         }
         s.append(" lowPowerMode=").append(mLowPowerMode);
+        if (mLocationSettingsIgnored) {
+            s.append(" ignoreSettings");
+        }
         s.append(']');
         return s.toString();
     }

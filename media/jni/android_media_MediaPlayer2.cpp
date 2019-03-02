@@ -46,7 +46,7 @@
 #include "utils/KeyedVector.h"
 #include "utils/String8.h"
 #include "android_media_BufferingParams.h"
-#include "android_media_Media2DataSource.h"
+#include "android_media_DataSourceCallback.h"
 #include "android_media_MediaMetricsJNI.h"
 #include "android_media_PlaybackParams.h"
 #include "android_media_SyncParams.h"
@@ -86,7 +86,8 @@ using media::VolumeShaper;
 // ----------------------------------------------------------------------------
 
 struct fields_t {
-    jfieldID    context;
+    jfieldID    context;               // passed from Java to native, used for creating JWakeLock
+    jfieldID    nativeContext;         // mNativeContext in MediaPlayer2.java
     jfieldID    surface_texture;
 
     jmethodID   post_event;
@@ -225,21 +226,21 @@ void JNIMediaPlayer2Listener::notify(int64_t srcId, int msg, int ext1, int ext2,
 static sp<MediaPlayer2> getMediaPlayer(JNIEnv* env, jobject thiz)
 {
     Mutex::Autolock l(sLock);
-    MediaPlayer2* const p = (MediaPlayer2*)env->GetLongField(thiz, fields.context);
+    MediaPlayer2* const p = (MediaPlayer2*)env->GetLongField(thiz, fields.nativeContext);
     return sp<MediaPlayer2>(p);
 }
 
 static sp<MediaPlayer2> setMediaPlayer(JNIEnv* env, jobject thiz, const sp<MediaPlayer2>& player)
 {
     Mutex::Autolock l(sLock);
-    sp<MediaPlayer2> old = (MediaPlayer2*)env->GetLongField(thiz, fields.context);
+    sp<MediaPlayer2> old = (MediaPlayer2*)env->GetLongField(thiz, fields.nativeContext);
     if (player.get()) {
         player->incStrong((void*)setMediaPlayer);
     }
     if (old != 0) {
         old->decStrong((void*)setMediaPlayer);
     }
-    env->SetLongField(thiz, fields.context, (jlong)player.get());
+    env->SetLongField(thiz, fields.nativeContext, (jlong)player.get());
     return old;
 }
 
@@ -423,7 +424,7 @@ android_media_MediaPlayer2_handleDataSourceCallback(
         jniThrowException(env, "java/lang/IllegalArgumentException", NULL);
         return;
     }
-    sp<DataSource> callbackDataSource = new JMedia2DataSource(env, dataSource);
+    sp<DataSource> callbackDataSource = new JDataSourceCallback(env, dataSource);
     sp<DataSourceDesc> dsd = new DataSourceDesc();
     dsd->mId = srcId;
     dsd->mType = DataSourceDesc::TYPE_CALLBACK;
@@ -785,22 +786,17 @@ android_media_MediaPlayer2_native_getMetrics(JNIEnv *env, jobject thiz)
         return 0;
     }
 
-    Parcel p;
-    int key = FOURCC('m','t','r','X');
-    status_t status = mp->getParameter(key, &p);
+    char *buffer = NULL;
+    size_t length = 0;
+    status_t status = mp->getMetrics(&buffer, &length);
     if (status != OK) {
         ALOGD("getMetrics() failed: %d", status);
         return (jobject) NULL;
     }
 
-    p.setDataPosition(0);
-    MediaAnalyticsItem *item = new MediaAnalyticsItem;
-    item->readFromParcel(p);
-    jobject mybundle = MediaMetricsJNI::writeMetricsToBundle(env, item, NULL);
+    jobject mybundle = MediaMetricsJNI::writeAttributesToBundle(env, NULL, buffer, length);
 
-    // housekeeping
-    delete item;
-    item = NULL;
+    free(buffer);
 
     return mybundle;
 }
@@ -820,7 +816,7 @@ android_media_MediaPlayer2_getCurrentPosition(JNIEnv *env, jobject thiz)
 }
 
 static jlong
-android_media_MediaPlayer2_getDuration(JNIEnv *env, jobject thiz)
+android_media_MediaPlayer2_getDuration(JNIEnv *env, jobject thiz, jlong srcId)
 {
     sp<MediaPlayer2> mp = getMediaPlayer(env, thiz);
     if (mp == NULL ) {
@@ -828,7 +824,7 @@ android_media_MediaPlayer2_getDuration(JNIEnv *env, jobject thiz)
         return 0;
     }
     int64_t msec;
-    process_media_player_call( env, thiz, mp->getDuration(&msec), NULL, NULL );
+    process_media_player_call( env, thiz, mp->getDuration(srcId, &msec), NULL, NULL );
     ALOGV("getDuration: %lld (msec)", (long long)msec);
     return (jlong) msec;
 }
@@ -955,8 +951,13 @@ android_media_MediaPlayer2_native_init(JNIEnv *env)
         return;
     }
 
-    fields.context = env->GetFieldID(clazz, "mNativeContext", "J");
+    fields.context = env->GetFieldID(clazz, "mContext", "Landroid/content/Context;");
     if (fields.context == NULL) {
+        return;
+    }
+
+    fields.nativeContext = env->GetFieldID(clazz, "mNativeContext", "J");
+    if (fields.nativeContext == NULL) {
         return;
     }
 
@@ -1013,7 +1014,8 @@ android_media_MediaPlayer2_native_setup(JNIEnv *env, jobject thiz,
         jint sessionId, jobject weak_this)
 {
     ALOGV("native_setup");
-    sp<MediaPlayer2> mp = MediaPlayer2::Create(sessionId);
+    jobject context = env->GetObjectField(thiz, fields.context);
+    sp<MediaPlayer2> mp = MediaPlayer2::Create(sessionId, context);
     if (mp == NULL) {
         jniThrowException(env, "java/lang/RuntimeException", "Out of memory");
         return;
@@ -1192,7 +1194,7 @@ static Vector<uint8_t> JByteArrayToVector(JNIEnv *env, jbyteArray const &byteArr
 }
 
 static void android_media_MediaPlayer2_prepareDrm(JNIEnv *env, jobject thiz,
-                    jbyteArray uuidObj, jbyteArray drmSessionIdObj)
+                    jlong srcId, jbyteArray uuidObj, jbyteArray drmSessionIdObj)
 {
     sp<MediaPlayer2> mp = getMediaPlayer(env, thiz);
     if (mp == NULL) {
@@ -1225,7 +1227,7 @@ static void android_media_MediaPlayer2_prepareDrm(JNIEnv *env, jobject thiz,
         return;
     }
 
-    status_t err = mp->prepareDrm(uuid.array(), drmSessionId);
+    status_t err = mp->prepareDrm(srcId, uuid.array(), drmSessionId);
     if (err != OK) {
         if (err == INVALID_OPERATION) {
             jniThrowException(
@@ -1243,7 +1245,7 @@ static void android_media_MediaPlayer2_prepareDrm(JNIEnv *env, jobject thiz,
     }
 }
 
-static void android_media_MediaPlayer2_releaseDrm(JNIEnv *env, jobject thiz)
+static void android_media_MediaPlayer2_releaseDrm(JNIEnv *env, jobject thiz, jlong srcId)
 {
     sp<MediaPlayer2> mp = getMediaPlayer(env, thiz);
     if (mp == NULL ) {
@@ -1251,7 +1253,7 @@ static void android_media_MediaPlayer2_releaseDrm(JNIEnv *env, jobject thiz)
         return;
     }
 
-    status_t err = mp->releaseDrm();
+    status_t err = mp->releaseDrm(srcId);
     if (err != OK) {
         if (err == INVALID_OPERATION) {
             jniThrowException(
@@ -1390,7 +1392,7 @@ static const JNINativeMethod gMethods[] = {
     },
     {
         "nativeHandleDataSourceCallback",
-        "(ZJLandroid/media/Media2DataSource;JJ)V",
+        "(ZJLandroid/media/DataSourceCallback;JJ)V",
         (void *)android_media_MediaPlayer2_handleDataSourceCallback
     },
     {"nativePlayNextDataSource", "(J)V",                        (void *)android_media_MediaPlayer2_playNextDataSource},
@@ -1408,7 +1410,7 @@ static const JNINativeMethod gMethods[] = {
     {"native_seekTo",       "(JI)V",                            (void *)android_media_MediaPlayer2_seekTo},
     {"native_pause",        "()V",                              (void *)android_media_MediaPlayer2_pause},
     {"getCurrentPosition",  "()J",                              (void *)android_media_MediaPlayer2_getCurrentPosition},
-    {"getDuration",         "()J",                              (void *)android_media_MediaPlayer2_getDuration},
+    {"native_getDuration",  "(J)J",                             (void *)android_media_MediaPlayer2_getDuration},
     {"native_release",      "()V",                              (void *)android_media_MediaPlayer2_release},
     {"native_reset",        "()V",                              (void *)android_media_MediaPlayer2_reset},
     {"native_setAudioAttributes", "(Landroid/media/AudioAttributes;)Z", (void *)android_media_MediaPlayer2_setAudioAttributes},
@@ -1425,8 +1427,8 @@ static const JNINativeMethod gMethods[] = {
     {"native_setAuxEffectSendLevel", "(F)V",                    (void *)android_media_MediaPlayer2_setAuxEffectSendLevel},
     {"native_attachAuxEffect", "(I)V",                          (void *)android_media_MediaPlayer2_attachAuxEffect},
     // Modular DRM
-    { "native_prepareDrm", "([B[B)V",                           (void *)android_media_MediaPlayer2_prepareDrm },
-    { "native_releaseDrm", "()V",                               (void *)android_media_MediaPlayer2_releaseDrm },
+    { "native_prepareDrm", "(J[B[B)V",                          (void *)android_media_MediaPlayer2_prepareDrm },
+    { "native_releaseDrm", "(J)V",                              (void *)android_media_MediaPlayer2_releaseDrm },
 
     // AudioRouting
     {"native_setPreferredDevice", "(Landroid/media/AudioDeviceInfo;)Z", (void *)android_media_MediaPlayer2_setPreferredDevice},

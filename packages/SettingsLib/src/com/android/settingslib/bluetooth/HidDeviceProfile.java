@@ -58,7 +58,6 @@ public class HidDeviceProfile implements LocalBluetoothProfile {
             implements BluetoothProfile.ServiceListener {
 
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            Log.d(TAG, "Bluetooth service connected :-), profile:" + profile);
             mService = (BluetoothHidDevice) proxy;
             // We just bound to the service, so refresh the UI for any connected HID devices.
             List<BluetoothDevice> deviceList = mService.getConnectedDevices();
@@ -78,7 +77,6 @@ public class HidDeviceProfile implements LocalBluetoothProfile {
         }
 
         public void onServiceDisconnected(int profile) {
-            Log.d(TAG, "Bluetooth service disconnected, profile:" + profile);
             mIsProfileReady = false;
         }
     }
@@ -173,7 +171,7 @@ public class HidDeviceProfile implements LocalBluetoothProfile {
 
     @Override
     public int getDrawableResource(BluetoothClass btClass) {
-        return R.drawable.ic_bt_misc_hid;
+        return com.android.internal.R.drawable.ic_bt_misc_hid;
     }
 
     protected void finalize() {

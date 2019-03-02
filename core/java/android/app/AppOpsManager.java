@@ -27,6 +27,7 @@ import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
 import android.app.usage.UsageStatsManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
 import android.database.ContentObserver;
 import android.media.AudioAttributes.AttributeUsage;
@@ -36,24 +37,34 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.Process;
+import android.os.RemoteCallback;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.util.ArrayMap;
+import android.util.SparseArray;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.app.IAppOpsActiveCallback;
 import com.android.internal.app.IAppOpsCallback;
+import com.android.internal.app.IAppOpsNotedCallback;
 import com.android.internal.app.IAppOpsService;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Preconditions;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * API for interacting with "application operation" tracking.
@@ -86,13 +97,68 @@ public class AppOpsManager {
      */
 
     final Context mContext;
+
     @UnsupportedAppUsage
     final IAppOpsService mService;
-    final ArrayMap<OnOpChangedListener, IAppOpsCallback> mModeWatchers = new ArrayMap<>();
-    final ArrayMap<OnOpActiveChangedListener, IAppOpsActiveCallback> mActiveWatchers =
+
+    @GuardedBy("mModeWatchers")
+    private final ArrayMap<OnOpChangedListener, IAppOpsCallback> mModeWatchers =
+            new ArrayMap<>();
+
+    @GuardedBy("mActiveWatchers")
+    private final ArrayMap<OnOpActiveChangedListener, IAppOpsActiveCallback> mActiveWatchers =
+            new ArrayMap<>();
+
+    @GuardedBy("mNotedWatchers")
+    private final ArrayMap<OnOpNotedListener, IAppOpsNotedCallback> mNotedWatchers =
             new ArrayMap<>();
 
     static IBinder sToken;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(flag = true, prefix = { "HISTORICAL_MODE_" }, value = {
+            HISTORICAL_MODE_DISABLED,
+            HISTORICAL_MODE_ENABLED_ACTIVE,
+            HISTORICAL_MODE_ENABLED_PASSIVE
+    })
+    public @interface HistoricalMode {}
+
+    /**
+     * Mode in which app op history is completely disabled.
+     * @hide
+     */
+    @TestApi
+    public static final int HISTORICAL_MODE_DISABLED = 0;
+
+    /**
+     * Mode in which app op history is enabled and app ops performed by apps would
+     * be tracked. This is the mode in which the feature is completely enabled.
+     * @hide
+     */
+    @TestApi
+    public static final int HISTORICAL_MODE_ENABLED_ACTIVE = 1;
+
+    /**
+     * Mode in which app op history is enabled but app ops performed by apps would
+     * not be tracked and the only way to add ops to the history is via explicit calls
+     * to dedicated APIs. This mode is useful for testing to allow full control of
+     * the historical content.
+     * @hide
+     */
+    @TestApi
+    public static final int HISTORICAL_MODE_ENABLED_PASSIVE = 2;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(flag = true, prefix = { "MODE_" }, value = {
+            MODE_ALLOWED,
+            MODE_IGNORED,
+            MODE_ERRORED,
+            MODE_DEFAULT,
+            MODE_FOREGROUND
+    })
+    public @interface Mode {}
 
     /**
      * Result from {@link #checkOp}, {@link #noteOp}, {@link #startOp}: the given caller is
@@ -147,12 +213,12 @@ public class AppOpsManager {
             "foreground",   // MODE_FOREGROUND
     };
 
-
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(flag = true, prefix = { "UID_STATE_" }, value = {
             UID_STATE_PERSISTENT,
             UID_STATE_TOP,
+            UID_STATE_FOREGROUND_SERVICE_LOCATION,
             UID_STATE_FOREGROUND_SERVICE,
             UID_STATE_FOREGROUND,
             UID_STATE_BACKGROUND,
@@ -161,9 +227,16 @@ public class AppOpsManager {
     public @interface UidState {}
 
     /**
+     * Invalid UID state.
+     * @hide
+     */
+    public static final int UID_STATE_INVALID = -1;
+
+    /**
      * Metrics about an op when its uid is persistent.
      * @hide
      */
+    @TestApi
     @SystemApi
     public static final int UID_STATE_PERSISTENT = 0;
 
@@ -171,48 +244,61 @@ public class AppOpsManager {
      * Metrics about an op when its uid is at the top.
      * @hide
      */
+    @TestApi
     @SystemApi
     public static final int UID_STATE_TOP = 1;
+
+    /**
+     * Metrics about an op when its uid is running a foreground service with location type.
+     * @hide
+     */
+    @TestApi
+    @SystemApi
+    public static final int UID_STATE_FOREGROUND_SERVICE_LOCATION = 2;
 
     /**
      * Metrics about an op when its uid is running a foreground service.
      * @hide
      */
+    @TestApi
     @SystemApi
-    public static final int UID_STATE_FOREGROUND_SERVICE = 2;
+    public static final int UID_STATE_FOREGROUND_SERVICE = 3;
 
     /**
      * Last UID state in which we don't restrict what an op can do.
      * @hide
      */
-    public static final int UID_STATE_LAST_NON_RESTRICTED = UID_STATE_FOREGROUND_SERVICE;
+    public static final int UID_STATE_LAST_NON_RESTRICTED = UID_STATE_FOREGROUND_SERVICE_LOCATION;
 
     /**
      * Metrics about an op when its uid is in the foreground for any other reasons.
      * @hide
      */
+    @TestApi
     @SystemApi
-    public static final int UID_STATE_FOREGROUND = 3;
+    public static final int UID_STATE_FOREGROUND = 4;
 
     /**
      * Metrics about an op when its uid is in the background for any reason.
      * @hide
      */
+    @TestApi
     @SystemApi
-    public static final int UID_STATE_BACKGROUND = 4;
+    public static final int UID_STATE_BACKGROUND = 5;
 
     /**
      * Metrics about an op when its uid is cached.
      * @hide
      */
+    @TestApi
     @SystemApi
-    public static final int UID_STATE_CACHED = 5;
+    public static final int UID_STATE_CACHED = 6;
 
     /**
      * Number of uid states we track.
      * @hide
      */
-    public static final int _NUM_UID_STATE = 6;
+    public static final int _NUM_UID_STATE = 7;
 
     // when adding one of these:
     //  - increment _NUM_OP
@@ -225,7 +311,7 @@ public class AppOpsManager {
     @UnsupportedAppUsage
     public static final int OP_NONE = -1;
     /** @hide Access to coarse location information. */
-    @UnsupportedAppUsage
+    @TestApi
     public static final int OP_COARSE_LOCATION = 0;
     /** @hide Access to fine location information. */
     @UnsupportedAppUsage
@@ -462,9 +548,27 @@ public class AppOpsManager {
     public static final int OP_USE_BIOMETRIC = 78;
     /** @hide Physical activity recognition. */
     public static final int OP_ACTIVITY_RECOGNITION = 79;
+    /** @hide Financial app sms read. */
+    public static final int OP_SMS_FINANCIAL_TRANSACTIONS = 80;
+    /** @hide Read media of audio type. */
+    public static final int OP_READ_MEDIA_AUDIO = 81;
+    /** @hide Write media of audio type. */
+    public static final int OP_WRITE_MEDIA_AUDIO = 82;
+    /** @hide Read media of video type. */
+    public static final int OP_READ_MEDIA_VIDEO = 83;
+    /** @hide Write media of video type. */
+    public static final int OP_WRITE_MEDIA_VIDEO = 84;
+    /** @hide Read media of image type. */
+    public static final int OP_READ_MEDIA_IMAGES = 85;
+    /** @hide Write media of image type. */
+    public static final int OP_WRITE_MEDIA_IMAGES = 86;
+    /** @hide Has a legacy (non-isolated) view of storage. */
+    public static final int OP_LEGACY_STORAGE = 87;
+    /** @hide Accessing accessibility features */
+    public static final int OP_ACCESS_ACCESSIBILITY = 88;
     /** @hide */
     @UnsupportedAppUsage
-    public static final int _NUM_OP = 80;
+    public static final int _NUM_OP = 89;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -715,6 +819,27 @@ public class AppOpsManager {
     /** @hide Recognize physical activity. */
     public static final String OPSTR_ACTIVITY_RECOGNITION = "android:activity_recognition";
 
+    /** @hide Financial app read sms. */
+    public static final String OPSTR_SMS_FINANCIAL_TRANSACTIONS =
+            "android:sms_financial_transactions";
+
+    /** @hide Read media of audio type. */
+    public static final String OPSTR_READ_MEDIA_AUDIO = "android:read_media_audio";
+    /** @hide Write media of audio type. */
+    public static final String OPSTR_WRITE_MEDIA_AUDIO = "android:write_media_audio";
+    /** @hide Read media of video type. */
+    public static final String OPSTR_READ_MEDIA_VIDEO = "android:read_media_video";
+    /** @hide Write media of video type. */
+    public static final String OPSTR_WRITE_MEDIA_VIDEO = "android:write_media_video";
+    /** @hide Read media of image type. */
+    public static final String OPSTR_READ_MEDIA_IMAGES = "android:read_media_images";
+    /** @hide Write media of image type. */
+    public static final String OPSTR_WRITE_MEDIA_IMAGES = "android:write_media_images";
+    /** @hide Has a legacy (non-isolated) view of storage. */
+    public static final String OPSTR_LEGACY_STORAGE = "android:legacy_storage";
+    /** @hide Interact with accessibility. */
+    public static final String OPSTR_ACCESS_ACCESSIBILITY = "android:access_accessibility";
+
     // Warning: If an permission is added here it also has to be added to
     // com.android.packageinstaller.permission.utils.EventLogger
     private static final int[] RUNTIME_AND_APPOP_PERMISSIONS_OPS = {
@@ -758,6 +883,14 @@ public class AppOpsManager {
             OP_BODY_SENSORS,
             // Activity recognition
             OP_ACTIVITY_RECOGNITION,
+            // Aural
+            OP_READ_MEDIA_AUDIO,
+            OP_WRITE_MEDIA_AUDIO,
+            // Visual
+            OP_READ_MEDIA_VIDEO,
+            OP_WRITE_MEDIA_VIDEO,
+            OP_READ_MEDIA_IMAGES,
+            OP_WRITE_MEDIA_IMAGES,
 
             // APPOP PERMISSIONS
             OP_ACCESS_NOTIFICATIONS,
@@ -765,6 +898,7 @@ public class AppOpsManager {
             OP_WRITE_SETTINGS,
             OP_REQUEST_INSTALL_PACKAGES,
             OP_START_FOREGROUND,
+            OP_SMS_FINANCIAL_TRANSACTIONS,
     };
 
     /**
@@ -856,6 +990,15 @@ public class AppOpsManager {
             OP_COARSE_LOCATION,                 // BLUETOOTH_SCAN
             OP_USE_BIOMETRIC,                   // BIOMETRIC
             OP_ACTIVITY_RECOGNITION,            // ACTIVITY_RECOGNITION
+            OP_SMS_FINANCIAL_TRANSACTIONS,      // SMS_FINANCIAL_TRANSACTIONS
+            OP_READ_MEDIA_AUDIO,                // READ_MEDIA_AUDIO
+            OP_WRITE_MEDIA_AUDIO,               // WRITE_MEDIA_AUDIO
+            OP_READ_MEDIA_VIDEO,                // READ_MEDIA_VIDEO
+            OP_WRITE_MEDIA_VIDEO,               // WRITE_MEDIA_VIDEO
+            OP_READ_MEDIA_IMAGES,               // READ_MEDIA_IMAGES
+            OP_WRITE_MEDIA_IMAGES,              // WRITE_MEDIA_IMAGES
+            OP_LEGACY_STORAGE,                  // LEGACY_STORAGE
+            OP_ACCESS_ACCESSIBILITY,            // ACCESS_ACCESSIBILITY
     };
 
     /**
@@ -942,6 +1085,15 @@ public class AppOpsManager {
             OPSTR_BLUETOOTH_SCAN,
             OPSTR_USE_BIOMETRIC,
             OPSTR_ACTIVITY_RECOGNITION,
+            OPSTR_SMS_FINANCIAL_TRANSACTIONS,
+            OPSTR_READ_MEDIA_AUDIO,
+            OPSTR_WRITE_MEDIA_AUDIO,
+            OPSTR_READ_MEDIA_VIDEO,
+            OPSTR_WRITE_MEDIA_VIDEO,
+            OPSTR_READ_MEDIA_IMAGES,
+            OPSTR_WRITE_MEDIA_IMAGES,
+            OPSTR_LEGACY_STORAGE,
+            OPSTR_ACCESS_ACCESSIBILITY,
     };
 
     /**
@@ -1000,7 +1152,7 @@ public class AppOpsManager {
             "WRITE_WALLPAPER",
             "ASSIST_STRUCTURE",
             "ASSIST_SCREENSHOT",
-            "OP_READ_PHONE_STATE",
+            "READ_PHONE_STATE",
             "ADD_VOICEMAIL",
             "USE_SIP",
             "PROCESS_OUTGOING_CALLS",
@@ -1029,6 +1181,15 @@ public class AppOpsManager {
             "BLUETOOTH_SCAN",
             "USE_BIOMETRIC",
             "ACTIVITY_RECOGNITION",
+            "SMS_FINANCIAL_TRANSACTIONS",
+            "READ_MEDIA_AUDIO",
+            "WRITE_MEDIA_AUDIO",
+            "READ_MEDIA_VIDEO",
+            "WRITE_MEDIA_VIDEO",
+            "READ_MEDIA_IMAGES",
+            "WRITE_MEDIA_IMAGES",
+            "LEGACY_STORAGE",
+            "ACCESS_ACCESSIBILITY",
     };
 
     /**
@@ -1117,6 +1278,15 @@ public class AppOpsManager {
             null, // no permission for OP_BLUETOOTH_SCAN
             Manifest.permission.USE_BIOMETRIC,
             Manifest.permission.ACTIVITY_RECOGNITION,
+            Manifest.permission.SMS_FINANCIAL_TRANSACTIONS,
+            Manifest.permission.READ_MEDIA_AUDIO,
+            null, // no permission for OP_WRITE_MEDIA_AUDIO
+            Manifest.permission.READ_MEDIA_VIDEO,
+            null, // no permission for OP_WRITE_MEDIA_VIDEO
+            Manifest.permission.READ_MEDIA_IMAGES,
+            null, // no permission for OP_WRITE_MEDIA_IMAGES
+            null, // no permission for OP_LEGACY_STORAGE
+            null, // no permission for OP_ACCESS_ACCESSIBILITY
     };
 
     /**
@@ -1205,6 +1375,15 @@ public class AppOpsManager {
             null, // maybe should be UserManager.DISALLOW_SHARE_LOCATION, //BLUETOOTH_SCAN
             null, // USE_BIOMETRIC
             null, // ACTIVITY_RECOGNITION
+            UserManager.DISALLOW_SMS, // SMS_FINANCIAL_TRANSACTIONS
+            null, // READ_MEDIA_AUDIO
+            null, // WRITE_MEDIA_AUDIO
+            null, // READ_MEDIA_VIDEO
+            null, // WRITE_MEDIA_VIDEO
+            null, // READ_MEDIA_IMAGES
+            null, // WRITE_MEDIA_IMAGES
+            null, // LEGACY_STORAGE
+            null, // ACCESS_ACCESSIBILITY
     };
 
     /**
@@ -1292,6 +1471,15 @@ public class AppOpsManager {
             true, // BLUETOOTH_SCAN
             false, // USE_BIOMETRIC
             false, // ACTIVITY_RECOGNITION
+            false, // SMS_FINANCIAL_TRANSACTIONS
+            false, // READ_MEDIA_AUDIO
+            false, // WRITE_MEDIA_AUDIO
+            false, // READ_MEDIA_VIDEO
+            false, // WRITE_MEDIA_VIDEO
+            false, // READ_MEDIA_IMAGES
+            false, // WRITE_MEDIA_IMAGES
+            false, // LEGACY_STORAGE
+            false, // ACCESS_ACCESSIBILITY
     };
 
     /**
@@ -1322,7 +1510,7 @@ public class AppOpsManager {
             AppOpsManager.MODE_ALLOWED, // READ_ICC_SMS
             AppOpsManager.MODE_ALLOWED, // WRITE_ICC_SMS
             AppOpsManager.MODE_DEFAULT, // WRITE_SETTINGS
-            AppOpsManager.MODE_DEFAULT, // SYSTEM_ALERT_WINDOW
+            getSystemAlertWindowDefault(), // SYSTEM_ALERT_WINDOW
             AppOpsManager.MODE_ALLOWED, // ACCESS_NOTIFICATIONS
             AppOpsManager.MODE_ALLOWED, // CAMERA
             AppOpsManager.MODE_ALLOWED, // RECORD_AUDIO
@@ -1378,6 +1566,15 @@ public class AppOpsManager {
             AppOpsManager.MODE_ALLOWED, // BLUETOOTH_SCAN
             AppOpsManager.MODE_ALLOWED, // USE_BIOMETRIC
             AppOpsManager.MODE_ALLOWED, // ACTIVITY_RECOGNITION
+            AppOpsManager.MODE_DEFAULT, // SMS_FINANCIAL_TRANSACTIONS
+            AppOpsManager.MODE_ALLOWED, // READ_MEDIA_AUDIO
+            AppOpsManager.MODE_ERRORED, // WRITE_MEDIA_AUDIO
+            AppOpsManager.MODE_ALLOWED, // READ_MEDIA_VIDEO
+            AppOpsManager.MODE_ERRORED, // WRITE_MEDIA_VIDEO
+            AppOpsManager.MODE_ALLOWED, // READ_MEDIA_IMAGES
+            AppOpsManager.MODE_ERRORED, // WRITE_MEDIA_IMAGES
+            AppOpsManager.MODE_DEFAULT, // LEGACY_STORAGE
+            AppOpsManager.MODE_ALLOWED, // ACCESS_ACCESSIBILITY
     };
 
     /**
@@ -1468,6 +1665,15 @@ public class AppOpsManager {
             false, // BLUETOOTH_SCAN
             false, // USE_BIOMETRIC
             false, // ACTIVITY_RECOGNITION
+            false, // SMS_FINANCIAL_TRANSACTIONS
+            false, // READ_MEDIA_AUDIO
+            false, // WRITE_MEDIA_AUDIO
+            false, // READ_MEDIA_VIDEO
+            false, // WRITE_MEDIA_VIDEO
+            false, // READ_MEDIA_IMAGES
+            false, // WRITE_MEDIA_IMAGES
+            false, // LEGACY_STORAGE
+            false, // ACCESS_ACCESSIBILITY
     };
 
     /**
@@ -1525,6 +1731,15 @@ public class AppOpsManager {
         }
     }
 
+    /** @hide */
+    public static final String KEY_HISTORICAL_OPS = "historical_ops";
+
+    /** System properties for debug logging of noteOp call sites */
+    private static final String DEBUG_LOGGING_ENABLE_PROP = "appops.logging_enabled";
+    private static final String DEBUG_LOGGING_PACKAGES_PROP = "appops.logging_packages";
+    private static final String DEBUG_LOGGING_OPS_PROP = "appops.logging_ops";
+    private static final String DEBUG_LOGGING_TAG = "AppOpsManager";
+
     /**
      * Retrieve the op switch that controls the given operation.
      * @hide
@@ -1542,6 +1757,15 @@ public class AppOpsManager {
     public static String opToName(int op) {
         if (op == OP_NONE) return "NONE";
         return op < sOpNames.length ? sOpNames[op] : ("Unknown(" + op + ")");
+    }
+
+    /**
+     * Retrieve a non-localized public name for the operation.
+     *
+     * @hide
+     */
+    public static @NonNull String opToPublicName(int op) {
+        return sOpToString[op];
     }
 
     /**
@@ -1611,7 +1835,7 @@ public class AppOpsManager {
      * Retrieve the default mode for the operation.
      * @hide
      */
-    public static int opToDefaultMode(int op) {
+    public static @Mode int opToDefaultMode(int op) {
         // STOPSHIP b/118520006: Hardcode the default values once the feature is stable.
         switch (op) {
             // SMS permissions
@@ -1675,7 +1899,7 @@ public class AppOpsManager {
      * Retrieve the human readable mode.
      * @hide
      */
-    public static String modeToName(int mode) {
+    public static String modeToName(@Mode int mode) {
         if (mode >= 0 && mode < MODE_NAMES.length) {
             return MODE_NAMES[mode];
         }
@@ -1765,7 +1989,7 @@ public class AppOpsManager {
     @SystemApi
     public static final class OpEntry implements Parcelable {
         private final int mOp;
-        private final int mMode;
+        private final @Mode int mMode;
         private final long[] mTimes;
         private final long[] mRejectTimes;
         private final int mDuration;
@@ -1776,7 +2000,7 @@ public class AppOpsManager {
         /**
          * @hide
          */
-        public OpEntry(int op, int mode, long time, long rejectTime, int duration,
+        public OpEntry(int op, @Mode int mode, long time, long rejectTime, int duration,
                 int proxyUid, String proxyPackage) {
             mOp = op;
             mMode = mode;
@@ -1793,7 +2017,7 @@ public class AppOpsManager {
         /**
          * @hide
          */
-        public OpEntry(int op, int mode, long[] times, long[] rejectTimes, int duration,
+        public OpEntry(int op, @Mode int mode, long[] times, long[] rejectTimes, int duration,
                 boolean running, int proxyUid, String proxyPackage) {
             mOp = op;
             mMode = mode;
@@ -1810,7 +2034,7 @@ public class AppOpsManager {
         /**
          * @hide
          */
-        public OpEntry(int op, int mode, long[] times, long[] rejectTimes, int duration,
+        public OpEntry(int op, @Mode int mode, long[] times, long[] rejectTimes, int duration,
                 int proxyUid, String proxyPackage) {
             this(op, mode, times, rejectTimes, duration, duration == -1, proxyUid, proxyPackage);
         }
@@ -1833,7 +2057,7 @@ public class AppOpsManager {
         /**
          * Return this entry's current mode, such as {@link #MODE_ALLOWED}.
          */
-        public int getMode() {
+        public @Mode int getMode() {
             return mMode;
         }
 
@@ -1966,41 +2190,774 @@ public class AppOpsManager {
         };
     }
 
+    /** @hide */
+    public interface HistoricalOpsVisitor {
+        void visitHistoricalOps(@NonNull HistoricalOps ops);
+        void visitHistoricalUidOps(@NonNull HistoricalUidOps ops);
+        void visitHistoricalPackageOps(@NonNull HistoricalPackageOps ops);
+        void visitHistoricalOp(@NonNull HistoricalOp ops);
+    }
+
     /**
-     * This class represents historical app op information about a package. The history
-     * is aggregated information about ops for a certain amount of time such
-     * as the times the op was accessed, the times the op was rejected, the total
-     * duration the app op has been accessed.
+     * This class represents historical app op state of all UIDs for a given time interval.
+     *
+     * @hide
+     */
+    @TestApi
+    @SystemApi
+    public static final class HistoricalOps implements Parcelable {
+        private long mBeginTimeMillis;
+        private long mEndTimeMillis;
+        private @Nullable SparseArray<HistoricalUidOps> mHistoricalUidOps;
+
+        /** @hide */
+        @TestApi
+        public HistoricalOps(long beginTimeMillis, long endTimeMillis) {
+            Preconditions.checkState(beginTimeMillis <= endTimeMillis);
+            mBeginTimeMillis = beginTimeMillis;
+            mEndTimeMillis = endTimeMillis;
+        }
+
+        /** @hide */
+        public HistoricalOps(@NonNull HistoricalOps other) {
+            mBeginTimeMillis = other.mBeginTimeMillis;
+            mEndTimeMillis = other.mEndTimeMillis;
+            Preconditions.checkState(mBeginTimeMillis <= mEndTimeMillis);
+            if (other.mHistoricalUidOps != null) {
+                final int opCount = other.getUidCount();
+                for (int i = 0; i < opCount; i++) {
+                    final HistoricalUidOps origOps = other.getUidOpsAt(i);
+                    final HistoricalUidOps clonedOps = new HistoricalUidOps(origOps);
+                    if (mHistoricalUidOps == null) {
+                        mHistoricalUidOps = new SparseArray<>(opCount);
+                    }
+                    mHistoricalUidOps.put(clonedOps.getUid(), clonedOps);
+                }
+            }
+        }
+
+        private HistoricalOps(Parcel parcel) {
+            mBeginTimeMillis = parcel.readLong();
+            mEndTimeMillis = parcel.readLong();
+            final int[] uids = parcel.createIntArray();
+            if (!ArrayUtils.isEmpty(uids)) {
+                final ParceledListSlice<HistoricalUidOps> listSlice = parcel.readParcelable(
+                        HistoricalOps.class.getClassLoader());
+                final List<HistoricalUidOps> uidOps = (listSlice != null)
+                        ? listSlice.getList() : null;
+                if (uidOps == null) {
+                    return;
+                }
+                for (int i = 0; i < uids.length; i++) {
+                    if (mHistoricalUidOps == null) {
+                        mHistoricalUidOps = new SparseArray<>();
+                    }
+                    mHistoricalUidOps.put(uids[i], uidOps.get(i));
+                }
+            }
+        }
+
+        /**
+         * Splice a piece from the beginning of these ops.
+         *
+         * @param splicePoint The fraction of the data to be spliced off.
+         *
+         * @hide
+         */
+        public @NonNull HistoricalOps spliceFromBeginning(double splicePoint) {
+            return splice(splicePoint, true);
+        }
+
+        /**
+         * Splice a piece from the end of these ops.
+         *
+         * @param fractionToRemove The fraction of the data to be spliced off.
+         *
+         * @hide
+         */
+        public @NonNull HistoricalOps spliceFromEnd(double fractionToRemove) {
+            return splice(fractionToRemove, false);
+        }
+
+        /**
+         * Splice a piece from the beginning or end of these ops.
+         *
+         * @param fractionToRemove The fraction of the data to be spliced off.
+         * @param beginning Whether to splice off the beginning or the end.
+         *
+         * @return The spliced off part.
+         *
+         * @hide
+         */
+        private @Nullable HistoricalOps splice(double fractionToRemove, boolean beginning) {
+            final long spliceBeginTimeMills;
+            final long spliceEndTimeMills;
+            if (beginning) {
+                spliceBeginTimeMills = mBeginTimeMillis;
+                spliceEndTimeMills = (long) (mBeginTimeMillis
+                        + getDurationMillis() * fractionToRemove);
+                mBeginTimeMillis = spliceEndTimeMills;
+            } else {
+                spliceBeginTimeMills = (long) (mEndTimeMillis
+                        - getDurationMillis() * fractionToRemove);
+                spliceEndTimeMills = mEndTimeMillis;
+                mEndTimeMillis = spliceBeginTimeMills;
+            }
+
+            HistoricalOps splice = null;
+            final int uidCount = getUidCount();
+            for (int i = 0; i < uidCount; i++) {
+                final HistoricalUidOps origOps = getUidOpsAt(i);
+                final HistoricalUidOps spliceOps = origOps.splice(fractionToRemove);
+                if (spliceOps != null) {
+                    if (splice == null) {
+                        splice = new HistoricalOps(spliceBeginTimeMills, spliceEndTimeMills);
+                    }
+                    if (splice.mHistoricalUidOps == null) {
+                        splice.mHistoricalUidOps = new SparseArray<>();
+                    }
+                    splice.mHistoricalUidOps.put(spliceOps.getUid(), spliceOps);
+                }
+            }
+            return splice;
+        }
+
+        /**
+         * Merge the passed ops into the current ones. The time interval is a
+         * union of the current and passed in one and the passed in data is
+         * folded into the data of this instance.
+         *
+         * @hide
+         */
+        public void merge(@NonNull HistoricalOps other) {
+            mBeginTimeMillis = Math.min(mBeginTimeMillis, other.mBeginTimeMillis);
+            mEndTimeMillis = Math.max(mEndTimeMillis, other.mEndTimeMillis);
+            final int uidCount = other.getUidCount();
+            for (int i = 0; i < uidCount; i++) {
+                final HistoricalUidOps otherUidOps = other.getUidOpsAt(i);
+                final HistoricalUidOps thisUidOps = getUidOps(otherUidOps.getUid());
+                if (thisUidOps != null) {
+                    thisUidOps.merge(otherUidOps);
+                } else {
+                    if (mHistoricalUidOps == null) {
+                        mHistoricalUidOps = new SparseArray<>();
+                    }
+                    mHistoricalUidOps.put(otherUidOps.getUid(), otherUidOps);
+                }
+            }
+        }
+
+        /**
+         * AppPermissionUsage the ops to leave only the data we filter for.
+         *
+         * @param uid Uid to filter for or {@link android.os.Process#INCIDENTD_UID} for all.
+         * @param packageName Package to filter for or null for all.
+         * @param opNames Ops to filter for or null for all.
+         * @param beginTimeMillis The begin time to filter for or {@link Long#MIN_VALUE} for all.
+         * @param endTimeMillis The end time to filter for or {@link Long#MAX_VALUE} for all.
+         *
+         * @hide
+         */
+        public void filter(int uid, @Nullable String packageName, @Nullable String[] opNames,
+                long beginTimeMillis, long endTimeMillis) {
+            final long durationMillis = getDurationMillis();
+            mBeginTimeMillis = Math.max(mBeginTimeMillis, beginTimeMillis);
+            mEndTimeMillis = Math.min(mEndTimeMillis, endTimeMillis);
+            final double scaleFactor = Math.min((double) (endTimeMillis - beginTimeMillis)
+                    / (double) durationMillis, 1);
+            final int uidCount = getUidCount();
+            for (int i = uidCount - 1; i >= 0; i--) {
+                final HistoricalUidOps uidOp = mHistoricalUidOps.valueAt(i);
+                if (uid != Process.INVALID_UID && uid != uidOp.getUid()) {
+                    mHistoricalUidOps.removeAt(i);
+                } else {
+                    uidOp.filter(packageName, opNames, scaleFactor);
+                }
+            }
+        }
+
+        /** @hide */
+        public boolean isEmpty() {
+            if (getBeginTimeMillis() >= getEndTimeMillis()) {
+                return true;
+            }
+            final int uidCount = getUidCount();
+            for (int i = uidCount - 1; i >= 0; i--) {
+                final HistoricalUidOps uidOp = mHistoricalUidOps.valueAt(i);
+                if (!uidOp.isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** @hide */
+        public long getDurationMillis() {
+            return mEndTimeMillis - mBeginTimeMillis;
+        }
+
+        /** @hide */
+        @TestApi
+        public void increaseAccessCount(int opCode, int uid, @NonNull String packageName,
+                @UidState int uidState, long increment) {
+            getOrCreateHistoricalUidOps(uid).increaseAccessCount(opCode,
+                    packageName, uidState, increment);
+        }
+
+        /** @hide */
+        @TestApi
+        public void increaseRejectCount(int opCode, int uid, @NonNull String packageName,
+                @UidState int uidState, long increment) {
+            getOrCreateHistoricalUidOps(uid).increaseRejectCount(opCode,
+                    packageName, uidState, increment);
+        }
+
+        /** @hide */
+        @TestApi
+        public void increaseAccessDuration(int opCode, int uid, @NonNull String packageName,
+                @UidState int uidState, long increment) {
+            getOrCreateHistoricalUidOps(uid).increaseAccessDuration(opCode,
+                    packageName, uidState, increment);
+        }
+
+        /** @hide */
+        @TestApi
+        public void offsetBeginAndEndTime(long offsetMillis) {
+            mBeginTimeMillis += offsetMillis;
+            mEndTimeMillis += offsetMillis;
+        }
+
+        /** @hide */
+        public void setBeginAndEndTime(long beginTimeMillis, long endTimeMillis) {
+            mBeginTimeMillis = beginTimeMillis;
+            mEndTimeMillis = endTimeMillis;
+        }
+
+        /** @hide */
+        public void setBeginTime(long beginTimeMillis) {
+            mBeginTimeMillis = beginTimeMillis;
+        }
+
+        /** @hide */
+        public void setEndTime(long endTimeMillis) {
+            mEndTimeMillis = endTimeMillis;
+        }
+
+        /**
+         * @return The beginning of the interval in milliseconds since
+         *    epoch start (January 1, 1970 00:00:00.000 GMT - Gregorian).
+         */
+        public long getBeginTimeMillis() {
+            return mBeginTimeMillis;
+        }
+
+        /**
+         * @return The end of the interval in milliseconds since
+         *    epoch start (January 1, 1970 00:00:00.000 GMT - Gregorian).
+         */
+        public long getEndTimeMillis() {
+            return mEndTimeMillis;
+        }
+
+        /**
+         * Gets number of UIDs with historical ops.
+         *
+         * @return The number of UIDs with historical ops.
+         *
+         * @see #getUidOpsAt(int)
+         */
+        public int getUidCount() {
+            if (mHistoricalUidOps == null) {
+                return 0;
+            }
+            return mHistoricalUidOps.size();
+        }
+
+        /**
+         * Gets the historical UID ops at a given index.
+         *
+         * @param index The index.
+         *
+         * @return The historical UID ops at the given index.
+         *
+         * @see #getUidCount()
+         */
+        public @NonNull HistoricalUidOps getUidOpsAt(int index) {
+            if (mHistoricalUidOps == null) {
+                throw new IndexOutOfBoundsException();
+            }
+            return mHistoricalUidOps.valueAt(index);
+        }
+
+        /**
+         * Gets the historical UID ops for a given UID.
+         *
+         * @param uid The UID.
+         *
+         * @return The historical ops for the UID.
+         */
+        public @Nullable HistoricalUidOps getUidOps(int uid) {
+            if (mHistoricalUidOps == null) {
+                return null;
+            }
+            return mHistoricalUidOps.get(uid);
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel parcel, int flags) {
+            parcel.writeLong(mBeginTimeMillis);
+            parcel.writeLong(mEndTimeMillis);
+            if (mHistoricalUidOps != null) {
+                final int uidCount = mHistoricalUidOps.size();
+                parcel.writeInt(uidCount);
+                for (int i = 0; i < uidCount; i++) {
+                    parcel.writeInt(mHistoricalUidOps.keyAt(i));
+                }
+                final List<HistoricalUidOps> opsList = new ArrayList<>(uidCount);
+                for (int i = 0; i < uidCount; i++) {
+                    opsList.add(mHistoricalUidOps.valueAt(i));
+                }
+                parcel.writeParcelable(new ParceledListSlice<>(opsList), flags);
+            } else {
+                parcel.writeInt(-1);
+            }
+        }
+
+        /**
+         * Accepts a visitor to traverse the ops tree.
+         *
+         * @param visitor The visitor.
+         *
+         * @hide
+         */
+        public void accept(@NonNull HistoricalOpsVisitor visitor) {
+            visitor.visitHistoricalOps(this);
+            final int uidCount = getUidCount();
+            for (int i = 0; i < uidCount; i++) {
+                getUidOpsAt(i).accept(visitor);
+            }
+        }
+
+        private @NonNull HistoricalUidOps getOrCreateHistoricalUidOps(int uid) {
+            if (mHistoricalUidOps == null) {
+                mHistoricalUidOps = new SparseArray<>();
+            }
+            HistoricalUidOps historicalUidOp = mHistoricalUidOps.get(uid);
+            if (historicalUidOp == null) {
+                historicalUidOp = new HistoricalUidOps(uid);
+                mHistoricalUidOps.put(uid, historicalUidOp);
+            }
+            return historicalUidOp;
+        }
+
+        /**
+         * @return Rounded value up at the 0.5 boundary.
+         *
+         * @hide
+         */
+        public static double round(double value) {
+            final BigDecimal decimalScale = new BigDecimal(value);
+            return decimalScale.setScale(0, RoundingMode.HALF_UP).doubleValue();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            final HistoricalOps other = (HistoricalOps) obj;
+            if (mBeginTimeMillis != other.mBeginTimeMillis) {
+                return false;
+            }
+            if (mEndTimeMillis != other.mEndTimeMillis) {
+                return false;
+            }
+            if (mHistoricalUidOps == null) {
+                if (other.mHistoricalUidOps != null) {
+                    return false;
+                }
+            } else if (!mHistoricalUidOps.equals(other.mHistoricalUidOps)) {
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = (int) (mBeginTimeMillis ^ (mBeginTimeMillis >>> 32));
+            result = 31 * result + mHistoricalUidOps.hashCode();
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return getClass().getSimpleName() + "[from:"
+                    + mBeginTimeMillis + " to:" + mEndTimeMillis + "]";
+        }
+
+        public static final Creator<HistoricalOps> CREATOR = new Creator<HistoricalOps>() {
+            @Override
+            public @NonNull HistoricalOps createFromParcel(@NonNull Parcel parcel) {
+                return new HistoricalOps(parcel);
+            }
+
+            @Override
+            public @NonNull HistoricalOps[] newArray(int size) {
+                return new HistoricalOps[size];
+            }
+        };
+    }
+
+    /**
+     * This class represents historical app op state for a UID.
+     *
+     * @hide
+     */
+    @TestApi
+    @SystemApi
+    public static final class HistoricalUidOps implements Parcelable {
+        private final int mUid;
+        private @Nullable ArrayMap<String, HistoricalPackageOps> mHistoricalPackageOps;
+
+        /** @hide */
+        public HistoricalUidOps(int uid) {
+            mUid = uid;
+        }
+
+        private HistoricalUidOps(@NonNull HistoricalUidOps other) {
+            mUid = other.mUid;
+            final int opCount = other.getPackageCount();
+            for (int i = 0; i < opCount; i++) {
+                final HistoricalPackageOps origOps = other.getPackageOpsAt(i);
+                final HistoricalPackageOps cloneOps = new HistoricalPackageOps(origOps);
+                if (mHistoricalPackageOps == null) {
+                    mHistoricalPackageOps = new ArrayMap<>(opCount);
+                }
+                mHistoricalPackageOps.put(cloneOps.getPackageName(), cloneOps);
+            }
+        }
+
+        private HistoricalUidOps(@NonNull Parcel parcel) {
+            // No arg check since we always read from a trusted source.
+            mUid = parcel.readInt();
+            mHistoricalPackageOps = parcel.createTypedArrayMap(HistoricalPackageOps.CREATOR);
+        }
+
+        private @Nullable HistoricalUidOps splice(double fractionToRemove) {
+            HistoricalUidOps splice = null;
+            final int packageCount = getPackageCount();
+            for (int i = 0; i < packageCount; i++) {
+                final HistoricalPackageOps origOps = getPackageOpsAt(i);
+                final HistoricalPackageOps spliceOps = origOps.splice(fractionToRemove);
+                if (spliceOps != null) {
+                    if (splice == null) {
+                        splice = new HistoricalUidOps(mUid);
+                    }
+                    if (splice.mHistoricalPackageOps == null) {
+                        splice.mHistoricalPackageOps = new ArrayMap<>();
+                    }
+                    splice.mHistoricalPackageOps.put(spliceOps.getPackageName(), spliceOps);
+                }
+            }
+            return splice;
+        }
+
+        private void merge(@NonNull HistoricalUidOps other) {
+            final int packageCount = other.getPackageCount();
+            for (int i = 0; i < packageCount; i++) {
+                final HistoricalPackageOps otherPackageOps = other.getPackageOpsAt(i);
+                final HistoricalPackageOps thisPackageOps = getPackageOps(
+                        otherPackageOps.getPackageName());
+                if (thisPackageOps != null) {
+                    thisPackageOps.merge(otherPackageOps);
+                } else {
+                    if (mHistoricalPackageOps == null) {
+                        mHistoricalPackageOps = new ArrayMap<>();
+                    }
+                    mHistoricalPackageOps.put(otherPackageOps.getPackageName(), otherPackageOps);
+                }
+            }
+        }
+
+        private void filter(@Nullable String packageName, @Nullable String[] opNames,
+                double fractionToRemove) {
+            final int packageCount = getPackageCount();
+            for (int i = packageCount - 1; i >= 0; i--) {
+                final HistoricalPackageOps packageOps = getPackageOpsAt(i);
+                if (packageName != null && !packageName.equals(packageOps.getPackageName())) {
+                    mHistoricalPackageOps.removeAt(i);
+                } else {
+                    packageOps.filter(opNames, fractionToRemove);
+                }
+            }
+        }
+
+        private boolean isEmpty() {
+            final int packageCount = getPackageCount();
+            for (int i = packageCount - 1; i >= 0; i--) {
+                final HistoricalPackageOps packageOps = mHistoricalPackageOps.valueAt(i);
+                if (!packageOps.isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void increaseAccessCount(int opCode, @NonNull String packageName,
+                @UidState int uidState, long increment) {
+            getOrCreateHistoricalPackageOps(packageName).increaseAccessCount(
+                    opCode, uidState, increment);
+        }
+
+        private void increaseRejectCount(int opCode, @NonNull String packageName,
+                @UidState int uidState, long increment) {
+            getOrCreateHistoricalPackageOps(packageName).increaseRejectCount(
+                    opCode, uidState, increment);
+        }
+
+        private void increaseAccessDuration(int opCode, @NonNull String packageName,
+                @UidState int uidState, long increment) {
+            getOrCreateHistoricalPackageOps(packageName).increaseAccessDuration(
+                    opCode, uidState, increment);
+        }
+
+        /**
+         * @return The UID for which the data is related.
+         */
+        public int getUid() {
+            return mUid;
+        }
+
+        /**
+         * Gets number of packages with historical ops.
+         *
+         * @return The number of packages with historical ops.
+         *
+         * @see #getPackageOpsAt(int)
+         */
+        public int getPackageCount() {
+            if (mHistoricalPackageOps == null) {
+                return 0;
+            }
+            return mHistoricalPackageOps.size();
+        }
+
+        /**
+         * Gets the historical package ops at a given index.
+         *
+         * @param index The index.
+         *
+         * @return The historical package ops at the given index.
+         *
+         * @see #getPackageCount()
+         */
+        public @NonNull HistoricalPackageOps getPackageOpsAt(int index) {
+            if (mHistoricalPackageOps == null) {
+                throw new IndexOutOfBoundsException();
+            }
+            return mHistoricalPackageOps.valueAt(index);
+        }
+
+        /**
+         * Gets the historical package ops for a given package.
+         *
+         * @param packageName The package.
+         *
+         * @return The historical ops for the package.
+         */
+        public @Nullable HistoricalPackageOps getPackageOps(@NonNull String packageName) {
+            if (mHistoricalPackageOps == null) {
+                return null;
+            }
+            return mHistoricalPackageOps.get(packageName);
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel parcel, int flags) {
+            parcel.writeInt(mUid);
+            parcel.writeTypedArrayMap(mHistoricalPackageOps, flags);
+        }
+
+        private void accept(@NonNull HistoricalOpsVisitor visitor) {
+            visitor.visitHistoricalUidOps(this);
+            final int packageCount = getPackageCount();
+            for (int i = 0; i < packageCount; i++) {
+                getPackageOpsAt(i).accept(visitor);
+            }
+        }
+
+        private @NonNull HistoricalPackageOps getOrCreateHistoricalPackageOps(
+                @NonNull String packageName) {
+            if (mHistoricalPackageOps == null) {
+                mHistoricalPackageOps = new ArrayMap<>();
+            }
+            HistoricalPackageOps historicalPackageOp = mHistoricalPackageOps.get(packageName);
+            if (historicalPackageOp == null) {
+                historicalPackageOp = new HistoricalPackageOps(packageName);
+                mHistoricalPackageOps.put(packageName, historicalPackageOp);
+            }
+            return historicalPackageOp;
+        }
+
+
+        public static final Creator<HistoricalUidOps> CREATOR = new Creator<HistoricalUidOps>() {
+            @Override
+            public @NonNull HistoricalUidOps createFromParcel(@NonNull Parcel parcel) {
+                return new HistoricalUidOps(parcel);
+            }
+
+            @Override
+            public @NonNull HistoricalUidOps[] newArray(int size) {
+                return new HistoricalUidOps[size];
+            }
+        };
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            final HistoricalUidOps other = (HistoricalUidOps) obj;
+            if (mUid != other.mUid) {
+                return false;
+            }
+            if (mHistoricalPackageOps == null) {
+                if (other.mHistoricalPackageOps != null) {
+                    return false;
+                }
+            } else if (!mHistoricalPackageOps.equals(other.mHistoricalPackageOps)) {
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = mUid;
+            result = 31 * result + (mHistoricalPackageOps != null
+                    ? mHistoricalPackageOps.hashCode() : 0);
+            return result;
+        }
+    }
+
+    /**
+     * This class represents historical app op information about a package.
      *
      * @hide
      */
     @TestApi
     @SystemApi
     public static final class HistoricalPackageOps implements Parcelable {
-        private final int mUid;
         private final @NonNull String mPackageName;
-        private final @NonNull List<HistoricalOpEntry> mEntries;
+        private @Nullable ArrayMap<String, HistoricalOp> mHistoricalOps;
 
-        /**
-         * @hide
-         */
-        public HistoricalPackageOps(int uid, @NonNull String packageName) {
-            mUid = uid;
+        /** @hide */
+        public HistoricalPackageOps(@NonNull String packageName) {
             mPackageName = packageName;
-            mEntries = new ArrayList<>();
         }
 
-        HistoricalPackageOps(@NonNull Parcel parcel) {
-            mUid = parcel.readInt();
+        private HistoricalPackageOps(@NonNull HistoricalPackageOps other) {
+            mPackageName = other.mPackageName;
+            final int opCount = other.getOpCount();
+            for (int i = 0; i < opCount; i++) {
+                final HistoricalOp origOp = other.getOpAt(i);
+                final HistoricalOp cloneOp = new HistoricalOp(origOp);
+                if (mHistoricalOps == null) {
+                    mHistoricalOps = new ArrayMap<>(opCount);
+                }
+                mHistoricalOps.put(cloneOp.getOpName(), cloneOp);
+            }
+        }
+
+        private HistoricalPackageOps(@NonNull Parcel parcel) {
             mPackageName = parcel.readString();
-            mEntries = parcel.createTypedArrayList(HistoricalOpEntry.CREATOR);
+            mHistoricalOps = parcel.createTypedArrayMap(HistoricalOp.CREATOR);
         }
 
-        /**
-         * @hide
-         */
-        public void addEntry(@NonNull HistoricalOpEntry entry) {
-            mEntries.add(entry);
+        private @Nullable HistoricalPackageOps splice(double fractionToRemove) {
+            HistoricalPackageOps splice = null;
+            final int opCount = getOpCount();
+            for (int i = 0; i < opCount; i++) {
+                final HistoricalOp origOps = getOpAt(i);
+                final HistoricalOp spliceOps = origOps.splice(fractionToRemove);
+                if (spliceOps != null) {
+                    if (splice == null) {
+                        splice = new HistoricalPackageOps(mPackageName);
+                    }
+                    if (splice.mHistoricalOps == null) {
+                        splice.mHistoricalOps = new ArrayMap<>();
+                    }
+                    splice.mHistoricalOps.put(spliceOps.getOpName(), spliceOps);
+                }
+            }
+            return splice;
+        }
+
+        private void merge(@NonNull HistoricalPackageOps other) {
+            final int opCount = other.getOpCount();
+            for (int i = 0; i < opCount; i++) {
+                final HistoricalOp otherOp = other.getOpAt(i);
+                final HistoricalOp thisOp = getOp(otherOp.getOpName());
+                if (thisOp != null) {
+                    thisOp.merge(otherOp);
+                } else {
+                    if (mHistoricalOps == null) {
+                        mHistoricalOps = new ArrayMap<>();
+                    }
+                    mHistoricalOps.put(otherOp.getOpName(), otherOp);
+                }
+            }
+        }
+
+        private void filter(@Nullable String[] opNames, double scaleFactor) {
+            final int opCount = getOpCount();
+            for (int i = opCount - 1; i >= 0; i--) {
+                final HistoricalOp op = mHistoricalOps.valueAt(i);
+                if (opNames != null && !ArrayUtils.contains(opNames, op.getOpName())) {
+                    mHistoricalOps.removeAt(i);
+                } else {
+                    op.filter(scaleFactor);
+                }
+            }
+        }
+
+        private boolean isEmpty() {
+            final int opCount = getOpCount();
+            for (int i = opCount - 1; i >= 0; i--) {
+                final HistoricalOp op = mHistoricalOps.valueAt(i);
+                if (!op.isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void increaseAccessCount(int opCode, @UidState int uidState, long increment) {
+            getOrCreateHistoricalOp(opCode).increaseAccessCount(uidState, increment);
+        }
+
+        private void increaseRejectCount(int opCode, @UidState int uidState, long increment) {
+            getOrCreateHistoricalOp(opCode).increaseRejectCount(uidState, increment);
+        }
+
+        private void increaseAccessDuration(int opCode, @UidState int uidState, long increment) {
+            getOrCreateHistoricalOp(opCode).increaseAccessDuration(uidState, increment);
         }
 
         /**
@@ -2013,36 +2970,33 @@ public class AppOpsManager {
         }
 
         /**
-         *  Gets the UID which the data represents.
+         * Gets number historical app ops.
          *
-         * @return The UID which the data represents.
+         * @return The number historical app ops.
+         *
+         * @see #getOpAt(int)
          */
-        public int getUid() {
-            return mUid;
+        public int getOpCount() {
+            if (mHistoricalOps == null) {
+                return 0;
+            }
+            return mHistoricalOps.size();
         }
 
         /**
-         * Gets number historical app op entries.
-         *
-         * @return The number historical app op entries.
-         *
-         * @see #getEntryAt(int)
-         */
-        public int getEntryCount() {
-            return mEntries.size();
-        }
-
-        /**
-         * Gets the historical at a given index.
+         * Gets the historical op at a given index.
          *
          * @param index The index to lookup.
          *
-         * @return The entry at the given index.
+         * @return The op at the given index.
          *
-         * @see #getEntryCount()
+         * @see #getOpCount()
          */
-        public @NonNull HistoricalOpEntry getEntryAt(int index) {
-            return mEntries.get(index);
+        public @NonNull HistoricalOp getOpAt(int index) {
+            if (mHistoricalOps == null) {
+                throw new IndexOutOfBoundsException();
+            }
+            return mHistoricalOps.valueAt(index);
         }
 
         /**
@@ -2052,15 +3006,11 @@ public class AppOpsManager {
          *
          * @return The historical entry for that op name.
          */
-        public @Nullable HistoricalOpEntry getEntry(@NonNull String opName) {
-            final int entryCount = mEntries.size();
-            for (int i = 0; i < entryCount; i++) {
-                final HistoricalOpEntry entry = mEntries.get(i);
-                if (entry.getOp().equals(opName)) {
-                    return entry;
-                }
+        public @Nullable HistoricalOp getOp(@NonNull String opName) {
+            if (mHistoricalOps == null) {
+                return null;
             }
-            return null;
+            return mHistoricalOps.get(opName);
         }
 
         @Override
@@ -2070,9 +3020,29 @@ public class AppOpsManager {
 
         @Override
         public void writeToParcel(@NonNull Parcel parcel, int flags) {
-            parcel.writeInt(mUid);
             parcel.writeString(mPackageName);
-            parcel.writeTypedList(mEntries, flags);
+            parcel.writeTypedArrayMap(mHistoricalOps, flags);
+        }
+
+        private void accept(@NonNull HistoricalOpsVisitor visitor) {
+            visitor.visitHistoricalPackageOps(this);
+            final int opCount = getOpCount();
+            for (int i = 0; i < opCount; i++) {
+                getOpAt(i).accept(visitor);
+            }
+        }
+
+        private @NonNull HistoricalOp getOrCreateHistoricalOp(int opCode) {
+            if (mHistoricalOps == null) {
+                mHistoricalOps = new ArrayMap<>();
+            }
+            final String opStr = sOpToString[opCode];
+            HistoricalOp op = mHistoricalOps.get(opStr);
+            if (op == null) {
+                op = new HistoricalOp(opCode);
+                mHistoricalOps.put(opStr, op);
+            }
+            return op;
         }
 
         public static final Creator<HistoricalPackageOps> CREATOR =
@@ -2087,49 +3057,177 @@ public class AppOpsManager {
                 return new HistoricalPackageOps[size];
             }
         };
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            final HistoricalPackageOps other = (HistoricalPackageOps) obj;
+            if (!mPackageName.equals(other.mPackageName)) {
+                return false;
+            }
+            if (mHistoricalOps == null) {
+                if (other.mHistoricalOps != null) {
+                    return false;
+                }
+            } else if (!mHistoricalOps.equals(other.mHistoricalOps)) {
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = mPackageName != null ? mPackageName.hashCode() : 0;
+            result = 31 * result + (mHistoricalOps != null ? mHistoricalOps.hashCode() : 0);
+            return result;
+        }
     }
 
     /**
-     * This class represents historical information about an app op. The history
-     * is aggregated information about the op for a certain amount of time such
-     * as the times the op was accessed, the times the op was rejected, the total
-     * duration the app op has been accessed.
+     * This class represents historical information about an app op.
      *
      * @hide
      */
     @TestApi
     @SystemApi
-    public static final class HistoricalOpEntry implements Parcelable {
+    public static final class HistoricalOp implements Parcelable {
         private final int mOp;
-        private final long[] mAccessCount;
-        private final long[] mRejectCount;
-        private final long[] mAccessDuration;
+        private @Nullable long[] mAccessCount;
+        private @Nullable long[] mRejectCount;
+        private @Nullable long[] mAccessDuration;
 
-        /**
-         * @hide
-         */
-        public HistoricalOpEntry(int op) {
+        /** @hide */
+        public HistoricalOp(int op) {
             mOp = op;
             mAccessCount = new long[_NUM_UID_STATE];
             mRejectCount = new long[_NUM_UID_STATE];
             mAccessDuration = new long[_NUM_UID_STATE];
         }
 
-        HistoricalOpEntry(@NonNull Parcel parcel) {
+        private HistoricalOp(@NonNull HistoricalOp other) {
+            mOp = other.mOp;
+            if (other.mAccessCount != null) {
+                System.arraycopy(other.mAccessCount, 0, getOrCreateAccessCount(),
+                        0, other.mAccessCount.length);
+            }
+            if (other.mRejectCount != null) {
+                System.arraycopy(other.mRejectCount, 0, getOrCreateRejectCount(),
+                        0, other.mRejectCount.length);
+            }
+            if (other.mAccessDuration != null) {
+                System.arraycopy(other.mAccessDuration, 0, getOrCreateAccessDuration(),
+                        0, other.mAccessDuration.length);
+            }
+        }
+
+        private HistoricalOp(@NonNull Parcel parcel) {
             mOp = parcel.readInt();
             mAccessCount = parcel.createLongArray();
             mRejectCount = parcel.createLongArray();
             mAccessDuration = parcel.createLongArray();
         }
 
-        /**
-         * @hide
-         */
-        public void addEntry(@UidState int uidState, long accessCount,
-                long rejectCount, long accessDuration) {
-            mAccessCount[uidState] = accessCount;
-            mRejectCount[uidState] = rejectCount;
-            mAccessDuration[uidState] = accessDuration;
+        private void filter(double scaleFactor) {
+            scale(mAccessCount, scaleFactor);
+            scale(mRejectCount, scaleFactor);
+            scale(mAccessDuration, scaleFactor);
+        }
+
+        private boolean isEmpty() {
+            return !hasData(mAccessCount)
+                    && !hasData(mRejectCount)
+                    && !hasData(mAccessDuration);
+        }
+
+        private boolean hasData(@NonNull long[] array) {
+            for (long value : array) {
+                if (value != 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private @Nullable HistoricalOp splice(double fractionToRemove) {
+            HistoricalOp splice = null;
+            if (mAccessCount != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    final long spliceAccessCount = Math.round(
+                            mAccessCount[i] * fractionToRemove);
+                    if (spliceAccessCount > 0) {
+                        if (splice == null) {
+                            splice = new HistoricalOp(mOp);
+                        }
+                        splice.getOrCreateAccessCount()[i] = spliceAccessCount;
+                        mAccessCount[i] -= spliceAccessCount;
+                    }
+                }
+            }
+
+            if (mRejectCount != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    final long spliceRejectCount = Math.round(
+                            mRejectCount[i] * fractionToRemove);
+
+                    if (spliceRejectCount > 0) {
+                        if (splice == null) {
+                            splice = new HistoricalOp(mOp);
+                        }
+                        splice.getOrCreateRejectCount()[i] = spliceRejectCount;
+                        mRejectCount[i] -= spliceRejectCount;
+                    }
+                }
+            }
+
+            if (mAccessDuration != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    final long spliceAccessDuration =  Math.round(
+                            mAccessDuration[i] * fractionToRemove);
+                    if (spliceAccessDuration > 0) {
+                        if (splice == null) {
+                            splice = new HistoricalOp(mOp);
+                        }
+                        splice.getOrCreateAccessDuration()[i] = spliceAccessDuration;
+                        mAccessDuration[i] -= spliceAccessDuration;
+                    }
+                }
+            }
+            return splice;
+        }
+
+        private void merge(@NonNull HistoricalOp other) {
+            if (other.mAccessCount != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    getOrCreateAccessCount()[i] += other.mAccessCount[i];
+                }
+            }
+            if (other.mRejectCount != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    getOrCreateRejectCount()[i] += other.mRejectCount[i];
+                }
+            }
+            if (other.mAccessDuration != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    getOrCreateAccessDuration()[i] += other.mAccessDuration[i];
+                }
+            }
+        }
+
+        private void increaseAccessCount(@UidState int uidState, long increment) {
+            getOrCreateAccessCount()[uidState] += increment;
+        }
+
+        private void increaseRejectCount(@UidState int uidState, long increment) {
+            getOrCreateRejectCount()[uidState] += increment;
+        }
+
+        private void increaseAccessDuration(@UidState int uidState, long increment) {
+            getOrCreateAccessDuration()[uidState] += increment;
         }
 
         /**
@@ -2137,8 +3235,13 @@ public class AppOpsManager {
          *
          * @return The op name.
          */
-        public @NonNull String getOp() {
+        public @NonNull String getOpName() {
             return sOpToString[mOp];
+        }
+
+        /** @hide */
+        public int getOpCode() {
+            return mOp;
         }
 
         /**
@@ -2150,6 +3253,9 @@ public class AppOpsManager {
          * @see #getAccessCount(int)
          */
         public long getForegroundAccessCount() {
+            if (mAccessCount == null) {
+                return 0;
+            }
             return sum(mAccessCount, UID_STATE_PERSISTENT, UID_STATE_LAST_NON_RESTRICTED + 1);
         }
 
@@ -2162,6 +3268,9 @@ public class AppOpsManager {
          * @see #getAccessCount(int)
          */
         public long getBackgroundAccessCount() {
+            if (mAccessCount == null) {
+                return 0;
+            }
             return sum(mAccessCount, UID_STATE_LAST_NON_RESTRICTED + 1, _NUM_UID_STATE);
         }
 
@@ -2170,6 +3279,7 @@ public class AppOpsManager {
          *
          * @param uidState The UID state for which to query. Could be one of
          * {@link #UID_STATE_PERSISTENT}, {@link #UID_STATE_TOP},
+         * {@link #UID_STATE_FOREGROUND_SERVICE_LOCATION},
          * {@link #UID_STATE_FOREGROUND_SERVICE}, {@link #UID_STATE_FOREGROUND},
          * {@link #UID_STATE_BACKGROUND}, {@link #UID_STATE_CACHED}.
          *
@@ -2179,6 +3289,9 @@ public class AppOpsManager {
          * @see #getBackgroundAccessCount()
          */
         public long getAccessCount(@UidState int uidState) {
+            if (mAccessCount == null) {
+                return 0;
+            }
             return mAccessCount[uidState];
         }
 
@@ -2191,6 +3304,9 @@ public class AppOpsManager {
          * @see #getRejectCount(int)
          */
         public long getForegroundRejectCount() {
+            if (mRejectCount == null) {
+                return 0;
+            }
             return sum(mRejectCount, UID_STATE_PERSISTENT, UID_STATE_LAST_NON_RESTRICTED + 1);
         }
 
@@ -2203,6 +3319,9 @@ public class AppOpsManager {
          * @see #getRejectCount(int)
          */
         public long getBackgroundRejectCount() {
+            if (mRejectCount == null) {
+                return 0;
+            }
             return sum(mRejectCount, UID_STATE_LAST_NON_RESTRICTED + 1, _NUM_UID_STATE);
         }
 
@@ -2211,6 +3330,7 @@ public class AppOpsManager {
          *
          * @param uidState The UID state for which to query. Could be one of
          * {@link #UID_STATE_PERSISTENT}, {@link #UID_STATE_TOP},
+         * {@link #UID_STATE_FOREGROUND_SERVICE_LOCATION},
          * {@link #UID_STATE_FOREGROUND_SERVICE}, {@link #UID_STATE_FOREGROUND},
          * {@link #UID_STATE_BACKGROUND}, {@link #UID_STATE_CACHED}.
          *
@@ -2220,6 +3340,9 @@ public class AppOpsManager {
          * @see #getBackgroundRejectCount()
          */
         public long getRejectCount(@UidState int uidState) {
+            if (mRejectCount == null) {
+                return 0;
+            }
             return mRejectCount[uidState];
         }
 
@@ -2232,6 +3355,9 @@ public class AppOpsManager {
          * @see #getAccessDuration(int)
          */
         public long getForegroundAccessDuration() {
+            if (mAccessDuration == null) {
+                return 0;
+            }
             return sum(mAccessDuration, UID_STATE_PERSISTENT, UID_STATE_LAST_NON_RESTRICTED + 1);
         }
 
@@ -2244,6 +3370,9 @@ public class AppOpsManager {
          * @see #getAccessDuration(int)
          */
         public long getBackgroundAccessDuration() {
+            if (mAccessDuration == null) {
+                return 0;
+            }
             return sum(mAccessDuration, UID_STATE_LAST_NON_RESTRICTED + 1, _NUM_UID_STATE);
         }
 
@@ -2252,6 +3381,7 @@ public class AppOpsManager {
          *
          * @param uidState The UID state for which to query. Could be one of
          * {@link #UID_STATE_PERSISTENT}, {@link #UID_STATE_TOP},
+         * {@link #UID_STATE_FOREGROUND_SERVICE_LOCATION},
          * {@link #UID_STATE_FOREGROUND_SERVICE}, {@link #UID_STATE_FOREGROUND},
          * {@link #UID_STATE_BACKGROUND}, {@link #UID_STATE_CACHED}.
          *
@@ -2261,6 +3391,9 @@ public class AppOpsManager {
          * @see #getBackgroundAccessDuration()
          */
         public long getAccessDuration(@UidState int uidState) {
+            if (mAccessDuration == null) {
+                return 0;
+            }
             return mAccessDuration[uidState];
         }
 
@@ -2277,34 +3410,29 @@ public class AppOpsManager {
             parcel.writeLongArray(mAccessDuration);
         }
 
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (other == null || getClass() != other.getClass()) {
-                return false;
-            }
-            final HistoricalOpEntry otherInstance = (HistoricalOpEntry) other;
-            if (mOp != otherInstance.mOp) {
-                return false;
-            }
-            if (!Arrays.equals(mAccessCount, otherInstance.mAccessCount)) {
-                return false;
-            }
-            if (!Arrays.equals(mRejectCount, otherInstance.mRejectCount)) {
-                return false;
-            }
-            return Arrays.equals(mAccessDuration, otherInstance.mAccessDuration);
+        private void accept(@NonNull HistoricalOpsVisitor visitor) {
+            visitor.visitHistoricalOp(this);
         }
 
-        @Override
-        public int hashCode() {
-            int result = mOp;
-            result = 31 * result + Arrays.hashCode(mAccessCount);
-            result = 31 * result + Arrays.hashCode(mRejectCount);
-            result = 31 * result + Arrays.hashCode(mAccessDuration);
-            return result;
+        private @NonNull long[] getOrCreateAccessCount() {
+            if (mAccessCount == null) {
+                mAccessCount = new long[_NUM_UID_STATE];
+            }
+            return mAccessCount;
+        }
+
+        private @NonNull long[] getOrCreateRejectCount() {
+            if (mRejectCount == null) {
+                mRejectCount = new long[_NUM_UID_STATE];
+            }
+            return mRejectCount;
+        }
+
+        private @NonNull long[] getOrCreateAccessDuration() {
+            if (mAccessDuration == null) {
+                mAccessDuration = new long[_NUM_UID_STATE];
+            }
+            return mAccessDuration;
         }
 
         /**
@@ -2324,17 +3452,62 @@ public class AppOpsManager {
             return totalCount;
         }
 
-        public static final Creator<HistoricalOpEntry> CREATOR = new Creator<HistoricalOpEntry>() {
+        /**
+         * Multiplies the entries in the array with the passed in scale factor and
+         * rounds the result at up 0.5 boundary.
+         *
+         * @param data The data to scale.
+         * @param scaleFactor The scale factor.
+         */
+        private static void scale(@NonNull long[] data, double scaleFactor) {
+            if (data != null) {
+                for (int i = 0; i < _NUM_UID_STATE; i++) {
+                    data[i] = (long) HistoricalOps.round((double) data[i] * scaleFactor);
+                }
+            }
+        }
+
+        public static final Creator<HistoricalOp> CREATOR = new Creator<HistoricalOp>() {
             @Override
-            public @NonNull HistoricalOpEntry createFromParcel(@NonNull Parcel source) {
-                return new HistoricalOpEntry(source);
+            public @NonNull HistoricalOp createFromParcel(@NonNull Parcel source) {
+                return new HistoricalOp(source);
             }
 
             @Override
-            public @NonNull HistoricalOpEntry[] newArray(int size) {
-                return new HistoricalOpEntry[size];
+            public @NonNull HistoricalOp[] newArray(int size) {
+                return new HistoricalOp[size];
             }
         };
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            final HistoricalOp other = (HistoricalOp) obj;
+            if (mOp != other.mOp) {
+                return false;
+            }
+            if (!Arrays.equals(mAccessCount, other.mAccessCount)) {
+                return false;
+            }
+            if (!Arrays.equals(mRejectCount, other.mRejectCount)) {
+                return false;
+            }
+            return Arrays.equals(mAccessDuration, other.mAccessDuration);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = mOp;
+            result = 31 * result + Arrays.hashCode(mAccessCount);
+            result = 31 * result + Arrays.hashCode(mRejectCount);
+            result = 31 * result + Arrays.hashCode(mAccessDuration);
+            return result;
+        }
     }
 
     /**
@@ -2363,6 +3536,23 @@ public class AppOpsManager {
     }
 
     /**
+     * Callback for notification of an op being noted.
+     *
+     * @hide
+     */
+    public interface OnOpNotedListener {
+        /**
+         * Called when an op was noted.
+         *
+         * @param code The op code.
+         * @param uid The UID performing the operation.
+         * @param packageName The package performing the operation.
+         * @param result The result of the note.
+         */
+        void onOpNoted(int code, int uid, String packageName, int result);
+    }
+
+    /**
      * Callback for notification of changes to operation state.
      * This allows you to see the raw op codes instead of strings.
      * @hide
@@ -2383,6 +3573,24 @@ public class AppOpsManager {
      * @param ops The set of operations you are interested in, or null if you want all of them.
      * @hide
      */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
+    public @NonNull List<AppOpsManager.PackageOps> getPackagesForOps(@Nullable String[] ops) {
+        final int opCount = ops.length;
+        final int[] opCodes = new int[opCount];
+        for (int i = 0; i < opCount; i++) {
+            opCodes[i] = sOpStrToOp.get(ops[i]);
+        }
+        final List<AppOpsManager.PackageOps> result = getPackagesForOps(opCodes);
+        return (result != null) ? result : Collections.emptyList();
+    }
+
+    /**
+     * Retrieve current operation state for all applications.
+     *
+     * @param ops The set of operations you are interested in, or null if you want all of them.
+     * @hide
+     */
     @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
     @UnsupportedAppUsage
     public List<AppOpsManager.PackageOps> getPackagesForOps(int[] ops) {
@@ -2394,40 +3602,22 @@ public class AppOpsManager {
     }
 
     /**
-     * Retrieve current operation state for all applications.
-     *
-     * @param ops The set of operations you are interested in, or null if you want all of them.
-     * @hide
-     */
-    @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
-    @SystemApi
-    public List<AppOpsManager.PackageOps> getPackagesForOpStrs(String[] ops) {
-        if (ops == null) {
-            return getPackagesForOps(null);
-        }
-        final int[] opCodes = new int[ops.length];
-        for (int i = 0; i < ops.length; ++i) {
-            final Integer opCode = sOpStrToOp.get(ops[i]);
-            if (opCode == null) {
-                opCodes[i] = OP_NONE;
-            } else {
-                opCodes[i] = opCode;
-            }
-        }
-        return getPackagesForOps(opCodes);
-    }
-
-    /**
      * Retrieve current operation state for one application.
      *
      * @param uid The uid of the application of interest.
      * @param packageName The name of the application of interest.
      * @param ops The set of operations you are interested in, or null if you want all of them.
+     *
+     * @deprecated The int op codes are not stable and you should use the string based op
+     * names which are stable and namespaced. Use
+     * {@link #getOpsForPackage(int, String, String...)})}.
+     *
      * @hide
      */
+    @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
-    public List<AppOpsManager.PackageOps> getOpsForPackage(int uid, String packageName, int[] ops) {
+    public List<PackageOps> getOpsForPackage(int uid, String packageName, int[] ops) {
         try {
             return mService.getOpsForPackage(uid, packageName, ops);
         } catch (RemoteException e) {
@@ -2436,7 +3626,49 @@ public class AppOpsManager {
     }
 
     /**
-     * Retrieve historical app op stats for a package.
+     * Retrieve current operation state for one application. The UID and the
+     * package must match.
+     *
+     * @param uid The uid of the application of interest.
+     * @param packageName The name of the application of interest.
+     * @param ops The set of operations you are interested in, or null if you want all of them.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
+    public @NonNull List<AppOpsManager.PackageOps> getOpsForPackage(int uid,
+            @NonNull String packageName, @Nullable String... ops) {
+        int[] opCodes = null;
+        if (ops != null) {
+            opCodes = new int[ops.length];
+            for (int i = 0; i < ops.length; i++) {
+                opCodes[i] = strOpToOp(ops[i]);
+            }
+        }
+        try {
+            final List<PackageOps> result = mService.getOpsForPackage(uid, packageName, opCodes);
+            if (result == null) {
+                return Collections.emptyList();
+            }
+            return result;
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Retrieve historical app op stats for a period.
+     *
+     * <p>Historical data can be obtained
+     * for a specific package by specifying the <code>packageName</code> argument,
+     * for a specific UID if specifying the <code>uid</code> argument, for a
+     * specific package in a UID by specifying the <code>packageName</code>
+     * and the <code>uid</code> arguments, for all packages by passing
+     * {@link android.os.Process#INVALID_UID} and <code>null</code> for the
+     *  <code>uid</code> and <code>packageName</code> arguments, respectively.
+     *  Similarly, you can specify the <code>opNames</code> argument to get
+     *  data only for these ops or <code>null</code> for all ops.
      *
      * @param uid The UID to query for.
      * @param packageName The package to query for.
@@ -2445,10 +3677,12 @@ public class AppOpsManager {
      *     negative.
      * @param endTimeMillis The end of the interval in milliseconds since
      *     epoch start (January 1, 1970 00:00:00.000 GMT - Gregorian). Must be after
-     *     {@code beginTimeMillis}.
+     *     {@code beginTimeMillis}. Pass {@link Long#MAX_VALUE} to get the most recent
+     *     history including ops that happen while this call is in flight.
      * @param opNames The ops to query for. Pass {@code null} for all ops.
-     *
-     * @return The historical ops or {@code null} if there are no ops for this package.
+     * @param executor Executor on which to run the callback. If <code>null</code>
+     *     the callback is executed on the default executor running on the main thread.
+     * @param callback Callback on which to deliver the result.
      *
      * @throws IllegalArgumentException If any of the argument contracts is violated.
      *
@@ -2457,47 +3691,78 @@ public class AppOpsManager {
     @TestApi
     @SystemApi
     @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
-    public @Nullable HistoricalPackageOps getHistoricalPackagesOps(
-            int uid, @NonNull String packageName, @Nullable String[] opNames,
-            long beginTimeMillis, long endTimeMillis) {
+    public void getHistoricalOps(int uid, @Nullable String packageName,
+            @Nullable String[] opNames, long beginTimeMillis, long endTimeMillis,
+            @NonNull Executor executor, @NonNull Consumer<HistoricalOps> callback) {
+        Preconditions.checkNotNull(executor, "executor cannot be null");
+        Preconditions.checkNotNull(callback, "callback cannot be null");
         try {
-            return mService.getHistoricalPackagesOps(uid, packageName, opNames,
-                    beginTimeMillis, endTimeMillis);
+            mService.getHistoricalOps(uid, packageName, opNames, beginTimeMillis, endTimeMillis,
+                    new RemoteCallback((result) -> {
+                final HistoricalOps ops = result.getParcelable(KEY_HISTORICAL_OPS);
+                final long identity = Binder.clearCallingIdentity();
+                try {
+                    executor.execute(() -> callback.accept(ops));
+                } finally {
+                    Binder.restoreCallingIdentity(identity);
+                }
+            }));
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     /**
-     * Retrieve historical app op stats for all packages.
+     * Retrieve historical app op stats for a period.
      *
+     * <p>Historical data can be obtained
+     * for a specific package by specifying the <code>packageName</code> argument,
+     * for a specific UID if specifying the <code>uid</code> argument, for a
+     * specific package in a UID by specifying the <code>packageName</code>
+     * and the <code>uid</code> arguments, for all packages by passing
+     * {@link android.os.Process#INVALID_UID} and <code>null</code> for the
+     *  <code>uid</code> and <code>packageName</code> arguments, respectively.
+     *  Similarly, you can specify the <code>opNames</code> argument to get
+     *  data only for these ops or <code>null</code> for all ops.
+     *  <p>
+     *  This method queries only the on disk state and the returned ops are raw,
+     *  which is their times are relative to the history start as opposed to the
+     *  epoch start.
+     *
+     * @param uid The UID to query for.
+     * @param packageName The package to query for.
      * @param beginTimeMillis The beginning of the interval in milliseconds since
-     *     epoch start (January 1, 1970 00:00:00.000 GMT - Gregorian). Must be non
-     *     negative.
+     *      history start. History time grows as one goes into the past.
      * @param endTimeMillis The end of the interval in milliseconds since
-     *     epoch start (January 1, 1970 00:00:00.000 GMT - Gregorian). Must be after
+     *      history start. History time grows as one goes into the past. Must be after
      *     {@code beginTimeMillis}.
      * @param opNames The ops to query for. Pass {@code null} for all ops.
-     *
-     * @return The historical ops or an empty list if there are no ops for any package.
+     * @param executor Executor on which to run the callback. If <code>null</code>
+     *     the callback is executed on the default executor running on the main thread.
+     * @param callback Callback on which to deliver the result.
      *
      * @throws IllegalArgumentException If any of the argument contracts is violated.
      *
      * @hide
      */
     @TestApi
-    @SystemApi
     @RequiresPermission(android.Manifest.permission.GET_APP_OPS_STATS)
-    public @NonNull List<HistoricalPackageOps> getAllHistoricPackagesOps(
-            @Nullable String[] opNames, long beginTimeMillis, long endTimeMillis) {
+    public void getHistoricalOpsFromDiskRaw(int uid, @Nullable String packageName,
+            @Nullable String[] opNames, long beginTimeMillis, long endTimeMillis,
+            @Nullable Executor executor, @NonNull Consumer<HistoricalOps> callback) {
+        Preconditions.checkNotNull(executor, "executor cannot be null");
+        Preconditions.checkNotNull(callback, "callback cannot be null");
         try {
-            @SuppressWarnings("unchecked")
-            final ParceledListSlice<HistoricalPackageOps> payload =
-                    mService.getAllHistoricalPackagesOps(opNames, beginTimeMillis, endTimeMillis);
-            if (payload != null) {
-                return payload.getList();
-            }
-            return Collections.emptyList();
+            mService.getHistoricalOpsFromDiskRaw(uid, packageName, opNames, beginTimeMillis,
+                    endTimeMillis, new RemoteCallback((result) -> {
+               final HistoricalOps ops = result.getParcelable(KEY_HISTORICAL_OPS);
+                final long identity = Binder.clearCallingIdentity();
+                try {
+                    executor.execute(() -> callback.accept(ops));
+                } finally {
+                    Binder.restoreCallingIdentity(identity);
+                }
+            }));
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -2514,7 +3779,7 @@ public class AppOpsManager {
      * @hide
      */
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
-    public void setUidMode(int code, int uid, int mode) {
+    public void setUidMode(int code, int uid, @Mode int mode) {
         try {
             mService.setUidMode(code, uid, mode);
         } catch (RemoteException e) {
@@ -2535,7 +3800,7 @@ public class AppOpsManager {
     @SystemApi
     @TestApi
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
-    public void setUidMode(String appOp, int uid, int mode) {
+    public void setUidMode(String appOp, int uid, @Mode int mode) {
         try {
             mService.setUidMode(AppOpsManager.strOpToOp(appOp), uid, mode);
         } catch (RemoteException e) {
@@ -2567,7 +3832,7 @@ public class AppOpsManager {
     /** @hide */
     @TestApi
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
-    public void setMode(int code, int uid, String packageName, int mode) {
+    public void setMode(int code, int uid, String packageName, @Mode int mode) {
         try {
             mService.setMode(code, uid, packageName, mode);
         } catch (RemoteException e) {
@@ -2588,7 +3853,7 @@ public class AppOpsManager {
      */
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
-    public void setMode(String op, int uid, String packageName, int mode) {
+    public void setMode(String op, int uid, String packageName, @Mode int mode) {
         try {
             mService.setMode(strOpToOp(op), uid, packageName, mode);
         } catch (RemoteException e) {
@@ -2609,7 +3874,7 @@ public class AppOpsManager {
      */
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
     @UnsupportedAppUsage
-    public void setRestriction(int code, @AttributeUsage int usage, int mode,
+    public void setRestriction(int code, @AttributeUsage int usage, @Mode int mode,
             String[] exceptionPackages) {
         try {
             final int uid = Binder.getCallingUid();
@@ -2735,7 +4000,7 @@ public class AppOpsManager {
      */
     public void stopWatchingMode(OnOpChangedListener callback) {
         synchronized (mModeWatchers) {
-            IAppOpsCallback cb = mModeWatchers.get(callback);
+            IAppOpsCallback cb = mModeWatchers.remove(callback);
             if (cb != null) {
                 try {
                     mService.stopWatchingMode(cb);
@@ -2809,10 +4074,74 @@ public class AppOpsManager {
     @TestApi
     public void stopWatchingActive(@NonNull OnOpActiveChangedListener callback) {
         synchronized (mActiveWatchers) {
-            final IAppOpsActiveCallback cb = mActiveWatchers.get(callback);
+            final IAppOpsActiveCallback cb = mActiveWatchers.remove(callback);
             if (cb != null) {
                 try {
                     mService.stopWatchingActive(cb);
+                } catch (RemoteException e) {
+                    throw e.rethrowFromSystemServer();
+                }
+            }
+        }
+    }
+
+    /**
+     * Start watching for noted app ops. An app op may be immediate or long running.
+     * Immediate ops are noted while long running ones are started and stopped. This
+     * method allows registering a listener to be notified when an app op is noted. If
+     * an op is being noted by any package you will get a callback. To change the
+     * watched ops for a registered callback you need to unregister and register it again.
+     *
+     * <p> If you don't hold the {@link android.Manifest.permission#WATCH_APPOPS} permission
+     * you can watch changes only for your UID.
+     *
+     * @param ops The ops to watch.
+     * @param callback Where to report changes.
+     *
+     * @see #startWatchingActive(int[], OnOpActiveChangedListener)
+     * @see #stopWatchingNoted(OnOpNotedListener)
+     * @see #noteOp(String, int, String)
+     *
+     * @hide
+     */
+    @RequiresPermission(value=Manifest.permission.WATCH_APPOPS, conditional=true)
+    public void startWatchingNoted(@NonNull int[] ops, @NonNull OnOpNotedListener callback) {
+        IAppOpsNotedCallback cb;
+        synchronized (mNotedWatchers) {
+            cb = mNotedWatchers.get(callback);
+            if (cb != null) {
+                return;
+            }
+            cb = new IAppOpsNotedCallback.Stub() {
+                @Override
+                public void opNoted(int op, int uid, String packageName, int mode) {
+                    callback.onOpNoted(op, uid, packageName, mode);
+                }
+            };
+            mNotedWatchers.put(callback, cb);
+        }
+        try {
+            mService.startWatchingNoted(ops, cb);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Stop watching for noted app ops. An app op may be immediate or long running.
+     * Unregistering a non-registered callback has no effect.
+     *
+     * @see #startWatchingNoted(int[], OnOpNotedListener)
+     * @see #noteOp(String, int, String)
+     *
+     * @hide
+     */
+    public void stopWatchingNoted(@NonNull OnOpNotedListener callback) {
+        synchronized (mNotedWatchers) {
+            final IAppOpsNotedCallback cb = mNotedWatchers.get(callback);
+            if (cb != null) {
+                try {
+                    mService.stopWatchingNoted(cb);
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
                 }
@@ -2897,7 +4226,7 @@ public class AppOpsManager {
      */
     public int unsafeCheckOpRaw(String op, int uid, String packageName) {
         try {
-            return mService.checkOperation(strOpToOp(op), uid, packageName);
+            return mService.checkOperationRaw(strOpToOp(op), uid, packageName);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -3171,6 +4500,7 @@ public class AppOpsManager {
      */
     @UnsupportedAppUsage
     public int noteOpNoThrow(int op, int uid, String packageName) {
+        logNoteOpIfNeeded(op, packageName);
         try {
             return mService.noteOperation(op, uid, packageName);
         } catch (RemoteException e) {
@@ -3330,6 +4660,104 @@ public class AppOpsManager {
     }
 
     /**
+     * Configures the app ops persistence for testing.
+     *
+     * @param mode The mode in which the historical registry operates.
+     * @param baseSnapshotInterval The base interval on which we would be persisting a snapshot of
+     *   the historical data. The history is recursive where every subsequent step encompasses
+     *   {@code compressionStep} longer interval with {@code compressionStep} distance between
+     *    snapshots.
+     * @param compressionStep The compression step in every iteration.
+     *
+     * @see #HISTORICAL_MODE_DISABLED
+     * @see #HISTORICAL_MODE_ENABLED_ACTIVE
+     * @see #HISTORICAL_MODE_ENABLED_PASSIVE
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(Manifest.permission.MANAGE_APPOPS)
+    public void setHistoryParameters(@HistoricalMode int mode, long baseSnapshotInterval,
+            int compressionStep) {
+        try {
+            mService.setHistoryParameters(mode, baseSnapshotInterval, compressionStep);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Offsets the history by the given duration.
+     *
+     * @param offsetMillis The offset duration.
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(Manifest.permission.MANAGE_APPOPS)
+    public void offsetHistory(long offsetMillis) {
+        try {
+            mService.offsetHistory(offsetMillis);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Adds ops to the history directly. This could be useful for testing especially
+     * when the historical registry operates in {@link #HISTORICAL_MODE_ENABLED_PASSIVE}
+     * mode.
+     *
+     * @param ops The ops to add to the history.
+     *
+     * @see #setHistoryParameters(int, long, int)
+     * @see #HISTORICAL_MODE_ENABLED_PASSIVE
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(Manifest.permission.MANAGE_APPOPS)
+    public void addHistoricalOps(@NonNull HistoricalOps ops) {
+        try {
+            mService.addHistoricalOps(ops);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Resets the app ops persistence for testing.
+     *
+     * @see #setHistoryParameters(int, long, int)
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(Manifest.permission.MANAGE_APPOPS)
+    public void resetHistoryParameters() {
+        try {
+            mService.resetHistoryParameters();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Clears all app ops history.
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(Manifest.permission.MANAGE_APPOPS)
+    public void clearHistory() {
+        try {
+            mService.clearHistory();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns all supported operation names.
      * @hide
      */
@@ -3360,5 +4788,126 @@ public class AppOpsManager {
             }
         }
         return time;
+    }
+
+    /** @hide */
+    public static String uidStateToString(@UidState int uidState) {
+        switch (uidState) {
+            case UID_STATE_PERSISTENT: {
+                return "UID_STATE_PERSISTENT";
+            }
+            case UID_STATE_TOP: {
+                return "UID_STATE_TOP";
+            }
+            case UID_STATE_FOREGROUND_SERVICE_LOCATION: {
+                return "UID_STATE_FOREGROUND_SERVICE_LOCATION";
+            }
+            case UID_STATE_FOREGROUND_SERVICE: {
+                return "UID_STATE_FOREGROUND_SERVICE";
+            }
+            case UID_STATE_FOREGROUND: {
+                return "UID_STATE_FOREGROUND";
+            }
+            case UID_STATE_BACKGROUND: {
+                return "UID_STATE_BACKGROUND";
+            }
+            case UID_STATE_CACHED: {
+                return "UID_STATE_CACHED";
+            }
+            default: {
+                return "UNKNOWN";
+            }
+        }
+    }
+
+    /** @hide */
+    public static int parseHistoricalMode(@NonNull String mode) {
+        switch (mode) {
+            case "HISTORICAL_MODE_ENABLED_ACTIVE": {
+                return HISTORICAL_MODE_ENABLED_ACTIVE;
+            }
+            case "HISTORICAL_MODE_ENABLED_PASSIVE": {
+                return HISTORICAL_MODE_ENABLED_PASSIVE;
+            }
+            default: {
+                return HISTORICAL_MODE_DISABLED;
+            }
+        }
+    }
+
+    /** @hide */
+    public static String historicalModeToString(@HistoricalMode int mode) {
+        switch (mode) {
+            case HISTORICAL_MODE_DISABLED: {
+                return "HISTORICAL_MODE_DISABLED";
+            }
+            case HISTORICAL_MODE_ENABLED_ACTIVE: {
+                return "HISTORICAL_MODE_ENABLED_ACTIVE";
+            }
+            case HISTORICAL_MODE_ENABLED_PASSIVE: {
+                return "HISTORICAL_MODE_ENABLED_PASSIVE";
+            }
+            default: {
+                return "UNKNOWN";
+            }
+        }
+    }
+
+    private static int getSystemAlertWindowDefault() {
+        final Context context = ActivityThread.currentApplication();
+        if (context == null) {
+            return AppOpsManager.MODE_DEFAULT;
+        }
+
+        // system alert window is disable on low ram phones starting from Q
+        final PackageManager pm = context.getPackageManager();
+        // TVs are constantly plugged in and has less concern for memory/power
+        if (ActivityManager.isLowRamDeviceStatic()
+                && !pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK, 0)) {
+            return AppOpsManager.MODE_IGNORED;
+        }
+
+        return AppOpsManager.MODE_DEFAULT;
+    }
+
+    private static void logNoteOpIfNeeded(int op, String callingPackage) {
+        // Check if debug logging propety is enabled.
+        if (!SystemProperties.getBoolean(DEBUG_LOGGING_ENABLE_PROP, false)) {
+            return;
+        }
+        // Check if this package should be logged.
+        String packages = SystemProperties.get(DEBUG_LOGGING_PACKAGES_PROP, "");
+        if (!"".equals(packages) && callingPackage != null) {
+            boolean found = false;
+            for (String pkg : packages.split(",")) {
+                if (callingPackage.equals(pkg)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return;
+            }
+        }
+        String opStr = opToName(op);
+        // Check if this app op should be logged
+        String logOps = SystemProperties.get(DEBUG_LOGGING_OPS_PROP, "");
+        if (!"".equals(logOps)) {
+            boolean found = false;
+            for (String logOp : logOps.split(",")) {
+                if (opStr.equals(logOp)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return;
+            }
+        }
+
+        // Log a stack trace
+        Exception here = new Exception("HERE!");
+        android.util.Log.i(DEBUG_LOGGING_TAG, "Note operation package= " + callingPackage
+                + " op= " + opStr, here);
     }
 }

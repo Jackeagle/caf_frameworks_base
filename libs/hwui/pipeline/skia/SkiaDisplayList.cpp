@@ -27,9 +27,9 @@ namespace android {
 namespace uirenderer {
 namespace skiapipeline {
 
-void SkiaDisplayList::syncContents() {
+void SkiaDisplayList::syncContents(const WebViewSyncData& data) {
     for (auto& functor : mChildFunctors) {
-        functor->syncFunctor();
+        functor->syncFunctor(data);
     }
     for (auto& animatedImage : mAnimatedImages) {
         animatedImage->syncProperties();
@@ -73,7 +73,6 @@ bool SkiaDisplayList::prepareListAndChildren(
         RenderNode* childNode = child.getRenderNode();
         Matrix4 mat4(child.getRecordedMatrix());
         info.damageAccumulator->pushTransform(&mat4);
-        // TODO: a layer is needed if the canvas is rotated or has a non-rect clip
         info.hasBackwardProjectedNodes = false;
         childFn(childNode, observer, info, functorsNeedLayer);
         hasBackwardProjectedNodesSubtree |= info.hasBackwardProjectedNodes;
@@ -141,6 +140,6 @@ void SkiaDisplayList::output(std::ostream& output, uint32_t level) {
     mDisplayList.draw(&canvas);
 }
 
-};  // namespace skiapipeline
-};  // namespace uirenderer
-};  // namespace android
+}  // namespace skiapipeline
+}  // namespace uirenderer
+}  // namespace android

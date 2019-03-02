@@ -39,10 +39,12 @@ import android.content.pm.IPackageManager;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageInstaller;
+import android.content.pm.PackageInstaller.SessionInfo;
 import android.content.pm.PackageInstaller.SessionParams;
 import android.content.pm.PackageItemInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.PackageManagerInternal;
 import android.content.pm.PackageParser;
 import android.content.pm.PackageParser.ApkLite;
 import android.content.pm.PackageParser.PackageLite;
@@ -59,6 +61,10 @@ import android.content.pm.dex.DexMetadataHelper;
 import android.content.pm.dex.ISnapshotRuntimeProfileCallback;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.content.rollback.IRollbackManager;
+import android.content.rollback.PackageRollbackInfo;
+import android.content.rollback.RollbackInfo;
+import android.content.rollback.RollbackManager;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -257,8 +263,12 @@ class PackageManagerShellCommand extends ShellCommand {
                     return runSetHarmfulAppWarning();
                 case "get-harmful-app-warning":
                     return runGetHarmfulAppWarning();
+                case "get-stagedsessions":
+                    return getStagedSessions();
                 case "uninstall-system-updates":
                     return uninstallSystemUpdates();
+                case "rollback-app":
+                    return runRollbackApp();
                 default: {
                     String nextArg = getNextArg();
                     if (nextArg == null) {
@@ -279,6 +289,28 @@ class PackageManagerShellCommand extends ShellCommand {
             pw.println("Remote exception: " + e);
         }
         return -1;
+    }
+
+    private int getStagedSessions() {
+        final PrintWriter pw = getOutPrintWriter();
+        try {
+            List<SessionInfo> stagedSessionsList =
+                    mInterface.getPackageInstaller().getStagedSessions().getList();
+            for (SessionInfo session: stagedSessionsList) {
+                pw.println("appPackageName = " + session.getAppPackageName()
+                        + "; sessionId = " + session.getSessionId()
+                        + "; isStaged = " + session.isStaged()
+                        + "; isSessionReady = " + session.isSessionReady()
+                        + "; isSessionApplied = " + session.isSessionApplied()
+                        + "; isSessionFailed = " + session.isSessionFailed() + ";");
+            }
+        } catch (RemoteException e) {
+            pw.println("Failure ["
+                    + e.getClass().getName() + " - "
+                    + e.getMessage() + "]");
+            return 0;
+        }
+        return 1;
     }
 
     private int uninstallSystemUpdates() {
@@ -320,6 +352,55 @@ class PackageManagerShellCommand extends ShellCommand {
         }
         pw.println("Success");
         return 1;
+    }
+
+    private int runRollbackApp() {
+        final PrintWriter pw = getOutPrintWriter();
+
+        final String packageName = getNextArgRequired();
+        if (packageName == null) {
+            pw.println("Error: package name not specified");
+            return 1;
+        }
+
+        final LocalIntentReceiver receiver = new LocalIntentReceiver();
+        try {
+            IRollbackManager rm = IRollbackManager.Stub.asInterface(
+                    ServiceManager.getService(Context.ROLLBACK_SERVICE));
+
+            RollbackInfo rollback = null;
+            for (RollbackInfo r : (List<RollbackInfo>) rm.getAvailableRollbacks().getList()) {
+                for (PackageRollbackInfo info : r.getPackages()) {
+                    if (packageName.equals(info.getPackageName())) {
+                        rollback = r;
+                        break;
+                    }
+                }
+            }
+
+            if (rollback == null) {
+                pw.println("No available rollbacks for: " + packageName);
+                return 1;
+            }
+
+            rm.commitRollback(rollback.getRollbackId(),
+                    ParceledListSlice.<VersionedPackage>emptyList(),
+                    "com.android.shell", receiver.getIntentSender());
+        } catch (RemoteException re) {
+            // Cannot happen.
+        }
+
+        final Intent result = receiver.getResult();
+        final int status = result.getIntExtra(RollbackManager.EXTRA_STATUS,
+                RollbackManager.STATUS_FAILURE);
+        if (status == RollbackManager.STATUS_SUCCESS) {
+            pw.println("Success");
+            return 0;
+        } else {
+            pw.println("Failure ["
+                    + result.getStringExtra(RollbackManager.EXTRA_STATUS_MESSAGE) + "]");
+            return 1;
+        }
     }
 
     private void setParamsSize(InstallParams params, String inPath) {
@@ -536,6 +617,7 @@ class PackageManagerShellCommand extends ShellCommand {
         boolean listInstaller = false;
         boolean showUid = false;
         boolean showVersionCode = false;
+        boolean listApexOnly = false;
         int uid = -1;
         int userId = UserHandle.USER_SYSTEM;
         try {
@@ -576,6 +658,10 @@ class PackageManagerShellCommand extends ShellCommand {
                     case "--show-versioncode":
                         showVersionCode = true;
                         break;
+                    case "--apex-only":
+                        getFlags |= PackageManager.MATCH_APEX;
+                        listApexOnly = true;
+                        break;
                     case "--user":
                         userId = UserHandle.parseUserArg(getNextArgRequired());
                         break;
@@ -606,30 +692,38 @@ class PackageManagerShellCommand extends ShellCommand {
             if (filter != null && !info.packageName.contains(filter)) {
                 continue;
             }
-            if (uid != -1 && info.applicationInfo.uid != uid) {
+            final boolean isApex = info.isApex;
+            if (uid != -1 && !isApex && info.applicationInfo.uid != uid) {
                 continue;
             }
-            final boolean isSystem =
+
+            final boolean isSystem = !isApex &&
                     (info.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM) != 0;
-            if ((!listDisabled || !info.applicationInfo.enabled) &&
-                    (!listEnabled || info.applicationInfo.enabled) &&
+            final boolean isEnabled = !isApex && info.applicationInfo.enabled;
+            if ((!listDisabled || !isEnabled) &&
+                    (!listEnabled || isEnabled) &&
                     (!listSystem || isSystem) &&
-                    (!listThirdParty || !isSystem)) {
+                    (!listThirdParty || !isSystem) &&
+                    (!listApexOnly || isApex)) {
                 pw.print("package:");
-                if (showSourceDir) {
+                if (showSourceDir && !isApex) {
                     pw.print(info.applicationInfo.sourceDir);
                     pw.print("=");
                 }
                 pw.print(info.packageName);
                 if (showVersionCode) {
                     pw.print(" versionCode:");
-                    pw.print(info.applicationInfo.versionCode);
+                    if (info.applicationInfo != null) {
+                        pw.print(info.applicationInfo.longVersionCode);
+                    } else {
+                        pw.print(info.getLongVersionCode());
+                    }
                 }
-                if (listInstaller) {
+                if (listInstaller && !isApex) {
                     pw.print("  installer=");
                     pw.print(mInterface.getInstallerPackageName(info.packageName));
                 }
-                if (showUid) {
+                if (showUid && !isApex) {
                     pw.print(" uid:");
                     pw.print(info.applicationInfo.uid);
                 }
@@ -1157,6 +1251,7 @@ class PackageManagerShellCommand extends ShellCommand {
         String checkProfilesRaw = null;
         boolean secondaryDex = false;
         String split = null;
+        boolean compileLayouts = false;
 
         String opt;
         while ((opt = getNextOption()) != null) {
@@ -1175,6 +1270,9 @@ class PackageManagerShellCommand extends ShellCommand {
                     break;
                 case "-r":
                     compilationReason = getNextArgRequired();
+                    break;
+                case "--compile-layouts":
+                    compileLayouts = true;
                     break;
                 case "--check-prof":
                     checkProfilesRaw = getNextArgRequired();
@@ -1207,14 +1305,16 @@ class PackageManagerShellCommand extends ShellCommand {
             }
         }
 
-        if (compilerFilter != null && compilationReason != null) {
-            pw.println("Cannot use compilation filter (\"-m\") and compilation reason (\"-r\") " +
-                    "at the same time");
-            return 1;
-        }
-        if (compilerFilter == null && compilationReason == null) {
-            pw.println("Cannot run without any of compilation filter (\"-m\") and compilation " +
-                    "reason (\"-r\") at the same time");
+        final boolean compilerFilterGiven = compilerFilter != null;
+        final boolean compilationReasonGiven = compilationReason != null;
+        // Make sure exactly one of -m, -r, or --compile-layouts is given.
+        if ((!compilerFilterGiven && !compilationReasonGiven && !compileLayouts)
+            || (!compilerFilterGiven && compilationReasonGiven && compileLayouts)
+            || (compilerFilterGiven && !compilationReasonGiven && compileLayouts)
+            || (compilerFilterGiven && compilationReasonGiven && !compileLayouts)
+            || (compilerFilterGiven && compilationReasonGiven && compileLayouts)) {
+            pw.println("Must specify exactly one of compilation filter (\"-m\"), compilation " +
+                    "reason (\"-r\"), or compile layouts (\"--compile-layouts\")");
             return 1;
         }
 
@@ -1228,15 +1328,16 @@ class PackageManagerShellCommand extends ShellCommand {
             return 1;
         }
 
-        String targetCompilerFilter;
-        if (compilerFilter != null) {
+        String targetCompilerFilter = null;
+        if (compilerFilterGiven) {
             if (!DexFile.isValidCompilerFilter(compilerFilter)) {
                 pw.println("Error: \"" + compilerFilter +
                         "\" is not a valid compilation filter.");
                 return 1;
             }
             targetCompilerFilter = compilerFilter;
-        } else {
+        }
+        if (compilationReasonGiven) {
             int reason = -1;
             for (int i = 0; i < PackageManagerServiceCompilerMapping.REASON_STRINGS.length; i++) {
                 if (PackageManagerServiceCompilerMapping.REASON_STRINGS[i].equals(
@@ -1278,12 +1379,19 @@ class PackageManagerShellCommand extends ShellCommand {
                 pw.flush();
             }
 
-            boolean result = secondaryDex
+            boolean result = true;
+            if (compileLayouts) {
+                PackageManagerInternal internal = LocalServices.getService(
+                        PackageManagerInternal.class);
+                result = internal.compileLayouts(packageName);
+            } else {
+                result = secondaryDex
                     ? mInterface.performDexOptSecondary(packageName,
                             targetCompilerFilter, forceCompilation)
                     : mInterface.performDexOptMode(packageName,
                             checkProfiles, targetCompilerFilter, forceCompilation,
                             true /* bootComplete */, split);
+            }
             if (!result) {
                 failedPackages.add(packageName);
             }
@@ -2193,9 +2301,6 @@ class PackageManagerShellCommand extends ShellCommand {
         boolean replaceExisting = true;
         while ((opt = getNextOption()) != null) {
             switch (opt) {
-                case "-l":
-                    sessionParams.installFlags |= PackageManager.INSTALL_FORWARD_LOCK;
-                    break;
                 case "-r": // ignore
                     break;
                 case "-R":
@@ -2209,9 +2314,6 @@ class PackageManagerShellCommand extends ShellCommand {
                     break;
                 case "-t":
                     sessionParams.installFlags |= PackageManager.INSTALL_ALLOW_TEST;
-                    break;
-                case "-s":
-                    sessionParams.installFlags |= PackageManager.INSTALL_EXTERNAL;
                     break;
                 case "-f":
                     sessionParams.installFlags |= PackageManager.INSTALL_INTERNAL;
@@ -2285,10 +2387,17 @@ class PackageManagerShellCommand extends ShellCommand {
                     sessionParams.installFlags |= PackageManager.INSTALL_FORCE_SDK;
                     break;
                 case "--apex":
-                    sessionParams.installFlags |= PackageManager.INSTALL_APEX;
+                    sessionParams.setInstallAsApex();
+                    sessionParams.setStaged();
                     break;
                 case "--multi-package":
                     sessionParams.setMultiPackage();
+                    break;
+                case "--staged":
+                    sessionParams.setStaged();
+                    break;
+                case "--enable-rollback":
+                    sessionParams.installFlags |= PackageManager.INSTALL_ENABLE_ROLLBACK;
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown option " + opt);
@@ -2575,7 +2684,7 @@ class PackageManagerShellCommand extends ShellCommand {
         try {
             session = new PackageInstaller.Session(
                     mInterface.getPackageInstaller().openSession(sessionId));
-            if (!session.isMultiPackage()) {
+            if (!session.isMultiPackage() && !session.isStaged()) {
                 // Sanity check that all .dm files match an apk.
                 // (The installer does not support standalone .dm files and will not process them.)
                 try {
@@ -2773,11 +2882,11 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("    Prints all system libraries.");
         pw.println("");
         pw.println("  list packages [-f] [-d] [-e] [-s] [-3] [-i] [-l] [-u] [-U] ");
-        pw.println("      [--uid UID] [--user USER_ID] [FILTER]");
+        pw.println("      [--show-versioncode] [--apex-only] [--uid UID] [--user USER_ID] [FILTER]");
         pw.println("    Prints all packages; optionally only those whose name contains");
         pw.println("    the text in FILTER.  Options are:");
         pw.println("      -f: see their associated file");
-        pw.println("      -a: all known packages");
+        pw.println("      -a: all known packages (but excluding APEXes)");
         pw.println("      -d: filter to only show disabled packages");
         pw.println("      -e: filter to only show enabled packages");
         pw.println("      -s: filter to only show system packages");
@@ -2786,6 +2895,8 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      -l: ignored (used for compatibility with older releases)");
         pw.println("      -U: also show the package UID");
         pw.println("      -u: also include uninstalled packages");
+        pw.println("      --show-versioncode: also show the version code");
+        pw.println("      --apex-only: only show APEX packages");
         pw.println("      --uid UID: filter to only show packages with the given UID");
         pw.println("      --user USER_ID: only list packages belonging to the given user");
         pw.println("");
@@ -2821,7 +2932,9 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("       [--install-reason 0/1/2/3/4] [--originating-uri URI]");
         pw.println("       [--referrer URI] [--abi ABI_NAME] [--force-sdk]");
         pw.println("       [--preload] [--instantapp] [--full] [--dont-kill]");
-        pw.println("       [--force-uuid internal|UUID] [--pkg PACKAGE] [-S BYTES] [PATH|-]");
+        pw.println("       [--enable-rollback]");
+        pw.println("       [--force-uuid internal|UUID] [--pkg PACKAGE] [-S BYTES] [--apex]");
+        pw.println("       [PATH|-]");
         pw.println("    Install an application.  Must provide the apk data to install, either as a");
         pw.println("    file path or '-' to read from stdin.  Options are:");
         pw.println("      -l: forward lock application");
@@ -2850,14 +2963,15 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      --force-uuid: force install on to disk volume with given UUID");
         pw.println("      --force-sdk: allow install even when existing app targets platform");
         pw.println("          codename but new one targets a final API level");
+        pw.println("      --apex: install an .apex file, not an .apk");
         pw.println("");
         pw.println("  install-create [-lrtsfdg] [-i PACKAGE] [--user USER_ID|all|current]");
         pw.println("       [-p INHERIT_PACKAGE] [--install-location 0/1/2]");
         pw.println("       [--install-reason 0/1/2/3/4] [--originating-uri URI]");
         pw.println("       [--referrer URI] [--abi ABI_NAME] [--force-sdk]");
         pw.println("       [--preload] [--instantapp] [--full] [--dont-kill]");
-        pw.println("       [--force-uuid internal|UUID] [--pkg PACKAGE] [-S BYTES]");
-        pw.println("       [--multi-package]");
+        pw.println("       [--force-uuid internal|UUID] [--pkg PACKAGE] [--apex] [-S BYTES]");
+        pw.println("       [--multi-package] [--staged]");
         pw.println("    Like \"install\", but starts an install session.  Use \"install-write\"");
         pw.println("    to push data into the session, and \"install-commit\" to finish.");
         pw.println("");
@@ -2985,6 +3099,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      --check-prof (true | false): look at profiles when doing dexopt?");
         pw.println("      --secondary-dex: compile app secondary dex files");
         pw.println("      --split SPLIT: compile only the given split name");
+        pw.println("      --compile-layouts: compile layout resources for faster inflation");
         pw.println("");
         pw.println("  force-dex-opt PACKAGE");
         pw.println("    Force immediate execution of dex opt for the given PACKAGE.");

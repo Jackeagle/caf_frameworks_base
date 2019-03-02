@@ -35,7 +35,6 @@ import android.widget.Switch;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.settingslib.net.DataUsageController;
-import com.android.systemui.Dependency;
 import com.android.systemui.Prefs;
 import com.android.systemui.R;
 import com.android.systemui.plugins.ActivityStarter;
@@ -51,6 +50,8 @@ import com.android.systemui.statusbar.policy.NetworkController;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkController.SignalCallback;
 
+import javax.inject.Inject;
+
 /** Quick settings tile: Cellular **/
 public class CellularTile extends QSTileImpl<SignalState> {
     private static final String ENABLE_SETTINGS_DATA_PLAN = "enable.settings.data.plan";
@@ -63,13 +64,16 @@ public class CellularTile extends QSTileImpl<SignalState> {
     private final ActivityStarter mActivityStarter;
     private final KeyguardMonitor mKeyguardMonitor;
 
-    public CellularTile(QSHost host) {
+    @Inject
+    public CellularTile(QSHost host, NetworkController networkController,
+            ActivityStarter activityStarter, KeyguardMonitor keyguardMonitor) {
         super(host);
-        mController = Dependency.get(NetworkController.class);
-        mActivityStarter = Dependency.get(ActivityStarter.class);
-        mKeyguardMonitor = Dependency.get(KeyguardMonitor.class);
+        mController = networkController;
+        mActivityStarter = activityStarter;
+        mKeyguardMonitor = keyguardMonitor;
         mDataController = mController.getMobileDataController();
         mDetailAdapter = new CellularDetailAdapter();
+        mController.observe(getLifecycle(), mSignalCallback);
     }
 
     @Override
@@ -84,11 +88,6 @@ public class CellularTile extends QSTileImpl<SignalState> {
 
     @Override
     public void handleSetListening(boolean listening) {
-        if (listening) {
-            mController.addCallback(mSignalCallback);
-        } else {
-            mController.removeCallback(mSignalCallback);
-        }
     }
 
     @Override
@@ -189,7 +188,7 @@ public class CellularTile extends QSTileImpl<SignalState> {
             state.secondaryLabel = r.getString(R.string.status_bar_airplane);
         } else if (mobileDataEnabled) {
             state.state = Tile.STATE_ACTIVE;
-            state.secondaryLabel = getMobileDataDescription(cb);
+            state.secondaryLabel = getMobileDataSubscriptionName(cb);
         } else {
             state.state = Tile.STATE_INACTIVE;
             state.secondaryLabel = r.getString(R.string.cell_data_off);
@@ -208,16 +207,16 @@ public class CellularTile extends QSTileImpl<SignalState> {
         state.contentDescription = state.label + ", " + contentDescriptionSuffix;
     }
 
-    private CharSequence getMobileDataDescription(CallbackInfo cb) {
-        if (cb.roaming && !TextUtils.isEmpty(cb.dataContentDescription)) {
+    private CharSequence getMobileDataSubscriptionName(CallbackInfo cb) {
+        if (cb.roaming && !TextUtils.isEmpty(cb.dataSubscriptionName)) {
             String roaming = mContext.getString(R.string.data_connection_roaming);
-            String dataDescription = cb.dataContentDescription;
+            String dataDescription = cb.dataSubscriptionName.toString();
             return mContext.getString(R.string.mobile_data_text_format, roaming, dataDescription);
         }
         if (cb.roaming) {
             return mContext.getString(R.string.data_connection_roaming);
         }
-        return cb.dataContentDescription;
+        return cb.dataSubscriptionName;
     }
 
     @Override
@@ -232,7 +231,7 @@ public class CellularTile extends QSTileImpl<SignalState> {
 
     private static final class CallbackInfo {
         boolean airplaneModeEnabled;
-        String dataContentDescription;
+        CharSequence dataSubscriptionName;
         boolean activityIn;
         boolean activityOut;
         boolean noSim;
@@ -244,16 +243,14 @@ public class CellularTile extends QSTileImpl<SignalState> {
 
         @Override
         public void setMobileDataIndicators(IconState statusIcon, IconState qsIcon, int statusType,
-                int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
-                int stackedDataIcon, int stackedVoiceIcon,
+                int qsType, boolean activityIn, boolean activityOut, int volteIcon,
                 String typeContentDescription, String description, boolean isWide,
-                int subId, boolean roaming,
-                boolean fiveGAvailable, int fiveGSignalStrengId, boolean dataOnFiveG) {
+                int subId, boolean roaming) {
             if (qsIcon == null) {
                 // Not data sim, don't display.
                 return;
             }
-            mInfo.dataContentDescription = typeContentDescription;
+            mInfo.dataSubscriptionName = mController.getMobileDataNetworkName();
             mInfo.activityIn = activityIn;
             mInfo.activityOut = activityOut;
             mInfo.roaming = roaming;

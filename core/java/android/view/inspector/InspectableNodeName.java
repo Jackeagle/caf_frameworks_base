@@ -19,6 +19,8 @@ package android.view.inspector;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 
+import android.annotation.TestApi;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -34,11 +36,12 @@ import java.lang.annotation.Target;
  * This annotation does not inherit. If a class extends an annotated parent class, but does not
  * annotate itself, its node name will be inferred from its Java name.
  *
- * @see InspectionHelper#getNodeName()
+ * @see InspectionCompanion#getNodeName()
  * @hide
  */
 @Target({TYPE})
 @Retention(SOURCE)
+@TestApi
 public @interface InspectableNodeName {
     /**
      * The display name for nodes of this type.

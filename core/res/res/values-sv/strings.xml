@@ -136,14 +136,10 @@
     <string name="wfcSpnFormat_spn_wifi" msgid="6546481665561961938">"Wi-Fi via <xliff:g id="SPN">%s</xliff:g>"</string>
     <string name="wfcSpnFormat_wifi_calling_bar_spn" msgid="1726178784338466265">"Wi-Fi-samtal | <xliff:g id="SPN">%s</xliff:g>"</string>
     <string name="wfcSpnFormat_spn_vowifi" msgid="4444638298656953681">"VoWifi via <xliff:g id="SPN">%s</xliff:g>"</string>
-    <!-- no translation found for wfcSpnFormat_wifi_calling (4990486735013125329) -->
-    <skip />
-    <!-- no translation found for wfcSpnFormat_wifi (1892673884655959773) -->
-    <skip />
-    <!-- no translation found for wfcSpnFormat_wifi_calling_wo_hyphen (1336669776254502831) -->
-    <skip />
-    <!-- no translation found for wfcSpnFormat_vowifi (1765176406171272629) -->
-    <skip />
+    <string name="wfcSpnFormat_wifi_calling" msgid="4990486735013125329">"Wi-Fi-samtal"</string>
+    <string name="wfcSpnFormat_wifi" msgid="1892673884655959773">"Wi-Fi"</string>
+    <string name="wfcSpnFormat_wifi_calling_wo_hyphen" msgid="1336669776254502831">"Wi-Fi-samtal"</string>
+    <string name="wfcSpnFormat_vowifi" msgid="1765176406171272629">"VoWifi"</string>
     <string name="wifi_calling_off_summary" msgid="8720659586041656098">"Av"</string>
     <string name="wfc_mode_wifi_preferred_summary" msgid="1994113411286935263">"Wi-Fi i första hand"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="1988279625335345908">"Använd mobildata"</string>
@@ -451,6 +447,8 @@
     <string name="permdesc_readPhoneState" msgid="1639212771826125528">"Tillåter att appen kommer åt enhetens telefonfunktioner. Med den här behörigheten tillåts appen att identifiera mobilens telefonnummer och enhets-ID, om ett samtal pågår och vilket nummer samtalet är kopplat till."</string>
     <string name="permlab_manageOwnCalls" msgid="1503034913274622244">"dirigera samtal via systemet"</string>
     <string name="permdesc_manageOwnCalls" msgid="6552974537554717418">"Appen tillåts att dirigera samtal via systemet för att förbättra samtalsupplevelsen."</string>
+    <string name="permlab_callCompanionApp" msgid="3599252979411970473">"visa och styra samtal via systemet."</string>
+    <string name="permdesc_callCompanionApp" msgid="4567344683275099090">"Tillåter att appen kan visa och styra pågående samtal på enheten. Detta omfattar information som telefonnummer för samtal och samtalens status."</string>
     <string name="permlab_acceptHandover" msgid="2661534649736022409">"fortsätta ett samtal från en annan app"</string>
     <string name="permdesc_acceptHandovers" msgid="4570660484220539698">"Tillåter att appen fortsätter ett samtal som har startats i en annan app."</string>
     <string name="permlab_readPhoneNumbers" msgid="6108163940932852440">"läsa telefonnummer"</string>
@@ -511,6 +509,8 @@
     <string name="permdesc_nfc" msgid="7120611819401789907">"Tillåter att appen kommunicerar med etiketter, kort och läsare för närfältskommunikation (NFC)."</string>
     <string name="permlab_disableKeyguard" msgid="3598496301486439258">"inaktivera skärmlåset"</string>
     <string name="permdesc_disableKeyguard" msgid="6034203065077122992">"Tillåter att appen inaktiverar tangentlåset och tillhörande lösenordsskydd. Ett exempel kan vara att tangentlåset inaktiveras vid inkommande samtal och aktiveras igen när samtalet är avslutat."</string>
+    <string name="permlab_getAndRequestScreenLockComplexity" msgid="3911592334192005424">"hämta och begär komplexitet för låsskärmen"</string>
+    <string name="permdesc_getAndRequestScreenLockComplexity" msgid="9045202063228854873">"Tillåter att appen får reda på komplexitetsnivån för skärmlåset (hög, mellan, låg eller ingen). Detta ger en indikation på skärmlåsets möjliga längd och typ. Appen kan även föreslå att skärmlåset uppdateras till en viss nivå, men användare kan ignorera förslaget och fortsätta navigera. Observera att skärmlåset inte lagras i vanlig text så appen får inte reda på det exakta lösenordet."</string>
     <string name="permlab_useBiometric" msgid="8837753668509919318">"använd biometrisk maskinvara"</string>
     <string name="permdesc_useBiometric" msgid="8389855232721612926">"Tillåter att appen använder biometrisk maskinvara vid autentisering"</string>
     <string name="permlab_manageFingerprint" msgid="5640858826254575638">"hantera maskinvara för fingeravtryck"</string>
@@ -533,6 +533,9 @@
     <string name="permdesc_mediaLocation" msgid="2237023389178865130">"Tillåter att appen läser av platser i din mediesamling."</string>
     <string name="biometric_dialog_default_title" msgid="4229778503907743328">"Appen <xliff:g id="APP">%s</xliff:g> vill autentisera"</string>
     <string name="biometric_error_hw_unavailable" msgid="645781226537551036">"Biometrisk maskinvara är inte tillgänglig"</string>
+    <string name="biometric_error_user_canceled" msgid="2260175018114348727">"Autentiseringen avbröts"</string>
+    <string name="biometric_not_recognized" msgid="5770511773560736082">"Identifierades inte"</string>
+    <string name="biometric_error_canceled" msgid="349665227864885880">"Autentiseringen avbröts"</string>
     <string name="fingerprint_acquired_partial" msgid="735082772341716043">"Ofullständigt fingeravtryck. Försök igen."</string>
     <string name="fingerprint_acquired_insufficient" msgid="4596546021310923214">"Det gick inte att bearbeta fingeravtrycket. Försök igen."</string>
     <string name="fingerprint_acquired_imager_dirty" msgid="1087209702421076105">"Fingeravtryckssensorn är smutsig. Rengör den och försök igen."</string>
@@ -540,7 +543,6 @@
     <string name="fingerprint_acquired_too_slow" msgid="59250885689661653">"Du rörde fingret för långsamt. Försök igen."</string>
   <string-array name="fingerprint_acquired_vendor">
   </string-array>
-    <string name="biometric_not_recognized" msgid="5770511773560736082">"Identifierades inte"</string>
     <string name="fingerprint_authenticated" msgid="5309333983002526448">"Fingeravtrycket har autentiserats"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="4018680978348659031">"Ansiktet har autentiserats"</string>
     <string name="face_authenticated_confirmation_required" msgid="8778347003507633610">"Ansiktet har autentiserats. Tryck på Bekräfta"</string>
@@ -596,14 +598,10 @@
     <string name="permdesc_writeSyncSettings" msgid="8956262591306369868">"Tillåter att appen ändrar synkroniseringsinställningarna för ett konto. Detta kan användas till exempel för att synkronisera appen Personer med ett konto."</string>
     <string name="permlab_readSyncStats" msgid="7396577451360202448">"läsa synkroniseringsstatistik"</string>
     <string name="permdesc_readSyncStats" msgid="1510143761757606156">"Tillåter att appen läser synkroniseringsstatistik för ett konto, inklusive historiken för synkroniseringshändelser och mängden data som synkroniseras."</string>
-    <string name="permlab_sdcardRead" product="nosdcard" msgid="367275095159405468">"läsa innehåll på USB-enheten"</string>
-    <string name="permlab_sdcardRead" product="default" msgid="2188156462934977940">"läsa innehållet på SD-kortet"</string>
-    <string name="permdesc_sdcardRead" product="nosdcard" msgid="3446988712598386079">"Låter appen läsa USB-innehåll."</string>
-    <string name="permdesc_sdcardRead" product="default" msgid="2607362473654975411">"Tillåter att appen läser innehållet på SD-kortet."</string>
-    <string name="permlab_sdcardWrite" product="nosdcard" msgid="8485979062254666748">"ändra eller ta bort innehåll på USB-enheten"</string>
-    <string name="permlab_sdcardWrite" product="default" msgid="8805693630050458763">"ändra eller ta bort innehåll på SD-kortet"</string>
-    <string name="permdesc_sdcardWrite" product="nosdcard" msgid="6175406299445710888">"Gör att app skriver till USB."</string>
-    <string name="permdesc_sdcardWrite" product="default" msgid="4337417790936632090">"Tillåter att appen skriver till SD-kortet."</string>
+    <string name="permlab_sdcardRead" msgid="1438933556581438863">"läsa innehåll på delat lagringsutrymmet"</string>
+    <string name="permdesc_sdcardRead" msgid="1804941689051236391">"Tillåter att appen läser innehåll på ditt delade lagringsutrymme."</string>
+    <string name="permlab_sdcardWrite" msgid="9220937740184960897">"ändra eller ta bort innehåll på delat lagringsutrymme"</string>
+    <string name="permdesc_sdcardWrite" msgid="2834431057338203959">"Tillåter att appen skriver innehåll på ditt delade lagringsutrymme."</string>
     <string name="permlab_use_sip" msgid="2052499390128979920">"gör/ta emot SIP-anrop"</string>
     <string name="permdesc_use_sip" msgid="2297804849860225257">"Tillåter att appen gör och tar emot SIP-anrop."</string>
     <string name="permlab_register_sim_subscription" msgid="3166535485877549177">"registrera nya telekommunikationsanslutningar för SIM-kortet"</string>
@@ -949,6 +947,8 @@
     <string name="save_password_never" msgid="8274330296785855105">"Aldrig"</string>
     <string name="open_permission_deny" msgid="7374036708316629800">"Du har inte behörighet att öppna den här sidan."</string>
     <string name="text_copied" msgid="4985729524670131385">"Text har kopierats till urklipp."</string>
+    <!-- no translation found for copied (8564151838171791598) -->
+    <skip />
     <string name="more_item_label" msgid="4650918923083320495">"Mer"</string>
     <string name="prepend_shortcut_label" msgid="2572214461676015642">"Menu+"</string>
     <string name="menu_meta_shortcut_label" msgid="4647153495550313570">"Meta + "</string>
@@ -1091,7 +1091,7 @@
     <string name="email_desc" msgid="3638665569546416795">"Skicka e-post till vald adress"</string>
     <string name="dial" msgid="1253998302767701559">"Ring"</string>
     <string name="dial_desc" msgid="6573723404985517250">"Ring valt telefonnummer"</string>
-    <string name="map" msgid="5441053548030107189">"Karta"</string>
+    <string name="map" msgid="5441053548030107189">"Öppna karta"</string>
     <string name="map_desc" msgid="1836995341943772348">"Hitta den valda adressen"</string>
     <string name="browse" msgid="1245903488306147205">"Öppna"</string>
     <string name="browse_desc" msgid="8220976549618935044">"Öppna vald webbadress"</string>
@@ -1101,10 +1101,14 @@
     <string name="add_contact_desc" msgid="4830217847004590345">"Lägg till i Kontakter"</string>
     <string name="view_calendar" msgid="979609872939597838">"Visa"</string>
     <string name="view_calendar_desc" msgid="5828320291870344584">"Visa vald tid i kalendern"</string>
-    <string name="add_calendar_event" msgid="1953664627192056206">"Schema"</string>
+    <string name="add_calendar_event" msgid="1953664627192056206">"Schemalägg"</string>
     <string name="add_calendar_event_desc" msgid="4326891793260687388">"Schemalägg händelse på den valda tiden"</string>
-    <string name="view_flight" msgid="7691640491425680214">"Spår"</string>
+    <string name="view_flight" msgid="7691640491425680214">"Spåra"</string>
     <string name="view_flight_desc" msgid="3876322502674253506">"Spåra valt flyg"</string>
+    <string name="translate" msgid="9218619809342576858">"Översätt"</string>
+    <string name="translate_desc" msgid="4502367770068777202">"Översätt markerad text"</string>
+    <string name="define" msgid="7394820043869954211">"Definiera"</string>
+    <string name="define_desc" msgid="7910883642444919726">"Definiera markerad text"</string>
     <string name="low_internal_storage_view_title" msgid="5576272496365684834">"Lagringsutrymmet börjar ta slut"</string>
     <string name="low_internal_storage_view_text" msgid="6640505817617414371">"Det kan hända att vissa systemfunktioner inte fungerar"</string>
     <string name="low_internal_storage_view_text_no_boot" msgid="6935190099204693424">"Det finns inte tillräckligt med utrymme för systemet. Kontrollera att du har ett lagringsutrymme på minst 250 MB och starta om."</string>
@@ -1124,10 +1128,13 @@
     <string name="whichViewApplication" msgid="3272778576700572102">"Öppna med"</string>
     <string name="whichViewApplicationNamed" msgid="2286418824011249620">"Öppna med %1$s"</string>
     <string name="whichViewApplicationLabel" msgid="2666774233008808473">"Öppna"</string>
+    <string name="whichGiveAccessToApplication" msgid="8279395245414707442">"Tillåt att länkar från <xliff:g id="HOST">%1$s</xliff:g> öppnas med"</string>
+    <string name="whichGiveAccessToApplicationNamed" msgid="7992388824107710849">"Tillåt att länkar från <xliff:g id="HOST">%1$s</xliff:g> öppnas med <xliff:g id="APPLICATION">%2$s</xliff:g>"</string>
+    <string name="whichGiveAccessToApplicationLabel" msgid="6142688895536868827">"Ge åtkomst"</string>
     <string name="whichEditApplication" msgid="144727838241402655">"Redigera med"</string>
     <string name="whichEditApplicationNamed" msgid="1775815530156447790">"Redigera med %1$s"</string>
     <string name="whichEditApplicationLabel" msgid="7183524181625290300">"Redigera"</string>
-    <string name="whichSendApplication" msgid="6902512414057341668">"Dela med"</string>
+    <string name="whichSendApplication" msgid="5803792421724377602">"Dela"</string>
     <string name="whichSendApplicationNamed" msgid="2799370240005424391">"Dela med %1$s"</string>
     <string name="whichSendApplicationLabel" msgid="4579076294675975354">"Dela"</string>
     <string name="whichSendToApplication" msgid="8272422260066642057">"Skicka med"</string>
@@ -1181,6 +1188,7 @@
     <string name="android_upgrading_title" product="tablet" msgid="4503169817302593560">"Surfplattan uppdateras …"</string>
     <string name="android_upgrading_title" product="device" msgid="7009520271220804517">"Enheten uppdateras …"</string>
     <string name="android_start_title" product="default" msgid="4536778526365907780">"Mobilen startar …"</string>
+    <string name="android_start_title" product="automotive" msgid="8418054686415318207">"Android startar …"</string>
     <string name="android_start_title" product="tablet" msgid="4929837533850340472">"Surfplattan startar …"</string>
     <string name="android_start_title" product="device" msgid="7467484093260449437">"Enheten startar …"</string>
     <string name="android_upgrading_fstrim" msgid="8036718871534640010">"Lagringsutrymmet optimeras."</string>
@@ -1239,6 +1247,10 @@
     <string name="wifi_available_content_failed_to_connect" msgid="3377406637062802645">"Tryck för att visa alla nätverk"</string>
     <string name="wifi_available_action_connect" msgid="2635699628459488788">"Anslut"</string>
     <string name="wifi_available_action_all_networks" msgid="4368435796357931006">"Alla nätverk"</string>
+    <string name="wifi_suggestion_title" msgid="8951405130379148709">"Det finns ett tillgängligt Wi‑Fi-nätverk som föreslås av <xliff:g id="NAME">%s</xliff:g>"</string>
+    <string name="wifi_suggestion_content" msgid="2658317015552324848">"Vill du ansluta till nätverk som föreslås av <xliff:g id="NAME">%s</xliff:g>?"</string>
+    <string name="wifi_suggestion_action_allow_app" msgid="3689946344485394085">"Ja"</string>
+    <string name="wifi_suggestion_action_disallow_app" msgid="7977918905605931385">"Nej"</string>
     <string name="wifi_wakeup_onboarding_title" msgid="228772560195634292">"Wi-Fi aktiveras automatiskt"</string>
     <string name="wifi_wakeup_onboarding_subtext" msgid="3989697580301186973">"När du är i närheten av ett sparat nätverk av hög kvalitet"</string>
     <string name="wifi_wakeup_onboarding_action_disable" msgid="838648204200836028">"Återaktivera inte"</string>
@@ -1250,6 +1262,7 @@
     <skip />
     <string name="wifi_no_internet" msgid="8938267198124654938">"Wi-Fi-nätverket är inte anslutet till internet"</string>
     <string name="wifi_no_internet_detailed" msgid="8083079241212301741">"Tryck för alternativ"</string>
+    <string name="captive_portal_logged_in_detailed" msgid="8489345381637456021">"Ansluten"</string>
     <string name="wifi_softap_config_change" msgid="8475911871165857607">"Ändringar i inställningarna för surfzon"</string>
     <string name="wifi_softap_config_change_summary" msgid="7601233252456548891">"Frekvensbandet för surfzonen har ändrats."</string>
     <string name="wifi_softap_config_change_detailed" msgid="8022936822860678033">"Den här enheten har inte stöd för inställningen för att endast använda 5 GHz. I stället används 5 GHz när det är möjligt."</string>
@@ -1332,8 +1345,12 @@
     <string name="usb_unsupported_audio_accessory_title" msgid="3529881374464628084">"Ett tillbehör med analog ljudutgång hittades"</string>
     <string name="usb_unsupported_audio_accessory_message" msgid="6309553946441565215">"Den anslutna enheten är inte kompatibel med mobilen. Tryck här om du vill veta mer."</string>
     <string name="adb_active_notification_title" msgid="6729044778949189918">"USB-felsökning ansluten"</string>
-    <string name="adb_active_notification_message" msgid="7463062450474107752">"Tryck om du vill inaktivera USB-felsökning"</string>
+    <string name="adb_active_notification_message" msgid="7463062450474107752">"Tryck för att inaktivera USB-felsökning"</string>
     <string name="adb_active_notification_message" product="tv" msgid="8470296818270110396">"Välj för att inaktivera USB-felsökning."</string>
+    <string name="usb_contaminant_detected_title" msgid="7136400633704058349">"Vätska eller smuts i USB-porten"</string>
+    <string name="usb_contaminant_detected_message" msgid="832337061059487250">"USB-porten har inaktiverats automatiskt. Tryck för att läsa mer."</string>
+    <string name="usb_contaminant_not_detected_title" msgid="4202417484434906086">"Nu kan du använda USB-porten igen"</string>
+    <string name="usb_contaminant_not_detected_message" msgid="2415791798244545292">"Mobilen känner inte längre av någon vätska eller smuts."</string>
     <string name="taking_remote_bugreport_notification_title" msgid="6742483073875060934">"Felrapporten överförs …"</string>
     <string name="share_remote_bugreport_notification_title" msgid="4987095013583691873">"Vill du dela felrapporten?"</string>
     <string name="sharing_remote_bugreport_notification_title" msgid="7572089031496651372">"Felrapporten delas …"</string>
@@ -1372,6 +1389,8 @@
     <string name="ext_media_init_action" msgid="7952885510091978278">"Konfigurera"</string>
     <string name="ext_media_unmount_action" msgid="1121883233103278199">"Mata ut"</string>
     <string name="ext_media_browse_action" msgid="8322172381028546087">"Utforska"</string>
+    <!-- no translation found for ext_media_seamless_action (5356508985817068711) -->
+    <skip />
     <string name="ext_media_missing_title" msgid="620980315821543904">"<xliff:g id="NAME">%s</xliff:g> saknas"</string>
     <string name="ext_media_missing_message" msgid="4012389235250987930">"Sätt i enheten igen"</string>
     <string name="ext_media_move_specific_title" msgid="1471100343872375842">"Flyttar <xliff:g id="NAME">%s</xliff:g>"</string>
@@ -1460,8 +1479,7 @@
       <item quantity="one">1 träff</item>
     </plurals>
     <string name="action_mode_done" msgid="7217581640461922289">"Klar"</string>
-    <string name="progress_erasing" product="nosdcard" msgid="4521573321524340058">"Raderar USB-lagring ..."</string>
-    <string name="progress_erasing" product="default" msgid="6596988875507043042">"Raderar SD-kort ..."</string>
+    <string name="progress_erasing" msgid="2569962663843586562">"Delat lagringsutrymme rensas …"</string>
     <string name="share" msgid="1778686618230011964">"Dela"</string>
     <string name="find" msgid="4808270900322985960">"Sök efter"</string>
     <string name="websearch" msgid="4337157977400211589">"Webbsökning"</string>
@@ -1558,6 +1576,7 @@
     <string name="SetupCallDefault" msgid="5834948469253758575">"Vill du ta emot samtal?"</string>
     <string name="activity_resolver_use_always" msgid="8017770747801494933">"Alltid"</string>
     <string name="activity_resolver_use_once" msgid="2404644797149173758">"Bara en gång"</string>
+    <string name="activity_resolver_app_settings" msgid="8965806928986509855">"Inställningar"</string>
     <string name="activity_resolver_work_profiles_support" msgid="185598180676883455">"%1$s har inte stöd för arbetsprofil"</string>
     <string name="default_audio_route_name" product="tablet" msgid="4617053898167127471">"Surfplatta"</string>
     <string name="default_audio_route_name" product="tv" msgid="9158088547603019321">"TV"</string>
@@ -1637,7 +1656,7 @@
     <string name="color_correction_feature_name" msgid="6779391426096954933">"Färgkorrigering"</string>
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"<xliff:g id="SERVICE_NAME">%1$s</xliff:g> aktiverades av Aktivera tillgänglighet snabbt"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"<xliff:g id="SERVICE_NAME">%1$s</xliff:g> inaktiverades av Aktivera tillgänglighet snabbt"</string>
-    <string name="accessibility_shortcut_spoken_feedback" msgid="6143872712930414829">"Använd Aktivera tillgänglighet snabbt en gång till om du vill aktivera tillgänglighetsfunktionen i fråga"</string>
+    <string name="accessibility_shortcut_spoken_feedback" msgid="8376923232350078434">"Tryck och håll båda volymknapparna i tre sekunder för att använda <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
     <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"Välj en funktion som ska användas när du trycker på tillgänglighetsknappen:"</string>
     <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"Tryck länge på tillgänglighetsknappen för att ändra funktioner."</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"Förstoring"</string>
@@ -1833,8 +1852,7 @@
     <string name="stk_cc_ss_to_ussd" msgid="5614626512855868785">"SS-begäran har ändrats till en USSD-begäran"</string>
     <string name="stk_cc_ss_to_ss" msgid="7716729801537709054">"Har ändrats till ny SS-begäran"</string>
     <string name="notification_work_profile_content_description" msgid="4600554564103770764">"Jobbprofil"</string>
-    <!-- no translation found for notification_alerted_content_description (1296617716556420585) -->
-    <skip />
+    <string name="notification_alerted_content_description" msgid="1296617716556420585">"Aviserad"</string>
     <string name="expand_button_content_description_collapsed" msgid="3609784019345534652">"Utöka"</string>
     <string name="expand_button_content_description_expanded" msgid="8520652707158554895">"Komprimera"</string>
     <string name="expand_action_accessibility" msgid="5307730695723718254">"Utöka/komprimera"</string>
@@ -1968,5 +1986,8 @@
     <string name="notification_appops_camera_active" msgid="5050283058419699771">"Kamera"</string>
     <string name="notification_appops_microphone_active" msgid="4335305527588191730">"Mikrofon"</string>
     <string name="notification_appops_overlay_active" msgid="633813008357934729">"visar över andra appar på mobilen"</string>
+    <string name="dynamic_mode_notification_channel_name" msgid="2348803891571320452">"Avisering om rutinläge"</string>
+    <string name="dynamic_mode_notification_title" msgid="508815255807182035">"Batteriet kan ta slut innan du brukar ladda det"</string>
+    <string name="dynamic_mode_notification_summary" msgid="2541166298550402690">"Batterisparläget har aktiverats för att utöka batteritiden"</string>
     <string name="car_loading_profile" msgid="3545132581795684027">"Läser in"</string>
 </resources>

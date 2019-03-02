@@ -21,6 +21,7 @@ import android.os.Process;
 import android.util.Slog;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.util.Preconditions;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -28,11 +29,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.function.Predicate;
 
 /**
  * Given a process, will iterate over the child threads of the process, and return the CPU usage
  * statistics for each child thread. The CPU usage statistics contain the amount of time spent in a
  * frequency band.
+ *
+ * <p>Frequencies are bucketed together to reduce the amount of data created. This means that we
+ * return less frequencies than provided by {@link ProcTimeInStateReader}. The number of
+ * frequencies is configurable by {@link #setNumBuckets}. Frequencies are reported as the lowest
+ * frequency in that range. Frequencies are spread as evenly as possible across the buckets. The
+ * buckets do not cross over the little/big frequencies reported.
+ *
+ * <p>N.B.: In order to bucket across little/big frequencies correctly, we assume that the {@code
+ * time_in_state} file contains every little core frequency in ascending order, followed by every
+ * big core frequency in ascending order. This assumption might not hold for devices with different
+ * kernel implementations of the {@code time_in_state} file generation.
  */
 public class KernelCpuThreadReader {
 
@@ -59,6 +72,11 @@ public class KernelCpuThreadReader {
     private static final String THREAD_NAME_FILENAME = "comm";
 
     /**
+     * Glob pattern for the process directory names under {@code proc}
+     */
+    private static final String PROCESS_DIRECTORY_FILTER = "[0-9]*";
+
+    /**
      * Default process name when the name can't be read
      */
     private static final String DEFAULT_PROCESS_NAME = "unknown_process";
@@ -80,6 +98,17 @@ public class KernelCpuThreadReader {
             DEFAULT_PROC_PATH.resolve("self/time_in_state");
 
     /**
+     * Value returned when there was an error getting an integer ID value (e.g. PID, UID)
+     */
+    private static final int ID_ERROR = -1;
+
+    /**
+     * When checking whether to report data for a thread, we check the UID of the thread's owner
+     * against this predicate
+     */
+    private Predicate<Integer> mUidPredicate;
+
+    /**
      * Where the proc filesystem is mounted
      */
     private final Path mProcPath;
@@ -88,16 +117,19 @@ public class KernelCpuThreadReader {
      * Frequencies read from the {@code time_in_state} file. Read from {@link
      * #mProcTimeInStateReader#getCpuFrequenciesKhz()} and cast to {@code int[]}
      */
-    private final int[] mFrequenciesKhz;
+    private int[] mFrequenciesKhz;
 
     /**
      * Used to read and parse {@code time_in_state} files
      */
     private final ProcTimeInStateReader mProcTimeInStateReader;
 
-    private KernelCpuThreadReader() throws IOException {
-        this(DEFAULT_PROC_PATH, DEFAULT_INITIAL_TIME_IN_STATE_PATH);
-    }
+    /**
+     * Used to sort frequencies and usage times into buckets
+     */
+    private FrequencyBucketCreator mFrequencyBucketCreator;
+
+    private final Injector mInjector;
 
     /**
      * Create with a path where `proc` is mounted. Used primarily for testing
@@ -107,16 +139,17 @@ public class KernelCpuThreadReader {
      * format
      */
     @VisibleForTesting
-    public KernelCpuThreadReader(Path procPath, Path initialTimeInStatePath) throws IOException {
+    public KernelCpuThreadReader(
+            int numBuckets,
+            Predicate<Integer> uidPredicate,
+            Path procPath,
+            Path initialTimeInStatePath,
+            Injector injector) throws IOException {
+        mUidPredicate = uidPredicate;
         mProcPath = procPath;
         mProcTimeInStateReader = new ProcTimeInStateReader(initialTimeInStatePath);
-
-        // Copy mProcTimeInState's frequencies, casting the longs to ints
-        long[] frequenciesKhz = mProcTimeInStateReader.getFrequenciesKhz();
-        mFrequenciesKhz = new int[frequenciesKhz.length];
-        for (int i = 0; i < frequenciesKhz.length; i++) {
-            mFrequenciesKhz[i] = (int) frequenciesKhz[i];
-        }
+        mInjector = injector;
+        setNumBuckets(numBuckets);
     }
 
     /**
@@ -125,13 +158,72 @@ public class KernelCpuThreadReader {
      * @return the reader, null if an exception was thrown during creation
      */
     @Nullable
-    public static KernelCpuThreadReader create() {
+    public static KernelCpuThreadReader create(int numBuckets, Predicate<Integer> uidPredicate) {
         try {
-            return new KernelCpuThreadReader();
+            return new KernelCpuThreadReader(
+                    numBuckets,
+                    uidPredicate,
+                    DEFAULT_PROC_PATH,
+                    DEFAULT_INITIAL_TIME_IN_STATE_PATH,
+                    new Injector());
         } catch (IOException e) {
             Slog.e(TAG, "Failed to initialize KernelCpuThreadReader", e);
             return null;
         }
+    }
+
+    /**
+     * Get the per-thread CPU usage of all processes belonging to a set of UIDs
+     *
+     * <p>This function will crawl through all process {@code proc} directories found by the pattern
+     * {@code /proc/[0-9]*}, and then check the UID using {@code /proc/$PID/status}. This takes
+     * approximately 500ms on a Pixel 2. Therefore, this method can be computationally expensive,
+     * and should not be called more than once an hour.
+     *
+     * <p>Data is only collected for UIDs passing the predicate supplied in {@link
+     * #setUidPredicate}.
+     */
+    @Nullable
+    public ArrayList<ProcessCpuUsage> getProcessCpuUsageByUids() {
+        if (DEBUG) {
+            Slog.d(TAG, "Reading CPU thread usages for processes owned by UIDs");
+        }
+
+        final ArrayList<ProcessCpuUsage> processCpuUsages = new ArrayList<>();
+
+        try (DirectoryStream<Path> processPaths =
+                     Files.newDirectoryStream(mProcPath, PROCESS_DIRECTORY_FILTER)) {
+            for (Path processPath : processPaths) {
+                final int processId = getProcessId(processPath);
+                final int uid = mInjector.getUidForPid(processId);
+                if (uid == ID_ERROR || processId == ID_ERROR) {
+                    continue;
+                }
+                if (!mUidPredicate.test(uid)) {
+                    continue;
+                }
+
+                final ProcessCpuUsage processCpuUsage =
+                        getProcessCpuUsage(processPath, processId, uid);
+                if (processCpuUsage != null) {
+                    processCpuUsages.add(processCpuUsage);
+                }
+            }
+        } catch (IOException e) {
+            Slog.w("Failed to iterate over process paths", e);
+            return null;
+        }
+
+        if (processCpuUsages.isEmpty()) {
+            Slog.w(TAG, "Didn't successfully get any process CPU information for UIDs specified");
+            return null;
+        }
+
+        if (DEBUG) {
+            Slog.d(TAG, "Read usage for " + processCpuUsages.size() + " processes");
+        }
+
+        return processCpuUsages;
     }
 
     /**
@@ -141,10 +233,7 @@ public class KernelCpuThreadReader {
      */
     @Nullable
     public ProcessCpuUsage getCurrentProcessCpuUsage() {
-        return getProcessCpuUsage(
-                mProcPath.resolve("self"),
-                Process.myPid(),
-                Process.myUid());
+        return getProcessCpuUsage(mProcPath.resolve("self"), mInjector.myPid(), mInjector.myUid());
     }
 
     /**
@@ -153,7 +242,8 @@ public class KernelCpuThreadReader {
      * @param processPath the {@code /proc} path of the thread
      * @param processId the ID of the process
      * @param uid the ID of the user who owns the process
-     * @return process CPU usage containing usage of all child threads
+     * @return process CPU usage containing usage of all child threads. Null if the process exited
+     * and its {@code proc} directory was removed while collecting information
      */
     @Nullable
     private ProcessCpuUsage getProcessCpuUsage(Path processPath, int processId, int uid) {
@@ -193,6 +283,31 @@ public class KernelCpuThreadReader {
     }
 
     /**
+     * Set the number of frequency buckets to use
+     */
+    void setNumBuckets(int numBuckets) {
+        if (numBuckets < 1) {
+            Slog.w(TAG, "Number of buckets must be at least 1, but was " + numBuckets);
+            return;
+        }
+        // If `numBuckets` hasn't changed since the last set, do nothing
+        if (mFrequenciesKhz != null && mFrequenciesKhz.length == numBuckets) {
+            return;
+        }
+        mFrequencyBucketCreator = new FrequencyBucketCreator(
+                mProcTimeInStateReader.getFrequenciesKhz(), numBuckets);
+        mFrequenciesKhz = mFrequencyBucketCreator.getBucketMinFrequencies(
+                mProcTimeInStateReader.getFrequenciesKhz());
+    }
+
+    /**
+     * Set the UID predicate for {@link #getProcessCpuUsageByUids}
+     */
+    void setUidPredicate(Predicate<Integer> uidPredicate) {
+        mUidPredicate = uidPredicate;
+    }
+
+    /**
      * Get the CPU frequencies that correspond to the times reported in
      * {@link ThreadCpuUsage#usageTimesMillis}
      */
@@ -205,7 +320,8 @@ public class KernelCpuThreadReader {
      * Get a thread's CPU usage
      *
      * @param threadDirectory the {@code /proc} directory of the thread
-     * @return null in the case that the directory read failed
+     * @return thread CPU usage. Null if the thread exited and its {@code proc} directory was
+     * removed while collecting information
      */
     @Nullable
     private ThreadCpuUsage getThreadCpuUsage(Path threadDirectory) {
@@ -228,12 +344,7 @@ public class KernelCpuThreadReader {
         if (cpuUsagesLong == null) {
             return null;
         }
-
-        // Convert long[] to int[]
-        final int[] cpuUsages = new int[cpuUsagesLong.length];
-        for (int i = 0; i < cpuUsagesLong.length; i++) {
-            cpuUsages[i] = (int) cpuUsagesLong[i];
-        }
+        int[] cpuUsages = mFrequencyBucketCreator.getBucketedValues(cpuUsagesLong);
 
         return new ThreadCpuUsage(threadId, threadName, cpuUsages);
     }
@@ -263,6 +374,148 @@ public class KernelCpuThreadReader {
             return DEFAULT_THREAD_NAME;
         }
         return threadName;
+    }
+
+    /**
+     * Get the ID of a process from its path
+     *
+     * @param processPath {@code proc} path of the process
+     * @return the ID, {@link #ID_ERROR} if the path could not be parsed
+     */
+    private int getProcessId(Path processPath) {
+        String fileName = processPath.getFileName().toString();
+        try {
+            return Integer.parseInt(fileName);
+        } catch (NumberFormatException e) {
+            Slog.w(TAG, "Failed to parse " + fileName + " as process ID", e);
+            return ID_ERROR;
+        }
+    }
+
+    /**
+     * Puts frequencies and usage times into buckets
+     */
+    @VisibleForTesting
+    public static class FrequencyBucketCreator {
+        private final int mNumBuckets;
+        private final int mNumFrequencies;
+        private final int mBigFrequenciesStartIndex;
+        private final int mLittleNumBuckets;
+        private final int mBigNumBuckets;
+        private final int mLittleBucketSize;
+        private final int mBigBucketSize;
+
+        /**
+         * Buckets based of a list of frequencies
+         *
+         * @param frequencies the frequencies to base buckets off
+         * @param numBuckets how many buckets to create
+         */
+        @VisibleForTesting
+        public FrequencyBucketCreator(long[] frequencies, int numBuckets) {
+            Preconditions.checkArgument(numBuckets > 0);
+
+            mNumFrequencies = frequencies.length;
+            mBigFrequenciesStartIndex = getBigFrequenciesStartIndex(frequencies);
+
+            final int littleNumBuckets;
+            final int bigNumBuckets;
+            if (mBigFrequenciesStartIndex < frequencies.length) {
+                littleNumBuckets = numBuckets / 2;
+                bigNumBuckets = numBuckets - littleNumBuckets;
+            } else {
+                // If we've got no big frequencies, set all buckets to little frequencies
+                littleNumBuckets = numBuckets;
+                bigNumBuckets = 0;
+            }
+
+            // Ensure that we don't have more buckets than frequencies
+            mLittleNumBuckets = Math.min(littleNumBuckets, mBigFrequenciesStartIndex);
+            mBigNumBuckets = Math.min(
+                    bigNumBuckets, frequencies.length - mBigFrequenciesStartIndex);
+            mNumBuckets = mLittleNumBuckets + mBigNumBuckets;
+
+            // Set the size of each little and big bucket. If they have no buckets, the size is zero
+            mLittleBucketSize = mLittleNumBuckets == 0 ? 0 :
+                    mBigFrequenciesStartIndex / mLittleNumBuckets;
+            mBigBucketSize = mBigNumBuckets == 0 ? 0 :
+                    (frequencies.length - mBigFrequenciesStartIndex) / mBigNumBuckets;
+        }
+
+        /**
+         * Find the index where frequencies change from little core to big core
+         */
+        @VisibleForTesting
+        public static int getBigFrequenciesStartIndex(long[] frequenciesKhz) {
+            for (int i = 0; i < frequenciesKhz.length - 1; i++) {
+                if (frequenciesKhz[i] > frequenciesKhz[i + 1]) {
+                    return i + 1;
+                }
+            }
+
+            return frequenciesKhz.length;
+        }
+
+        /**
+         * Get the minimum frequency in each bucket
+         */
+        @VisibleForTesting
+        public int[] getBucketMinFrequencies(long[] frequenciesKhz) {
+            Preconditions.checkArgument(frequenciesKhz.length == mNumFrequencies);
+            // If there's only one bucket, we bucket everything together so the first bucket is the
+            // min frequency
+            if (mNumBuckets == 1) {
+                return new int[]{(int) frequenciesKhz[0]};
+            }
+
+            final int[] bucketMinFrequencies = new int[mNumBuckets];
+            // Initialize little buckets min frequencies
+            for (int i = 0; i < mLittleNumBuckets; i++) {
+                bucketMinFrequencies[i] = (int) frequenciesKhz[i * mLittleBucketSize];
+            }
+            // Initialize big buckets min frequencies
+            for (int i = 0; i < mBigNumBuckets; i++) {
+                final int frequencyIndex = mBigFrequenciesStartIndex + i * mBigBucketSize;
+                bucketMinFrequencies[mLittleNumBuckets + i] = (int) frequenciesKhz[frequencyIndex];
+            }
+            return bucketMinFrequencies;
+        }
+
+        /**
+         * Put an array of values into buckets. This takes a {@code long[]} and returns {@code
+         * int[]} as everywhere this method is used will have to do the conversion anyway, so we
+         * save time by doing it here instead
+         *
+         * @param values the values to bucket
+         * @return the bucketed usage times
+         */
+        @VisibleForTesting
+        public int[] getBucketedValues(long[] values) {
+            Preconditions.checkArgument(values.length == mNumFrequencies);
+            final int[] bucketed = new int[mNumBuckets];
+
+            // If there's only one bucket, add all frequencies in
+            if (mNumBuckets == 1) {
+                for (int i = 0; i < values.length; i++) {
+                    bucketed[0] += values[i];
+                }
+                return bucketed;
+            }
+
+            // Initialize the little buckets
+            for (int i = 0; i < mBigFrequenciesStartIndex; i++) {
+                final int bucketIndex = Math.min(i / mLittleBucketSize, mLittleNumBuckets - 1);
+                bucketed[bucketIndex] += values[i];
+            }
+            // Initialize the big buckets
+            for (int i = mBigFrequenciesStartIndex; i < values.length; i++) {
+                final int bucketIndex = Math.min(
+                        mLittleNumBuckets + (i - mBigFrequenciesStartIndex) / mBigBucketSize,
+                        mNumBuckets - 1);
+                bucketed[bucketIndex] += values[i];
+            }
+            return bucketed;
+        }
     }
 
     /**
@@ -301,6 +554,33 @@ public class KernelCpuThreadReader {
             this.threadId = threadId;
             this.threadName = threadName;
             this.usageTimesMillis = usageTimesMillis;
+        }
+    }
+
+    /**
+     * Used to inject static methods from {@link Process}
+     */
+    @VisibleForTesting
+    public static class Injector {
+        /**
+         * Get the PID of the current process
+         */
+        public int myPid() {
+            return Process.myPid();
+        }
+
+        /**
+         * Get the UID that owns the current process
+         */
+        public int myUid() {
+            return Process.myUid();
+        }
+
+        /**
+         * Get the UID for the process with ID {@code pid}
+         */
+        public int getUidForPid(int pid) {
+            return Process.getUidForPid(pid);
         }
     }
 }

@@ -20,8 +20,10 @@ import android.annotation.LayoutRes;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemService;
+import android.annotation.TestApi;
 import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
@@ -29,6 +31,7 @@ import android.graphics.Canvas;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -38,6 +41,9 @@ import android.widget.FrameLayout;
 
 import com.android.internal.R;
 
+import dalvik.system.PathClassLoader;
+import java.io.File;
+import java.lang.reflect.Method;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -72,6 +78,10 @@ public abstract class LayoutInflater {
     private static final String TAG = LayoutInflater.class.getSimpleName();
     private static final boolean DEBUG = false;
 
+    private static final String USE_PRECOMPILED_LAYOUT_SYSTEM_PROPERTY
+        = "view.precompiled_layout_enabled";
+    private static final String COMPILED_VIEW_DEX_FILE_NAME = "/compiled_view.dex";
+
     /** Empty stack trace used to avoid log spam in re-throw exceptions. */
     private static final StackTraceElement[] EMPTY_STACK_TRACE = new StackTraceElement[0];
 
@@ -92,6 +102,13 @@ public abstract class LayoutInflater {
     @UnsupportedAppUsage
     private Factory2 mPrivateFactory;
     private Filter mFilter;
+
+    // Indicates whether we should try to inflate layouts using a precompiled layout instead of
+    // inflating from the XML resource.
+    private boolean mUseCompiledView;
+    // This variable holds the classloader that will be used to look for precompiled layouts. The
+    // The classloader includes the generated compiled_view.dex file.
+    private ClassLoader mPrecompiledClassLoader;
 
     @UnsupportedAppUsage
     final Object[] mConstructorArgs = new Object[2];
@@ -223,6 +240,7 @@ public abstract class LayoutInflater {
      */
     protected LayoutInflater(Context context) {
         mContext = context;
+        initPrecompiledViews();
     }
 
     /**
@@ -239,6 +257,7 @@ public abstract class LayoutInflater {
         mFactory2 = original.mFactory2;
         mPrivateFactory = original.mPrivateFactory;
         setFilter(original.mFilter);
+        initPrecompiledViews();
     }
 
     /**
@@ -380,6 +399,56 @@ public abstract class LayoutInflater {
         }
     }
 
+    private void initPrecompiledViews() {
+        initPrecompiledViews(
+                SystemProperties.getBoolean(USE_PRECOMPILED_LAYOUT_SYSTEM_PROPERTY, false));
+    }
+
+    private void initPrecompiledViews(boolean enablePrecompiledViews) {
+        mUseCompiledView = enablePrecompiledViews;
+
+        if (!mUseCompiledView) {
+            mPrecompiledClassLoader = null;
+            return;
+        }
+
+        // Make sure the application allows code generation
+        ApplicationInfo appInfo = mContext.getApplicationInfo();
+        if (appInfo.isEmbeddedDexUsed() || appInfo.isPrivilegedApp()) {
+            mUseCompiledView = false;
+            return;
+        }
+
+        // Try to load the precompiled layout file.
+        try {
+            mPrecompiledClassLoader = mContext.getClassLoader();
+            String dexFile = mContext.getCodeCacheDir() + COMPILED_VIEW_DEX_FILE_NAME;
+            if (new File(dexFile).exists()) {
+                mPrecompiledClassLoader = new PathClassLoader(dexFile, mPrecompiledClassLoader);
+            } else {
+                // If the precompiled layout file doesn't exist, then disable precompiled
+                // layouts.
+                mUseCompiledView = false;
+            }
+        } catch (Throwable e) {
+            if (DEBUG) {
+                Log.e(TAG, "Failed to initialized precompiled views layouts", e);
+            }
+            mUseCompiledView = false;
+        }
+        if (!mUseCompiledView) {
+            mPrecompiledClassLoader = null;
+        }
+    }
+
+    /**
+     * @hide for use by CTS tests
+     */
+    @TestApi
+    public void setPrecompiledLayoutsEnabledForTesting(boolean enablePrecompiledLayouts) {
+        initPrecompiledViews(enablePrecompiledLayouts);
+    }
+
     /**
      * Inflate a new view hierarchy from the specified xml resource. Throws
      * {@link InflateException} if there is an error.
@@ -436,14 +505,85 @@ public abstract class LayoutInflater {
         final Resources res = getContext().getResources();
         if (DEBUG) {
             Log.d(TAG, "INFLATING from resource: \"" + res.getResourceName(resource) + "\" ("
-                    + Integer.toHexString(resource) + ")");
+                  + Integer.toHexString(resource) + ")");
         }
 
-        final XmlResourceParser parser = res.getLayout(resource);
+        View view = tryInflatePrecompiled(resource, res, root, attachToRoot);
+        if (view != null) {
+            return view;
+        }
+        XmlResourceParser parser = res.getLayout(resource);
         try {
             return inflate(parser, root, attachToRoot);
         } finally {
             parser.close();
+        }
+    }
+
+    private @Nullable
+    View tryInflatePrecompiled(@LayoutRes int resource, Resources res, @Nullable ViewGroup root,
+        boolean attachToRoot) {
+        if (!mUseCompiledView) {
+            return null;
+        }
+
+        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "inflate (precompiled)");
+
+        // Try to inflate using a precompiled layout.
+        String pkg = res.getResourcePackageName(resource);
+        String layout = res.getResourceEntryName(resource);
+
+        try {
+            Class clazz = mPrecompiledClassLoader.loadClass("" + pkg + ".CompiledView");
+            Method inflater = clazz.getMethod(layout, Context.class, int.class);
+            View view = (View) inflater.invoke(null, mContext, resource);
+
+            if (view != null && root != null) {
+                // We were able to use the precompiled inflater, but now we need to do some work to
+                // attach the view to the root correctly.
+                XmlResourceParser parser = res.getLayout(resource);
+                try {
+                    AttributeSet attrs = Xml.asAttributeSet(parser);
+                    advanceToRootNode(parser);
+                    ViewGroup.LayoutParams params = root.generateLayoutParams(attrs);
+
+                    if (attachToRoot) {
+                        root.addView(view, params);
+                    } else {
+                        view.setLayoutParams(params);
+                    }
+                } finally {
+                    parser.close();
+                }
+            }
+
+            return view;
+        } catch (Throwable e) {
+            if (DEBUG) {
+                Log.e(TAG, "Failed to use precompiled view", e);
+            }
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
+        return null;
+    }
+
+    /**
+     * Advances the given parser to the first START_TAG. Throws InflateException if no start tag is
+     * found.
+     */
+    private void advanceToRootNode(XmlPullParser parser)
+        throws InflateException, IOException, XmlPullParserException {
+        // Look for the root node.
+        int type;
+        while ((type = parser.next()) != XmlPullParser.START_TAG &&
+            type != XmlPullParser.END_DOCUMENT) {
+            // Empty
+        }
+
+        if (type != XmlPullParser.START_TAG) {
+            throw new InflateException(parser.getPositionDescription()
+                + ": No start tag found!");
         }
     }
 
@@ -480,18 +620,7 @@ public abstract class LayoutInflater {
             View result = root;
 
             try {
-                // Look for the root node.
-                int type;
-                while ((type = parser.next()) != XmlPullParser.START_TAG &&
-                        type != XmlPullParser.END_DOCUMENT) {
-                    // Empty
-                }
-
-                if (type != XmlPullParser.START_TAG) {
-                    throw new InflateException(parser.getPositionDescription()
-                            + ": No start tag found!");
-                }
-
+                advanceToRootNode(parser);
                 final String name = parser.getName();
 
                 if (DEBUG) {
@@ -784,24 +913,8 @@ public abstract class LayoutInflater {
             ta.recycle();
         }
 
-        if (name.equals(TAG_1995)) {
-            // Let's party like it's 1995!
-            return new BlinkLayout(context, attrs);
-        }
-
         try {
-            View view;
-            if (mFactory2 != null) {
-                view = mFactory2.onCreateView(parent, name, context, attrs);
-            } else if (mFactory != null) {
-                view = mFactory.onCreateView(name, context, attrs);
-            } else {
-                view = null;
-            }
-
-            if (view == null && mPrivateFactory != null) {
-                view = mPrivateFactory.onCreateView(parent, name, context, attrs);
-            }
+            View view = tryCreateView(parent, name, context, attrs);
 
             if (view == null) {
                 final Object lastContext = mConstructorArgs[0];
@@ -833,6 +946,48 @@ public abstract class LayoutInflater {
             ie.setStackTrace(EMPTY_STACK_TRACE);
             throw ie;
         }
+    }
+
+    /**
+     * Tries to create a view from a tag name using the supplied attribute set.
+     *
+     * This method gives the factory provided by {@link LayoutInflater#setFactory} and
+     * {@link LayoutInflater#setFactory2} a chance to create a view. However, it does not apply all
+     * of the general view creation logic, and thus may return {@code null} for some tags. This
+     * method is used by {@link LayoutInflater#inflate} in creating {@code View} objects.
+     *
+     * @hide for use by precompiled layouts.
+     *
+     * @param parent the parent view, used to inflate layout params
+     * @param name the name of the XML tag used to define the view
+     * @param context the inflation context for the view, typically the
+     *                {@code parent} or base layout inflater context
+     * @param attrs the attribute set for the XML tag used to define the view
+     */
+    @UnsupportedAppUsage(trackingBug = 122360734)
+    @Nullable
+    public final View tryCreateView(@Nullable View parent, @NonNull String name,
+        @NonNull Context context,
+        @NonNull AttributeSet attrs) {
+        if (name.equals(TAG_1995)) {
+            // Let's party like it's 1995!
+            return new BlinkLayout(context, attrs);
+        }
+
+        View view;
+        if (mFactory2 != null) {
+            view = mFactory2.onCreateView(parent, name, context, attrs);
+        } else if (mFactory != null) {
+            view = mFactory.onCreateView(name, context, attrs);
+        } else {
+            view = null;
+        }
+
+        if (view == null && mPrivateFactory != null) {
+            view = mPrivateFactory.onCreateView(parent, name, context, attrs);
+        }
+
+        return view;
     }
 
     /**
@@ -921,129 +1076,132 @@ public abstract class LayoutInflater {
             AttributeSet attrs) throws XmlPullParserException, IOException {
         int type;
 
-        if (parent instanceof ViewGroup) {
-            // Apply a theme wrapper, if requested. This is sort of a weird
-            // edge case, since developers think the <include> overwrites
-            // values in the AttributeSet of the included View. So, if the
-            // included View has a theme attribute, we'll need to ignore it.
-            final TypedArray ta = context.obtainStyledAttributes(attrs, ATTRS_THEME);
-            final int themeResId = ta.getResourceId(0, 0);
-            final boolean hasThemeOverride = themeResId != 0;
-            if (hasThemeOverride) {
-                context = new ContextThemeWrapper(context, themeResId);
-            }
-            ta.recycle();
-
-            // If the layout is pointing to a theme attribute, we have to
-            // massage the value to get a resource identifier out of it.
-            int layout = attrs.getAttributeResourceValue(null, ATTR_LAYOUT, 0);
-            if (layout == 0) {
-                final String value = attrs.getAttributeValue(null, ATTR_LAYOUT);
-                if (value == null || value.length() <= 0) {
-                    throw new InflateException("You must specify a layout in the"
-                            + " include tag: <include layout=\"@layout/layoutID\" />");
-                }
-
-                // Attempt to resolve the "?attr/name" string to an attribute
-                // within the default (e.g. application) package.
-                layout = context.getResources().getIdentifier(
-                        value.substring(1), "attr", context.getPackageName());
-
-            }
-
-            // The layout might be referencing a theme attribute.
-            if (mTempValue == null) {
-                mTempValue = new TypedValue();
-            }
-            if (layout != 0 && context.getTheme().resolveAttribute(layout, mTempValue, true)) {
-                layout = mTempValue.resourceId;
-            }
-
-            if (layout == 0) {
-                final String value = attrs.getAttributeValue(null, ATTR_LAYOUT);
-                throw new InflateException("You must specify a valid layout "
-                        + "reference. The layout ID " + value + " is not valid.");
-            } else {
-                final XmlResourceParser childParser = context.getResources().getLayout(layout);
-
-                try {
-                    final AttributeSet childAttrs = Xml.asAttributeSet(childParser);
-
-                    while ((type = childParser.next()) != XmlPullParser.START_TAG &&
-                            type != XmlPullParser.END_DOCUMENT) {
-                        // Empty.
-                    }
-
-                    if (type != XmlPullParser.START_TAG) {
-                        throw new InflateException(childParser.getPositionDescription() +
-                                ": No start tag found!");
-                    }
-
-                    final String childName = childParser.getName();
-
-                    if (TAG_MERGE.equals(childName)) {
-                        // The <merge> tag doesn't support android:theme, so
-                        // nothing special to do here.
-                        rInflate(childParser, parent, context, childAttrs, false);
-                    } else {
-                        final View view = createViewFromTag(parent, childName,
-                                context, childAttrs, hasThemeOverride);
-                        final ViewGroup group = (ViewGroup) parent;
-
-                        final TypedArray a = context.obtainStyledAttributes(
-                                attrs, R.styleable.Include);
-                        final int id = a.getResourceId(R.styleable.Include_id, View.NO_ID);
-                        final int visibility = a.getInt(R.styleable.Include_visibility, -1);
-                        a.recycle();
-
-                        // We try to load the layout params set in the <include /> tag.
-                        // If the parent can't generate layout params (ex. missing width
-                        // or height for the framework ViewGroups, though this is not
-                        // necessarily true of all ViewGroups) then we expect it to throw
-                        // a runtime exception.
-                        // We catch this exception and set localParams accordingly: true
-                        // means we successfully loaded layout params from the <include>
-                        // tag, false means we need to rely on the included layout params.
-                        ViewGroup.LayoutParams params = null;
-                        try {
-                            params = group.generateLayoutParams(attrs);
-                        } catch (RuntimeException e) {
-                            // Ignore, just fail over to child attrs.
-                        }
-                        if (params == null) {
-                            params = group.generateLayoutParams(childAttrs);
-                        }
-                        view.setLayoutParams(params);
-
-                        // Inflate all children.
-                        rInflateChildren(childParser, view, childAttrs, true);
-
-                        if (id != View.NO_ID) {
-                            view.setId(id);
-                        }
-
-                        switch (visibility) {
-                            case 0:
-                                view.setVisibility(View.VISIBLE);
-                                break;
-                            case 1:
-                                view.setVisibility(View.INVISIBLE);
-                                break;
-                            case 2:
-                                view.setVisibility(View.GONE);
-                                break;
-                        }
-
-                        group.addView(view);
-                    }
-                } finally {
-                    childParser.close();
-                }
-            }
-        } else {
+        if (!(parent instanceof ViewGroup)) {
             throw new InflateException("<include /> can only be used inside of a ViewGroup");
         }
 
+        // Apply a theme wrapper, if requested. This is sort of a weird
+        // edge case, since developers think the <include> overwrites
+        // values in the AttributeSet of the included View. So, if the
+        // included View has a theme attribute, we'll need to ignore it.
+        final TypedArray ta = context.obtainStyledAttributes(attrs, ATTRS_THEME);
+        final int themeResId = ta.getResourceId(0, 0);
+        final boolean hasThemeOverride = themeResId != 0;
+        if (hasThemeOverride) {
+            context = new ContextThemeWrapper(context, themeResId);
+        }
+        ta.recycle();
+
+        // If the layout is pointing to a theme attribute, we have to
+        // massage the value to get a resource identifier out of it.
+        int layout = attrs.getAttributeResourceValue(null, ATTR_LAYOUT, 0);
+        if (layout == 0) {
+            final String value = attrs.getAttributeValue(null, ATTR_LAYOUT);
+            if (value == null || value.length() <= 0) {
+                throw new InflateException("You must specify a layout in the"
+                    + " include tag: <include layout=\"@layout/layoutID\" />");
+            }
+
+            // Attempt to resolve the "?attr/name" string to an attribute
+            // within the default (e.g. application) package.
+            layout = context.getResources().getIdentifier(
+                value.substring(1), "attr", context.getPackageName());
+
+        }
+
+        // The layout might be referencing a theme attribute.
+        if (mTempValue == null) {
+            mTempValue = new TypedValue();
+        }
+        if (layout != 0 && context.getTheme().resolveAttribute(layout, mTempValue, true)) {
+            layout = mTempValue.resourceId;
+        }
+
+        if (layout == 0) {
+            final String value = attrs.getAttributeValue(null, ATTR_LAYOUT);
+            throw new InflateException("You must specify a valid layout "
+                + "reference. The layout ID " + value + " is not valid.");
+        }
+
+        final View precompiled = tryInflatePrecompiled(layout, context.getResources(),
+            (ViewGroup) parent, /*attachToRoot=*/true);
+        if (precompiled == null) {
+            final XmlResourceParser childParser = context.getResources().getLayout(layout);
+
+            try {
+                final AttributeSet childAttrs = Xml.asAttributeSet(childParser);
+
+                while ((type = childParser.next()) != XmlPullParser.START_TAG &&
+                    type != XmlPullParser.END_DOCUMENT) {
+                    // Empty.
+                }
+
+                if (type != XmlPullParser.START_TAG) {
+                    throw new InflateException(childParser.getPositionDescription() +
+                        ": No start tag found!");
+                }
+
+                final String childName = childParser.getName();
+
+                if (TAG_MERGE.equals(childName)) {
+                    // The <merge> tag doesn't support android:theme, so
+                    // nothing special to do here.
+                    rInflate(childParser, parent, context, childAttrs, false);
+                } else {
+                    final View view = createViewFromTag(parent, childName,
+                        context, childAttrs, hasThemeOverride);
+                    final ViewGroup group = (ViewGroup) parent;
+
+                    final TypedArray a = context.obtainStyledAttributes(
+                        attrs, R.styleable.Include);
+                    final int id = a.getResourceId(R.styleable.Include_id, View.NO_ID);
+                    final int visibility = a.getInt(R.styleable.Include_visibility, -1);
+                    a.recycle();
+
+                    // We try to load the layout params set in the <include /> tag.
+                    // If the parent can't generate layout params (ex. missing width
+                    // or height for the framework ViewGroups, though this is not
+                    // necessarily true of all ViewGroups) then we expect it to throw
+                    // a runtime exception.
+                    // We catch this exception and set localParams accordingly: true
+                    // means we successfully loaded layout params from the <include>
+                    // tag, false means we need to rely on the included layout params.
+                    ViewGroup.LayoutParams params = null;
+                    try {
+                        params = group.generateLayoutParams(attrs);
+                    } catch (RuntimeException e) {
+                        // Ignore, just fail over to child attrs.
+                    }
+                    if (params == null) {
+                        params = group.generateLayoutParams(childAttrs);
+                    }
+                    view.setLayoutParams(params);
+
+                    // Inflate all children.
+                    rInflateChildren(childParser, view, childAttrs, true);
+
+                    if (id != View.NO_ID) {
+                        view.setId(id);
+                    }
+
+                    switch (visibility) {
+                        case 0:
+                            view.setVisibility(View.VISIBLE);
+                            break;
+                        case 1:
+                            view.setVisibility(View.INVISIBLE);
+                            break;
+                        case 2:
+                            view.setVisibility(View.GONE);
+                            break;
+                    }
+
+                    group.addView(view);
+                }
+            } finally {
+                childParser.close();
+            }
+        }
         LayoutInflater.consumeChildElements(parser);
     }
 

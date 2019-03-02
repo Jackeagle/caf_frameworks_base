@@ -17,26 +17,33 @@
 package android.os;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
+import android.gamedriver.GameDriverProto.Blacklist;
+import android.gamedriver.GameDriverProto.Blacklists;
 import android.opengl.EGL14;
-import android.os.Build;
-import android.os.SystemProperties;
 import android.provider.Settings;
+import android.util.Base64;
 import android.util.Log;
+
+import com.android.framework.protobuf.InvalidProtocolBufferException;
 
 import dalvik.system.VMRuntime;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /** @hide */
 public class GraphicsEnvironment {
@@ -53,10 +60,11 @@ public class GraphicsEnvironment {
     private static final boolean DEBUG = false;
     private static final String TAG = "GraphicsEnvironment";
     private static final String PROPERTY_GFX_DRIVER = "ro.gfx.driver.0";
-    private static final String PROPERTY_GFX_DRIVER_WHITELIST = "ro.gfx.driver.whitelist.0";
-    private static final String ANGLE_PACKAGE_NAME = "com.android.angle";
     private static final String ANGLE_RULES_FILE = "a4a_rules.json";
     private static final String ANGLE_TEMP_RULES = "debug.angle.rules";
+    private static final String ACTION_ANGLE_FOR_ANDROID = "android.app.action.ANGLE_FOR_ANDROID";
+    private static final String GAME_DRIVER_BLACKLIST_FLAG = "blacklist";
+    private static final int BASE64_FLAGS = Base64.NO_PADDING | Base64.NO_WRAP;
 
     private ClassLoader mClassLoader;
     private String mLayerPath;
@@ -67,7 +75,7 @@ public class GraphicsEnvironment {
      */
     public void setup(Context context, Bundle coreSettings) {
         setupGpuLayers(context, coreSettings);
-        setupAngle(context, coreSettings);
+        setupAngle(context, coreSettings, context.getPackageName());
         chooseDriver(context, coreSettings);
     }
 
@@ -192,119 +200,293 @@ public class GraphicsEnvironment {
         setLayerPaths(mClassLoader, layerPaths);
     }
 
+    enum OpenGlDriverChoice {
+        DEFAULT,
+        NATIVE,
+        ANGLE
+    }
+
+    private static final Map<OpenGlDriverChoice, String> sDriverMap = buildMap();
+    private static Map<OpenGlDriverChoice, String> buildMap() {
+        Map<OpenGlDriverChoice, String> map = new HashMap<>();
+        map.put(OpenGlDriverChoice.DEFAULT, "default");
+        map.put(OpenGlDriverChoice.ANGLE, "angle");
+        map.put(OpenGlDriverChoice.NATIVE, "native");
+
+        return map;
+    }
+
+
+    private static List<String> getGlobalSettingsString(Bundle bundle, String globalSetting) {
+        List<String> valueList = null;
+        String settingsValue = bundle.getString(globalSetting);
+
+        if (settingsValue != null) {
+            valueList = new ArrayList<>(Arrays.asList(settingsValue.split(",")));
+        } else {
+            valueList = new ArrayList<>();
+        }
+
+        return valueList;
+    }
+
+    private static int getGlobalSettingsPkgIndex(String pkgName,
+                                                 List<String> globalSettingsDriverPkgs) {
+        for (int pkgIndex = 0; pkgIndex < globalSettingsDriverPkgs.size(); pkgIndex++) {
+            if (globalSettingsDriverPkgs.get(pkgIndex).equals(pkgName)) {
+                return pkgIndex;
+            }
+        }
+
+        return -1;
+    }
+
+    private static String getDriverForPkg(Bundle bundle, String packageName) {
+        String allUseAngle =
+                bundle.getString(Settings.Global.GLOBAL_SETTINGS_ANGLE_GL_DRIVER_ALL_ANGLE);
+        if ((allUseAngle != null) && allUseAngle.equals("1")) {
+            return sDriverMap.get(OpenGlDriverChoice.ANGLE);
+        }
+
+        List<String> globalSettingsDriverPkgs =
+                getGlobalSettingsString(bundle,
+                        Settings.Global.GLOBAL_SETTINGS_ANGLE_GL_DRIVER_SELECTION_PKGS);
+        List<String> globalSettingsDriverValues =
+                getGlobalSettingsString(bundle,
+                        Settings.Global.GLOBAL_SETTINGS_ANGLE_GL_DRIVER_SELECTION_VALUES);
+
+        // Make sure we have a good package name
+        if ((packageName == null) || (packageName.isEmpty())) {
+            return sDriverMap.get(OpenGlDriverChoice.DEFAULT);
+        }
+        // Make sure we have good settings to use
+        if (globalSettingsDriverPkgs.size() != globalSettingsDriverValues.size()) {
+            Log.w(TAG,
+                    "Global.Settings values are invalid: "
+                        + "globalSettingsDriverPkgs.size = "
+                            + globalSettingsDriverPkgs.size() + ", "
+                        + "globalSettingsDriverValues.size = "
+                            + globalSettingsDriverValues.size());
+            return sDriverMap.get(OpenGlDriverChoice.DEFAULT);
+        }
+
+        int pkgIndex = getGlobalSettingsPkgIndex(packageName, globalSettingsDriverPkgs);
+
+        if (pkgIndex < 0) {
+            return sDriverMap.get(OpenGlDriverChoice.DEFAULT);
+        }
+
+        return globalSettingsDriverValues.get(pkgIndex);
+    }
+
+    /**
+     * Get the ANGLE package name.
+     */
+    private String getAnglePackageName(Context context) {
+        Intent intent = new Intent(ACTION_ANGLE_FOR_ANDROID);
+
+        List<ResolveInfo> resolveInfos = context.getPackageManager()
+                .queryIntentActivities(intent, PackageManager.MATCH_SYSTEM_ONLY);
+        if (resolveInfos.size() != 1) {
+            Log.e(TAG, "Invalid number of ANGLE packages. Required: 1, Found: "
+                    + resolveInfos.size());
+            for (ResolveInfo resolveInfo : resolveInfos) {
+                Log.e(TAG, "Found ANGLE package: " + resolveInfo.activityInfo.packageName);
+            }
+            return "";
+        }
+
+        // Must be exactly 1 ANGLE PKG found to get here.
+        return resolveInfos.get(0).activityInfo.packageName;
+    }
+
+    /**
+     * Attempt to setup ANGLE with a temporary rules file.
+     * True: Temporary rules file was loaded.
+     * False: Temporary rules file was *not* loaded.
+     */
+    private boolean setupAngleWithTempRulesFile(Context context,
+                                                String packageName,
+                                                String paths,
+                                                String devOptIn) {
+        /**
+         * We only want to load a temp rules file for:
+         *  - apps that are marked 'debuggable' in their manifest
+         *  - devices that are running a userdebug build (ro.debuggable) or can inject libraries for
+         *    debugging (PR_SET_DUMPABLE).
+         */
+        boolean appIsDebuggable = isDebuggable(context);
+        boolean deviceIsDebuggable = getCanLoadSystemLibraries() == 1;
+        if (!(appIsDebuggable || deviceIsDebuggable)) {
+            Log.v(TAG, "Skipping loading temporary rules file: "
+                    + "appIsDebuggable = " + appIsDebuggable + ", "
+                    + "adbRootEnabled = " + deviceIsDebuggable);
+            return false;
+        }
+
+        String angleTempRules = SystemProperties.get(ANGLE_TEMP_RULES);
+
+        if ((angleTempRules == null) || angleTempRules.isEmpty()) {
+            Log.v(TAG, "System property '" + ANGLE_TEMP_RULES + "' is not set or is empty");
+            return false;
+        }
+
+        Log.i(TAG, "Detected system property " + ANGLE_TEMP_RULES + ": " + angleTempRules);
+
+        File tempRulesFile = new File(angleTempRules);
+        if (tempRulesFile.exists()) {
+            Log.i(TAG, angleTempRules + " exists, loading file.");
+            try {
+                FileInputStream stream = new FileInputStream(angleTempRules);
+
+                try {
+                    FileDescriptor rulesFd = stream.getFD();
+                    long rulesOffset = 0;
+                    long rulesLength = stream.getChannel().size();
+                    Log.i(TAG, "Loaded temporary ANGLE rules from " + angleTempRules);
+
+                    setAngleInfo(paths, packageName, devOptIn, rulesFd, rulesOffset, rulesLength);
+
+                    stream.close();
+
+                    // We successfully setup ANGLE, so return with good status
+                    return true;
+                } catch (IOException e) {
+                    Log.w(TAG, "Hit IOException thrown by FileInputStream: " + e);
+                }
+            } catch (FileNotFoundException e) {
+                Log.w(TAG, "Temp ANGLE rules file not found: " + e);
+            } catch (SecurityException e) {
+                Log.w(TAG, "Temp ANGLE rules file not accessible: " + e);
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Attempt to setup ANGLE with a rules file loaded from the ANGLE APK.
+     * True: APK rules file was loaded.
+     * False: APK rules file was *not* loaded.
+     */
+    private boolean setupAngleRulesApk(String anglePkgName,
+            ApplicationInfo angleInfo,
+            Context context,
+            String packageName,
+            String paths,
+            String devOptIn) {
+        // Pass the rules file to loader for ANGLE decisions
+        try {
+            AssetManager angleAssets =
+                    context.getPackageManager().getResourcesForApplication(angleInfo).getAssets();
+
+            try {
+                AssetFileDescriptor assetsFd = angleAssets.openFd(ANGLE_RULES_FILE);
+
+                setAngleInfo(paths, packageName, devOptIn, assetsFd.getFileDescriptor(),
+                        assetsFd.getStartOffset(), assetsFd.getLength());
+
+                assetsFd.close();
+
+                return true;
+            } catch (IOException e) {
+                Log.w(TAG, "Failed to get AssetFileDescriptor for " + ANGLE_RULES_FILE
+                        + " from '" + anglePkgName + "': " + e);
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Failed to get AssetManager for '" + anglePkgName + "': " + e);
+        }
+
+        return false;
+    }
+
+    /**
+     * Pull ANGLE whitelist from GlobalSettings and compare against current package
+     */
+    private boolean checkAngleWhitelist(Bundle bundle, String packageName) {
+        List<String> angleWhitelist =
+                getGlobalSettingsString(bundle,
+                    Settings.Global.GLOBAL_SETTINGS_ANGLE_WHITELIST);
+
+        return angleWhitelist.contains(packageName);
+    }
+
     /**
      * Pass ANGLE details down to trigger enable logic
      */
-    private static void setupAngle(Context context, Bundle coreSettings) {
+    public void setupAngle(Context context, Bundle bundle, String packageName) {
+        if (packageName.isEmpty()) {
+            Log.v(TAG, "No package name available yet, skipping ANGLE setup");
+            return;
+        }
 
-        String angleEnabledApp =
-                coreSettings.getString(Settings.Global.ANGLE_ENABLED_APP);
+        String devOptIn = getDriverForPkg(bundle, packageName);
+        if (DEBUG) {
+            Log.v(TAG, "ANGLE Developer option for '" + packageName + "' "
+                    + "set to: '" + devOptIn + "'");
+        }
 
-        String packageName = context.getPackageName();
+        // We only need to check rules if the app is whitelisted or the developer has
+        // explicitly chosen something other than default driver.
+        //
+        // The whitelist will be generated by the ANGLE APK at both boot time and
+        // ANGLE update time. It will only include apps mentioned in the rules file.
+        //
+        // If the user has set the developer option to something other than default,
+        // we need to call setupAngleRulesApk() with the package name and the developer
+        // option value (native/angle/other). Then later when we are actually trying to
+        // load a driver, GraphicsEnv::shouldUseAngle() has seen the package name before
+        // and can confidently answer yes/no based on the previously set developer
+        // option value.
+        boolean whitelisted = checkAngleWhitelist(bundle, packageName);
+        boolean defaulted = devOptIn.equals(sDriverMap.get(OpenGlDriverChoice.DEFAULT));
+        boolean rulesCheck = (whitelisted || !defaulted);
+        if (!rulesCheck) {
+            return;
+        }
 
-        boolean devOptIn = false;
-        if ((angleEnabledApp != null && packageName != null)
-                && (!angleEnabledApp.isEmpty() && !packageName.isEmpty())
-                && angleEnabledApp.equals(packageName)) {
+        if (whitelisted) {
+            Log.v(TAG, "ANGLE whitelist includes " + packageName);
+        }
+        if (!defaulted) {
+            Log.v(TAG, "ANGLE developer option for " + packageName + ": " + devOptIn);
+        }
 
-            Log.i(TAG, packageName + " opted in for ANGLE via Developer Setting");
-
-            devOptIn = true;
+        String anglePkgName = getAnglePackageName(context);
+        if (anglePkgName.isEmpty()) {
+            Log.e(TAG, "Failed to find ANGLE package.");
+            return;
         }
 
         ApplicationInfo angleInfo;
         try {
-            angleInfo = context.getPackageManager().getApplicationInfo(ANGLE_PACKAGE_NAME,
+            angleInfo = context.getPackageManager().getApplicationInfo(anglePkgName,
                 PackageManager.MATCH_SYSTEM_ONLY);
         } catch (PackageManager.NameNotFoundException e) {
-            Log.w(TAG, "ANGLE package '" + ANGLE_PACKAGE_NAME + "' not installed");
+            Log.w(TAG, "ANGLE package '" + anglePkgName + "' not installed");
             return;
         }
 
         String abi = chooseAbi(angleInfo);
 
         // Build a path that includes installed native libs and APK
-        StringBuilder sb = new StringBuilder();
-        sb.append(angleInfo.nativeLibraryDir)
-            .append(File.pathSeparator)
-            .append(angleInfo.sourceDir)
-            .append("!/lib/")
-            .append(abi);
-        String paths = sb.toString();
+        String paths = angleInfo.nativeLibraryDir
+                + File.pathSeparator
+                + angleInfo.sourceDir
+                + "!/lib/"
+                + abi;
 
         if (DEBUG) Log.v(TAG, "ANGLE package libs: " + paths);
 
-        // Look up rules file to pass to ANGLE
-        FileDescriptor rulesFd = null;
-        long rulesOffset = 0;
-        long rulesLength = 0;
-
-        // Check for temporary rules if debuggable or root
-        if (isDebuggable(context) || (getCanLoadSystemLibraries() == 1)) {
-            String angleTempRules = SystemProperties.get(ANGLE_TEMP_RULES);
-            if (angleTempRules != null && !angleTempRules.isEmpty()) {
-                Log.i(TAG, "Detected system property " + ANGLE_TEMP_RULES + ": " + angleTempRules);
-                File tempRulesFile = new File(angleTempRules);
-                if (tempRulesFile.exists()) {
-                    Log.i(TAG, angleTempRules + " exists, loading file.");
-                    FileInputStream stream = null;
-                    try {
-                        stream = new FileInputStream(angleTempRules);
-                    } catch (FileNotFoundException e) {
-                        Log.w(TAG, "Unable to create stream for temp ANGLE rules");
-                    }
-
-                    if (stream != null) {
-                        try {
-                            rulesFd = stream.getFD();
-                            rulesOffset = 0;
-                            rulesLength = stream.getChannel().size();
-                            Log.i(TAG, "Loaded temporary ANGLE rules from " + angleTempRules);
-                        } catch (IOException e) {
-                            Log.w(TAG, "Failed to get input stream for " + angleTempRules);
-                        }
-                    }
-                }
-            }
+        if (setupAngleWithTempRulesFile(context, packageName, paths, devOptIn)) {
+            // We setup ANGLE with a temp rules file, so we're done here.
+            return;
         }
 
-        // If no temp rules, load the real ones from the APK
-        if (rulesFd == null) {
-
-            // Pass the rules file to loader for ANGLE decisions
-            AssetManager angleAssets = null;
-            try {
-                angleAssets =
-                    context.getPackageManager().getResourcesForApplication(angleInfo).getAssets();
-            } catch (PackageManager.NameNotFoundException e) {
-                Log.w(TAG, "Failed to get AssetManager for '" + ANGLE_PACKAGE_NAME + "'");
-                return;
-            }
-
-            AssetFileDescriptor assetsFd = null;
-            try {
-                assetsFd = angleAssets.openFd(ANGLE_RULES_FILE);
-            } catch (IOException e) {
-                Log.w(TAG, "Failed to get AssetFileDescriptor for " + ANGLE_RULES_FILE + " from "
-                           + "'" + ANGLE_PACKAGE_NAME + "'");
-                return;
-            }
-
-            if (assetsFd != null) {
-                rulesFd = assetsFd.getFileDescriptor();
-                rulesOffset = assetsFd.getStartOffset();
-                rulesLength = assetsFd.getLength();
-            } else {
-                Log.w(TAG, "Failed to get file descriptor for " + ANGLE_RULES_FILE);
-                return;
-            }
+        if (setupAngleRulesApk(anglePkgName, angleInfo, context, packageName, paths, devOptIn)) {
+            // We setup ANGLE with rules from the APK, so we're done here.
+            return;
         }
-
-        // Further opt-in logic is handled in native, so pass relevant info down
-        // TODO: Move the ANGLE selection logic earlier so we don't need to keep these
-        //       file descriptors open.
-        setAngleInfo(paths, packageName, devOptIn,
-                     rulesFd, rulesOffset, rulesLength);
     }
 
     /**
@@ -313,27 +495,6 @@ public class GraphicsEnvironment {
     private static void chooseDriver(Context context, Bundle coreSettings) {
         String driverPackageName = SystemProperties.get(PROPERTY_GFX_DRIVER);
         if (driverPackageName == null || driverPackageName.isEmpty()) {
-            return;
-        }
-
-        // To minimize risk of driver updates crippling the device beyond user repair, never use an
-        // updated driver for privileged or non-updated system apps. Presumably pre-installed apps
-        // were tested thoroughly with the pre-installed driver.
-        ApplicationInfo ai = context.getApplicationInfo();
-        if (ai.isPrivilegedApp() || (ai.isSystemApp() && !ai.isUpdatedSystemApp())) {
-            if (DEBUG) Log.v(TAG, "ignoring driver package for privileged/non-updated system app");
-            return;
-        }
-
-        String applicationPackageName = context.getPackageName();
-        String devOptInApplicationName = coreSettings.getString(
-                Settings.Global.UPDATED_GFX_DRIVER_DEV_OPT_IN_APP);
-        boolean devOptIn = applicationPackageName.equals(devOptInApplicationName);
-        boolean whitelisted = onWhitelist(context, driverPackageName, ai.packageName);
-        if (!devOptIn && !whitelisted) {
-            if (DEBUG) {
-                Log.w(TAG, applicationPackageName + " is not on the whitelist.");
-            }
             return;
         }
 
@@ -353,6 +514,79 @@ public class GraphicsEnvironment {
                 Log.w(TAG, "updated driver package is not known to be compatible with O");
             }
             return;
+        }
+
+        // To minimize risk of driver updates crippling the device beyond user repair, never use an
+        // updated driver for privileged or non-updated system apps. Presumably pre-installed apps
+        // were tested thoroughly with the pre-installed driver.
+        ApplicationInfo ai = context.getApplicationInfo();
+        if (ai.isPrivilegedApp() || (ai.isSystemApp() && !ai.isUpdatedSystemApp())) {
+            if (DEBUG) Log.v(TAG, "ignoring driver package for privileged/non-updated system app");
+            return;
+        }
+
+        // GAME_DRIVER_ALL_APPS
+        // 0: Default (Invalid values fallback to default as well)
+        // 1: All apps use Game Driver
+        // 2: All apps use system graphics driver
+        int gameDriverAllApps = coreSettings.getInt(Settings.Global.GAME_DRIVER_ALL_APPS, 0);
+        if (gameDriverAllApps == 2) {
+            if (DEBUG) {
+                Log.w(TAG, "Game Driver is turned off on this device");
+            }
+            return;
+        }
+
+        if (gameDriverAllApps != 1) {
+            // GAME_DRIVER_OPT_OUT_APPS has higher priority than GAME_DRIVER_OPT_IN_APPS
+            if (getGlobalSettingsString(coreSettings, Settings.Global.GAME_DRIVER_OPT_OUT_APPS)
+                            .contains(ai.packageName)) {
+                if (DEBUG) {
+                    Log.w(TAG, ai.packageName + " opts out from Game Driver.");
+                }
+                return;
+            }
+            boolean isOptIn =
+                    getGlobalSettingsString(coreSettings, Settings.Global.GAME_DRIVER_OPT_IN_APPS)
+                            .contains(ai.packageName);
+            if (!isOptIn
+                    && !getGlobalSettingsString(coreSettings, Settings.Global.GAME_DRIVER_WHITELIST)
+                        .contains(ai.packageName)) {
+                if (DEBUG) {
+                    Log.w(TAG, ai.packageName + " is not on the whitelist.");
+                }
+                return;
+            }
+
+            if (!isOptIn) {
+                // At this point, the application is on the whitelist only, check whether it's
+                // on the blacklist, terminate early when it's on the blacklist.
+                try {
+                    // TODO(b/121350991) Switch to DeviceConfig with property listener.
+                    String base64String =
+                            coreSettings.getString(Settings.Global.GAME_DRIVER_BLACKLIST);
+                    if (base64String != null && !base64String.isEmpty()) {
+                        Blacklists blacklistsProto = Blacklists.parseFrom(
+                                Base64.decode(base64String, BASE64_FLAGS));
+                        List<Blacklist> blacklists = blacklistsProto.getBlacklistsList();
+                        long driverVersionCode = driverInfo.longVersionCode;
+                        for (Blacklist blacklist : blacklists) {
+                            if (blacklist.getVersionCode() == driverVersionCode) {
+                                for (String packageName : blacklist.getPackageNamesList()) {
+                                    if (packageName == ai.packageName) {
+                                        return;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } catch (InvalidProtocolBufferException e) {
+                    if (DEBUG) {
+                        Log.w(TAG, "Can't parse blacklist, skip and continue...");
+                    }
+                }
+            }
         }
 
         String abi = chooseAbi(driverInfo);
@@ -410,48 +644,12 @@ public class GraphicsEnvironment {
         return null;
     }
 
-    private static boolean onWhitelist(Context context, String driverPackageName,
-            String applicationPackageName) {
-        String whitelistName = SystemProperties.get(PROPERTY_GFX_DRIVER_WHITELIST);
-
-        // Empty whitelist implies no updatable graphics driver. Typically, the pre-installed
-        // updatable graphics driver is supposed to be a place holder and contains no graphics
-        // driver and whitelist.
-        if (whitelistName == null || whitelistName.isEmpty()) {
-            if (DEBUG) {
-                Log.w(TAG, "No whitelist found.");
-            }
-            return false;
-        }
-        try {
-            Context driverContext = context.createPackageContext(driverPackageName,
-                                                                 Context.CONTEXT_RESTRICTED);
-            AssetManager assets = driverContext.getAssets();
-            InputStream stream = assets.open(whitelistName);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-            for (String packageName; (packageName = reader.readLine()) != null; ) {
-                if (packageName.equals(applicationPackageName)) {
-                    return true;
-                }
-            }
-        } catch (PackageManager.NameNotFoundException e) {
-            if (DEBUG) {
-                Log.w(TAG, "driver package '" + driverPackageName + "' not installed");
-            }
-        } catch (IOException e) {
-            if (DEBUG) {
-                Log.w(TAG, "Failed to load whitelist driver package, abort.");
-            }
-        }
-        return false;
-    }
-
     private static native int getCanLoadSystemLibraries();
     private static native void setLayerPaths(ClassLoader classLoader, String layerPaths);
     private static native void setDebugLayers(String layers);
     private static native void setDebugLayersGLES(String layers);
     private static native void setDriverPath(String path);
     private static native void setAngleInfo(String path, String appPackage,
-                                            boolean devOptIn, FileDescriptor rulesFd,
+                                            String devOptIn, FileDescriptor rulesFd,
                                             long rulesOffset, long rulesLength);
 }

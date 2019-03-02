@@ -51,6 +51,8 @@ import android.hardware.camera2.marshal.impl.MarshalQueryableString;
 import android.hardware.camera2.params.Face;
 import android.hardware.camera2.params.HighSpeedVideoConfiguration;
 import android.hardware.camera2.params.LensShadingMap;
+import android.hardware.camera2.params.MandatoryStreamCombination;
+import android.hardware.camera2.params.MandatoryStreamCombination.MandatoryStreamInformation;
 import android.hardware.camera2.params.OisSample;
 import android.hardware.camera2.params.RecommendedStreamConfiguration;
 import android.hardware.camera2.params.RecommendedStreamConfigurationMap;
@@ -75,6 +77,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Implementation of camera metadata marshal/unmarshal across Binder to
@@ -574,6 +577,15 @@ public class CameraMetadataNative implements Parcelable {
                     @SuppressWarnings("unchecked")
                     public <T> T getValue(CameraMetadataNative metadata, Key<T> key) {
                         return (T) metadata.getStreamConfigurationMap();
+                    }
+                });
+        sGetCommandMap.put(
+                CameraCharacteristics.SCALER_MANDATORY_STREAM_COMBINATIONS.getNativeKey(),
+                        new GetCommand() {
+                    @Override
+                    @SuppressWarnings("unchecked")
+                    public <T> T getValue(CameraMetadataNative metadata, Key<T> key) {
+                        return (T) metadata.getMandatoryStreamCombinations();
                     }
                 });
         sGetCommandMap.put(
@@ -1107,6 +1119,8 @@ public class CameraMetadataNative implements Parcelable {
                 continue;
             }
 
+            // Dynamic depth streams involve alot of SW processing and currently cannot be
+            // recommended.
             StreamConfigurationMap map = null;
             switch (i) {
                 case RecommendedStreamConfigurationMap.USECASE_PREVIEW:
@@ -1115,28 +1129,44 @@ public class CameraMetadataNative implements Parcelable {
                     map = new StreamConfigurationMap(scData.streamConfigurationArray,
                             scData.minDurationArray, scData.stallDurationArray,
                             /*depthconfiguration*/ null, /*depthminduration*/ null,
-                            /*depthstallduration*/ null, /*highspeedvideoconfigurations*/ null,
+                            /*depthstallduration*/ null,
+                            /*dynamicDepthConfigurations*/ null,
+                            /*dynamicDepthMinFrameDurations*/ null,
+                            /*dynamicDepthStallDurations*/ null,
+                            /*highspeedvideoconfigurations*/ null,
                             /*inputoutputformatsmap*/ null, listHighResolution, supportsPrivate[i]);
                     break;
                 case RecommendedStreamConfigurationMap.USECASE_RECORD:
                     map = new StreamConfigurationMap(scData.streamConfigurationArray,
                             scData.minDurationArray, scData.stallDurationArray,
                             /*depthconfiguration*/ null, /*depthminduration*/ null,
-                            /*depthstallduration*/ null, highSpeedVideoConfigurations,
+                            /*depthstallduration*/ null,
+                            /*dynamicDepthConfigurations*/ null,
+                            /*dynamicDepthMinFrameDurations*/ null,
+                            /*dynamicDepthStallDurations*/ null,
+                            highSpeedVideoConfigurations,
                             /*inputoutputformatsmap*/ null, listHighResolution, supportsPrivate[i]);
                     break;
                 case RecommendedStreamConfigurationMap.USECASE_ZSL:
                     map = new StreamConfigurationMap(scData.streamConfigurationArray,
                             scData.minDurationArray, scData.stallDurationArray,
                             depthScData.streamConfigurationArray, depthScData.minDurationArray,
-                            depthScData.stallDurationArray, /*highSpeedVideoConfigurations*/ null,
+                            depthScData.stallDurationArray,
+                            /*dynamicDepthConfigurations*/ null,
+                            /*dynamicDepthMinFrameDurations*/ null,
+                            /*dynamicDepthStallDurations*/ null,
+                            /*highSpeedVideoConfigurations*/ null,
                             inputOutputFormatsMap, listHighResolution, supportsPrivate[i]);
                     break;
                 default:
                     map = new StreamConfigurationMap(scData.streamConfigurationArray,
                             scData.minDurationArray, scData.stallDurationArray,
                             depthScData.streamConfigurationArray, depthScData.minDurationArray,
-                            depthScData.stallDurationArray, /*highSpeedVideoConfigurations*/ null,
+                            depthScData.stallDurationArray,
+                            /*dynamicDepthConfigurations*/ null,
+                            /*dynamicDepthMinFrameDurations*/ null,
+                            /*dynamicDepthStallDurations*/ null,
+                            /*highSpeedVideoConfigurations*/ null,
                             /*inputOutputFormatsMap*/ null, listHighResolution, supportsPrivate[i]);
             }
 
@@ -1161,6 +1191,26 @@ public class CameraMetadataNative implements Parcelable {
         return ret;
     }
 
+    private MandatoryStreamCombination[] getMandatoryStreamCombinations() {
+        int[] capabilities = getBase(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+        ArrayList<Integer> caps = new ArrayList<Integer>();
+        caps.ensureCapacity(capabilities.length);
+        for (int c : capabilities) {
+            caps.add(new Integer(c));
+        }
+        int hwLevel = getBase(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+        MandatoryStreamCombination.Builder build = new MandatoryStreamCombination.Builder(
+                mCameraId, hwLevel, mDisplaySize, caps, getStreamConfigurationMap());
+        List<MandatoryStreamCombination> combs = build.getAvailableMandatoryStreamCombinations();
+        if ((combs != null) && (!combs.isEmpty())) {
+            MandatoryStreamCombination[] combArray = new MandatoryStreamCombination[combs.size()];
+            combArray = combs.toArray(combArray);
+            return combArray;
+        }
+
+        return null;
+    }
+
     private StreamConfigurationMap getStreamConfigurationMap() {
         StreamConfiguration[] configurations = getBase(
                 CameraCharacteristics.SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
@@ -1174,6 +1224,12 @@ public class CameraMetadataNative implements Parcelable {
                 CameraCharacteristics.DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS);
         StreamConfigurationDuration[] depthStallDurations = getBase(
                 CameraCharacteristics.DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS);
+        StreamConfiguration[] dynamicDepthConfigurations = getBase(
+                CameraCharacteristics.DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
+        StreamConfigurationDuration[] dynamicDepthMinFrameDurations = getBase(
+                CameraCharacteristics.DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS);
+        StreamConfigurationDuration[] dynamicDepthStallDurations = getBase(
+                CameraCharacteristics.DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
         HighSpeedVideoConfiguration[] highSpeedVideoConfigurations = getBase(
                 CameraCharacteristics.CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
         ReprocessFormatsMap inputOutputFormatsMap = getBase(
@@ -1182,7 +1238,8 @@ public class CameraMetadataNative implements Parcelable {
         return new StreamConfigurationMap(
                 configurations, minFrameDurations, stallDurations,
                 depthConfigurations, depthMinFrameDurations, depthStallDurations,
-                highSpeedVideoConfigurations, inputOutputFormatsMap,
+                dynamicDepthConfigurations, dynamicDepthMinFrameDurations,
+                dynamicDepthStallDurations, highSpeedVideoConfigurations, inputOutputFormatsMap,
                 listHighResolution);
     }
 
@@ -1433,6 +1490,31 @@ public class CameraMetadataNative implements Parcelable {
         return true;
     }
 
+    private int mCameraId = -1;
+    private Size mDisplaySize = new Size(0, 0);
+
+    /**
+     * Set the current camera Id.
+     *
+     * @param cameraId Current camera id.
+     *
+     * @hide
+     */
+    public void setCameraId(int cameraId) {
+        mCameraId = cameraId;
+    }
+
+    /**
+     * Set the current display size.
+     *
+     * @param displaySize The current display size.
+     *
+     * @hide
+     */
+    public void setDisplaySize(Size displaySize) {
+        mDisplaySize = displaySize;
+    }
+
     @UnsupportedAppUsage
     private long mMetadataPtr; // native CameraMetadata*
 
@@ -1476,6 +1558,8 @@ public class CameraMetadataNative implements Parcelable {
      */
     public void swap(CameraMetadataNative other) {
         nativeSwap(other);
+        mCameraId = other.mCameraId;
+        mDisplaySize = other.mDisplaySize;
     }
 
     /**

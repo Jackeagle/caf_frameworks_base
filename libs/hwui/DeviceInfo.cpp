@@ -20,6 +20,7 @@
 
 #include <gui/ISurfaceComposer.h>
 #include <gui/SurfaceComposerClient.h>
+#include <ui/GraphicTypes.h>
 
 #include <mutex>
 #include <thread>
@@ -61,6 +62,44 @@ DisplayInfo QueryDisplayInfo() {
     return displayInfo;
 }
 
+static void queryWideColorGamutPreference(sk_sp<SkColorSpace>* colorSpace, SkColorType* colorType) {
+    if (Properties::isolatedProcess) {
+        *colorSpace = SkColorSpace::MakeSRGB();
+        *colorType = SkColorType::kN32_SkColorType;
+        return;
+    }
+    ui::Dataspace defaultDataspace, wcgDataspace;
+    ui::PixelFormat defaultPixelFormat, wcgPixelFormat;
+    status_t status =
+        SurfaceComposerClient::getCompositionPreference(&defaultDataspace, &defaultPixelFormat,
+                                                        &wcgDataspace, &wcgPixelFormat);
+    LOG_ALWAYS_FATAL_IF(status, "Failed to get composition preference, error %d", status);
+    switch (wcgDataspace) {
+        case ui::Dataspace::DISPLAY_P3:
+            *colorSpace = SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB, SkNamedGamut::kDCIP3);
+            break;
+        case ui::Dataspace::V0_SCRGB:
+            *colorSpace = SkColorSpace::MakeSRGB();
+            break;
+        case ui::Dataspace::V0_SRGB:
+            // when sRGB is returned, it means wide color gamut is not supported.
+            *colorSpace = SkColorSpace::MakeSRGB();
+            break;
+        default:
+            LOG_ALWAYS_FATAL("Unreachable: unsupported wide color space.");
+    }
+    switch (wcgPixelFormat) {
+        case ui::PixelFormat::RGBA_8888:
+            *colorType = SkColorType::kN32_SkColorType;
+            break;
+        case ui::PixelFormat::RGBA_FP16:
+            *colorType = SkColorType::kRGBA_F16_SkColorType;
+            break;
+        default:
+            LOG_ALWAYS_FATAL("Unreachable: unsupported pixel format.");
+    }
+}
+
 DeviceInfo::DeviceInfo() {
 #if HWUI_NULL_GPU
         mMaxTextureSize = NULL_GPU_MAX_TEXTURE_SIZE;
@@ -68,6 +107,7 @@ DeviceInfo::DeviceInfo() {
         mMaxTextureSize = -1;
 #endif
     mDisplayInfo = QueryDisplayInfo();
+    queryWideColorGamutPreference(&mWideColorSpace, &mWideColorType);
 }
 
 int DeviceInfo::maxTextureSize() const {

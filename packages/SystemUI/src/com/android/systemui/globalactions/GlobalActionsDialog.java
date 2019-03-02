@@ -67,10 +67,8 @@ import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.BaseAdapter;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ImageView.ScaleType;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.android.internal.R;
@@ -86,8 +84,8 @@ import com.android.internal.util.ScreenRecordHelper;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.Dependency;
-import com.android.systemui.HardwareUiLayout;
 import com.android.systemui.Interpolators;
+import com.android.systemui.MultiListLayout;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.plugins.GlobalActions.GlobalActionsManager;
 import com.android.systemui.statusbar.phone.ScrimController;
@@ -326,8 +324,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
         ArraySet<String> addedKeys = new ArraySet<String>();
         mHasLogoutButton = false;
         mHasLockdownButton = false;
-        mSeparatedEmergencyButtonEnabled = FeatureFlagUtils
-                .isEnabled(mContext, FeatureFlagUtils.EMERGENCY_DIAL_SHORTCUTS);
+        mSeparatedEmergencyButtonEnabled = true;
         for (int i = 0; i < defaultActions.length; i++) {
             String actionKey = defaultActions[i];
             if (addedKeys.contains(actionKey)) {
@@ -489,6 +486,11 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
 
         @Override
         public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldBeSeparated() {
             return true;
         }
     }
@@ -927,6 +929,34 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             return getItem(position).isEnabled();
         }
 
+        public ArrayList<Action> getSeparatedActions(boolean shouldUseSeparatedView) {
+            ArrayList<Action> separatedActions = new ArrayList<Action>();
+            if (!shouldUseSeparatedView) {
+                return separatedActions;
+            }
+            for (int i = 0; i < mItems.size(); i++) {
+                final Action action = mItems.get(i);
+                if (action.shouldBeSeparated()) {
+                    separatedActions.add(action);
+                }
+            }
+            return separatedActions;
+        }
+
+        public ArrayList<Action> getListActions(boolean shouldUseSeparatedView) {
+            if (!shouldUseSeparatedView) {
+                return new ArrayList<Action>(mItems);
+            }
+            ArrayList<Action> listActions = new ArrayList<Action>();
+            for (int i = 0; i < mItems.size(); i++) {
+                final Action action = mItems.get(i);
+                if (!action.shouldBeSeparated()) {
+                    listActions.add(action);
+                }
+            }
+            return listActions;
+        }
+
         @Override
         public boolean areAllItemsEnabled() {
             return false;
@@ -966,7 +996,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             View view = action.create(mContext, convertView, parent, LayoutInflater.from(mContext));
             // Everything but screenshot, the last item, gets white background.
             if (position == getCount() - 1) {
-                HardwareUiLayout.get(parent).setDivisionView(view);
+                MultiListLayout.get(parent).setDivisionView(view);
             }
             return view;
         }
@@ -1005,6 +1035,10 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
         boolean showBeforeProvisioning();
 
         boolean isEnabled();
+
+        default boolean shouldBeSeparated() {
+            return false;
+        }
     }
 
     /**
@@ -1056,9 +1090,16 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             }
         }
 
+        protected int getActionLayoutId(Context context) {
+            if (FeatureFlagUtils.isEnabled(context, FeatureFlagUtils.GLOBAL_ACTIONS_GRID_ENABLED)) {
+                return com.android.systemui.R.layout.global_actions_grid_item;
+            }
+            return com.android.systemui.R.layout.global_actions_item;
+        }
+
         public View create(
                 Context context, View convertView, ViewGroup parent, LayoutInflater inflater) {
-            View v = inflater.inflate(com.android.systemui.R.layout.global_actions_item, parent,
+            View v = inflater.inflate(getActionLayoutId(context), parent,
                     false);
 
             ImageView icon = (ImageView) v.findViewById(R.id.icon);
@@ -1424,9 +1465,7 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
 
         private final Context mContext;
         private final MyAdapter mAdapter;
-        private final LinearLayout mListView;
-        private final FrameLayout mSeparatedView;
-        private final HardwareUiLayout mHardwareLayout;
+        private final MultiListLayout mGlobalActionsLayout;
         private final OnClickListener mClickListener;
         private final OnItemLongClickListener mLongClickListener;
         private final GradientDrawable mGradientDrawable;
@@ -1466,17 +1505,13 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             window.setBackgroundDrawable(mGradientDrawable);
             window.setType(WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY);
 
-            setContentView(com.android.systemui.R.layout.global_actions_wrapped);
-            mListView = findViewById(android.R.id.list);
-            mSeparatedView = findViewById(com.android.systemui.R.id.separated_button);
-            if (!mShouldDisplaySeparatedButton) {
-                mSeparatedView.setVisibility(View.GONE);
-            }
-            mHardwareLayout = HardwareUiLayout.get(mListView);
-            mHardwareLayout.setOutsideTouchListener(view -> dismiss());
-            mHardwareLayout.setHasSeparatedButton(mShouldDisplaySeparatedButton);
-            setTitle(R.string.global_actions);
-            mListView.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+
+            setContentView(getGlobalActionsLayoutId(context));
+            mGlobalActionsLayout = (MultiListLayout)
+                    findViewById(com.android.systemui.R.id.global_actions_view);
+            mGlobalActionsLayout.setOutsideTouchListener(view -> dismiss());
+            mGlobalActionsLayout.setHasSeparatedView(mShouldDisplaySeparatedButton);
+            mGlobalActionsLayout.setListViewAccessibilityDelegate(new View.AccessibilityDelegate() {
                 @Override
                 public boolean dispatchPopulateAccessibilityEvent(
                         View host, AccessibilityEvent event) {
@@ -1485,20 +1520,40 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                     return true;
                 }
             });
+            setTitle(R.string.global_actions);
+        }
+
+        private int getGlobalActionsLayoutId(Context context) {
+            if (FeatureFlagUtils.isEnabled(context, FeatureFlagUtils.GLOBAL_ACTIONS_GRID_ENABLED)) {
+                return com.android.systemui.R.layout.global_actions_grid;
+            }
+            return com.android.systemui.R.layout.global_actions_wrapped;
         }
 
         private void updateList() {
-            mListView.removeAllViews();
-            mSeparatedView.removeAllViews();
+            mGlobalActionsLayout.removeAllItems();
+            ArrayList<Action> separatedActions =
+                    mAdapter.getSeparatedActions(mShouldDisplaySeparatedButton);
+            ArrayList<Action> listActions = mAdapter.getListActions(mShouldDisplaySeparatedButton);
+            mGlobalActionsLayout.setExpectedListItemCount(listActions.size());
+            mGlobalActionsLayout.setExpectedSeparatedItemCount(separatedActions.size());
+
             for (int i = 0; i < mAdapter.getCount(); i++) {
-                ViewGroup parentView = mShouldDisplaySeparatedButton && i == mAdapter.getCount() - 1
-                        ? mSeparatedView : mListView;
-                View v = mAdapter.getView(i, null, parentView);
+                Action action = mAdapter.getItem(i);
+                int separatedIndex = separatedActions.indexOf(action);
+                ViewGroup parent;
+                if (separatedIndex != -1) {
+                    parent = mGlobalActionsLayout.getParentView(true, separatedIndex);
+                } else {
+                    int listIndex = listActions.indexOf(action);
+                    parent = mGlobalActionsLayout.getParentView(false, listIndex);
+                }
+                View v = mAdapter.getView(i, null, parent);
                 final int pos = i;
                 v.setOnClickListener(view -> mClickListener.onClick(this, pos));
                 v.setOnLongClickListener(view ->
                         mLongClickListener.onItemLongClick(null, v, pos, 0));
-                parentView.addView(v);
+                parent.addView(v);
             }
         }
 
@@ -1544,9 +1599,9 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
             super.show();
             mShowing = true;
             mGradientDrawable.setAlpha(0);
-            mHardwareLayout.setTranslationX(getAnimTranslation());
-            mHardwareLayout.setAlpha(0);
-            mHardwareLayout.animate()
+            mGlobalActionsLayout.setTranslationX(getAnimTranslation());
+            mGlobalActionsLayout.setAlpha(0);
+            mGlobalActionsLayout.animate()
                     .alpha(1)
                     .translationX(0)
                     .setDuration(300)
@@ -1565,9 +1620,9 @@ class GlobalActionsDialog implements DialogInterface.OnDismissListener,
                 return;
             }
             mShowing = false;
-            mHardwareLayout.setTranslationX(0);
-            mHardwareLayout.setAlpha(1);
-            mHardwareLayout.animate()
+            mGlobalActionsLayout.setTranslationX(0);
+            mGlobalActionsLayout.setAlpha(1);
+            mGlobalActionsLayout.animate()
                     .alpha(0)
                     .translationX(getAnimTranslation())
                     .setDuration(300)

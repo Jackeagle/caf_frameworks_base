@@ -193,6 +193,8 @@ public class BroadcastRecordTest {
                 false /* serialized */,
                 false /* sticky */,
                 false /* initialSticky */,
-                userId);
+                userId,
+                false, /* allowBackgroundActivityStarts */
+                false /* timeoutExempt */ );
     }
 }

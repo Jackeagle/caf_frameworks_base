@@ -23,8 +23,9 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.platform.test.annotations.Presubmit;
-import android.support.test.filters.SmallTest;
-import android.support.test.runner.AndroidJUnit4;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -105,7 +106,6 @@ public final class LooperStatsTest {
         assertThat(entry.recordedDelayMessageCount).isEqualTo(1);
         assertThat(entry.delayMillis).isEqualTo(30);
         assertThat(entry.maxDelayMillis).isEqualTo(30);
-
     }
 
     @Test
@@ -135,6 +135,26 @@ public final class LooperStatsTest {
         assertThat(entry.maxLatencyMicros).isEqualTo(0);
         assertThat(entry.cpuUsageMicros).isEqualTo(0);
         assertThat(entry.maxCpuUsageMicros).isEqualTo(0);
+    }
+
+    @Test
+    public void testThrewException_notSampled() {
+        TestableLooperStats looperStats = new TestableLooperStats(2, 100);
+
+        Object token = looperStats.messageDispatchStarting();
+        looperStats.tickRealtime(10);
+        looperStats.tickThreadTime(10);
+        looperStats.messageDispatched(token, mHandlerFirst.obtainMessage(0));
+        assertThat(looperStats.getEntries()).hasSize(1);
+
+        // Will not be sampled so does not contribute to any entries.
+        Object token2 = looperStats.messageDispatchStarting();
+        looperStats.tickRealtime(100);
+        looperStats.tickThreadTime(10);
+        looperStats.dispatchingThrewException(
+                token2, mHandlerSecond.obtainMessage(7), new ArithmeticException());
+        assertThat(looperStats.getEntries()).hasSize(1);
+        assertThat(looperStats.getEntries().get(0).messageCount).isEqualTo(1);
     }
 
     @Test
@@ -274,8 +294,7 @@ public final class LooperStatsTest {
 
     @Test
     public void testDataNotCollectedBeforeDeviceStateSet() {
-        TestableLooperStats looperStats = new TestableLooperStats(1, 100);
-        looperStats.setDeviceState(null);
+        TestableLooperStats looperStats = new TestableLooperStats(1, 100, null);
 
         Object token1 = looperStats.messageDispatchStarting();
         looperStats.messageDispatched(token1, mHandlerFirst.obtainMessage(1000));
@@ -429,6 +448,34 @@ public final class LooperStatsTest {
         assertThat(entries).hasSize(0);
     }
 
+    @Test
+    public void testAddsDebugEntries() {
+        TestableLooperStats looperStats = new TestableLooperStats(1, 100);
+        looperStats.setAddDebugEntries(true);
+
+        Message message = mHandlerFirst.obtainMessage(1000);
+        message.when = looperStats.getSystemUptimeMillis();
+        Object token = looperStats.messageDispatchStarting();
+        looperStats.messageDispatched(token, message);
+
+        List<LooperStats.ExportedEntry> entries = looperStats.getEntries();
+        assertThat(entries).hasSize(4);
+        LooperStats.ExportedEntry debugEntry1 = entries.get(1);
+        assertThat(debugEntry1.handlerClassName).isEqualTo("");
+        assertThat(debugEntry1.messageName).isEqualTo("__DEBUG_start_time_millis");
+        assertThat(debugEntry1.totalLatencyMicros).isEqualTo(
+                looperStats.getStartElapsedTimeMillis());
+        LooperStats.ExportedEntry debugEntry2 = entries.get(2);
+        assertThat(debugEntry2.handlerClassName).isEqualTo("");
+        assertThat(debugEntry2.messageName).isEqualTo("__DEBUG_end_time_millis");
+        assertThat(debugEntry2.totalLatencyMicros).isAtLeast(
+                looperStats.getStartElapsedTimeMillis());
+        LooperStats.ExportedEntry debugEntry3 = entries.get(3);
+        assertThat(debugEntry3.handlerClassName).isEqualTo("");
+        assertThat(debugEntry3.messageName).isEqualTo("__DEBUG_battery_time_millis");
+        assertThat(debugEntry3.totalLatencyMicros).isAtLeast(0L);
+    }
+
     private static void assertThrows(Class<? extends Exception> exceptionClass, Runnable r) {
         try {
             r.run();
@@ -447,9 +494,16 @@ public final class LooperStatsTest {
         private int mSamplingInterval;
 
         TestableLooperStats(int samplingInterval, int sizeCap) {
+            this(samplingInterval, sizeCap, mDeviceState);
+        }
+
+        TestableLooperStats(int samplingInterval, int sizeCap, CachedDeviceState deviceState) {
             super(samplingInterval, sizeCap);
-            this.mSamplingInterval = samplingInterval;
-            this.setDeviceState(mDeviceState.getReadonlyClient());
+            mSamplingInterval = samplingInterval;
+            setAddDebugEntries(false);
+            if (deviceState != null) {
+                setDeviceState(deviceState.getReadonlyClient());
+            }
         }
 
         void tickRealtime(long micros) {

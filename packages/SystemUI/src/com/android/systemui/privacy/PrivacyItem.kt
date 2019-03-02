@@ -24,8 +24,8 @@ typealias Privacy = PrivacyType
 
 enum class PrivacyType(val nameId: Int, val iconId: Int) {
     TYPE_CAMERA(R.string.privacy_type_camera, R.drawable.stat_sys_camera),
-    TYPE_LOCATION(R.string.privacy_type_location, R.drawable.stat_sys_location),
-    TYPE_MICROPHONE(R.string.privacy_type_microphone, R.drawable.stat_sys_mic_none);
+    TYPE_MICROPHONE(R.string.privacy_type_microphone, R.drawable.stat_sys_mic_none),
+    TYPE_LOCATION(R.string.privacy_type_location, R.drawable.stat_sys_location);
 
     fun getName(context: Context) = context.resources.getString(nameId)
 
@@ -37,24 +37,29 @@ data class PrivacyItem(
     val application: PrivacyApplication
 )
 
-data class PrivacyApplication(val packageName: String, val context: Context)
+data class PrivacyApplication(val packageName: String, val uid: Int, val context: Context)
     : Comparable<PrivacyApplication> {
 
     override fun compareTo(other: PrivacyApplication): Int {
         return applicationName.compareTo(other.applicationName)
     }
 
-    var icon: Drawable? = null
-    var applicationName: String
-
-    init {
+    private val applicationInfo: ApplicationInfo? by lazy {
         try {
-            val app: ApplicationInfo = context.packageManager
-                    .getApplicationInfo(packageName, 0)
-            icon = context.packageManager.getApplicationIcon(app)
-            applicationName = context.packageManager.getApplicationLabel(app) as String
-        } catch (e: PackageManager.NameNotFoundException) {
-            applicationName = packageName
+            context.packageManager.getApplicationInfo(packageName, 0)
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
         }
+    }
+    val icon: Drawable by lazy {
+        applicationInfo?.let {
+            context.packageManager.getApplicationIcon(it)
+        } ?: context.getDrawable(android.R.drawable.sym_def_app_icon)
+    }
+
+    val applicationName: String by lazy {
+        applicationInfo?.let {
+            context.packageManager.getApplicationLabel(it) as String
+        } ?: packageName
     }
 }

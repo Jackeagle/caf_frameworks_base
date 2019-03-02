@@ -21,7 +21,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.os.Parcel;
-import android.support.test.filters.SmallTest;
+
+import androidx.test.filters.SmallTest;
 
 import org.junit.Test;
 
@@ -34,6 +35,7 @@ public class WifiInfoTest {
     private static final long TEST_TX_RETRIES = 2;
     private static final long TEST_TX_BAD = 3;
     private static final long TEST_RX_SUCCESS = 4;
+    private static final String TEST_PACKAGE_NAME = "com.test.example";
 
     /**
      *  Verify parcel write/read with WifiInfo.
@@ -46,6 +48,8 @@ public class WifiInfoTest {
         writeWifiInfo.txBad = TEST_TX_BAD;
         writeWifiInfo.rxSuccess = TEST_RX_SUCCESS;
         writeWifiInfo.setTrusted(true);
+        writeWifiInfo.setOsuAp(true);
+        writeWifiInfo.setNetworkSuggestionOrSpecifierPackageName(TEST_PACKAGE_NAME);
 
         Parcel parcel = Parcel.obtain();
         writeWifiInfo.writeToParcel(parcel, 0);
@@ -59,5 +63,7 @@ public class WifiInfoTest {
         assertEquals(TEST_TX_BAD, readWifiInfo.txBad);
         assertEquals(TEST_RX_SUCCESS, readWifiInfo.rxSuccess);
         assertTrue(readWifiInfo.isTrusted());
+        assertTrue(readWifiInfo.isOsuAp());
+        assertEquals(TEST_PACKAGE_NAME, readWifiInfo.getNetworkSuggestionOrSpecifierPackageName());
     }
 }

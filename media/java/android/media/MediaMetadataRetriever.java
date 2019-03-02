@@ -25,6 +25,7 @@ import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Build;
 import android.os.IBinder;
 
 import java.io.FileDescriptor;
@@ -40,8 +41,7 @@ import java.util.Map;
  * MediaMetadataRetriever class provides a unified interface for retrieving
  * frame and meta data from an input media file.
  */
-public class MediaMetadataRetriever
-{
+public class MediaMetadataRetriever implements AutoCloseable {
     static {
         System.loadLibrary("media_jni");
         native_init();
@@ -672,17 +672,22 @@ public class MediaMetadataRetriever
     @UnsupportedAppUsage
     private native byte[] getEmbeddedPicture(int pictureType);
 
+    @Override
+    public void close() {
+        release();
+    }
+
     /**
      * Call it when one is done with the object. This method releases the memory
      * allocated internally.
      */
     public native void release();
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private native void native_setup();
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private static native void native_init();
 
-    @UnsupportedAppUsage
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     private native final void native_finalize();
 
     @Override
@@ -915,12 +920,14 @@ public class MediaMetadataRetriever
     public static final int METADATA_KEY_VIDEO_FRAME_COUNT = 32;
 
     /**
-     * @hide
+     * If the media contains EXIF data, this key retrieves the offset value
+     * of the data.
      */
     public static final int METADATA_KEY_EXIF_OFFSET = 33;
 
     /**
-     * @hide
+     * If the media contains EXIF data, this key retrieves the length of the
+     * data.
      */
     public static final int METADATA_KEY_EXIF_LENGTH = 34;
 

@@ -16,7 +16,6 @@
 
 package android.net.wifi;
 
-
 import android.content.pm.ParceledListSlice;
 
 import android.net.wifi.hotspot2.OsuProvider;
@@ -25,9 +24,11 @@ import android.net.wifi.hotspot2.IProvisioningCallback;
 
 import android.net.DhcpInfo;
 import android.net.Network;
+import android.net.wifi.IDppCallback;
 import android.net.wifi.INetworkRequestMatchCallback;
 import android.net.wifi.ISoftApCallback;
 import android.net.wifi.ITrafficStateCallback;
+import android.net.wifi.IWifiUsabilityStatsListener;
 import android.net.wifi.PasspointManagementObjectDefinition;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiActivityEnergyInfo;
@@ -47,7 +48,7 @@ import android.os.WorkSource;
  */
 interface IWifiManager
 {
-    int getSupportedFeatures();
+    long getSupportedFeatures();
 
     WifiActivityEnergyInfo reportActivityInfo();
 
@@ -59,13 +60,15 @@ interface IWifiManager
      */
     oneway void requestActivityInfo(in ResultReceiver result);
 
-    ParceledListSlice getConfiguredNetworks();
+    ParceledListSlice getConfiguredNetworks(String packageName);
 
-    ParceledListSlice getPrivilegedConfiguredNetworks();
+    ParceledListSlice getPrivilegedConfiguredNetworks(String packageName);
 
-    List<WifiConfiguration> getAllMatchingWifiConfigs(in List<ScanResult> scanResult);
+    Map getAllMatchingFqdnsForScanResults(in List<ScanResult> scanResult);
 
-    List<OsuProvider> getMatchingOsuProviders(in List<ScanResult> scanResult);
+    Map getMatchingOsuProviders(in List<ScanResult> scanResult);
+
+    Map getMatchingPasspointConfigsForOsuProviders(in List<OsuProvider> osuProviders);
 
     int addOrUpdateNetwork(in WifiConfiguration config, String packageName);
 
@@ -74,6 +77,8 @@ interface IWifiManager
     boolean removePasspointConfiguration(in String fqdn, String packageName);
 
     List<PasspointConfiguration> getPasspointConfigurations();
+
+    List<WifiConfiguration> getWifiConfigsForPasspointProfiles(in List<String> fqdnList);
 
     void queryPasspointIcon(long bssid, String fileName);
 
@@ -91,11 +96,11 @@ interface IWifiManager
 
     List<ScanResult> getScanResults(String callingPackage);
 
-    void disconnect(String packageName);
+    boolean disconnect(String packageName);
 
-    void reconnect(String packageName);
+    boolean reconnect(String packageName);
 
-    void reassociate(String packageName);
+    boolean reassociate(String packageName);
 
     WifiInfo getConnectionInfo(String callingPackage);
 
@@ -183,6 +188,10 @@ interface IWifiManager
 
     void unregisterSoftApCallback(int callbackIdentifier);
 
+    void addWifiUsabilityStatsListener(in IBinder binder, in IWifiUsabilityStatsListener listener, int listenerIdentifier);
+
+    void removeWifiUsabilityStatsListener(int listenerIdentifier);
+
     void registerTrafficStateCallback(in IBinder binder, in ITrafficStateCallback callback, int callbackIdentifier);
 
     void unregisterTrafficStateCallback(int callbackIdentifier);
@@ -219,8 +228,21 @@ interface IWifiManager
 
     void unregisterNetworkRequestMatchCallback(int callbackIdentifier);
 
-    boolean addNetworkSuggestions(in List<WifiNetworkSuggestion> networkSuggestions, in String packageName);
+    int addNetworkSuggestions(in List<WifiNetworkSuggestion> networkSuggestions, in String packageName);
 
-    boolean removeNetworkSuggestions(in List<WifiNetworkSuggestion> networkSuggestions, in String packageName);
+    int removeNetworkSuggestions(in List<WifiNetworkSuggestion> networkSuggestions, in String packageName);
+
+    String[] getFactoryMacAddresses();
+
+    void setDeviceMobilityState(int state);
+
+    void startDppAsConfiguratorInitiator(in IBinder binder, in String enrolleeUri,
+        int selectedNetworkId, int netRole, in IDppCallback callback);
+
+    void startDppAsEnrolleeInitiator(in IBinder binder, in String configuratorUri,
+        in IDppCallback callback);
+
+    void stopDppSession();
+
+    void updateWifiUsabilityScore(int seqNum, int score, int predictionHorizonSec);
 }
-

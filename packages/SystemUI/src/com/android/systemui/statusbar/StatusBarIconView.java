@@ -16,7 +16,7 @@
 
 package com.android.systemui.statusbar;
 
-import static com.android.systemui.statusbar.policy.DarkIconDispatcher.getTint;
+import static com.android.systemui.plugins.DarkIconDispatcher.getTint;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -204,6 +204,10 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
 
     private void updateIconScaleForSystemIcons() {
         mIconScale = SYSTEM_ICON_SCALE;
+    }
+
+    public float getIconScaleFullyDark() {
+        return (float) mStatusBarIconDrawingSizeDark / mStatusBarIconDrawingSize;
     }
 
     public float getIconScale() {
@@ -590,8 +594,8 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
                     mCurrentSetColor, Color.WHITE, mDarkAmount);
             updateTintMatrix(mMatrix, color, DARK_ALPHA_BOOST * mDarkAmount);
             mMatrixColorFilter.setColorMatrixArray(mMatrix);
+            setColorFilter(null);  // setColorFilter only invalidates if the instance changed.
             setColorFilter(mMatrixColorFilter);
-            invalidate();  // setColorFilter only invalidates if the filter instance changed.
         } else {
             mDozer.updateGrayscale(this, mDarkAmount);
         }

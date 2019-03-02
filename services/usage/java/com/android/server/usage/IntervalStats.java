@@ -15,10 +15,32 @@
  */
 package com.android.server.usage;
 
+import static android.app.usage.UsageEvents.Event.ACTIVITY_DESTROYED;
+import static android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED;
+import static android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED;
+import static android.app.usage.UsageEvents.Event.ACTIVITY_STOPPED;
+import static android.app.usage.UsageEvents.Event.CONFIGURATION_CHANGE;
+import static android.app.usage.UsageEvents.Event.CONTINUE_PREVIOUS_DAY;
+import static android.app.usage.UsageEvents.Event.CONTINUING_FOREGROUND_SERVICE;
+import static android.app.usage.UsageEvents.Event.DEVICE_SHUTDOWN;
+import static android.app.usage.UsageEvents.Event.END_OF_DAY;
+import static android.app.usage.UsageEvents.Event.FLUSH_TO_DISK;
+import static android.app.usage.UsageEvents.Event.FOREGROUND_SERVICE_START;
+import static android.app.usage.UsageEvents.Event.FOREGROUND_SERVICE_STOP;
+import static android.app.usage.UsageEvents.Event.KEYGUARD_HIDDEN;
+import static android.app.usage.UsageEvents.Event.KEYGUARD_SHOWN;
+import static android.app.usage.UsageEvents.Event.NOTIFICATION_INTERRUPTION;
+import static android.app.usage.UsageEvents.Event.ROLLOVER_FOREGROUND_SERVICE;
+import static android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE;
+import static android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE;
+import static android.app.usage.UsageEvents.Event.SHORTCUT_INVOCATION;
+import static android.app.usage.UsageEvents.Event.STANDBY_BUCKET_CHANGED;
+import static android.app.usage.UsageEvents.Event.SYSTEM_INTERACTION;
+
 import android.app.usage.ConfigurationStats;
 import android.app.usage.EventList;
 import android.app.usage.EventStats;
-import android.app.usage.UsageEvents;
+import android.app.usage.UsageEvents.Event;
 import android.app.usage.UsageStats;
 import android.content.res.Configuration;
 import android.util.ArrayMap;
@@ -45,7 +67,7 @@ public class IntervalStats {
     public final ArrayMap<String, UsageStats> packageStats = new ArrayMap<>();
     public final ArrayMap<Configuration, ConfigurationStats> configurations = new ArrayMap<>();
     public Configuration activeConfiguration;
-    public EventList events;
+    public EventList events = new EventList();
 
     // A string cache. This is important as when we're parsing XML files, we don't want to
     // keep hundreds of strings that have the same contents. We will read the string
@@ -91,6 +113,9 @@ public class IntervalStats {
 
     }
 
+    public IntervalStats() {
+    }
+
     /**
      * Gets the UsageStats object for the given package, or creates one and adds it internally.
      */
@@ -125,8 +150,8 @@ public class IntervalStats {
     /**
      * Builds a UsageEvents.Event, but does not add it internally.
      */
-    UsageEvents.Event buildEvent(String packageName, String className) {
-        UsageEvents.Event event = new UsageEvents.Event();
+    Event buildEvent(String packageName, String className) {
+        Event event = new Event();
         event.mPackage = getCachedStringRef(packageName);
         if (className != null) {
             event.mClass = getCachedStringRef(className);
@@ -138,9 +163,9 @@ public class IntervalStats {
      * Builds a UsageEvents.Event from a proto, but does not add it internally.
      * Built here to take advantage of the cached String Refs
      */
-    UsageEvents.Event buildEvent(ProtoInputStream parser, List<String> stringPool)
+    Event buildEvent(ProtoInputStream parser, List<String> stringPool)
             throws IOException {
-        final UsageEvents.Event event = new UsageEvents.Event();
+        final Event event = new Event();
         while (true) {
             switch (parser.nextField()) {
                 case (int) IntervalStatsProto.Event.PACKAGE:
@@ -190,20 +215,31 @@ public class IntervalStats {
                             parser.readInt(IntervalStatsProto.Event.NOTIFICATION_CHANNEL_INDEX)
                                     - 1));
                     break;
+                case (int) IntervalStatsProto.Event.INSTANCE_ID:
+                    event.mInstanceId = parser.readInt(IntervalStatsProto.Event.INSTANCE_ID);
+                    break;
+                case (int) IntervalStatsProto.Event.TASK_ROOT_PACKAGE_INDEX:
+                    event.mTaskRootPackage = getCachedStringRef(stringPool.get(
+                            parser.readInt(IntervalStatsProto.Event.TASK_ROOT_PACKAGE_INDEX) - 1));
+                    break;
+                case (int) IntervalStatsProto.Event.TASK_ROOT_CLASS_INDEX:
+                    event.mTaskRootClass = getCachedStringRef(stringPool.get(
+                            parser.readInt(IntervalStatsProto.Event.TASK_ROOT_CLASS_INDEX) - 1));
+                    break;
                 case ProtoInputStream.NO_MORE_FIELDS:
                     // Handle default values for certain events types
                     switch (event.mEventType) {
-                        case UsageEvents.Event.CONFIGURATION_CHANGE:
+                        case CONFIGURATION_CHANGE:
                             if (event.mConfiguration == null) {
                                 event.mConfiguration = new Configuration();
                             }
                             break;
-                        case UsageEvents.Event.SHORTCUT_INVOCATION:
+                        case SHORTCUT_INVOCATION:
                             if (event.mShortcutId == null) {
                                 event.mShortcutId = "";
                             }
                             break;
-                        case UsageEvents.Event.NOTIFICATION_INTERRUPTION:
+                        case NOTIFICATION_INTERRUPTION:
                             if (event.mNotificationChannelId == null) {
                                 event.mNotificationChannelId = "";
                             }
@@ -220,14 +256,16 @@ public class IntervalStats {
 
     private boolean isStatefulEvent(int eventType) {
         switch (eventType) {
-            case UsageEvents.Event.MOVE_TO_FOREGROUND:
-            case UsageEvents.Event.MOVE_TO_BACKGROUND:
-            case UsageEvents.Event.FOREGROUND_SERVICE_START:
-            case UsageEvents.Event.FOREGROUND_SERVICE_STOP:
-            case UsageEvents.Event.END_OF_DAY:
-            case UsageEvents.Event.ROLLOVER_FOREGROUND_SERVICE:
-            case UsageEvents.Event.CONTINUE_PREVIOUS_DAY:
-            case UsageEvents.Event.CONTINUING_FOREGROUND_SERVICE:
+            case ACTIVITY_RESUMED:
+            case ACTIVITY_PAUSED:
+            case ACTIVITY_STOPPED:
+            case FOREGROUND_SERVICE_START:
+            case FOREGROUND_SERVICE_STOP:
+            case END_OF_DAY:
+            case ROLLOVER_FOREGROUND_SERVICE:
+            case CONTINUE_PREVIOUS_DAY:
+            case CONTINUING_FOREGROUND_SERVICE:
+            case DEVICE_SHUTDOWN:
                 return true;
         }
         return false;
@@ -238,17 +276,57 @@ public class IntervalStats {
      * interaction. Excludes those that are internally generated.
      */
     private boolean isUserVisibleEvent(int eventType) {
-        return eventType != UsageEvents.Event.SYSTEM_INTERACTION
-                && eventType != UsageEvents.Event.STANDBY_BUCKET_CHANGED;
+        return eventType != SYSTEM_INTERACTION
+                && eventType != STANDBY_BUCKET_CHANGED;
     }
 
     /**
+     * Update the IntervalStats by a activity or foreground service event.
+     * @param packageName package name of this event. Is null if event targets to all packages.
+     * @param className class name of a activity or foreground service, could be null to if this
+     *                  is sent to all activities/services in this package.
+     * @param timeStamp Epoch timestamp in milliseconds.
+     * @param eventType event type as in {@link Event}
+     * @param instanceId if className is an activity, the hashCode of ActivityRecord's appToken.
+     *                 if className is not an activity, instanceId is not used.
      * @hide
      */
     @VisibleForTesting
-    public void update(String packageName, String className, long timeStamp, int eventType) {
-        UsageStats usageStats = getOrCreateUsageStats(packageName);
-        usageStats.update(className, timeStamp, eventType);
+    public void update(String packageName, String className, long timeStamp, int eventType,
+            int instanceId) {
+        if (eventType == DEVICE_SHUTDOWN
+                || eventType == FLUSH_TO_DISK) {
+            // DEVICE_SHUTDOWN and FLUSH_TO_DISK are sent to all packages.
+            final int size = packageStats.size();
+            for (int i = 0; i < size; i++) {
+                UsageStats usageStats = packageStats.valueAt(i);
+                usageStats.update(null, timeStamp, eventType, instanceId);
+            }
+        } else if (eventType == ACTIVITY_DESTROYED) {
+            UsageStats usageStats = packageStats.get(packageName);
+            if (usageStats != null) {
+                // If previous event is not ACTIVITY_STOPPED, convert ACTIVITY_DESTROYED
+                // to ACTIVITY_STOPPED and add to event list.
+                // Otherwise do not add anything to event list. (Because we want to save space
+                // and we do not want a ACTIVITY_STOPPED followed by
+                // ACTIVITY_DESTROYED in event list).
+                final int index = usageStats.mActivities.indexOfKey(instanceId);
+                if (index >= 0) {
+                    final int type = usageStats.mActivities.valueAt(index);
+                    if (type != ACTIVITY_STOPPED) {
+                        Event event = new Event(ACTIVITY_STOPPED, timeStamp);
+                        event.mPackage = packageName;
+                        event.mClass = className;
+                        event.mInstanceId = instanceId;
+                        addEvent(event);
+                    }
+                }
+                usageStats.update(className, timeStamp, ACTIVITY_DESTROYED, instanceId);
+            }
+        } else {
+            UsageStats usageStats = getOrCreateUsageStats(packageName);
+            usageStats.update(className, timeStamp, eventType, instanceId);
+        }
         endTime = timeStamp;
     }
 
@@ -256,16 +334,19 @@ public class IntervalStats {
      * @hide
      */
     @VisibleForTesting
-    public void addEvent(UsageEvents.Event event) {
-        if (events == null) {
-            events = new EventList();
-        }
+    public void addEvent(Event event) {
         // Cache common use strings
         event.mPackage = getCachedStringRef(event.mPackage);
         if (event.mClass != null) {
             event.mClass = getCachedStringRef(event.mClass);
         }
-        if (event.mEventType == UsageEvents.Event.NOTIFICATION_INTERRUPTION) {
+        if (event.mTaskRootPackage != null) {
+            event.mTaskRootPackage = getCachedStringRef(event.mTaskRootPackage);
+        }
+        if (event.mTaskRootClass != null) {
+            event.mTaskRootClass = getCachedStringRef(event.mTaskRootClass);
+        }
+        if (event.mEventType == NOTIFICATION_INTERRUPTION) {
             event.mNotificationChannelId = getCachedStringRef(event.mNotificationChannelId);
         }
         events.insert(event);
@@ -338,13 +419,13 @@ public class IntervalStats {
     }
 
     void addEventStatsTo(List<EventStats> out) {
-        interactiveTracker.addToEventStats(out, UsageEvents.Event.SCREEN_INTERACTIVE,
+        interactiveTracker.addToEventStats(out, SCREEN_INTERACTIVE,
                 beginTime, endTime);
-        nonInteractiveTracker.addToEventStats(out, UsageEvents.Event.SCREEN_NON_INTERACTIVE,
+        nonInteractiveTracker.addToEventStats(out, SCREEN_NON_INTERACTIVE,
                 beginTime, endTime);
-        keyguardShownTracker.addToEventStats(out, UsageEvents.Event.KEYGUARD_SHOWN,
+        keyguardShownTracker.addToEventStats(out, KEYGUARD_SHOWN,
                 beginTime, endTime);
-        keyguardHiddenTracker.addToEventStats(out, UsageEvents.Event.KEYGUARD_HIDDEN,
+        keyguardHiddenTracker.addToEventStats(out, KEYGUARD_HIDDEN,
                 beginTime, endTime);
     }
 

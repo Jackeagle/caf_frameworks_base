@@ -18,7 +18,6 @@
 package android.os;
 
 import android.net.InterfaceConfiguration;
-import android.net.INetd;
 import android.net.INetworkManagementEventObserver;
 import android.net.ITetheringStatsProvider;
 import android.net.Network;
@@ -45,11 +44,6 @@ interface INetworkManagementService
      * Unregister an observer from receiving events.
      */
     void unregisterObserver(INetworkManagementEventObserver obs);
-
-    /**
-     * Retrieve an INetd to talk to netd.
-     */
-    INetd getNetdService();
 
     /**
      * Returns a list of currently known network interfaces
@@ -362,16 +356,6 @@ interface INetworkManagementService
     void removeVpnUidRanges(int netId, in UidRange[] ranges);
 
     /**
-     * Start the clatd (464xlat) service on the given interface.
-     */
-    void startClatd(String interfaceName);
-
-    /**
-     * Stop the clatd (464xlat) service on the given interface.
-     */
-    void stopClatd(String interfaceName);
-
-    /**
      * Start listening for mobile activity state changes.
      */
     void registerNetworkActivityListener(INetworkActivityListener listener);
@@ -396,7 +380,7 @@ interface INetworkManagementService
     /**
      * Setup a new VPN.
      */
-    void createVirtualNetwork(int netId, boolean hasDNS, boolean secure);
+    void createVirtualNetwork(int netId, boolean secure);
 
     /**
      * Remove a network.

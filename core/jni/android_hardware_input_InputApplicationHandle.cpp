@@ -17,11 +17,13 @@
 #define LOG_TAG "InputApplicationHandle"
 
 #include <nativehelper/JNIHelp.h>
+#include "core_jni_helpers.h"
 #include "jni.h"
 #include <android_runtime/AndroidRuntime.h>
 #include <utils/threads.h>
 
 #include "android_hardware_input_InputApplicationHandle.h"
+#include "android_util_Binder.h"
 
 namespace android {
 
@@ -29,6 +31,7 @@ static struct {
     jfieldID ptr;
     jfieldID name;
     jfieldID dispatchingTimeoutNanos;
+    jfieldID token;
 } gInputApplicationHandleClassInfo;
 
 static Mutex gHandleMutex;
@@ -61,19 +64,19 @@ bool NativeInputApplicationHandle::updateInfo() {
         mInfo = new InputApplicationInfo();
     }
 
-    jstring nameObj = jstring(env->GetObjectField(obj,
-            gInputApplicationHandleClassInfo.name));
-    if (nameObj) {
-        const char* nameStr = env->GetStringUTFChars(nameObj, NULL);
-        mInfo->name = nameStr;
-        env->ReleaseStringUTFChars(nameObj, nameStr);
-        env->DeleteLocalRef(nameObj);
-    } else {
-        mInfo->name = "<null>";
-    }
+    mInfo->name = getStringField(env, obj, gInputApplicationHandleClassInfo.name, "<null>");
 
     mInfo->dispatchingTimeout = env->GetLongField(obj,
             gInputApplicationHandleClassInfo.dispatchingTimeoutNanos);
+
+    jobject tokenObj = env->GetObjectField(obj,
+            gInputApplicationHandleClassInfo.token);
+    if (tokenObj) {
+        mInfo->token = ibinderForJavaObject(env, tokenObj);
+        env->DeleteLocalRef(tokenObj);
+    } else {
+        mInfo->token.clear();
+    }
 
     env->DeleteLocalRef(obj);
     return true;
@@ -82,7 +85,7 @@ bool NativeInputApplicationHandle::updateInfo() {
 
 // --- Global functions ---
 
-sp<InputApplicationHandle> android_server_InputApplicationHandle_getHandle(
+sp<InputApplicationHandle> android_view_InputApplicationHandle_getHandle(
         JNIEnv* env, jobject inputApplicationHandleObj) {
     if (!inputApplicationHandleObj) {
         return NULL;
@@ -97,7 +100,7 @@ sp<InputApplicationHandle> android_server_InputApplicationHandle_getHandle(
     } else {
         jweak objWeak = env->NewWeakGlobalRef(inputApplicationHandleObj);
         handle = new NativeInputApplicationHandle(objWeak);
-        handle->incStrong((void*)android_server_InputApplicationHandle_getHandle);
+        handle->incStrong((void*)android_view_InputApplicationHandle_getHandle);
         env->SetLongField(inputApplicationHandleObj, gInputApplicationHandleClassInfo.ptr,
                 reinterpret_cast<jlong>(handle));
     }
@@ -107,7 +110,7 @@ sp<InputApplicationHandle> android_server_InputApplicationHandle_getHandle(
 
 // --- JNI ---
 
-static void android_server_InputApplicationHandle_nativeDispose(JNIEnv* env, jobject obj) {
+static void android_view_InputApplicationHandle_nativeDispose(JNIEnv* env, jobject obj) {
     AutoMutex _l(gHandleMutex);
 
     jlong ptr = env->GetLongField(obj, gInputApplicationHandleClassInfo.ptr);
@@ -115,7 +118,7 @@ static void android_server_InputApplicationHandle_nativeDispose(JNIEnv* env, job
         env->SetLongField(obj, gInputApplicationHandleClassInfo.ptr, 0);
 
         NativeInputApplicationHandle* handle = reinterpret_cast<NativeInputApplicationHandle*>(ptr);
-        handle->decStrong((void*)android_server_InputApplicationHandle_getHandle);
+        handle->decStrong((void*)android_view_InputApplicationHandle_getHandle);
     }
 }
 
@@ -123,7 +126,7 @@ static void android_server_InputApplicationHandle_nativeDispose(JNIEnv* env, job
 static const JNINativeMethod gInputApplicationHandleMethods[] = {
     /* name, signature, funcPtr */
     { "nativeDispose", "()V",
-            (void*) android_server_InputApplicationHandle_nativeDispose },
+            (void*) android_view_InputApplicationHandle_nativeDispose },
 };
 
 #define FIND_CLASS(var, className) \
@@ -134,7 +137,7 @@ static const JNINativeMethod gInputApplicationHandleMethods[] = {
         var = env->GetFieldID(clazz, fieldName, fieldDescriptor); \
         LOG_FATAL_IF(! (var), "Unable to find field " fieldName);
 
-int register_android_server_InputApplicationHandle(JNIEnv* env) {
+int register_android_view_InputApplicationHandle(JNIEnv* env) {
     int res = jniRegisterNativeMethods(env, "android/view/InputApplicationHandle",
             gInputApplicationHandleMethods, NELEM(gInputApplicationHandleMethods));
     (void) res;  // Faked use when LOG_NDEBUG.
@@ -152,6 +155,9 @@ int register_android_server_InputApplicationHandle(JNIEnv* env) {
     GET_FIELD_ID(gInputApplicationHandleClassInfo.dispatchingTimeoutNanos,
             clazz,
             "dispatchingTimeoutNanos", "J");
+
+    GET_FIELD_ID(gInputApplicationHandleClassInfo.token, clazz,
+            "token", "Landroid/os/IBinder;");
 
     return 0;
 }

@@ -216,6 +216,12 @@ public class TypedValue {
      * */
     public int density;
 
+    /**
+     * If the Value came from a style resource or a layout resource (set in an XML layout), this
+     * holds the corresponding style or layout resource id against which the attribute was resolved.
+     */
+    public int sourceResourceId;
+
     /* ------------------------------------------------------------ */
 
     /** Return the data for this value as a float.  Only use for values

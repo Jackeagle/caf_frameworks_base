@@ -17,14 +17,17 @@
 package com.android.internal.telephony;
 
 import android.os.Bundle;
-import android.telephony.ServiceState;
-import android.telephony.SignalStrength;
+import android.telephony.CallAttributes;
 import android.telephony.CellInfo;
 import android.telephony.DataConnectionRealTimeInfo;
 import android.telephony.PhoneCapability;
 import android.telephony.PhysicalChannelConfig;
 import android.telephony.PreciseCallState;
 import android.telephony.PreciseDataConnectionState;
+import android.telephony.ServiceState;
+import android.telephony.SignalStrength;
+import android.telephony.emergency.EmergencyNumber;
+import android.telephony.ims.ImsReasonInfo;
 
 oneway interface IPhoneStateListener {
     void onServiceStateChanged(in ServiceState serviceState);
@@ -53,5 +56,9 @@ oneway interface IPhoneStateListener {
     void onPhoneCapabilityChanged(in PhoneCapability capability);
     void onPreferredDataSubIdChanged(in int subId);
     void onRadioPowerStateChanged(in int state);
+    void onCallAttributesChanged(in CallAttributes callAttributes);
+    void onEmergencyNumberListChanged(in Map emergencyNumberList);
+    void onCallDisconnectCauseChanged(in int disconnectCause, in int preciseDisconnectCause);
+    void onImsCallDisconnectCauseChanged(in ImsReasonInfo imsReasonInfo);
 }
 
