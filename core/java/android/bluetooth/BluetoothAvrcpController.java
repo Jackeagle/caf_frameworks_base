@@ -289,6 +289,26 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
         if (service == null) Log.w(TAG, "Proxy not attached to service");
     }
 
+    /**
+     * Informs AvrcpControllerService to start fetching Album Art.
+     * Fetching will start only after this api is called.
+     * input parameters are preferred values from app.
+     * if input parameters are null, 0, 0, 0: image in native encoding will be fetched.
+     */
+    public void startFetchingAlbumArt(String mimeType, int height, int width, long maxSize) {
+        if (DBG) Log.d(TAG, "startFetchingAlbumArt");
+        if (mService != null && isEnabled()) {
+            try {
+                mService.startFetchingAlbumArt(mimeType, height, width, maxSize);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in startFetchingAlbumArt() " + e);
+                return;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return ;
+    }
+
     private final ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
             if (DBG) Log.d(TAG, "Proxy object connected");
