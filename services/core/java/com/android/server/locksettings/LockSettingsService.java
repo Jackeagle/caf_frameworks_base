@@ -562,7 +562,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                ensureProfileKeystoreUnlocked(userId);
+//                ensureProfileKeystoreUnlocked(userId);
                 // Hide notification first, as tie managed profile lock takes time
                 hideEncryptionNotification(new UserHandle(userId));
 
@@ -798,7 +798,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                     Slog.e(TAG, "Invalid tied profile lock type: " + quality);
                 }
             }
-            try {
+            /*try {
                 final String alias = LockPatternUtils.PROFILE_KEY_NAME_ENCRYPT + userInfo.id;
                 java.security.KeyStore keyStore =
                         java.security.KeyStore.getInstance("AndroidKeyStore");
@@ -809,7 +809,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             } catch (KeyStoreException | NoSuchAlgorithmException |
                     CertificateException | IOException e) {
                 Slog.e(TAG, "Unable to remove tied profile key", e);
-            }
+            }*/
         }
 
         boolean isWatch = mContext.getPackageManager().hasSystemFeature(
@@ -2797,7 +2797,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
                 if (isProvisioned()) {
                     Slog.i(TAG, "Reporting device setup complete to IGateKeeperService");
-                    reportDeviceSetupComplete();
+                    //reportDeviceSetupComplete();
                     clearFrpCredentialIfOwnerNotSecure();
                 }
             } else if (mUserSetupCompleteUri.equals(uri)) {

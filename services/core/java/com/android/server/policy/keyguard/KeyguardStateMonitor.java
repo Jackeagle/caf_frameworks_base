@@ -95,11 +95,13 @@ public class KeyguardStateMonitor extends IKeyguardStateCallback.Stub {
         mIsShowing = showing;
 
         mCallback.onShowingChanged();
+/*
         try {
             mKeystoreService.onKeyguardVisibilityChanged(showing, mCurrentUserId);
         } catch (RemoteException e) {
             Slog.e(TAG, "Error informing keystore of screen lock", e);
         }
+*/
     }
 
     @Override // Binder interface
