@@ -54,15 +54,21 @@ public final class BluetoothMapClient implements BluetoothProfile {
      * Action to be used for notifying read status changed
      * Always contains the extra fields EXTRA_MESSAGE_HANDLE
      */
-    public static final String ACTION_MESSAGE_READ_STATUS_CHANGED =
-            "android.bluetooth.mapmce.profile.action.MESSAGE_READ_STATUS_CHANGED";
+    public static final String ACTION_EXT_MESSAGE_READ_STATUS_CHANGED =
+            "android.bluetooth.mapmce.profile.action.ext.MESSAGE_READ_STATUS_CHANGED";
 
     /**
-     * Extended action to be used for notifying delete status changed
+     * Extended action to notify delete status changed
      * Always contains the extra fields EXTRA_MESSAGE_HANDLE
      */
     public static final String ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED =
             "android.bluetooth.mapmce.profile.action.ext.MESSAGE_DELETED_STATUS_CHANGED";
+
+    /**
+     * Extended action to retrieve MAS instance information
+     */
+    public static final String ACTION_EXT_INSTANCE_INFORMATION =
+            "android.bluetooth.mapmce.profile.action.ext.INSTANCE_INFORMATION";
 
     /* Extras used in ACTION_MESSAGE_RECEIVED intent.
      * NOTE: HANDLE is only valid for a single session with the device. */
@@ -86,7 +92,9 @@ public final class BluetoothMapClient implements BluetoothProfile {
             "android.bluetooth.mapmce.profile.extra.TYPE";
 
     /**
-     * Used as a String extra field in ACTION_MESSAGE_RECEIVED
+     * Used as a String extra field in
+     * ACTION_MESSAGE_RECEIVED
+     * ACTION_EXT_MESSAGE_READ_STATUS_CHANGED
      * It contains MAP message read status
      * Possible values are:
      * "READ"
@@ -106,11 +114,49 @@ public final class BluetoothMapClient implements BluetoothProfile {
             "android.bluetooth.mapmce.profile.extra.DELETED_STATUS";
 
     /**
-     * Used as a String extra field in ACTION_MESSAGE_READ_STATUS_CHANGED
+     * Used as a String extra field in
+     * ACTION_MESSAGE_RECEIVED
+     * ACTION_EXT_MESSAGE_READ_STATUS_CHANGED
+     * ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED
      * It contains the folder where the message status changed
      */
     public static final String EXTRA_FOLDER =
             "android.bluetooth.mapmce.profile.extra.FOLDER";
+
+    /**
+     * Used as a String extra field in
+     * ACTION_MESSAGE_RECEIVED
+     * ACTION_EXT_MESSAGE_READ_STATUS_CHANGED
+     * ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED
+     * ACTION_EXT_INSTANCE_INFORMATION
+     * It contains MAP message instance id
+     * Possible value is from 0 to 255
+     */
+    public static final String EXTRA_INSTANCE_ID =
+            "android.bluetooth.mapmce.profile.extra.INSTANCE_ID";
+
+    /**
+     * Used as a String extra field in ACTION_EXT_INSTANCE_INFORMATION
+     * It contains the owner UCI(Unique Client/Caller Identifier) of the MAS-instance
+     * for which the information is requested
+     */
+    public static final String EXTRA_OWNER_UCI =
+            "android.bluetooth.mapmce.profile.extra.OWNER_UCI";
+
+    /**
+     * Used as a String extra field in ACTION_EXT_INSTANCE_INFORMATION
+     * It contains MAP message instance name
+     */
+    public static final String EXTRA_INSTANCE_NAME =
+            "android.bluetooth.mapmce.profile.extra.INSTANCE_NAME";
+
+    /**
+     * Used as a int extra field in ACTION_EXT_INSTANCE_INFORMATION
+     * It contains supported MAP message type mask
+     * Possible values are defined in SdpMasRecord.MessageType
+     */
+    public static final String EXTRA_SUPPORTED_TYPE =
+            "android.bluetooth.mapmce.profile.extra.SUPPORTED_TYPE";
 
     /** Set message status to read */
     public static final int READ = 0;
@@ -455,7 +501,7 @@ public final class BluetoothMapClient implements BluetoothProfile {
      * Set message status of message on MSE
      * <p>
      * When read status changed, the result will be published via
-     * {@link #ACTION_MESSAGE_READ_STATUS_CHANGED}
+     * {@link #ACTION_EXT_MESSAGE_READ_STATUS_CHANGED}
      * When deleted status changed, the result will be published via
      * {@link #ACTION_MESSAGE_DELETED_STATUS_CHANGED}
      *
@@ -494,6 +540,28 @@ public final class BluetoothMapClient implements BluetoothProfile {
         if (service != null && isEnabled() && isValidDevice(device)) {
             try {
                 return service.abort(device);
+            } catch (RemoteException e) {
+                Log.e(TAG, Log.getStackTraceString(new Throwable()));
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * When connected with more than 1 instance, before sendMessage, getUnreadMessages, setMessageStatus,
+     * set the active instance id first for which instance will be worked on.
+     *
+     * @param device Bluetooth device
+     * @param instance instance id. Invalid value is from 0 to 255 for one instance,
+     * @return <code>true</code> if request has been sent, <code>false</code> on error
+     */
+    public boolean setActiveInstance(BluetoothDevice device, byte instance) {
+        if (DBG) Log.d(TAG, "setActiveInstance(" + device + ", " + instance + ")");
+        final IBluetoothMapClient service = mService;
+        if (service != null && isEnabled() && isValidDevice(device)) {
+            try {
+                return service.setActiveInstance(device, instance);
             } catch (RemoteException e) {
                 Log.e(TAG, Log.getStackTraceString(new Throwable()));
                 return false;
