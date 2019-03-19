@@ -56,7 +56,7 @@ interface IBluetoothGatt {
     void startAdvertisingSet(in AdvertisingSetParameters parameters, in AdvertiseData advertiseData,
                                 in AdvertiseData scanResponse, in PeriodicAdvertisingParameters periodicParameters,
                                 in AdvertiseData periodicData, in int duration, in int maxExtAdvEvents,
-                                in IAdvertisingSetCallback callback);
+                                in IAdvertisingSetCallback callback, in List<BluetoothDevice> btDevices);
     void stopAdvertisingSet(in IAdvertisingSetCallback callback);
 
     void getOwnAddress(in int advertiserId);
@@ -67,6 +67,7 @@ interface IBluetoothGatt {
     void setPeriodicAdvertisingParameters(in int advertiserId, in PeriodicAdvertisingParameters parameters);
     void setPeriodicAdvertisingData(in int advertiserId, in AdvertiseData data);
     void setPeriodicAdvertisingEnable(in int advertiserId, in boolean enable);
+    void updateAdvertisingWhiteList(in int advertiserId, in BluetoothDevice btDevice, in boolean toAdd);
 
     void registerSync(in ScanResult scanResult, in int skip, in int timeout, in IPeriodicAdvertisingCallback callback);
     void unregisterSync(in IPeriodicAdvertisingCallback callback);

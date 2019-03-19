@@ -98,6 +98,7 @@ import com.android.server.locksettings.LockSettingsStorage.CredentialHash;
 import com.android.server.locksettings.SyntheticPasswordManager.AuthenticationResult;
 import com.android.server.locksettings.SyntheticPasswordManager.AuthenticationToken;
 import com.android.server.locksettings.LockSettingsStorage.PersistentData;
+import com.android.internal.R;
 
 import libcore.util.HexEncoding;
 
@@ -2544,7 +2545,10 @@ public class LockSettingsService extends ILockSettings.Stub {
 
                 if (isProvisioned()) {
                     Slog.i(TAG, "Reporting device setup complete to IGateKeeperService");
-                    reportDeviceSetupComplete();
+                    if (!mContext.getResources().getBoolean(
+                            com.android.internal.R.bool.config_enable_hypervisor)) {
+                        reportDeviceSetupComplete();
+                    }
                     clearFrpCredentialIfOwnerNotSecure();
                 }
             }

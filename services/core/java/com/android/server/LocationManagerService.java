@@ -21,6 +21,7 @@ import android.annotation.NonNull;
 import android.content.pm.PackageManagerInternal;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import com.android.internal.R;
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.location.ProviderProperties;
 import com.android.internal.location.ProviderRequest;
@@ -344,10 +345,12 @@ public class LocationManagerService extends ILocationManager.Stub {
             updateUserProfiles(mCurrentUserId);
 
             updateBackgroundThrottlingWhitelistLocked();
-
-            // prepare providers
-            loadProvidersLocked();
-            updateProvidersLocked();
+            if (!mContext.getResources().getBoolean(
+                    com.android.internal.R.bool.config_enable_hypervisor)) {
+                // prepare providers
+                loadProvidersLocked();
+                updateProvidersLocked();
+            }
         }
 
         // listen for settings changes

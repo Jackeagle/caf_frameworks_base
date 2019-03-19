@@ -17,6 +17,7 @@
 package android.bluetooth.le;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.IBluetoothGatt;
 import android.bluetooth.IBluetoothManager;
 import android.bluetooth.le.IAdvertisingSetCallback;
@@ -203,5 +204,18 @@ public final class AdvertisingSet {
      */
     public int getAdvertiserId(){
       return advertiserId;
+    }
+
+    /**
+     * Updates Advertising whitelist with Bluetooth devices.
+     *
+     * @hide
+     */
+    public void updateAdvertisingWhiteList(BluetoothDevice btDevice, boolean toAdd) {
+        try {
+            gatt.updateAdvertisingWhiteList(this.advertiserId, btDevice, toAdd);
+        } catch (RemoteException e) {
+            Log.e(TAG, "remote exception - ", e);
+        }
     }
 }
