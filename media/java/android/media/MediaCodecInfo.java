@@ -470,6 +470,11 @@ public final class MediaCodecInfo {
         public static final String FEATURE_IntraRefresh = "intra-refresh";
 
         /**
+         * <b>video encoder only</b>: codec supports secure encoding.
+         */
+        public static final String FEATURE_SecureEncode = "secure-encode";
+
+        /**
          * Query codec feature capabilities.
          * <p>
          * These features are supported to be used by the codec.  These
@@ -499,6 +504,7 @@ public final class MediaCodecInfo {
 
         private static final Feature[] encoderFeatures = {
             new Feature(FEATURE_IntraRefresh, (1 << 0), false),
+            new Feature(FEATURE_SecureEncode, (1 << 1), false),
         };
 
         /** @hide */
