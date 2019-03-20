@@ -63,7 +63,7 @@ public class SettingsDrawerActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        requestWindowFeature(Window.FEATURE_SWIPE_TO_DISMISS);
         long startTime = System.currentTimeMillis();
 
         TypedArray theme = getTheme().obtainStyledAttributes(android.R.styleable.Theme);
