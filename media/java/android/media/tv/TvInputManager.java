@@ -2582,6 +2582,14 @@ public final class TvInputManager {
             }
         }
 
+        public void sendAppPrivateCommand(String action, Bundle data) {
+            try {
+                mInterface.sendAppPrivateCommand(action, data);
+            } catch (RemoteException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         public void setStreamVolume(float volume) {
             try {
                 mInterface.setStreamVolume(volume);

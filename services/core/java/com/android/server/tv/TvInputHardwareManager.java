@@ -58,6 +58,7 @@ import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.view.KeyEvent;
 import android.view.Surface;
+import android.os.Bundle;
 
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.IndentingPrintWriter;
@@ -1011,6 +1012,16 @@ class TvInputHardwareManager implements TvInputHal.Callback {
                 if (sourceGainConfig != null) {
                     mAudioManager.setAudioPortGain(mAudioSource, sourceGainConfig);
                 }
+            }
+        }
+
+        @Override
+        public void sendAppPrivateCommand(String action, Bundle data) throws RemoteException {
+            synchronized (mImplLock) {
+                if (mReleased) {
+                    throw new IllegalStateException("Device already released.");
+                }
+                int result = mHal.sendAppPrivateCommand(mInfo.getDeviceId(), action, data);
             }
         }
 
