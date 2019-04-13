@@ -79,6 +79,28 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
     public static final String EXTRA_PLAYER_SETTING =
             "android.bluetooth.avrcp-controller.profile.extra.PLAYER_SETTING";
 
+    /**
+     * Intent used to broadcast the change in connection state of the AVRCP Controller
+     * profile.
+     *
+     * <p>This intent will have 1 extra:
+     * <ul>
+     *   <li> {@link BluetoothDevice#EXTRA_DEVICE} - The remote device. </li>
+     * </ul>
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
+    public static final String ACTION_UIDS_EVENT =
+        "android.bluetooth.avrcp-controller.profile.action.UIDS_EVENT";
+
+    /* Remote supported Features */
+    public static final int BTRC_FEAT_NONE = 0x00;
+    public static final int BTRC_FEAT_METADATA = 0x01;
+    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
+    public static final int BTRC_FEAT_BROWSE = 0x04;
+    public static final int BTRC_FEAT_COVER_ART = 0x08;
+
     private Context mContext;
     private ServiceListener mServiceListener;
     private volatile IBluetoothAvrcpController mService;
@@ -287,6 +309,26 @@ public final class BluetoothAvrcpController implements BluetoothProfile {
             }
         }
         if (service == null) Log.w(TAG, "Proxy not attached to service");
+    }
+
+    /**
+     * Informs AvrcpControllerService to start fetching Album Art.
+     * Fetching will start only after this api is called.
+     * input parameters are preferred values from app.
+     * if input parameters are null, 0, 0, 0: image in native encoding will be fetched.
+     */
+    public void startFetchingAlbumArt(String mimeType, int height, int width, long maxSize) {
+        if (DBG) Log.d(TAG, "startFetchingAlbumArt");
+        if (mService != null && isEnabled()) {
+            try {
+                mService.startFetchingAlbumArt(mimeType, height, width, maxSize);
+            } catch (RemoteException e) {
+                Log.e(TAG, "Error talking to BT service in startFetchingAlbumArt() " + e);
+                return;
+            }
+        }
+        if (mService == null) Log.w(TAG, "Proxy not attached to service");
+        return ;
     }
 
     private final ServiceConnection mConnection = new ServiceConnection() {
