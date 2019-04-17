@@ -563,7 +563,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                ensureProfileKeystoreUnlocked(userId);
+                //ensureProfileKeystoreUnlocked(userId);
                 // Hide notification first, as tie managed profile lock takes time
                 hideEncryptionNotification(new UserHandle(userId));
 
