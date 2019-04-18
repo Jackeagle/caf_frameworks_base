@@ -84,6 +84,13 @@ public class KeyguardServiceDelegate {
         }
     };
 
+    public boolean deviceHasKeyguard(){
+        if(mKeyguardState != null){
+            return mKeyguardState.deviceHasKeyguard;
+        }
+        return false;
+    }
+
     public interface DrawnListener {
         void onDrawn();
     }
