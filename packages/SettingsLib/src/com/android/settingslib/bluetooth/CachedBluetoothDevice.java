@@ -714,6 +714,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 connect(false);
             }
         }
+
+        if (bondState == BluetoothDevice.BOND_BONDING) {
+            mProfiles.clear();
+        }
     }
 
     void setBtClass(BluetoothClass btClass) {
